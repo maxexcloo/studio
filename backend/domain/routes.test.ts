@@ -9,11 +9,18 @@ import type { QueueCancelAllResponse, UnfinishedJob } from "../../shared/queue.t
 import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import { GenerationQueue, type JobObservation } from "./queue.ts";
-import { registerMaintenanceRoutes, registerRewriteRoutes } from "./routes.ts";
+import { registerMaintenanceRoutes, registerQueueRoutes } from "./routes.ts";
 import { Store, everyone } from "./store.ts";
 const { enforceMultiUserRequest } = await import(
   new URL("../multi-user-gate.js", import.meta.url).href
 );
+
+/** What a test that sends no generations gives the routes. */
+const unused = {
+  admit: async () => ({ status: 500, payload: { error: "Not in this test." } }),
+  media: () => [],
+  ownsItem: () => false,
+};
 
 test("Cancel All isolates the owner and retains accepted work until cancellation or durable saving is confirmed", async () => {
   const store = new Store(openDatabase(":memory:"));
@@ -66,10 +73,7 @@ test("Cancel All isolates the owner and retains accepted work until cancellation
       accountForRequest: () => ({ userId: "alice", role: "user" }),
     }),
   );
-  registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
-    store,
-    queue,
-  });
+  registerQueueRoutes(app, { store, queue, ...unused });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   try {
@@ -122,10 +126,7 @@ test("Clearing takes only the owner's failed jobs out of the queue and keeps the
     Object.assign(req, { studioAccount: { userId: "alice" } });
     next();
   });
-  registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
-    store,
-    queue: new GenerationQueue(store, {} as never),
-  });
+  registerQueueRoutes(app, { store, queue: new GenerationQueue(store, {} as never), ...unused });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/queue`;
@@ -161,9 +162,10 @@ test("A run from an item records it as its source, only when the item is the own
     next();
   });
   const queue = new GenerationQueue(store, {} as never);
-  registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
+  registerQueueRoutes(app, {
     store,
     queue,
+    media: unused.media,
     admit: createGenerationAdmission({
       store,
       queue,
@@ -320,10 +322,7 @@ test("The queue polled since a change sends only the jobs changed since then, wi
     Object.assign(req, { studioAccount: { userId: "alice" } });
     next();
   });
-  registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
-    store,
-    queue: new GenerationQueue(store, {} as never),
-  });
+  registerQueueRoutes(app, { store, queue: new GenerationQueue(store, {} as never), ...unused });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/queue`;

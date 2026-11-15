@@ -24,7 +24,7 @@ import {
 } from "./dream.ts";
 import { createProjects } from "./projects.ts";
 import { type GenerationQueue, writtenJob } from "./queue.ts";
-import { registerRewriteRoutes } from "./routes.ts";
+import { registerQueueRoutes } from "./routes.ts";
 import { Store, queuePriority } from "./store.ts";
 import { createTaste, itemValues, tasteSignal } from "./taste.ts";
 
@@ -383,8 +383,11 @@ test("Dream is off until turned on, queues one hidden job per account only while
     Object.assign(req, { studioAccount: { userId: "alice", role: "user" } });
     nextHandler();
   });
-  registerRewriteRoutes(app as never, {
+  registerQueueRoutes(app, {
     store,
+    admit: async () => ({ status: 500, payload: { error: "Not in this test." } }),
+    media: () => [],
+    ownsItem: () => false,
     queue: {
       tick: async () => undefined,
       cancel: async (ownerId: string, jobId: string) =>

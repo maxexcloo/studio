@@ -10,24 +10,6 @@ import { type RouteAccount, directRoute } from "./direct-route.ts";
 import { GenerationQueue } from "./queue.ts";
 import { type OwnedJob, Store, everyone, publicJob, queuePriority } from "./store.ts";
 
-interface Request {
-  studioAccount?: { userId: string; role?: string };
-  params: Record<string, string>;
-  query?: Record<string, unknown>;
-  body?: Record<string, unknown>;
-}
-interface Response {
-  status(code: number): Response;
-  json(value: unknown): unknown;
-}
-type Handler = (req: Request, res: Response) => unknown;
-interface Router {
-  get(path: string, handler: Handler): unknown;
-  patch(path: string, handler: Handler): unknown;
-  post(path: string, handler: Handler): unknown;
-  delete(path: string, handler: Handler): unknown;
-}
-const owner = (req: Request) => req.studioAccount?.userId || "";
 const ownerOf = (account: RouteAccount) => account?.userId || "";
 /**
  * The person's queue, Dream's background jobs included, without failed jobs the person cleared:
@@ -39,16 +21,16 @@ const listed = (store: Store, ownerId: string) =>
 const ownWork = (store: Store, ownerId: string) =>
   store.openJobs(ownerId).filter((job) => !job.cleared && job.priority !== queuePriority.dream);
 const clear = (store: Store, job: OwnedJob) => store.save({ ...job, cleared: true });
-const missing = (res: Response) => res.status(404).json({ error: "Not found." });
 const notFound = { status: 404, payload: { error: "Not found." } };
+const refused = (error: string) => ({ status: 400, payload: { error } });
 // A cancel the worker could not confirm yet (busy, or a proxy answering for it); recovery finishes it.
 export const unconfirmedCancel =
   "Cancellation could not be confirmed. The recorded job remains available for recovery.";
 const object = (value: unknown): value is GenerationInput =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
 
-export function registerRewriteRoutes(
-  app: Router,
+export function registerQueueRoutes(
+  app: object,
   {
     store,
     queue,
@@ -59,7 +41,7 @@ export function registerRewriteRoutes(
     store: Store;
     queue: GenerationQueue;
     /** domain/admission.ts's: a session's generations are admitted as every other request. */
-    admit?: (
+    admit: (
       input: GenerationInput,
       account?: GenerationAccount,
       scope?: GenerationScope,
@@ -69,77 +51,84 @@ export function registerRewriteRoutes(
      * cloud provider's bare files, or a snapshot taken on completion), so the queue shows the
      * gallery's records instead: each with its prompt, settings, title and rating.
      */
-    media?: (ownerId: string, jobId: string) => QueueMedia[];
+    media: (ownerId: string, jobId: string) => QueueMedia[];
     /** Whether the owner has this gallery item, which a run may then be made from. */
-    ownsItem?: (ownerId: string, id: string) => boolean;
+    ownsItem: (ownerId: string, id: string) => boolean;
   },
 ) {
   const shown = (ownerId: string, jobs: OwnedJob[]) =>
     jobs.map((job) => {
-      const items = media?.(ownerId, job.id);
+      const items = media(ownerId, job.id);
       return publicJob(items?.length ? { ...job, items } : job);
     });
   // Polled while work runs: a job with gallery records drops the adapter's copies of them, which
   // every reader passes over for the records.
   const queued = (ownerId: string, jobs: OwnedJob[]) =>
     shown(ownerId, jobs).map((job) => (job.items.length ? { ...job, outputs: [] } : job));
-  app.get("/api/user-presets", (req, res) => res.json({ presets: store.presets(owner(req)) }));
-  app.post("/api/user-presets", (req, res) => {
-    if (typeof req.body?.title !== "string" || !req.body.title.trim() || !object(req.body.input))
-      return res.status(400).json({ error: "A title and generation input are required." });
+  directRoute(app, "GET", "/api/user-presets", (account) => ({
+    status: 200,
+    payload: { presets: store.presets(ownerOf(account)) },
+  }));
+  directRoute(app, "POST", "/api/user-presets", (account, { body }) => {
+    if (typeof body?.title !== "string" || !body.title.trim() || !object(body.input))
+      return refused("A title and generation input are required.");
     // The parts of a draft a preset holds, when it holds only some (the Presets popup's names).
-    const parts = req.body.parts;
+    const parts = body.parts;
     if (
       parts !== undefined &&
       (!Array.isArray(parts) || !parts.every((part) => typeof part === "string"))
     )
-      return res.status(400).json({ error: "Preset parts must be a list of names." });
-    if (req.body.family !== undefined && typeof req.body.family !== "string")
-      return res.status(400).json({ error: "A preset family must be a name." });
-    return res.status(201).json({
-      preset: store.createPreset(
-        owner(req),
-        req.body.title.trim(),
-        req.body.input,
-        parts,
-        req.body.family,
-      ),
-    });
+      return refused("Preset parts must be a list of names.");
+    if (body.family !== undefined && typeof body.family !== "string")
+      return refused("A preset family must be a name.");
+    return {
+      status: 201,
+      payload: {
+        preset: store.createPreset(
+          ownerOf(account),
+          body.title.trim(),
+          body.input,
+          parts,
+          body.family,
+        ),
+      },
+    };
   });
-  app.delete("/api/user-presets/:id", (req, res) =>
-    store.deletePreset(owner(req), req.params.id) ? res.json({ ok: true }) : missing(res),
+  directRoute(app, "DELETE", "/api/user-presets/:id", (account, { params }) =>
+    store.deletePreset(ownerOf(account), params.id)
+      ? { status: 200, payload: { ok: true } }
+      : notFound,
   );
-  app.patch("/api/user-presets/:id", (req, res) => {
-    if (
-      req.body?.title !== undefined &&
-      (typeof req.body.title !== "string" || !req.body.title.trim())
-    )
-      return res.status(400).json({ error: "A preset title is required." });
-    if (req.body?.input !== undefined && !object(req.body.input))
-      return res.status(400).json({ error: "Generation input must be an object." });
-    const preset = store.updatePreset(owner(req), req.params.id, {
-      ...(typeof req.body?.title === "string" ? { title: req.body.title.trim() } : {}),
-      ...(object(req.body?.input) ? { input: req.body.input } : {}),
+  directRoute(app, "PATCH", "/api/user-presets/:id", (account, { params, body }) => {
+    if (body?.title !== undefined && (typeof body.title !== "string" || !body.title.trim()))
+      return refused("A preset title is required.");
+    if (body?.input !== undefined && !object(body.input))
+      return refused("Generation input must be an object.");
+    const preset = store.updatePreset(ownerOf(account), params.id, {
+      ...(typeof body?.title === "string" ? { title: body.title.trim() } : {}),
+      ...(object(body?.input) ? { input: body.input } : {}),
     });
-    return preset ? res.json({ preset }) : missing(res);
+    return preset ? { status: 200, payload: { preset } } : notFound;
   });
-  app.post("/api/sessions", (req, res) =>
-    res.status(201).json({
+  directRoute(app, "POST", "/api/sessions", (account, { body }) => ({
+    status: 201,
+    payload: {
       session: store.createSession(
-        owner(req),
-        typeof req.body?.title === "string" ? req.body.title : undefined,
+        ownerOf(account),
+        typeof body?.title === "string" ? body.title : undefined,
       ),
-    }),
-  );
-  app.post("/api/sessions/:id/generations", async (req, res) => {
-    if (!store.session(owner(req), req.params.id)) return missing(res);
-    const { operation = "image", parentJobId, parentItemId, ...input } = req.body || {};
+    },
+  }));
+  directRoute(app, "POST", "/api/sessions/:id/generations", async (account, { params, body }) => {
+    const ownerId = ownerOf(account);
+    if (!store.session(ownerId, params.id)) return notFound;
+    const { operation = "image", parentJobId, parentItemId, ...input } = body || {};
     if (!["image", "refine", "animate"].includes(String(operation)))
-      return res.status(400).json({ error: "Unknown generation operation." });
-    const found = typeof parentJobId === "string" ? store.job(owner(req), parentJobId) : undefined;
-    const parent = found?.sessionId === req.params.id ? found : undefined;
+      return refused("Unknown generation operation.");
+    const found = typeof parentJobId === "string" ? store.job(ownerId, parentJobId) : undefined;
+    const parent = found?.sessionId === params.id ? found : undefined;
     if (parentJobId !== undefined && !parent)
-      return res.status(400).json({ error: "Parent generation must belong to this session." });
+      return refused("Parent generation must belong to this session.");
     // The result a run is made from is the owner's: one of the parent's results or a gallery item.
     if (
       parentItemId !== undefined &&
@@ -147,22 +136,22 @@ export function registerRewriteRoutes(
         !(
           [...(parent?.items || []), ...(parent?.outputs || [])].some(
             (item) => item.id === parentItemId,
-          ) || ownsItem?.(owner(req), parentItemId)
+          ) || ownsItem(ownerId, parentItemId)
         ))
     )
-      return res.status(400).json({ error: "Parent result must be one of your items." });
-    if (!admit) return res.status(501).json({ error: "Generation is unavailable." });
-    const admitted = await admit(input, req.studioAccount as GenerationAccount | undefined, {
-      sessionId: req.params.id,
+      return refused("Parent result must be one of your items.");
+    const admitted = await admit(input, account ?? undefined, {
+      sessionId: params.id,
       operation: operation as GenerationScope["operation"],
       parentJobId: parentJobId as string | undefined,
       parentItemId: parentItemId as string | undefined,
     });
-    if (admitted.status >= 400) return res.status(admitted.status).json(admitted.payload);
-    const job = store.job(owner(req), String(admitted.payload.jobId))!;
-    return res
-      .status(202)
-      .json({ jobId: job.id, sessionId: job.sessionId, status: job.status, job: publicJob(job) });
+    if (admitted.status >= 400) return admitted;
+    const job = store.job(ownerId, String(admitted.payload.jobId))!;
+    return {
+      status: 202,
+      payload: { jobId: job.id, sessionId: job.sessionId, status: job.status, job: publicJob(job) },
+    };
   });
   // With `since` (an `updatedAt`), only the jobs changed since then, and every listed job's ID.
   directRoute(app, "GET", "/api/queue", (account, { query }) => {
@@ -249,14 +238,14 @@ export function registerRewriteRoutes(
       return { status: 409, payload: { error: "Only failed generations can be cleared." } };
     return { status: 200, payload: { job: publicJob(clear(store, job)) } };
   });
-  app.post("/api/queue/:id/cancel", async (req, res) => {
+  directRoute(app, "POST", "/api/queue/:id/cancel", async (account, { params }) => {
     let job;
     try {
-      job = await queue.cancel(owner(req), req.params.id);
+      job = await queue.cancel(ownerOf(account), params.id);
     } catch {
-      return res.status(503).json({ error: unconfirmedCancel });
+      return { status: 503, payload: { error: unconfirmedCancel } };
     }
-    return job ? res.json({ job: publicJob(job) }) : missing(res);
+    return job ? { status: 200, payload: { job: publicJob(job) } } : notFound;
   });
   directRoute(app, "POST", "/api/queue/:id/retry", (account, { params }) => {
     if (!store.job(ownerOf(account), params.id)) return notFound;
@@ -273,7 +262,7 @@ export function registerRewriteRoutes(
  * out of the queue, keeping its records), one at a time or every listed job at once.
  */
 export function registerMaintenanceRoutes(
-  app: Router,
+  app: object,
   {
     store,
     queue,
