@@ -59,17 +59,22 @@ function stillShown(item, { filename, subfolder, type }) {
 
 const idle = () => buildStats().building === 0 && buildStats().waiting === 0 && encoderIdle();
 
-// When the event loop last had a turn; see quietly.
+// When the event loop last had a turn; see giveTurn.
 let turnAt = 0;
+
+/**
+ * Lets other work run every 10 ms: done items and existing files resolve without waiting on
+ * anything, so a pass over a large warmed gallery would otherwise hold the event loop throughout.
+ */
+async function giveTurn() {
+  if (performance.now() - turnAt <= 10) return;
+  await yieldToEventLoop();
+  turnAt = performance.now();
+}
 
 /** Runs one build when the studio is otherwise quiet, then rests for as long as it took. */
 async function quietly(key, item, media, build) {
-  // Done and existing files resolve without waiting on anything, so a pass over a large warmed
-  // gallery would hold the event loop for its whole length: give it a turn now and then.
-  if (performance.now() - turnAt > 10) {
-    await yieldToEventLoop();
-    turnAt = performance.now();
-  }
+  await giveTurn();
   if (settled.has(key)) return;
   while (!idle()) await delay(250, undefined, { ref: false });
   if (!stillShown(item, media)) return;
@@ -92,6 +97,9 @@ export async function warmGallery({ items = eachGalleryItem({ status: "done" }) 
   let videos = 0;
   const previews = [];
   for (const item of items) {
+    // Newest first: once both budgets are spent, older items would only be read and skipped.
+    if (images >= thumbnailBudget && videos >= posterBudget) break;
+    await giveTurn();
     for (const media of itemMedia(item)) {
       const { filename, subfolder, type } = media;
       const key = `${type}:${subfolder}:${filename}`;
