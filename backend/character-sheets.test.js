@@ -139,6 +139,65 @@ test("a run takes the sheet's view its prompt names, and a subject video takes t
   assert.equal(run("She dances", { profile: frames })[0].assetId, "own");
 });
 
+test("a character's other images follow its view in its reference stack's free places", () => {
+  const card = {
+    id: "chr-1",
+    referenceIds: ["own", "two", "three", "four"],
+    sheet: { jobId: "job", panels: [{ role: "back", referenceId: "back" }] },
+  };
+  const stack = (count) => ({
+    kind: "image",
+    editReferences: true,
+    mediaInputs: Array.from({ length: count }, (_, index) => ({
+      id: index ? `reference-${index + 1}` : "reference",
+      role: "reference",
+      ...(index ? { follows: index > 1 ? `reference-${index}` : "reference" } : {}),
+    })),
+  });
+  const run = (references, profile, prompt = "Back view in the rain") =>
+    sheetReferences({ references, prompt, cards: [card], profile }).map(
+      ({ assetId, slot }) => `${assetId}@${slot}`,
+    );
+  const own = [{ assetId: "own", slot: "reference" }];
+  assert.deepEqual(run(own, stack(10)), [
+    "back@reference",
+    "two@reference-2",
+    "three@reference-3",
+    "four@reference-4",
+  ]);
+  // Up to the stack's capacity, after a named reference.
+  assert.deepEqual(
+    run(
+      [
+        { assetId: "dress", slot: "reference" },
+        { ...own[0], slot: "reference-2" },
+      ],
+      stack(3),
+    ),
+    ["dress@reference", "back@reference-2", "two@reference-3"],
+  );
+  // A slot taking several counts each place; an Identity slot of one stays alone.
+  assert.deepEqual(run(own, { editReferences: true, mediaInputs: [{ id: "reference", max: 3 }] }), [
+    "back@reference",
+    "two@reference",
+    "three@reference",
+  ]);
+  assert.deepEqual(
+    run([{ assetId: "own", slot: "face" }], {
+      mediaInputs: [{ id: "face", role: "identity" }, { id: "reference" }],
+    }),
+    ["back@face"],
+  );
+  // An img2img profile keeps its start image alone.
+  assert.deepEqual(
+    run(own, {
+      family: "sdxl",
+      mediaInputs: [{ id: "reference" }, { id: "reference-2", follows: "reference" }],
+    }),
+    ["back@reference"],
+  );
+});
+
 test("a new character's finished portrait becomes its first image, then its sheet queues as its owner", async () => {
   const account = { userId: "artist" };
   const card = createCard(account, "characters", {
