@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { upscaleQualities } from "../shared/upscale.ts";
 import { catalogueDownload } from "./catalogue-downloads.js";
 import { comfy, localOutputFile, optionsFor } from "./comfy/comfy.js";
 import { outputFolderName } from "./data-names.js";
@@ -12,7 +13,6 @@ import { nodePacks } from "./node-packs.js";
 // SeedVR2 restores detail rather than interpolating it, so the pipeline mirrors
 // the reference workflow: soften the source with a lanczos pre-scale, then let
 // the model rebuild the short side at the requested resolution.
-export const upscaleQualities = ["fast", "balanced", "high"];
 
 /**
  * Every SeedVR2 weight a tier names, with the exact size and SHA-256 Hugging

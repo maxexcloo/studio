@@ -1,3 +1,5 @@
+/** The most LoRAs a stack runs: a loader holds up to this many (rgthree stacks and Radiance take 4). */
+export const maxLoras = 8;
 /** The backends one profile can run on, by name; a combined profile keeps each one's graph and settings in `studio.backends`. */
 export const profileBackendLabels: Readonly<Record<string, string>> = Object.freeze({
   comfyui: "ComfyUI",

@@ -1,3 +1,4 @@
+import { maxLoras } from "../../shared/profiles.ts";
 import { dataDir } from "../gallery/store.js";
 import {
   ownerDocumentName,
@@ -12,7 +13,6 @@ import { cleanTriggers } from "./catalogue.js";
 const stacksDocument = (ownerId = "") => ownerDocumentName("lora-stacks", ownerId);
 
 // Generous caps: enough for anyone, small enough that a bad client cannot bloat the document.
-const maxLorasPerStack = 8;
 const maxOpsPerRequest = 500;
 
 // Ratings are stored as "up" and "down", which predate Like.
@@ -61,7 +61,7 @@ function cleanStack(value) {
         },
       ];
     })
-    .slice(0, maxLorasPerStack);
+    .slice(0, maxLoras);
 }
 
 function cleanNames(value, limit = 500) {
