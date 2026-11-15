@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   cardImageNote,
   cardImageSlots,
+  cardKinds,
   characterImages,
   characterProfiles,
   characterTraits,
@@ -655,9 +656,7 @@ export function registerGenerateTools({
                 cardKind
               ] ?? [])
             : [];
-        const [characters, outfits, scenes] = await Promise.all(
-          ["characters", "outfits", "scenes"].map(cards),
-        );
+        const [characters, outfits, scenes] = await Promise.all(Object.keys(cardKinds).map(cards));
         // Each card's gist: generate reads the whole description by name.
         const cardList = (items) =>
           items.map(({ id, name, description }) => ({

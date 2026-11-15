@@ -1,6 +1,6 @@
 // Gallery records built from a run: its pending tiles, recorded settings and what ComfyUI's history
 // says it made. Pure functions, so code that only builds records never loads the gallery (store.js).
-import { maxCardDescription, maxCardName } from "../../shared/characters.ts";
+import { cardKinds, maxCardDescription, maxCardName } from "../../shared/characters.ts";
 import { keptTriggers } from "../lora/prompts.js";
 import { videoPattern } from "../media-paths.js";
 import { defaultWorkerId } from "../workers.js";
@@ -99,7 +99,7 @@ export function storedResultSet(value) {
 function storedContext(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const context = {};
-  for (const kind of ["character", "outfit", "scene"]) {
+  for (const { name: kind } of Object.values(cardKinds)) {
     const name = shortText(value[kind]?.name, maxCardName);
     const description = shortText(value[kind]?.description, maxCardDescription);
     if (name) context[kind] = { name, ...(description ? { description } : {}) };

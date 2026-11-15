@@ -1,5 +1,9 @@
 /** The most LoRAs a stack runs: a loader holds up to this many (rgthree stacks and Radiance take 4). */
 export const maxLoras = 8;
+/** What a LoRA does to a picture, as the catalogue classifies it. */
+export const loraTypes = ["slider", "style", "character", "concept"] as const;
+/** How a LoRA runs: an optional effect, or part of a recipe (an acceleration adapter, a supporting file). */
+export const loraRoles = ["effect", "acceleration", "supporting"] as const;
 /** The backends one profile can run on, by name; a combined profile keeps each one's graph and settings in `studio.backends`. */
 export const profileBackendLabels: Readonly<Record<string, string>> = Object.freeze({
   comfyui: "ComfyUI",

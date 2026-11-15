@@ -9,7 +9,7 @@ import path from "node:path";
 
 import express from "express";
 
-import { characterImageIds } from "../shared/characters.ts";
+import { cardKinds, characterImageIds } from "../shared/characters.ts";
 import { isCloudProfile, loraName } from "../shared/profiles.ts";
 import { canAdmin, clientOf } from "./access.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
@@ -948,7 +948,7 @@ const dream = createDream({
   cards: (ownerId) => {
     if (cardRefusal(ownerId ? accountAccessForId(ownerId) : undefined)) return null;
     return Object.fromEntries(
-      ["characters", "outfits", "scenes"].map((kind) => [kind, listCards(kind, ownerId)]),
+      Object.keys(cardKinds).map((kind) => [kind, listCards(kind, ownerId)]),
     );
   },
   createCard,
