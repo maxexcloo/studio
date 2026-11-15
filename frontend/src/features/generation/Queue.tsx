@@ -80,6 +80,8 @@ export const queueQuery = queryOptions({
   // without the window regaining focus.
   refetchInterval: (query) =>
     query.state.data?.jobs.some((job) => !terminalStatuses.has(job.status)) ? 1500 : 3000,
+  // Polls pause while the tab is hidden, so returning checks at once, however fresh the data.
+  refetchOnWindowFocus: "always",
 });
 /** One of the account's jobs, however old: the queue lists only its latest finished ones. */
 export const queueJobQuery = (id: string) =>
