@@ -390,6 +390,43 @@ test("The strip holds the item's versions, not the other results of its run", as
   await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
 
+test("A set's strip holds the shown result's versions in its place, as one strip", async ({
+  page,
+}) => {
+  const set = { id: "set-birds", title: "Birds" };
+  const { viewer } = await seed(page, { resultSet: { ...set, index: 0 } }, async (_page, state) => {
+    state.jobs.length = 0;
+    state.gallery.unshift(
+      {
+        ...state.gallery[0],
+        id: "heron",
+        prompt: "A grey heron",
+        createdAt: "2026-10-23T00:01:00.000Z",
+        resultSet: { ...set, index: 1 },
+      },
+      {
+        ...state.gallery[0],
+        id: "hub-night",
+        prompt: "An amber bird at night",
+        createdAt: "2026-10-23T00:02:00.000Z",
+        resultSet: undefined,
+        parentItemId: "hub",
+      },
+    );
+  });
+  const strip = viewer.getByRole("list", { name: "Set: Birds", exact: true });
+  const versions = viewer.getByRole("list", { name: "Versions", exact: true });
+  await expect(versions).toHaveCount(0);
+  expect(
+    await strip.getByRole("listitem").evaluateAll((all) => all.map((entry) => entry.ariaLabel)),
+  ).toEqual(["Show A grey heron (1 of 2)", "Show Version 2", "Show Version 1"]);
+  await expect(strip.getByRole("listitem").last()).toHaveAttribute("aria-current", "true");
+  // A version outside the set shows its versions alone.
+  await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
+  await expect(strip).toHaveCount(0);
+  await expect(versions.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
+});
+
 test("A version keeps its strip once the runs have left the queue, and runs from it record it", async ({
   page,
 }) => {
