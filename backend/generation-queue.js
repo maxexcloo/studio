@@ -3,7 +3,7 @@ import { withResolution } from "../shared/resolution.ts";
 import { accountAccessForId } from "./account-store.js";
 import { moveTargets, onWorkerOffline, profileOnBackendKey, routeJob } from "./comfy/backends.js";
 import { comfyOn } from "./comfy/comfy.js";
-import { cancelPrompt } from "./comfy/queue.js";
+import { cancelPrompt, isTransientComfyError } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 import { logWarning } from "./crash-log.js";
 import { getCustomWorkflow, workflowOnBackend } from "./custom-workflows.js";
@@ -127,14 +127,19 @@ export function createGenerationQueue({
       if (!job.backend || !workerById(job.backend))
         return "Waiting for its worker to be configured.";
       const workloads = managedWorkloads(job);
+      let started = false;
       try {
         if (workloads.length && !mediaLeases.has(job.id))
           mediaLeases.set(job.id, await runtime.controller.acquire(workloads, `job ${job.id}`));
+        started = true;
         await loadComfyContext(job.backend);
       } catch (error) {
         mediaLeases.get(job.id)?.release();
         mediaLeases.delete(job.id);
-        return error.message;
+        // A started worker's timeout or dropped connection reads as it being slow, not a raw error.
+        return started && isTransientComfyError(error)
+          ? `Waiting for ${workerById(job.backend).name} to answer.`
+          : error.message;
       }
     },
     settled: async (job) => {
