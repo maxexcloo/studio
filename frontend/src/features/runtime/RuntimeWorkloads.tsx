@@ -42,6 +42,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
+import { BenchmarkDialog, benchmarksQuery } from "./Benchmarks";
 
 export const runtimeStatusQuery = queryOptions({
   queryKey: ["runtime-status"],
@@ -450,6 +451,9 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   const [cancelling, setCancelling] = useState("");
   const [logId, setLogId] = useState("");
   const [workloadLogId, setWorkloadLogId] = useState("");
+  const [benchmarkId, setBenchmarkId] = useState("");
+  const benchmarks = useQuery(benchmarksQuery).data;
+  const benchmarking = benchmarks?.runs.some((run) => run.status === "running");
   const refresh = () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey });
   const previewing = useMutation({
     mutationFn: (workloads: string[]) =>
@@ -613,6 +617,15 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
                 Restart
               </Menu.Item>
             )}
+            {item.kind === "text" && benchmarks?.configured && (
+              <Menu.Item
+                leftSection={<icons.benchmark size={16} />}
+                disabled={benchmarking || item.phase !== "running"}
+                onClick={() => setBenchmarkId(item.id)}
+              >
+                Benchmark
+              </Menu.Item>
+            )}
             <Menu.Item
               leftSection={<icons.log size={16} />}
               onClick={() => setWorkloadLogId(item.id)}
@@ -675,6 +688,10 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
         history={history}
         change={change}
         onClose={() => setWorkloadLogId("")}
+      />
+      <BenchmarkDialog
+        workload={workloads.find((item) => item.id === benchmarkId)}
+        onClose={() => setBenchmarkId("")}
       />
       <ConfirmDialog
         opened={Boolean(preview)}

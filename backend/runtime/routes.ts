@@ -1,5 +1,6 @@
 import { type Request, type Response, Router } from "express";
 
+import type { Benchmarks } from "./benchmarks.ts";
 import { type RuntimeController, RuntimeRequestError } from "./controller.ts";
 
 const workloadIds = (value: unknown) => {
@@ -25,6 +26,7 @@ const handle =
 /** Mount behind the existing administrator middleware. Apply and restart answer at once; poll the operation. */
 export function createRuntimeRouter(
   controller: RuntimeController,
+  benchmarks: Benchmarks,
   requestedBy: (request: Request) => string,
 ) {
   const router = Router();
@@ -81,6 +83,21 @@ export function createRuntimeRouter(
         Number.isFinite(lines) ? Math.min(Math.max(lines, 1), 1000) : 200,
       );
     }),
+  );
+  router.get(
+    "/benchmarks",
+    handle(() => benchmarks.list()),
+  );
+  router.post(
+    "/benchmarks",
+    handle(
+      (request) => benchmarks.start(String(request.body?.workload ?? ""), requestedBy(request)),
+      202,
+    ),
+  );
+  router.post(
+    "/benchmarks/:id/stop",
+    handle((request) => benchmarks.stop(String(request.params.id))),
   );
   router.get(
     "/operations/:id",

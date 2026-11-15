@@ -98,3 +98,37 @@ export interface RuntimeStatus {
   history: RuntimeOperation[];
   workloads: RuntimeWorkload[];
 }
+
+/** BetterBench's headline figures for one run, as its report's tiles give them. */
+export interface BenchmarkSummary {
+  version: string;
+  /** Single-stream decode tokens per second, weighted across categories. */
+  decode: number | null;
+  /** Single-stream time to first token, weighted median, in milliseconds. */
+  ttftMs: number | null;
+  /** Throughput at the highest concurrency level. */
+  aggregate: { level: number; tps: number } | null;
+  /** Median prompt processing at the deepest prompt measured. */
+  prefill: { depth: number; tps: number } | null;
+}
+
+/** One BetterBench run against a local text workload (`/api/runtime/benchmarks`). */
+export interface BenchmarkRun {
+  id: string;
+  workload: string;
+  label: string;
+  /** The name the model's server reports, which the run measured. */
+  model: string;
+  status: "running" | "completed" | "failed" | "stopped";
+  requestedBy: string;
+  startedAt: string;
+  finishedAt?: string;
+  error?: string;
+  summary?: BenchmarkSummary;
+}
+
+/** `configured` is false without a benchmark image; runs are newest first. */
+export interface BenchmarkStatus {
+  configured: boolean;
+  runs: BenchmarkRun[];
+}
