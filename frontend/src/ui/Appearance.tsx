@@ -2,6 +2,7 @@ import {
   ActionIcon,
   ColorSwatch,
   MantineProvider,
+  Popover,
   ScrollArea,
   SegmentedControl,
   Stack,
@@ -12,7 +13,7 @@ import {
   useMantineTheme,
 } from "@mantine/core";
 import { useLocalStorage, useMediaQuery, useReducedMotion } from "@mantine/hooks";
-import { Check } from "lucide-react";
+import { Check, Palette } from "lucide-react";
 import {
   type ReactNode,
   createContext,
@@ -32,6 +33,7 @@ import {
   motionSpeeds,
   studioTheme,
 } from "../theme";
+import { PopupTooltip } from "./PopupTooltip";
 import { usePhone, useSideways, useTouch } from "./usePhone";
 
 const defaults: Appearance = {
@@ -132,6 +134,7 @@ export function useMotionDuration() {
   return useMantineTheme().other.motionDuration as number;
 }
 export function AppearanceControls() {
+  const phone = usePhone();
   const { appearance, setAppearance } = useAppearance();
   const palette = useMantineTheme();
   return (
@@ -142,6 +145,7 @@ export function AppearanceControls() {
             Animations
           </Text>
           <SegmentedControl
+            size={phone ? "sm" : undefined}
             aria-label="Animations"
             fullWidth
             value={appearance.motion}
@@ -161,6 +165,7 @@ export function AppearanceControls() {
             Background
           </Text>
           <SegmentedControl
+            size={phone ? "sm" : undefined}
             aria-label="Background"
             fullWidth
             value={appearance.background}
@@ -182,7 +187,7 @@ export function AppearanceControls() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(5, 30px)",
+              gridTemplateColumns: phone ? "repeat(5, 1fr)" : "repeat(5, 30px)",
               justifyContent: "space-between",
               rowGap: "var(--mantine-spacing-xs)",
             }}
@@ -194,7 +199,7 @@ export function AppearanceControls() {
               >
                 <ActionIcon
                   variant="transparent"
-                  size={30}
+                  size={phone ? undefined : 30}
                   aria-label={`Use ${colour === "studio" ? "Amber" : colour[0].toUpperCase() + colour.slice(1)} Colour`}
                   aria-pressed={appearance.colour === colour}
                   onClick={() => setAppearance((previous) => ({ ...previous, colour }))}
@@ -212,6 +217,7 @@ export function AppearanceControls() {
             Colour Scheme
           </Text>
           <SegmentedControl
+            size={phone ? "sm" : undefined}
             aria-label="Colour Scheme"
             fullWidth
             value={appearance.colourScheme}
@@ -234,6 +240,7 @@ export function AppearanceControls() {
             Corners
           </Text>
           <SegmentedControl
+            size={phone ? "sm" : undefined}
             aria-label="Corners"
             fullWidth
             value={appearance.rounding}
@@ -255,6 +262,7 @@ export function AppearanceControls() {
             Layout
           </Text>
           <SegmentedControl
+            size={phone ? "sm" : undefined}
             aria-label="Layout"
             fullWidth
             value={appearance.layout}
@@ -269,5 +277,22 @@ export function AppearanceControls() {
         </Stack>
       </Stack>
     </ScrollArea.Autosize>
+  );
+}
+
+export function AppearanceMenu() {
+  return (
+    <Popover width={290} position="bottom-end" offset={18} shadow="md" trapFocus>
+      <PopupTooltip label="Appearance">
+        <Popover.Target>
+          <ActionIcon aria-label="Appearance" variant="subtle" color="gray">
+            <Palette size={19} />
+          </ActionIcon>
+        </Popover.Target>
+      </PopupTooltip>
+      <Popover.Dropdown data-composer-layer>
+        <AppearanceControls />
+      </Popover.Dropdown>
+    </Popover>
   );
 }
