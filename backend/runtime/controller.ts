@@ -44,7 +44,7 @@ interface RuntimeEngine {
 export class RuntimeUnavailable extends Error {
   status = 503;
 }
-class RuntimeConflict extends Error {
+export class RuntimeConflict extends Error {
   status = 409;
 }
 export class RuntimeRequestError extends Error {
@@ -88,12 +88,10 @@ const historyLimit = 100;
 /** Why work for a parked workload waits, in the words every surface uses. */
 export const parkedReason = (label: string) =>
   `${label} is stopped: an administrator can start it in Settings › Workers.`;
-const memoryStore = (): RuntimeStore => {
-  let record: RuntimeRecord | undefined;
-  return {
-    read: () => record,
-    write: (value) => (record = structuredClone(value)),
-  };
+/** A store for a runtime document that lasts only as long as the process. */
+export const memoryStore = <T>() => {
+  let stored: T | undefined;
+  return { read: () => stored, write: (value: T) => (stored = structuredClone(value)) };
 };
 
 /** A deployment holds its GPUs while it should run or while any of its pods still exists. */
@@ -130,7 +128,7 @@ export class RuntimeController {
     engine,
     workloads,
     pools,
-    store = memoryStore(),
+    store = memoryStore<RuntimeRecord>(),
     now = Date.now,
     sleep = delay,
     pollMs = 2000,

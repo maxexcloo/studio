@@ -19,7 +19,7 @@ export interface DeploymentState {
 }
 /** Answers JSON parsed, and anything else (such as a pod log) as its text. */
 export type KubernetesRequest = (
-  method: "GET" | "PATCH",
+  method: "GET" | "PATCH" | "POST" | "DELETE",
   path: string,
   body?: unknown,
 ) => Promise<{ status: number; body: unknown }>;
@@ -51,7 +51,7 @@ export function inClusterRequest(
           headers: {
             Accept: "application/json, */*",
             Authorization: `Bearer ${readFileSync(`${directory}/token`, "utf8").trim()}`,
-            ...(payload ? { "Content-Type": "application/merge-patch+json" } : {}),
+            ...(payload ? { "Content-Type": contentType(method) } : {}),
           },
         },
         (response) => {
@@ -81,7 +81,7 @@ export function urlRequest(base: string, fetchImpl: typeof fetch = fetch): Kuber
       method,
       headers: {
         Accept: "application/json, */*",
-        ...(body === undefined ? {} : { "Content-Type": "application/merge-patch+json" }),
+        ...(body === undefined ? {} : { "Content-Type": contentType(method) }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       redirect: "error",
@@ -93,6 +93,10 @@ export function urlRequest(base: string, fetchImpl: typeof fetch = fetch): Kuber
     };
   };
 }
+
+/** Patches merge; posts create. */
+const contentType = (method: string) =>
+  method === "PATCH" ? "application/merge-patch+json" : "application/json";
 
 function parse(text: string, type?: string | null) {
   if (!type?.includes("json")) return text;

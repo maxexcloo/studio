@@ -5,9 +5,16 @@ import test from "node:test";
 import express from "express";
 
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
+import { Benchmarks } from "./benchmarks.ts";
 import { RuntimeController, type Workload } from "./controller.ts";
 import { KubernetesEngine } from "./kubernetes.ts";
 import { createRuntimeRouter, createSwapRouter } from "./routes.ts";
+
+const noBenchmarks = new Benchmarks({
+  request: async () => ({ status: 404, body: {} }),
+  workloads: [],
+  environment: {},
+});
 
 /** One GPU, shared by every workload given; `running` start with a ready pod. */
 function runtime(workloads: Pick<Workload, "id" | "kind" | "url">[], running: string[]) {
@@ -47,7 +54,7 @@ test("administrator runtime routes preview, apply and report operations, with pl
   );
   const app = express();
   app.use(express.json());
-  app.use(createRuntimeRouter(controller, () => "account:admin"));
+  app.use(createRuntimeRouter(controller, noBenchmarks, () => "account:admin"));
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   context.after(() => server.close());
@@ -99,7 +106,7 @@ test("the logs route tails each pod's first container, falling back to its last 
     ["text"],
   );
   const app = express();
-  app.use(createRuntimeRouter(controller, () => "account:admin"));
+  app.use(createRuntimeRouter(controller, noBenchmarks, () => "account:admin"));
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   context.after(() => server.close());
