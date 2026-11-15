@@ -320,6 +320,12 @@ export function registerMcpRoutes(
     // A ref, number, option letter or job id as its job output (media.resolve).
     const resolveOutput = (value, signal) => media.resolve(owner, refs, value, { signal });
     const resolve = async (value, signal) => (await resolveOutput(value, signal)).jobId;
+    // A reference asset id, or a result's number or option letter ("#12", "B") as its image's.
+    const referenceAsset = async (value, signal) => {
+      if (!media.namesResult(value)) return media.referenceId(value);
+      const found = await resolveOutput(value, signal);
+      return (await media.resultReference(owner, found.jobId, found.index || 0)).asset.id;
+    };
     const server = new McpServer(
       // The commit the image was built from, so a client sees when Studio (and its tools) changed.
       { name: "Studio", version: appVersion || "development" },
@@ -351,6 +357,7 @@ export function registerMcpRoutes(
         actor,
         resolve,
         resolveOutput,
+        referenceAsset,
         publicUrl,
         generateDedupeMs,
         reviewedGuides,
@@ -360,7 +367,16 @@ export function registerMcpRoutes(
         chatChoices,
       });
       registerResultTools({ tool, server, media, actor, resolveOutput, reviewWaitSeconds });
-      registerManageTools({ tool, server, media, owner, refs, resolve, resolveOutput });
+      registerManageTools({
+        tool,
+        server,
+        media,
+        owner,
+        refs,
+        resolve,
+        resolveOutput,
+        referenceAsset,
+      });
       registerProjectTool({ tool, server, media, owner, chat: actor.conversation, namedInTier });
       registerVariantsTool({
         tool,

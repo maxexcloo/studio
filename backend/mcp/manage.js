@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import {
   cardKinds,
+  characterTraits,
   maxCardDescription,
   maxCardName,
   maxCharacterImages,
@@ -38,9 +39,19 @@ export const findCard = (cards, value) => {
 
 /**
  * Registers gallery, queue, dream, cards and taste. `tool` is mcp.js's helper, `media` its McpMedia,
- * `refs` the conversation's result scope and `resolve(value)` resolves a ref into its job id.
+ * `refs` the conversation's result scope, `resolve(value)` resolves a ref into its job id and
+ * `referenceAsset(value)` a result's number or letter, or an asset id, into a reference asset id.
  */
-export function registerManageTools({ tool, server, media, owner, refs, resolve, resolveOutput }) {
+export function registerManageTools({
+  tool,
+  server,
+  media,
+  owner,
+  refs,
+  resolve,
+  resolveOutput,
+  referenceAsset,
+}) {
   const api = (method, route, body, signal) =>
     media.request(method, route, body, owner, { signal });
   /** A ref or job id this owner holds, as its job id. */
@@ -286,17 +297,23 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve,
 
   /** A card's images that still exist, as the route lists them. */
   const imageIds = (card) => (card.references || []).map((asset) => asset.id);
+  const story = (card) =>
+    Object.fromEntries(
+      ["age", ...characterTraits].filter((key) => card[key]).map((key) => [key, card[key]]),
+    );
   const shownCard = (card) => ({
     id: card.id,
     name: card.name,
     ...(card.description ? { description: card.description } : {}),
+    ...story(card),
     image_ids: imageIds(card),
+    ...(card.portrait ? { portrait: card.portrait.status } : {}),
   });
   tool(
     server,
     "cards",
     "manage cards",
-    "The user's character, outfit and scene cards (needs the Characters feature), when asked. list; create, or update by id or name: name, description, image_ids (reference_asset_ids; a character 1–4, clearest first, an outfit or scene 0–1). describe writes a description from the first image; rate scores each 1–5 as a reference.",
+    "The user's character, outfit and scene cards (needs the Characters feature), when asked. list (one with id); create, or update by id or name: name, description, image_ids (reference_asset_ids or result numbers; a character 1–4, clearest first, an outfit or scene 0–1). describe writes a description from the first image; rate scores each 1–5 as a reference.",
     {
       action: z.enum(["list", "create", "update", "describe", "rate"]),
       kind: z.enum(Object.keys(cardKinds)),
@@ -305,10 +322,17 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve,
       description: z.string().trim().max(maxCardDescription).optional(),
       image_ids: z.array(z.string().trim().min(1).max(200)).max(maxCharacterImages).optional(),
     },
-    async ({ action, kind, id, name, description, image_ids }, signal) => {
+    async ({ action, kind, id, name, description, image_ids: named }, signal) => {
       const noun = cardKinds[kind].name;
       const list = async () => (await api("GET", `/api/${kind}`, undefined, signal))[kind] || [];
-      if (action === "list") return mcpJson({ [kind]: (await list()).map(shownCard) });
+      if (action === "list") {
+        if (!id) return mcpJson({ [kind]: (await list()).map(shownCard) });
+        const card = findCard(await list(), id);
+        if (!card) throw new Error(`No ${noun} "${id}". Call cards list to see them.`);
+        return mcpJson({ [noun]: shownCard(card) });
+      }
+      const image_ids =
+        named && (await Promise.all(named.map((value) => referenceAsset(value, signal))));
       if (action === "describe" || action === "rate") {
         if (!image_ids?.length) throw new Error(`Pass image_ids to ${action}.`);
         if (action === "describe") {
@@ -342,6 +366,7 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve,
         {
           name: name ?? current?.name,
           description: description ?? current?.description ?? "",
+          ...(current ? story(current) : {}),
           referenceIds: image_ids ?? (current ? imageIds(current) : []),
         },
         signal,

@@ -33,7 +33,21 @@ export interface Card {
   createdAt: string;
   updatedAt: string;
 }
-export interface Character extends Card {
+/**
+ * A character's own story beside its looks: shown on its card and never sent to a model, which
+ * draws only the description. Ages start at 18.
+ */
+export const characterTraits = ["job", "backstory", "likes", "dislikes"] as const;
+export type CharacterTrait = (typeof characterTraits)[number];
+export const maxCharacterTrait = 500;
+export const minCharacterAge = 18;
+export const maxCharacterAge = 120;
+/** How many characters one create_characters call makes (backend/mcp/generate.js). */
+export const maxNewCharacters = 4;
+export interface Character extends Card, Partial<Record<CharacterTrait, string>> {
+  age?: number;
+  /** The portrait an MCP chat queued for a new card, until it becomes the card's first image. */
+  portrait?: { jobId: string; sheet?: boolean };
   /** Make Sheet's job, then its panels once backend/character-sheets.js has split them. */
   sheet?: CharacterSheet;
 }

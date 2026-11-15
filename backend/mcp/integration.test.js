@@ -335,6 +335,7 @@ async function fixture(
               ...(body.loras?.length ? { loras: body.loras } : {}),
             },
             ...(body.assistant ? { assistant: body.assistant } : {}),
+            ...(body.resultSet ? { resultSet: body.resultSet } : {}),
           }
         : {};
     res.json({
@@ -957,6 +958,7 @@ test("media and administrator credentials discover only their own friendly tools
   assert.deepEqual(tools.map((tool) => tool.name).sort(), [
     "cancel",
     "cards",
+    "create_characters",
     "dream",
     "gallery",
     "generate",
@@ -978,6 +980,7 @@ test("media and administrator credentials discover only their own friendly tools
   assert.deepEqual(Object.fromEntries(tools.map((tool) => [tool.name, tool.title])), {
     cancel: "cancel",
     cards: "manage cards",
+    create_characters: "create characters",
     dream: "dream",
     gallery: "manage gallery",
     generate: "generate",
@@ -1091,9 +1094,9 @@ test("media and administrator credentials discover only their own friendly tools
     // project, to 18,120 for its character_sheet, to 19,000 for variants and result numbers and to
     // 19,300 for one call per step (models' profile_ids, review's also) and to 19,850 for applying
     // a person's rules in proportion with the shape of liked portraits, to 20,050 for naming a
-    // person's age and ethnicity first, and to 20,250 for Search's dislikes, pages and summary and
-    // for leaving LoRA strengths to vary.
-    JSON.stringify(tools).length + media.getInstructions().length < 20250,
+    // person's age and ethnicity first, to 20,250 for Search's dislikes, pages and summary and for
+    // leaving LoRA strengths to vary, and to 21,750 for generate's chat context and create_characters.
+    JSON.stringify(tools).length + media.getInstructions().length < 21750,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1619,12 +1622,25 @@ test("a call of several results is one titled set, each prompt titled by the cha
     ],
   );
   assert.equal(sets[0].id, sets[1].id);
-  // Without a title the set is named from the request; one result alone is no set.
+  // Without a title the set is named from the request; one untitled result alone is no set.
   await generate(client, { request: "owls in the snow please", prompts: ["An owl", "Two owls"] });
   assert.equal(f.submitted.at(-1).resultSet.title, "Owls in the snow please");
   assert.notEqual(f.submitted.at(-1).resultSet.id, sets[0].id);
-  await generate(client, { title: "Alone", prompts: ["A lone tree"] });
+  await generate(client, { prompts: ["A lone tree"], count: 1 });
   assert.equal(f.submitted.at(-1).resultSet, undefined);
+  // A titled result is a set of one under its title, which names the result too.
+  await generate(client, { title: "Alone", prompts: ["A lone tree"], count: 1 });
+  assert.equal(f.submitted.at(-1).resultSet.variation, "Alone");
+  // The chat's context stays on the results, and reuse carries it to a follow-up.
+  const context = {
+    character: { name: "Mara", description: "Red-haired ranger" },
+    series: "Ranger Days",
+  };
+  const made = await generate(client, { context, prompts: ["Mara at camp"], count: 1 });
+  assert.deepEqual(f.submitted.at(-1).resultSet.context, context);
+  finish(f);
+  await call(client, "reuse", { job_id: jobId(made), prompt: "Mara at dawn" });
+  assert.deepEqual(f.submitted.at(-1).resultSet.context, context);
 });
 
 test("partial queue failures retain successful owned jobs without retrying the submission", async (t) => {
@@ -1717,6 +1733,7 @@ test("cards updates a card named by name, keeping the fields and images left out
     id: "chr-mara",
     name: "Mara",
     description: "red-haired ranger",
+    job: "Scout",
     referenceIds: ["kept", "deleted"],
     references: [{ id: "kept" }],
   });
@@ -1730,12 +1747,106 @@ test("cards updates a card named by name, keeping the fields and images left out
     id: "chr-mara",
     name: "Mara",
     description: "ranger, cloak",
+    job: "Scout",
     image_ids: ["kept"],
   });
   assert.deepEqual(saved, [
-    ["chr-mara", { name: "Mara", description: "ranger, cloak", referenceIds: ["kept"] }],
+    [
+      "chr-mara",
+      { name: "Mara", description: "ranger, cloak", job: "Scout", referenceIds: ["kept"] },
+    ],
   ]);
   await failure(client, "cards", { ...args, id: "Ivo" });
+  // list reads one card by name or id.
+  assert.equal(
+    data(await call(client, "cards", { action: "list", kind: "characters", id: "MARA" })).character
+      .job,
+    "Scout",
+  );
+  // A result's number names its image.
+  const created = [];
+  f.app.post("/api/characters", (req, res) => {
+    created.push(req.body);
+    res.json({ character: { id: "chr-new", ...req.body, references: [] } });
+  });
+  await generate(client, { prompts: ["Ivo by the fire"], count: 1 });
+  finish(f);
+  await call(client, "cards", {
+    action: "create",
+    kind: "characters",
+    name: "Ivo",
+    image_ids: ["#1"],
+  });
+  assert.equal(created.length, 1);
+  assert.match(created[0].referenceIds[0], /\S/);
+  assert.notEqual(created[0].referenceIds[0], "#1");
+});
+
+test("create_characters saves each card with its story and queues its portrait, refusing a name in use before queueing", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client("alice");
+  const created = [];
+  f.app.post("/api/characters", (req, res) => {
+    created.push(req.body);
+    res.json({ character: { id: `chr-${created.length}`, ...req.body, references: [] } });
+  });
+  const reply = await call(client, "create_characters", {
+    characters: [
+      {
+        name: "Mara",
+        description: "Red-haired ranger",
+        portrait: "Portrait of a red-haired ranger",
+        age: 31,
+        job: "Scout",
+        likes: "Rain",
+      },
+      { name: "Ivo", description: "Tall smith", portrait: "Portrait of a tall smith" },
+    ],
+    sheets: true,
+  });
+  assert.notEqual(reply.isError, true, texts(reply));
+  assert.deepEqual(
+    f.submitted.map((body) => [body.prompt, body.resultSet.variation]),
+    [
+      ["Portrait of a red-haired ranger", "Mara"],
+      ["Portrait of a tall smith", "Ivo"],
+    ],
+  );
+  const jobs = data(reply).jobs.map((job) => job.job_id);
+  assert.deepEqual(created, [
+    {
+      name: "Mara",
+      description: "Red-haired ranger",
+      age: 31,
+      job: "Scout",
+      likes: "Rain",
+      referenceIds: [],
+      portrait: { jobId: jobs[0], sheet: true },
+    },
+    {
+      name: "Ivo",
+      description: "Tall smith",
+      referenceIds: [],
+      portrait: { jobId: jobs[1], sheet: true },
+    },
+  ]);
+  assert.match(texts(reply), /^Saved Mara, Ivo in Library › Characters/);
+  // A name already in use queues nothing; an age under 18 never reaches the tool.
+  f.characters.push({
+    id: "chr-1",
+    name: "Mara",
+    description: "",
+    referenceIds: [],
+    references: [],
+  });
+  const before = f.submitted.length;
+  await failure(client, "create_characters", {
+    characters: [{ name: "mara", description: "Ranger", portrait: "A ranger" }],
+  });
+  await failure(client, "create_characters", {
+    characters: [{ name: "Kit", description: "Ranger", portrait: "A ranger", age: 16 }],
+  });
+  assert.equal(f.submitted.length, before);
 });
 
 test("models lists the account's characters, and generate applies one by name: its first image goes in and its lead starts each prompt", async (t) => {
@@ -2654,7 +2765,7 @@ test(
         },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 18);
+    assert.equal((await client.listTools()).tools.length, 19);
     const profileId = "custom:test-image";
     assert.ok(
       data(await call(client, "models", { kind: "image" })).image.some((line) =>
