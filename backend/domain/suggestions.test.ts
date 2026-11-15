@@ -171,6 +171,19 @@ test("composer ideas come from the taste profile, framed as data, short and dist
   assert.match(user.content, /- A lighthouse in fog/);
 });
 
+test("composer ideas asked again offer different ones from those shown", async () => {
+  const { calls, suggestions, advance } = fixture();
+  await suggestions.suggest("alice", { surface: "composer", kind: "image" });
+  advance(11 * 60_000);
+  // The model repeats itself: shown ideas still come back rather than none.
+  const again = await suggestions.suggest("alice", { surface: "composer", kind: "image" });
+  assert.match(
+    calls[1][1].content,
+    /Already suggested \(offer different ones\): A foghorn lighthouse at blue hour; /,
+  );
+  assert.equal(again.suggestions.length, 3);
+});
+
 test("viewer next steps use the item's prompt and settings, with Title Case labels of four words", async () => {
   const { calls, suggestions } = fixture();
   const result = await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
