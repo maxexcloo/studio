@@ -1,4 +1,4 @@
-import { ActionBar, ActionIcon, Button, Divider, Menu, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Button, Divider, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Shuffle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -32,10 +32,9 @@ const shareLimit = 20;
 const compareLimit = 4;
 
 /**
- * The contextual selection bar under the toolbar: the count and the quick selects, then on
- * desktop the selection's actions and Clear Selection; phones keep the actions on a bottom
- * toolbar. The same actions show as a context menu at `menu` (right-click or
- * Shift+F10).
+ * The contextual selection bar under the toolbar: the count and quick selects, then
+ * the selection's actions and Clear Selection. The same actions show as a context menu at `menu`
+ * (right-click or Shift+F10).
  */
 export function GallerySelectionBar({
   selection,
@@ -402,16 +401,14 @@ export function GallerySelectionBar({
     ...(selected.length ? [none] : []),
     ...matching.filter((action) => action.id !== "select-all"),
   ];
-  const bar = phone ? (
+  const bar = (
     <ActionBarGroups
       groups={actions}
       labelled={namedItemActions}
-      fit
-      stacked
-      menuPosition="top-end"
+      fit={phone}
+      stacked={phone}
+      menuPosition="bottom-end"
     />
-  ) : (
-    <ActionBarGroups groups={actions} labelled={namedItemActions} menuPosition="bottom-end" />
   );
   return (
     <>
@@ -420,11 +417,7 @@ export function GallerySelectionBar({
           {selected.length} Selected
         </Text>
         {!phone && <Divider orientation="vertical" className={classes.divider} />}
-        <div
-          role="group"
-          aria-label="Quick Select"
-          className={phone ? `${classes.actions} ${classes.quick}` : classes.quick}
-        >
+        <div role="group" aria-label="Quick Select" className={classes.quick}>
           {quick.map((action) => (
             <Button
               key={action.id}
@@ -440,14 +433,10 @@ export function GallerySelectionBar({
             </Button>
           ))}
         </div>
-        {!phone && (
-          <>
-            <div role="group" aria-label="Selected Item Actions" className={classes.actions}>
-              {bar}
-            </div>
-            <Divider orientation="vertical" className={classes.divider} />
-          </>
-        )}
+        <div role="group" aria-label="Selected Item Actions" className={classes.actions}>
+          {bar}
+        </div>
+        {!phone && <Divider orientation="vertical" className={classes.divider} />}
         {/* The count leads; closing the selection is always the last icon. */}
         <Tooltip label="Clear Selection">
           <ActionIcon
@@ -461,19 +450,6 @@ export function GallerySelectionBar({
           </ActionIcon>
         </Tooltip>
       </div>
-      {phone && (
-        <ActionBar
-          opened
-          aria-label="Selected Item Actions"
-          radius={0}
-          shadow="none"
-          className={classes.toolbar}
-          position={{ left: 0, right: 0, bottom: 0 }}
-          transitionProps={{ transition: "slide-up" }}
-        >
-          {bar}
-        </ActionBar>
-      )}
       <Menu
         opened={menu !== null}
         onChange={(opened) => !opened && onMenuClose()}

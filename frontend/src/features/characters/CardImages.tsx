@@ -216,7 +216,12 @@ export function CardThumbnails({
           key={image.key}
           aria-label={`Preview ${image.alt}`}
           style={{ flexShrink: 0 }}
-          onClick={() => preview.open(images, index)}
+          onClick={() =>
+            preview.open(
+              images.map((image) => ({ ...image, title: image.title || image.alt })),
+              index,
+            )
+          }
         >
           <Image
             src={image.thumbnailUrl || image.src}
@@ -265,6 +270,7 @@ export function LibraryCard({
                     src: asset.url || asset.thumbnailUrl,
                     thumbnailUrl: asset.thumbnailUrl,
                     alt: `${name} ${index + 1}`,
+                    title: `${name} ${index + 1}`,
                   })),
                   0,
                 )

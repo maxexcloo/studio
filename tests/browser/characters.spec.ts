@@ -176,7 +176,7 @@ test("New Character saves a name, description and gallery images from the Refere
     .filter({ has: page.getByRole("button", { name: "Add image: Portrait of a ranger" }) })
     .getByRole("button", { name: "Preview", exact: true })
     .click();
-  const preview = page.getByRole("dialog", { name: /^Portrait of a ranger/ });
+  const preview = page.getByRole("dialog", { name: /^Portrait of a Ranger/ });
   await expect(preview).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();
@@ -248,7 +248,7 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   });
   await page.goto("/images");
   await page
-    .getByRole("button", { name: "Open image: A ranger in a green cloak", exact: true })
+    .getByRole("button", { name: "Open image: Ranger in a Green Cloak", exact: true })
     .click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await page.getByRole("menuitem", { name: /^Use as Character/ }).click();
@@ -356,7 +356,7 @@ test("A result's chat character offers Create Character in Details, starting the
   });
   await page.goto("/images");
   await page
-    .getByRole("button", { name: "Open image: A tall smith at the forge", exact: true })
+    .getByRole("button", { name: "Open image: Tall Smith at the Forge", exact: true })
     .click();
   if (testInfo.project.use.isMobile)
     await page.getByRole("button", { name: "Generation Details", exact: true }).click();

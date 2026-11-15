@@ -310,12 +310,13 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   page,
 }) => {
   await setup(page);
+  const fullPrompt = `Result 147, ${"A quiet harbour beneath a wide evening sky. ".repeat(24)}`;
   const items = Array.from({ length: 150 }, (_, index) => ({
     id: `result-${index}`,
     jobId: `job-${index}`,
     type: "image",
     status: "done",
-    prompt: `Result ${index}`,
+    prompt: index === 147 ? fullPrompt : `Result ${index}`,
     url: image,
     thumbnailUrl: image,
     width: 1024,
@@ -373,11 +374,22 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   await expect(chosen).toHaveAttribute("aria-pressed", "true");
   const previewButton = grid
     .getByRole("listitem")
-    .filter({ has: page.getByRole("button", { name: "Use reference: Result 147", exact: true }) })
+    .filter({
+      has: page.getByRole("button", { name: `Use reference: ${fullPrompt}`, exact: true }),
+    })
     .getByRole("button", { name: "Preview", exact: true });
   await previewButton.click();
   const preview = page.getByRole("dialog", { name: /^Result 147/ });
   await expect(preview).toBeVisible();
+  await expect(preview.getByRole("img", { name: fullPrompt, exact: true })).toBeVisible();
+  const heading = preview.getByRole("button", { name: "Result 147 · 148 of 150", exact: true });
+  await expect(heading).toHaveAttribute("aria-expanded", "false");
+  await expect(preview.getByText(fullPrompt, { exact: true })).toHaveCount(0);
+  await heading.click();
+  await expect(heading).toHaveAttribute("aria-expanded", "true");
+  await expect(preview.getByText(fullPrompt, { exact: true })).toBeVisible();
+  await heading.click();
+  await expect(preview.getByText(fullPrompt, { exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();
   await expect(picker).toBeVisible();
@@ -396,7 +408,7 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
     await expect(chosen).toBeFocused();
     await page.mouse.move(0, 0);
     await previewButton.hover();
-    await expect(beside("Result 147")).toBeVisible();
+    await expect(beside(fullPrompt)).toBeVisible();
     // Pressing Preview while the image shows opens it full screen.
     await previewButton.click();
     await expect(preview).toBeVisible();

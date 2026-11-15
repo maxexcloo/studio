@@ -536,7 +536,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
   });
   await page.goto("/images");
   await page
-    .getByRole("button", { name: "Open image: A copper bird", exact: true })
+    .getByRole("button", { name: "Open image: Copper Bird", exact: true })
     .click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
@@ -744,10 +744,10 @@ test("Clicking out of the open composer closes it without opening what lies unde
   await page.goto("/");
   await page.locator("[data-composer-prompt]").click();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A lantern in fog");
-  await page.getByRole("button", { name: "Open image: A quiet harbour", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Quiet Harbour", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   // The next click works as usual.
-  await page.getByRole("button", { name: "Open image: A quiet harbour", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Quiet Harbour", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
 });
 

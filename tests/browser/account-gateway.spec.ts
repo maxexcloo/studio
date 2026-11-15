@@ -459,11 +459,10 @@ test("Account menu names the account by its email and opens the account workspac
   await more.click();
   await expect(more).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("tooltip", { name: "More Options", exact: true })).toBeHidden();
-  await expect(page.getByRole("menuitem")).toContainText([
-    "Appearance",
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Account",
     "Library",
     "Settings",
-    "Account",
     "Sign Out",
   ]);
   await expect(page.getByText("admin@example.test", { exact: true })).toBeVisible();

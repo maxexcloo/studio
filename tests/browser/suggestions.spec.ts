@@ -117,7 +117,7 @@ test("The viewer prompt offers Review Prompt, styles, Suggestions with Refreshâ€
     return route.fulfill({ json: { suggestions: body.fresh ? others : steps } });
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await viewerAction(page, "Edit");
   const mediaMenu = page.getByRole("menu");
@@ -181,7 +181,7 @@ test("Custom Animation suggests what could happen from the image, filling the in
     return route.fulfill({ json: { suggestions: motion } });
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   await viewerAction(page, "Animate");
   await page.getByRole("menuitem", { name: "Customâ€¦", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });
@@ -221,7 +221,7 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
     return route.fulfill({ json: { suggestions: body.surface === "viewer" ? steps : [] } });
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   const menu = await viewerPromptMenu(page);
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText([
@@ -259,7 +259,7 @@ test("Animate offers motions written for the image, then its templates and Custo
     });
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   // Motions are asked for only once the menu opens.
   await expect(page.getByRole("button", { name: "Animate", exact: true })).toBeVisible();
   expect(asked).toEqual([]);
@@ -289,7 +289,7 @@ test("Animate offers motions written for the image, then its templates and Custo
 test("No ideas or suggestions show when Studio has none", async ({ page }) => {
   await openViewer(page);
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const menu = await viewerPromptMenu(page);
   await expect(menu.getByRole("menuitem", { name: "No Suggestions", exact: true })).toBeDisabled();
