@@ -78,12 +78,12 @@ const kinds: { value: Kind; label: string; description: string }[] = [
   {
     value: "animate",
     label: "Animate",
-    description: "Themes Animate writes a motion prompt for, listed before Custom…",
+    description: "Templates Animate writes a motion prompt for, listed before Custom…",
   },
   {
     value: "change",
-    label: "Changes",
-    description: "Fixed AI edits, listed before an image's suggested changes.",
+    label: "Edit",
+    description: "Templates Edit asks the assistant for, listed before Custom…",
   },
 ];
 

@@ -45,8 +45,16 @@ interface AnimateChoice {
   note?: string;
 }
 
-/** Animate's Review Prompt: themes write the prompt for editing before it runs; off until chosen. */
+/** Animate's Review Prompt: templates write the prompt for editing before it runs; off until chosen. */
 export const useAnimateReview = () => useRemembered<boolean>("animate-review", false);
+/** Edit's Review Prompt: a change's proposal fills the viewer's prompt before it runs; on until chosen. */
+export const useEditReview = () => useRemembered<boolean>("viewer-review-first", true);
+/** How Edit asks for a change: the viewer asks in its prompt field; a tile opens the viewer to. */
+export interface EditAsk {
+  pending: boolean;
+  pick: (request: string) => void;
+  custom: () => void;
+}
 /** The prompt as typed, for the prompt field: Studio adds LoRA trigger words only to the run. */
 export const typedPrompt = (item: MediaItem) =>
   typeof item.settings?.typedPrompt === "string" ? item.settings.typedPrompt : item.prompt || "";
@@ -248,8 +256,8 @@ export interface AnimateRequest {
   theme: string;
   instruction?: string;
 }
-/** Animate's themes for the account (Library › Prompt Styles), Custom last; none without the assistant. */
-export function useAnimateThemes() {
+/** Animate's templates for the account (Library › Prompt Styles), Custom last; none without the assistant. */
+export function useAnimateTemplates() {
   const assistant = useQuery(assistantQuery).data;
   return assistant?.available ? assistant.themes : [];
 }

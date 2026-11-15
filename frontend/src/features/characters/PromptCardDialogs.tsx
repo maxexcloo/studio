@@ -31,14 +31,14 @@ export const promptCardText = {
 
 /**
  * New, Edit and Delete for outfit or scene cards: `edit` and `remove` open their dialog, which
- * `dialogs` renders. `onLayer` hears when one opens or closes over a sheet.
+ * `dialogs` renders; a new card may start with `references`. `onLayer` hears when one opens or closes over a sheet.
  */
 export function usePromptCardDialogs(
   kind: PromptCardKind,
   onLayer: (open: boolean) => void = () => {},
 ) {
   const { noun } = promptCardText[kind];
-  const [editing, setEditing] = useState<{ card?: PromptCard }>();
+  const [editing, setEditing] = useState<{ card?: PromptCard; references?: ReferenceAsset[] }>();
   const [deleting, setDeleting] = useState<PromptCard | null>(null);
   const deletion = useDeletePromptCard(kind);
   const closeEditor = () => {
@@ -50,8 +50,8 @@ export function usePromptCardDialogs(
     onLayer(false);
   };
   return {
-    edit: (card?: PromptCard) => {
-      setEditing({ card });
+    edit: (card?: PromptCard, references?: ReferenceAsset[]) => {
+      setEditing({ card, references });
       onLayer(true);
     },
     remove: (card: PromptCard) => {
@@ -71,6 +71,7 @@ export function usePromptCardDialogs(
               key={editing.card?.id || "new"}
               kind={kind}
               card={editing.card}
+              references={editing.references}
               onClose={closeEditor}
             />
           )}
@@ -95,16 +96,18 @@ export function usePromptCardDialogs(
 function PromptCardForm({
   kind,
   card,
+  references,
   onClose,
 }: {
   kind: PromptCardKind;
   card?: PromptCard;
+  references?: ReferenceAsset[];
   onClose: () => void;
 }) {
   const { hint, placeholder } = promptCardText[kind];
   const [name, setName] = useState(card?.name || "");
   const [description, setDescription] = useState(card?.description || "");
-  const [images, setImages] = useState<ReferenceAsset[]>(card?.references || []);
+  const [images, setImages] = useState<ReferenceAsset[]>(card?.references || references || []);
   const save = useSavePromptCard(kind, card?.id);
   return (
     <CardForm

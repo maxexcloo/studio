@@ -978,9 +978,9 @@ export async function selectionMenuItem(page: Page, group: string, label: string
   return page.getByRole("menuitem", { name: label, exact: true });
 }
 
-/** Turns on Compare Upscale in the viewer's Edit › Upscale menu. */
+/** Turns on Compare Upscale in the viewer's Upscale menu. */
 export async function compareUpscale(page: Page) {
-  await viewerAction(page, "Edit", "Upscale", "Compare Upscale");
+  await viewerAction(page, "Upscale", "Compare Upscale");
 }
 
 /** Chooses a text box's tool from its ⋯ menu, such as Recent Prompts from the Prompt's. */

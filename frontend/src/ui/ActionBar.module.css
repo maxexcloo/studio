@@ -132,7 +132,3 @@
 .switch {
   pointer-events: none;
 }
-
-.reserved {
-  visibility: hidden;
-}
