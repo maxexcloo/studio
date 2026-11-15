@@ -33,6 +33,10 @@ import {
 import { ReferenceRoles, ReferenceSlots, referenceCellType } from "./ReferenceSlots";
 import { type ReferenceBrowser, useReferenceBrowser } from "./useReferenceBrowser";
 
+import classes from "./ReferencePicker.module.css";
+
+const referenceGalleryTabs = galleryTabs.filter((tab) => tab.value !== "liked");
+
 /** The Library's cards, after the gallery's tabs, with Characters. */
 const cardTabs: typeof galleryTabs = [
   { value: "characters", label: "Characters" },
@@ -124,11 +128,11 @@ export function ReferencePicker({
   const localBrowser = useReferenceBrowser();
   const browser = controlledBrowser || localBrowser;
   const chosen = browser.state.target;
-  const referenceTabs = charactersOn ? [galleryTabs, cardTabs] : [galleryTabs];
+  const referenceTabs = charactersOn ? [referenceGalleryTabs, cardTabs] : [referenceGalleryTabs];
   const tab = referenceTabs.flat().some((item) => item.value === browser.state.tab)
     ? browser.state.tab
     : "gallery";
-  const galleryTab = galleryTabs.some((item) => item.value === tab);
+  const galleryTab = referenceGalleryTabs.some((item) => item.value === tab);
   const target = nextReferenceTarget(references, profile, chosen);
   function browse(patch: Partial<ReferenceBrowser["state"]>) {
     if (!("target" in patch)) browser.scroll.current = 0;
@@ -139,8 +143,11 @@ export function ReferencePicker({
   const groups = referenceGroups(profile);
   const single = groups.length === 1 && slotCapacity(groups[0]) === 1;
   function uploadFiles(files: File[], into: ReferenceTarget | null = chosen) {
-    void placement.uploadFiles(files, into);
-    settle();
+    if (!files.length) return;
+    const before = list.get().map(referenceKey);
+    void placement.uploadFiles(files, into).then(() => {
+      if (list.get().some((asset, index) => referenceKey(asset) !== before[index])) settle();
+    });
   }
   /** A placed reference dropped on another slot moves there; within its role it swaps places. */
   function moveReference(key: string, into: ReferenceTarget) {
@@ -174,24 +181,26 @@ export function ReferencePicker({
     else if (data.files.length) void placement.uploadFiles([...data.files], into);
     settle();
   }
-  // Uploads go straight into the next slot, so this is an action rather than the gallery's menu.
-  const uploadButton = (
-    <FileButton accept={uploadTypes.join(",")} multiple onChange={(files) => uploadFiles(files)}>
-      {(props) => (
-        <Tooltip label="Upload" disabled={!phone}>
+  const uploadTile = (
+    <div role="listitem" className={classes.uploadTile}>
+      <FileButton accept={uploadTypes.join(",")} multiple onChange={(files) => uploadFiles(files)}>
+        {(props) => (
           <Button
             {...props}
-            {...(phone ? iconChipProps : chipProps)}
+            className={classes.upload}
+            variant="default"
             aria-label="Upload Reference"
             loading={placement.uploading}
-            disabled={!target}
-            leftSection={phone ? undefined : <icons.upload size={15} />}
+            disabled={!target || placement.uploading}
           >
-            {phone ? <icons.upload size={16} /> : "Upload"}
+            <Stack align="center" gap="xs">
+              <icons.upload size={22} aria-hidden />
+              <span>Upload</span>
+            </Stack>
           </Button>
-        </Tooltip>
-      )}
-    </FileButton>
+        )}
+      </FileButton>
+    </div>
   );
   // Touch screens have no paste key, and iOS no paste event outside a text field: Paste reads the
   // clipboard on a tap instead.
@@ -316,12 +325,9 @@ export function ReferencePicker({
           more={charactersOn ? [cardTabs] : []}
           browser={browser}
           enabled={opened}
-          actions={
-            <>
-              {pasteButton}
-              {uploadButton}
-            </>
-          }
+          galleryViews={referenceGalleryTabs}
+          actions={pasteButton}
+          uploadTile={uploadTile}
           tile={(item, name) => {
             const matches = (reference: ReferenceAsset) => reference.galleryItemId === item.id;
             const selected = references.some(matches);
