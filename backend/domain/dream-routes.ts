@@ -13,12 +13,12 @@ export function registerDreamRoutes(
   {
     dream,
     projects,
-    numbered = (items) => items,
+    numbered,
   }: {
     dream: Dream;
     projects: Projects;
     /** The results with their numbers (domain/result-numbers.ts). */
-    numbered?: <T extends object>(items: T[]) => T[];
+    numbered: <T extends object>(items: T[]) => T[];
   },
 ) {
   const owner = (account: RouteAccount) => account?.userId || "";
