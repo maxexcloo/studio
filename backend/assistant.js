@@ -33,6 +33,7 @@ import {
   precedence,
   proportionate,
   subjectFirst,
+  suggestionChoices,
   writerGuide,
 } from "./domain/writing-standard.ts";
 import { cleanTriggers } from "./lora/catalogue.js";
@@ -1175,7 +1176,7 @@ export function createAssistant(
       messages: [
         {
           role: "system",
-          content: `${cardIdeaInstructions[field](kind, count)} Reply with only JSON: {"options":["…"]}. ${contentRule(explicit)}`,
+          content: `${cardIdeaInstructions[field](kind, count)} Reply with only JSON: {"options":["…"]}. ${contentRule(explicit)} ${suggestionChoices("card", explicit)}`,
         },
         {
           role: "user",

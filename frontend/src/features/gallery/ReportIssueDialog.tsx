@@ -41,6 +41,8 @@ export function ReportIssueDialog({
         item.jobId!,
         `Fix what is wrong, keeping everything else: ${issue}`,
         video ? ["recreate"] : ["edit", "recreate"],
+        undefined,
+        item.id,
       );
       const [change] = answer.suggestions;
       if (!change) throw new Error(answer.reason || "The assistant couldn't suggest a fix.");

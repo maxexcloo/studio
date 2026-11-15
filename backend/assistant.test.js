@@ -677,8 +677,27 @@ test("cardIdeas offers distinct names from a card's images, unlike those already
   );
   const [system, user] = seen.calls[0].body.messages;
   assert.match(system.content, /6 useful, distinct names.*never a real person's name/s);
+  assert.match(system.content, /same reference, not alternative appearances/);
+  assert.match(system.content, /not synonyms or near-duplicates/);
   assert.match(user.content[0].text, /Juno/s);
   assert.equal(user.content.filter((part) => part.type === "image_url").length, 2);
+});
+
+test("Spicy card ideas describe the reference without proposing body edits", async () => {
+  const seen = fakeGateway(() =>
+    json('{"options":["Broad build, grey hair, scar over left eye"]}'),
+  );
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  await engine.cardIdeas({
+    kind: "characters",
+    field: "description",
+    images: [{ mime: "image/jpeg", data: "AAAA" }],
+    explicit: true,
+  });
+  const system = seen.calls[0].body.messages[0].content;
+  assert.match(system, /without inventing or changing bodies/);
+  assert.match(system, /ambiguous ages or nonhuman subjects/);
+  assert.doesNotMatch(system, /include a non-graphic body-shape/);
 });
 
 test("card ideas offer six descriptions, while a custom request returns one result", async () => {

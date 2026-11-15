@@ -16,26 +16,32 @@ export const promptIdeasQuery = (kind: MediaKind) =>
   });
 
 /** A finished image's next steps; `fresh` asks for different ones than those saved with it. */
-export const askNextSteps = (jobId: string, fresh = false) =>
-  post<Suggestions<NextStep>>("/api/suggestions", { surface: "viewer", jobId, fresh });
+export const askNextSteps = (jobId: string, fresh = false, prompt?: string, itemId?: string) =>
+  post<Suggestions<NextStep>>("/api/suggestions", {
+    surface: "viewer",
+    jobId,
+    fresh,
+    prompt,
+    itemId,
+  });
 
 /** A finished image's next steps, which the viewer's Suggestions offers. */
-export const nextStepsQuery = (jobId: string) =>
+export const nextStepsQuery = (jobId: string, prompt?: string, itemId?: string) =>
   queryOptions({
-    queryKey: ["suggestions", "viewer", jobId],
-    queryFn: () => askNextSteps(jobId),
+    queryKey: ["suggestions", "viewer", jobId, prompt, itemId],
+    queryFn: () => askNextSteps(jobId, false, prompt, itemId),
     ...cached,
   });
 
 /** What could happen when a finished image is animated; `fresh` asks for different ideas. */
-export const askMotionIdeas = (jobId: string, fresh = false) =>
-  post<Suggestions<NextStep>>("/api/suggestions", { surface: "animate", jobId, fresh });
+export const askMotionIdeas = (jobId: string, fresh = false, itemId?: string) =>
+  post<Suggestions<NextStep>>("/api/suggestions", { surface: "animate", jobId, fresh, itemId });
 
 /** A finished image's motion ideas, which Animate's Custom Animation offers. */
-export const motionIdeasQuery = (jobId: string) =>
+export const motionIdeasQuery = (jobId: string, itemId?: string) =>
   queryOptions({
-    queryKey: ["suggestions", "animate", jobId],
-    queryFn: () => askMotionIdeas(jobId),
+    queryKey: ["suggestions", "animate", jobId, itemId],
+    queryFn: () => askMotionIdeas(jobId, false, itemId),
     ...cached,
   });
 
@@ -52,8 +58,21 @@ export const draftStepsQuery = (kind: MediaKind, prompt: string) =>
   });
 
 /** The action and prompt for a change to a result asked for in plain words, chosen from `actions`. */
-export const askChange = (jobId: string, request: string, actions: ChangeAction[]) =>
-  post<Suggestions<Change>>("/api/suggestions", { surface: "change", jobId, request, actions });
+export const askChange = (
+  jobId: string,
+  request: string,
+  actions: ChangeAction[],
+  prompt?: string,
+  itemId?: string,
+) =>
+  post<Suggestions<Change>>("/api/suggestions", {
+    surface: "change",
+    jobId,
+    request,
+    actions,
+    prompt,
+    itemId,
+  });
 
 /** The same for the composer's draft prompt, which has no result yet. */
 export const askDraftChange = (

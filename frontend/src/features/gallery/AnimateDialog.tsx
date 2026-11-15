@@ -49,8 +49,8 @@ export function AnimateDialog({
   const assistant = useQuery(assistantQuery);
   const offered = Boolean(assistant.data?.available && item.jobId) && item.type === "image";
   const ideas = useChangeSuggestions({
-    query: motionIdeasQuery(item.jobId ?? ""),
-    fresh: () => askMotionIdeas(item.jobId!, true),
+    query: motionIdeasQuery(item.jobId ?? "", item.id),
+    fresh: () => askMotionIdeas(item.jobId!, true, item.id),
     enabled: asking && offered,
     onPick: setInstruction,
   });
