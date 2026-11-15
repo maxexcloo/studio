@@ -335,6 +335,8 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
       },
     });
   });
+  // The picker shares the gallery's loaded pages, so the gallery loads again from these.
+  await create(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   const picker = page.getByRole("region", { name: "References", exact: true });
   const grid = picker.getByRole("list", { name: "References Choices", exact: true });
