@@ -18,9 +18,8 @@ export const cardKinds = {
 } as const;
 export type CardKind = keyof typeof cardKinds;
 /**
- * How many of a card's images go to a model: its first. A model that edits with references reads
- * each image as another subject, so three views of one person drew her twice on live, however the
- * prompt said there was one.
+ * How many of a card's images a draft places: its first. The run adds the others after it where the
+ * profile's reference stack has room (backend/character-sheets.js sheetReferences).
  */
 export const characterImages = 1;
 

@@ -1,10 +1,13 @@
 import {
   characterImage,
   characterImageIds,
+  characterImages,
+  keepsIdentity,
   maxCardName,
   sheetRoles,
   takesSubjects,
 } from "../shared/characters.ts";
+import { slotCapacity, slotGroups } from "../shared/profiles.ts";
 import { listCards, refusal, shownCard, updateCharacter } from "./cards.js";
 import { logWarning } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
@@ -179,7 +182,7 @@ export async function sheetPanels(buffer) {
 /**
  * A run's references (`{ assetId, slot }`) with the account's characters' sheets in play: the
  * card's first image becomes the sheet's panel for the view the `prompt` names (characterImage),
- * and on a video `profile` that animates subjects (MiniMax H3's Reference profiles) any image of
+ * followed by its other images where the `profile` has room (withCharacterImages), and on a video `profile` that animates subjects (MiniMax H3's Reference profiles) any image of
  * the character becomes its whole sheet, or the sheet joins a frame made with the character in
  * the next free slot. `madeWith(assetId)` lists the asset IDs a gallery image was made with.
  */
@@ -205,9 +208,34 @@ export function sheetReferences({ references, prompt, cards, profile, madeWith =
     }
     if (at < 0 || references[at].assetId !== card.referenceIds[0]) continue;
     const view = characterImage(card, prompt);
-    return view === card.referenceIds[0] ? references : swap(at, view);
+    const viewed = view === card.referenceIds[0] ? references : swap(at, view);
+    return profile ? withCharacterImages(viewed, references[at].slot, card, profile) : viewed;
   }
   return references;
+}
+
+/**
+ * A character's other images (2–4) after its own, in the free places of its slot's linked stack
+ * (slotGroups) on a `profile` that keeps faces from its references; never a start or end frame.
+ */
+function withCharacterImages(references, slot, card, profile) {
+  if (!keepsIdentity(profile)) return references;
+  const group = slotGroups(profile.mediaInputs).find((slots) =>
+    slots.some((input) => input.id === slot),
+  );
+  if (!group || slotCapacity(group) < 2 || ["start", "end"].includes(group[0].role))
+    return references;
+  const free = group.flatMap((input) =>
+    Array.from(
+      { length: (input.max || 1) - references.filter((asset) => asset.slot === input.id).length },
+      () => input.id,
+    ),
+  );
+  const others = card.referenceIds
+    .slice(characterImages)
+    .filter((id) => !references.some((asset) => asset.assetId === id))
+    .slice(0, free.length);
+  return [...references, ...others.map((assetId, index) => ({ assetId, slot: free[index] }))];
 }
 
 /**

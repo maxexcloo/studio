@@ -1293,10 +1293,10 @@ export function registerGenerateTools({
         : await Promise.all(
             targets.map(async ({ profile, note }) => {
               const sized = mcpSize(profile, aspect ? { aspect } : {});
-              // A character sends its first image (characterImages), only to a model that keeps its
-              // face: into its Identity slot, the named references filling the others in order, or
-              // after them on a model that edits with references. As an img2img start image its
-              // pose and layout (a whole sheet) would carry over.
+              // A character sends its first image (characterImages; the run adds its others where
+              // there is room) only to a model that keeps its face: into its Identity slot, the
+              // named references filling the others in order, or after them on a model that edits
+              // with references. As an img2img start image its pose and layout would carry over.
               const identity = identitySlot(profile);
               const room = keepsIdentity(profile)
                 ? Math.min(Math.max(0, referenceCount(profile).max - named.length), characterImages)
