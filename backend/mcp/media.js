@@ -1839,7 +1839,7 @@ export class McpMedia {
    * comparison arrives side by side in one image, so the model reads one small preview. A result
    * Studio expects within `waitSeconds` is waited for.
    */
-  async review(owner, targets, { scope = "", signal, waitSeconds = 0 } = {}) {
+  async review(owner, targets, { scope = "", signal, waitSeconds = 0, brief = true } = {}) {
     const records = [];
     const tiles = [];
     for (const { jobId, index } of targets) {
@@ -1930,7 +1930,7 @@ export class McpMedia {
     return {
       content: [
         text(
-          `${reviewBrief}${order}\n\n${records.map((record) => JSON.stringify(record)).join("\n")}`,
+          `${brief ? reviewBrief : ""}${order}\n\n${records.map((record) => JSON.stringify(record)).join("\n")}`.trim(),
         ),
         { type: "image", data: sheet.toString("base64"), mimeType: "image/jpeg" },
       ],

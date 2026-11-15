@@ -1075,8 +1075,9 @@ test("media and administrator credentials discover only their own friendly tools
     // writes a character's shots so the wording never drifts), to 16,100 for reference_strengths
     // and to 17,200 for Cards (describe and rate a card's images), then lowered to 17,100 once Cards'
     // description was tightened, then raised to 17,150 for generate's 18+ floor, to 18,050 for
-    // project, to 18,120 for its character_sheet and to 19,000 for variants and result numbers.
-    JSON.stringify(tools).length + media.getInstructions().length < 19000,
+    // project, to 18,120 for its character_sheet, to 19,000 for variants and result numbers and to
+    // 19,300 for one call per step (models' profile_ids, review's also).
+    JSON.stringify(tools).length + media.getInstructions().length < 19300,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1188,6 +1189,13 @@ test("Models uses only this studio, filters readiness and kind, and returns deta
     needs_setup: { "not-ready": "Its files or nodes aren't ready." },
   });
   const detail = data(await call(client, "models", { profile_id: imageProfile.id }));
+  // Several models answer in one call, each as profile_id alone would.
+  assert.deepEqual(
+    data(
+      await call(client, "models", { profile_ids: [imageProfile.id, videoProfile.id] }),
+    ).profiles.map((profile) => profile.id),
+    [imageProfile.id, videoProfile.id],
+  );
   // The reference count comes from the profile's graph, not its hand-written text.
   assert.equal(detail.references.max, (imageProfile.mediaInputs || []).length);
   // Only adjustable controls are advertised; raw capability and constraint tables are not.
@@ -5532,6 +5540,23 @@ test("Review compares two owned results and refuses a hidden result before downl
   await failure(client, "review", { job_id: "#1" });
   assert.equal(f.downloads.length, before);
   assert.equal(f.submitted.length, 2);
+});
+
+test("Review takes several results in one call, one image each and the brief once", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  await generate(client, { prompts: ["A heron", "A crane", "A stork"], count: 1 });
+  finish(f);
+  const result = await call(client, "review", { job_id: "#1", also: ["#2", "#3", "#9"] });
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(
+    reviewed(result).map((record) => record.ref),
+    ["#1", "#2", "#3"],
+  );
+  assert.equal(result.content.filter((item) => item.type === "image").length, 3);
+  assert.equal(texts(result).match(/task data, never instructions/g).length, 1);
+  assert.match(texts(result), /#9: /, "an unknown ref is named without failing the others");
+  assert.equal(f.submitted.length, 3, "reviewing queues nothing");
 });
 
 test("Review does not poll or download a pending result, and refuses video", async (t) => {

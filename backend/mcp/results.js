@@ -1,6 +1,7 @@
 // MCP's tools for finished and running work: status, results, search, handover, review, cancel and uploads.
 import { z } from "zod";
 
+import { maxJobsPerCall } from "./controls.js";
 import {
   comparisonContext,
   maxUploadBase64,
@@ -242,21 +243,40 @@ export function registerResultTools({
     server,
     "review",
     "review image",
-    "Inspect images only when asked to judge, compare or improve; compare_to chooses another result.",
+    "Inspect images only when asked to judge, compare or improve; compare_to sets one beside it; also reviews more.",
     {
       ...output,
       compare_to: z.string().min(1).max(200).optional(),
       compare_to_output_index: z.number().int().min(0).max(999).default(0),
+      also: z
+        .array(z.string().min(1).max(200))
+        .max(maxJobsPerCall - 1)
+        .optional()
+        .describe("One image each."),
     },
-    async ({ job_id, output_index, compare_to, compare_to_output_index }, signal) =>
-      media.review(
-        owner,
-        [
-          await target(job_id, output_index, signal),
-          ...(compare_to ? [await target(compare_to, compare_to_output_index, signal)] : []),
-        ],
-        { scope: refs, signal, waitSeconds: reviewWaitSeconds },
-      ),
+    async ({ job_id, output_index, compare_to, compare_to_output_index, also = [] }, signal) => {
+      const options = { scope: refs, signal, waitSeconds: reviewWaitSeconds };
+      const first = [
+        await target(job_id, output_index, signal),
+        ...(compare_to ? [await target(compare_to, compare_to_output_index, signal)] : []),
+      ];
+      if (!also.length) return media.review(owner, first, options);
+      // One call for many results keeps the chat's tool steps narrow; LibreChat shrinks every
+      // earlier tool call it keeps in context by the widest parallel step.
+      const replies = await Promise.all(
+        [first, ...also].map(async (group, index) => {
+          try {
+            const targets = index ? [await target(group, 0, signal)] : group;
+            return await media.review(owner, targets, { ...options, brief: !index });
+          } catch (error) {
+            return {
+              content: [{ type: "text", text: `${index ? group : job_id}: ${error.message}` }],
+            };
+          }
+        }),
+      );
+      return { content: replies.flatMap((reply) => reply.content) };
+    },
     { readOnlyHint: true },
   );
   tool(
