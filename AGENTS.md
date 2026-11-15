@@ -3,8 +3,8 @@
 ## Ownership
 
 - This is Studio, a hard fork of HEISS UI. It no longer syncs upstream: Studio owns all of its code and may restructure any of it, including the core (model and family detection, graphs, composer, gallery, viewer).
-- User-facing text, documentation, settings (`STUDIO_*`), headers, cookies, browser storage and internal identifiers say Studio. Every Studio setting starts with `STUDIO_` and old names are not read as aliases; third-party credentials keep their standard names (`HF_TOKEN`, `CIVITAI_API_TOKEN`).
-- Runtime state is authoritative. Studio reads and writes only Studio names on disk (`studio` media folder, the `studio` profile block); no legacy names or fallbacks. Runtime files are moved or renamed only by the explicit migration in `migrate-runtime` (dry run, then apply) or an administrator's run of its steps through `POST /api/maintenance/migrations`, never implicitly.
+- User-facing text, documentation, settings (`STUDIO_*`), headers, cookies, browser storage and internal identifiers say Studio. Every Studio setting starts with `STUDIO_` and old names are not read as aliases; third-party credentials keep their standard names (`HF_TOKEN`, `CIVITAI_API_TOKEN`), as do the platform's `HOST` and `PORT` and the worker's `RADIANCE_*` variables.
+- Runtime state is authoritative. Studio reads and writes only Studio names on disk (`studio` media folder, the `studio` profile block); no legacy names or fallbacks. Runtime files are moved or renamed only by `migrate-runtime` ([Data & Migrations](README.md#data--migrations)), never implicitly.
 - Keep externally used names stable: MCP tool names (lowercase snake_case with lowercase titles, such as `generate` and `upload_link`), `/api` routes, the profile file format and result links, including the `heiss-mcp-result-link-v2` sealing label.
 - Studio owns live generation profiles, prompting guides and model/LoRA catalogue definitions in its runtime data folder, including uncensored content. Administrators edit and approve them in Studio. Live data is the only source: the sample profiles in `backend/samples/` seed only a data folder that has never held a profile. Keep deployment/workload configuration in kubelab.
 - The whole repository is AGPL-3.0 (`LICENSE`). Keep the MIT notices for HEISS UI, J-AI Studio and MantineHub in `NOTICE`, shipped in both images, and their credits in Settings › About and `README.md`.
@@ -22,9 +22,10 @@
 
 ## Verification
 
-- Retain browser interaction tests in CI and run them only there.
+- Browser specs run only in CI. They cover meaningful desktop, Chromium phone and WebKit phone flows through accessible roles and event-driven fixtures, with shared mocks in `fixtures.ts` and cross-feature journeys in `workflows.spec.ts`. Avoid exact animation timing and cosmetic-only assertions; fixtures never become production fallbacks.
 - Keep runtime data out of Git and test output.
 - Tests never generate media or call cloud providers. Verify real behaviour on the live deployment, never on a local copy of production data.
+- Report measured conditions for performance claims.
 - To use live Studio or LibreChat in agent-browser as the user, never another account, run `mise run browser-sign-in` then `agent-browser --session <name> state load <file>` with the file it names (`--state` is ignored on the shared browser).
 
 ## UI Patterns
@@ -36,6 +37,8 @@ management. Media tools such as masking, zoom, comparison and virtualised media
 layouts may use custom components. Do not add another primitive or styling
 framework. Use [Mantine’s documentation index](https://mantine.dev/llms.txt) as
 the primary component reference and verify APIs against the installed version.
+Feature behaviour belongs to its code; this section holds only the rules that
+recur across features.
 
 ### Code Structure
 
@@ -50,10 +53,12 @@ the primary component reference and verify APIs against the installed version.
   once rather than repeating them in consumers.
 - Reuse the shared generation editor, item actions, pickers, tables, setting
   rows, text boxes, confirmation, empty/loading states and clipboard helpers.
-- `ui/icons.ts` owns icons by meaning. `theme.ts` owns tokens, component
-  defaults, control densities, breakpoints and motion. Use Mantine props and
-  theme defaults before co-located CSS modules; avoid global class rules and
-  per-call values that restate defaults.
+- `ui/icons.ts` owns the icons of actions, modes and records by meaning; one
+  meaning keeps one icon. Plain glyphs (chevrons, checks, arrows, search,
+  close) may come from `lucide-react` directly.
+- `theme.ts` owns tokens, component defaults, control densities, breakpoints
+  and motion. Use Mantine props and theme defaults before co-located CSS
+  modules; avoid global class rules and per-call values that restate defaults.
 
 ### Theme & Layout
 
@@ -66,12 +71,13 @@ the primary component reference and verify APIs against the installed version.
 - Use Mantine spacing, typography, colours and breakpoints in custom CSS too.
   Give Paper padding and borders explicitly where needed; avoid defaults that
   leak into dialogs and navigation.
-- Appearance controls live in the header's Appearance popover. Preferences
-  follow the account rather than the device.
+- Preferences follow the account rather than the device, Appearance included;
+  the browser keeps a copy of Appearance only for the moments before sign-in.
+  Appearance controls live in the header's Appearance popover.
 - Library and Settings use the shared route-backed modal and
-  `WorkspaceSections` navigation, with scrolling inside a stable body.
-  Mount sections on first visit and preserve visited forms and edits.
-  Render a section failure inline without taking down the workspace.
+  `WorkspaceSections` navigation, with scrolling inside a stable body. Mount
+  sections on first visit, preserve visited forms and edits, and render a
+  section failure inline without taking down the workspace.
 - Use one section heading and toolbar; group further parts with `SettingGroup`.
   Use compact `DataTable` rows for dense records and cards for visual content.
   Phone tables fold secondary information into the main cell. Use headings
@@ -90,34 +96,48 @@ the primary component reference and verify APIs against the installed version.
 - Empty views use `EmptyState`: one short, subdued line and at most the action
   that fills the view. `LoadingState` centres within the content while the
   shell stays mounted. Empty, loading and failure remain distinct states.
-- Search clears only its query. Filters preserve it. Toolbars show search as a field;
-  phones open it from an icon. Named controls opening a picker or menu show ▾ (Animate ▾, Copy ▾), small beside an
-  action bar's icon; ⋯ already means more, so it never carries one. Icon-only controls use accessible names and tooltips. Menus group related actions, put the usual
-  action first and Delete last, and share their sizing and item style. An option whose label
-  alone is ambiguous carries a one-line `description` under it, except in item action menus,
-  which carry none. An action's settings sit in its
-  menu, not in a separate dialog. Every menu has one shape: settings (segmented choices, switches,
-  checked options) first, then its choices, then after a divider the action that runs or leaves it
-  (Upscale, Animate in Composer, Clear). Labels name the verb alone where the menu or box already
-  says what it acts on (Upscale, Share, Copy, Clear, Reset; not Upscale Image or Clear Prompt),
-  adding a word only where the verb alone is ambiguous (Stop Upscale, Edit in Composer), and one
-  action keeps one label everywhere. Clear and Reset turn into Undo until the text next changes.
-  Assistant menus (Animate, Edit) share `assistMenu`: settings, the suggestions written for the
-  item under Suggestions with Refresh last, Library's records under Templates with Custom… last,
-  then the menu's other groups and its run. While suggestions load one Loading… row stands in,
-  with none one No Suggestions line; nothing reserves blank rows, so what follows may shift once.
-  Animate asks for motions only when opened, Edit outside the viewer likewise.
+
+### Actions & Menus
+
+- Search clears only its query; filters preserve it. Toolbars show search as a
+  field; phones open it from an icon.
+- Named controls that open a picker or menu show ▾ (Animate ▾, Copy ▾), small
+  beside an action bar's icon; ⋯ already means more, so it never carries one.
+  Icon-only controls use accessible names and tooltips.
+- Every menu has one shape: settings (segmented choices, switches, checked
+  options) first, then its choices, then after a divider the action that runs
+  or leaves it. Menus group related actions with the usual action first and
+  Delete last, and share their sizing and item style. An action's settings sit
+  in its menu, not a separate dialog. An option whose label alone is ambiguous
+  carries a one-line `description`, except in item action menus.
+- Sections sort alphabetically, except settings first, Like before Dislike,
+  Refresh and Custom… last and Delete last.
+- Labels name the verb alone where the menu or box already says what it acts
+  on (Upscale, Share, Clear; not Clear Prompt), adding a word only where the
+  verb alone is ambiguous (Stop Upscale, Edit in Composer). One action keeps
+  one label everywhere. Clear and Reset turn into Undo until the text next
+  changes.
+- Item actions are the same on tiles, context menus, the viewer and the
+  selection bar. `MediaActions.tsx` owns their availability and
+  `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
+  Submenus match in bar and menu, and assistant menus share `assistMenu`.
+  Bars name Retry, Stop and the menus and show the rest as icons; when they
+  outgrow their row the last names drop, then phones narrow the controls, and
+  only then do they wrap, never scrolling.
+- Like and Dislike rate an item and teach taste. A Dislike never deletes: it
+  hides the item with Undo, and the gallery's Disliked filter shows it again.
+- A finished selection action ends the selection, keeping selected only the
+  items it failed for; opening a menu does not. Quick selects take every
+  match, not only loaded pages, and deletion confirms.
 
 ### Layers, Focus & Phones
 
 - The phone layout covers screens below Mantine's `sm` breakpoint and phones
   held sideways (short touch screens up to 1000 px wide); iPads in landscape
-  keep the tablet layout. `ui/usePhone.ts` owns the rule: components use
+  keep the tablet layout. `ui/usePhone.ts` owns phone detection: components use
   `usePhone()` and `useSideways()`, and CSS the root's `data-phone` attribute
-  (`sideways` for a phone held sideways), never width media queries,
-  `visibleFrom` or `hiddenFrom`. A phone held sideways shows four gallery
-  columns and puts the viewer's controls and Dream's card captions beside the
-  media.
+  (`sideways` for a phone held sideways), never their own width queries,
+  `visibleFrom` or `hiddenFrom` to tell a phone.
 - Outside click and Escape close only the topmost layer; nothing beneath
   reacts. A closing layer no longer counts while it fades out.
   `ui/popupClicks.ts` owns this: custom handlers defer to `layerAbove(owner)`,
@@ -128,43 +148,22 @@ the primary component reference and verify APIs against the installed version.
   dropdowns stay inside their owning Popover with
   `comboboxProps.withinPortal: false` and preserve focus when selected.
 - Shared chip popups (`ChipPopup`) anchor on desktop and open full-screen
-  sheets on phones where the content needs the room; compact choices may use a
-  fitted popover. On desktop its heading (`PopupHeading`) holds the title, then
-  its actions at the end: every popup's Clear and Save, such as Save Preset,
-  as compact subtle buttons with Clear first. A saved record's name is one
-  combobox (`SavedName`): it loads, searches, and names the draft to save as
-  new or rename, marks Edited, shows Saved for a moment, keeps names unique and
-  enables Save only for a change. A side column, such as the LoRA stack, has its own heading with
-  its actions; desktop shows it beside the content, divided to the top, and
-  phones under it. On phones, overlays keep their actions at the bottom and
-  always in sight: a sheet's header holds only the title and Close, and its
-  footer (other actions, then Clear, Save and Apply where choices apply as
-  made) stays pinned above the safe area while the content between scrolls,
-  with one scroll owner per form; a full-screen dialog pins its `DialogFooter`
-  the same way. On touch screens, tablets included, chip popups and option lists
-  open with the keyboard down: a popup's or option list's search (the Profile
-  chip's) waits for a tap.
+  sheets on phones where the content needs the room. Their heading
+  (`PopupHeading`) holds the title, then compact subtle actions with Clear
+  first. A saved record's name is one `SavedName` combobox.
+- On phones, overlays keep their actions at the bottom and always in sight: a
+  sheet's header holds only the title and Close, its footer stays pinned above
+  the safe area while the content between scrolls, with one scroll owner per
+  form; a full-screen dialog pins its `DialogFooter` the same way. On touch
+  screens, popups and option lists open with the keyboard down; their search
+  waits for a tap.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
-  use `useOpenComposer`: close the source surface, open the correct page and
-  focus the prompt; phones open Generate with the keyboard down.
-- Use the shared `TextBox`. Composer fields edit in place on every breakpoint;
-  other phone text boxes open the shared full-screen editor. Beside the text
-  stand only the send, small Copy (where the page has no other) and Clear icons,
-  and one ⋯ menu of the box's own `tools` (Suggestions, Ask for a Change… or Improve Prompt, Recent
-  Prompts). The menu is one level deep: a tool's options (suggested changes,
-  Improve Prompt's styles, each with its description) are listed first under its
-  name, never in a submenu, then the other tools as one group. Improve Prompt's
-  styles, like Animate's templates, are Library › Prompt Styles' records, sorted alphabetically.
-  A box that opens the phone editor has no ⋯ beside it: the editor shows the
-  tools as named buttons in a bar above the keyboard, then Copy and Clear as
-  icons beside the sends, as in the composer, and its header holds only the
-  title and Done. A box without tools has no ⋯, Copy or Clear. Suggestions holds Refresh
-  under its options. The viewer's prompt has Improve Prompt (every style but
-  Custom) and resets to the item's prompt rather than clearing. It rests on one
-  line ending in an ellipsis and shows the whole prompt while focused. Its other
-  assistance opens the viewer's Edit ▾, whose Custom… asks for a change in its
-  own small dialog, never typed over the
-  prompt, with Review Prompt remembered.
+  use `useOpenComposer`.
+- Use the shared `TextBox`. Its tools sit in one ⋯ menu one level deep, a
+  tool's options listed under its name, never in a submenu. Composer fields
+  edit in place; other phone text boxes open the shared full-screen editor,
+  which shows the tools as named buttons above the keyboard. A box without
+  tools has no ⋯, Copy or Clear.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating
@@ -173,187 +172,64 @@ the primary component reference and verify APIs against the installed version.
   visible names where their icons alone are ambiguous. Preserve focus trapping,
   Escape and return focus in dialogs and viewers.
 - Scope shortcuts to the active surface; do not capture typing, composition or
-  another overlay. On phones, gallery tiles without Tile Captions hide their
-  menu button and open that menu on hold; other gallery tiles hold
-  to select. Holds cancel on movement and their release opens nothing.
-  Right-click, the Menu key and Shift+F10 open the same menu.
+  another overlay. Right-click, the Menu key and Shift+F10 open the same
+  context menu. Holds cancel on movement and their release opens nothing.
 
 ### Generation & Media
 
 - Preserve exact profile IDs and account-owned asset IDs. Display readable
   profile, family and reference-role names rather than backend filenames.
-  Profile options carry short facts (model or family · kind · Cloud or Local
-  GPU), not prose. Reference order, explicit slot IDs and source-result lineage
-  survive edits and reordering; optional End-only inputs and one asset in
-  several roles work. Group compatible linked slots by their declared capacity
-  rather than a global reference limit.
-- Selected LoRAs retain enable, strength and pointer/keyboard ordering controls
-  when filters hide them. Presets hold any parts of a draft; the LoRA stack
-  lists and saves this family's presets with LoRAs, applying only their LoRAs,
-  and preserves their family, order, strengths and disabled entries. Trigger words are applied when submitting, without
-  altering the typed prompt; reuse restores the typed prompt and Details
-  shows what ran.
+  Reference order, explicit slot IDs and source-result lineage survive edits
+  and reordering.
 - Preserve actual model/provider metadata. Studio routes work to a worker
-  itself; there is no worker choice. Animate displays its choice before queuing. Its
-  menus show one choice, Cloud | Fast | Quality, where the account prefers
-  videos to run: an account preference, not a menu setting, so Settings can
-  show it too. Cloud shows with the Cloud Models grant, Fast and Quality for
-  the local tiers a profile offers, and the choice only when there are two.
-  The preferred side falls back to the other, saying so; Extend keeps its
-  video's model unless Cloud is preferred.
-- Settings › Preferences › Where Work Runs sets Cloud or Local for Images and
-  Videos' Cloud | Fast | Quality as Animate's menus do. It sets only defaults: a
-  model the person picks wins, and a draft keeps following the default until
-  then. A default on the other side says so where its work shows: a
-  notification on queuing. Text is the account's text model picker for
-  prompt writing, the only one; its aliases route themselves, so it has no
-  fallback or notice. Studio's own calls keep their automatic route.
-- Replacing unsaved work with a preset asks first. Assistant proposals
-  replace text in place with Undo and a label naming the action and the words changed, leaving a review pause before
-  the proposed action runs, unless the viewer's Review Prompt is off. Suggestions never act on their own.
-  Ideas for an empty prompt are one Suggestions ▾ chip in the
-  box's chip row, after References (`usePromptIdeas`); nothing floats over the
-  text and ideas never show as a row of their own. Custom Animation's
-  instruction offers Suggestions of what could happen, written from the image.
-- Queue access belongs to the header status action. Under the queue, its popup
-  summarises each kind in one quiet, read-only line for everyone: Images and
-  Videos as their workers and Idle, N running or Stopped; Text as its local
-  models and state, or Cloud only. Report actual endpoint health:
-  configuration alone does not prove readiness. A deliberately parked worker
-  reads Stopped, not failing; an unexpectedly unavailable one remains a
-  failure. Runtime controls belong in Settings › Workers; only media work
-  waiting on GPUs a text model holds offers its swap where the work shows.
-- Keep recorded provider work and saving visible. Retry uses the shared queue
-  command; bulk retry deduplicates IDs, retains unsuccessful items and preserves
-  unrelated selection. Stop requests cancellation but accepted work may remain
-  active until the provider confirms or results are saved. Clear Failed removes
-  queue entries without deleting their records. Pause holds
-  unstarted work in place (all accounts for a multi-user administrator); started
-  work finishes. Reordering affects only the account's waiting work,
-  preserving other accounts and queue tiers. Started background work finishes.
-- The viewer is the iteration hub for finished and unfinished work, using the
-  same actions as tiles and context menus. `MediaActions.tsx` owns availability
-  and `itemActions.ts` the order for every bar and menu, the selection bar
-  offering those that act on several, with no ⋯ More anywhere. Sections sort
-  alphabetically but for Like before Dislike, Delete last, settings first and
-  Refresh and Custom… last; prefer even-sized sections. Bars: Animate ▾, Edit ▾,
-  Recreate ▾, Upscale ▾ | Like, Dislike, Report, Share ▾ | Similar, Delete. A
-  tile's context menu (right-click, hold, Menu key, Shift+F10): Select, which
-  starts selecting with that item | Like, Dislike, Report, Share | Animate,
-  Edit, Recreate, Upscale | Similar, Delete. Submenus match in bar and menu.
-  Animate: Cloud | Fast | Quality and Review Prompt, Suggestions, Templates,
-  then Animate in Composer (a video's templates continue it, then Extend in
-  Composer). Edit: Review Prompt, Suggestions, Templates (Library's changes),
-  then Use as Character, Use as Outfit, Use as Reference and Use as Scene (each
-  card starting in its Library section), then Edit in Composer; a video has
-  Save Frame as Image and Use Frame as Reference, then its edits and Trim….
-  Outside the viewer Edit's assistance opens the viewer to ask there. Recreate:
-  Run Again and Run Again, Same Seed, which queue from where they are, then
-  Compare Models, More Like This Set and Open Comparison where they apply, then
-  Recreate in Composer. Upscale: Show and Compare Upscale once there is one,
-  Face Detail, Quality and Size, then Upscale or Stop Upscale. Share: Copy
-  Details, Copy Prompt, Download and, where the device shares files, Share.
-  Options expand in place on phones and touch screens. Bars name Retry, Stop
-  and the four menus, the rest icons: phones under their icons across one row,
-  elsewhere beside them on one row; where they outgrow it the last names drop,
-  then phones narrow the controls, and only then do they wrap onto another row,
-  never scrolling. The phone bar
-  drops its prompt field while Details is open. Gallery
-  selection uses the shared contextual selection bar under the search and
-  filters, which stay in place; its quick selects take every match, not only
-  loaded pages, and it confirms deletion. A finished action ends
-  the selection, keeping selected only the items it failed for; opening a menu does not.
-- Like and Dislike rate an item and teach taste; a Dislike never deletes. It hides
-  the item from the gallery, Dream and search with Undo, and the Disliked switch
-  in the gallery's Filters shows it, where Dislike reads Restore. Report asks
-  what is wrong, has the assistant fix it as an edit or a run on its seed,
-  queues that as a version and dislikes the original with the issue.
-- Details sections show their content in full rather than scrolling it in a
-  box. Only a long caption folds, with Expand at the end of its last line; its
-  tags always show. Prompt and Negative Prompt alone have a Copy beside their heading.
-- Version grouping has one owner in `gallery/versions.ts`; sharing a session or
-  prompt alone does not group results. Keep source and derived relationships
-  visible, even when a result stands alone.
-- Viewers fill the viewport independently of workspace width. Empty-stage
-  clicks close; media, native video controls and actions remain interactive.
-  Images open fitted without exceeding their real size. Keep the current image
-  visible until the next version loads, then refit before painting. Navigation
-  stops at the first and last item. A result from a run of several, like its
-  Open All, flips through only that run's results; other results flip through
-  the gallery. A set's results stand together, newest first, in the gallery,
-  Runs and the viewer's one strip, which shows only that set on one row, the
-  shown result's versions standing smaller in its place (outside a set, its
-  versions alone), scrolling sideways to keep the current result in view. Closing reveals and
-  focuses the current tile.
-- On touch screens a tap on the media hides the viewer's chrome (top bar, arrows, strip, prompt,
-  actions and Details) with a fade, as Photos does, and another tap shows it; desktop keeps it.
-  A picture's tap waits out the double tap, and pinches, drags, long presses and swipes do not
-  count; swipes still navigate and keep it hidden until the viewer closes. A tap on a video whose
-  controls are hidden also shows them; taps while they show work them. Escape, a viewer key,
-  Details, a tap beside the media and focus reaching hidden chrome bring it back. Open menus and
-  sheets and loading actions stay in sight; the strip hides, even with results still loading. With
-  nothing else in sight the media glides to the middle of the screen at its fitted size.
-- Viewing and upscale comparison share `MediaZoom`. Mask zoom and pan preserve
-  pixels and undo history. Display, thumbnails, sharing and downloads respect
-  the saved original/upscale choice through `mediaSource`; video upscales stay
-  videos and comparison is an image action.
-- Pinned phone tile captions keep to two lines and leave out the time. Reserve
-  media dimensions, virtualise large galleries, lazy-load images and avoid
-  autoplaying tile videos. Release a closed viewer's player and pause playback
-  when the tab hides. Heavy tools load only when opened. Paging keeps loaded
-  results and offers retry on failure. Failed images show no broken icon.
+  itself; there is no worker choice. Trigger words apply when submitting,
+  without altering the typed prompt.
+- Replacing unsaved work with a preset asks first. Assistant proposals replace
+  text in place with Undo and a label naming the action and the words changed.
+  Suggestions never act on their own, and nothing floats over the text.
+- Report actual endpoint health: configuration alone does not prove readiness.
+  A deliberately parked worker reads Stopped, not failing; an unexpectedly
+  unavailable one remains a failure. Runtime controls belong in
+  Settings › Workers.
+- Keep recorded provider work and saving visible. Stop requests cancellation,
+  but accepted work may remain active until the provider confirms or results
+  are saved. Clear Failed removes queue entries without deleting their
+  records.
+- The viewer is the iteration hub for finished and unfinished work. Viewers
+  fill the viewport, keep the current image visible until the next loads,
+  stop navigation at the first and last item, and on closing reveal and focus
+  the current tile.
+- Version grouping has one owner in `gallery/versions.ts`. Viewing and upscale
+  comparison share `MediaZoom`. Display, thumbnails, sharing and downloads
+  respect the saved original/upscale choice through `mediaSource`.
+- Reserve media dimensions, virtualise large galleries, lazy-load images and
+  avoid autoplaying tile videos. Release a closed viewer's player and pause
+  playback when the tab hides. Heavy tools load only when opened. Paging keeps
+  loaded results and offers retry on failure.
 
 ### Data & Feedback
 
 - Switching modes preserves unsent prompts, references and settings. Use
   `useRemembered` for settled UI state per account, including every setting in
-  an action menu (Animate's Review Prompt, Upscale's quality, size and
-  Face Detail), shared by every surface showing that menu; a setting Settings
-  also shows, such as where videos run, is an account preference instead. Do
-  not persist open popups,
-  selection or search queries. Keep credentials and private account records
-  out of browser storage. A generated password shows once, in the view that
-  issued it; an MCP token shows only to its own account, hidden until Show.
-  Neither enters a query cache. Typing must not rerender unchanged media or history;
-  shared provider commands retain their identity.
+  an action menu, shared by every surface showing that menu; a setting Settings
+  also shows is an account preference instead. Do not persist open popups,
+  selection or search queries.
+- Keep credentials and private account records out of browser storage and
+  query caches. A generated password shows once, in the view that issued it;
+  an MCP token shows only to its own account, hidden until Show.
+- Typing must not rerender unchanged media or history; shared provider
+  commands retain their identity.
 - Account groups own grants. Runtime definition edits retain administrator
   approval and conflict handling; read back saved changes.
-- A queued generation whose prompt is written streams its thinking and prompt
-  in the Writing Prompt stage without a review pause. Viewer change proposals
-  and Animate's Review Prompt are explicit review paths: Run queues the
-  edited prompt exactly as shown.
 - Failed forms show their mutation error inline. Other failures use the
   `MutationCache` default notification; avoid duplicate error surfaces.
 - Routine success appears where it happened: a saved row, a copy check or a
   brief action label (`useFlash`). Notifications serve failures, Undo and
-  outcomes with nowhere else to show. Generation submission and completion
-  appear in their gallery or strip, from any source, as soon as the queue
-  reports them, without waiting for every loaded page; the gallery shows
-  unfinished work as the account's Unfinished Work preference says (None by
-  default, In Progress or Queued). Keep notifications clear of actions.
-- Dream results stay in their own pool until kept; Dislike, Like and Keep teach taste.
-  Dream opens on the deck, a swipeable card stack of unseen results,
-  comparisons and calibration, keyed on desktop; Overview's While You Were Away
-  lists each project's unseen results by how well they fit its brief, misses
-  folded last and kept. Its cards and the deck's bar offer only large Dislike,
-  Like (keep and like) and Keep; a comparison's images fill its card and
-  are its A and B, a tap choosing one with Undo and a hold, pinch or its label
-  opening it in the viewer, over compact Neither and Both. The viewer's bar
-  offers every choice, More Like This and Variations under Recreate ▾. A
-  comparison's viewer steps between its sides as any viewer does, naming the
-  shown side in the top bar, with Side by Side in its bar on desktop. Familiar ideas vary
-  one thing of a liked or kept image on its profile, LoRAs and settings; a
-  project's brief steers them rather than replacing them.
-  Calibration uses only the account's own Studio generations and leaves the
-  gallery unchanged apart from an explicit Like or Dislike. Dream keeps every free
-  GPU busy within its daily caps: images start while nobody's own work waits,
-  videos only while Studio is idle. Its jobs show in the
-  person's queue with a Dream badge, wait below everyone's own work and are not
-  reordered; Stop All leaves them to Dream's own pause.
-- Face Redo queues one Run Again of a drifted character result in its owner's
-  own queue as a version of it, never a redo of a redo; Details says so.
+  outcomes with nowhere else to show, clear of actions. Generation submission
+  and completion appear in their gallery or strip as soon as the queue reports
+  them.
 
-### Motion & Verification
+### Motion
 
 - Use shared motion tokens for short transitions without layout jumps, flashes
   or blocked input. Page, tab and section navigation is immediate; animation
@@ -361,8 +237,3 @@ the primary component reference and verify APIs against the installed version.
 - Animate transform and opacity, allowing Mantine indicators to size themselves.
   Avoid decorative hover movement and layout animation in hot paths. Respect
   reduced motion in CSS and Mantine, and retain colour and focus feedback.
-- Browser specs cover meaningful desktop, Chromium phone and WebKit phone
-  flows through accessible roles and event-driven fixtures. Keep shared mocks
-  in `fixtures.ts` and cross-feature journeys in `workflows.spec.ts`. Avoid
-  exact animation timing and cosmetic-only assertions; fixtures never become
-  production fallbacks. Report measured conditions for performance claims.
