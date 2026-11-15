@@ -1,4 +1,4 @@
-import { ActionIcon, Group, TextInput, type TextInputProps } from "@mantine/core";
+import { ActionIcon, TextInput, type TextInputProps } from "@mantine/core";
 import { useMergedRef } from "@mantine/hooks";
 import { ArrowLeft, Search } from "lucide-react";
 import { forwardRef, useRef } from "react";
@@ -18,7 +18,6 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
   const input = useRef<HTMLInputElement>(null);
   const ref = useMergedRef(input, forwardedRef);
   const hasQuery = String(value ?? "").length > 0;
-  const controls = Number(hasQuery);
   return (
     <TextInput
       placeholder="Search"
@@ -35,26 +34,21 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
         )
       }
       leftSectionPointerEvents={onClose ? "all" : undefined}
-      rightSectionWidth={controls ? controls * 30 + 8 : undefined}
       rightSection={
-        controls ? (
-          <Group gap={0} wrap="nowrap">
-            {hasQuery && (
-              <ActionIcon
-                aria-label="Clear Search"
-                variant="subtle"
-                color="gray"
-                size={30}
-                onClick={() => {
-                  onClear();
-                  input.current?.focus();
-                }}
-              >
-                <icons.clear size={16} />
-              </ActionIcon>
-            )}
-          </Group>
-        ) : undefined
+        hasQuery && (
+          <ActionIcon
+            aria-label="Clear Search"
+            variant="subtle"
+            color="gray"
+            size={30}
+            onClick={() => {
+              onClear();
+              input.current?.focus();
+            }}
+          >
+            <icons.clear size={16} />
+          </ActionIcon>
+        )
       }
     />
   );
