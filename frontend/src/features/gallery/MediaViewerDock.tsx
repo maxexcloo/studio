@@ -166,9 +166,38 @@ function ResultStrip({
   depths?: boolean;
   choose?: (item: MediaItem) => void;
 }) {
+  // The shown result stays centred in the strip as the viewer moves, scrolling only the strip:
+  // at once on opening, smoothly after unless motion is reduced.
+  const viewport = useRef<HTMLDivElement>(null);
+  const placed = useRef(false);
+  useEffect(() => {
+    const element = viewport.current;
+    const shown = element?.querySelector<HTMLElement>("[data-current]");
+    if (!element || !shown) return;
+    const still = !placed.current || matchMedia("(prefers-reduced-motion: reduce)").matches;
+    placed.current = true;
+    element.scrollTo({
+      left: shown.offsetLeft - (element.clientWidth - shown.offsetWidth) / 2,
+      behavior: still ? "instant" : "smooth",
+    });
+  }, [current.id]);
   return (
-    <ScrollArea className={classes.strip} onClick={(event) => event.stopPropagation()}>
-      <Group gap={6} wrap="nowrap" role="list" aria-label={label} justify="center" px={2} py={2}>
+    <ScrollArea
+      className={classes.strip}
+      viewportRef={viewport}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {/* Centred while it fits; wider, it starts at the edge so every thumbnail scrolls into reach. */}
+      <Group
+        gap={6}
+        wrap="nowrap"
+        role="list"
+        aria-label={label}
+        w="max-content"
+        mx="auto"
+        px={2}
+        py={2}
+      >
         {entries.map(({ key, item: result, depth }, index) => {
           const shown = result?.id === current.id;
           return (
@@ -204,13 +233,8 @@ function Thumbnail({
   onClick: () => void;
 }) {
   const thumbnail = result?.thumbnailUrl || (result?.type === "image" ? result.url : "");
-  const button = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (shown) button.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [shown]);
   return (
     <UnstyledButton
-      ref={button}
       role="listitem"
       className={classes.variation}
       data-current={shown || undefined}
