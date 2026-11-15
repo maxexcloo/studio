@@ -140,9 +140,7 @@ async function applyMappedInputs(graph, workflow, body) {
   }
 }
 
-const maxLoras = 8;
-
-function enabledLoras(body, limit = maxLoras) {
+function enabledLoras(body, limit) {
   return Array.isArray(body.loras)
     ? body.loras.filter((item) => item?.enabled !== false && item?.name).slice(0, limit)
     : [];

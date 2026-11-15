@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { upscaleQualities } from "../shared/upscale.ts";
 import { canAdmin } from "./access.js";
 import { ownedQuery, ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import { profileOnBackendKey, readyWorkers } from "./comfy/backends.js";
@@ -14,7 +15,6 @@ import { dataDir, galleryItems } from "./gallery/store.js";
 import { queueSchedule, runEstimate, workerLoads } from "./queue-eta.js";
 import { requireAdmin } from "./route-access.js";
 import { galleryStats, profileStats, recentRuns } from "./stats.js";
-import { upscaleQualities } from "./upscale.js";
 import { capabilityForProfile, defaultWorker } from "./workers.js";
 
 // Whether the default worker's ComfyUI runs on this machine, for the bug report.

@@ -3,6 +3,7 @@ import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
+import { maxLoras } from "../../../../shared/profiles";
 import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import type { Action as ToolAction } from "../../ui/ActionBar";
@@ -287,7 +288,9 @@ export function usePromptAssistant({
   });
   function apply(suggestion: Suggestion) {
     if (input.loras.some((item) => item.name === suggestion.name)) return;
-    if (input.loras.filter((item) => item.enabled !== false).length >= (profile?.maxLoras || 8)) {
+    if (
+      input.loras.filter((item) => item.enabled !== false).length >= (profile?.maxLoras || maxLoras)
+    ) {
       notifications.show({
         color: "yellow",
         message: "Disable or remove a LoRA before adding another.",

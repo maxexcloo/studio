@@ -1,3 +1,4 @@
+import { upscaleQualities } from "../shared/upscale.ts";
 import { recordBelongsToAccount, recordsForRequest } from "./account-ownership.js";
 import { isDefaultBackend, routeJob } from "./comfy/backends.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
@@ -8,7 +9,6 @@ import { findUpscaleTarget, prepareUpscale, toggleUpscaleView } from "./upscale-
 import {
   normalizeQuality,
   uploadUpscaleVideoSource,
-  upscaleQualities,
   upscaleStatus,
   upscaleTargets,
 } from "./upscale.js";

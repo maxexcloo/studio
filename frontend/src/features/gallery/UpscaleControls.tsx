@@ -2,11 +2,12 @@ import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, ScanFace } from "lucide-react";
 
-import type {
-  UpscaleQuality,
-  UpscaleRequest,
-  UpscaleResponse,
-  UpscaleStatus,
+import {
+  type UpscaleQuality,
+  type UpscaleRequest,
+  type UpscaleResponse,
+  type UpscaleStatus,
+  upscaleQualities,
 } from "../../../../shared/upscale";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
@@ -173,7 +174,7 @@ function upscaleSettings(quick: ReturnType<typeof useQuickUpscale>, image: boole
       icon: icons.upscale,
       choice: {
         value: quick.quality,
-        options: (status?.qualities ?? (["fast", "balanced", "high"] as const)).map((value) => ({
+        options: (status?.qualities ?? upscaleQualities).map((value) => ({
           value,
           label: value[0].toUpperCase() + value.slice(1),
         })),

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 
+import { upscaleQualities } from "../shared/upscale.ts";
 import { hasFullAccess, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
 import { startFrameSize } from "./animate-profile.js";
 import { assistantRecord } from "./assistant-routes.js";
@@ -30,7 +31,7 @@ import { loraAllowed } from "./model/catalogue.js";
 import { recordPrompt } from "./prompt-history.js";
 import { referenceExistsForAccount, stageReferenceAssetsForAccount } from "./references.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
-import { upscaleQualities, upscaleTargets } from "./upscale.js";
+import { upscaleTargets } from "./upscale.js";
 import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {
   capabilityForProfile,

@@ -1,4 +1,5 @@
-export type UpscaleQuality = "fast" | "balanced" | "high";
+export const upscaleQualities = ["fast", "balanced", "high"] as const;
+export type UpscaleQuality = (typeof upscaleQualities)[number];
 type UpscaleTarget = 2048 | 4096;
 
 export interface UpscaleRequest {

@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 
+import { maxLoras } from "../../../../shared/profiles";
 import { api } from "../../api";
 import type { GenerationInput, Profile } from "../../types";
 import { inputForProfile } from "./GenerationProvider";
@@ -53,7 +54,7 @@ export function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
       )
     )
       blockers.push("This profile cannot load all source LoRAs.");
-    const maximum = profile.maxLoras ?? 8;
+    const maximum = profile.maxLoras ?? maxLoras;
     if (loras.length > maximum) blockers.push(`This profile supports up to ${maximum} LoRAs.`);
     const checkpoint = resources.find((resource) =>
       ["checkpoints", "diffusion_models"].includes(resource.folder || ""),
