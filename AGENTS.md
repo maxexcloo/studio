@@ -256,7 +256,8 @@ the primary component reference and verify APIs against the installed version.
   Options expand in place on phones and touch screens. Bars name Retry, Stop
   and the four menus, the rest icons: phones under their icons across one row,
   elsewhere beside them on one row; where they outgrow it the last names drop,
-  and only then do they wrap onto another row, never scrolling. The phone bar
+  then phones narrow the controls, and only then do they wrap onto another row,
+  never scrolling. The phone bar
   drops its prompt field while Details is open. Gallery
   selection uses the shared contextual selection bar under the search and
   filters, which stay in place; its quick selects take every match, not only
