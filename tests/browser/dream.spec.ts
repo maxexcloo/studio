@@ -338,8 +338,7 @@ test("Taste displays readable preferences and saves explicit edits separately", 
       signals: 40,
     },
   });
-  await page.goto("/dream");
-  await page.getByRole("button", { name: "Taste", exact: true }).click();
+  await page.goto("/dream/taste");
   const profile = page.getByRole("region", { name: "Taste Profile" });
   await expect(profile.getByText(/foxes in snow/)).toBeVisible();
   await expect(profile.getByText("Image Quality", { exact: true })).toBeVisible();
