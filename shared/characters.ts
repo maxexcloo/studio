@@ -190,12 +190,13 @@ export function characterProfiles<
 /**
  * What leads a prompt for a character, with the card's description verbatim: the reference image
  * names the person and the description adds lasting looks, so the prompt after it only sets the
- * outfit and scene. Without the image (`fromImage` false) the description alone leads.
+ * outfit and scene, naming its `images` in the plural when the run sends several. Without the
+ * image (`fromImage` false) the description alone leads.
  */
-export function characterLead(description: string, fromImage = true) {
+export function characterLead(description: string, fromImage = true, images = 1) {
   const looks = description.trim().replace(/[\s.,;:]+$/, "");
   if (!fromImage) return looks && `${looks}.`;
-  return `The person from the reference image${looks ? `, ${looks},` : ""} with the same face, hair and build.`;
+  return `The person from the reference image${images > 1 ? "s" : ""}${looks ? `, ${looks},` : ""} with the same face, hair and build.`;
 }
 
 /** The prompt led by a card's identity (characterLead), unless it already holds it. */
