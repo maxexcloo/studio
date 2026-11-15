@@ -13,7 +13,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
     capabilities: ["image", "video", "upscale", "models"],
   },
 ]);
-const { createGuideStore, createProfileStore, hashOf, livePrompting } = await import("./store.js");
+const { createGuideStore, createProfileStore, livePrompting } = await import("./store.js");
 const editor = await import("./editor.js");
 const { loadMcpPrompting, mergedPrompting } = await import("../mcp/prompting.js");
 const { userWorkflowsDir } = await import("../custom-workflows.js");
@@ -44,63 +44,19 @@ const scratch = (t) => {
   return dir;
 };
 
-test("profiles migrate once: the current file becomes the seed version", (t) => {
+test("the same text again is no new version", (t) => {
   const dir = scratch(t);
-  const workflows = path.join(dir, "workflows");
-  fs.mkdirSync(workflows, { recursive: true });
-  fs.writeFileSync(path.join(workflows, "edited.json"), profile("Third"));
-  fs.writeFileSync(path.join(workflows, "plain.json"), profile("Plain"));
-  fs.writeFileSync(
-    path.join(workflows, ".studio-edits.json"),
-    JSON.stringify({
-      edited: {
-        editedAt: "2026-10-03T10:00:00.000Z",
-        by: "admin-1",
-        baseHash: hashOf(profile("First")),
-      },
-    }),
-  );
-  const before = fs.readFileSync(path.join(workflows, ".studio-edits.json"), "utf8");
-  const store = createProfileStore({ dataDir: dir, workflowsDir: workflows, log: quiet });
-  assert.deepEqual(store.migrate(), { profiles: 2, versions: 2 });
-  assert.deepEqual(
-    store.versions("edited").map((item) => [item.version, item.origin, item.by, item.at]),
-    [[1, "seed", "seed", "2026-10-03T10:00:00.000Z"]],
-  );
-  assert.match(store.version("edited", 1).text, /"Third"/);
-  assert.equal(store.meta("edited").seedHash, hashOf(profile("First")));
-  assert.deepEqual(
-    store.versions("plain").map((item) => item.origin),
-    ["seed"],
-  );
-  // Idempotent; a seed deploy that changed an unedited profile is a new seed version.
-  assert.deepEqual(store.migrate(), { profiles: 2, versions: 0 });
-  fs.writeFileSync(path.join(workflows, "plain.json"), profile("Plain v2"));
-  assert.deepEqual(store.migrate(), { profiles: 2, versions: 1 });
-  assert.deepEqual(
-    store.versions("plain").map((item) => [item.version, item.origin]),
-    [
-      [2, "seed"],
-      [1, "seed"],
-    ],
-  );
-  assert.equal(
-    fs.readFileSync(path.join(workflows, ".studio-edits.json"), "utf8"),
-    before,
-    ".studio-edits.json is left for the deploy script",
-  );
-  // The same text again is no new version.
-  assert.equal(store.record("plain", profile("Plain v2"), { origin: "studio" }).version, 2);
-  assert.deepEqual(fs.readdirSync(path.join(dir, "history", "profiles", "plain")).sort(), [
-    "1.json",
-    "2.json",
-  ]);
+  const store = createProfileStore({ dataDir: dir });
+  assert.equal(store.record("plain", profile("Plain"), { origin: "seed" }).version, 1);
+  assert.equal(store.record("plain", profile("Plain"), { origin: "studio" }).version, 1);
+  assert.deepEqual(fs.readdirSync(path.join(dir, "history", "profiles", "plain")), ["1.json"]);
 });
 
 test("saving through the editor records versions, marks AI drafts until an edit or Approve, and reverts as a new version", () => {
   fs.mkdirSync(userWorkflowsDir, { recursive: true });
   fs.writeFileSync(path.join(userWorkflowsDir, "image-test.json"), profile("Seed Name"));
-  const store = createProfileStore({ log: quiet });
+  const store = createProfileStore();
+  store.record("image-test", profile("Seed Name"), { origin: "seed" });
   const { hash } = editor.readEditableProfile("image-test");
   const drafted = editor.saveEditableProfile("image-test", profile("AI Name"), {
     baseHash: hash,
@@ -141,13 +97,6 @@ test("saving through the editor records versions, marks AI drafts until an edit 
     store.versions("image-test").map((item) => item.version),
     [5, 4, 3, 2, 1],
     "history only grows",
-  );
-  assert.equal(
-    JSON.parse(fs.readFileSync(path.join(userWorkflowsDir, ".studio-edits.json"), "utf8"))[
-      "image-test"
-    ].by,
-    "admin-1",
-    "still written",
   );
   assert.throws(() => editor.revertEditableProfile("image-test", 9), /version was not found/);
 });

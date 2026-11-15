@@ -223,12 +223,10 @@ app.use((req, res, next) => {
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
 app.use(requestGuard({ network: networkListening }));
 // Once per start and safe to repeat: the samples seed an empty data folder, then the catalogue
-// and profile stores take in what the older files hold, which stay where they are
-// (profile/seed.js, library/catalogue.js, profile/store.js).
+// takes in the model manifest (profile/seed.js, library/catalogue.js).
 for (const [name, migrate] of [
   ["seed", () => seedSamples({ dataDir, workflowsDir: userWorkflowsDir, store: profileStore() })],
   ["catalogue", () => loraCatalogue().migrate()],
-  ["profiles", () => profileStore().migrate()],
 ]) {
   try {
     migrate();
