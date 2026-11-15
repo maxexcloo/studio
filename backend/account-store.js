@@ -12,6 +12,7 @@ import { accountPreferences, forgetAccountPreferences } from "./account-preferen
 import { currentDataDir } from "./data-dir.js";
 import { scryptAsync } from "./kdf.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
+import { digest } from "./values.js";
 
 const dataDir = currentDataDir();
 const sessionLifetimeMs = 30 * 24 * 60 * 60 * 1000;
@@ -797,7 +798,7 @@ export function signInWithOidcIdentity({
     const base =
       validUsername(email) && emailVerified
         ? email
-        : `oidc-${crypto.createHash("sha256").update(`${issuer}|${subject}`).digest("hex").slice(0, 12)}`;
+        : `oidc-${digest(`${issuer}|${subject}`).slice(0, 12)}`;
     let username = base;
     for (
       let suffix = 2;

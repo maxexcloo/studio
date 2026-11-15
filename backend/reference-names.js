@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+import { digest } from "./values.js";
 
 /** The image types Studio takes as references and reuses as results. */
 export const imageMimes = ["image/png", "image/jpeg", "image/webp"];
@@ -18,6 +18,6 @@ export function mimeExtension(mime = "") {
  * picture is uploaded once.
  */
 export function referenceInputName(buffer, mime = "") {
-  const hash = crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 32);
+  const hash = digest(buffer).slice(0, 32);
   return `studio-reference-${hash}.${mimeExtension(mime)}`;
 }

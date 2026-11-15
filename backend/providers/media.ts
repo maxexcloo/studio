@@ -1,10 +1,11 @@
-import { createHash } from "node:crypto";
 import path from "node:path";
 
 import sharp from "sharp";
 
 import type { QueueMedia } from "../../shared/queue.ts";
 import type { OwnedJob } from "../domain/store.ts";
+import { mediaUrls } from "../media-paths.js";
+import { digest } from "../values.js";
 
 /** Provider outputs use existing Studio media names and result-link shapes. */
 export function providerMediaWriter(
@@ -23,7 +24,7 @@ export function providerMediaWriter(
   ): Promise<QueueMedia> => {
     const subfolder = subfolderFor(job.ownerId);
     const directory = path.join(root, subfolder);
-    const filename = `${createHash("sha256").update(job.id).digest("hex")}-${index}.${kind === "video" ? "mp4" : "png"}`;
+    const filename = `${digest(job.id)}-${index}.${kind === "video" ? "mp4" : "png"}`;
     const destination = path.join(directory, filename);
     let content = kind === "image" ? await sharp(bytes).png().toBuffer() : bytes;
     const dimensions = kind === "image" ? await sharp(content).metadata() : undefined;
@@ -42,15 +43,13 @@ export function providerMediaWriter(
       content = annotated;
     }
     await writeBytes(destination, content, { mode: 0o600 });
-    const query = new URLSearchParams({ filename, subfolder, type: "media" }).toString();
     return {
       id: `${job.id}-${index}`,
       jobId: job.id,
       index,
       type: kind,
       status: "done",
-      url: `/comfy/view?${query}`,
-      thumbnailUrl: `/comfy/thumb?${query}`,
+      ...mediaUrls(filename, subfolder),
       filename,
       provider: "cliproxyapi",
       providerModel: model,
