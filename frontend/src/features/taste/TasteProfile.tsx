@@ -27,7 +27,7 @@ export interface Taste {
   profiles: Record<"image" | "video", ({ id: string } & Weighted)[]>;
   loras: ({ name: string; strength?: number } & Weighted)[];
   updatedAt: string;
-  /** How many signals (stars, comparisons, iterations) the profile holds. */
+  /** How many signals (likes, comparisons, iterations) the profile holds. */
   signals: number;
   /** Whether the text model may write this account's profile. */
   writer: boolean;
@@ -197,7 +197,7 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
           clear.reset();
         }}
       >
-        Studio forgets what it learnt and what you asked it to avoid. Your gallery and stars stay.
+        Studio forgets what it learnt and what you asked it to avoid. Your gallery and likes stay.
       </ConfirmDialog>
     </SettingGroup>
   );

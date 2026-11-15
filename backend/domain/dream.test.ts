@@ -549,7 +549,11 @@ test("Dream draws a ready profile by its taste, explores one axis at a time and 
   // Uncensored Models only, since imports carry no content rating.
   state.access.alice!.uncensored = true;
   state.loras.alice = {
-    ratings: { "fox.safetensors": "up", "film.safetensors": "up", "ink.safetensors": "down" },
+    ratings: {
+      "fox.safetensors": "liked",
+      "film.safetensors": "liked",
+      "ink.safetensors": "disliked",
+    },
     strengths: {},
   };
   state.inspiration = [
@@ -1198,19 +1202,19 @@ test("Calibration offers the account's older Studio generations, unjudged first,
   );
 });
 
-test("Dream loads a LoRA drawn by taste and thumbs up, at its learnt strength, and explores untried ones", async (t) => {
+test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and explores untried ones", async (t) => {
   const { dream, state, store, taste, dreamOnce } = fixture(t, [profiles[0]]);
   // A LoRA for another family is left out; the run goes ahead without it.
-  state.loras.alice = { ratings: { "klein.safetensors": "up" }, strengths: {} };
+  state.loras.alice = { ratings: { "klein.safetensors": "liked" }, strengths: {} };
   await dream.save("alice", { enabled: true });
   assert.deepEqual((await dreamOnce())!.input.loras, []);
   state.loras.alice = {
     ratings: {
-      "klein.safetensors": "up",
-      "not-installed.safetensors": "up",
-      "fox.safetensors": "up",
-      "film.safetensors": "up",
-      "ink.safetensors": "down",
+      "klein.safetensors": "liked",
+      "not-installed.safetensors": "liked",
+      "fox.safetensors": "liked",
+      "film.safetensors": "liked",
+      "ink.safetensors": "disliked",
     },
     strengths: { "family:flux": { "film.safetensors": 0.6 } },
   };
@@ -1218,7 +1222,7 @@ test("Dream loads a LoRA drawn by taste and thumbs up, at its learnt strength, a
     (store.job("alice", job.id)!.input.loras as { name: string; strength: number }[]).map(
       (lora) => [lora.name, lora.strength],
     );
-  // Thumbs up alone: the first of those alike, at its saved strength.
+  // Liked alone: the first of those alike, at its saved strength.
   assert.deepEqual(loras((await dreamOnce())!), [["fox.safetensors", 1]]);
   // A liked result with film at 0.8 outweighs it, at the strength it was liked at.
   taste.record("alice", [

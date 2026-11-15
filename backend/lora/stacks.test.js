@@ -15,40 +15,46 @@ const {
   saveLoraLibrary,
   saveLoraStack,
 } = await import("./stacks.js");
-const { runtimeDatabase } = await import("../persistence/runtime.ts");
+const { ownerDocumentName, readRuntimeDocument, runtimeDatabase } =
+  await import("../persistence/runtime.ts");
 const { Store } = await import("../domain/store.ts");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 test("account LoRA stacks and library state use separate files from each other and legacy state", () => {
   clearLoraState("account-a");
   clearLoraState("account-b");
-  saveLoraLibrary({ ratings: { "private-a.safetensors": "up" } }, "account-a");
-  saveLoraLibrary({ ratings: { "private-b.safetensors": "down" } }, "account-b");
-  assert.deepEqual(loadLoraLibrary("account-a").ratings, { "private-a.safetensors": "up" });
-  assert.deepEqual(loadLoraLibrary("account-b").ratings, { "private-b.safetensors": "down" });
+  saveLoraLibrary({ ratings: { "private-a.safetensors": "liked" } }, "account-a");
+  saveLoraLibrary({ ratings: { "private-b.safetensors": "disliked" } }, "account-b");
+  assert.deepEqual(loadLoraLibrary("account-a").ratings, { "private-a.safetensors": "liked" });
+  assert.deepEqual(loadLoraLibrary("account-b").ratings, { "private-b.safetensors": "disliked" });
   assert.equal(loadLoraLibrary()?.ratings["private-a.safetensors"], undefined);
+  // The saved ratings predate Like.
+  assert.deepEqual(
+    readRuntimeDocument(dir, ownerDocumentName("lora-stacks", "account-b")).library.ratings,
+    { "private-b.safetensors": "down" },
+  );
 });
 
 test("replayed ratings are harmless", () => {
   clearLoraState();
   applyLoraOps([
-    { op: "rating", name: "a", rating: "up" },
-    { op: "rating", name: "a", rating: "up" },
-    { op: "rating", name: "b", rating: "down" },
+    { op: "rating", name: "a", rating: "liked" },
+    { op: "rating", name: "a", rating: "liked" },
+    { op: "rating", name: "b", rating: "disliked" },
     { op: "rating", name: "b", rating: null },
   ]);
-  assert.deepEqual(loadLoraLibrary().ratings, { a: "up" });
+  assert.deepEqual(loadLoraLibrary().ratings, { a: "liked" });
 });
 
 test("a stale whole-library save merges instead of wiping newer ratings", () => {
   clearLoraState();
-  applyLoraOps([{ op: "rating", name: "a", rating: "up" }]);
+  applyLoraOps([{ op: "rating", name: "a", rating: "liked" }]);
   const library = saveLoraLibrary({
-    ratings: { a: "down", b: "down" },
+    ratings: { a: "disliked", b: "disliked" },
     strengths: {},
     recents: [],
   });
-  assert.deepEqual(library.ratings, { a: "up", b: "down" });
+  assert.deepEqual(library.ratings, { a: "liked", b: "disliked" });
 });
 
 test("strengths, recents and the active stack all apply", () => {
@@ -82,7 +88,7 @@ test("a removed LoRA leaves every account's stacks, strengths, ratings, recents 
   saveLoraLibrary(
     {
       strengths: { fast: { "gone.safetensors": 0.5 } },
-      ratings: { "gone.safetensors": "up" },
+      ratings: { "gone.safetensors": "liked" },
       recents: ["gone.safetensors", "kept.safetensors"],
     },
     "account-c",

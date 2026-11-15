@@ -15,11 +15,24 @@ const stacksDocument = (ownerId = "") => ownerDocumentName("lora-stacks", ownerI
 const maxLorasPerStack = 8;
 const maxOpsPerRequest = 500;
 
+// Ratings are stored as "up" and "down", which predate Like.
+const storedRatings = { liked: "up", disliked: "down" };
+const readRatings = { up: "liked", down: "disliked" };
+const withRatings = (library, names) =>
+  library?.ratings && typeof library.ratings === "object"
+    ? {
+        ...library,
+        ratings: Object.fromEntries(
+          Object.entries(library.ratings).map(([name, rating]) => [name, names[rating]]),
+        ),
+      }
+    : library;
+
 function readState(ownerId = "") {
   try {
     const value = readRuntimeDocument(dataDir, stacksDocument(ownerId));
     if (value?.stacks && typeof value.stacks === "object")
-      return { stacks: value.stacks, library: value.library || null };
+      return { stacks: value.stacks, library: withRatings(value.library, readRatings) || null };
     return { stacks: value && typeof value === "object" ? value : {}, library: null };
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
@@ -28,7 +41,10 @@ function readState(ownerId = "") {
 }
 
 function writeState(state, ownerId = "") {
-  writeRuntimeDocument(dataDir, stacksDocument(ownerId), state);
+  writeRuntimeDocument(dataDir, stacksDocument(ownerId), {
+    ...state,
+    library: withRatings(state.library, storedRatings),
+  });
 }
 
 function cleanStack(value) {
@@ -77,12 +93,12 @@ function cleanStrengths(value) {
   );
 }
 
-/** Thumbs up or down per LoRA file; anything else is unrated and left out. */
+/** Liked or disliked per LoRA file; anything else is unrated and left out. */
 function cleanRatings(value) {
   const source = value && typeof value === "object" ? value : {};
   return Object.fromEntries(
     Object.entries(source)
-      .filter(([name, rating]) => name.trim() && (rating === "up" || rating === "down"))
+      .filter(([name, rating]) => name.trim() && (rating === "liked" || rating === "disliked"))
       .slice(0, 2000),
   );
 }
@@ -144,7 +160,7 @@ function applyOp(state, library, op) {
     case "rating": {
       const name = String(op.name || "").trim();
       if (!name) break;
-      if (op.rating === "up" || op.rating === "down") library.ratings[name] = op.rating;
+      if (op.rating === "liked" || op.rating === "disliked") library.ratings[name] = op.rating;
       else delete library.ratings[name];
       break;
     }

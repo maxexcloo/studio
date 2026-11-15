@@ -101,7 +101,7 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
     try {
       const result = deleteImportedWorkflow(req.params.id.replace(/^custom:/, ""));
       const preferences = loadWorkflowPreferences();
-      preferences.favorites = preferences.favorites.filter(
+      preferences.liked = preferences.liked.filter(
         (id) => id !== `custom:${result.id}` && id !== result.id,
       );
       delete preferences.lastUsed[`custom:${result.id}`];

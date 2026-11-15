@@ -341,12 +341,12 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
     server,
     "taste",
     "taste & lora ratings",
-    "The user's taste profile, when asked: read, save (avoid replaces their avoid list), refresh or reset. rate_lora sets a LoRA (name from models) up, down or none; needs the LoRAs feature.",
+    "The user's taste profile, when asked: read, save (avoid replaces their avoid list), refresh or reset. rate_lora sets a LoRA (name from models) like, dislike or none; needs the LoRAs feature.",
     {
       action: z.enum(["read", "save", "refresh", "reset", "rate_lora"]).default("read"),
       avoid: z.array(z.string().trim().max(maxAvoid)).max(maxAvoids).optional(),
       lora: z.string().trim().min(1).max(400).optional(),
-      rating: z.enum(["up", "down", "none"]).optional(),
+      rating: z.enum(["like", "dislike", "none"]).optional(),
     },
     async ({ action, avoid, lora, rating }, signal) => {
       if (action === "rate_lora") {
@@ -354,7 +354,15 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
         const { library = {} } = await api(
           "POST",
           "/api/loras/library/ops",
-          { ops: [{ op: "rating", name: lora, rating: rating === "none" ? null : rating }] },
+          {
+            ops: [
+              {
+                op: "rating",
+                name: lora,
+                rating: { like: "liked", dislike: "disliked" }[rating] ?? null,
+              },
+            ],
+          },
           signal,
         );
         return mcpJson({ lora, rating: library.ratings?.[lora] || "none" });

@@ -105,7 +105,7 @@ fs.writeFileSync(
 );
 saveWorkflowPreferences(
   {
-    favorites: [`custom:${radianceId}`],
+    liked: [`custom:${radianceId}`],
     lastUsed: { [`custom:${comfyId}`]: "2026-10-20T00:00:00.000Z" },
   },
   { immediate: true },
@@ -363,7 +363,7 @@ test("combining needs the preview's hash, backs up, aliases each id to its backe
       Object.keys(section).filter((key) => key.startsWith("custom:")),
       [],
     );
-  assert.deepEqual(loadWorkflowPreferences().favorites, [`custom:${combinedId}`]);
+  assert.deepEqual(loadWorkflowPreferences().liked, [`custom:${combinedId}`]);
   assert.deepEqual(Object.keys(loadWorkflowPreferences().lastUsed), [`custom:${combinedId}`]);
   // LoRA stacks and strengths follow; strengths of both old ids join.
   const stacks = readRuntimeDocument(temporary, "lora-stacks:owner");

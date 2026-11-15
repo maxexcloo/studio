@@ -8,15 +8,15 @@ import {
 /**
  * Prompts you generated with, newest first, kept per account in studio.sqlite
  * (`prompt-history:<key>`, `negative-prompt-history:<key>`) so every device sees the same list.
- * A prompt used again moves to the top instead of appearing twice; pinned ones stay no matter how
+ * A prompt used again moves to the top instead of appearing twice; liked ones stay no matter how
  * many follow.
  *
  * It can be turned off (Settings › Generation): then nothing new is kept and
- * the recent ones are forgotten; starred prompts stay until unstarred.
+ * the recent ones are forgotten; liked prompts stay until unliked.
  */
 
 export const historyLimit = 500;
-const pinnedLimit = 200;
+const likedLimit = 200;
 const maxPromptLength = 8000;
 
 /** Two prompts are the same when they only differ in spacing or case. */
@@ -48,19 +48,20 @@ function cleanEntries(value) {
         ? new Date(raw.at).toISOString()
         : new Date(0).toISOString(),
       uses: Math.max(0, Math.floor(Number(raw?.uses) || 0)),
-      ...(raw?.pinned ? { pinned: true } : {}),
+      // Stored as `pinned`, which predates Like.
+      ...(raw?.pinned ? { liked: true } : {}),
     });
   }
   return capEntries(entries);
 }
 
-/** Newest first; at most `historyLimit` unpinned and `pinnedLimit` pinned. */
+/** Newest first; at most `historyLimit` unliked and `likedLimit` liked. */
 function capEntries(entries) {
   const sorted = [...entries].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-  let pinned = 0;
+  let liked = 0;
   let recent = 0;
   return sorted.filter((entry) =>
-    entry.pinned ? (pinned += 1) <= pinnedLimit : (recent += 1) <= historyLimit,
+    entry.liked ? (liked += 1) <= likedLimit : (recent += 1) <= historyLimit,
   );
 }
 
@@ -74,7 +75,7 @@ export function addPrompt(entries, text, at = new Date()) {
     text: clean,
     at: new Date(at).toISOString(),
     uses: (previous?.uses || 0) + 1,
-    ...(previous?.pinned ? { pinned: true } : {}),
+    ...(previous?.liked ? { liked: true } : {}),
   };
   return capEntries([next, ...entries.filter((entry) => entry !== previous)]);
 }
@@ -114,7 +115,14 @@ function createHistory(
   }
 
   function save() {
-    writeRuntimeDocument(dataDir, documentName, { version: 1, enabled, entries: cache || [] });
+    writeRuntimeDocument(dataDir, documentName, {
+      version: 1,
+      enabled,
+      // Stored as `pinned`, which predates Like.
+      entries: (cache || []).map(({ liked, ...entry }) =>
+        liked ? { ...entry, pinned: true } : entry,
+      ),
+    });
   }
 
   function promptHistoryEnabled() {
@@ -122,11 +130,11 @@ function createHistory(
     return enabled;
   }
 
-  /** Turning it off forgets the recent prompts (starred ones stay) and keeps no new ones. */
+  /** Turning it off forgets the recent prompts (liked ones stay) and keeps no new ones. */
   function setPromptHistoryEnabled(on) {
     loadPromptHistory();
     enabled = Boolean(on);
-    if (!enabled) cache = cache.filter((entry) => entry.pinned);
+    if (!enabled) cache = cache.filter((entry) => entry.liked);
     save();
     return cache;
   }
@@ -144,28 +152,28 @@ function createHistory(
     return cache;
   }
 
-  function setPromptPinned(text, pinned) {
+  function setPromptLiked(text, liked) {
     const key = promptKey(text);
     const entries = loadPromptHistory();
     const found = entries.find((entry) => promptKey(entry.text) === key);
-    // Pinning something not in the list yet (a prompt typed but never run) keeps it too.
-    if (!found && !pinned) return entries;
+    // Liking something not in the list yet (a prompt typed but never run) keeps it too.
+    if (!found && !liked) return entries;
     const clean = cleanText(text);
     if (!found && !promptKey(clean)) return entries;
     cache = capEntries(
       found
         ? entries.map((entry) => {
             if (entry !== found) return entry;
-            const { pinned: _pinned, ...rest } = entry;
-            return pinned ? { ...rest, pinned: true } : rest;
+            const { liked: _liked, ...rest } = entry;
+            return liked ? { ...rest, liked: true } : rest;
           })
-        : [{ text: clean, at: new Date().toISOString(), uses: 0, pinned: true }, ...entries],
+        : [{ text: clean, at: new Date().toISOString(), uses: 0, liked: true }, ...entries],
     );
     save();
     return cache;
   }
 
-  /** Forgets these prompts. `keep` (keys) spares any that should stay, pinned or not. */
+  /** Forgets these prompts. `keep` (keys) spares any that should stay, liked or not. */
   function forgetPrompts(texts, keep = new Set()) {
     const keys = new Set(texts.map(promptKey).filter((key) => key && !keep.has(key)));
     if (!keys.size) return loadPromptHistory();
@@ -177,8 +185,8 @@ function createHistory(
     return cache;
   }
 
-  function clearPromptHistory({ keepPinned = true } = {}) {
-    cache = keepPinned ? loadPromptHistory().filter((entry) => entry.pinned) : [];
+  function clearPromptHistory({ keepLiked = true } = {}) {
+    cache = keepLiked ? loadPromptHistory().filter((entry) => entry.liked) : [];
     save();
     return cache;
   }
@@ -196,7 +204,7 @@ function createHistory(
     recordPrompt,
     resetPromptHistoryCache,
     setPromptHistoryEnabled,
-    setPromptPinned,
+    setPromptLiked,
   };
 }
 
@@ -231,8 +239,8 @@ export const promptHistoryEnabled = (kind = "positive", ownerId = "") =>
   historyFor(kind, ownerId).promptHistoryEnabled();
 export const recordPrompt = (text, kind = "positive", ownerId = "") =>
   historyFor(kind, ownerId).recordPrompt(text);
-export const setPromptPinned = (text, pinned, kind = "positive", ownerId = "") =>
-  historyFor(kind, ownerId).setPromptPinned(text, pinned);
+export const setPromptLiked = (text, liked, kind = "positive", ownerId = "") =>
+  historyFor(kind, ownerId).setPromptLiked(text, liked);
 export const forgetPrompts = (texts, keep = new Set(), kind = "positive", ownerId = "") =>
   historyFor(kind, ownerId).forgetPrompts(texts, keep);
 export const clearPromptHistory = (options = {}, kind = "positive", ownerId = "") =>

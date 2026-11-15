@@ -13,7 +13,7 @@ import { mediaSource, playbackUrl } from "../gallery/mediaSource";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { LoraThumbs, loraInfoQuery, loraTitle } from "../generation/LoraPicker";
+import { LoraRatings, loraInfoQuery, loraTitle } from "../generation/LoraPicker";
 import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import { type Choice, type Verdict, dreamChoices, viewerChoices } from "./choices";
@@ -199,7 +199,7 @@ const dreamed = (card: DeckCard) =>
 
 function Caption({ item }: { item: DreamItem }) {
   const info = useQuery(loraInfoQuery);
-  // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's Starred LoRAs.
+  // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's Liked LoRAs.
   const loras = (Array.isArray(item.settings?.loras) ? item.settings.loras : [])
     .filter((lora) => lora?.name && lora.enabled !== false)
     .map((lora) => String(lora.name));
@@ -220,7 +220,7 @@ function Caption({ item }: { item: DreamItem }) {
             <Text size="xs" truncate>
               LoRA: {title}
             </Text>
-            <LoraThumbs file={file} title={title} />
+            <LoraRatings file={file} title={title} />
           </Group>
         );
       })}

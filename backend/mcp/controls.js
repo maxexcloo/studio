@@ -277,8 +277,8 @@ const stem = (name) =>
 const maxDetails = 5;
 
 /** Profile-compatible optional LoRAs, verified fits first, then by name; the studio picker ranks the same way. */
-/** Thumbs up first, then unrated, then thumbs down. */
-const ratingOrder = (rating) => (rating === "up" ? 0 : rating === "down" ? 2 : 1);
+/** Liked first, then unrated, then disliked. */
+const ratingOrder = (rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);
 
 function loraCandidates(profile, infos, ratings = {}) {
   if (profile.capabilities?.lora === false) return [];
