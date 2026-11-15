@@ -253,9 +253,9 @@ test("Tile Captions in Settings › Preferences pin phone tile captions", async 
     createdAt: stamp,
   });
   await page.goto("/images");
-  const caption = page.getByText("A quiet harbour", { exact: true });
+  const caption = page.getByText("Quiet Harbour", { exact: true });
   await expect(
-    page.getByRole("button", { name: "Open image: A quiet harbour", exact: true }),
+    page.getByRole("button", { name: "Open image: Quiet Harbour", exact: true }),
   ).toBeVisible();
   await expect(caption).toHaveCount(0);
   await page.goto("/settings#preferences");
@@ -424,7 +424,12 @@ test("Header appearance preferences persist across reloads", async ({ page }) =>
     .getByRole("radiogroup", { name: "Background", exact: true })
     .getByText("Warm", { exact: true })
     .click();
-  await page.getByText("Fast", { exact: true }).click();
+  const animations = page.getByRole("radiogroup", { name: "Animations", exact: true });
+  for (const label of ["Off", "Fast", "Standard", "Relaxed"]) {
+    await animations.getByText(label, { exact: true }).click();
+    await expect(animations.getByRole("radio", { name: label, exact: true })).toBeChecked();
+  }
+  await animations.getByText("Fast", { exact: true }).click();
   await page.getByText("Round", { exact: true }).click();
   await page.getByText("Dark", { exact: true }).click();
   await page.getByText("Fixed Width", { exact: true }).click();

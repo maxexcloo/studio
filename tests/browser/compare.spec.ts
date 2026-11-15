@@ -261,7 +261,7 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   });
   await page.goto("/images");
   await page
-    .getByRole("button", { name: "Open image: An amber bird", exact: true })
+    .getByRole("button", { name: "Open image: Amber Bird", exact: true })
     .click({ button: "right" });
   await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Compare in Composer", exact: true }).click();
@@ -340,13 +340,13 @@ test("Compare Selected sets chosen images side by side, number keys pick the win
   );
   await page.goto("/images");
   await expect(
-    page.getByRole("button", { name: "Open image: A felt owl", exact: true }),
+    page.getByRole("button", { name: "Open image: Felt Owl", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
   const pick = (title: string) =>
     page.getByRole("button", { name: `Select image: ${title}`, exact: true }).click();
-  await pick("A tin owl");
-  await pick("A glass owl");
+  await pick("Tin Owl");
+  await pick("Glass Owl");
   await (await selectionMenuItem(page, "Recreate", "Compare")).click();
 
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
@@ -371,13 +371,14 @@ test("Compare Selected sets chosen images side by side, number keys pick the win
 
   // The Comparisons filter keeps only compared results.
   await page.getByRole("link", { name: "Back to Images", exact: true }).click();
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("switch", { name: "Comparisons", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Open image: Felt Owl", exact: true })).toHaveCount(
+    0,
+  );
   await expect(
-    page.getByRole("button", { name: "Open image: A felt owl", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Open image: A tin owl", exact: true }),
+    page.getByRole("button", { name: "Open image: Tin Owl", exact: true }),
   ).toBeVisible();
 });
 
