@@ -1203,6 +1203,7 @@ test("Copy ▾ lists Details then Prompt, and each copies its text", async ({ pa
       [
         "An amber bird",
         "Negative Prompt: blurry",
+        `Created: ${formatDateTime(stamp)}`,
         "Profile: Image Quality",
         "CFG: 4",
         "Mode: Generate",
@@ -1774,8 +1775,10 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     for (const name of ["Animate", "Edit"]) {
       await expect(bar.getByRole("button", { name, exact: true })).toHaveText("");
       await viewerAction(page, name);
-      await expect(page.getByRole("menu")).toBeVisible();
+      const menu = page.getByRole("menu", { name, exact: true });
+      await expect(menu).toBeVisible();
       await page.keyboard.press("Escape");
+      await expect(menu).toBeHidden();
     }
   }
   await viewerAction(page, "Share");
