@@ -87,6 +87,14 @@
   height: 10px;
 }
 
+/* A phone bar whose names have all gone narrows its controls to fit one row, keeping their touch
+   height; the theme's touch minimum width is an inline style. */
+.actions[data-stacked][data-tight] .action {
+  width: 32px;
+  min-width: 0 !important;
+  padding-inline: 0;
+}
+
 /* A fitted bar whose names have all gone draws each ▾ closer. */
 .actions[data-tight] .options {
   padding-inline: 2px 1px;
