@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import test from "node:test";
 
+import { recordedObjectInfo } from "./fixtures/fake-comfy.js";
 import {
   featherSigma,
   inpaintFiles,
@@ -11,9 +11,7 @@ import {
   maskBufferFromDataUrl,
 } from "./inpaint.js";
 
-const objectInfo = JSON.parse(
-  fs.readFileSync(new URL("./fixtures/object_info-comfyui-0.45.0.json", import.meta.url), "utf8"),
-);
+const objectInfo = recordedObjectInfo();
 
 test("the inpaint nodes are all ComfyUI core nodes", () => {
   for (const node of inpaintNodes) assert.ok(objectInfo[node], node);
