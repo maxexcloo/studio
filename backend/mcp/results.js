@@ -64,7 +64,12 @@ export function registerResultTools({
         ...(comparisons.length ? { comparisons } : {}),
         outputs: (status.outputs || []).flatMap((item, index) =>
           mcpOutputPath(item.url)
-            ? [{ output_index: index, url: media.url(owner, id, index) }]
+            ? [
+                {
+                  ...media.outputFeedback(id, index, item.rating),
+                  url: media.url(owner, id, index),
+                },
+              ]
             : [],
         ),
       });
@@ -182,13 +187,14 @@ export function registerResultTools({
         job_id: item.jobId,
         output_index: item.index,
         link: media.url(owner, item.jobId, item.index),
-        ...(item.rating ? { rating: item.rating } : {}),
+        rating: item.rating || "unrated",
       }));
       // A line each: its ref, then a gist; Details and the link keep the whole prompt.
       const lines = hits.map((item, position) => {
         const { ref, link } = results[position];
         return [
           `- [${ref}](${link})${item.rating === "liked" ? " ♥" : ""}`,
+          `user feedback: ${item.rating || "unrated"}`,
           shortPrompt(item.title || item.prompt || "", 80),
           item.settings?.modelName || item.model || item.settings?.profileId,
           String(item.createdAt || "").slice(0, 10),

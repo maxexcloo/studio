@@ -181,6 +181,8 @@ export const comparisonContext = (comparisons) =>
   comparisons.length
     ? `Studio comparisons: ${JSON.stringify(comparisons.map(({ id, link, winner }) => ({ id, link, winner })))}`
     : "";
+const feedbackContext = (outputs) =>
+  outputs.length ? `Recorded user feedback: ${JSON.stringify(outputs)}` : "";
 const mcpOwner = (key, user, token) =>
   crypto
     .createHmac("sha256", key)
@@ -927,7 +929,7 @@ export class McpMedia {
         index < 1000 &&
         mcpOutputPath(item.url)
       ) {
-        outputs.set(index, { url: item.url });
+        outputs.set(index, { url: item.url, rating: item.rating || "unrated" });
         kind = item.type;
         profileId ||= canonicalProfileId(item.settings?.profileId);
         prompt ||= item.prompt;
@@ -1330,6 +1332,20 @@ export class McpMedia {
   refOf(jobId) {
     const number = this.numberOf(jobId);
     return number ? `#${number}` : undefined;
+  }
+  outputFeedback(jobId, index, rating) {
+    const number = this.numberOf(jobId, index);
+    return {
+      ref: (number ? `#${number}` : this.refOf(jobId)) || jobId,
+      job_id: jobId,
+      output_index: index,
+      rating: rating || "unrated",
+    };
+  }
+  feedback(jobId, job) {
+    return (job.outputs || []).flatMap((item, index) =>
+      mcpOutputPath(item?.url) ? [this.outputFeedback(jobId, index, item.rating)] : [],
+    );
   }
   async job(owner, jobId, seconds = 0, { signal, credential, interval = 2000 } = {}) {
     this.own(owner, jobId);
@@ -2009,8 +2025,7 @@ export class McpMedia {
       if (loras.length) settings.loras = loras.map(({ name, strength }) => ({ name, strength }));
       const recorded = this.promptRecord(jobId);
       records.push({
-        ref: this.refOf(jobId) || jobId,
-        ...(index ? { output_index: index } : {}),
+        ...this.outputFeedback(jobId, index, item.rating),
         prompt: item.prompt,
         ...(item.negative ? { negative_prompt: item.negative } : {}),
         ...(recorded?.request && recorded.request !== item.prompt
@@ -2074,10 +2089,15 @@ export class McpMedia {
     const comparisons = await this.comparisons(owner, [jobId], { scope, signal });
     const { outputs, markdown } = await this.markdown(owner, [{ jobId, job, label }], scope);
     if (!outputs.length) throw new Error("This completed job has no available output.");
+    const feedback = this.feedback(jobId, job);
     return {
       content: [
         text(
-          [comparisonContext(comparisons), `${label} is ready. ${replyRule}\n\n${markdown}`]
+          [
+            comparisonContext(comparisons),
+            feedbackContext(feedback),
+            `${label} is ready. ${replyRule}\n\n${markdown}`,
+          ]
             .filter(Boolean)
             .join("\n\n"),
         ),
@@ -2085,6 +2105,7 @@ export class McpMedia {
       structuredContent: {
         ...named,
         status: "done",
+        outputs: feedback,
         ...(comparisons.length ? { comparisons } : {}),
       },
     };
@@ -2193,6 +2214,12 @@ export class McpMedia {
     );
     const pending = jobs.filter(({ job }) => !terminal.has(job.status));
     const shown = done.slice(-maxShownResults);
+    const results = jobs.map(({ ref, jobId, job }) => ({
+      ref,
+      job_id: jobId,
+      status: job.status,
+      ...(finished.has(job.status) ? { outputs: this.feedback(jobId, job) } : {}),
+    }));
     // One block per run: results queued together share their contact sheet.
     const runs = [];
     for (const { ref, jobId, job } of shown) {
@@ -2219,7 +2246,11 @@ export class McpMedia {
     return {
       content: [
         text(
-          [comparisonContext(comparisons), `${message}\n\n${markdown}`]
+          [
+            comparisonContext(comparisons),
+            feedbackContext(results.flatMap(({ outputs = [] }) => outputs)),
+            `${message}\n\n${markdown}`,
+          ]
             .filter(Boolean)
             .join("\n\n"),
         ),
@@ -2227,11 +2258,7 @@ export class McpMedia {
       structuredContent: {
         status: pending.length ? "running" : "done",
         ...(comparisons.length ? { comparisons } : {}),
-        results: jobs.map(({ ref, jobId, job }) => ({
-          ref,
-          job_id: jobId,
-          status: job.status,
-        })),
+        results,
       },
     };
   }

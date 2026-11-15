@@ -2184,6 +2184,113 @@ test("image Result returns one short linked preview that opens the unchanged ori
     assert.match(output.url, /^https:\/\/studio\.example\.test\/mcp\/results\//);
 });
 
+test("Result reads current per-output user feedback for single, all and set requests", async (t) => {
+  const f = await fixture(t);
+  const alice = await f.client("alice");
+  const bob = await f.client("bob");
+  const generated = await generate(alice, { count: 3 });
+  const id = jobId(generated);
+  const job = f.jobs.get(id);
+  Object.assign(job, {
+    status: "done",
+    outputs: ["liked", "disliked", undefined].map((rating, index) => ({
+      url: `/comfy/view?filename=feedback-${index}.png`,
+      ...(rating ? { rating } : {}),
+    })),
+  });
+  const expected = ["liked", "disliked", "unrated"].map((rating, output_index) => ({
+    ref: `#${job.numbers[output_index]}`,
+    job_id: id,
+    output_index,
+    rating,
+  }));
+  const read = async (job_id, feedback) => {
+    const before = f.requests.length;
+    const reply = await call(alice, "result", { job_id });
+    const body = data(reply);
+    assert.deepEqual(
+      body.outputs || body.results.find((item) => item.job_id === id).outputs,
+      feedback,
+    );
+    assert.deepEqual(JSON.parse(/Recorded user feedback: (.+)/.exec(texts(reply))[1]), feedback);
+    assert.equal(
+      f.requests.slice(before).filter((item) => item.path === `/gallery/jobs/${id}`).length,
+      1,
+    );
+    assert.equal(links(reply).length, 1);
+    return body;
+  };
+  await read(id, expected);
+  job.outputs[0].rating = "disliked";
+  delete job.outputs[1].rating;
+  expected[0].rating = "disliked";
+  expected[1].rating = "unrated";
+  await read("#1", expected);
+  await read("all", expected);
+  await read(generated.set, expected);
+  const pending = jobId(await generate(alice, { prompts: ["Still running"] }));
+  const failed = jobId(await generate(alice, { prompts: ["Failed work"] }));
+  f.jobs.get(failed).status = "failed";
+  const all = await read("all", expected);
+  assert.equal(all.status, "running");
+  for (const [job_id, status] of [
+    [pending, "running"],
+    [failed, "failed"],
+  ])
+    assert.deepEqual(
+      all.results.find((item) => item.job_id === job_id),
+      {
+        ref: `#${f.jobs.get(job_id).numbers[0]}`,
+        job_id,
+        status,
+      },
+    );
+  await failure(bob, "result", { job_id: id });
+  await failure(bob, "result", { job_id: "all" });
+  const bobsId = jobId(await generate(bob));
+  Object.assign(f.jobs.get(bobsId), {
+    status: "done",
+    outputs: [{ url: "/comfy/view?filename=bobs.png", rating: "liked" }],
+  });
+  const bobsResults = data(await call(bob, "result", { job_id: "all" })).results;
+  assert.equal(bobsResults.length, 1);
+  assert.equal(bobsResults[0].job_id, bobsId);
+  assert.equal(bobsResults[0].outputs[0].rating, "liked");
+  await read("all", expected);
+  assert.equal(f.submitted.length, 4);
+  assert.equal(f.downloads.length, 0);
+});
+
+test("Search and Review distinguish recorded user ratings from visual judgement", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const id = jobId(await generate(client, { count: 2 }));
+  Object.assign(f.jobs.get(id), {
+    status: "done",
+    outputs: [
+      { url: "/comfy/view?filename=liked.png", rating: "liked" },
+      { url: "/comfy/view?filename=unrated.png" },
+    ],
+  });
+  const search = await call(client, "search");
+  assert.deepEqual(
+    data(search).results.map(({ rating }) => rating),
+    ["liked", "unrated"],
+  );
+  assert.match(texts(search), /user feedback: liked/);
+  assert.match(texts(search), /user feedback: unrated/);
+  const review = await call(client, "review", { job_id: "#2" });
+  const record = JSON.parse(
+    texts(review)
+      .split("\n")
+      .find((line) => line.startsWith("{")),
+  );
+  assert.equal(record.ref, "#2");
+  assert.equal(record.job_id, id);
+  assert.equal(record.output_index, 1);
+  assert.equal(record.rating, "unrated");
+});
+
 test("video results return signed links without eagerly downloading video bytes", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
@@ -3946,7 +4053,7 @@ test("tier-based Generate chooses only profiles the account may use", async (t) 
   );
 });
 
-test("Result returns only its markdown, never a settings record", async (t) => {
+test("Result returns recorded feedback and markdown, never a settings record", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   const id = jobId(await generate(client));
@@ -3967,9 +4074,14 @@ test("Result returns only its markdown, never a settings record", async (t) => {
   assert.equal(lean.content.length, 1);
   assert.match(
     lean.content[0].text,
-    /^#1 is ready\. .+\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
+    /^Recorded user feedback: .+\n\n#1 is ready\. .+\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
   );
-  assert.deepEqual(lean.structuredContent, { job_id: id, ref: "#1", status: "done" });
+  assert.deepEqual(lean.structuredContent, {
+    job_id: id,
+    ref: "#1",
+    status: "done",
+    outputs: [{ ref: "#1", job_id: id, output_index: 0, rating: "unrated" }],
+  });
 });
 
 test("a finished video notification names its result and profile beside View Video", async (t) => {
@@ -4334,7 +4446,7 @@ test("Search finds the account's own finished work through the gallery search, a
   assert.match(texts(result), /^4 of 6 matches, newest first\./);
   assert.match(
     texts(result),
-    /- \[#5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · Red Lantern · fixture-image$/m,
+    /- \[#5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · user feedback: unrated · Red Lantern · fixture-image$/m,
   );
   assert.match(texts(result), /\[#1\]\([^)]+\) · .*A red heron/);
   // The images come as one contact sheet, drawn when opened.
@@ -5515,7 +5627,7 @@ test('replies label links Result N with one All Results page, and Result "all" s
   const body = texts(shown);
   assert.match(
     body,
-    /^2 results are ready, 1 still running\. Reply with the markdown below exactly/,
+    /^2 results are ready, 1 still running\. Reply with the markdown below exactly/m,
   );
   // Results queued together share one contact sheet.
   assert.match(body, /\*\*#1–#2\*\*[^\n]*\n\[!\[#1–#2\]/);
