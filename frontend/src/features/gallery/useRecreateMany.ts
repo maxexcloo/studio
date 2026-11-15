@@ -54,6 +54,8 @@ export function useRecreateMany() {
       return { queued, failed, waiting: items.length - ready.length };
     },
     onSuccess: ({ queued, failed, waiting }) => {
+      // Queued recreations show in the gallery; only what didn't queue needs saying.
+      if (queued && !failed.length && !waiting) return;
       notifications.show({
         color: failed.length ? "red" : undefined,
         message: [

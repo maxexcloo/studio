@@ -94,16 +94,19 @@ the primary component reference and verify APIs against the installed version.
   phones open it from an icon. Named controls opening a picker or menu show ▾ (Animate ▾, Copy ▾), small beside an
   action bar's icon; ⋯ already means more, so it never carries one. Icon-only controls use accessible names and tooltips. Menus group related actions, put the usual
   action first and Delete last, and share their sizing and item style. An option whose label
-  alone is ambiguous carries a one-line `description` under it. An action's settings sit in its
+  alone is ambiguous carries a one-line `description` under it, except in item action menus,
+  which carry none. An action's settings sit in its
   menu, not in a separate dialog. Every menu has one shape: settings (segmented choices, switches,
   checked options) first, then its choices, then after a divider the action that runs or leaves it
   (Upscale, Animate in Composer, Clear). Labels name the verb alone where the menu or box already
   says what it acts on (Upscale, Share, Copy, Clear, Reset; not Upscale Image or Clear Prompt),
   adding a word only where the verb alone is ambiguous (Stop Upscale, Edit in Composer), and one
   action keeps one label everywhere. Clear and Reset turn into Undo until the text next changes.
-  Assistant menus (Animate, the viewer's Edit) share `assistMenu`: settings, the fixed options from Library
-  records under their heading, the suggestions written for the item under Suggestions with
-  Refresh Suggestions, then Custom… and the menu's run. Animate asks for motions only when opened.
+  Assistant menus (Animate, Edit) share `assistMenu`: settings, the suggestions written for the
+  item under Suggestions with Refresh last, Library's records under Templates with Custom… last,
+  then the menu's other groups and its run. While suggestions load one Loading… row stands in,
+  with none one No Suggestions line; nothing reserves blank rows, so what follows may shift once.
+  Animate asks for motions only when opened, Edit outside the viewer likewise.
 
 ### Layers, Focus & Phones
 
@@ -151,11 +154,11 @@ the primary component reference and verify APIs against the installed version.
   Prompts). The menu is one level deep: a tool's options (suggested changes,
   Improve Prompt's styles, each with its description) are listed first under its
   name, never in a submenu, then the other tools as one group. Improve Prompt's
-  styles, like Animate's themes, are Library › Prompt Styles' records, in order.
+  styles, like Animate's templates, are Library › Prompt Styles' records, sorted alphabetically.
   A box that opens the phone editor has no ⋯ beside it: the editor shows the
   tools as named buttons in a bar above the keyboard, then Copy and Clear as
   icons beside the sends, as in the composer, and its header holds only the
-  title and Done. A box without tools has no ⋯, Copy or Clear. Suggestions holds Refresh Suggestions
+  title and Done. A box without tools has no ⋯, Copy or Clear. Suggestions holds Refresh
   under its options. The viewer's prompt has Improve Prompt (every style but
   Custom) and resets to the item's prompt rather than clearing. It rests on one
   line ending in an ellipsis and shows the whole prompt while focused. Its other
@@ -207,7 +210,7 @@ the primary component reference and verify APIs against the installed version.
   fallback or notice. Studio's own calls keep their automatic route.
 - Replacing unsaved work with a preset asks first. Assistant proposals
   replace text in place with Undo and a label naming the action and the words changed, leaving a review pause before
-  the proposed action runs, unless the viewer's Review Prompt is off. Suggestions never move layout or act on their own.
+  the proposed action runs, unless the viewer's Review Prompt is off. Suggestions never act on their own.
   Ideas for an empty prompt are one Suggestions ▾ chip in the
   box's chip row, after References (`usePromptIdeas`); nothing floats over the
   text and ideas never show as a row of their own. Custom Animation's
@@ -231,26 +234,38 @@ the primary component reference and verify APIs against the installed version.
 - The viewer is the iteration hub for finished and unfinished work, using the
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
   and `itemActions.ts` the order for every bar and menu, the selection bar
-  offering those that act on several, with no ⋯ More anywhere: Animate ▾, Edit ▾,
-  Recreate ▾ | Share ▾ | Like, Dislike, Delete. Edit holds the viewer's prompt assistance
-  (Review Prompt, Library's changes, Suggestions, Custom…), then Upscale, Edit in
-  Composer, Use as Reference and Use as Character (starting a card in Library ›
-  Characters), or a video's Trim and the like. Recreate holds Run Again and Run
-  Again, Same Seed, which queue from where they are, and Report Issue…, then Compare Models, Open
-  Comparison where the item belongs to one and Similar, then Recreate in Composer.
-  Options expand in place on phones and touch screens. Share holds Copy Prompt, Copy Details, Download and, where the device shares
-  files, Share. A tile's context menu starts with Select, which starts selecting
-  with that item. Bars name every action but Like, Dislike and Delete: phones under their
-  icons across one row, elsewhere beside them on one row; where they outgrow it
-  the last names drop, and only then do they wrap onto another row, never
-  scrolling. The phone bar drops its prompt field while Details is open. Gallery
+  offering those that act on several, with no ⋯ More anywhere. Sections sort
+  alphabetically but for Like before Dislike, Delete last, settings first and
+  Refresh and Custom… last; prefer even-sized sections. Bars: Animate ▾, Edit ▾,
+  Recreate ▾, Upscale ▾ | Like, Dislike, Report, Share ▾ | Similar, Delete. A
+  tile's context menu (right-click, hold, Menu key, Shift+F10): Select, which
+  starts selecting with that item | Like, Dislike, Report, Share | Animate,
+  Edit, Recreate, Upscale | Similar, Delete. Submenus match in bar and menu.
+  Animate: Cloud | Fast | Quality and Review Prompt, Suggestions, Templates,
+  then Animate in Composer (a video's templates continue it, then Extend in
+  Composer). Edit: Review Prompt, Suggestions, Templates (Library's changes),
+  then Use as Character, Use as Outfit, Use as Reference and Use as Scene (each
+  card starting in its Library section), then Edit in Composer; a video has
+  Save Frame as Image and Use Frame as Reference, then its edits and Trim….
+  Outside the viewer Edit's assistance opens the viewer to ask there. Recreate:
+  Run Again and Run Again, Same Seed, which queue from where they are, then
+  Compare Models, More Like This Set and Open Comparison where they apply, then
+  Recreate in Composer. Upscale: Show and Compare Upscale once there is one,
+  Face Detail, Quality and Size, then Upscale or Stop Upscale. Share: Copy
+  Details, Copy Prompt, Download and, where the device shares files, Share.
+  Options expand in place on phones and touch screens. Bars name Retry, Stop
+  and the four menus, the rest icons: phones under their icons across one row,
+  elsewhere beside them on one row; where they outgrow it the last names drop,
+  then phones narrow the controls, and only then do they wrap onto another row,
+  never scrolling. The phone bar
+  drops its prompt field while Details is open. Gallery
   selection uses the shared contextual selection bar under the search and
   filters, which stay in place; its quick selects take every match, not only
   loaded pages, and it confirms deletion. A finished action ends
   the selection, keeping selected only the items it failed for; opening a menu does not.
 - Like and Dislike rate an item and teach taste; a Dislike never deletes. It hides
   the item from the gallery, Dream and search with Undo, and the Disliked switch
-  in the gallery's Filters shows it, where Dislike reads Restore. Report Issue… asks
+  in the gallery's Filters shows it, where Dislike reads Restore. Report asks
   what is wrong, has the assistant fix it as an edit or a run on its seed,
   queues that as a version and dislikes the original with the issue.
 - Details sections show their content in full rather than scrolling it in a
@@ -266,16 +281,17 @@ the primary component reference and verify APIs against the installed version.
   stops at the first and last item. A result from a run of several, like its
   Open All, flips through only that run's results; other results flip through
   the gallery. A set's results stand together, newest first, in the gallery,
-  Runs and the viewer's set strip, which shows only that set on one row,
-  scrolling sideways to keep the current result in view. Closing reveals and
+  Runs and the viewer's one strip, which shows only that set on one row, the
+  shown result's versions standing smaller in its place (outside a set, its
+  versions alone), scrolling sideways to keep the current result in view. Closing reveals and
   focuses the current tile.
-- On touch screens a tap on the media hides the viewer's chrome (top bar, arrows, strips, prompt,
+- On touch screens a tap on the media hides the viewer's chrome (top bar, arrows, strip, prompt,
   actions and Details) with a fade, as Photos does, and another tap shows it; desktop keeps it.
   A picture's tap waits out the double tap, and pinches, drags, long presses and swipes do not
   count; swipes still navigate and keep it hidden until the viewer closes. A tap on a video whose
   controls are hidden also shows them; taps while they show work them. Escape, a viewer key,
   Details, a tap beside the media and focus reaching hidden chrome bring it back. Open menus and
-  sheets and loading actions stay in sight; strips hide, even with results still loading. With
+  sheets and loading actions stay in sight; the strip hides, even with results still loading. With
   nothing else in sight the media glides to the middle of the screen at its fitted size.
 - Viewing and upscale comparison share `MediaZoom`. Mask zoom and pan preserve
   pixels and undo history. Display, thumbnails, sharing and downloads respect
@@ -323,7 +339,7 @@ the primary component reference and verify APIs against the installed version.
   Like (keep and like) and Keep; a comparison's images fill its card and
   are its A and B, a tap choosing one with Undo and a hold, pinch or its label
   opening it in the viewer, over compact Neither and Both. The viewer's bar
-  offers every choice, Variations and More Like This under Recreate ▾. A
+  offers every choice, More Like This and Variations under Recreate ▾. A
   comparison's viewer steps between its sides as any viewer does, naming the
   shown side in the top bar, with Side by Side in its bar on desktop. Familiar ideas vary
   one thing of a liked or kept image on its profile, LoRAs and settings; a

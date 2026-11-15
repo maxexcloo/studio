@@ -57,6 +57,7 @@ test("the migrations route answers administrators with every step's plan, and lo
     mcpOwnership: { applied, document: false, rows: {}, conflicts: [] },
     galleryRatings: { applied, likes: 0, unstarred: 0, dislikes: 0, signals: 0 },
     radianceModels: { ...radiance, applied },
+    characterGenerated: { applied, characters: 0, cards: [] },
   });
   assert.deepEqual(await post({}), {
     code: 200,
@@ -73,8 +74,8 @@ test("the migrations route answers administrators with every step's plan, and lo
   const again = await post({ apply: true });
   assert.deepEqual(again.body.steps.radianceModels.profiles, [], "a second run finds nothing");
   assert.deepEqual(lines, [
-    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; radianceModels: 1 planned",
-    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; radianceModels: 1 applied",
-    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; radianceModels: 0 nothing to do",
+    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; radianceModels: 1 planned; characterGenerated: 0 nothing to do",
+    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; radianceModels: 1 applied; characterGenerated: 0 nothing to do",
+    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; radianceModels: 0 nothing to do; characterGenerated: 0 nothing to do",
   ]);
 });

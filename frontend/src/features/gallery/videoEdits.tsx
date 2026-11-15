@@ -1,5 +1,4 @@
 import { Alert, Button, Modal, RangeSlider, Stack, Text } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 
@@ -44,16 +43,8 @@ export function TrimVideoDialog({ item, onClose }: { item: MediaItem; onClose: (
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          // The dialog closes, leaving nowhere in place to say so.
-          save.mutate(
-            { kind: "trim", start: range[0], end: range[1] },
-            {
-              onSuccess: () => {
-                notifications.show({ message: "Saved as a new version." });
-                onClose();
-              },
-            },
-          );
+          // The new version shows in the viewer.
+          save.mutate({ kind: "trim", start: range[0], end: range[1] }, { onSuccess: onClose });
         }}
       >
         <Stack>

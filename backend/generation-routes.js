@@ -43,6 +43,10 @@ import {
 } from "./workers.js";
 import { markWorkflowUsed } from "./workflow-catalogue.js";
 
+/** A listed profile as it runs on `backend`, with that backend's own reference slots. */
+const runProfile = (profile, backend) =>
+  profile?.backendOptions?.find((option) => option.id === backend)?.profile || profile;
+
 export function createGenerationSubmission({ loadComfyContext, mediaModels, comfyDownMessage }) {
   /**
    * Which worker runs this generation (workers.js): one that has the
@@ -313,20 +317,21 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
       );
       if (body.prompt !== typed) body.typedPrompt = typed;
     }
-    // A character's sheet: the view the prompt names, or the whole sheet for a video model that
-    // animates subjects (character-sheets.js); never in the run that makes the sheet.
+    // A character's sheet: the view the prompt names and the card's other images, or the whole
+    // sheet for a video model that animates subjects (character-sheets.js); never in the run that
+    // makes the sheet.
     if (body.referenceAssets?.length && input.writing?.kind !== "sheet") {
       const ownerId = body.ownerId || "";
       body.referenceAssets = sheetReferences({
         references: body.referenceAssets,
         prompt: body.prompt,
         cards: listCards("characters", ownerId),
-        profile:
-          body.kind === "video"
-            ? (await mediaModels().catch(() => null))?.models?.profiles?.find(
-                (item) => item.id === body.profileId,
-              )
-            : undefined,
+        profile: runProfile(
+          (await mediaModels().catch(() => null))?.models?.profiles?.find(
+            (item) => item.id === body.profileId,
+          ),
+          body.profileBackend,
+        ),
         madeWith: (id) =>
           galleryItem(id, ownerId)?.settings?.referenceAssets?.map((asset) => asset.assetId) || [],
       });

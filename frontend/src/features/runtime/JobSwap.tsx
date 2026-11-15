@@ -84,7 +84,10 @@ export function useJobSwap() {
 export function SwapNotice({ jobs }: { jobs?: QueueJob[] }) {
   const swap = useJobSwap();
   const seen = useRef(new Set<string>());
-  const waiting = jobs?.find((job) => swap.swappable(job) && !seen.current.has(job.id));
+  // Dream's own work waits quietly; the queue row still offers its swap.
+  const waiting = jobs?.find(
+    (job) => !job.dream && swap.swappable(job) && !seen.current.has(job.id),
+  );
   useEffect(() => {
     if (!waiting) return;
     seen.current.add(waiting.id);

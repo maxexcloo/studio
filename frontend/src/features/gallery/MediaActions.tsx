@@ -1,4 +1,3 @@
-import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
@@ -27,6 +26,7 @@ import {
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
+import type { CardKind } from "../../../../shared/characters";
 import { post } from "../../api";
 import type { MediaItem, Profile } from "../../types";
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
@@ -34,39 +34,38 @@ import { copyText } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
 import { useGroupFeature } from "../auth/AccountGate";
+import { useStartCard } from "../characters/useCardFrom";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { useStageComparison } from "../compare/variants";
 import { assistMenu, useChangeSuggestions } from "../generation/AskChange";
 import { defaultProfile, useGeneration } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
-import { profileForBackend, profileName } from "../generation/payload";
+import { profileForBackend } from "../generation/payload";
 import { type AssistantOption, assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
+import { type VideosPreference, useVideosPreference } from "../settings/accountPreferences";
 import {
-  type VideosPreference,
-  showQueued,
-  useVideosPreference,
-} from "../settings/accountPreferences";
-import { askMotionIdeas, motionIdeasQuery } from "../taste/suggestions";
+  askMotionIdeas,
+  askNextSteps,
+  motionIdeasQuery,
+  nextStepsQuery,
+} from "../taste/suggestions";
 import { videoExport } from "./download";
 import { itemAction, itemActionGroups } from "./itemActions";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
-import {
-  type SimilarStrictness,
-  similarStrictnessOptions,
-  useSimilarStrictness,
-} from "./similarStrictness";
-import { useStopUpscale, useUpscaleAction } from "./UpscaleControls";
+import { useUpscaleAction } from "./UpscaleControls";
 import { useItemMutation } from "./useItemMutation";
 import {
   type AnimateOffers,
   type AnimateRequest,
+  type EditAsk,
   type Iteration,
   animateProfileQuery,
   useAnimateReview,
-  useAnimateThemes,
+  useAnimateTemplates,
+  useEditReview,
   useMediaAction,
   useMediaIteration,
 } from "./useMediaAction";
@@ -74,10 +73,11 @@ import { useMediaRating } from "./useMediaRating";
 import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
 import { type VideoEdit, useVideoEdit } from "./videoEdits";
+import type { ViewerAsk } from "./ViewerPrompt";
 
 /**
  * An action whose options come to one runs that option itself, so no submenu holds just one.
- * Animate stays a menu, as its themes load after it shows.
+ * Animate stays a menu, as its templates load after it shows.
  */
 function withoutLoneOption(action: Action): Action {
   const options = action.menu?.flat() ?? [];
@@ -94,8 +94,8 @@ function withoutLoneOption(action: Action): Action {
   };
 }
 
-// Seeded themes have their own icons; others share Animate's.
-const themeIcons: Record<string, LucideIcon> = {
+// Seeded templates have their own icons; others share Animate's.
+const templateIcons: Record<string, LucideIcon> = {
   cinematic: Camera,
   living: Wind,
   action: Zap,
@@ -195,21 +195,11 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
   return {
     id: "use-reference",
     label: video ? "Use Frame as Reference" : "Use as Reference",
-    description: takes
-      ? undefined
-      : fallback
-        ? `Switches to ${profileName(fallback)}`
-        : `${profileName(profile)} takes no references`,
     icon: ImagePlus,
     disabled: !(takes || fallback) || reference.isPending,
     keepOpen: true,
     onClick: () => {
-      if (fallback) {
-        selectProfile(fallback);
-        notifications.show({
-          message: `${profileName(profile)} takes no references, so the composer uses ${profileName(fallback)}.`,
-        });
-      }
+      if (fallback) selectProfile(fallback);
       reference.mutate(
         { ...item, frame: video ? viewerFrame(item) : undefined },
         {
@@ -225,45 +215,42 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
 }
 
 /**
- * Edit › Use as Character: opens Library › Characters with a new card started from the image, where
- * the prompt assistant can describe it.
+ * Edit › Use as Character, Use as Outfit and Use as Scene: each opens its Library section with a new
+ * card started from the image and what its chat called it, where the prompt assistant can describe it.
  */
-function useCharacterAction(item: MediaItem, onApplied: () => void): Action | null {
+function useCardActions(item: MediaItem, onApplied: () => void): Action[] {
   const characters = useGroupFeature("characters");
-  const location = useLocation();
-  const navigate = useNavigate();
-  if (!characters || item.type !== "image") return null;
-  return {
-    id: "make-character",
-    label: "Use as Character",
-    icon: icons.character,
-    onClick: () => {
-      onApplied();
-      navigate("/library#characters", {
-        state: {
-          // The gallery under Library, without its viewer.
-          backgroundLocation: location.state?.backgroundLocation || {
-            ...location,
-            search: location.search.replace(/[?&]item=[^&]*/, "").replace(/^&/, "?"),
-          },
-          characterFrom: item.id,
-        },
-      });
-    },
+  const startCard = useStartCard();
+  if (!characters || item.type !== "image") return [];
+  const start = (kind: CardKind) => () => {
+    onApplied();
+    startCard(kind, item);
   };
+  return [
+    {
+      id: "make-character",
+      label: "Use as Character",
+      icon: icons.character,
+      onClick: start("characters"),
+    },
+    { id: "make-outfit", label: "Use as Outfit", icon: icons.outfit, onClick: start("outfits") },
+    { id: "make-scene", label: "Use as Scene", icon: icons.scene, onClick: start("scenes") },
+  ];
 }
 
 interface MediaActionOptions {
   transfer: MediaTransferActions;
   compare?: boolean;
+  /** How Edit asks for a change: the viewer's prompt. Without it, Edit's choices open the viewer. */
+  edit?: EditAsk;
   /** Queues a new run; the viewer's joins its strip. Defaults to queueing it directly. */
   iterate?: (iteration: Iteration) => void;
   onApplied?: () => void;
   onCompare?: () => void;
-  /** Opens Animate's dialog: Custom Animation, or any theme or suggested motion under Review Prompt. */
+  /** Opens Animate's dialog: Custom…, or any template or suggested motion under Review Prompt. */
   onAnimate: (choice: AnimateRequest) => void;
   onDelete: () => void;
-  /** Opens Report Issue…. */
+  /** Opens Report's dialog. */
   onReport: () => void;
   onRetried?: (jobId: string) => void;
   onTrim: () => void;
@@ -271,14 +258,15 @@ interface MediaActionOptions {
 }
 
 /**
- * The one media action definition for the viewer bar, tile and context menus: labels,
- * sections, order, options and availability.
+ * The one media action definition for the viewer bar and tile menus: labels, options and
+ * availability, placed in a bar's or a menu's order (itemActions.ts).
  */
 export function useMediaActions(
   item: MediaItem,
   {
     transfer,
     compare,
+    edit,
     iterate,
     onApplied = () => {},
     onCompare,
@@ -289,14 +277,12 @@ export function useMediaActions(
     onTrim,
     onVersionChange,
   }: MediaActionOptions,
+  layout: "bar" | "menu" = "bar",
 ): ActionGroups {
   const action = useMediaAction(item, onApplied);
   const iteration = useMediaIteration(item);
   const client = useQueryClient();
-  // Outside the viewer, whose strip shows the run, nothing else may.
-  const run =
-    iterate ??
-    ((next: Iteration) => iteration.mutate(next, { onSuccess: () => showQueued(client) }));
+  const run = iterate ?? ((next: Iteration) => iteration.mutate(next));
   // Runs from the item, also the viewer's own, share its pending state.
   const running = iteration.variables?.kind;
   const stage = useStageComparison();
@@ -307,7 +293,7 @@ export function useMediaActions(
   const settingsText = useSettingsText(item);
   const retry = useRetryAction(item, onRetried);
   const reference = useReferenceAction(item, onApplied);
-  const character = useCharacterAction(item, onApplied);
+  const cards = useCardActions(item, onApplied);
   const recreate = useRecreateAction(item, onApplied);
   // An upload has only its suggested prompt to recreate.
   const recreateAction = item.uploaded
@@ -337,21 +323,22 @@ export function useMediaActions(
     onClick: () =>
       videoEdit.mutate({ kind }, { onSuccess: () => flashEdited(`${item.id}:${kind}`) }),
   });
+  const location = useLocation();
   const navigate = useNavigate();
   const rating = useMediaRating(item);
   const ready = item.status === "done" && Boolean(item.url);
   const gif = ready ? videoExport(item, "gif") : null;
   const loop = ready ? videoExport(item, "loop") : null;
   const image = ready && item.type === "image";
-  const [strictness, setStrictness] = useSimilarStrictness();
+  const video = ready && item.type === "video";
   const upscale = useUpscaleAction(item, {
     ready,
     compare,
     onCompare,
     onVersionChange,
   });
-  const stopUpscale = useStopUpscale(item);
   const assistant = useQuery(assistantQuery);
+  const assisted = Boolean(assistant.data?.available);
   // The assistant writes new variations into the item's MCP result set, in the queue.
   const moreSet = useItemMutation(item.id, "more-like-set", {
     mutationFn: () => post("/api/result-sets/more", { itemId: item.id }),
@@ -362,22 +349,25 @@ export function useMediaActions(
         ),
       ),
   });
-  const moreLikeSet: Omit<Action, "id"> | null =
-    ready && !item.uploaded && item.resultSet && assistant.data?.available
-      ? {
-          label: "More Like This Set",
-          icon: icons.suggestions,
-          disabled: moreSet.isPending,
-          onClick: () => moreSet.mutate(),
-        }
-      : null;
+  const moreLikeSet: Action[] =
+    ready && !item.uploaded && item.resultSet && assisted
+      ? [
+          {
+            id: "more-like-set",
+            label: "More Like This Set",
+            icon: icons.suggestions,
+            disabled: moreSet.isPending,
+            onClick: () => moreSet.mutate(),
+          },
+        ]
+      : [];
   // Animate says why no model can run before anything queues.
   const [videos, setVideos] = useVideosPreference();
   const [review, setReview] = useAnimateReview();
   // The menu keeps its choice while a switch loads.
   const animation = useQuery({
     ...animateProfileQuery(item),
-    enabled: image || (ready && item.type === "video"),
+    enabled: image || video,
     placeholderData: keepPreviousData,
   });
   // A refusal still says what is offered.
@@ -408,26 +398,20 @@ export function useMediaActions(
       : [];
   // Nothing can animate: say why.
   const refusal = animation.error?.message;
-  const themes = useAnimateThemes();
-  const themeItem = (theme: AssistantOption, disabled: boolean): Action => ({
-    id: `animate-${theme.id}`,
-    label: `${theme.label}${theme.id === "custom" ? "…" : ""}`,
-    description: theme.description,
-    icon: themeIcons[theme.id] ?? icons.animate,
-    disabled,
+  // A video's templates continue the clip from its last frame at once; it keeps the clip's own
+  // model unless videos run on Cloud.
+  const animateDisabled = video ? action.isPending : !animation.data;
+  const templates = useAnimateTemplates();
+  const templateItem = (template: AssistantOption): Action => ({
+    id: `animate-${template.id}`,
+    label: `${template.label}${template.id === "custom" ? "…" : ""}`,
+    icon: templateIcons[template.id] ?? icons.animate,
+    disabled: animateDisabled,
     onClick:
-      theme.id === "custom" || review
-        ? () => onAnimate({ theme: theme.id })
-        : () => run({ kind: "animate", theme: theme.id }),
+      template.id === "custom" || review
+        ? () => onAnimate({ theme: template.id })
+        : () => run({ kind: "animate", theme: template.id }),
   });
-  const themeOptions = (disabled: boolean) => ({
-    label: "Themes",
-    options: themes
-      .filter((theme) => theme.id !== "custom")
-      .map((theme) => themeItem(theme, disabled)),
-  });
-  const customTheme = (disabled: boolean) =>
-    themes.filter((theme) => theme.id === "custom").map((theme) => themeItem(theme, disabled));
   // Motions written for this image, asked for only once its Animate menu opens.
   const [motionsFor, setMotionsFor] = useState<string>();
   const motions = useChangeSuggestions({
@@ -440,9 +424,9 @@ export function useMediaActions(
         ? onAnimate({ theme: "custom", instruction })
         : run({ kind: "animate", theme: "custom", instruction }),
   });
-  const motionsOffered = image && Boolean(item.jobId && assistant.data?.available);
-  // Themes write the prompt into an editable review before anything queues.
-  const reviewItems = assistant.data?.available
+  const motionsOffered = image && Boolean(item.jobId && assisted);
+  // Templates write the prompt into an editable review before anything queues.
+  const reviewItems = assisted
     ? [
         {
           id: "animate-review",
@@ -454,18 +438,35 @@ export function useMediaActions(
         },
       ]
     : [];
+  // Edit asks the assistant for a change: in the viewer's prompt, or elsewhere by opening the
+  // viewer to ask there (GalleryPage's `item`, ViewerPrompt's `ask`).
+  const openViewer = (ask: ViewerAsk) => {
+    onApplied();
+    const search = new URLSearchParams(location.search);
+    search.set("item", item.id);
+    navigate({ search: `?${search}` }, { state: { viewer: true, ask } });
+  };
+  const editAsk: EditAsk = edit ?? {
+    pending: false,
+    pick: (request) => openViewer({ request }),
+    custom: () => openViewer({ custom: true }),
+  };
+  const [editReview, setEditReview] = useEditReview();
+  const editAssisted = assisted && ready && Boolean(item.jobId);
+  // The image's next steps load as the viewer opens it, elsewhere once Edit opens.
+  const [stepsFor, setStepsFor] = useState<string>();
+  const steps = useChangeSuggestions({
+    query: nextStepsQuery(item.jobId ?? ""),
+    fresh: () => askNextSteps(item.jobId!, true),
+    enabled: editAssisted && image && (Boolean(edit) || stepsFor === item.id),
+    disabled: editAsk.pending,
+    onPick: editAsk.pick,
+  });
   // The assistant and the animate offers decide every option, so they show together.
   const optionsLoading = assistant.isPending || animation.isPending;
   const actions = [
     retry,
-    stopUpscale &&
-      itemAction("stop", {
-        label: "Stop Upscale",
-        loading: stopUpscale.isPending,
-        disabled: stopUpscale.isPending,
-        onClick: stopUpscale.stop,
-      }),
-    image &&
+    (image || video) &&
       itemAction("animate", {
         loading: running === "animate" || action.isPending,
         // When nothing can animate, the options stay disabled and the note says why.
@@ -474,54 +475,84 @@ export function useMediaActions(
         menu: assistMenu({
           loading: optionsLoading,
           settings: [...modelChoice, ...reviewItems],
-          fixed: themeOptions(!animation.data),
           suggestions: motionsOffered ? motions.group : [],
+          templates: templates.filter((template) => template.id !== "custom").map(templateItem),
+          custom: templates.filter((template) => template.id === "custom").map(templateItem),
           last: [
-            ...customTheme(!animation.data),
-            {
-              id: "animate-composer",
-              label: "Animate in Composer",
-              icon: icons.prompt,
-              disabled: !animation.data,
-              onClick: () => action.mutate("animate"),
-            },
+            video
+              ? {
+                  id: "extend",
+                  label: "Extend in Composer",
+                  icon: FastForward,
+                  disabled: animateDisabled,
+                  onClick: () => action.mutate("extend"),
+                }
+              : {
+                  id: "animate-composer",
+                  label: "Animate in Composer",
+                  icon: icons.prompt,
+                  disabled: animateDisabled,
+                  onClick: () => action.mutate("animate"),
+                },
           ],
         }),
       }),
-    ready &&
-      item.type === "video" &&
-      itemAction("animate", {
-        label: "Extend",
-        loading: running === "animate" || action.isPending,
-        // A theme continues the clip from its last frame at once; the composer shows it first. It
-        // keeps the clip's own model unless videos run on Cloud.
-        note: refusal,
-        menu: assistMenu({
-          loading: optionsLoading,
-          settings: [...modelChoice, ...reviewItems],
-          fixed: themeOptions(action.isPending),
-          others: [...(reference ? [reference] : []), saveFrame],
-          last: [
-            ...customTheme(action.isPending),
-            {
-              id: "extend",
-              label: "Extend in Composer",
-              icon: FastForward,
-              disabled: action.isPending,
-              onClick: () => action.mutate("extend"),
-            },
-          ],
-        }),
-      }),
-    // Edit changes the item itself or reuses it elsewhere; a video's edits each save a new version
-    // and the original stays. The viewer adds its prompt's assistance first (MediaViewerActions).
+    // Edit asks the assistant for a change, reuses the item elsewhere, or for a video saves an
+    // edit as a new version, the original staying.
     ready &&
       itemAction("edit", {
-        loading: videoEdit.isPending,
-        menu: image
-          ? [
-              [
-                ...(upscale ? [upscale] : []),
+        loading: videoEdit.isPending || editAsk.pending,
+        onOpen: image && !edit ? () => setStepsFor(item.id) : undefined,
+        menu: assistMenu({
+          loading: assistant.isPending,
+          settings: editAssisted
+            ? [
+                {
+                  id: "review",
+                  label: "Review Prompt",
+                  icon: icons.review,
+                  checked: editReview,
+                  keepOpen: true,
+                  onClick: () => setEditReview(!editReview),
+                },
+              ]
+            : [],
+          suggestions: editAssisted && image ? steps.group : [],
+          // Library's fixed changes, asked for as a suggestion's request is.
+          templates: editAssisted
+            ? (assistant.data?.changes ?? []).map((change) => ({
+                id: `change:${change.id}`,
+                label: change.label,
+                icon: icons.suggestions,
+                disabled: editAsk.pending,
+                onClick: () => editAsk.pick(change.instruction),
+              }))
+            : [],
+          custom: editAssisted
+            ? [
+                {
+                  id: "custom",
+                  label: "Custom…",
+                  icon: icons.custom,
+                  disabled: editAsk.pending,
+                  onClick: editAsk.custom,
+                },
+              ]
+            : [],
+          others: image
+            ? [[...cards.slice(0, 2), ...(reference ? [reference] : []), ...cards.slice(2)]]
+            : [
+                [saveFrame, ...(reference ? [reference] : [])],
+                [
+                  editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
+                  editAction("reverse", "Reverse", Rewind, "reverse"),
+                  editAction("slow-motion", "Slow Motion", Snail, "slow"),
+                  editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
+                  { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
+                ],
+              ],
+          last: image
+            ? [
                 {
                   id: "edit-image",
                   label: "Edit in Composer",
@@ -529,26 +560,12 @@ export function useMediaActions(
                   disabled: action.isPending,
                   onClick: () => action.mutate("refine"),
                 },
-                ...(reference ? [reference] : []),
-                ...(character ? [character] : []),
-              ],
-            ]
-          : [
-              [
-                ...(upscale ? [upscale] : []),
-                { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
-                editAction("reverse", "Reverse", Rewind, "reverse"),
-                editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
-              ],
-              // Interpolated edits, the slowest to make.
-              [
-                editAction("slow-motion", "Slow Motion", Snail, "slow"),
-                editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
-              ],
-            ],
+              ]
+            : [],
+        }),
       }),
-    // Recreate runs the item again from here, compares or finds what is like it, then opens it in
-    // the composer. An upload has only its suggested prompt; unfinished work opens its prompt.
+    // Recreate runs the item again from here, compares it or makes more of its set, then opens it
+    // in the composer. An upload has only its suggested prompt; unfinished work opens its prompt.
     itemAction("recreate", {
       disabled: !ready && action.isPending,
       loading: running === "regenerate" || running === "repeat" || variants.isPending,
@@ -570,16 +587,6 @@ export function useMediaActions(
                     icon: Repeat,
                     onClick: () => run({ kind: "repeat" }),
                   },
-                  ...(item.jobId && assistant.data?.available
-                    ? [
-                        {
-                          id: "report",
-                          label: "Report Issue…",
-                          icon: icons.report,
-                          onClick: onReport,
-                        },
-                      ]
-                    : []),
                 ],
             [
               // Compare Models stages this image's prompt across models in the composer; Open
@@ -595,6 +602,7 @@ export function useMediaActions(
                     },
                   ]
                 : []),
+              ...moreLikeSet,
               ...(image && comparison
                 ? [
                     {
@@ -608,115 +616,12 @@ export function useMediaActions(
                     },
                   ]
                 : []),
-              // How alike the gallery's results must be, then the gallery ranked by likeness to
-              // this image (GalleryPage reads `similar`) and new variations of its MCP result set;
-              // a video in a set has only the latter.
-              ...(image
-                ? [
-                    {
-                      id: "similar",
-                      label: "Similar",
-                      icon: icons.similar,
-                      menu: [
-                        [
-                          {
-                            id: "similar-strictness",
-                            label: "Strictness",
-                            icon: icons.similar,
-                            choice: {
-                              value: strictness,
-                              options: similarStrictnessOptions,
-                              onChange: (value: string) =>
-                                setStrictness(value as SimilarStrictness),
-                            },
-                          },
-                        ],
-                        [
-                          {
-                            id: "similar-gallery",
-                            label: "Similar",
-                            icon: icons.similar,
-                            onClick: () => {
-                              onApplied();
-                              navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
-                            },
-                          },
-                          ...(moreLikeSet ? [{ id: "more-like-set", ...moreLikeSet }] : []),
-                        ],
-                      ],
-                    },
-                  ]
-                : moreLikeSet
-                  ? [{ id: "more-like-set", ...moreLikeSet }]
-                  : []),
             ],
             [recreateAction],
           ]
         : undefined,
     }),
-    itemAction("share", {
-      menu: [
-        [
-          {
-            id: "copy-prompt",
-            label: "Copy Prompt",
-            icon: TextQuote,
-            onClick: () => void copyText(item.prompt || "", "Prompt"),
-          },
-          {
-            id: "copy-details",
-            label: "Copy Details",
-            icon: ListChecks,
-            onClick: () => void copyText(settingsText(), "Details"),
-          },
-        ],
-        ready
-          ? [
-              {
-                id: "download",
-                label: "Download",
-                icon: icons.download,
-                link: gif && loop ? undefined : transfer.download,
-                menu:
-                  gif && loop
-                    ? [
-                        [
-                          {
-                            id: "download-video",
-                            label: "Video",
-                            icon: icons.download,
-                            link: transfer.download,
-                          },
-                          { id: "download-gif", label: "GIF", icon: Film, link: gif },
-                          {
-                            id: "download-loop",
-                            label: "Back & Forth",
-                            icon: ArrowLeftRight,
-                            link: loop,
-                          },
-                        ],
-                      ]
-                    : undefined,
-              },
-              // Phones that share natively also share it as a file.
-              ...(transfer.canShare
-                ? [
-                    {
-                      id: "share-file",
-                      label: "Share",
-                      icon: icons.share,
-                      disabled: transfer.sharing,
-                      loading: transfer.sharing,
-                      keepOpen: !transfer.shareReady,
-                      onClick: () => void transfer.share(),
-                    },
-                  ]
-                : []),
-            ]
-          : [],
-      ],
-    }),
-    itemAction("delete", { onClick: onDelete }),
+    upscale,
     ready &&
       itemAction("like", {
         label: item.rating === "liked" ? "Unlike" : "Like",
@@ -732,22 +637,99 @@ export function useMediaActions(
         disabled: rating.isPending,
         onClick: rating.dislike,
       }),
+    ready &&
+      !item.uploaded &&
+      item.jobId &&
+      assisted &&
+      itemAction("report", { onClick: onReport }),
+    itemAction("share", {
+      menu: [
+        [
+          {
+            id: "copy-details",
+            label: "Copy Details",
+            icon: ListChecks,
+            onClick: () => void copyText(settingsText(), "Details"),
+          },
+          {
+            id: "copy-prompt",
+            label: "Copy Prompt",
+            icon: TextQuote,
+            onClick: () => void copyText(item.prompt || "", "Prompt"),
+          },
+          ...(ready
+            ? [
+                {
+                  id: "download",
+                  label: "Download",
+                  icon: icons.download,
+                  link: gif && loop ? undefined : transfer.download,
+                  menu:
+                    gif && loop
+                      ? [
+                          [
+                            {
+                              id: "download-video",
+                              label: "Video",
+                              icon: icons.download,
+                              link: transfer.download,
+                            },
+                            { id: "download-gif", label: "GIF", icon: Film, link: gif },
+                            {
+                              id: "download-loop",
+                              label: "Back & Forth",
+                              icon: ArrowLeftRight,
+                              link: loop,
+                            },
+                          ],
+                        ]
+                      : undefined,
+                },
+              ]
+            : []),
+          // Phones that share natively also share it as a file.
+          ...(ready && transfer.canShare
+            ? [
+                {
+                  id: "share-file",
+                  label: "Share",
+                  icon: icons.share,
+                  disabled: transfer.sharing,
+                  loading: transfer.sharing,
+                  keepOpen: !transfer.shareReady,
+                  onClick: () => void transfer.share(),
+                },
+              ]
+            : []),
+        ],
+      ],
+    }),
+    // The gallery ranked by likeness to this image (GalleryPage reads `similar`).
+    image &&
+      itemAction("similar", {
+        onClick: () => {
+          onApplied();
+          navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
+        },
+      }),
+    itemAction("delete", { onClick: onDelete }),
   ];
   return itemActionGroups(
     actions.filter((entry): entry is Action => !!entry).map(withoutLoneOption),
+    layout,
   );
 }
 
 /**
  * The shared actions as menu items, mounted while a menu is open; a gallery tile's menu starts with
- * Select, which starts selecting with its item selected.
+ * Select, alone, which starts selecting with its item selected.
  */
 export function MediaActionMenu({
   item,
   onSelect,
   ...options
 }: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
-  const groups = useMediaActions(item, options);
+  const groups = useMediaActions(item, options, "menu");
   return (
     <ActionMenuItems
       groups={

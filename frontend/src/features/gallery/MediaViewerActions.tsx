@@ -1,5 +1,5 @@
 import { Box } from "@mantine/core";
-import { type Ref, type RefObject, useState } from "react";
+import { type Ref, type RefObject, useRef, useState } from "react";
 
 import type { MediaItem } from "../../types";
 import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "../../ui/ActionBar";
@@ -69,9 +69,13 @@ export function MediaViewerActions({
   const [animating, setAnimating] = useState<AnimateRequest | null>(null);
   const [trimming, setTrimming] = useState(false);
   const [reporting, setReporting] = useState(false);
-  const itemGroups = useMediaActions(item, {
+  // Edit's changes run through the viewer's own actions (an Upscale), read once they exist.
+  const current = useRef<ActionGroups>([]);
+  const prompt = useViewerPrompt(item, { groups: () => current.current, iterate });
+  const groups = useMediaActions(item, {
     transfer,
     compare,
+    edit: prompt.edit,
     iterate,
     onApplied,
     onCompare,
@@ -82,23 +86,8 @@ export function MediaViewerActions({
     onTrim: () => setTrimming(true),
     onVersionChange,
   });
-  const prompt = useViewerPrompt(item, { groups: itemGroups, iterate });
-  // Edit opens with the prompt's assistance, before the item's own edits.
-  const ai = prompt.ai;
-  const groups = ai
-    ? itemGroups.map((group) =>
-        group.map((action) =>
-          action.id === "edit"
-            ? {
-                ...action,
-                loading: action.loading || ai.loading,
-                menu: [...ai.menu!, ...action.menu!],
-              }
-            : action,
-        ),
-      )
-    : itemGroups;
-  if (shortcuts) shortcuts.current = itemGroups;
+  current.current = groups;
+  if (shortcuts) shortcuts.current = groups;
   return (
     <ActionBarSurface
       ref={ref}

@@ -8,11 +8,13 @@ import {
   cardImageSlots,
   characterImages,
   characterProfiles,
-  characterShots,
+  characterTraits,
   composePrompt,
   identitySlot,
   keepsCharacterFaces,
   keepsIdentity,
+  maxNewCharacters,
+  minCharacterAge,
   startImageSlot,
   withCharacter,
 } from "../../shared/characters.ts";
@@ -26,18 +28,20 @@ import { savedDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { canonicalProfileId } from "../profile/store.js";
 import { promptStyleStore } from "../prompt-styles.js";
 import {
+  clip,
   closest,
   listedControls,
   loraIndex,
   loraQueryWords,
   maxJobsPerCall,
+  maxSplitJobs,
   mcpControls,
   mcpGenerationCount,
   mcpLoras,
   mcpSize,
 } from "./controls.js";
 import { findCard } from "./manage.js";
-import { assertJobCount, mcpJson } from "./media.js";
+import { aboutTime, assertJobCount, mcpJson, readyIn } from "./media.js";
 import { assertAvoided, briefLine, keptChoices, projectArgs, projectTargets } from "./project.js";
 import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
 import { output, shortPrompt } from "./results.js";
@@ -66,13 +70,6 @@ import {
 
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;
-/** A set's expected wait for the reply: "about 40 s", "about 3 min". */
-const aboutTime = (ms) =>
-  ms < 55_000
-    ? `about ${Math.max(5, Math.round(ms / 5000) * 5)} s`
-    : ms < 90 * 60_000
-      ? `about ${Math.round(ms / 60_000)} min`
-      : `about ${Math.round(ms / 3_600_000)} h`;
 /** JSON with sorted keys and undefined left out, so equal arguments give equal text. */
 const stableJson = (value) =>
   JSON.stringify(value, (_key, item) =>
@@ -111,7 +108,18 @@ const theme = z
   .describe(`One of ${themeIds().join(", ")}.`);
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
 const setTitle = z.string().trim().min(1).max(80);
-const promptList = z.array(z.string().trim().min(1)).min(1).max(maxJobsPerCall);
+// Kept short in the schema: gallery/records.js storedResultSet trims what it stores.
+const cardContext = z.object({ name: z.string(), description: z.string().optional() });
+// Stored on the results, where Studio offers to save the character, outfit and scene as cards.
+const chatContext = z
+  .object({
+    character: cardContext.optional(),
+    outfit: cardContext.optional(),
+    scene: cardContext.optional(),
+    series: z.string().optional(),
+  })
+  .describe("Who and what it shows; series names a story or project.");
+const promptList = z.array(z.string().trim().min(1)).min(1).max(maxSplitJobs);
 /** A JSON array sent as one string, or a single prompt. */
 const promptListText = z.string().transform((text) => {
   try {
@@ -195,6 +203,7 @@ export function registerGenerateTools({
   media,
   actor,
   resolveOutput,
+  referenceAsset,
   publicUrl,
   generateDedupeMs,
   reviewedGuides,
@@ -222,12 +231,14 @@ export function registerGenerateTools({
     guide = "",
     promptSource = "exact",
     note = "",
-    promptLength = 200,
   ) => {
     const label = profile.label || profile.id;
     // Iterations that rebuild a whole generate call drift from the result; reuse keeps its settings.
     const followUp = `To change or animate one later, call reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and its full prompt revised (status shows it).`;
-    const [endsAt] = await media.finishTimes(owner, [submission], { signal });
+    const {
+      ends: [endsAt],
+      ahead,
+    } = await media.finishTimes(owner, [submission], { signal });
     const left = endsAt === null ? 0 : Math.max(0, endsAt - Date.now());
     const structured = {
       status: submission.status,
@@ -239,6 +250,7 @@ export function registerGenerateTools({
       },
       prompt_source: promptSource,
       ...(left ? { eta_seconds: Math.round(left / 1000) } : {}),
+      ...(ahead === undefined ? {} : { jobs_ahead: ahead }),
       jobs: submission.jobs.map(({ job_id, ref, link, status, images }) => ({
         job_id,
         ref,
@@ -247,12 +259,6 @@ export function registerGenerateTools({
         ...(images ? { images } : {}),
       })),
     };
-    // The prompt each result ran, shortened unless reuse is revising it; one line when every job shares it.
-    const prompted = submission.jobs.filter(({ prompt }) => prompt);
-    const distinct = new Set(prompted.map(({ prompt }) => prompt));
-    const prompts = !prompted.length
-      ? ""
-      : `\n\n${distinct.size === 1 ? `Prompt: ${shortPrompt([...distinct][0], promptLength)}` : prompted.map(({ ref, prompt }) => `${ref[0].toUpperCase()}${ref.slice(1)} prompt: ${shortPrompt(prompt, promptLength)}`).join("\n")}`;
     // The profile's guide follows its first use in a conversation, so the agent applies it to later prompts.
     const extra = guide
       ? [
@@ -273,10 +279,10 @@ export function registerGenerateTools({
     ].join(" · ");
     const message =
       submission.status === "queued"
-        ? `Queued on ${label}${left ? `, ready in ${aboutTime(left)}` : ""}. ${ignoredNote(submission)}${note}${await waiting(profile)}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. When the user later asks to see results, call result. Never poll or resubmit. ${followUp}`
+        ? `Queued on ${label}${readyIn(left, ahead)}. ${ignoredNote(submission)}${note}${await waiting(profile)}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. When the user later asks to see results, call result. Never poll or resubmit. ${followUp}`
         : `${submission.error} ${ignoredNote(submission)}${note}Share the links; never resubmit.`;
     return {
-      content: [{ type: "text", text: `${message}\n\n${pending}${prompts}` }, ...extra],
+      content: [{ type: "text", text: `${message}\n\n${pending}` }, ...extra],
       structuredContent: {
         ...structured,
         ...(submission.error ? { error: submission.error } : {}),
@@ -321,7 +327,7 @@ export function registerGenerateTools({
         sets.map(({ queued }) => queued),
         { signal },
       )
-    ).map((endsAt) => (endsAt === null ? 0 : Math.max(0, endsAt - now)));
+    ).ends.map((endsAt) => (endsAt === null ? 0 : Math.max(0, endsAt - now)));
     const lines = sets.map(
       ({ profile, queued }, index) =>
         `${profile.label || profile.id}: ${queued.error || queued.jobs.map(link).join(" · ")}${left[index] ? ` (${aboutTime(left[index])})` : ""}${queued.ignored ? ` ${queued.ignored}` : ""}`,
@@ -381,7 +387,14 @@ export function registerGenerateTools({
               (item.mediaInputs || []).length >= inputs,
           )
         : [found];
-      return { profile: fastestFirst([found, ...family])[0], note: "" };
+      const fastest = fastestFirst([found, ...family])[0];
+      return {
+        profile: fastest,
+        note:
+          fastest.id === found.id
+            ? ""
+            : `Ran on ${fastest.label || fastest.id}, the fast choice for ${found.label || found.id}; pass tier "quality" only when the user asks for Quality. `,
+      };
     }
     return found.id === value
       ? { profile: found, note: "" }
@@ -407,7 +420,7 @@ export function registerGenerateTools({
             ),
           }
         : {}),
-      note: "From the profile's graph, so it outranks any count its label or description gives.",
+      note: "From the profile's graph; outranks its label.",
     };
   };
   /** Profiles as the models tool lists them: "id — label" grouped by kind, marked when their worker isn't running. */
@@ -500,11 +513,49 @@ export function registerGenerateTools({
    */
   const submit = async (profile, args, record = {}, { guide = true } = {}) => {
     const fresh = guide && review(refs, profile.id);
+    // A set over maxJobsPerCall images queues in batches of that size, one after another.
+    const count = args.count ?? mcpGenerationCount;
+    const size = Math.max(1, Math.floor(maxJobsPerCall / count));
+    const prompts = args.prompts || [""];
+    let queued;
     try {
-      const queued = await media.queue(owner, args, refs, {
-        ...record,
-        ...(conversation ? { conversation } : {}),
-      });
+      for (let at = 0; at < prompts.length; at += size) {
+        const part = await media
+          .queue(
+            owner,
+            prompts.length > size
+              ? {
+                  ...args,
+                  prompts: prompts.slice(at, at + size),
+                  ...(args.titles ? { titles: args.titles.slice(at, at + size) } : {}),
+                  ...(args.result_set ? { result_set: { ...args.result_set, first: at } } : {}),
+                  ...(Number.isInteger(args.seed) && !args.same_seed
+                    ? { seed: args.seed + at * count }
+                    : {}),
+                }
+              : args,
+            refs,
+            { ...record, ...(conversation ? { conversation } : {}) },
+          )
+          .catch((error) => {
+            if (!queued) throw error;
+            return {
+              status: "partially_queued",
+              jobs: [],
+              error: `Further submission failed; retain returned jobs before retrying. ${error.message}`,
+            };
+          });
+        queued = queued
+          ? {
+              ...queued,
+              ...(part.error ? { status: part.status, error: part.error } : {}),
+              jobs: [...queued.jobs, ...part.jobs],
+            }
+          : part;
+        if (queued.error) break;
+      }
+      if (prompts.length > size)
+        queued.ignored = `${queued.ignored ? `${queued.ignored} ` : ""}Queued ${prompts.length * count} images in batches of up to ${size * count}.`;
       return { queued, guide: fresh ? compactGuide(profile.prompting) : "" };
     } catch (error) {
       // A refused submission delivered no guide, so the next attempt carries it.
@@ -516,7 +567,7 @@ export function registerGenerateTools({
     server,
     "models",
     "find models",
-    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; shots: Studio writes each, outfit and scene a card's name or words; character_views queues views; character_sheet its sheet). With profile_id (id, label or words), or profile_ids: each one's guide gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
+    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; shots: Studio writes each, outfit and scene a card's name or words; character_sheet its sheet). With profile_id (id, label or words), or profile_ids: each one's guide gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
     {
       kind: z.enum(["all", "image", "video"]).default("all"),
       tier: tier.optional(),
@@ -606,8 +657,13 @@ export function registerGenerateTools({
         const [characters, outfits, scenes] = await Promise.all(
           ["characters", "outfits", "scenes"].map(cards),
         );
+        // Each card's gist: generate reads the whole description by name.
         const cardList = (items) =>
-          items.map(({ id, name, description }) => ({ id, name, description }));
+          items.map(({ id, name, description }) => ({
+            id,
+            name,
+            description: clip(description, 120),
+          }));
         const shown = (value) => kind === "all" || kind === value;
         const services = catalogue.backends
           ? Object.fromEntries(
@@ -658,7 +714,7 @@ export function registerGenerateTools({
                 characters: characters.map((card) => ({
                   id: card.id,
                   name: card.name,
-                  description: card.description,
+                  description: clip(card.description, 120),
                   images: card.references.length,
                   ...(card.sheet ? { sheet: card.sheet.status } : {}),
                 })),
@@ -754,16 +810,7 @@ export function registerGenerateTools({
           : compactGuide(profile.prompting, maxShownGuideCharacters);
         const detail = {
           ...Object.fromEntries(
-            [
-              "id",
-              "label",
-              "kind",
-              "family",
-              "description",
-              "mediaInputs",
-              "aspectPolicy",
-              "native",
-            ]
+            ["id", "label", "kind", "family", "description", "aspectPolicy", "native"]
               .filter((key) => key in profile)
               .map((key) => [key, profile[key]]),
           ),
@@ -792,8 +839,7 @@ export function registerGenerateTools({
           ...(controls.loras
             ? {
                 loras_total: total,
-                loras_note:
-                  "Only when the user asks for a LoRA: find it with lora_query, then pass its name to generate.",
+                loras_note: `Only when the user asks for a LoRA: find it with lora_query, then pass its name to generate.${profile.capabilities?.defaultLoras === false ? " This model does best without LoRAs: add one only when the user names it." : ""}`,
               }
             : {}),
           ...(guide ? { prompting: guide } : {}),
@@ -810,7 +856,7 @@ export function registerGenerateTools({
     server,
     "generate",
     "generate",
-    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Leave count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Anyone sexual or nude must be 18+ (no teens).`,
+    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request; at most ${maxSplitJobs} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Leave count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Anyone sexual or nude must be 18+ (no teens).`,
     {
       request: z
         .string()
@@ -825,7 +871,8 @@ export function registerGenerateTools({
         .optional()
         .describe("Run as written; count images each."),
       title: setTitle.optional(),
-      titles: z.array(setTitle).max(maxJobsPerCall).optional().describe("One per prompt."),
+      titles: z.array(setTitle).max(maxSplitJobs).optional().describe("One per prompt."),
+      context: chatContext.optional(),
       preview: z.boolean().optional(),
       count: jobCount
         .optional()
@@ -846,7 +893,9 @@ export function registerGenerateTools({
         .array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }))
         .max(8)
         .optional()
-        .describe("Only LoRAs the user asks for."),
+        .describe(
+          "Only LoRAs the user asks for; strength only if they give one, so a set varies it.",
+        ),
       reference_asset_ids: z
         .array(z.string().min(1))
         .max(16)
@@ -859,8 +908,6 @@ export function registerGenerateTools({
       reference_strengths: z.array(z.number().finite().nullable()).max(16).optional(),
       // A character's name or id (models lists them).
       character: z.string().min(1).optional(),
-      // Generate References: Studio writes one prompt per view of the character (shared/characters.ts).
-      character_views: z.boolean().optional(),
       // Make Sheet: the character's design sheet, whose views generate then sends (character-sheets.js).
       character_sheet: z.boolean().optional(),
       // The user insists on a model that can't hold the character's face (the refusal says so).
@@ -939,15 +986,19 @@ export function registerGenerateTools({
     },
   );
   /** The account's character by id or name, with the images it still has, owned for this call. */
-  const characterFor = async (value, signal, views = false) => {
+  const characterFor = async (value, signal) => {
     const { characters = [] } = await media.request("GET", "/api/characters", undefined, owner, {
       signal,
     });
     const card = findCard(characters, value);
     if (!card) throw new Error(`No character "${value}". Call models to list them.`);
     const referenceIds = card.references.map((asset) => asset.id);
-    if (!referenceIds.length && !views)
-      throw new Error(`${card.name} has no images left. Ask the user to add some in Studio.`);
+    if (!referenceIds.length)
+      throw new Error(
+        card.portrait?.status === "making"
+          ? `${card.name}'s portrait isn't finished yet. Try again once it is.`
+          : `${card.name} has no images left. Ask the user to add some in Studio.`,
+      );
     media.adopt(owner, refs, { assets: referenceIds });
     return { ...card, referenceIds };
   };
@@ -979,31 +1030,21 @@ export function registerGenerateTools({
       profile_ids,
       each_profile,
       title,
+      context,
       ...args
     } = constrained.args;
-    // A result's number or option letter ("#12", "B") passes its image as a reference.
     if (args.reference_asset_ids)
       args.reference_asset_ids = await Promise.all(
-        args.reference_asset_ids.map(async (id) => {
-          if (!media.namesResult(id)) return media.referenceId(id);
-          const found = await resolveOutput(id, signal);
-          return (await media.resultReference(owner, found.jobId, found.index || 0)).asset.id;
-        }),
+        args.reference_asset_ids.map((id) => referenceAsset(id, signal)),
       );
-    const views = args.character_views === true;
     const sheet = args.character_sheet === true;
-    delete args.character_views;
     delete args.character_sheet;
-    if ((views || sheet) && !args.character)
-      throw new Error(
-        `${sheet ? "character_sheet" : "character_views"} needs character: the name or id of the card.`,
-      );
-    const card = args.character ? await characterFor(args.character, signal, views) : null;
+    if (sheet && !args.character)
+      throw new Error("character_sheet needs character: the name or id of the card.");
+    const card = args.character ? await characterFor(args.character, signal) : null;
     if (sheet) {
-      if (views || args.prompts || args.shots)
-        throw new Error(
-          "character_sheet queues the sheet alone: leave out prompts, shots and character_views.",
-        );
+      if (args.prompts || args.shots)
+        throw new Error("character_sheet queues the sheet alone: leave out prompts and shots.");
       const made = await media.request(
         "POST",
         `/api/characters/${encodeURIComponent(card.id)}/sheet`,
@@ -1017,7 +1058,7 @@ export function registerGenerateTools({
         content: [
           {
             type: "text",
-            text: `Queued ${card.name}'s character sheet on ${made.profile}: Studio writes its prompt, then keeps its face, front, side and back views and gear on the card, and generate sends the view a prompt names. Share the link and end your turn.\n\n[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`,
+            text: `Queued ${card.name}'s character sheet on ${made.profile}: Studio writes its prompt, then keeps its face, front, side and back views on the card, and generate sends the view a prompt names. Share the link and end your turn.\n\n[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`,
           },
         ],
         structuredContent: { status: "queued", jobs: [{ job_id: made.jobId, ref, link }] },
@@ -1026,22 +1067,13 @@ export function registerGenerateTools({
     const anyModel = args.any_model === true;
     delete args.character;
     delete args.any_model;
-    // The views share one seed and, where the profile edits with references, the card's first
-    // image, which each plan's prompts then follow (characterShots).
-    if (views)
-      Object.assign(args, {
-        prompts: characterShots(card.description, false),
-        count: 1,
-        seed: args.seed ?? crypto.randomInt(2 ** 31),
-        same_seed: true,
-      });
     // Shots: Studio writes each prompt from its parts, an outfit or scene card's own description
     // where one is named, so the assistant never rewords the character, outfit or place.
     const shots = args.shots;
     delete args.shots;
     // Outfit and scene card images as references: off until a live proof run shows they help.
     const cardImages = process.env.STUDIO_CARD_IMAGES === "1";
-    if (shots && (args.prompts || views)) throw new Error("Pass shots or prompts, not both.");
+    if (shots && args.prompts) throw new Error("Pass shots or prompts, not both.");
     const lists = {};
     const cardNamed = async (kind, value) => {
       if (!value?.trim()) return undefined;
@@ -1087,8 +1119,6 @@ export function registerGenerateTools({
         "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call generate again.",
       );
     const several = Boolean(profile_ids || each_profile);
-    if (several && views)
-      throw new Error("character_views queues on one model: pass profile_id or leave it out.");
     if (several && args.loras?.length)
       throw new Error(
         "LoRAs belong to one model: pass them with profile_id, or leave loras out for several models.",
@@ -1101,7 +1131,7 @@ export function registerGenerateTools({
       const minor = minorAgeRefusal(prompt);
       if (minor) throw new Error(minor);
     }
-    const listProblem = views ? "" : promptListProblem(args.prompts);
+    const listProblem = promptListProblem(args.prompts);
     if (listProblem) throw new Error(listProblem);
     // "count: 4" beside four prompts means one image each, not sixteen.
     if (
@@ -1111,7 +1141,7 @@ export function registerGenerateTools({
     )
       args.count = 1;
     // Checked before any prompt is written, so an oversized call costs nothing and says how to split.
-    assertJobCount(args.prompts?.length || 1, args.count ?? 1);
+    assertJobCount(args.prompts?.length || 1, args.count ?? 1, maxSplitJobs);
     const named = args.reference_asset_ids || [];
     // A character needs a model that takes references; its images then fill what room each has.
     const references = named.length + (card?.referenceIds.length ? 1 : 0);
@@ -1226,7 +1256,7 @@ export function registerGenerateTools({
     }));
     // The model a warning names when the chosen one can't hold a character's (or reference's) face.
     const keeper =
-      (card?.referenceIds.length || named.length) && !views
+      card?.referenceIds.length || named.length
         ? characterProfiles(localUnlessAsked(await media.profiles("image", owner), { request }))[0]
         : undefined;
     targets = targets.filter(
@@ -1236,7 +1266,7 @@ export function registerGenerateTools({
     // Identity lock: a character runs only where its image is edited with, never as text alone or
     // an img2img start image, unless the user insists on the model.
     const unable =
-      card?.referenceIds.length && !views && !anyModel
+      card?.referenceIds.length && !anyModel
         ? targets.filter(({ profile }) => !keepsIdentity(profile))
         : [];
     if (unable.length)
@@ -1249,9 +1279,9 @@ export function registerGenerateTools({
         ? mcpGenerationCount
         : 1);
     const jobs = targets.length * (args.prompts?.length || 1) * count;
-    if (jobs > maxJobsPerCall)
+    if (jobs > maxSplitJobs)
       throw new Error(
-        `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs}; one call queues at most ${maxJobsPerCall}. Lower count, pass fewer profile_ids, or name a tier.`,
+        `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs}; one call queues at most ${maxSplitJobs}. Lower count, pass fewer profile_ids, or name a tier.`,
       );
     // A preview's prompts run as shown when the same call follows without preview.
     const previewKey = `${refs || owner}\n${stableJson({ ...input, preview: undefined })}`;
@@ -1263,10 +1293,10 @@ export function registerGenerateTools({
         : await Promise.all(
             targets.map(async ({ profile, note }) => {
               const sized = mcpSize(profile, aspect ? { aspect } : {});
-              // A character sends its first image (characterImages), only to a model that keeps its
-              // face: into its Identity slot, the named references filling the others in order, or
-              // after them on a model that edits with references. As an img2img start image its
-              // pose and layout (a whole sheet) would carry over.
+              // A character sends its first image (characterImages; the run adds its others where
+              // there is room) only to a model that keeps its face: into its Identity slot, the
+              // named references filling the others in order, or after them on a model that edits
+              // with references. As an img2img start image its pose and layout would carry over.
               const identity = identitySlot(profile);
               const room = keepsIdentity(profile)
                 ? Math.min(Math.max(0, referenceCount(profile).max - named.length), characterImages)
@@ -1290,18 +1320,16 @@ export function registerGenerateTools({
                   ? { prompts: shotPrompts(room > 0) }
                   : card
                     ? {
-                        prompts: views
-                          ? characterShots(card.description, room > 0)
-                          : args.prompts.map((prompt) =>
-                              withCharacter(prompt, card.description, room > 0),
-                            ),
+                        prompts: args.prompts.map((prompt) =>
+                          withCharacter(prompt, card.description, room > 0),
+                        ),
                       }
                     : {}),
                 profile_id: profile.id,
                 ...(profile.namedBackend ? { profile_backend: profile.namedBackend } : {}),
               };
               const start =
-                card?.referenceIds.length && !views && !room
+                card?.referenceIds.length && !room
                   ? `${profile.label || profile.id} can't take ${card.name}'s image as a reference, so only the description carries the character and the face will change from image to image. Tell the user; ${keeper ? `${keeper.label || keeper.id}` : "a model that edits with references"} keeps the same face in new outfits and scenes. `
                   : "";
               // A reference on an img2img model is its start image, and the reply says what follows.
@@ -1345,13 +1373,9 @@ export function registerGenerateTools({
                   .map((label) => `${cardImageNote(label, slots.length)} `)
                   .join("");
               }
-              const alone =
-                views && card.referenceIds.length && !room
-                  ? `The views come from ${card.name}'s description alone: this model doesn't edit with references. `
-                  : "";
               return {
                 profile,
-                note: `${note || ""}${start}${img2img}${alone}${cards}`,
+                note: `${note || ""}${start}${img2img}${cards}`,
                 plan,
                 source: "exact",
               };
@@ -1373,16 +1397,23 @@ export function registerGenerateTools({
         ],
       };
     }
-    // A call of several results is one titled set, with the character it was made with; the
-    // gallery titles each prompt's results by titles, or by its prompt where they are missing.
-    const resultSet = jobs > 1 && {
+    // A call of several results, or one the chat titled or described, is one titled set, with the
+    // character it was made with and the chat's context; the gallery titles each prompt's results
+    // by titles, by a one-prompt call's title, or by its prompt where they are missing.
+    const resultSet = (jobs > 1 || title || args.titles || context) && {
       id: crypto.randomUUID(),
       // A character's set is named for it unless the chat named the set.
       title: title || card?.name || replyTitle(request) || promptWords(args.prompts[0]),
       source: actor.client || "MCP",
       ...(card ? { character: { id: card.id, name: card.name } } : {}),
+      ...(context ? { context } : {}),
     };
-    for (const item of plans) if (resultSet) item.plan.result_set = resultSet;
+    for (const item of plans)
+      if (resultSet) {
+        item.plan.result_set = resultSet;
+        if (title && !item.plan.titles && item.plan.prompts.length === 1)
+          item.plan.titles = [title];
+      }
     // Request and prompts together: the prompts run, and the request stays on the record.
     const recordOf = ({ plan }) => {
       const assistant = actor.assistant
@@ -1429,24 +1460,13 @@ export function registerGenerateTools({
     }
     const submission = await submit(profile, plan, recordOf({ plan }));
     if (submission.queued.jobs.length) accepted.push({ profile, queued: submission.queued });
-    let viewsNote = "";
-    if (views) {
-      await media.request(
-        "POST",
-        `/api/characters/${encodeURIComponent(card.id)}/generated`,
-        { jobIds: submission.queued.jobs.map((job) => job.job_id) },
-        owner,
-        { signal },
-      );
-      viewsNote = `Studio wrote one prompt per view for ${card.name}; once they finish, the user picks which to keep on the card in Studio. `;
-    }
     return respond(
       submission.queued,
       profile,
       signal,
       submission.guide,
       source,
-      `${projectNote}${tierNote || ""}${faceNote}${viewsNote}`,
+      `${projectNote}${tierNote || ""}${faceNote}`,
     );
   };
   tool(
@@ -1472,10 +1492,12 @@ export function registerGenerateTools({
       length: z.number().optional(),
       runs_on: z.enum(["local", "cloud"]).optional(),
       upscale_quality: z.enum(["fast", "balanced", "high"]).optional(),
+      title: setTitle.optional(),
     },
     async (
       {
         job_id,
+        title,
         output_index: chosenIndex,
         mode,
         upscale_quality,
@@ -1511,6 +1533,7 @@ export function registerGenerateTools({
           length,
           runs_on,
           upscale_quality,
+          title,
         })
           .filter(([, value]) => value)
           .map(([name]) => name);
@@ -1536,7 +1559,16 @@ export function registerGenerateTools({
       if (upscale_quality && mode !== "upscale")
         throw new Error("upscale_quality is for mode upscale. Call reuse again.");
       if (mode === "upscale") {
-        if (wanted || prompt || request || profile_id || preserve_seed || theme || count > 1)
+        if (
+          wanted ||
+          prompt ||
+          request ||
+          profile_id ||
+          preserve_seed ||
+          theme ||
+          count > 1 ||
+          title
+        )
           throw new Error(
             "mode upscale takes only job_id, output_index and upscale_quality. Call reuse again.",
           );
@@ -1646,6 +1678,19 @@ export function registerGenerateTools({
         Object.assign(plan.args, { prompts: [""], write });
         source = "studio";
       }
+      // A follow-up keeps its source's character and chat context, as a set of one titled by the call.
+      const set = item.resultSet;
+      const kept = set?.context;
+      if (title || kept) {
+        plan.args.result_set = {
+          id: crypto.randomUUID(),
+          title: title || set?.title || promptWords(plan.args.prompts?.[0] || item.prompt),
+          source: actor.client || "MCP",
+          ...(set?.character ? { character: set.character } : {}),
+          ...(kept ? { context: kept } : {}),
+        };
+        if (title) plan.args.titles = [title];
+      }
       // A plain run again keeps the result's prompt, so it keeps how that prompt was written (Recreate does the same).
       const carried = !prompt && !moved ? item.assistant || recorded?.assistant : null;
       const submission = await submit(plan.profile, plan.args, {
@@ -1665,8 +1710,90 @@ export function registerGenerateTools({
         submission.guide,
         source,
         `${plan.tierNote || ""}${dropped}`,
-        Infinity,
       );
+    },
+  );
+  tool(
+    server,
+    "create_characters",
+    "create characters",
+    `Up to ${maxNewCharacters} new character cards in one call: name, description (lasting looks), optional age and story, and portrait (your prompt for their first image). sheets then makes each sheet.`,
+    {
+      characters: z
+        .array(
+          z.object({
+            // Lengths and the age's ceiling are checked where the card is saved (cards.js).
+            name: z.string(),
+            description: z.string(),
+            portrait: z.string(),
+            age: z.number().int().min(minCharacterAge).optional(),
+            ...Object.fromEntries(characterTraits.map((key) => [key, z.string().optional()])),
+          }),
+        )
+        .min(1)
+        .max(maxNewCharacters),
+      sheets: z.boolean().optional(),
+      profile_id: z.string().min(1).optional(),
+    },
+    async ({ characters, sheets, profile_id }, signal) => {
+      const { characters: existing = [] } = await media.request(
+        "GET",
+        "/api/characters",
+        undefined,
+        owner,
+        { signal },
+      );
+      // Checked before any portrait queues, so a retried call makes no second set.
+      const taken = characters.filter(({ name }) => findCard(existing, name));
+      if (taken.length)
+        throw new Error(
+          `${taken.map(({ name }) => name).join(", ")} already exist${taken.length === 1 ? "s" : ""}: pick other names, or change them with cards update.`,
+        );
+      for (const { portrait, ...card } of characters) {
+        const refusal = minorAgeRefusal(Object.values(card).join("\n"));
+        if (refusal) throw new Error(refusal);
+      }
+      const names = characters.map(({ name }) => name);
+      const reply = await generateOnce(
+        {
+          prompts: characters.map(({ portrait }) => portrait),
+          titles: names,
+          title: names.join(", ").slice(0, 80),
+          count: 1,
+          ...(profile_id ? { profile_id } : {}),
+        },
+        signal,
+        [],
+      );
+      const jobs = reply.structuredContent?.jobs || [];
+      const saved = [];
+      for (const [index, { portrait: _prompt, ...card }] of characters.entries()) {
+        if (!jobs[index]) break;
+        const made = await media.request(
+          "POST",
+          "/api/characters",
+          {
+            ...card,
+            referenceIds: [],
+            portrait: { jobId: jobs[index].job_id, ...(sheets ? { sheet: true } : {}) },
+          },
+          owner,
+          { signal },
+        );
+        saved.push(made.character.name);
+      }
+      const [text, ...rest] = reply.content;
+      return {
+        ...reply,
+        content: [
+          {
+            type: "text",
+            text: `Saved ${saved.join(", ")} in Library › Characters; each portrait becomes its card's first image when it finishes${sheets ? ", then Studio makes its sheet" : ""}. ${text.text}`,
+          },
+          ...rest,
+        ],
+        structuredContent: { ...reply.structuredContent, characters: saved },
+      };
     },
   );
   return { namedInTier };

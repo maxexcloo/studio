@@ -20,11 +20,17 @@ import {
 
 const sheetStatus = { making: "Making Sheet", done: "Sheet", failed: "Sheet Failed" };
 
-/** A card's images and its sheet. */
+/** A card's images, or its portrait while it is made, and its sheet. */
 export function characterDetail(card: CharacterCard) {
   const count = card.references.length;
   return [
-    count ? `${count} ${count === 1 ? "image" : "images"}` : "No images",
+    count
+      ? `${count} ${count === 1 ? "image" : "images"}`
+      : card.portrait?.status === "making"
+        ? "Making Portrait"
+        : card.portrait
+          ? "Portrait Failed"
+          : "No images",
     card.sheet && sheetStatus[card.sheet.status],
   ]
     .filter(Boolean)
@@ -124,7 +130,6 @@ export function CharacterChoices({
                     card={card}
                     withinPortal={false}
                     onEdit={() => dialogs.edit(card)}
-                    onGenerate={() => dialogs.generate(card)}
                     onSheet={() => dialogs.sheet(card)}
                     onDelete={() => dialogs.remove(card)}
                   />

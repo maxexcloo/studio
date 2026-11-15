@@ -1,11 +1,4 @@
-import { notifications } from "@mantine/notifications";
-import {
-  type QueryClient,
-  queryOptions,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../api";
 import { modelsQuery } from "../generation/GenerationProvider";
@@ -46,23 +39,6 @@ export const preferencesQuery = queryOptions({
   queryKey: ["preferences"],
   queryFn: () => api<PreferencesStatus>("/api/preferences"),
 });
-
-/**
- * Where the gallery holds back queued work (Unfinished Work), queuing says so instead of a tile,
- * in one notice with any `note` about where the work runs.
- */
-export function showQueued(client: QueryClient, note?: string) {
-  const work = client.getQueryData(preferencesQuery.queryKey)?.preferences.galleryWork;
-  const message = [
-    note,
-    work === "running"
-      ? "Queued. It shows in the gallery once it starts."
-      : work !== "queued" && "Queued. It shows in the gallery once it's done.",
-  ]
-    .filter(Boolean)
-    .join(" ");
-  if (message) notifications.show({ message });
-}
 
 /** Saves preferences at once; a failure refetches the saved ones and reports through the default notification. */
 export function useSavePreferences() {

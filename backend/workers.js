@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 
 /**
- * Studio's workers: none, one or many, each with a stable id, a name, an address, what it runs
- * and its backend: ComfyUI (every request to one names it, comfy/comfy.js) or Radiance, which
- * Studio calls directly (providers/radiance.ts).
+ * Studio's workers: none, one or many, each with a stable id, a name, an address, what it runs,
+ * how many jobs at once (`slots`) and its backend: ComfyUI (every request to one names it,
+ * comfy/comfy.js) or Radiance, which Studio calls directly (providers/radiance.ts).
  *
  * The deployment defines them: `STUDIO_WORKERS` (a JSON list), else the media
  * workloads Studio found in Kubernetes (runtime/workloads.ts).
@@ -109,8 +109,12 @@ export function normalizeWorker(raw, { taken = new Set(), where = "Worker" } = {
     throw new WorkerConfigError(
       `${where} has an unknown backend: ${backend}. Use ${workerBackends.join(" or ")}.`,
     );
+  // How many jobs it runs at once: one, or one per GPU where each serves its own model.
+  const slots = raw.slots ?? 1;
+  if (!Number.isInteger(slots) || slots < 1)
+    throw new WorkerConfigError(`${where} needs a whole number of slots, 1 or more.`);
   taken.add(id);
-  return { id, name: name || defaultName(capabilities), url, capabilities, backend };
+  return { id, name: name || defaultName(capabilities), url, capabilities, slots, backend };
 }
 
 const workerBackends = ["comfyui", "radiance"];
