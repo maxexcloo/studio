@@ -7017,3 +7017,13 @@ test("admin tools chain a Library search, a one-call install and a named update 
     await failure(user, name, args);
   assert.equal(seen.length, before);
 });
+
+test("Models tells a chat when a profile does best without LoRAs", async (t) => {
+  const f = await fixture(t);
+  await f.profiles([
+    { ...imageProfile, capabilities: { ...imageProfile.capabilities, defaultLoras: false } },
+  ]);
+  const client = await f.client();
+  const details = data(await call(client, "models", { profile_id: imageProfile.id }));
+  assert.match(details.loras_note, /does best without LoRAs: add one only when the user names it/);
+});
