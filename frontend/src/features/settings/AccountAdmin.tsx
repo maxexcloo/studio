@@ -17,27 +17,19 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Check,
-  ImageOff,
-  KeyRound,
-  ShieldCheck,
-  Unlink,
-  UserCheck,
-  UserRound,
-  UserX,
-} from "lucide-react";
+import { ImageOff, KeyRound, ShieldCheck, Unlink, UserCheck, UserRound, UserX } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 
 import { isCloudProfile } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { Account } from "../../types";
 import { formatBytes } from "../../ui/bytes";
-import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
+import { CopyButton } from "../../ui/CopyButton";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
@@ -425,8 +417,6 @@ export const galleryOwnersQuery = queryOptions({
   queryKey: ["gallery-owners"],
   queryFn: () => api<{ owners: Record<string, GalleryOwner> }>("/api/gallery/owners"),
 });
-const plural = (count: number, noun: string) =>
-  `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
 /** The last 30 days in brief: only what the account made, with its GPU minutes. */
 const usageLine = (usage?: GalleryOwner) =>
   [
@@ -461,7 +451,6 @@ function ResetPassword({
   const [generated, setGenerated] = useState("");
   // Passwords stay in this dialog, never in the mutation cache's variables.
   const issuing = useRef("");
-  const { copied, copy } = useCopy();
   const reset = useMutation({
     meta: { inlineError: true },
     mutationFn: (generate: boolean) =>
@@ -486,13 +475,7 @@ function ResetPassword({
           onFocus={(event) => event.currentTarget.select()}
         />
         <DialogFooter>
-          <Button
-            variant="default"
-            leftSection={copied ? <Check size={16} /> : <icons.copy size={16} />}
-            onClick={() => copy(generated, "password")}
-          >
-            {copied ? "Copied" : "Copy Password"}
-          </Button>
+          <CopyButton text={generated} label="Copy Password" />
           <Button onClick={saved}>Done</Button>
         </DialogFooter>
       </Stack>

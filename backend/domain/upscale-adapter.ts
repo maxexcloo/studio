@@ -157,15 +157,3 @@ export function createUpscaleQueueAdapter(options: UpscaleOptions): QueueAdapter
     async saveOutputs() {},
   };
 }
-
-export function withUpscaleAdapter(generation: QueueAdapter, upscale: QueueAdapter): QueueAdapter {
-  const forJob = (job: OwnedJob) => (job.operation === "upscale" ? upscale : generation);
-  return {
-    submit: (job) => forJob(job).submit(job),
-    observe: (job) => forJob(job).observe(job),
-    cancel: (job) => forJob(job).cancel(job),
-    saveOutputs: (job) => forJob(job).saveOutputs(job),
-    eligible: (job) => forJob(job).eligible?.(job) || Promise.resolve(undefined),
-    settled: (job) => forJob(job).settled?.(job) || Promise.resolve(),
-  };
-}

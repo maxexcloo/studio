@@ -6,7 +6,7 @@ export interface TitleItem extends IdleItem {
   title?: string;
 }
 /** The assistant gateway (assistant.js). */
-export interface TitleWriter {
+interface TitleWriter {
   title(request: { prompt: string; signal?: AbortSignal }): Promise<{ title: string }>;
 }
 

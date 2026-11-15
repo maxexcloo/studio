@@ -1,6 +1,9 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import type { Appearance } from "../../../../shared/appearance";
 import { api } from "../../api";
+import { accountQuery, useAccount } from "../auth/AccountGate";
+import { galleryKey } from "../gallery/queries";
 import { modelsQuery } from "../generation/GenerationProvider";
 
 /** Where the account prefers videos to run: Cloud, or the local Fast or Quality tier. */
@@ -24,6 +27,8 @@ export interface Preferences {
   writingModel?: string;
   /** Unsaved, Fast where the account has local video, otherwise Cloud. */
   videos?: VideosPreference;
+  /** The header's Appearance settings; unsaved, the browser's. */
+  appearance?: Partial<Appearance>;
 }
 interface PreferencesStatus {
   preferences: Preferences;
@@ -55,13 +60,13 @@ export function useSavePreferences() {
       client.setQueryData(preferencesQuery.queryKey, status);
       // Model choices change what the account may use everywhere.
       if ("cloudModels" in patch || "loras" in patch || "uncensoredModels" in patch)
-        for (const queryKey of [["account"], modelsQuery.queryKey])
+        for (const queryKey of [accountQuery.queryKey, modelsQuery.queryKey])
           void client.invalidateQueries({ queryKey });
       // Explicit wording (Spicy Prompts with Uncensored Models) changes what suggestions say.
       if ("spicyPrompts" in patch || "uncensoredModels" in patch)
         void client.invalidateQueries({ queryKey: ["suggestions"] });
       // The gallery shows the unfinished work the account chose.
-      if ("galleryWork" in patch) void client.invalidateQueries({ queryKey: ["gallery"] });
+      if ("galleryWork" in patch) void client.invalidateQueries({ queryKey: galleryKey });
       // Default models follow where the account prefers each area to run.
       if ("images" in patch || "videos" in patch)
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
@@ -89,4 +94,16 @@ export function useVideosPreference() {
     useQuery(preferencesQuery).data?.preferences.videos,
     (videos: VideosPreference) => save.mutate({ videos }),
   ] as const;
+}
+
+/** The account's Appearance and its saver, once someone is signed in (single-user mode always is). */
+export function useAppearancePreference() {
+  const account = useAccount().data;
+  const signedIn = !!account && (account.mode !== "multi-user" || !!account.signedIn);
+  const preferences = useQuery({ ...preferencesQuery, enabled: signedIn });
+  const save = useSavePreferences();
+  return {
+    saved: preferences.data?.preferences.appearance,
+    save: preferences.data ? (appearance: Appearance) => save.mutate({ appearance }) : undefined,
+  };
 }

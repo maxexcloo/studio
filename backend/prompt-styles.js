@@ -18,12 +18,12 @@ import { hashOf, versionsIn, writeVersion } from "./profile/store.js";
 import { isObject } from "./values.js";
 
 const origins = ["seed", "studio", "ai", "chat"];
-export const styleKinds = ["improve", "animate", "change"];
+const styleKinds = ["improve", "animate", "change"];
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 const text = (value, max) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
 /** A saved list as the store keeps it, or a 400 naming what is wrong. */
-export function cleanStyles(value) {
+function cleanStyles(value) {
   if (!Array.isArray(value)) throw fail("Prompt styles are a list.");
   const seen = new Set();
   return value.map((entry, index) => {

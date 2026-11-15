@@ -80,12 +80,14 @@ test("the graph uses the machine's own device and skips block swap without an of
   assert.equal(cuda["3"].inputs.blocks_to_swap, 16);
 });
 
-test("the terminal install clones the pinned pack and installs its requirements", async () => {
+test("the terminal install clones the worker's pinned pack and installs its requirements", async () => {
   const { packInstallPlan } = await import("./node-install.js");
   const { nodePack } = await import("./node-packs.js");
+  const { default: sources } = await import("../worker/sources.json", { with: { type: "json" } });
+  const { revision } = sources.find(({ path }) => path.endsWith("/ComfyUI-SeedVR2_VideoUpscaler"));
   assert.equal(
     packInstallPlan(nodePack("seedvr2")).commands[0].command,
-    'cd "ComfyUI/custom_nodes" && git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git && git -C ComfyUI-SeedVR2_VideoUpscaler checkout --detach 5a4bf428f3735cc72ac760d40f372f94dec28422 && python3 -m pip install -r ComfyUI-SeedVR2_VideoUpscaler/requirements.txt',
+    `cd "ComfyUI/custom_nodes" && git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git && git -C ComfyUI-SeedVR2_VideoUpscaler checkout --detach ${revision} && python3 -m pip install -r ComfyUI-SeedVR2_VideoUpscaler/requirements.txt`,
   );
 });
 

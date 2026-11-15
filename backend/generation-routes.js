@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
 
+import { upscaleQualities } from "../shared/upscale.ts";
 import { hasFullAccess, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
 import { startFrameSize } from "./animate-profile.js";
 import { assistantRecord } from "./assistant-routes.js";
 import { listCards } from "./cards.js";
-import { sheetReferences } from "./character-sheets.js";
+import { characterPrompt, sheetReferences } from "./character-sheets.js";
 import { routeProfile } from "./comfy/backends.js";
 import { logEvent } from "./crash-log.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
@@ -30,7 +31,7 @@ import { loraAllowed } from "./model/catalogue.js";
 import { recordPrompt } from "./prompt-history.js";
 import { referenceExistsForAccount, stageReferenceAssetsForAccount } from "./references.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
-import { upscaleQualities, upscaleTargets } from "./upscale.js";
+import { upscaleTargets } from "./upscale.js";
 import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {
   capabilityForProfile,
@@ -322,10 +323,11 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     // makes the sheet.
     if (body.referenceAssets?.length && input.writing?.kind !== "sheet") {
       const ownerId = body.ownerId || "";
+      const cards = listCards("characters", ownerId);
       body.referenceAssets = sheetReferences({
         references: body.referenceAssets,
         prompt: body.prompt,
-        cards: listCards("characters", ownerId),
+        cards,
         profile: runProfile(
           (await mediaModels().catch(() => null))?.models?.profiles?.find(
             (item) => item.id === body.profileId,
@@ -335,6 +337,16 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
         madeWith: (id) =>
           galleryItem(id, ownerId)?.settings?.referenceAssets?.map((asset) => asset.assetId) || [],
       });
+      // Reuse restores what was typed; the run says "reference images" when it sends several.
+      const prompt = characterPrompt({
+        prompt: body.prompt,
+        references: body.referenceAssets,
+        cards,
+      });
+      if (prompt !== body.prompt) {
+        body.typedPrompt ??= body.prompt;
+        body.prompt = prompt;
+      }
     }
     // Radiance takes its references with the request (radiance-jobs.js), so nothing is staged for it.
     const staging = !isRadianceWorker(workerById(backend));

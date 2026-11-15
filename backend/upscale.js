@@ -2,17 +2,18 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { upscaleQualities } from "../shared/upscale.ts";
 import { catalogueDownload } from "./catalogue-downloads.js";
 import { comfy, localOutputFile, optionsFor } from "./comfy/comfy.js";
 import { outputFolderName } from "./data-names.js";
 import { families } from "./family-catalogue.js";
 import { classifyModel } from "./model/families.js";
 import { nodePacks } from "./node-packs.js";
+import { digest } from "./values.js";
 
 // SeedVR2 restores detail rather than interpolating it, so the pipeline mirrors
 // the reference workflow: soften the source with a lanczos pre-scale, then let
 // the model rebuild the short side at the requested resolution.
-export const upscaleQualities = ["fast", "balanced", "high"];
 
 /**
  * Every SeedVR2 weight a tier names, with the exact size and SHA-256 Hugging
@@ -568,7 +569,7 @@ export async function uploadUpscaleVideoSource(worker, item) {
   if (![".mp4", ".webm", ".mov", ".mkv", ".m4v"].includes(extension))
     throw new Error("Only MP4, WebM, MOV, MKV and M4V videos can be upscaled.");
   const buffer = fs.readFileSync(file);
-  const filename = `studio-upscale-${crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 32)}${extension}`;
+  const filename = `studio-upscale-${digest(buffer).slice(0, 32)}${extension}`;
   const form = new FormData();
   form.append("image", new Blob([buffer]), filename);
   form.append("type", "input");

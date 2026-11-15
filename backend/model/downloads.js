@@ -1,9 +1,9 @@
-import crypto from "node:crypto";
 import path from "node:path";
 
 import { civitaiFetch, civitaiTokenStatus } from "../civitai/access.js";
 // Every catalogue request goes through Hugging Face access: token and mirror (hf-access.js).
 import { hfFetch as fetch, hfAccessNote, hfMirrored, hfTokenValue } from "../hf-access.js";
+import { digest } from "../values.js";
 import {
   refreshWorkerModels,
   uploadWorkerModel,
@@ -327,7 +327,7 @@ async function fetchIntoWorker(entry, signal) {
   await refreshWorkerModels({ force: true, workerUrl: entry.workerUrl });
   if (!/^[a-f0-9]{64}$/i.test(entry.sha256 || ""))
     throw finalError("The worker requires a published SHA-256 checksum.");
-  const source = crypto.createHash("sha256").update(entry.url).digest("hex");
+  const source = digest(entry.url);
   const saved = await workerModelFile(entry);
   if (saved.size > 0) {
     const existing = await workerModelFile(entry, "hash");

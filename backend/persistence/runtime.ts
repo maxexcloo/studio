@@ -8,14 +8,14 @@ import { syncGallerySchema } from "./gallery-rows.ts";
 
 const databases = new Map<string, DatabaseSync>();
 /** The JSON stores runtime-json-v1 moved into SQLite. */
-export const legacyFiles = ["accounts.json", "gallery.json", "gallery-hidden.json"] as const;
+const legacyFiles = ["accounts.json", "gallery.json", "gallery-hidden.json"] as const;
 export const databaseFile = (dataDir: string) => path.join(dataDir, "studio.sqlite");
 /**
  * The JSON files json-stores-v1 moved into SQLite, relative to the data folder, `.bak` copies
  * included: documents, each account's prompt histories and LoRA stacks
  * (in `accounts/<key>/`, at the top in single-user mode), import records and ingested runs.
  */
-export const jsonStoreSource =
+const jsonStoreSource =
   /^(?:(workflow-preferences|timings|model-types|presets|library\/updates|mcp-assistant|comparisons|mcp-ownership)|(?:accounts\/([0-9a-f]{64})\/)?(prompt-history|negative-prompt-history|lora-stacks)|library\/imports\/(imp-[a-z0-9]{6,40})|media-ingested)\.json(\.bak)?$/;
 
 const jsonStoresMigration = "json-stores-v1";
@@ -172,12 +172,12 @@ export function assertCurrentStorage(dataDir: string): void {
     );
 }
 
+/** A document's value, or undefined without one. */
 export function readRuntimeDocument(dataDir: string, name: string): unknown {
   const row = runtimeDatabase(dataDir)
     .prepare("SELECT value FROM studio_documents WHERE name = ?")
     .get(name) as { value: string } | undefined;
-  if (!row) throw Object.assign(new Error(`No saved ${name}`), { code: "ENOENT" });
-  return JSON.parse(row.value);
+  return row ? JSON.parse(row.value) : undefined;
 }
 
 export function writeRuntimeDocument(dataDir: string, name: string, value: unknown): void {
@@ -188,16 +188,9 @@ export function writeRuntimeDocument(dataDir: string, name: string, value: unkno
     .run(name, JSON.stringify(value));
 }
 
-/**
- * A document's value, or undefined without one. A folder without a database stays without one, so
- * dry runs read through this.
- */
+/** readRuntimeDocument, except a folder without a database stays without one, so dry runs read through this. */
 export function savedDocument(dataDir: string, name: string): unknown {
-  if (!fs.existsSync(databaseFile(dataDir))) return undefined;
-  const row = runtimeDatabase(dataDir)
-    .prepare("SELECT value FROM studio_documents WHERE name = ?")
-    .get(name) as { value: string } | undefined;
-  return row ? JSON.parse(row.value) : undefined;
+  return fs.existsSync(databaseFile(dataDir)) ? readRuntimeDocument(dataDir, name) : undefined;
 }
 
 /** Every account's `name` document (ownerDocumentName), read like savedDocument. */

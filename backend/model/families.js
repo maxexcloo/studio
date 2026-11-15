@@ -36,13 +36,8 @@ function choiceKey(source, name) {
 
 function loadModelChoices() {
   if (choicesCache) return choicesCache;
-  try {
-    const raw = readRuntimeDocument(dataDir, "model-types");
-    choicesCache = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    choicesCache = {};
-  }
+  const raw = readRuntimeDocument(dataDir, "model-types");
+  choicesCache = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   return choicesCache;
 }
 

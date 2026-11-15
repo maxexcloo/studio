@@ -44,10 +44,7 @@ export function createChatAssistantMemory({ now = Date.now, dataDir = "", log = 
           if (typeof id === "string" && fresh(value)) map.set(id, value);
       }
     } catch (error) {
-      if (error.code !== "ENOENT")
-        log.warn?.(
-          `The chat assistant records couldn't be read; starting afresh: ${error.message}`,
-        );
+      log.warn?.(`The chat assistant records couldn't be read; starting afresh: ${error.message}`);
     }
   }
   const save = () => {

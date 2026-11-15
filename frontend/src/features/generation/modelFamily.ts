@@ -1,4 +1,4 @@
-import { loraFamilyId } from "../../../shared/profiles";
+import { loraFamilyId } from "../../../../shared/profiles";
 
 // Names the catalogue doesn't define: quantisation formats and older family ids.
 const names: Record<string, string> = {

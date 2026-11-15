@@ -15,7 +15,7 @@ import { Activity } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
-import { pausedReason, terminalStatuses } from "../../../../shared/queue";
+import { activeStatuses, pausedReason, terminalStatuses } from "../../../../shared/queue";
 import { icons } from "../../ui/icons";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { PopupTooltip } from "../../ui/PopupTooltip";
@@ -44,9 +44,7 @@ export function StatusAction() {
   const held = !generating && unfinished.length > 0;
   // The summary counts running work too, so it reads again as soon as the account's own starts or ends.
   const client = useQueryClient();
-  const running = unfinished.filter((job) =>
-    ["starting", "running", "saving"].includes(job.status),
-  );
+  const running = unfinished.filter((job) => activeStatuses.has(job.status));
   const runningKey = running.map((job) => job.id).join();
   useEffect(() => {
     void client.invalidateQueries({ queryKey: servicesStatusQuery.queryKey });

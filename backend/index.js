@@ -9,7 +9,7 @@ import path from "node:path";
 
 import express from "express";
 
-import { characterImageIds } from "../shared/characters.ts";
+import { cardKinds, characterImageIds } from "../shared/characters.ts";
 import { isCloudProfile, loraName } from "../shared/profiles.ts";
 import { canAdmin, clientOf } from "./access.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
@@ -66,7 +66,7 @@ import { registerIdlePassRoutes } from "./domain/idle-work.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
 import { createProjects, stylesWithChoice } from "./domain/projects.ts";
 import { createReview } from "./domain/review.ts";
-import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
+import { registerMaintenanceRoutes, registerQueueRoutes } from "./domain/routes.ts";
 import { Store, queuePriority } from "./domain/store.ts";
 import { createPromptSuggester } from "./domain/suggested-prompts.ts";
 import {
@@ -571,14 +571,7 @@ const assistantEngine = registerAssistantRoutes(app, {
   liked: assistant.liked,
 });
 
-const readComparisons = () => {
-  try {
-    return readRuntimeDocument(dataDir, "comparisons");
-  } catch (error) {
-    if (error.code === "ENOENT") return [];
-    throw error;
-  }
-};
+const readComparisons = () => readRuntimeDocument(dataDir, "comparisons") ?? [];
 registerGalleryReadRoutes(app, {
   store,
   compared: (ownerId) => {
@@ -763,7 +756,7 @@ app.post("/api/generate", async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
   res.status(result.status).json(result.payload);
 });
-registerRewriteRoutes(app, {
+registerQueueRoutes(app, {
   store,
   queue: generationQueue,
   admit: admitGeneration,
@@ -983,7 +976,7 @@ const dream = createDream({
   cards: (ownerId) => {
     if (cardRefusal(ownerId ? accountAccessForId(ownerId) : undefined)) return null;
     return Object.fromEntries(
-      ["characters", "outfits", "scenes"].map((kind) => [kind, listCards(kind, ownerId)]),
+      Object.keys(cardKinds).map((kind) => [kind, listCards(kind, ownerId)]),
     );
   },
   createCard,
@@ -1046,14 +1039,7 @@ async function smallImage(item) {
 // The gallery as idle work walks it (domain/idle-work.ts).
 const idleItems = (since, after) => eachGalleryItem({ since }, after && galleryKey(after));
 // Gallery captions (domain/captions.ts) let search match what an image shows.
-const runtimeLoad = (name) => () => {
-  try {
-    return readRuntimeDocument(dataDir, name);
-  } catch (error) {
-    if (error.code === "ENOENT") return null;
-    throw error;
-  }
-};
+const runtimeLoad = (name) => () => readRuntimeDocument(dataDir, name) ?? null;
 const captioner = createCaptioner({
   enabled: () => flagEnabled("STUDIO_GALLERY_CAPTIONS"),
   writer: assistantEngine,

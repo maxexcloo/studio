@@ -10,6 +10,20 @@ export type QueueStatus =
   | "cancelled";
 /** The longest prompt Studio writes, keeps or accepts, in characters. */
 export const maxPromptCharacters = 4000;
+/** Not yet handed to a provider: the work a pause holds and a move reorders. */
+export const pendingStatuses: ReadonlySet<string> = new Set<QueueStatus>([
+  "writing",
+  "queued",
+  "waiting",
+]);
+/** Handed to a provider and not yet done. */
+export const activeStatuses: ReadonlySet<string> = new Set<QueueStatus>([
+  "starting",
+  "running",
+  "saving",
+]);
+/** A gallery item or ComfyUI run in one of these is finished: saved, failed or cancelled. */
+export const finishedItemStatuses: ReadonlySet<string> = new Set(["done", "failed", "cancelled"]);
 /** A job in one of these is done and changes no more. */
 export const terminalStatuses: ReadonlySet<string> = new Set<QueueStatus>([
   "completed",

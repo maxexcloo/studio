@@ -24,6 +24,7 @@ import { usePhone } from "../../ui/usePhone";
 import { projectPath, projectsQuery } from "../dream/queries";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaViewer } from "../gallery/MediaViewer";
+import { galleryKey } from "../gallery/queries";
 import { useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
 import { type Comparison, comparisonQuery } from "./queries";
@@ -66,7 +67,7 @@ export function ComparePage() {
     },
     onSettled: () =>
       Promise.all(
-        [["comparison", id], ["gallery"], ["gallery-filters"]].map((queryKey) =>
+        [["comparison", id], galleryKey, ["gallery-filters"]].map((queryKey) =>
           client.invalidateQueries({ queryKey }),
         ),
       ),
