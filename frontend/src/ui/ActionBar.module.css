@@ -81,6 +81,12 @@
   align-items: center;
 }
 
+/* The ▾ beside a name stays small where touch screens enlarge icons (theme.module.css). */
+.actions[data-stacked] .stackedLabel > span :global(svg.lucide.lucide-chevron-down) {
+  width: 10px;
+  height: 10px;
+}
+
 /* A fitted bar whose names have all gone draws each ▾ closer. */
 .actions[data-tight] .options {
   padding-inline: 2px 1px;
