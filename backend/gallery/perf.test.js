@@ -9,7 +9,7 @@ const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
 process.env.STUDIO_MEDIA_DIR = outputDir;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 process.env.STUDIO_DATA_DIR = dataDir;
-const { readGalleryRows } = await import("../persistence/gallery-rows.ts");
+const { galleryKey, readGalleryRows } = await import("../persistence/gallery-rows.ts");
 const { runtimeDatabase } = await import("../persistence/runtime.ts");
 const {
   eachGalleryItem,
@@ -254,5 +254,26 @@ test("profile health reads recent finished and failed runs from the runs index, 
       ["profile-b", "failed", false],
       ["profile-a", "done", false],
     ],
+  );
+});
+
+test("a walk resumes after any record, across the gallery, Dream's pool and uploads", () => {
+  const item = (id, fields) => ({ ...output(id), url: undefined, ...fields });
+  setGallery([
+    item("one"),
+    item("two"),
+    item("pooled", { dream: { state: "unseen" } }),
+    item("upload", { uploaded: true }),
+  ]);
+  const walk = [...eachGalleryItem()].map((item) => item.id);
+  assert.deepEqual(new Set(walk), new Set(["one", "two", "pooled", "upload"]));
+  for (const [index, id] of walk.entries())
+    assert.deepEqual(
+      [...eachGalleryItem({}, galleryKey({ id }))].map((item) => item.id),
+      walk.slice(index + 1),
+    );
+  assert.deepEqual(
+    [...eachGalleryItem({}, "gone")].map((item) => item.id),
+    walk,
   );
 });
