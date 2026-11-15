@@ -85,7 +85,7 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
   expect(asked).toHaveLength(1);
 });
 
-test("The viewer's Edit menu offers Review Prompt, then Suggestions with Refresh, then Custom…", async ({
+test("The viewer's Edit menu offers Review Prompt, then Suggestions with Refresh…, then Custom…", async ({
   page,
 }) => {
   await openViewer(page);
@@ -111,7 +111,7 @@ test("The viewer's Edit menu offers Review Prompt, then Suggestions with Refresh
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
     ...steps.map((step) => step.label),
-    "Refresh",
+    "Refresh…",
     "Custom…",
     "Use as Character",
     "Use as Outfit",
@@ -120,7 +120,7 @@ test("The viewer's Edit menu offers Review Prompt, then Suggestions with Refresh
     "Edit in Composer",
   ]);
   expect(asked).toEqual([{ surface: "viewer", jobId: "job-hub", fresh: false }]);
-  await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
+  await menu.getByRole("menuitem", { name: "Refresh…", exact: true }).click();
   await expect(thinking).toBeVisible();
   release[1]();
   await expect(menu.getByRole("menuitem", { name: "Snowfall", exact: true })).toBeVisible();
@@ -206,7 +206,7 @@ test("Edit offers Library's fixed changes above the image's suggestions", async 
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
     ...steps.map((step) => step.label),
-    "Refresh",
+    "Refresh…",
     "Softer Shadows",
     "Custom…",
     "Use as Character",
@@ -246,7 +246,7 @@ test("Animate offers motions written for the image, then its templates and Custo
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
     "Wings Unfold",
-    "Refresh",
+    "Refresh…",
     "Action",
     "Cinematic Camera",
     "Dialogue",
