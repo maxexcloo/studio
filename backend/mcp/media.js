@@ -64,6 +64,18 @@ export function uploadPage({ message = "", open = true } = {}) {
     "body{font-size:1.1rem}form{display:grid;gap:1rem;max-width:30rem}input,button{font:inherit}button{padding:.8rem;border-radius:.5rem}",
   );
 }
+/**
+ * A set's items in order, each model's prompts in turn: the plan, the prompt's place and its jobs.
+ * "set 3 2" names the second.
+ */
+export const setItems = (set) =>
+  set.plans.flatMap((plan, planIndex) =>
+    plan.prompts.map((prompt, index) => ({
+      plan: planIndex,
+      prompt: index,
+      jobs: plan.jobs.filter((job) => job.prompt === index),
+    })),
+  );
 /** An account's result number, as Studio shows it ("#123", or "123"). */
 const numberPattern = /^\s*#?\s*(\d{1,9})\s*$/;
 /** A conversation's own result number from before Studio's ("result 3", "r3"), which older chats still use. */
@@ -72,6 +84,10 @@ const chatNumberPattern = /^\s*(?:result|r)\s*#?\s*(\d{1,7})\s*$/i;
 const letterPattern = /^\s*(?:option\s+)?([A-J])\s*$/i;
 // One output of a result by its letter, as a chat lists picks: "#12b", "result 2 c", "2c".
 const outputPattern = /^\s*(result\s*|r\s*)?#?\s*(\d{1,9})\s*([a-j])\s*$/i;
+// A conversation's set ("set 3"), one item of it, counting each model's prompts in turn ("set 3 2"),
+// and that item's image by letter ("set 3 2c").
+const setPattern =
+  /^\s*set\s*#?\s*(\d{1,7})(?:\s*[:/.,-]?\s*(?:(\d{1,3})\s*([a-j])?|([a-z]{1,2})))?\s*$/i;
 // Chat hosts such as LibreChat cannot hand an attached file to a tool.
 const attachedImageHint =
   "LibreChat can't pass attached files to tools: call upload_link, ask the user to upload the image there, then pass its reference_asset_id to generate.";
@@ -690,7 +706,7 @@ export class McpMedia {
       body.tiledDecode = true;
     const writing = write?.animate ? { kind: "animate", ...write.animate } : null;
     // A set's prompts spread the LoRAs left to Studio around the strengths the account liked.
-    const vary = Boolean(result_set) && stack.some((lora) => !lora.fixed);
+    const vary = Boolean(result_set) && !request.comparison && stack.some((lora) => !lora.fixed);
     const liked = vary
       ? Object.fromEntries(
           (
@@ -778,6 +794,7 @@ export class McpMedia {
             });
             queued.push({
               job_id: result.jobId,
+              prompt_index: position,
               ...this.handle(owner, scope, result.jobId),
               ...(ran ? { prompt: ran } : {}),
               ...(size > 1 ? { images: size } : {}),
@@ -1146,6 +1163,24 @@ export class McpMedia {
    * the value named one output.
    */
   async resolve(owner, scope, value, { signal } = {}) {
+    const inSet = this.chatSet(owner, scope, value);
+    if (inSet) {
+      if (!inSet.item)
+        throw new Error(
+          `set ${inSet.number} is a whole set: name one of it ("set ${inSet.number} 2c"), or pass the set to review, result, gallery or reuse.`,
+        );
+      const item = setItems(inSet.set)[inSet.item - 1];
+      if (!item) throw new Error(`set ${inSet.number} has no item ${inSet.item}.`);
+      if (!item.jobs.length)
+        throw new Error(`set ${inSet.number} item ${inSet.item} was not queued.`);
+      if (!inSet.letter) return { jobId: item.jobs[0].id };
+      let at = inSet.letter.toLowerCase().charCodeAt(0) - 97;
+      for (const job of item.jobs) {
+        if (at < job.images) return { jobId: job.id, index: at, output: true };
+        at -= job.images;
+      }
+      throw new Error(`set ${inSet.number} item ${inSet.item} has no image ${inSet.letter}.`);
+    }
     const lettered = outputPattern.exec(String(value || ""));
     if (lettered) {
       const [, chat, number, letter] = lettered;
@@ -1199,10 +1234,45 @@ export class McpMedia {
     this.noteNumbers([{ jobId: found.jobId, index: found.index, number }]);
     return { jobId: found.jobId, index: found.index };
   }
+  /** Records a conversation's set (persistence/mcp-ownership.ts ChatSet) and answers its number. */
+  addSet(owner, scope, set) {
+    return this.rows.addSet(scope || this.referenceScope(owner), set);
+  }
+  /** The conversation's set a "set 3" ref names, with the item and letter it picks, else null. */
+  chatSet(owner, scope, value) {
+    const match = setPattern.exec(String(value || ""));
+    if (!match) return null;
+    const number = Number(match[1]);
+    const set = this.rows.chatSet(scope || this.referenceScope(owner), number);
+    if (!set) throw new Error(`There is no set ${number} in this conversation.`);
+    if (match[4]) {
+      let at =
+        [...match[4].toUpperCase()].reduce((sum, char) => sum * 26 + char.charCodeAt(0) - 64, 0) -
+        1;
+      for (const [index, item] of setItems(set).entries()) {
+        const images = item.jobs.reduce((sum, job) => sum + job.images, 0);
+        if (at < images)
+          return { number, set, item: index + 1, letter: String.fromCharCode(97 + at) };
+        at -= images;
+      }
+      throw new Error(`set ${number} has no image ${match[4].toUpperCase()}.`);
+    }
+    return { number, set, item: Number(match[2]) || 0, letter: match[3] };
+  }
+  /** Every output of a whole set's ref as resolve answers one, or null for any other value. */
+  setOutputs(owner, scope, value) {
+    const found = this.chatSet(owner, scope, value);
+    if (!found || found.item) return null;
+    return found.set.plans.flatMap(({ jobs }) =>
+      jobs.flatMap(({ id, images }) =>
+        Array.from({ length: images }, (_, index) => ({ jobId: id, index, output: true })),
+      ),
+    );
+  }
   /** Whether a value names a result by its number or option letter rather than an id. */
   namesResult(value) {
-    return [numberPattern, chatNumberPattern, letterPattern, outputPattern].some((pattern) =>
-      pattern.test(String(value)),
+    return [numberPattern, chatNumberPattern, letterPattern, outputPattern, setPattern].some(
+      (pattern) => pattern.test(String(value)),
     );
   }
   /** A result's image as a new reference asset, for generate. */
@@ -2073,8 +2143,10 @@ export class McpMedia {
     };
   }
   /** A conversation's most recent results by number, each with its job status; unreadable jobs are skipped. */
-  async scopeJobs(owner, scope, { signal, credential } = {}) {
-    const refs = this.rows.latestRefs(scope || this.referenceScope(owner), maxListedResults);
+  async scopeJobs(owner, scope, { signal, credential, jobIds } = {}) {
+    const refs = jobIds
+      ? jobIds.map((jobId) => ({ jobId }))
+      : this.rows.latestRefs(scope || this.referenceScope(owner), maxListedResults);
     const jobs = await Promise.all(
       refs.map(async ({ jobId }) => {
         try {
@@ -2092,8 +2164,8 @@ export class McpMedia {
    * Every finished result of a conversation as one reply ("show me all"): the most recent few as
    * markdown under their Result headers, and the All Results page when there are more or some are pending.
    */
-  async resultsAll(owner, scope, { signal } = {}) {
-    const jobs = await this.scopeJobs(owner, scope, { signal });
+  async resultsAll(owner, scope, { signal, jobIds } = {}) {
+    const jobs = await this.scopeJobs(owner, scope, { signal, jobIds });
     if (!jobs.length)
       throw new Error(
         "There are no results in this conversation yet. For the user's earlier or liked work, call search (liked: true for liked).",

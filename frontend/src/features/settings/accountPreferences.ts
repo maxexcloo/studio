@@ -1,6 +1,7 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { Appearance } from "../../../../shared/appearance";
+import type { ChatBrief } from "../../../../shared/chat-brief";
 import { api } from "../../api";
 import { accountQuery, useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
@@ -19,6 +20,8 @@ export interface Preferences {
   spicyPrompts: boolean;
   tileCaptions: boolean;
   uncensoredModels: boolean;
+  /** The standing brief every chat writes its prompts to; unsaved, none. */
+  chatBrief?: ChatBrief;
   /** Which unfinished work the gallery shows; unsaved, none. */
   galleryWork?: GalleryWorkPreference;
   /** Where images run by default; unsaved, Local. */
@@ -30,7 +33,7 @@ export interface Preferences {
   /** The header's Appearance settings; unsaved, the browser's. */
   appearance?: Partial<Appearance>;
 }
-interface PreferencesStatus {
+export interface PreferencesStatus {
   preferences: Preferences;
   /** The preferences the account has saved itself. */
   saved: (keyof Preferences)[];

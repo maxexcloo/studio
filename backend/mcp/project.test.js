@@ -145,6 +145,7 @@ function projectTool(t, chat = "chat-a") {
   const media = {
     profiles: async () => [turbo, quality, video],
     async request(method, route, body) {
+      if (route === "/api/chat-brief") return { brief: {} };
       const [, id, action] = /^\/api\/dream\/projects(?:\/([^/?]+))?(?:\/(\w+))?/.exec(route);
       if (id === "attach") return { project: projects.attach(owner, body.chat, body.projectId) };
       if (id === "activity") return { project: projects.activity(owner, body.chat) };
@@ -187,9 +188,20 @@ test("the project tool creates, attaches, updates and shows a chat's project", a
   const updated = await call({
     action: "update",
     avoid: "people",
+    ethnicity: "Australian",
+    age: "30–40",
+    body: "tall",
+    rules: "Keep the outfit",
+    lora_names: ["film"],
     profiles: ["Moss · Quality"],
   });
   assert.equal(updated.project.brief.avoid, "people");
+  assert.equal(updated.project.brief.ethnicity, "Australian");
+  assert.equal(updated.project.brief.age, "30–40");
+  assert.equal(updated.project.brief.body, "tall");
+  assert.equal(updated.project.brief.rules, "Keep the outfit");
+  assert.deepEqual(updated.project.brief.loras, ["film"]);
+  assert.match(briefLine(updated.project), /rules Keep the outfit; LoRAs film/);
   assert.deepEqual(updated.project.constraints.profiles, ["Moss · Quality"]);
   assert.match(updated.note, /undo/);
   // The chat's change is the one Undo restores on the Dream page.
