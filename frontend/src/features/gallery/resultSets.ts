@@ -24,8 +24,8 @@ export function setMembers(items: MediaItem[], item: MediaItem) {
 export const inRunOrder = (items: MediaItem[]) =>
   items[0]?.resultSet ? [...items].sort(setOrder) : items;
 
-/** "Variety Test › Fox Wizard (3 of 5)": the set, the result's own title and its place. */
+/** "Fox Wizard · 3 / 5": the result's title and its place; Details holds the set's name. */
 export function setPosition(item: MediaItem, members: MediaItem[]) {
   const position = members.findIndex((member) => member.id === item.id) + 1;
-  return `${item.resultSet!.title} › ${mediaTitle(item)} (${position} of ${members.length})`;
+  return `${mediaTitle(item)} · ${position} / ${members.length}`;
 }

@@ -1,5 +1,5 @@
 // More Like This Set: the queue's writing stage writes one new variation for an MCP result set
-// (prompt-stage.js), from the set's title and the prompts it holds so far.
+// (prompt-stage.js), anchored to its selected source with earlier variations for variety.
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { replyTitle } from "../shared/titles.ts";
 import { AssistantError, cleanPrompt } from "./assistant.js";
@@ -17,6 +17,7 @@ export async function writeSetPrompt({
   profile,
   guide,
   title,
+  source,
   prompts,
   writer,
   signal,
@@ -32,16 +33,17 @@ export async function writeSetPrompt({
         role: "system",
         content: [
           `You write one new prompt for ${profile.label || profile.id}, a variation in the set "${title}".`,
-          "Keep the set's theme and style, and make it distinct from every prompt in it: a different subject, scene or angle.",
+          "The source prompt defines the subject and intended set theme. Preserve its species, breed, identity and defining appearance, and keep its theme and style. Vary the pose, scene, composition or camera angle within that theme; never switch animal species or replace the subject.",
+          "The set title is only a label and may be incomplete. Previous variations are only for avoiding repetition: ignore any that drift away from the source; they must never redefine the subject or theme.",
           `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
-          'Reply with JSON only: {"title": "a two to four word title", "prompt": "the finished prompt"}.',
+          'Reply with JSON only: {"title": "a concise two to four word Title Case label naming the content, without request wording", "prompt": "the finished prompt"}.',
         ]
           .filter(Boolean)
           .join("\n"),
       },
       {
         role: "user",
-        content: `The set's prompts so far:\n${prompts
+        content: `Source prompt (authoritative subject and theme):\n${source}\n\nPrevious variations (avoid repetition, not subject guidance):\n${prompts
           .slice(-shownPrompts)
           .map((prompt) => `- ${prompt.replace(/\s+/g, " ").slice(0, 1000)}`)
           .join("\n")}`,
