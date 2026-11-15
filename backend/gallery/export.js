@@ -156,13 +156,6 @@ async function measure(file) {
   return { size, checksum };
 }
 
-/**
- * Streams a stored (uncompressed: images and videos don't shrink) ZIP of the
- * gallery to `res`, one file at a time, never written faster than the
- * browser takes it. The header comes first and needs the CRC, so a file too
- * big to hold is read twice, the second time usually from the system's cache.
- */
-/** The attachment name of a download, such as `studio-gallery-2026-10-20.zip`. */
 /** A small archive held in memory (`[{name, body, date?}]`), stored without compression. */
 export function zipBuffer(entries) {
   const parts = [];
@@ -188,10 +181,17 @@ export function zipBuffer(entries) {
   return Buffer.concat([...parts, ...central, zipEnd(central.length, centralSize, offset)]);
 }
 
+/** The attachment name of a download, such as `studio-gallery-2026-10-20.zip`. */
 export const exportFilename = (kind, extension, date = new Date()) =>
   `studio-${kind}-${date.toISOString().slice(0, 10)}.${extension}`;
 
-/** `ids`: only these items (a selection), by id or address. */
+/**
+ * Streams a stored (uncompressed: images and videos don't shrink) ZIP of the
+ * gallery to `res`, one file at a time, never written faster than the
+ * browser takes it. The header comes first and needs the CRC, so a file too
+ * big to hold is read twice, the second time usually from the system's cache.
+ * `ids`: only these items (a selection), by id or address.
+ */
 export async function sendGalleryExport(res, { req = null, ids = null } = {}) {
   let closed = false;
   res.on("close", () => {

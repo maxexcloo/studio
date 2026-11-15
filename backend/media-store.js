@@ -7,6 +7,7 @@ import { dataDir } from "./data-dir.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { mediaPath, mediaSubfolder, mediaUrls } from "./media-paths.js";
 import { runtimeDatabase } from "./persistence/runtime.ts";
+import { workerTokenHeader } from "./workers.js";
 
 /*
  * Runs already moved into Studio media, by job ID (studio_ingested_jobs, the newest 20,000).
@@ -37,10 +38,6 @@ export function noteIngested(jobIds) {
  * cannot be fetched keeps its ComfyUI address, so nothing is lost.
  */
 
-const workerTokenHeader = () =>
-  process.env.STUDIO_WORKER_TOKEN
-    ? { "X-Studio-Worker-Token": process.env.STUDIO_WORKER_TOKEN }
-    : {};
 const missingWorker = new Set();
 
 function comfyRef(url) {

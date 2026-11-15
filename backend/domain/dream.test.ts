@@ -655,7 +655,7 @@ async function serve(
     Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]), role: "user" } });
     next();
   });
-  registerDreamRoutes(app as never, { dream, projects });
+  registerDreamRoutes(app as never, { dream, projects, numbered: (items) => items });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => {

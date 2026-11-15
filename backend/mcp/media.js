@@ -1871,11 +1871,6 @@ export class McpMedia {
     return result;
   }
   /**
-   * Pixels and the recorded brief for a requested visual review; never generates or judges. A
-   * comparison arrives side by side in one image, so the model reads one small preview. A result
-   * Studio expects within `waitSeconds` is waited for.
-   */
-  /**
    * These jobs as last read, each waited for together until `seconds` from now unless Studio
    * expects it later or other work runs first, and whether each has ended (`done`).
    */

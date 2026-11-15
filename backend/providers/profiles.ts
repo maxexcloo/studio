@@ -1,6 +1,7 @@
 import sharp from "sharp";
 
 import type { GenerationInput } from "../../shared/queue.ts";
+import { modelOf } from "../domain/queue.ts";
 import type { OwnedJob } from "../domain/store.ts";
 import { CliProxyMedia, type CloudRequest } from "./cliproxy.ts";
 
@@ -104,7 +105,7 @@ export function studioCloudProfiles(options: ProfileOptions) {
   }
   async function resolve(job: Pick<OwnedJob, "input" | "ownerId">): Promise<CloudRequest> {
     const input = job.input as Value;
-    const profile = (await profiles()).find((item) => item.id === (input.profileId || input.model));
+    const profile = (await profiles()).find((item) => item.id === modelOf(input));
     if (!profile)
       throw new Error("This cloud profile is unavailable from its configured provider.");
     const account = job.ownerId ? options.accountForOwner(job.ownerId) : null;
@@ -180,7 +181,6 @@ export function studioCloudProfiles(options: ProfileOptions) {
   return {
     profiles,
     resolve,
-    isProfile: (input: GenerationInput) =>
-      Boolean(workflowFor(String(input.profileId || input.model || ""))),
+    isProfile: (input: GenerationInput) => Boolean(workflowFor(modelOf(input))),
   };
 }

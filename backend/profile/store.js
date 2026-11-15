@@ -41,7 +41,7 @@ const validPackId = (id) =>
 export const hashOf = (value) => digest(typeof value === "string" ? value : JSON.stringify(value));
 const stamp = () => new Date().toISOString();
 const notFound = (message) => Object.assign(new Error(message), { status: 404 });
-const conflict = (message) => Object.assign(new Error(message), { status: 409 });
+export const conflict = (message) => Object.assign(new Error(message), { status: 409 });
 
 function readObject(file, fallback = {}, recover = true) {
   try {
