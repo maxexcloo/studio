@@ -44,6 +44,7 @@ test("adjustable controls omit fixed, single-option and unsupported Generate arg
   const controls = mcpControls(profile);
   assert.deepEqual(Object.keys(controls), [
     "aspect",
+    "resolution",
     "count",
     "seed",
     "steps",

@@ -169,7 +169,7 @@ test("without a face detector, Face Detail offers the catalogue's", () => {
   assert.equal(upscaleStatus(detectors(["bbox/face_yolov8m.pt"])).faceDetail.download, undefined);
 });
 
-test("the size menu's 2K/4K reach their long side, whatever the scale", () => {
+test("explicit upscale targets reach their long side, whatever the scale", () => {
   // 4K on a model drawn at 2K: doubles. On a square 1024: four times, not capped at 2816.
   assert.deepEqual(
     [upscalePlan({ width: 2048, height: 2048, quality: "high", target: 4096 })].map((plan) => [

@@ -461,7 +461,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
   }
 
   /**
-   * Smart upscale (2K / 4K in the size menu) goes into the run's own graph, so
+   * An explicitly requested Smart upscale goes into the run's own graph, so
    * a run and its upscale are one ComfyUI job (run-upscale.js). When ComfyUI's
    * node list is out of reach the run still goes ahead, without the upscale.
    */

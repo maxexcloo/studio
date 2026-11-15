@@ -5,7 +5,7 @@ import {
   slotCapacity,
   slotGroups,
 } from "../../../../shared/profiles";
-import { withResolution } from "../../../../shared/resolution";
+import { selectedResolution, withResolution } from "../../../../shared/resolution";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 
 /** Whether `profile` is the one a recorded id names, including an id merged into it. */
@@ -143,6 +143,7 @@ export function generationInput(
   const sized = withResolution(
     {
       ...input,
+      resolutionTier: selectedResolution(input, profile),
       referenceAssets: references.length ? details.map(referenceAsset) : input.referenceAssets,
     },
     profile,
