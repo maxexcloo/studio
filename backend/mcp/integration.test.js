@@ -5359,18 +5359,18 @@ test("aspect picks the profile's own preset and resolution its long edge", async
     const body = f.submitted.at(-1);
     return [body.width, body.height];
   };
-  // The saved size and presets give only the shape; the resolution (1K unless named) sets the long edge.
-  assert.deepEqual(await size({}), [768, 1024], "the saved shape without aspect");
-  assert.deepEqual(await size({ aspect: "landscape" }), [1024, 576]);
-  assert.deepEqual(await size({ aspect: "portrait" }), [576, 1024]);
+  assert.deepEqual(await size({}), [864, 1152], "the saved dimensions without aspect");
+  assert.deepEqual(await size({ aspect: "landscape" }), [1360, 768]);
+  assert.deepEqual(await size({ aspect: "portrait" }), [768, 1360]);
   assert.deepEqual(await size({ aspect: "square" }), [1024, 1024]);
-  assert.deepEqual(await size({ aspect: "4:3" }), [1024, 768]);
+  assert.deepEqual(await size({ aspect: "4:3" }), [1184, 880]);
+  assert.deepEqual(await size({ aspect: "landscape", resolution: "1K" }), [1024, 576]);
   assert.deepEqual(await size({ aspect: "landscape", resolution: "2K" }), [2048, 1152]);
   assert.equal(f.submitted.at(-1).tiledDecode, true);
   assert.equal(f.submitted.at(-1).autoUpscale, null);
   assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
   // A free width and height are not arguments: the preset decides, on the profile's grid.
-  assert.deepEqual(await size({ aspect: "portrait", width: 777, height: 1001 }), [576, 1024]);
+  assert.deepEqual(await size({ aspect: "portrait", width: 777, height: 1001 }), [768, 1360]);
   const submitted = f.submitted.length;
   const unsupported = await call(client, "generate", {
     kind: "image",
@@ -5401,7 +5401,7 @@ test("aspect picks the profile's own preset and resolution its long edge", async
     data(await call(client, "models", { profile_id: "native" })).controls.aspect.default,
     "16:9",
   );
-  assert.deepEqual(await size({}), [1024, 576], "the family's default preset without aspect");
+  assert.deepEqual(await size({}), [1360, 768], "the family's default preset without aspect");
 });
 
 test("a vague generate runs two images on its family's fastest profile at the default preset, without LoRAs", async (t) => {
