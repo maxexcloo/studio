@@ -19,11 +19,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api, post } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
-import { modelFamilyLabel } from "../../ui/modelFamily";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
+import { modelFamilyLabel } from "../generation/modelFamily";
 import { type LibraryItem, libraryItemCategory } from "./LibraryCatalogueTable";
 import { catalogueQuery } from "./queries";
 interface CatalogueItem extends LibraryItem {

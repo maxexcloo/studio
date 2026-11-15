@@ -13,8 +13,8 @@ import {
 
 import { api } from "../../api";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
-import { setFamilyLabels } from "../../ui/modelFamily";
 import { useRememberedKey } from "../auth/useRemembered";
+import { setFamilyLabels } from "./modelFamily";
 import { isProfile, profileForBackend, referencePatch } from "./payload";
 
 export const modelsQuery = queryOptions({

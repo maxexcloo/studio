@@ -8,10 +8,10 @@ import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
-import { modelFamilyLabel } from "../../ui/modelFamily";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
+import { modelFamilyLabel } from "../generation/modelFamily";
 import { CombineBackends } from "./CombineBackends";
 import { ConvertToRadiance } from "./ConvertToRadiance";
 import {

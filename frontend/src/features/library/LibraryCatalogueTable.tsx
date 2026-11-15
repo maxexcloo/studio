@@ -4,9 +4,9 @@ import { type ReactNode, useState } from "react";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
-import { modelFamilyLabel } from "../../ui/modelFamily";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { usePhone } from "../../ui/usePhone";
+import { modelFamilyLabel } from "../generation/modelFamily";
 
 export interface LibraryItem {
   key: string;
