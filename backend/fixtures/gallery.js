@@ -1,4 +1,5 @@
-import { dataDir, galleryItems, putGalleryItems } from "../gallery/store.js";
+import { dataDir } from "../data-dir.js";
+import { galleryItems, putGalleryItems } from "../gallery/store.js";
 import { runtimeDatabase } from "../persistence/runtime.ts";
 
 /** Replaces the whole test gallery with `items`. */

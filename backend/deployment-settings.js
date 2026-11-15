@@ -1,4 +1,4 @@
-import { currentDataDir } from "./data-dir.js";
+import { dataDir } from "./data-dir.js";
 import { savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 /**
@@ -8,7 +8,6 @@ import { savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
  * Settings show each value with its source, so nothing changes behind the
  * deployment's back and nothing saved here silently loses to it after a restart.
  */
-const dataDir = currentDataDir();
 const documentName = "settings";
 
 export function settingSource(key) {

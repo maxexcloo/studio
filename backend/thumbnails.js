@@ -10,7 +10,7 @@ import {
   noteComfyReachable,
 } from "./comfy/comfy.js";
 import { logEvent } from "./crash-log.js";
-import { dataDir } from "./gallery/store.js";
+import { dataDir } from "./data-dir.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { mediaType } from "./media-paths.js";
 import { loadSharp } from "./sharp-loader.js";

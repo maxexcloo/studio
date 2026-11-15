@@ -8,14 +8,14 @@ import {
   profileBackendLabels,
   sharedProfileFields,
 } from "../shared/profiles.ts";
-import { currentDataDir } from "./data-dir.js";
+import { dataDir } from "./data-dir.js";
 import { writeJsonFile } from "./json-store.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { chainReferenceSlots } from "./reference-chains.js";
 
 export { profileBackendLabels, sharedProfileFields };
 
-export const userWorkflowsDir = path.join(currentDataDir(), "workflows");
+export const userWorkflowsDir = path.join(dataDir, "workflows");
 
 // Windows keeps these names for devices, with any extension: `con.json` can never be a file.
 const windowsReserved = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/;

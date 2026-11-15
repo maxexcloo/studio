@@ -1,5 +1,5 @@
 import { appearanceChoices } from "../shared/appearance.ts";
-import { currentDataDir } from "./data-dir.js";
+import { dataDir } from "./data-dir.js";
 import {
   deleteRuntimeDocument,
   readRuntimeDocument,
@@ -37,7 +37,6 @@ const known = (key) =>
   Object.hasOwn(preferenceChoices, key) ||
   key === "writingModel" ||
   key === "appearance";
-const dataDir = currentDataDir();
 const cache = new Map();
 const documentName = (ownerId) => `preferences:${ownerId}`;
 

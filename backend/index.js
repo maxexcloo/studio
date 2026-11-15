@@ -51,7 +51,7 @@ import { cancelPrompt } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 import { logEvent, logWarning } from "./crash-log.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
-import { appVersion } from "./data-dir.js";
+import { appVersion, dataDir } from "./data-dir.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
 import { flagEnabled } from "./deployment-settings.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
@@ -97,7 +97,6 @@ import {
 import {
   cleanupGalleryState,
   countGalleryItems,
-  dataDir,
   deleteOwnedGalleryItems,
   eachGalleryItem,
   filterVisibleGallery,
