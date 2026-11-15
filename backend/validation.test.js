@@ -1,7 +1,9 @@
 import "./fixtures/sample-profiles.js";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 
+import { saveImportedWorkflow } from "./custom-workflows.js";
 import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 
 const exact = {
@@ -123,4 +125,31 @@ test("omitted settings take the profile's defaults, not ComfyUI's node defaults"
   assert.deepEqual([body.textEncoder, body.vae], [textEncoder, vae]);
   // No clip type of its own, so the graph takes the profile's (flux2), not a generic stand-in.
   assert.equal(body.clipType, "");
+});
+
+test("submission fills a missing negative from the guide and preserves the caller's text", () => {
+  const raw = JSON.parse(
+    fs.readFileSync(new URL("./samples/flux2-real-dream-image-edit.json", import.meta.url)),
+  );
+  raw.studio.id = "guided-negative";
+  raw.studio.capabilities.cfg = true;
+  raw.studio.capabilities.negativePrompt = true;
+  saveImportedWorkflow(raw);
+  const input = {
+    ...request,
+    workflow: "custom:guided-negative",
+    profileId: "custom:guided-negative",
+    model: "custom:guided-negative",
+    referenceAssets: [{ slot: "reference", assetId: "upload-id" }],
+    cfg: 3,
+  };
+  const prompting = (profile) => {
+    assert.equal(profile.id, input.profileId);
+    return { negative: { effect: "recommended", default: "blur" } };
+  };
+  const run = (patch) => sanitizeGenerateBody({ ...input, ...patch }, exact, {}, prompting);
+  assert.equal(run({}).negative, "blur");
+  assert.equal(run({ negative: "" }).negative, "blur");
+  assert.equal(run({ negative: "  keep my wording  " }).negative, "  keep my wording  ");
+  assert.equal(run({ cfg: 1 }).negative, "");
 });

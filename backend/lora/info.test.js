@@ -8,7 +8,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-lora-info-"));
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, triggersFromMetadata } =
+const { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos, triggersFromMetadata } =
   await import("./info.js");
 
 const { loraCompatibility } = await import("../../shared/profiles.ts");
@@ -130,4 +130,16 @@ test("LoRA details come from the catalogue definitions and edits; a left-over lo
   loraCatalogue().edit("loras/a.safetensors", { title: "Edited" });
   const info = catalogueLoraInfo("a.safetensors", { families: [], triggers: [] });
   assert.deepEqual([info.title, info.note], ["Edited", "Low"], "an edit over the definition");
+});
+
+test("catalogue triggers and family remain available without worker metadata", async () => {
+  loraCatalogue().edit("loras/offline.safetensors", {
+    families: ["krea2"],
+    triggers: ["ink"],
+    strength: { min: -2, max: 3 },
+  });
+  const infos = await loraInfos("offline", ["offline.safetensors"], { remote: false });
+  assert.deepEqual(infos["offline.safetensors"].families, ["krea2"]);
+  assert.deepEqual(infos["offline.safetensors"].triggers, ["ink"]);
+  assert.deepEqual(infos["offline.safetensors"].strengthRange, { min: -2, max: 3, step: 0.05 });
 });

@@ -306,7 +306,7 @@ test("a hidden LoRA stays in the catalogue, marked hidden until shown again", (t
   assert.equal(store.loraView().catalogue["style.safetensors"].hidden, undefined);
 });
 
-test("partial LoRA strength recommendations survive saved definitions and edits without inventing control bounds", (t) => {
+test("LoRA strength recommendations retain known bounds and leave missing bounds unspecified", (t) => {
   const f = fixture(t);
   const catalogueFile = path.join(f.dir, "library/catalogue.json");
   const saved = JSON.parse(fs.readFileSync(catalogueFile, "utf8"));
@@ -342,7 +342,10 @@ test("partial LoRA strength recommendations survive saved definitions and edits 
       families,
       { krea2: { label: "Krea 2" } },
     );
-    assert.equal(strengthRange(info), null, "partial bounds do not replace controls");
+    assert.deepEqual(
+      strengthRange(info),
+      name === "recommended-1.safetensors" ? { min: 1, max: 2, step: 0.05, default: 1 } : null,
+    );
     assert.equal(loraDefaultStrength(info, 1), expected, "the browser's initial strength");
     const profile = { family: "krea2", options: { loras: [name] } };
     assert.equal(
@@ -350,9 +353,10 @@ test("partial LoRA strength recommendations survive saved definitions and edits 
       expected,
     );
     assert.equal(prepareLoras(profile, { [name]: info }, [{ name }])[0].strength, expected);
+    const explicit = name === "recommended-1.safetensors" ? 1.25 : 0.5;
     assert.equal(
-      prepareLoras(profile, { [name]: info }, [{ name, strength: 0.5 }])[0].strength,
-      0.5,
+      prepareLoras(profile, { [name]: info }, [{ name, strength: explicit }])[0].strength,
+      explicit,
       "an explicit strength still wins",
     );
   }

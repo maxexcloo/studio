@@ -4,7 +4,7 @@ import { missingNodes, nodeRange, optionsFor } from "./comfy/comfy.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { catalogueLoraInfo } from "./lora/info.js";
-import { keptTriggers } from "./lora/prompts.js";
+import { keptTriggers, recommendedNegative } from "./lora/prompts.js";
 import { inferModels } from "./model/models.js";
 import { hasReferenceImage, resolveImageMode } from "./workflow-modes.js";
 
@@ -134,7 +134,12 @@ export function validateReferenceSlots(references, profile) {
       );
   }
 }
-export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
+export function sanitizeGenerateBody(
+  input = {},
+  info = {},
+  stats = {},
+  prompting = (profile) => profile.prompting,
+) {
   const kind = input.kind === "video" ? "video" : "image";
   const workflow = String(input.workflow || "");
   const installed = workflow.startsWith("custom:")
@@ -258,12 +263,24 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   if (profile.capabilities.resolution && !resolutions.includes(resolution))
     throw new Error("Choose a supported resolution for this model.");
   const loras = sanitizeLoras(input, info, profile, kind, customWorkflow?.loraStack?.max);
+  const cfg =
+    profile.capabilities?.cfg === false
+      ? undefined
+      : snapNumber(input.cfg, fallback("cfg", cfgRange), cfgRange);
+  const negative =
+    String(input.negative || "").trim() ||
+    recommendedNegative(prompting(profile), {
+      cfg,
+      takesNegative: profile.capabilities?.negativePrompt !== false,
+      stack: loras,
+      infos: Object.fromEntries(loras.map(({ name }) => [name, catalogueLoraInfo(name)])),
+    });
   return {
     ...input,
     kind,
     workflow,
     prompt,
-    negative: String(input.negative || ""),
+    negative: String(input.negative || "").trim() ? String(input.negative) : negative,
     model: String(input.model || ""),
     modelName: String(input.modelName || customWorkflow?.defaults?.model || ""),
     textEncoder,
@@ -278,10 +295,7 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
         ? undefined
         : snapInteger(input.steps, fallback("steps", stepsRange), stepsRange),
     // A profile without CFG (distilled; capabilities.cfg false) keeps its graph's own guidance, so none is taken or recorded.
-    cfg:
-      profile.capabilities?.cfg === false
-        ? undefined
-        : snapNumber(input.cfg, fallback("cfg", cfgRange), cfgRange),
+    cfg,
     denoise: snapNumber(input.denoise, fallback("denoise", denoiseRange), denoiseRange),
     sampler: String(input.sampler || ""),
     scheduler: String(input.scheduler || ""),

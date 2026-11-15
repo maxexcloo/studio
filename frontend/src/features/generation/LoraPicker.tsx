@@ -328,7 +328,11 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   const typeOf = (file: string) => metadata[file]?.type || "";
   const familiesOf = (file: string) => metadata[file]?.families || [];
   // A LoRA the Library hides isn't offered; a stack that has one keeps it.
-  const available = (profile?.options?.loras || []).filter((file) => !metadata[file]?.hidden);
+  const available = (profile?.options?.loras || []).filter(
+    (file) =>
+      !metadata[file]?.hidden &&
+      !["acceleration", "supporting"].includes(metadata[file]?.role || ""),
+  );
   const ratings = library.data?.library.ratings || {};
   // A tab remembered from before shows All.
   const tab = loraTabs.some((item) => item.value === picker.tab) ? picker.tab : "all";
@@ -590,6 +594,11 @@ function LoraStack(props: LoraPickerProps) {
       ) : (
         <ScrollArea className={classes.stack}>
           <Stack gap="xs">
+            {profile?.loraNote && (
+              <Text size="xs" c="dimmed">
+                {profile.loraNote}
+              </Text>
+            )}
             {!!profile?.maxLoras && enabledCount > profile.maxLoras && (
               <Text size="xs" c="yellow">
                 This profile takes up to {profile.maxLoras} enabled LoRAs. Disable or remove the

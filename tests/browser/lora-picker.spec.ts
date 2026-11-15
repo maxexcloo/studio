@@ -151,7 +151,13 @@ test("The LoRA list starts on the profile's family and filters by family", async
       ...profiles[0],
       options: {
         ...profiles[0].options,
-        loras: ["detail.safetensors", "soft-style.safetensors", "other-detail.safetensors"],
+        loras: [
+          "detail.safetensors",
+          "soft-style.safetensors",
+          "other-detail.safetensors",
+          "speed.safetensors",
+          "support.safetensors",
+        ],
       },
     },
   ]);
@@ -162,6 +168,12 @@ test("The LoRA list starts on the profile's family and filters by family", async
           "soft-style.safetensors": { title: "Soft Style", families: ["test"], type: "style" },
           "detail.safetensors": { title: "Detail Slider", families: ["test"], type: "slider" },
           "other-detail.safetensors": { title: "Other Detail", families: ["other"] },
+          "speed.safetensors": { title: "Speed Adapter", families: ["test"], role: "acceleration" },
+          "support.safetensors": {
+            title: "Supporting Adapter",
+            families: ["test"],
+            role: "supporting",
+          },
         },
       },
     }),
@@ -169,6 +181,10 @@ test("The LoRA list starts on the profile's family and filters by family", async
   await create(page);
   await openLoraChoices(page);
   const choices = page.getByRole("list", { name: "LoRA Choices", exact: true });
+  await expect(choices.getByRole("button", { name: "Speed Adapter", exact: true })).toHaveCount(0);
+  await expect(
+    choices.getByRole("button", { name: "Supporting Adapter", exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Filter LoRAs", exact: true })).toHaveCount(0);
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
   await expect(choices.getByRole("button", { name: "Other Detail", exact: true })).toHaveCount(0);

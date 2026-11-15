@@ -457,9 +457,12 @@ export function inferModels(
       aspectPolicy: workflow.aspectPolicy,
       maxLoras: workflow.loraStack?.max,
       backend: workflow.backend,
-      // Radiance video takes a request's LoRAs through one rank-64 slot (ai's video runtime), so the picker says so.
+      // Radiance composes the stack into a rank-limited adapter.
       ...(workflow.kind === "video" && workflow.loraStack?.adapter === "radiance-tags-v1"
-        ? { loraNote: "Up to rank 64 in total" }
+        ? {
+            loraNote:
+              "Radiance approximates combined LoRAs above rank 64. Use ComfyUI for exact application.",
+          }
         : {}),
     });
     const reason = configuredOnly ? "" : unready(workflow);
