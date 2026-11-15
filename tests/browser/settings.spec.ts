@@ -318,6 +318,12 @@ test("Where Work Runs in Settings › Preferences saves where each area runs and
   const choose = (name: string, choice: string) =>
     area(name).locator("label").filter({ hasText: choice }).click();
   await expect(where.getByRole("radiogroup")).toHaveCount(2);
+  expect(
+    await where
+      .getByRole("radiogroup")
+      .or(where.getByRole("combobox"))
+      .evaluateAll((controls) => controls.map((control) => control.getAttribute("aria-label"))),
+  ).toEqual(["Images", "Videos", "Text"]);
   await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();
   // Videos offers Animate's three choices, its saved tier showing.
   await expect(area("Videos").getByRole("radio")).toHaveCount(3);

@@ -895,13 +895,8 @@ export async function expandComposer(page: Page) {
   await expect(page.locator("[data-composer-prompt]")).toHaveCount(0);
 }
 export async function openNav(page: Page, label: string) {
-  const more = page.getByRole("button", { name: "More Options" });
-  if (["Library", "Settings"].includes(label))
-    await expect(
-      more.or(page.getByRole("link", { name: label, exact: true }).first()),
-    ).toBeVisible();
-  if (["Library", "Settings"].includes(label) && (await more.isVisible())) {
-    await more.click();
+  if (["Library", "Settings"].includes(label)) {
+    await page.getByRole("button", { name: "More Options", exact: true }).click();
     await page.getByRole("menuitem", { name: label, exact: true }).click();
     return;
   }
@@ -909,15 +904,8 @@ export async function openNav(page: Page, label: string) {
 }
 
 export async function openTheme(page: Page) {
-  const theme = page.getByRole("button", { name: "Appearance", exact: true });
-  await expect(
-    theme.or(page.getByRole("button", { name: "More Options", exact: true })),
-  ).toBeVisible();
-  if (await theme.isVisible()) await theme.click();
-  else {
-    await page.getByRole("button", { name: "More Options", exact: true }).click();
-    await page.getByRole("menuitem", { name: "Appearance", exact: true }).click();
-  }
+  await page.getByRole("button", { name: "More Options", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Appearance", exact: true }).click();
 }
 
 /** A toolbar's search box: in the toolbar on desktop, opened from its icon on phones. */
