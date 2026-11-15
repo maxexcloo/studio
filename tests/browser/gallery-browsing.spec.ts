@@ -1440,6 +1440,9 @@ test("Incoming results preserve loaded pages, the scroll anchor and selection wi
     .locator("[data-gallery-view]")
     .evaluate((host) => host.style.height);
   const previousReads = requests.length;
+  const point = { x: before!.x + before!.width / 2, y: before!.y + before!.height / 2 };
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
   incoming = results(5).map((item, index) => ({
     ...item,
     id: `incoming-${index}`,
@@ -1467,6 +1470,25 @@ test("Incoming results preserve loaded pages, the scroll anchor and selection wi
   await expect
     .poll(async () => Math.abs((await selectedTile.boundingBox())!.y - before!.y))
     .toBeLessThan(2);
+  // An arrival during a tap must keep the hit target over the gallery, not a toolbar filter.
+  await page.mouse.up();
+  await expect(page.getByRole("button", { name: "Liked", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(page.getByRole("button", { name: "Uploads", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  if (test.info().project.use.isMobile)
+    await expect(
+      page.getByRole("button", { name: "Gallery Filters", exact: true }),
+    ).toHaveAttribute("aria-expanded", "false");
+  else
+    await expect(page.getByRole("combobox", { name: "Date", exact: true })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
   expect(requests.filter(Boolean)).toEqual(["older"]);
   await expect(page.getByRole("button", { name: /^\d+ New$/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
