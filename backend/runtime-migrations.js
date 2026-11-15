@@ -1,5 +1,6 @@
 import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
+import { dreamAnimationStars } from "./dream-animation-stars.js";
 import { dreamOwnership } from "./dream-ownership.js";
 
 /**
@@ -11,7 +12,14 @@ import { dreamOwnership } from "./dream-ownership.js";
  * reload, so it needs Studio stopped.
  */
 // Applied steps are removed once the live data folder has them; Git history keeps them.
-const steps = [];
+const steps = [
+  {
+    name: "dreamAnimationStars",
+    run: dreamAnimationStars,
+    changes: (plan) => plan.stars,
+    online: true,
+  },
+];
 
 const stopped =
   "Needs Studio stopped: run migrate-runtime against the data folder (README.md, Data & Migrations).";
