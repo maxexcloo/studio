@@ -7,6 +7,7 @@ import {
   Group,
   type PopoverProps,
   ScrollArea,
+  Scroller,
   Select,
   Stack,
   Switch,
@@ -205,7 +206,7 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
               opened={adding}
               onOpenedChange={setAdding}
               target={
-                // "Add" keeps the footer to one row beside Clear, Save Preset and Apply.
+                // "Add" keeps the footer to one row beside Clear, Save and Apply.
                 <Button variant="default" aria-label="Add LoRAs" onClick={() => setAdding(true)}>
                   Add
                 </Button>
@@ -224,7 +225,7 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
     <ChipPopup
       title="LoRAs"
       position={position}
-      width="min(46rem, calc(100vw - 2rem))"
+      width="min(56rem, calc(100vw - 2rem))"
       opened={picker.opened}
       onOpenedChange={picker.setOpened}
       target={trigger}
@@ -423,7 +424,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
             aria-label="Family"
             size="sm"
             radius="xl"
-            w="10rem"
+            w="8rem"
             data={[
               { value: "all", label: "All Families" },
               ...families.map((value) => ({ value, label: modelFamilyLabel(value) })),
@@ -509,6 +510,7 @@ function StackActions(props: LoraPickerProps) {
       </Button>
       <SaveButton
         noun="Preset"
+        label="Save"
         naming={props.picker.naming}
         current={current}
         edited={edited}
@@ -569,8 +571,13 @@ function LoraStack(props: LoraPickerProps) {
         title="Stack"
         detail={
           !!profile?.maxLoras && (
-            <Text size="xs" c={enabledCount > profile.maxLoras ? "yellow" : "dimmed"}>
-              {enabledCount} of {profile.maxLoras} Enabled
+            <Text
+              size="xs"
+              c={enabledCount > profile.maxLoras ? "yellow" : "dimmed"}
+              style={{ whiteSpace: "nowrap" }}
+              aria-label={`${enabledCount} of ${profile.maxLoras} Enabled`}
+            >
+              {enabledCount}/{profile.maxLoras}
             </Text>
           )
         }
@@ -688,6 +695,11 @@ function StackEntry({
             This profile can't use this LoRA. Disable or remove it.
           </Text>
         )}
+        {info?.sourceUrl && (
+          <Anchor size="xs" href={info.sourceUrl} target="_blank" rel="noopener noreferrer">
+            View Source
+          </Anchor>
+        )}
         {!!triggers.length && (
           <Chip.Group
             multiple
@@ -700,27 +712,30 @@ function StackEntry({
               });
             }}
           >
-            <Group gap={6} role="group" aria-label={`${title} Trigger Words`}>
-              <Text size="xs" c="dimmed">
-                Trigger Words
-              </Text>
-              {triggers.map((word) => (
-                <Chip key={word} value={word} size="xs" variant="light">
-                  {word}
-                </Chip>
-              ))}
-            </Group>
+            <Scroller controlSize={28} edgeGradientColor="var(--mantine-color-body)">
+              <Group
+                gap={6}
+                wrap="nowrap"
+                py={4}
+                role="group"
+                aria-label={`${title} Trigger Words`}
+              >
+                <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                  Trigger Words
+                </Text>
+                {triggers.map((word) => (
+                  <Chip key={word} value={word} size="xs" variant="light">
+                    {word}
+                  </Chip>
+                ))}
+              </Group>
+            </Scroller>
           </Chip.Group>
         )}
         {info?.description && (
           <Text size="xs" c="dimmed" lineClamp={3}>
             {info.description}
           </Text>
-        )}
-        {info?.sourceUrl && (
-          <Anchor size="xs" href={info.sourceUrl} target="_blank" rel="noopener noreferrer">
-            View Source
-          </Anchor>
         )}
       </Stack>
     </Stack>

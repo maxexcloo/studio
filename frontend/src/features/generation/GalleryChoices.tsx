@@ -42,6 +42,8 @@ export const galleryTabs: { value: Tab; label: string }[] = [
 export function GalleryChoices({
   label,
   more = [],
+  galleryViews = galleryTabs,
+  uploadTile,
   browser,
   enabled,
   actions,
@@ -52,6 +54,8 @@ export function GalleryChoices({
   /** Names the picker and its grid, such as "References". */
   label: string;
   more?: { value: Tab; label: string }[][];
+  galleryViews?: typeof galleryTabs;
+  uploadTile?: ReactNode;
   browser: ReferenceBrowser;
   enabled: boolean;
   actions?: ReactNode;
@@ -63,7 +67,7 @@ export function GalleryChoices({
   onDeleted: (id: string) => void;
   onLayer?: (open: boolean) => void;
 }) {
-  const tabs = [galleryTabs, ...more];
+  const tabs = [galleryViews, ...more];
   const { query, filters } = browser.state;
   const tab = tabs.flat().some((item) => item.value === browser.state.tab)
     ? browser.state.tab
@@ -119,12 +123,15 @@ export function GalleryChoices({
     return () => observer.disconnect();
   }, [viewport]);
   const { columns, pitch } = rows;
-  const rowCount = Math.ceil(items.length / columns);
+  const leadingTile = uploads && uploadTile;
+  const leadingCount = leadingTile ? 1 : 0;
+  const rowCount = Math.ceil((items.length + leadingCount) / columns);
   const span = useWindowSpan(grid, rowCount * pitch, viewport);
   // Until a tile is measured, the first page shows.
   const first = pitch ? Math.max(0, Math.floor(span.top / pitch)) : 0;
   const last = pitch ? Math.min(rowCount, Math.ceil(span.bottom / pitch)) : 60 / columns;
-  const shown = items.slice(first * columns, last * columns);
+  const start = Math.max(0, first * columns - leadingCount);
+  const shown = items.slice(start, Math.max(0, last * columns - leadingCount));
   const restoreScroll = useRef(true);
   useLayoutEffect(() => {
     if (!viewport) restoreScroll.current = true;
@@ -172,11 +179,11 @@ export function GalleryChoices({
         }
       />
       {/* Loading and empty states fill the space under the header, centred in it. */}
-      {listing.isPending ? (
+      {listing.isPending && !leadingTile ? (
         <LoadingState fill label="Loading Images" />
-      ) : listing.error && !listing.data ? (
+      ) : listing.error && !listing.data && !leadingTile ? (
         <Alert color="red">{listing.error.message}</Alert>
-      ) : !items.length ? (
+      ) : !items.length && !leadingTile ? (
         <EmptyState
           fill
           action={
@@ -208,8 +215,9 @@ export function GalleryChoices({
               paddingBottom: Math.max(0, rowCount - last) * pitch,
             }}
           >
+            {first === 0 && leadingTile}
             {shown.map((item, offset) => {
-              const index = first * columns + offset;
+              const index = start + offset;
               const title = name(item, index);
               return (
                 <PickerTile
@@ -242,6 +250,16 @@ export function GalleryChoices({
               );
             })}
           </PickerGrid>
+          {leadingTile &&
+            (listing.isPending ? (
+              <LoadingState label="Loading Images" />
+            ) : listing.error && !listing.data ? (
+              <Alert color="red">{listing.error.message}</Alert>
+            ) : !items.length ? (
+              <Text size="xs" c="dimmed" mt="sm">
+                {search ? "No matching uploads." : "Upload, paste or drop images."}
+              </Text>
+            ) : null)}
           {morePages}
         </ScrollArea.Autosize>
       )}
