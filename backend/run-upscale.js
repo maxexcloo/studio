@@ -4,7 +4,7 @@ import { saveIntoStudioFolder } from "./graphs.js";
 import { embedUpscale, faceDetailSource, normalizeQuality, upscaleStatus } from "./upscale.js";
 
 /**
- * Smart upscale as part of a run: the size menu's 2K and 4K. The upscale goes
+ * An explicitly requested Smart upscale as part of a run. The upscale goes
  * into the run's own ComfyUI graph (upscale.js embedUpscale), so a run and its
  * upscale are one job: nothing queued behind it starts in between, and its
  * tile shows one picture, never an original and an upscale to flip between.
@@ -14,7 +14,7 @@ const tierLabels = { balanced: "2K", high: "4K" };
 const targetLabels = { 2048: "2K", 4096: "4K" };
 
 /**
- * Whether a request's own 2K/4K pick should be dropped before it reaches a
+ * Whether a request's Smart upscale should be dropped before it reaches a
  * run. Once a reference dictates the framing, or the run paints a mask, the
  * output's size is already decided by that reference or mask, not the pick,
  * so a stale one from before either was set must not sneak an upscale in.
@@ -25,7 +25,7 @@ export function dropsAutoUpscale({
   hasReference,
   referenceRole = "edit",
 }) {
-  // A reference that only guides (Edit | Ref) leaves the size to the pick, so its 2K/4K stays.
+  // A reference that only guides leaves the output size and Smart upscale to the request.
   return Boolean(inpaint || (referencesFamily && hasReference && referenceRole !== "reference"));
 }
 

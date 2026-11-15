@@ -552,11 +552,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
   const aspect = page.getByRole("button", { name: "Aspect", exact: true });
   await aspect.click();
   const resolution = page.getByRole("radiogroup", { name: "Resolution", exact: true });
-  // 4K, which the model doesn't draw itself, draws at 2K and upscales.
-  await resolution.locator("label").filter({ hasText: "4K" }).click();
-  await expect(
-    page.getByText("This model draws 4K at 2K, then Upscale enlarges it.", { exact: true }),
-  ).toBeVisible();
+  await expect(resolution.getByRole("radio", { name: "4K", exact: true })).toHaveCount(0);
   await resolution.locator("label").filter({ hasText: "2K" }).click();
   await page.getByRole("button", { name: "16:9 2048 × 1152", exact: true }).click();
   await aspect.click();
@@ -837,20 +833,16 @@ test("Image presets draw at the chosen resolution within profile constraints", a
   await page.getByRole("button", { name: "Landscape 1024 × 704", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Width", exact: true })).toBeHidden();
   const resolution = page.getByRole("radiogroup", { name: "Resolution", exact: true });
-  await resolution.locator("label").filter({ hasText: "2K" }).click();
-  // A model that doesn't draw 2K itself draws at 1K and upscales in the same run.
-  await expect(
-    page.getByText("This model draws 2K at 1K, then Upscale enlarges it.", { exact: true }),
-  ).toBeVisible();
+  await expect(resolution.getByRole("radio", { name: "2K", exact: true })).toHaveCount(0);
+  await expect(resolution.getByRole("radio", { name: "4K", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
-  await expect(aspect).toHaveText("Landscape · 2K");
+  await expect(aspect).toHaveText("Landscape · 1K");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input).toMatchObject({
     width: 1024,
     height: 704,
-    resolutionTier: "2K",
-    autoUpscale: { quality: "balanced", target: 2048 },
+    resolutionTier: "1K",
   });
 });
 

@@ -347,11 +347,18 @@ export function createGenerationQueue({
         Boolean(input.referenceAssets?.length),
       );
     else delete input.profileBackend;
-    // Every path (composer, Compare, Dream, MCP) draws at its size tier, 1K unless it names one.
-    const sized = (await mediaModels().catch(() => null))?.models?.profiles?.find(
+    // Every path (composer, Compare, Dream, MCP) applies an explicitly selected native tier.
+    const listed = (await mediaModels().catch(() => null))?.models?.profiles?.find(
       (profile) => profile.id === input.profileId,
     );
-    Object.assign(input, withResolution(input, sized));
+    const sized =
+      listed?.backendOptions?.find((option) => option.id === input.profileBackend)?.profile ||
+      listed;
+    try {
+      Object.assign(input, withResolution(input, sized));
+    } catch (error) {
+      return { status: 400, payload: { ok: false, error: error.message } };
+    }
     if (directCloud?.isProfile(input)) {
       try {
         await directCloud.resolve({ ownerId: account?.userId || "", input });
