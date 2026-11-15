@@ -1,7 +1,7 @@
 // MCP's tools for finished and running work: status, results, search, handover, review, cancel and uploads.
 import { z } from "zod";
 
-import { maxJobsPerCall } from "./controls.js";
+import { maxJobsPerCall, maxSplitJobs } from "./controls.js";
 import {
   comparisonContext,
   maxUploadBase64,
@@ -75,22 +75,31 @@ export function registerResultTools({
     server,
     "result",
     "show result",
-    'Show results as markdown to reply with, only when the user asks ("show result 3"; job_id "all" for this chat\'s). A running job returns its link: share it and stop; never poll, repeat or background this.',
+    'Show results as markdown to reply with, only when the user asks ("show #3", a set, or "all" for this chat\'s). A running job returns its link: share it and stop; never poll, repeat or background this.',
     {
       job_id: z.string().min(1).max(200),
       wait_seconds: wait,
     },
-    async ({ job_id, wait_seconds }, signal) =>
-      /^\s*all\s*$/i.test(job_id)
-        ? media.resultsAll(owner, refs, { signal })
-        : media.result(owner, await resolve(job_id, signal), wait_seconds, { scope: refs, signal }),
+    async ({ job_id, wait_seconds }, signal) => {
+      if (/^\s*all\s*$/i.test(job_id)) return media.resultsAll(owner, refs, { signal });
+      const set = media.setOutputs(owner, refs, job_id);
+      if (set)
+        return media.resultsAll(owner, refs, {
+          signal,
+          jobIds: [...new Set(set.map(({ jobId }) => jobId))],
+        });
+      return media.result(owner, await resolve(job_id, signal), wait_seconds, {
+        scope: refs,
+        signal,
+      });
+    },
     { readOnlyHint: true },
   );
   tool(
     server,
     "search",
     "search gallery",
-    "Search the user's whole gallery by words, file name or look, with refs (♥ liked); filter by liked, disliked, model or lora (part of a name) or aspect; cursor pages. summary: what all matches share, for questions about all of them. uploads: the user's uploads, as reference_asset_ids.",
+    "Search the user's whole gallery by words, file name or look, with refs (♥ liked); filter by liked, disliked, model or lora (part of a name) or aspect; cursor pages. summary: what all matches share. uploads: the user's uploads, as reference_asset_ids.",
     {
       query: z.string().trim().max(200).default(""),
       kind: z.enum(["image", "video"]).optional(),
@@ -229,7 +238,7 @@ export function registerResultTools({
     server,
     "handover",
     "copy chat summary",
-    "A copy-paste summary for a new chat, when asked or when the host reports about 90% context used. Pass decisions, preferences and unfinished work as summary.",
+    "A copy-paste summary for a new chat, when asked or when the host reports about 90% context used. Pass decisions and unfinished work as summary.",
     {
       summary: z.string().trim().min(1).max(12000),
     },
@@ -277,7 +286,7 @@ export function registerResultTools({
     server,
     "review",
     "review image",
-    "Inspect images only when asked to judge, compare or improve; compare_to sets one beside it; also reviews more.",
+    "Inspect images only when asked to judge, compare or improve; compare_to sets one beside it; also reviews more; a set ref reviews its images.",
     {
       ...output,
       compare_to: z.string().min(1).max(200).optional(),
@@ -289,22 +298,36 @@ export function registerResultTools({
         .describe("One image each."),
     },
     async ({ job_id, output_index, compare_to, compare_to_output_index, also = [] }, signal) => {
+      // A whole set's ref stands for each of its images.
+      const entries = [job_id, ...also].flatMap((value, place) => {
+        const whole = media.setOutputs(owner, refs, value);
+        return whole
+          ? whole.map(({ jobId, index }) => ({
+              label: `${media.refOf(jobId) || value}${String.fromCharCode(97 + index)}`,
+              target: { jobId, index },
+            }))
+          : [{ label: value, value, index: place ? 0 : output_index }];
+      });
+      const shown = entries.slice(0, maxSplitJobs);
+      const resolved = async ({ target: known, value, index }) =>
+        known || (await target(value, index, signal));
       // One call for many results keeps the chat's tool steps narrow; LibreChat shrinks every
       // earlier tool call it keeps in context by the widest parallel step.
+      const [first, ...rest] = shown;
       const groups = [
         {
-          label: job_id,
+          label: first.label,
           targets: [
-            await target(job_id, output_index, signal),
+            await resolved(first),
             ...(compare_to ? [await target(compare_to, compare_to_output_index, signal)] : []),
           ],
         },
         ...(await Promise.all(
-          also.map(async (value) => {
+          rest.map(async (entry) => {
             try {
-              return { label: value, targets: [await target(value, 0, signal)] };
+              return { label: entry.label, targets: [await resolved(entry)] };
             } catch (error) {
-              return { label: value, error: error.message };
+              return { label: entry.label, error: error.message };
             }
           }),
         )),
@@ -360,8 +383,17 @@ export function registerResultTools({
             },
           ]
         : [];
+      const more =
+        entries.length > shown.length
+          ? [
+              {
+                type: "text",
+                text: `Reviewed the first ${shown.length} of ${entries.length} images; review the rest in another call if asked.`,
+              },
+            ]
+          : [];
       return {
-        content: [...replies.flatMap((reply) => reply.content), ...failed, ...pending],
+        content: [...replies.flatMap((reply) => reply.content), ...failed, ...pending, ...more],
         ...(waiting.length
           ? { structuredContent: { waiting: waiting.map(({ line: _line, ...item }) => item) } }
           : {}),
@@ -389,7 +421,7 @@ export function registerResultTools({
     server,
     "upload",
     "upload reference",
-    `Upload a PNG, JPEG or WebP reference image (base64, at most ${maxUploadMegabytes} MB) for generate.`,
+    `Upload a PNG, JPEG or WebP reference image (base64, at most ${maxUploadMegabytes} MB).`,
     {
       // Left unbounded below so an empty file gets upload's own advice, not a schema refusal.
       content_base64: z.string().max(maxUploadBase64),

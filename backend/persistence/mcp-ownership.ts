@@ -28,7 +28,7 @@ export const linkKeyOf = (link: McpLink) =>
 
 /**
  * MCP's records, a row per change: each job's and reference's MCP owner, each conversation's
- * results in order (`refs`) and its latest lettered options, Studio's result numbers by output,
+ * results in order (`refs`), its sets in order (`sets`, see `ChatSet`) and its latest lettered options, Studio's result numbers by output,
  * short links (several ids may share a key), the request behind each job and the asset each upload
  * link's image became.
  */
@@ -36,6 +36,7 @@ export const createMcpTables = `CREATE TABLE IF NOT EXISTS studio_mcp_jobs (job_
   CREATE TABLE IF NOT EXISTS studio_mcp_assets (asset_id TEXT NOT NULL, owner TEXT NOT NULL, PRIMARY KEY (asset_id, owner));
   CREATE TABLE IF NOT EXISTS studio_mcp_refs (scope TEXT NOT NULL, number INTEGER NOT NULL, job_id TEXT NOT NULL, PRIMARY KEY (scope, number));
   CREATE INDEX IF NOT EXISTS studio_mcp_refs_job ON studio_mcp_refs (scope, job_id);
+  CREATE TABLE IF NOT EXISTS studio_mcp_sets (scope TEXT NOT NULL, number INTEGER NOT NULL, value TEXT NOT NULL, PRIMARY KEY (scope, number));
   CREATE TABLE IF NOT EXISTS studio_mcp_offers (scope TEXT PRIMARY KEY, value TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS studio_mcp_numbers (job_id TEXT NOT NULL, output INTEGER NOT NULL, number INTEGER NOT NULL, PRIMARY KEY (job_id, output));
   CREATE INDEX IF NOT EXISTS studio_mcp_numbers_number ON studio_mcp_numbers (number);
@@ -48,6 +49,19 @@ export interface Offer {
   comparison: string;
   jobs: string[];
   picked?: string;
+}
+
+/**
+ * A conversation's set: one generate call, a set rerun or a comparison. Each plan is one model's
+ * submission (its generate arguments without prompts) and its jobs, in order, with the prompt each
+ * ran (`prompt`, an index into `prompts`) and how many images it makes.
+ */
+export interface ChatSet {
+  plans: {
+    args: Record<string, unknown>;
+    prompts: string[];
+    jobs: { id: string; prompt: number; images: number }[];
+  }[];
 }
 
 type Row = Record<string, string | number> | undefined;
@@ -115,6 +129,18 @@ export function mcpOwnership(db: DatabaseSync) {
           "SELECT number, job_id AS jobId FROM studio_mcp_refs WHERE scope = ? ORDER BY number DESC LIMIT ?",
         ).all(scope, limit) as { number: number; jobId: string }[]
       ).reverse(),
+    /** Adds the scope's next set; a number is never reused. */
+    addSet: (scope: string, set: ChatSet) =>
+      get(
+        "INSERT INTO studio_mcp_sets (scope, number, value) SELECT ?, coalesce(max(number), 0) + 1, ? FROM studio_mcp_sets WHERE scope = ? RETURNING number",
+        scope,
+        JSON.stringify(set),
+        scope,
+      )!.number as number,
+    chatSet: (scope: string, number: number) =>
+      json(
+        get("SELECT value FROM studio_mcp_sets WHERE scope = ? AND number = ?", scope, number),
+      ) as ChatSet | undefined,
     offer: (scope: string) =>
       json(get("SELECT value FROM studio_mcp_offers WHERE scope = ?", scope)) as Offer | undefined,
     setOffer(scope: string, offer: Offer) {

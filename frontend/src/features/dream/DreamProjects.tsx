@@ -20,6 +20,8 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { maxBriefList } from "../../../../shared/chat-brief";
+import { loraName } from "../../../../shared/profiles";
 import {
   type Project,
   type ProjectContent,
@@ -38,6 +40,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { TextBox } from "../../ui/TextBox";
 import { CardDialog, CardForm } from "../characters/CardImages";
 import { modelsQuery } from "../generation/GenerationProvider";
+import { loraInfoQuery } from "../generation/LoraPicker";
 import { profileOptions } from "../generation/ProfilePicker";
 import { projectPath, projectsQuery } from "./queries";
 
@@ -48,7 +51,11 @@ const blank: ProjectContent = {
 };
 const briefFields = [
   ["subjects", "Subjects", "Who or what the work shows."],
+  ["ethnicity", "Ethnicity", "The person's ethnicity."],
+  ["age", "Age", "The person's age range."],
+  ["body", "Body", "The person's build and proportions."],
   ["styles", "Styles", "How it looks: medium, light, mood."],
+  ["rules", "Banned Changes & Rules", "Standing rules every prompt keeps to."],
   ["avoid", "Avoid", "What prompts must never name, separated by commas."],
 ] as const;
 const aspectLabel = (aspect: string) =>
@@ -70,6 +77,7 @@ function useSaveProject(id?: string) {
 
 function ProjectForm({ project, onClose }: { project?: Project; onClose: () => void }) {
   const models = useQuery(modelsQuery);
+  const loras = useQuery(loraInfoQuery);
   const [draft, setDraft] = useState<ProjectContent>(() =>
     structuredClone(
       project
@@ -102,10 +110,23 @@ function ProjectForm({ project, onClose }: { project?: Project; onClose: () => v
           autosize
           minRows={2}
           maxLength={maxProjectBrief}
-          value={draft.brief[key]}
+          value={draft.brief[key] || ""}
           onChange={(value) => brief(key, value)}
         />
       ))}
+      <MultiSelect
+        label="Favourite LoRAs"
+        searchable
+        maxValues={maxBriefList}
+        data={[
+          ...new Set([...Object.keys(loras.data?.loras || {}), ...(draft.brief.loras || [])]),
+        ].map((name) => ({
+          value: name,
+          label: loraName(name, loras.data?.loras?.[name]),
+        }))}
+        value={draft.brief.loras || []}
+        onChange={(loras) => setDraft({ ...draft, brief: { ...draft.brief, loras } })}
+      />
       <MultiSelect
         label="Profiles"
         description="Chats use only these; none for any."

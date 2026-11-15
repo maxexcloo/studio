@@ -1,7 +1,8 @@
+import type { ChatBrief } from "./chat-brief.ts";
 import type { Resolution } from "./resolution.ts";
 
 /** What a project's work shows, how it looks and what it leaves out. */
-export interface ProjectBrief {
+export interface ProjectBrief extends Omit<ChatBrief, "profiles"> {
   subjects: string;
   styles: string;
   avoid: string;

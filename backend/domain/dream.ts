@@ -1372,7 +1372,12 @@ export function createDream(options: {
     const brief = project
       ? [
           ["Subjects", project.brief.subjects],
+          ["Ethnicity", project.brief.ethnicity],
+          ["Age", project.brief.age],
+          ["Body", project.brief.body],
           ["Styles", project.brief.styles],
+          ["Rules", project.brief.rules],
+          ["Favourite LoRAs", project.brief.loras?.join(", ")],
           ["Avoid", project.brief.avoid],
         ].filter(([, value]) => value)
       : [];

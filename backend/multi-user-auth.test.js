@@ -600,6 +600,8 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
     ["POST", "/api/dream/projects/activity"],
     ["PUT", "/api/dream/projects/project-1"],
     ["PUT", "/api/taste"],
+    ["GET", "/api/chat-brief"],
+    ["PATCH", "/api/chat-brief"],
     ["POST", "/api/loras/library/ops"],
     ["POST", "/api/upscale"],
   ]) {

@@ -1,5 +1,7 @@
 import { appearanceChoices } from "../shared/appearance.ts";
+import { cleanBrief } from "../shared/chat-brief.ts";
 import { dataDir } from "./data-dir.js";
+import { minorAgeRefusal } from "./minor-age.js";
 import {
   deleteRuntimeDocument,
   readRuntimeDocument,
@@ -17,7 +19,8 @@ import {
  * animate-profile.js). `writingModel` is the text model prompt writing asks for (assistant.js
  * `writerModel`). `galleryWork` is which unfinished work the gallery shows: none (unsaved), work
  * in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
- * settings (shared/appearance.ts). Keys Studio no longer knows are dropped as the document is read.
+ * settings (shared/appearance.ts), and `chatBrief` the standing brief chats write to
+ * (shared/chat-brief.ts). Keys Studio no longer knows are dropped as the document is read.
  */
 const preferenceDefaults = Object.freeze({
   cloudModels: true,
@@ -36,7 +39,8 @@ const known = (key) =>
   Object.hasOwn(preferenceDefaults, key) ||
   Object.hasOwn(preferenceChoices, key) ||
   key === "writingModel" ||
-  key === "appearance";
+  key === "appearance" ||
+  key === "chatBrief";
 const cache = new Map();
 const documentName = (ownerId) => `preferences:${ownerId}`;
 
@@ -73,6 +77,13 @@ export function saveAccountPreferences(ownerId, patch) {
           throw new Error(`Set appearance ${setting} to one of its choices.`);
       continue;
     }
+    if (key === "chatBrief") {
+      const brief = cleanBrief(value);
+      const refusal = minorAgeRefusal(Object.values(brief).flat().join("\n"));
+      if (refusal) throw new Error(refusal);
+      patch = { ...patch, chatBrief: brief };
+      continue;
+    }
     if (key === "writingModel") {
       if (typeof value !== "string" || !value.trim() || value.length > 200)
         throw new Error("Choose a text model.");
@@ -81,7 +92,7 @@ export function saveAccountPreferences(ownerId, patch) {
     if (!known(key)) throw new Error(`Unknown preference ${key}.`);
     if (typeof value !== "boolean") throw new Error(`Set ${key} to true or false.`);
   }
-  const next = { ...saved(ownerId), ...Object.fromEntries(entries) };
+  const next = { ...saved(ownerId), ...patch };
   writeRuntimeDocument(dataDir, documentName(ownerId), next);
   cache.set(ownerId, next);
   return accountPreferences(ownerId);

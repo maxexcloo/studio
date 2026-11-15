@@ -207,8 +207,12 @@ test("compare runs queue one seeded set, read back per owner and record the star
   const created = await request("", {
     jobIds: jobs.map((job: { id: string }) => job.id),
     labels: ["Flux", "Qwen"],
+    axis: "profile",
+    projectId: "foxes",
   });
   assert.equal(created.status, 201);
+  assert.equal(records.find(({ id }) => id === created.body.id)?.axis, "profile");
+  assert.equal(records.find(({ id }) => id === created.body.id)?.projectId, "foxes");
   assert.deepEqual(
     created.body.variants.map((entry: { label: string }) => entry.label),
     ["Flux", "Qwen"],

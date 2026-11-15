@@ -15,7 +15,6 @@ import {
   maxCharacterImages,
 } from "../../shared/characters.ts";
 import { terminalStatuses } from "../../shared/queue.ts";
-import { maxAvoid, maxAvoids } from "../../shared/taste.ts";
 import { mcpJson } from "./media.js";
 
 const maxResults = 50;
@@ -70,7 +69,7 @@ export function registerManageTools({
     server,
     "gallery",
     "manage gallery",
-    'Change the user\'s gallery when asked: like, dislike (hides) or clear_rating results the user picks, delete them with their files (only on request), or clear_failed. results: refs from generate or search, a letter picking one output ("#12b"), else output_index, else all.',
+    'Change the user\'s gallery when asked: like, dislike (hides) or clear_rating results the user picks, delete them with their files (only on request), or clear_failed. results: refs from generate or search, a letter picking one output ("#12b", "set 3 B"), else output_index, else all.',
     {
       action: z.enum(["like", "dislike", "clear_rating", "delete", "clear_failed"]),
       results: z.array(result).min(1).max(maxResults).optional(),
@@ -84,13 +83,21 @@ export function registerManageTools({
       }
       if (!results) throw new Error(`Pass results: the refs or job_ids to ${action}.`);
       // A ref with an output letter ("#12b") names that output alone, else output_index, else all.
-      const picks = await Promise.all(
-        results.map(async (value) => {
-          const found = await resolveOutput(value, signal);
-          media.own(owner, found.jobId);
-          return { jobId: found.jobId, index: found.output ? found.index : output_index };
-        }),
-      );
+      // A whole set's ref ("set 3") names each of its images; "set 3 2c" one of them.
+      const picks = (
+        await Promise.all(
+          results.map(async (value) => {
+            const found = media.setOutputs(owner, refs, value) || [
+              await resolveOutput(value, signal),
+            ];
+            for (const { jobId } of found) media.own(owner, jobId);
+            return found.map(({ jobId, index, output }) => ({
+              jobId,
+              index: output ? index : output_index,
+            }));
+          }),
+        )
+      ).flat();
       const ids = [...new Set(picks.map((pick) => pick.jobId))];
       const urls = [];
       for (const id of ids) {
@@ -133,7 +140,7 @@ export function registerManageTools({
     server,
     "queue",
     "manage queue",
-    "The user's queue, when asked. list: unfinished and failed jobs with refs. pause holds new work (running work finishes), resume, cancel_all, clear_failed. retry or clear one failed job_id; move a waiting job_id to position (0 is next).",
+    "The user's queue, when asked. list: unfinished and failed jobs with refs. pause holds new work, resume, cancel_all, clear_failed. retry or clear one failed job_id; move a waiting job_id to position (0 is next).",
     {
       action: z.enum([
         "list",
@@ -226,7 +233,7 @@ export function registerManageTools({
     server,
     "dream",
     "dream",
-    "The user's Dream (background images from their taste; needs the Dream feature), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer toward it) or variations (count new seeds) take an item_id; answer takes a pair_id and answer. settings sets enabled, paused, images, videos, spicy, dailyImages, dailyVideos. discarded lists discards.",
+    "The user's Dream (background images from their taste), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer to it) or variations (count new seeds) take item_id; answer takes pair_id and answer. settings sets enabled, paused, images, videos, spicy, dailyImages, dailyVideos. discarded lists discards.",
     {
       action: z.enum([
         "status",
@@ -313,7 +320,7 @@ export function registerManageTools({
     server,
     "cards",
     "manage cards",
-    "The user's character, outfit and scene cards (needs the Characters feature), when asked. list (one with id); create, or update by id or name: name, description, image_ids (reference_asset_ids or result numbers; a character 1–4, clearest first, an outfit or scene 0–1). describe writes a description from the first image; rate scores each 1–5 as a reference.",
+    "The user's character, outfit and scene cards, when asked. list (one with id); create, or update by id or name: name, description, image_ids (reference_asset_ids or result numbers; a character 1–4, clearest first, an outfit or scene 0–1). describe writes one from the first image; rate scores each 1–5 as a reference.",
     {
       action: z.enum(["list", "create", "update", "describe", "rate"]),
       kind: z.enum(Object.keys(cardKinds)),
@@ -379,14 +386,13 @@ export function registerManageTools({
     server,
     "taste",
     "taste & lora ratings",
-    "The user's taste profile, when asked: read, save (avoid replaces their avoid list), refresh or reset. rate_lora sets a LoRA (name from models) like, dislike or none; needs the LoRAs feature.",
+    "The user's learnt taste, when asked: read, refresh or reset. rate_lora sets a LoRA (name from models) like, dislike or none.",
     {
-      action: z.enum(["read", "save", "refresh", "reset", "rate_lora"]).default("read"),
-      avoid: z.array(z.string().trim().max(maxAvoid)).max(maxAvoids).optional(),
+      action: z.enum(["read", "refresh", "reset", "rate_lora"]).default("read"),
       lora: z.string().trim().min(1).max(400).optional(),
       rating: z.enum(["like", "dislike", "none"]).optional(),
     },
-    async ({ action, avoid, lora, rating }, signal) => {
+    async ({ action, lora, rating }, signal) => {
       if (action === "rate_lora") {
         if (!lora || !rating) throw new Error("Pass lora (its name from models) and rating.");
         const { library = {} } = await api(
@@ -405,16 +411,12 @@ export function registerManageTools({
         );
         return mcpJson({ lora, rating: library.ratings?.[lora] || "none" });
       }
-      if (action === "save" && avoid === undefined)
-        throw new Error("Pass avoid: everything the user asks Studio to avoid.");
       const answer =
         action === "read"
           ? await api("GET", "/api/taste", undefined, signal)
-          : action === "save"
-            ? await api("PUT", "/api/taste", { avoid }, signal)
-            : action === "refresh"
-              ? await api("POST", "/api/taste/refresh", {}, signal)
-              : await api("DELETE", "/api/taste", undefined, signal);
+          : action === "refresh"
+            ? await api("POST", "/api/taste/refresh", {}, signal)
+            : await api("DELETE", "/api/taste", undefined, signal);
       return mcpJson({
         summary: answer.summary || "",
         likes: answer.likes,
