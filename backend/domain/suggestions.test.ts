@@ -27,6 +27,7 @@ function fixture(
 ) {
   const calls: Message[][] = [];
   const models: string[] = [];
+  const pictures: unknown[] = [];
   let clock = 0;
   const model: TasteWriter<ReturnType<typeof userContent>> = {
     settings: () => ({}),
@@ -56,6 +57,8 @@ function fixture(
   };
   const items: Record<string, Record<string, unknown>> = {
     "alice:job-a": {
+      id: "result-a",
+      jobId: "job-a",
       type: "image",
       status: "done",
       prompt: "A harbour at dawn",
@@ -75,8 +78,17 @@ function fixture(
     writer: (owner) => ((options.writer || (() => true))(owner) ? model : null),
     online: async () => options.online ?? true,
     explicit: options.explicit || ((owner) => owner === "bob"),
-    item: (owner, jobId) => items[`${owner}:${jobId}`],
-    image: async () => (options.image ? { mime: "image/jpeg", data: "AAAA" } : null),
+    item: (owner, jobId, itemId) =>
+      itemId
+        ? Object.entries(items).find(
+            ([key, value]) =>
+              key.startsWith(`${owner}:`) && value.jobId === jobId && value.id === itemId,
+          )?.[1]
+        : items[`${owner}:${jobId}`],
+    image: async (item) => {
+      pictures.push(item);
+      return options.image ? { mime: "image/jpeg", data: "AAAA" } : null;
+    },
     save: (item, nextSteps) => Object.assign(item, { nextSteps }),
     ideas: () => options.switches?.ideas ?? true,
     nextSteps: () => options.switches?.nextSteps ?? true,
@@ -95,6 +107,7 @@ function fixture(
   return {
     calls,
     models,
+    pictures,
     items,
     suggestions,
     advance: (ms: number) => (clock += ms),
@@ -190,6 +203,7 @@ test("older saved suggestions refresh on access, and a new short answer stays ca
   items["alice:job-a"].nextSteps = {
     steps: [{ label: "Old", request: "old", prompt: "old" }],
     at: "2026-01-01",
+    count: maxSuggestions,
   };
   const body = { surface: "viewer", jobId: "job-a" };
   const answer = await suggestions.suggest("alice", body);
@@ -315,9 +329,9 @@ test("viewer next steps vary across relevant areas, specific, and spicy only whe
   assert.match(calls[0][0].content, /\(body, face, hair, outfit, pose, setting, lighting, camera;/);
   assert.match(calls[0][0].content, /never a vague style or mood tweak/);
   assert.match(calls[0][0].content, /state the new result in absolute words/);
-  assert.doesNotMatch(calls[0][0].content, /sensual or explicit for this image/);
+  assert.doesNotMatch(calls[0][0].content, /body-shape, proportion or build alternative/);
   await labels("bob", "job-b");
-  assert.match(calls[1][0].content, /sensual or explicit for this image/);
+  assert.match(calls[1][0].content, /clearly adult human subject.*body-shape, proportion or build/);
 });
 
 test("suggestions never repeat a fixed option in the same menu, and the writer is told them", async () => {
@@ -343,6 +357,133 @@ test("suggestions never repeat a fixed option in the same menu, and the writer i
   assert.equal(calls.length, 3);
 });
 
+test("all creative suggestion surfaces share context and variety while motion keeps its task", async () => {
+  for (const surface of ["composer", "draft", "viewer", "animate"]) {
+    for (const kind of surface === "draft" || surface === "composer"
+      ? ["image", "video"]
+      : ["image"]) {
+      const { calls, suggestions, items } = fixture({ image: true });
+      const prompt =
+        "A 35-year-old woman with a broad build and short black hair, seated on a boat";
+      items["bob:job-b"].prompt = prompt;
+      await suggestions.suggest("bob", { surface, kind, prompt, jobId: "job-b" });
+      const [system, context] = calls[0];
+      assert.match(system.content, /current prompt and reference images first/);
+      assert.match(system.content, /Preserve identity, species, breed, age/);
+      assert.match(system.content, /not synonyms or near-duplicates/);
+      assert.match(system.content, /minors, ambiguous ages or nonhuman subjects/);
+      assert.match(context.content, /35-year-old woman with a broad build/);
+      if (surface === "animate" || kind === "video") {
+        assert.match(system.content, /Vary motion, subject action/);
+        assert.doesNotMatch(system.content, /include a non-graphic body-shape/);
+      } else {
+        assert.match(system.content, /include a non-graphic body-shape/);
+      }
+    }
+  }
+});
+
+test("different labels cannot offer the same change twice", async () => {
+  const { suggestions } = fixture({
+    reply: () =>
+      JSON.stringify({
+        steps: [
+          { label: "Warmer Light", request: "warm the light", prompt: "A warm harbour" },
+          { label: "Golden Glow", request: "Warm the light!", prompt: "A golden harbour" },
+          { label: "warmer-light", request: "add amber light", prompt: "An amber harbour" },
+          { label: "Close Crop", request: "crop closer", prompt: "A close harbour" },
+        ],
+      }),
+  });
+  const result = await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
+  assert.deepEqual(
+    result.suggestions.map((idea) => (idea as { label: string }).label),
+    ["Warmer Light", "Close Crop"],
+  );
+});
+
+test("viewer ideas and chosen changes use current wording without changing saved prompts or lineage", async () => {
+  const { calls, suggestions, items } = fixture({ image: true });
+  const source = items["alice:job-a"];
+  source.parentItemId = "original-reference";
+  await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
+  const saved = structuredClone(source);
+  const prompt = "A brindle greyhound with a white chest, lying on a blue boat";
+  await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a", prompt });
+  assert.match(calls[1][1].content, /Prompt: A brindle greyhound with a white chest/);
+  assert.equal(calls[1][1].images, 1);
+  assert.match(calls[1][0].content, /Prompting guide/);
+  assert.deepEqual(source, saved, "draft ideas never replace a result's saved steps or prompt");
+  await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a", prompt, fresh: true });
+  assert.match(calls[2][1].content, /Already suggested.*make the light warmer/);
+  await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
+  assert.equal(calls.length, 3, "the original result keeps its saved ideas");
+
+  const changes = fixture({
+    reply: () =>
+      JSON.stringify({
+        action: "recreate",
+        label: "Standing",
+        prompt: "A brindle greyhound with a white chest, standing on a blue boat",
+      }),
+  });
+  await changes.suggestions.suggest("alice", {
+    surface: "change",
+    jobId: "job-a",
+    prompt,
+    request: "standing",
+    actions: ["recreate"],
+  });
+  assert.match(changes.calls[0][1].content, /Prompt: A brindle greyhound with a white chest/);
+  assert.equal(changes.items["alice:job-a"].prompt, "A harbour at dawn");
+});
+
+test("uploaded media ideas use its recreation prompt for both still and motion choices", async () => {
+  const { calls, suggestions, items } = fixture();
+  items["alice:job-a"].prompt = "";
+  items["alice:job-a"].suggestedPrompt = "An adult Irish wolfhound with a shaggy grey coat";
+  for (const surface of ["viewer", "animate"]) {
+    await suggestions.suggest("alice", { surface, jobId: "job-a" });
+    assert.match(
+      calls.at(-1)![1].content,
+      /Prompt: An adult Irish wolfhound with a shaggy grey coat/,
+    );
+  }
+});
+
+test("each output supplies its own picture and saved ideas without crossing owners or jobs", async () => {
+  const { calls, pictures, suggestions, items } = fixture({ image: true });
+  items["alice:second"] = {
+    ...items["alice:job-a"],
+    id: "result-b",
+    prompt: "A black poodle standing on a pier",
+  };
+  for (const itemId of ["result-a", "result-b"]) {
+    await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a", itemId });
+  }
+  assert.match(calls[0][1].content, /Prompt: A harbour at dawn/);
+  assert.match(calls[1][1].content, /Prompt: A black poodle/);
+  assert.deepEqual(
+    pictures.map((item) => (item as { id: string }).id),
+    ["result-a", "result-b"],
+  );
+  assert.notStrictEqual(items["alice:job-a"].nextSteps, items["alice:second"].nextSteps);
+  await suggestions.suggest("alice", { surface: "animate", jobId: "job-a", itemId: "result-b" });
+  assert.match(calls[2][1].content, /Prompt: A black poodle/);
+  for (const body of [
+    { jobId: "other-job", itemId: "result-b" },
+    { jobId: "job-a", itemId: "missing" },
+  ]) {
+    await assert.rejects(suggestions.suggest("alice", { surface: "viewer", ...body }), {
+      status: 404,
+    });
+  }
+  await assert.rejects(
+    suggestions.suggest("bob", { surface: "viewer", jobId: "job-a", itemId: "result-b" }),
+    { status: 404 },
+  );
+});
+
 test("an image's next steps are kept with it, and More asks for different ones", async () => {
   const { calls, suggestions, advance } = fixture();
   const ask = (fresh?: boolean) =>
@@ -355,7 +496,7 @@ test("an image's next steps are kept with it, and More asks for different ones",
   assert.equal(calls.length, 2);
   assert.match(
     calls[1][1].content,
-    /Already suggested \(offer different ones\): Warmer Light Please Now, Closer Crop/,
+    /Already suggested.*Warmer Light Please Now: make the light warmer, Closer Crop: crop closer/,
   );
 });
 

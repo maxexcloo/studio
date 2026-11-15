@@ -17,7 +17,7 @@ interface ChangeContext {
  * either upscales where its actions can. `run` carries out the proposal with its (perhaps edited)
  * prompt.
  */
-export function useItemChange<T>(
+export function useItemChange<T extends string>(
   item: MediaItem,
   {
     groups,
@@ -33,13 +33,13 @@ export function useItemChange<T>(
   const upscale = () =>
     findAction(groups(), "upscale-run") ?? findAction(groups(), "upscale-again");
   const ask = useAskChange<T>({
-    ask: (request) => {
+    ask: (request, typed) => {
       const actions: ChangeAction[] = [
         ...(video ? [] : (["edit", "recreate"] as const)),
         "animate",
         ...(upscale() ? (["upscale"] as const) : []),
       ];
-      return askChange(item.jobId!, request, actions);
+      return askChange(item.jobId!, request, actions, typed, item.id);
     },
     show,
     restore,
