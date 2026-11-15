@@ -204,7 +204,7 @@ export function GalleryPage() {
       return;
     }
     pendingFirst.current = null;
-    void readFirst({ cancelRefetch: false });
+    if (client.getQueryData(listingKey)) void readFirst({ cancelRefetch: false });
   }, [client, listingKey, readFirst]);
   useEffect(
     () => () => {

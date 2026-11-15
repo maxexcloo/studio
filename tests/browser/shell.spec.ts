@@ -4,18 +4,16 @@ import { create, fixtures, image, openTheme, promptMenu, promptTool, stamp } fro
 
 test("A click outside an open popup only closes it", async ({ page }) => {
   await fixtures(page);
-  await page.goto("/images");
+  await page.goto("/video");
   await openTheme(page);
   const theme = page.getByText("Colour Scheme", { exact: true });
   await expect(theme).toBeVisible();
-  const videos = page
-    .getByRole("navigation", { name: "Creative Modes" })
-    .getByRole("link", { name: "Videos" });
-  await videos.click();
+  const home = page.getByRole("link", { name: "Studio.", exact: true });
+  await home.click();
   await expect(theme).toHaveCount(0);
-  await expect(page).toHaveURL(/\/images$/);
-  await videos.click();
   await expect(page).toHaveURL(/\/video$/);
+  await home.click();
+  await expect(page).toHaveURL(/\/images$/);
 });
 
 test("A phone tap outside a text menu closes it without submitting the composer", async ({

@@ -1528,7 +1528,7 @@ test("Incoming results keep the viewer on its current item and return focus to t
   await expect(tile).toBeFocused();
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(
-    page.getByRole("button", { name: "Open image: Incoming In Viewer", exact: true }),
+    page.getByRole("button", { name: "Open image: Incoming in Viewer", exact: true }),
   ).toBeVisible();
 });
 
@@ -1711,8 +1711,18 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
         await page.keyboard.press(direction === "next" ? "ArrowRight" : "ArrowLeft");
       else {
         const photo = viewer.getByRole("img");
-        const start = direction === "next" ? 220 : 60;
-        const end = direction === "next" ? 60 : 220;
+        const start = direction === "next" ? (page.viewportSize()?.width ?? 390) - 1 : 1;
+        const end = direction === "next" ? start - 160 : start + 160;
+        // WebKit's OS history gesture is not emulated; verify the cancellable edge start and
+        // the same viewer navigation, including bounds, that follows it.
+        expect(
+          await photo.evaluate((target, x) => {
+            const touch = new Touch({ identifier: 7, target, clientX: x, clientY: 250 });
+            return target.dispatchEvent(
+              new TouchEvent("touchstart", { bubbles: true, cancelable: true, touches: [touch] }),
+            );
+          }, start),
+        ).toBe(false);
         const pointer = {
           pointerId: 7,
           pointerType: "touch",
@@ -1723,6 +1733,7 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
         await photo.dispatchEvent("pointerdown", { ...pointer, clientX: start });
         await photo.dispatchEvent("pointermove", { ...pointer, clientX: end });
         await photo.dispatchEvent("pointerup", { ...pointer, clientX: end });
+        await photo.dispatchEvent("touchend", { touches: [], changedTouches: [] });
       }
     }
     const refreshed = page.waitForResponse(
