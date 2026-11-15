@@ -65,12 +65,14 @@ export function studioCloudProfiles(options: ProfileOptions) {
         const configuredDefaults = Object.fromEntries(
           Object.entries(workflow.defaults).filter(([, value]) => value !== undefined),
         );
+        // The graph's seed is only a placeholder: a draft starts on a random seed, as elsewhere.
+        const { seed: _seed, ...inputs } = node.inputs;
         const defaults = {
           width: 1024,
           height: 1024,
           count: 1,
           duration: 6,
-          ...node.inputs,
+          ...inputs,
           ...configuredDefaults,
           model,
         };
