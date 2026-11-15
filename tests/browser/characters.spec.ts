@@ -344,7 +344,7 @@ test("Use as Character starts a card from a gallery image in Library › Charact
       .getByRole("textbox", { name: "Description", exact: true })
       .getAttribute("inputmode")) === "none"
   )
-    await editorMenu(editor, "Description", "Suggest Description");
+    await editorMenu(editor, "Description", "Suggested");
   else await promptMenu(editor, "Description");
   await expect(page.getByRole("menuitem")).toHaveText([
     ...(testInfo.project.use.isMobile ? [] : ["Copy", "Clear"]),
