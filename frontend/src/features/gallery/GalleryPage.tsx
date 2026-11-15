@@ -11,6 +11,7 @@ import {
 import { useDebouncedValue } from "@mantine/hooks";
 import {
   type InfiniteData,
+  focusManager,
   useInfiniteQuery,
   useQuery,
   useQueryClient,
@@ -160,12 +161,15 @@ export function GalleryPage() {
     // Search and filter changes keep the current results until the new ones arrive; switching
     // between Images and Videos never shows the other mode's results.
     placeholderData: (previous, query) => (query?.queryKey[2] === kind ? previous : undefined),
+    // Returning to the tab reads only the first page (below), not every loaded page.
+    refetchOnWindowFocus: false,
   });
   // Reads the first page afresh into the shown results: the newest tiles show without waiting for
-  // every loaded page to refetch.
+  // every loaded page to refetch. Calls while one is reading share it.
+  const readingFirst = useRef<Promise<unknown>>(undefined);
   const refreshFirst = useCallback(
     () =>
-      galleryPage("")
+      (readingFirst.current ??= galleryPage("")
         .then((first) =>
           client.setQueryData<InfiniteData<Page>>(galleryKey, (data) => {
             if (!data) return data;
@@ -184,7 +188,10 @@ export function GalleryPage() {
             return { ...data, pages: [page, ...rest] };
           }),
         )
-        .catch(() => undefined),
+        .catch(() => undefined)
+        .finally(() => {
+          readingFirst.current = undefined;
+        })),
     [galleryPage, galleryKey, client],
   );
   // Active work's tiles are the newest, on the first page: only it polls, for live previews.
@@ -196,6 +203,13 @@ export function GalleryPage() {
     }, 3000);
     return () => clearInterval(timer);
   }, [jobs?.active, refreshFirst]);
+  useEffect(
+    () =>
+      focusManager.subscribe((focused) => {
+        if (focused) void refreshFirst();
+      }),
+    [refreshFirst],
+  );
   const seenJobs = useRef(jobs?.key);
   useEffect(() => {
     if (seenJobs.current === jobs?.key) return;

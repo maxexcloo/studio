@@ -1180,6 +1180,31 @@ test("A result of work started elsewhere shows as soon as its job finishes", asy
   ).toBeVisible();
 });
 
+test("Returning to the tab reads the gallery's newest results at once", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(1));
+  await page.goto("/images");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+  const visibility = (hidden: boolean) =>
+    page.evaluate((hidden) => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => (hidden ? "hidden" : "visible"),
+      });
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
+      document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
+    }, hidden);
+  await visibility(true);
+  // Saved from another app while Studio was hidden: no job announces it.
+  state.gallery.unshift({ ...results(1)[0], id: "away-0", prompt: "Saved While Away" });
+  await visibility(false);
+  await expect(
+    page.getByRole("button", { name: "Open image: Saved While Away", exact: true }),
+  ).toBeVisible();
+});
+
 test("The open item is in the URL: Back closes the viewer and a link opens it", async ({
   page,
 }) => {

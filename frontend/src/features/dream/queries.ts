@@ -60,6 +60,7 @@ export const dreamCountQuery = queryOptions({
   queryKey: ["dream", "count"],
   queryFn: () => api<{ unseen: number; active: boolean }>("/api/dream/count"),
   refetchInterval: (query) => (query.state.data?.active ? 15_000 : false),
+  refetchOnWindowFocus: "always",
 });
 export const discardedQuery = infiniteQueryOptions({
   queryKey: ["dream", "discarded"],
