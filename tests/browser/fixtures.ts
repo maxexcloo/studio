@@ -829,6 +829,7 @@ export async function fixtures(page: Page) {
         etaSeconds: null,
       });
     // Dream off, as a new account sees it; serveDream replaces this for Dream's own specs.
+    if (path === "/api/dream/history") return respond({ items: [] });
     if (path === "/api/dream/count") return respond({ unseen: 0, active: false });
     if (path === "/api/dream")
       return respond({
@@ -1199,6 +1200,7 @@ export async function serveDream(
     enabled?: boolean;
     unseen?: any[];
     discarded?: any[];
+    history?: import("../../shared/taste").DreamActivity[];
     spicyAvailable?: boolean;
     /** Older gallery images offered for calibration until judged. */
     calibration?: any[];
@@ -1304,6 +1306,8 @@ export async function serveDream(
       return route.fulfill({ json: { since: options.since ?? null } });
     if (method !== "GET") state.requests.push({ method, path, body });
     if (path === "/api/dream") return route.fulfill({ json: show() });
+    if (path === "/api/dream/history")
+      return route.fulfill({ json: { items: options.history || [] } });
     if (path === "/api/dream/count")
       return route.fulfill({
         json: {

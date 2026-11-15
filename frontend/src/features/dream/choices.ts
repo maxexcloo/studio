@@ -17,7 +17,7 @@ export interface Choice {
   /** Its key on desktop. */
   hint?: string;
   tip?: string;
-  /** One of the bars' large choices: Dislike, Like and Keep, or a comparison's A and B. */
+  /** A single card's main choices: Dislike, Like and Keep. */
   main?: boolean;
   primary?: boolean;
 }
@@ -42,7 +42,6 @@ export function dreamChoices(card: DeckCard): Choice[][] {
           icon: icons.winner,
           hint: "←",
           tip: tip(0, "A"),
-          main: true,
         },
         {
           choice: "b",
@@ -51,7 +50,6 @@ export function dreamChoices(card: DeckCard): Choice[][] {
           icon: icons.winner,
           hint: "→",
           tip: tip(1, "B"),
-          main: true,
         },
         { choice: "both", id: "both", label: "Both", icon: icons.keep, hint: "↑" },
       ],
@@ -122,7 +120,7 @@ export function dreamChoices(card: DeckCard): Choice[][] {
  * The choices as the viewer's action groups, on one row in the item bar's order: Animate and Edit,
  * then Recreate ▾ holding More Like This and Variations, then the verdicts at the end, Dislike,
  * Like and Keep, with Keep the filled one. Phones leave Like's name to its icon. A comparison
- * names all its answers, A and B large.
+ * names all its answers, each with an equal target.
  */
 export function viewerChoices(
   card: DeckCard,
@@ -140,6 +138,7 @@ export function viewerChoices(
   if (card.kind === "pair")
     return {
       label: "Comparison Answers",
+      equal: true,
       groups: choices,
       labelled: choices.flat().map((choice) => choice.id),
     };
