@@ -241,7 +241,11 @@ export function SectionToolbar({
             </Menu.Dropdown>
           </Menu>
         )}
-        {actions}
+        {actions && (
+          <Group gap="xs" ml="xs" wrap="nowrap">
+            {actions}
+          </Group>
+        )}
       </Group>
     </Group>
   );
