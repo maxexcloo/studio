@@ -43,7 +43,7 @@ jobs:
       - name: Set Up Shared Tools & Tasks
         uses: maxexcloo/dotfiles/.github/actions/mise@main
         with:
-          tools: python ruff shellcheck uv
+          tools: python ruff shellcheck
       - name: Check Bridges & Entrypoint
         run: "mise run check:python ::: check:shell ::: test:python"
       # The ROCm image fills the runner's disk; drop toolchains and images this job never uses.
