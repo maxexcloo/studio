@@ -15,7 +15,7 @@ test("result links are sealed, reveal no account or job, and earlier signed link
     publicUrl: "https://studio.example.test",
     signingKey: "fixture-signing-key",
   });
-  media.state.jobs["job-secret-42"] = "account-private-7";
+  media.rows.setJobOwner("job-secret-42", "account-private-7");
   const token = media.token("account-private-7", "job-secret-42", 0);
   assert.match(token, /^v2\./);
   for (const part of token.split(".").slice(1)) {
@@ -50,7 +50,7 @@ test("result links are sealed, reveal no account or job, and earlier signed link
     publicUrl: "https://studio.example.test",
     signingKey: "another-key",
   });
-  other.state.jobs["job-secret-42"] = "account-private-7";
+  other.rows.setJobOwner("job-secret-42", "account-private-7");
   assert.throws(() => other.claims(token), /Invalid result link/);
 });
 
@@ -62,7 +62,7 @@ test("a failed job's result says what went wrong, a Radiance LoRA refusal word f
     publicUrl: "https://studio.example.test",
     signingKey: "fixture-signing-key",
   });
-  media.state.jobs["job-lora-1"] = "account-7";
+  media.rows.setJobOwner("job-lora-1", "account-7");
   const refusal =
     "loras: none of the adapters' modules is a module of this model (zimage_style.safetensors)";
   media.job = async () => ({
@@ -111,7 +111,7 @@ test("a recovered video with an indexed gallery record keeps its MCP outputs", a
     signingKey: "fixture-signing-key",
     domainRequest,
   });
-  media.state.jobs["job-fl20"] = "account-7";
+  media.rows.setJobOwner("job-fl20", "account-7");
   const job = await media.job("account-7", "job-fl20");
   assert.equal(job.status, "done");
   assert.equal(job.outputs.length, 1);

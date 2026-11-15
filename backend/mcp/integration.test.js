@@ -18,7 +18,8 @@ import { startDemoWorker } from "../fixtures/demo-worker.js";
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
 import { fakeStudio } from "../fixtures/fake-studio.js";
 import { withPreferredDefaults } from "../model/catalogue.js";
-import { readRuntimeDocument } from "../persistence/runtime.ts";
+import { mcpOwnership } from "../persistence/mcp-ownership.ts";
+import { runtimeDatabase, savedDocument } from "../persistence/runtime.ts";
 import { RuntimeController } from "../runtime/controller.ts";
 import { KubernetesEngine } from "../runtime/kubernetes.ts";
 import { createGuideLog, registerGenerateTools } from "./generate.js";
@@ -26,6 +27,7 @@ import { presetPlacement } from "./gpu.js";
 import { registerMcpRoutes } from "./mcp.js";
 import { McpMedia } from "./media.js";
 
+const ownership = (dataDir) => mcpOwnership(runtimeDatabase(dataDir));
 const mediaKey = "fixture-media-credential";
 const controlKey = "fixture-control-credential";
 /** Studio's runtime over a fake cluster: two GPUs; `running` start with a ready pod. */
@@ -572,8 +574,7 @@ test("a headerless client connects at /mcp/<token>, and a URL carries only a per
     f.requests.find((request) => request.path === "/generate")?.authorization,
     `Bearer ${token}`,
   );
-  const saved = readRuntimeDocument(f.dataDir, "mcp-ownership");
-  assert.equal(saved.jobs[jobId(result)], "url-token-account");
+  assert.equal(ownership(f.dataDir).jobOwner(jobId(result)), "url-token-account");
 });
 
 test("the public MCP host takes only personal account tokens, and private hosts keep the shared keys", async (t) => {
@@ -653,8 +654,7 @@ test("account MCP tokens map requests and jobs to the stable account identity", 
     f.requests.find((request) => request.path === "/generate")?.authorization,
     `Bearer ${token}`,
   );
-  const saved = readRuntimeDocument(f.dataDir, "mcp-ownership");
-  assert.equal(saved.jobs[id], "stable-account-a");
+  assert.equal(ownership(f.dataDir).jobOwner(id), "stable-account-a");
   Object.assign(f.jobs.get(id), {
     status: "done",
     outputs: [{ url: "/comfy/view?filename=account-result.png" }],
@@ -759,7 +759,7 @@ test("account mode trusts the gateway key only for linked forwarded users and ke
   // MCP calls Studio as the linked account with Studio's own credential, never the gateway key.
   assert.equal(submission.authorization, undefined);
   assert.equal(submission.account, linked.userId);
-  assert.equal(readRuntimeDocument(f.dataDir, "mcp-ownership").jobs[id], linked.userId);
+  assert.equal(ownership(f.dataDir).jobOwner(id), linked.userId);
 
   const control = await f.client("administrator", controlKey);
   assert.deepEqual((await control.listTools()).tools.map((tool) => tool.name).sort(), [
@@ -2425,13 +2425,12 @@ test("signed links do not expire, preserve the configured public path and cannot
     clock.mock.restore();
   }
   // Sealed links issued before short links keep opening the same output.
-  const ownership = readRuntimeDocument(dir, "mcp-ownership");
   const sealed = new McpMedia({
     dataDir: fs.mkdtempSync(path.join(dir, "sealed-")),
     publicUrl: "https://studio.example.test/nested/studio",
-    signingKey: ownership.signingKey,
+    signingKey: savedDocument(dir, "mcp-signing-key"),
   });
-  const legacy = `${f.base}/mcp/results/${sealed.token(ownership.jobs[id], id, 0)}`;
+  const legacy = `${f.base}/mcp/results/${sealed.token(ownership(dir).jobOwner(id), id, 0)}`;
   assert.match(legacy, /\/mcp\/results\/v2\./);
   assert.equal((await fetch(legacy)).status, 200);
 });
