@@ -1,3 +1,5 @@
+import workerSources from "../worker/sources.json" with { type: "json" };
+
 /**
  * Every ComfyUI custom node pack Studio knows how to ask for. A model family,
  * a runner or a feature names its pack by id; setup panels then offer the same
@@ -16,18 +18,17 @@
  *
  * commit pins the exact code a one-click install clones: a pack's moving
  * branch could change under us, and whatever lands in custom_nodes runs with
- * ComfyUI's rights. It is the latest tagged release where the pack tags them,
- * else the default branch as it was when reviewed; `ref` says which, for
- * people reading the install panel. Moving to a newer version is a reviewed
- * change here, never automatic. Last reviewed 2026-09-28.
+ * ComfyUI's rights. Packs the worker image installs take its commit from
+ * worker/sources.json, so both install the same code. For the rest it is the
+ * latest tagged release where the pack tags them, else the default branch as
+ * it was when reviewed; `ref` says which. Moving to a newer version is a
+ * reviewed change here, never automatic. Last reviewed 2026-09-28.
  */
 export const nodePacks = {
   seedvr2: {
     name: "SeedVR2 Video Upscaler",
     repository: "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git",
     folder: "ComfyUI-SeedVR2_VideoUpscaler",
-    commit: "5a4bf428f3735cc72ac760d40f372f94dec28422",
-    ref: "v2.5.23",
     search: "SeedVR2",
     manager: "seedvr2_videoupscaler",
     nodes: ["SeedVR2LoadDiTModel", "SeedVR2LoadVAEModel", "SeedVR2VideoUpscaler"],
@@ -52,8 +53,6 @@ export const nodePacks = {
     name: "ComfyUI Impact Pack",
     repository: "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git",
     folder: "ComfyUI-Impact-Pack",
-    commit: "ba09fbc4c05688667e7bfda35823933c9fe09196",
-    ref: "8.28",
     search: "Impact Pack",
     manager: "comfyui-impact-pack",
     nodes: ["FaceDetailer", "SAMLoader"],
@@ -62,8 +61,6 @@ export const nodePacks = {
     name: "ComfyUI Impact Subpack",
     repository: "https://github.com/ltdrdata/ComfyUI-Impact-Subpack.git",
     folder: "ComfyUI-Impact-Subpack",
-    commit: "5b4e55058ae48e18e1c6d974000461ad1e240135",
-    ref: "1.3.4",
     search: "Impact Subpack",
     manager: "comfyui-impact-subpack",
     nodes: ["UltralyticsDetectorProvider"],
@@ -74,8 +71,6 @@ export const nodePacks = {
     folder: "ComfyUI-GGUF",
     search: "ComfyUI-GGUF",
     manager: "comfyui-gguf",
-    commit: "6ea2651e7df66d7585f6ffee804b20e92fb38b8a",
-    ref: "main, 2026-01-12",
     nodes: [
       "UnetLoaderGGUF",
       "CLIPLoaderGGUF",
@@ -120,8 +115,10 @@ export const nodePacks = {
   },
 };
 
+const workerCommits = new Map(workerSources.map(({ url, revision }) => [url, revision]));
+
 export function nodePack(id) {
   const pack = nodePacks[id];
   if (!pack) throw new Error(`Unknown node pack: ${id}`);
-  return { id, ...pack };
+  return { id, commit: workerCommits.get(pack.repository), ...pack };
 }
