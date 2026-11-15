@@ -443,7 +443,6 @@ function CardImages({
                     {`${noun.replace(/s$/, "")} ${images.indexOf(asset) + 1}`}
                   </Text>
                   <Badge
-                    variant="light"
                     color={rating >= 4 ? "green" : rating >= 3 ? "yellow" : "red"}
                     style={{ flexShrink: 0 }}
                   >

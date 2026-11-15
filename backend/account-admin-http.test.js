@@ -154,6 +154,22 @@ test(
       body: { videos: true },
     });
     assert.equal(wrong.status, 400);
+    // Appearance follows the account, one of each setting's choices.
+    const appearance = await call("/api/preferences", {
+      method: "PATCH",
+      cookie,
+      body: { appearance: { colour: "teal", colourScheme: "dark" } },
+    });
+    assert.deepEqual(appearance.body.preferences.appearance, {
+      colour: "teal",
+      colourScheme: "dark",
+    });
+    const unknown = await call("/api/preferences", {
+      method: "PATCH",
+      cookie,
+      body: { appearance: { colour: "plaid" } },
+    });
+    assert.equal(unknown.status, 400);
   },
 );
 

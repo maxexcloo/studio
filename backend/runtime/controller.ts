@@ -88,7 +88,7 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
 const minutes = (ms: number) => plural(Math.round(ms / 60_000), "minute");
 const historyLimit = 100;
 /** Why work for a parked workload waits, in the words every surface uses. */
-export const parkedReason = (label: string) =>
+const parkedReason = (label: string) =>
   `${label} is stopped: an administrator can start it in Settings › Workers.`;
 /** A store for a runtime document that lasts only as long as the process. */
 export const memoryStore = <T>() => {

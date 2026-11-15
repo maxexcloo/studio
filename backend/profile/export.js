@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { zipBuffer } from "../gallery/export.js";
+import { writeBytesFile } from "../json-store.js";
 import { hashOf } from "./store.js";
 
 const exportsKept = 20;
@@ -152,10 +153,7 @@ export function writeExport({ dataDir, ...options }) {
   const archive = zipBuffer(built.files);
   const name = `studio-profiles-${now.toISOString().replace(/[:.]/g, "-")}.zip`;
   const dir = path.join(dataDir, "exports");
-  fs.mkdirSync(dir, { recursive: true });
-  const temporary = path.join(dir, `.${name}.${process.pid}.tmp`);
-  fs.writeFileSync(temporary, archive, { mode: 0o600 });
-  fs.renameSync(temporary, path.join(dir, name));
+  writeBytesFile(path.join(dir, name), archive, { mode: 0o600 });
   try {
     const kept = fs
       .readdirSync(dir)

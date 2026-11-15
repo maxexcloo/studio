@@ -1,6 +1,6 @@
-import { civitaiJson, isCivitaiHost, limitedBody } from "../civitai/access.js";
+import { civitaiJson, isCivitaiHost } from "../civitai/access.js";
 import { civitaiLink, versionResource } from "../civitai/import.js";
-import { hfFetch } from "../hf-access.js";
+import { hfFetch, hfRevision } from "../hf-access.js";
 import { loraCatalogue } from "../lora/info.js";
 import { downloadState, existingCopy, startDownload } from "../model/downloads.js";
 import { refreshWorkerModels, workerInventory, workerModelFile } from "../worker-models.js";
@@ -72,17 +72,7 @@ export async function resolveModelLink(
   const filePath = fileParts.join("/");
   const file = fileParts.at(-1);
   if (!/\.(safetensors|gguf)$/i.test(file)) throw new Error("Choose a SafeTensors or GGUF file.");
-  const response = await request(
-    `https://huggingface.co/api/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/revision/${encodeURIComponent(revision)}?blobs=true`,
-    { signal: AbortSignal.timeout(30000) },
-  );
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error(
-      `Hugging Face metadata is unavailable (HTTP ${response.status}). Check the link and your token in Settings.`,
-    );
-  }
-  const metadata = JSON.parse((await limitedBody(response, 4 * 1024 * 1024)).toString());
+  const metadata = await hfRevision(`${owner}/${repo}`, revision, { request });
   const entry = metadata.siblings?.find((item) => item.rfilename === filePath);
   const sha256 = entry?.lfs?.sha256;
   if (!/^[a-f0-9]{64}$/i.test(sha256 || "") || !/^[a-f0-9]{40}$/i.test(metadata.sha || ""))

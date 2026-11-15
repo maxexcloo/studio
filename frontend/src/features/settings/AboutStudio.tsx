@@ -1,16 +1,15 @@
-import { Anchor, Button, Group, Kbd, Stack, Text } from "@mantine/core";
+import { Anchor, Group, Kbd, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Check } from "lucide-react";
 import { Fragment } from "react";
 
+import { homepage as repository } from "../../../../package.json";
 import { api } from "../../api";
-import { useCopy } from "../../ui/clipboard";
+import { CopyButton } from "../../ui/CopyButton";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { StudioLogo } from "../../ui/StudioLogo";
 import { usePhone } from "../../ui/usePhone";
 
-const repository = "https://github.com/maxexcloo/studio";
 // Studio's lineage first, then what it runs on.
 const credits = [
   {
@@ -70,7 +69,6 @@ const link = (href: string, label: string) => (
 /** Bug-report help, and on desktop the keyboard shortcuts; phones have no keyboard to use them with. */
 function Help() {
   const phone = usePhone();
-  const { copied, copy } = useCopy();
   // Read ahead so copying stays inside the tap, which Safari requires for the clipboard.
   const diagnostics = useQuery({
     queryKey: ["diagnostics"],
@@ -84,16 +82,11 @@ function Help() {
           label="Copy Diagnostics"
           description="Versions, system and GPU for a bug report; no prompts, images or file names."
         >
-          <Button
+          <CopyButton
             size="compact-sm"
-            variant="default"
-            leftSection={copied ? <Check size={16} /> : <icons.copy size={16} />}
+            text={diagnostics.data?.text || ""}
             loading={diagnostics.isPending}
-            disabled={!diagnostics.data}
-            onClick={() => diagnostics.data && copy(diagnostics.data.text)}
-          >
-            {copied ? "Copied" : "Copy"}
-          </Button>
+          />
         </SettingRow>
         <SettingRow label="Troubleshooting" description="Common errors and how to fix them.">
           {link(`${repository}/blob/main/README.md#troubleshooting`, "Troubleshooting")}

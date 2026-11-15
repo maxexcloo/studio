@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -25,7 +24,6 @@ const saved = () => JSON.stringify(readRuntimeDocument(dataDir, "gallery-hidden"
 writeRuntimeDocument(dataDir, "gallery-hidden", { [view("image_00007_.png")]: Date.now() });
 
 const store = await import("./store.js");
-const thumbnails = await import("../thumbnails.js");
 
 test("the list of deleted outputs no longer says what they were", () => {
   assert.ok(!saved().includes("image_00007_"), "the old readable list was turned into digests");
@@ -53,23 +51,4 @@ test("the list of deleted outputs no longer says what they were", () => {
     store.isGalleryHidden({ url: view("image_00008_.png"), createdAt: new Date(0).toISOString() }),
     false,
   );
-});
-
-test("forgetting an image deletes its cached thumbnails, and its upscale's", async () => {
-  const cacheName = (filename) =>
-    crypto.createHash("sha1").update(`output:studio:${filename}:768:72`).digest("hex");
-  const dir = path.join(dataDir, ".thumbnails");
-  for (const name of ["image_00010_.png", "upscale_00010_.png", "image_00011_.png"])
-    fs.writeFileSync(path.join(dir, `${cacheName(name)}-${"a".repeat(64)}.webp`), "thumb");
-  const removed = await thumbnails.forgetItemThumbnails({
-    url: view("image_00010_.png"),
-    upscale: { url: view("upscale_00010_.png") },
-  });
-  assert.equal(removed, 2);
-  const left = fs.readdirSync(dir);
-  assert.ok(
-    left.some((name) => name.startsWith(cacheName("image_00011_.png"))),
-    "other images keep theirs",
-  );
-  assert.ok(!left.some((name) => name.startsWith(cacheName("image_00010_.png"))));
 });

@@ -2,21 +2,24 @@ import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, ScanFace } from "lucide-react";
 
-import type {
-  UpscaleQuality,
-  UpscaleRequest,
-  UpscaleResponse,
-  UpscaleStatus,
+import {
+  type UpscaleQuality,
+  type UpscaleRequest,
+  type UpscaleResponse,
+  type UpscaleStatus,
+  upscaleQualities,
 } from "../../../../shared/upscale";
-import { api, failure, post } from "../../api";
+import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import type { Action } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
+import { queueQuery } from "../generation/Queue";
 import { downloadsQuery } from "../library/queries";
 import { itemAction } from "./itemActions";
+import { galleryKey } from "./queries";
 import { useItemMutation } from "./useItemMutation";
 
 const statusQuery = (quality: UpscaleQuality) => ({
@@ -36,7 +39,7 @@ export function useStopUpscale(item: MediaItem) {
     mutationFn: (jobId: string) => post(`/api/queue/${encodeURIComponent(jobId)}/cancel`),
     onSuccess: () =>
       void Promise.all(
-        ["queue", "gallery"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
+        [galleryKey, queueQuery.queryKey].map((queryKey) => cache.invalidateQueries({ queryKey })),
       ),
   });
   const jobId = upscaling(item) ? item.upscale?.jobId : undefined;
@@ -64,7 +67,7 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
       } satisfies UpscaleRequest),
     onSuccess: () =>
       void Promise.all(
-        ["gallery", "queue"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
+        [galleryKey, queueQuery.queryKey].map((queryKey) => cache.invalidateQueries({ queryKey })),
       ),
   });
   const detector = status.data?.faceDetail;
@@ -81,7 +84,6 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
       });
       void cache.invalidateQueries({ queryKey: downloadsQuery.queryKey });
     },
-    onError: failure,
   });
   const download = admin && detector?.nodesInstalled ? detector.download : undefined;
   const downloadFaceDetector = download && {
@@ -132,7 +134,7 @@ export function useUpscaleMany(items: MediaItem[]) {
     },
     onSettled: () =>
       void Promise.all(
-        ["gallery", "queue"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
+        [galleryKey, queueQuery.queryKey].map((queryKey) => cache.invalidateQueries({ queryKey })),
       ),
   });
   return { ...mutation, settings: upscaleSettings(quick, true) };
@@ -172,7 +174,7 @@ function upscaleSettings(quick: ReturnType<typeof useQuickUpscale>, image: boole
       icon: icons.upscale,
       choice: {
         value: quick.quality,
-        options: (status?.qualities ?? (["fast", "balanced", "high"] as const)).map((value) => ({
+        options: (status?.qualities ?? upscaleQualities).map((value) => ({
           value,
           label: value[0].toUpperCase() + value.slice(1),
         })),
@@ -229,7 +231,7 @@ export function useUpscaleAction(
       post<{ upscaleActive: boolean }>("/api/upscale/toggle", { galleryItemId: item.id, active }),
     onSuccess: (result) => {
       onVersionChange?.(item.id, result.upscaleActive);
-      void cache.invalidateQueries({ queryKey: ["gallery"] });
+      void cache.invalidateQueries({ queryKey: galleryKey });
     },
   });
   const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);

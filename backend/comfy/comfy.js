@@ -20,9 +20,8 @@ export function setListeningPort(value) {
   return port;
 }
 /**
- * A subfolder with a dot folder anywhere in it, such as an old .studio-trash,
- * kept out of sight. Never served, whether
- * from Studio media or through ComfyUI.
+ * A subfolder with a dot folder anywhere in it, kept out of sight. Never
+ * served, whether from Studio media or through ComfyUI.
  */
 export function inDotFolder(subfolder = "") {
   // A query string can name it twice; every value counts.
@@ -192,7 +191,7 @@ export function optionsFor(info, node, key) {
   return [];
 }
 
-export function hasNode(info, node) {
+function hasNode(info, node) {
   return Boolean(info?.[node]);
 }
 

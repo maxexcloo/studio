@@ -30,13 +30,7 @@ import { getFileVideoPoster, getFileVideoPreview, sendVideoPreview } from "./vid
 import { refreshWorkerModels } from "./worker-models.js";
 
 const previewsDir = path.join(dataDir, "preset-previews");
-let presets;
-try {
-  presets = readRuntimeDocument(dataDir, "presets");
-} catch (error) {
-  if (error.code !== "ENOENT") throw error;
-  presets = [];
-}
+let presets = readRuntimeDocument(dataDir, "presets");
 if (!Array.isArray(presets)) presets = [];
 const imported = new Map();
 

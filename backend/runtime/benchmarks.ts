@@ -11,7 +11,7 @@ import {
 import type { KubernetesRequest } from "./kubernetes.ts";
 
 type Environment = Record<string, string | undefined>;
-export interface BenchmarkStore {
+interface BenchmarkStore {
   read(): BenchmarkRun[] | undefined;
   write(runs: BenchmarkRun[]): void;
 }

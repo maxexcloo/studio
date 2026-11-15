@@ -6,6 +6,7 @@ import type { MediaItem } from "../../types";
 import { useGeneration } from "../generation/GenerationProvider";
 import { generationInput } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
+import { galleryKey } from "./queries";
 
 /**
  * Recreate › Run Suggested Prompts for several uploads at once: each with a suggested prompt queues that
@@ -69,7 +70,7 @@ export function useRecreateMany() {
           .filter(Boolean)
           .join(" "),
       });
-      for (const queryKey of [queueQuery.queryKey, ["gallery"]])
+      for (const queryKey of [queueQuery.queryKey, galleryKey])
         void client.invalidateQueries({ queryKey });
     },
   });

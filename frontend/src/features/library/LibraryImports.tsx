@@ -20,6 +20,7 @@ import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { useFlash } from "../../ui/useFlash";
+import { galleryKey } from "../gallery/queries";
 import { inspirationQuery } from "../generation/inspiration";
 import {
   type ImportRecord,
@@ -107,7 +108,7 @@ export function LibraryImports({
     mutationFn: () => post<RedditImport>("/api/gallery/import/reddit", { url: url.trim() }),
     onSuccess: () => {
       setUrl("");
-      void client.invalidateQueries({ queryKey: ["gallery"] });
+      void client.invalidateQueries({ queryKey: galleryKey });
     },
   });
   const redditLink = isRedditLink(url);

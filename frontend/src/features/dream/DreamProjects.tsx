@@ -212,7 +212,7 @@ function ProjectCard({
         {badges.length > 0 && (
           <Group gap={6}>
             {badges.map((badge) => (
-              <Badge key={badge} variant="light" color="gray">
+              <Badge key={badge} color="gray">
                 {badge}
               </Badge>
             ))}

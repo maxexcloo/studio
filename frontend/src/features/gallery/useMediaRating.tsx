@@ -10,10 +10,12 @@ import {
 
 import { post } from "../../api";
 import type { MediaItem, Rating } from "../../types";
+import { queueQuery } from "../generation/Queue";
+import { galleryKey } from "./queries";
 
 /** Caches that hold media records: gallery pages (the reference picker's too) and the queue. */
-const mediaCaches = new Set(["gallery", "queue"]);
-const holdsMedia = (query: Query) => mediaCaches.has(String(query.queryKey[0]));
+const holdsMedia = (query: Query) =>
+  [galleryKey[0], queueQuery.queryKey[0]].includes(String(query.queryKey[0]));
 const ratingsKey = ["ratings"];
 /** A gallery list's rating filter (its key's filters, position 3): Liked or Disliked. */
 const listRating = (query: Query) =>
@@ -76,7 +78,7 @@ export function useRatings() {
       cache.setQueriesData({ predicate: holdsMedia }, (data) => withRating(data, wanted, rating));
       cache.setQueriesData<Pages>(
         {
-          queryKey: ["gallery"],
+          queryKey: galleryKey,
           predicate: (query) => (listRating(query) === "disliked") !== (rating === "disliked"),
         },
         (data) =>

@@ -1,7 +1,7 @@
-import crypto from "node:crypto";
 import path from "node:path";
 
 import { accountFolder } from "./data-names.js";
+import { digest } from "./values.js";
 
 /** The authenticated server identity is the only source of a content owner ID. */
 export function ownerIdForRequest(req) {
@@ -30,7 +30,7 @@ export function recordsForRequest(records, req) {
   return records.filter((record) => recordBelongsToRequest(record, req));
 }
 
-const ownerHash = (ownerId) => crypto.createHash("sha256").update(ownerId).digest("hex");
+const ownerHash = (ownerId) => digest(ownerId);
 
 /** The account's folder new outputs go to. */
 export function accountOutputSubfolder(ownerId) {

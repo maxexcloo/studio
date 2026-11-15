@@ -12,6 +12,7 @@ import path from "node:path";
 
 import { civitaiFileSpec, civitaiFolder, civitaiModelFiles } from "../civitai/import.js";
 import { civitaiAvailability } from "./availability.js";
+import { civitaiLinks } from "./sources.js";
 import { nameParts } from "./substitutes.js";
 
 const offerLimit = 12;
@@ -88,7 +89,7 @@ export function civitaiOffers({
     if (!fit.fits) return;
     const access = civitaiAvailability(full, file, { now });
     const spec = civitaiFileSpec(full, file, { now });
-    const url = `https://civitai.com/models/${full.modelId}?modelVersionId=${candidate.id}`;
+    const url = civitaiLinks(full.modelId, candidate.id).civitaiCom;
     offers.push({
       key: `civitai:${candidate.id}:${file.id}`,
       source: {

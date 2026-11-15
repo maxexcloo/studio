@@ -22,7 +22,7 @@ export interface ImageEncoder {
  * The least cosine similarity between a search and an image that counts as a match. SigLIP 2
  * scores a fitting description at about 0.10–0.15 and unrelated ones mostly below 0.07.
  */
-export const nearThreshold = 0.08;
+const nearThreshold = 0.08;
 /**
  * The least likeness to the source that Find Similar keeps at each strictness. Gallery images are
  * mostly 0.5–0.9 alike to each other, so these keep about a handful, a few dozen and a few hundred.

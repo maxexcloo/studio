@@ -9,19 +9,12 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import {
-  type InfiniteData,
-  focusManager,
-  useInfiniteQuery,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { focusManager, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LayoutGrid, Rows3, SquareCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
 import { terminalStatuses } from "../../../../shared/queue";
-import { api } from "../../api";
 import type { MediaItem, MediaKind } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
@@ -33,7 +26,7 @@ import { useGenerationActions } from "../generation/GenerationProvider";
 import type { OpenComposerState } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import { useTileCaptions } from "../settings/accountPreferences";
-import { appendGalleryFilters, emptyGalleryFilters } from "./GalleryFilters";
+import { emptyGalleryFilters } from "./GalleryFilters";
 import { GallerySelectionBar } from "./GallerySelectionBar";
 import { GalleryToolbar } from "./GalleryToolbar";
 import { GalleryUpload, droppedFiles, useGalleryUpload } from "./GalleryUpload";
@@ -44,6 +37,7 @@ import { currentMedia } from "./mediaSource";
 import { MediaTileActions } from "./MediaTileActions";
 import { MediaViewer } from "./MediaViewer";
 import { MorePages } from "./MorePages";
+import { galleryKey, galleryPage, galleryQuery } from "./queries";
 import { inRunOrder, runKey } from "./resultSets";
 import { RunsView } from "./RunsView";
 import {
@@ -58,13 +52,6 @@ import { versionGroups } from "./versions";
 
 import classes from "./GalleryPage.module.css";
 
-interface Page {
-  items: MediaItem[];
-  nextCursor: string;
-  hasMore: boolean;
-  /** How many items match, across every page. */
-  totalApprox: number;
-}
 export function GalleryPage() {
   const [query, setQuery] = useState("");
   const [search] = useDebouncedValue(query, 250);
@@ -129,35 +116,22 @@ export function GalleryPage() {
       active: data.jobs.some((job) => !terminalStatuses.has(job.status)),
     }),
   }).data;
-  const galleryKey = useMemo(
-    () => ["gallery", search, kind, filters, similar && [similar, strictness], setId],
+  const listing = useMemo(
+    () => ({ search, kind, filters, similar, strictness, setId }) as const,
     [search, kind, filters, similar, strictness, setId],
   );
-  const galleryPage = useCallback(
-    (cursor: string, limit = 60) => {
-      const params = new URLSearchParams({ limit: String(limit), cursor, q: search, type: kind });
-      appendGalleryFilters(params, filters);
-      if (similar) {
-        params.set("similar", similar);
-        params.set("strictness", strictness);
-      }
-      if (setId) params.set("set", setId);
-      return api<Page>(`/api/gallery?${params}`);
-    },
-    [search, kind, filters, similar, strictness, setId],
-  );
-  // The gallery key (as JSON) whose every match a quick select is loading: its later pages, refetches
-  // included, then come 500 at a time.
+  // The listing key (as JSON) whose every match a quick select is loading: its later pages,
+  // refetches included, then come 500 at a time.
   const everyMatch = useRef("");
+  const listingQuery = useMemo(() => {
+    const options = galleryQuery(listing, (cursor) =>
+      cursor && everyMatch.current === JSON.stringify(options.queryKey) ? 500 : 60,
+    );
+    return options;
+  }, [listing]);
+  const listingKey = listingQuery.queryKey;
   const gallery = useInfiniteQuery({
-    queryKey: galleryKey,
-    initialPageParam: "",
-    queryFn: ({ pageParam, queryKey }) =>
-      galleryPage(
-        pageParam,
-        pageParam && everyMatch.current === JSON.stringify(queryKey) ? 500 : 60,
-      ),
-    getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
+    ...listingQuery,
     // Search and filter changes keep the current results until the new ones arrive; switching
     // between Images and Videos never shows the other mode's results.
     placeholderData: (previous, query) => (query?.queryKey[2] === kind ? previous : undefined),
@@ -169,9 +143,9 @@ export function GalleryPage() {
   const readingFirst = useRef<Promise<unknown>>(undefined);
   const refreshFirst = useCallback(
     () =>
-      (readingFirst.current ??= galleryPage("")
+      (readingFirst.current ??= galleryPage(listing, "")
         .then((first) =>
-          client.setQueryData<InfiniteData<Page>>(galleryKey, (data) => {
+          client.setQueryData(listingKey, (data) => {
             if (!data) return data;
             // The fresh first page leads; what it pushed past its end stays, as the next page
             // carries on from the old first page's cursor. What it holds leaves the later pages
@@ -198,7 +172,7 @@ export function GalleryPage() {
         .finally(() => {
           readingFirst.current = undefined;
         })),
-    [galleryPage, galleryKey, client],
+    [listing, listingKey, client],
   );
   // Active work's tiles are the newest, on the first page: only it polls, for live previews.
   // Work starting or finishing refreshes every page through the queue key below.
@@ -221,7 +195,7 @@ export function GalleryPage() {
     if (seenJobs.current === jobs?.key) return;
     seenJobs.current = jobs?.key;
     void refreshFirst();
-    void client.invalidateQueries({ queryKey: ["gallery"] });
+    void client.invalidateQueries({ queryKey: galleryKey });
   }, [jobs?.key, client, refreshFirst]);
   const loaded = useMemo(
     () => gallery.data?.pages.flatMap((page) => page.items) || [],
@@ -252,16 +226,16 @@ export function GalleryPage() {
     [versions, loaded],
   );
   // The query the shown results answer: placeholder results still answer the previous one.
-  const [resultsKey, setResultsKey] = useState(() => JSON.stringify(galleryKey));
-  if (!gallery.isPlaceholderData && resultsKey !== JSON.stringify(galleryKey))
-    setResultsKey(JSON.stringify(galleryKey));
+  const [resultsKey, setResultsKey] = useState(() => JSON.stringify(listingKey));
+  if (!gallery.isPlaceholderData && resultsKey !== JSON.stringify(listingKey))
+    setResultsKey(JSON.stringify(listingKey));
   const loadEveryMatch = useCallback(async () => {
-    everyMatch.current = JSON.stringify(galleryKey);
+    everyMatch.current = JSON.stringify(listingKey);
     let result = gallery;
     while (result.hasNextPage && !result.isFetchNextPageError)
       result = await result.fetchNextPage({ cancelRefetch: false });
     return !result.hasNextPage;
-  }, [galleryKey, gallery]);
+  }, [listingKey, gallery]);
   const selection = useGallerySelection(
     items,
     JSON.stringify([kind, search, filters, similar, strictness]),
@@ -593,7 +567,7 @@ export function GalleryPage() {
                 : "No Images"}
         </EmptyState>
       )}
-      <MorePages listing={gallery} results={JSON.stringify(galleryKey)} paused={!!itemId} />
+      <MorePages listing={gallery} results={JSON.stringify(listingKey)} paused={!!itemId} />
       {!selection.selecting && (
         <ComposerDock
           compose={params.get("compose")}

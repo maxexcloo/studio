@@ -13,7 +13,8 @@ import { closeWhenTop } from "../../ui/popupClicks";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
-import { statusLabels } from "../generation/Queue";
+import { galleryKey } from "../gallery/queries";
+import { queueQuery, statusLabels } from "../generation/Queue";
 import { accountAdminQuery } from "./AccountAdmin";
 
 const unfinishedQuery = queryOptions({
@@ -54,7 +55,7 @@ export function UnfinishedItems() {
   const ownerName = (job: UnfinishedJob) =>
     accounts.data?.accounts.find((entry) => entry.id === job.ownerId)?.username || job.ownerId;
   const refresh = () => {
-    for (const queryKey of [unfinishedQuery.queryKey, ["queue"], ["gallery"]])
+    for (const queryKey of [unfinishedQuery.queryKey, queueQuery.queryKey, galleryKey])
       void client.invalidateQueries({ queryKey });
   };
   const act = useMutation({

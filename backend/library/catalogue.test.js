@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { loraDefaultStrength } from "../../shared/profiles.ts";
+import { loraCompatibility, loraDefaultStrength } from "../../shared/profiles.ts";
 import { enrichLocalLoraInfo } from "../lora/catalogue.js";
-import { loraCompatibility, strengthRange } from "../lora/policy.js";
+import { strengthRange } from "../lora/policy.js";
 import { mcpLoras, prepareLoras } from "../mcp/controls.js";
 import { createCatalogueStore } from "./catalogue.js";
 

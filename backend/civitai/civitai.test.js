@@ -11,7 +11,7 @@ const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-media-"));
 process.env.STUDIO_MEDIA_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 const { parametersText, writeCivitaiParameters } = await import("./civitai.js");
-const { parseA1111Parameters, readPngInfo } = await import("../png-text.js");
+const { a1111Recipe, readImageMetadata } = await import("../image-metadata.js");
 
 const body = {
   prompt: "a lighthouse at dusk",
@@ -41,11 +41,11 @@ test("the text reads the way AUTOMATIC1111 writes it", () => {
     settings,
     /^Steps: 30, Sampler: DPM\+\+ 2M, Schedule type: Karras, CFG scale: 5\.5, Seed: 424242, Size: 832x1216, Model hash: 0123456789, Model: juggernautXL_v9/,
   );
-  const parsed = parseA1111Parameters(text);
-  assert.equal(parsed.prompt, prompt);
+  const parsed = a1111Recipe(text);
+  assert.equal(parsed.prompt, "a lighthouse at dusk");
   assert.equal(parsed.negative, "blurry");
-  assert.equal(parsed.seed, "424242");
-  assert.equal(parsed.model, "juggernautXL_v9");
+  assert.equal(parsed.settings.seed, "424242");
+  assert.equal(parsed.resources[0].name, "juggernautXL_v9");
 });
 
 test("a finished PNG in Studio media always carries it", async () => {
@@ -65,9 +65,9 @@ test("a finished PNG in Studio media always carries it", async () => {
     },
   ];
 
-  assert.equal(readPngInfo(file).text.parameters, undefined);
+  assert.equal(readImageMetadata(fs.readFileSync(file)).text.parameters, undefined);
   assert.equal(await writeCivitaiParameters(outputs, body), 1);
-  const info = readPngInfo(file);
+  const info = readImageMetadata(fs.readFileSync(file));
   assert.match(info.text.parameters, /Size: 8x6/, "the file's own size, not the one asked for");
   assert.equal((await sharp(file).metadata()).width, 8);
 });

@@ -1,4 +1,9 @@
-import type { FinishingSettings, FinishingStatus, UpscaleQuality } from "../../shared/upscale.ts";
+import {
+  type FinishingSettings,
+  type FinishingStatus,
+  type UpscaleQuality,
+  upscaleQualities,
+} from "../../shared/upscale.ts";
 import { logger } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
@@ -40,7 +45,6 @@ const defaultFinishingSettings: FinishingSettings = {
   quality: "balanced",
   faceDetail: true,
 };
-const qualities: UpscaleQuality[] = ["fast", "balanced", "high"];
 const tickMs = 30_000;
 const waiting = (job: OwnedJob) => ["queued", "waiting"].includes(job.status);
 const finishingJob = (job: OwnedJob) => job.priority === queuePriority.finishing;
@@ -73,17 +77,13 @@ export function createFinishing(options: {
   const { store, log = logger } = options;
   const name = (ownerId: string) => `finishing:${ownerId}`;
   function read(ownerId: string): FinishingRecord {
-    try {
-      const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as Partial<FinishingRecord>;
-      return {
-        waiting: saved.waiting || [],
-        settings: { ...defaultFinishingSettings, ...saved.settings },
-      };
-    } catch (error) {
-      if ((error as { code?: string }).code === "ENOENT")
-        return { settings: { ...defaultFinishingSettings }, waiting: [] };
-      throw error;
-    }
+    const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as
+      | Partial<FinishingRecord>
+      | undefined;
+    return {
+      waiting: saved?.waiting || [],
+      settings: { ...defaultFinishingSettings, ...saved?.settings },
+    };
   }
   const write = (ownerId: string, record: FinishingRecord) =>
     writeRuntimeDocument(options.dataDir, name(ownerId), record);
@@ -243,7 +243,7 @@ export function registerFinishingRoutes(app: Router, { finishing }: { finishing:
       patch[key] = body[key];
     }
     if (body.quality !== undefined) {
-      if (!qualities.includes(body.quality as UpscaleQuality))
+      if (!upscaleQualities.includes(body.quality as UpscaleQuality))
         return res.status(400).json({ ok: false, error: "Choose fast, balanced or high quality." });
       patch.quality = body.quality as UpscaleQuality;
     }

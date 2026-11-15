@@ -15,14 +15,14 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 import { ChevronDown, type LucideIcon, X } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { profileNameParts } from "../../../../shared/profiles";
+import { loraName, profileNameParts } from "../../../../shared/profiles";
 import { api } from "../../api";
 import type { MediaKind, Profile, Rating } from "../../types";
 import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { loraInfoQuery, loraTitle } from "../generation/LoraPicker";
+import { loraInfoQuery } from "../generation/LoraPicker";
 import { profileName, shownProfileName } from "../generation/payload";
 
 import classes from "./GalleryFilters.module.css";
@@ -191,7 +191,7 @@ function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues
     facets,
     options: {
       model: byName(keys("model"), (key) => modelNames.get(key) || modelKeyName(key)),
-      lora: byName(keys("lora"), (key) => loraTitle(loraInfo.data?.loras[key], key)),
+      lora: byName(keys("lora"), (key) => loraName(key, loraInfo.data?.loras[key])),
       size: facets.data?.sizes || [],
       aspect: facets.data?.aspects || [],
       tag: facets.data?.tags || [],

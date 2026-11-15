@@ -2,13 +2,14 @@ import { Alert, Badge, Button, Group, Stack, TagsInput, Text } from "@mantine/co
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { loraName } from "../../../../shared/profiles";
 import { maxAvoid, maxAvoids } from "../../../../shared/taste";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { formatDateTime } from "../../ui/dates";
 import { SettingGroup } from "../../ui/SettingRows";
 import { modelsQuery } from "../generation/GenerationProvider";
-import { loraInfoQuery, loraTitle } from "../generation/LoraPicker";
+import { loraInfoQuery } from "../generation/LoraPicker";
 
 interface Weighted {
   score: number;
@@ -134,7 +135,7 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
                   label="LoRAs"
                   values={top(data.loras).map(
                     (lora) =>
-                      `${loraTitle(loraInfo.data?.loras[lora.name], lora.name)}${lora.strength === undefined ? "" : ` ${lora.strength}`}`,
+                      `${loraName(lora.name, loraInfo.data?.loras[lora.name])}${lora.strength === undefined ? "" : ` ${lora.strength}`}`,
                   )}
                 />
               </>

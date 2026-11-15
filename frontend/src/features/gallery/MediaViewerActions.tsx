@@ -1,16 +1,13 @@
 import { Box } from "@mantine/core";
-import { type Ref, type RefObject, useRef, useState } from "react";
+import { type Ref, type RefObject, useRef } from "react";
 
 import type { MediaItem } from "../../types";
 import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "../../ui/ActionBar";
 import { usePhone } from "../../ui/usePhone";
-import { AnimateDialog } from "./AnimateDialog";
 import { namedItemActions } from "./itemActions";
-import { useMediaActions } from "./MediaActions";
+import { useMediaActions, useMediaDialogs } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
-import { ReportIssueDialog } from "./ReportIssueDialog";
-import type { AnimateRequest, Iteration } from "./useMediaAction";
-import { TrimVideoDialog } from "./videoEdits";
+import type { Iteration } from "./useMediaAction";
 import { ViewerPrompt, useViewerPrompt } from "./ViewerPrompt";
 
 import classes from "./MediaViewer.module.css";
@@ -66,9 +63,7 @@ export function MediaViewerActions({
   promptHidden?: boolean;
 }) {
   const transfer = useMediaTransfer(item, true);
-  const [animating, setAnimating] = useState<AnimateRequest | null>(null);
-  const [trimming, setTrimming] = useState(false);
-  const [reporting, setReporting] = useState(false);
+  const { handlers, dialogs } = useMediaDialogs(item, iterate);
   // Edit's changes run through the viewer's own actions (an Upscale), read once they exist.
   const current = useRef<ActionGroups>([]);
   const prompt = useViewerPrompt(item, { groups: () => current.current, iterate });
@@ -79,11 +74,9 @@ export function MediaViewerActions({
     iterate,
     onApplied,
     onCompare,
-    onAnimate: setAnimating,
     onDelete,
-    onReport: () => setReporting(true),
     onRetried,
-    onTrim: () => setTrimming(true),
+    ...handlers,
     onVersionChange,
   });
   current.current = groups;
@@ -102,18 +95,7 @@ export function MediaViewerActions({
         </Box>
       )}
       <ViewerActionGroups groups={groups} labelled={namedItemActions} />
-      {animating && (
-        <AnimateDialog
-          item={item}
-          iterate={iterate}
-          {...animating}
-          onClose={() => setAnimating(null)}
-        />
-      )}
-      {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
-      {reporting && (
-        <ReportIssueDialog item={item} iterate={iterate} onClose={() => setReporting(false)} />
-      )}
+      {dialogs}
     </ActionBarSurface>
   );
 }

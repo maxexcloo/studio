@@ -2,6 +2,7 @@ import {
   characterImage,
   characterImageIds,
   characterImages,
+  characterLead,
   keepsIdentity,
   maxCardName,
   sheetRoles,
@@ -26,7 +27,7 @@ import { loadSharp } from "./sharp-loader.js";
  * A sheet's 3:2 shape, as its layout asks, at the 1K tier: on live (13 Nov) Qwen-Image 2.1 drew a
  * clean sheet at 1024×672, each view about 650 pixels tall.
  */
-export const sheetSize = { width: 1536, height: 1024, resolutionTier: "1K" };
+const sheetSize = { width: 1536, height: 1024, resolutionTier: "1K" };
 
 /** The profile a sheet draws on: a ready Qwen-Image 2.1 that takes an image, Quality first. */
 export function sheetProfile(profiles) {
@@ -212,6 +213,20 @@ export function sheetReferences({ references, prompt, cards, profile, madeWith =
     return profile ? withCharacterImages(viewed, references[at].slot, card, profile) : viewed;
   }
   return references;
+}
+
+/**
+ * The run's prompt with a character's lead naming its images in the plural where the run sends
+ * several of them (sheetReferences).
+ */
+export function characterPrompt({ prompt, references, cards }) {
+  for (const card of cards) {
+    const own = new Set([...card.referenceIds, ...characterImageIds(card)]);
+    const lead = characterLead(card.description);
+    if (prompt.includes(lead) && references.filter((asset) => own.has(asset.assetId)).length > 1)
+      return prompt.replace(lead, characterLead(card.description, true, 2));
+  }
+  return prompt;
 }
 
 /**

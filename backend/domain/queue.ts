@@ -4,12 +4,13 @@ import {
   type QueueMedia,
   type QueueStatus,
   pausedReason,
+  pendingStatuses,
   terminalStatuses,
 } from "../../shared/queue.ts";
 import { logEvent, logWarning } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 import { logFailure } from "./log-failure.ts";
-import { type OwnedJob, Store, everyone, pendingStatuses, queuePriority } from "./store.ts";
+import { type OwnedJob, Store, everyone, queuePriority } from "./store.ts";
 
 export interface JobObservation {
   status: QueueStatus;
@@ -50,8 +51,20 @@ export interface QueueAdapter {
   slots?(resource: string): number;
 }
 
+/** One adapter that hands each job to the adapter `pick` chooses for it. */
+export function routeAdapters(pick: (job: OwnedJob) => QueueAdapter): QueueAdapter {
+  return {
+    submit: (job) => pick(job).submit(job),
+    observe: (job) => pick(job).observe(job),
+    cancel: (job) => pick(job).cancel(job),
+    saveOutputs: (job) => pick(job).saveOutputs(job),
+    eligible: (job) => pick(job).eligible?.(job) || Promise.resolve(undefined),
+    settled: (job) => pick(job).settled?.(job) || Promise.resolve(),
+  };
+}
+
 /** What the writing stage streams into the item's progress while the prompt is written. */
-export interface WritingProgress {
+interface WritingProgress {
   thinking: string;
   prompt: string;
 }
@@ -122,7 +135,7 @@ export const modelOf = (input: GenerationInput) => String(input.profileId || inp
  * A resource's load: whether its slots are all taken (`current`, the last started job's id), how
  * many jobs wait for it and the model it last ran.
  */
-export interface ResourceLoad {
+interface ResourceLoad {
   busy: boolean;
   current?: string;
   queued: number;

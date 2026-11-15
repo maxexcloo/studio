@@ -1,9 +1,9 @@
 import { ArchiveX, BookOpen, Boxes, FileCog, HardDriveDownload, Import } from "lucide-react";
 
+import { cardKinds } from "../../../../shared/characters";
 import { icons } from "../../ui/icons";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
-import { useIsAdmin } from "../auth/AccountGate";
-import { useLibraryAccess } from "./useLibraryAccess";
+import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
 // Groups run from the most used; Your Cards and Prompting list A–Z, Models & LoRAs lead with their
 // names and Add Models follows an import to its downloads. The Library opens on Models.
@@ -95,11 +95,11 @@ export const librarySections = {
 /** Administrators see the whole Library; other accounts only their cards and Presets. */
 export function useLibraryNavigation() {
   const admin = useIsAdmin();
-  const { characters } = useLibraryAccess();
+  const characters = useGroupFeature("characters");
   return {
     admin,
     options: visibleSections(librarySections, admin, (key) =>
-      ["characters", "outfits", "scenes"].includes(key) ? characters : key === "presets" || admin,
+      Object.hasOwn(cardKinds, key) ? characters : key === "presets" || admin,
     ),
   };
 }
