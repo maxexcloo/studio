@@ -109,7 +109,7 @@ test("without STUDIO_WORKERS, the image and video workloads give one worker per 
       url: "http://radiance:8000",
       capabilities: ["image", "video"],
       backend: "radiance",
-      slots: 1,
+      slots: 2,
     },
   ]);
   const listed = [{ id: "local", url: "http://local:8188", capabilities: ["image"] }];
