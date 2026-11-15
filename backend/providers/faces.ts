@@ -8,7 +8,7 @@ import { createModelFiles, createOnnxRunner } from "./onnx.ts";
  * AuraFace (fal, Apache-2.0; an ArcFace ResNet-100) turns an aligned face into a vector whose
  * cosine similarity says whether two faces are one person.
  */
-export const faceSource = {
+const faceSource = {
   // renovate: datasource=git-refs depName=https://github.com/opencv/opencv_zoo
   detectorRevision: "48b10fa505aeb51fbd127fc60a5c660040e823b7",
   // renovate: datasource=git-refs depName=https://huggingface.co/fal/AuraFace-v1

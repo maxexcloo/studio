@@ -20,7 +20,7 @@ export const dreamState = field("dream.state");
  * is Date.parse's time (null when unreadable) and `bucket` is order.js's galleryBucket: JS `trim`
  * strips every whitespace character, so the SQL one names them.
  */
-export const galleryColumns: [string, string][] = [
+const galleryColumns: [string, string][] = [
   ["item_id", field("id")],
   ["owner_id", `coalesce(${field("ownerId")}, '')`],
   ["job_id", field("jobId")],
@@ -49,7 +49,7 @@ const galleryOrder =
 /** The indexes over `galleryColumns`: gallery order with and without an owner, jobs, ids, sets,
  * states, Dream states, an owner's prompts (a repeated prompt's title), times (recent work) and
  * runs (profile health, read from the index alone). */
-export const galleryIndexes: [string, string][] = [
+const galleryIndexes: [string, string][] = [
   ["studio_gallery_order", galleryOrder],
   ["studio_gallery_owner_order", `owner_id, ${galleryOrder}`],
   ["studio_gallery_job", "job_id"],

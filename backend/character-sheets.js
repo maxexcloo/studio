@@ -27,7 +27,7 @@ import { loadSharp } from "./sharp-loader.js";
  * A sheet's 3:2 shape, as its layout asks, at the 1K tier: on live (13 Nov) Qwen-Image 2.1 drew a
  * clean sheet at 1024×672, each view about 650 pixels tall.
  */
-export const sheetSize = { width: 1536, height: 1024, resolutionTier: "1K" };
+const sheetSize = { width: 1536, height: 1024, resolutionTier: "1K" };
 
 /** The profile a sheet draws on: a ready Qwen-Image 2.1 that takes an image, Quality first. */
 export function sheetProfile(profiles) {

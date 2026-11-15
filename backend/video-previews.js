@@ -615,7 +615,7 @@ export async function getComfyVideoPreview(filename, subfolder, type, worker = "
  * Whether iOS Safari plays a video as it is: H.264 at 8-bit 4:2:0 in MP4 or QuickTime, within the
  * 4096 × 2304 an iPhone decodes, with AAC, MP3 or no sound. Read from ffmpeg's report of the file.
  */
-export function playsOnIos(report) {
+function playsOnIos(report) {
   const container = report.match(/Input #0, ([^\n]*?), from/)?.[1] || "";
   const video = report.match(/Stream #[^\n]*?Video: ([^\n]*)/)?.[1] || "";
   const audio = report.match(/Stream #[^\n]*?Audio: (\w+)/)?.[1];
@@ -747,37 +747,6 @@ export async function getComfyVideoPlayback(filename, subfolder, type) {
     { poster: true },
   );
   return { file, original: false };
-}
-
-/** Hiding/deleting the original also removes its cached plaintext preview, after any encoder finishes. */
-export async function forgetItemVideoPreviews(item) {
-  if (item?.type !== "video" || !item.url) return 0;
-  let identity;
-  try {
-    const url = new URL(item.url, "http://studio.local");
-    if (url.pathname === "/comfy/view")
-      identity = sourceIdentity(
-        url.searchParams.get("filename") || "",
-        url.searchParams.get("subfolder") || "",
-        url.searchParams.get("type") || "output",
-        url.searchParams.get("worker") || "",
-      );
-  } catch {
-    return 0;
-  }
-  if (!identity) return 0;
-  const key = identityKey(identity);
-  await pending.get(key)?.catch(() => {});
-  await pending.get(`poster:${key}`)?.catch(() => {});
-  await pending.get(`play:${key}`)?.catch(() => {});
-  remoteVersions.delete(key);
-  let removed = 0;
-  for (const name of await fs.promises.readdir(dir).catch(() => [])) {
-    if (!name.startsWith(`${key}-`)) continue;
-    await fs.promises.rm(path.join(dir, name), { force: true });
-    removed++;
-  }
-  return removed;
 }
 
 /** Serves the bytes to ffmpeg over a seekable loopback URL, so MP4s with trailing metadata work and no plaintext file is written. */

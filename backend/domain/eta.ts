@@ -1,5 +1,5 @@
 /** A job waiting in Studio's queue: the resources it may run on, best first, and how long it takes. */
-export interface WaitingRun {
+interface WaitingRun {
   id: string;
   resources: string[];
   /** Null while its length is unknown. */

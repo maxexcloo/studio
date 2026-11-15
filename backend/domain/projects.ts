@@ -18,7 +18,7 @@ interface ProjectsRecord {
   chats: Chats;
 }
 /** What a create or update may carry: any part of a project's content. */
-export interface ProjectPatch {
+interface ProjectPatch {
   name?: string;
   brief?: Partial<ProjectContent["brief"]>;
   constraints?: Partial<ProjectContent["constraints"]>;
