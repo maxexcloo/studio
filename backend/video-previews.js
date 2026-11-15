@@ -783,11 +783,10 @@ async function withLoopback(buffer, work) {
 }
 
 /**
- * A video's final frame at full size, as a PNG: the first frame of its
- * extension. Only the last half second is decoded, then played backwards so
- * the first frame out is the last one in.
+ * A video's frame at full size, as a PNG: its last (the first frame of its extension), or the one
+ * at a time in milliseconds. For the last, only the final half second is decoded, then played
+ * backwards so the first frame out is the last one in.
  */
-/** A video's frame as PNG: its last, or the one at a time in milliseconds. */
 export async function extractFrame(buffer, at = "last") {
   if (buffer.length > maxSourceBytes) throw new Error("This video is too large to extend.");
   // The last frame is the first of the reversed final half second.

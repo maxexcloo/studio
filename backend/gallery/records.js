@@ -42,7 +42,6 @@ export function outputsFrom(worker, history) {
   return urls;
 }
 
-/** A stored `assistant` record (assistant-routes.js assistantRecord), kept to its known fields, or null. */
 /** The chat that asked for a run: its conversation id, as LibreChat names it (X-Studio-Conversation-Id). */
 export function storedChatRecord(value) {
   const id =
@@ -121,6 +120,7 @@ export function storedWritingRecord(value) {
   return { kind: value.kind, ...(model ? { model } : {}), ...(thinking ? { thinking } : {}) };
 }
 
+/** A stored `assistant` record (assistant-routes.js assistantRecord), kept to its known fields, or null. */
 export function storedAssistantRecord(value) {
   if (
     !value ||

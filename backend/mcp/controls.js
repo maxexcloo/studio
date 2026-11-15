@@ -284,10 +284,13 @@ const stem = (name) =>
     .replace(/\.(?:safetensors|ckpt|pt|pth|bin)$/i, "");
 const maxDetails = 5;
 
-/** Profile-compatible optional LoRAs, verified fits first, then by name; the studio picker ranks the same way. */
 /** Liked first, then unrated, then disliked. */
 const ratingOrder = (rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);
 
+/**
+ * Profile-compatible optional LoRAs, liked first, then verified fits, then by name; the studio
+ * picker ranks the same way.
+ */
 function loraCandidates(profile, infos, ratings = {}) {
   if (profile.capabilities?.lora === false) return [];
   const entries = [];
