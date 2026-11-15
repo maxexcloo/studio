@@ -124,7 +124,6 @@ export function CharacterChoices({
                     card={card}
                     withinPortal={false}
                     onEdit={() => dialogs.edit(card)}
-                    onGenerate={() => dialogs.generate(card)}
                     onSheet={() => dialogs.sheet(card)}
                     onDelete={() => dialogs.remove(card)}
                   />
