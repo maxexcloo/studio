@@ -568,6 +568,98 @@ test("a waiting job moves to the idle worker with its model loaded, manual work 
   }
 });
 
+test("split Count reserves one worker, moves together before starting and survives completion and restart", async () => {
+  const { store, adapter, observations, submitted } = fixture();
+  adapter.alternatives = () => ["worker:a", "worker:b"];
+  let queue = new GenerationQueue(store, adapter);
+  try {
+    const session = store.createSession("alice");
+    const enqueue = (id: string, batch?: string) =>
+      store.enqueue(
+        "alice",
+        session.id,
+        { count: 1, profileId: "model" },
+        "image",
+        undefined,
+        "worker:a",
+        id,
+        { queueSet: "request", ...(batch ? { queueBatch: batch } : {}) },
+      );
+    enqueue("busy");
+    await queue.tick();
+    enqueue("first", "first");
+    enqueue("second", "first");
+    await queue.tick();
+    assert.equal(store.job("alice", "first")?.resource, "worker:b");
+    assert.equal(store.job("alice", "second")?.resource, "worker:b");
+    assert.deepEqual(submitted, ["busy", "first"]);
+    observations.set("busy", { status: "completed" });
+    await queue.tick();
+    assert.equal(store.job("alice", "second")?.status, "waiting");
+    // A different prompt/comparison in the same request can use the idle worker.
+    enqueue("variant");
+    await queue.tick();
+    assert.deepEqual(submitted, ["busy", "first", "variant"]);
+    observations.set("first", { status: "completed" });
+    await queue.tick();
+    assert.equal(store.job("alice", "second")?.resource, "worker:b");
+    assert.equal(store.job("alice", "second")?.status, "running");
+    // A later sibling still follows the completed first job, even after a process restart.
+    store.enqueue("alice", session.id, { count: 1 }, "image", undefined, "worker:b", "third", {
+      queueSet: "request",
+      queueBatch: "first",
+    });
+    queue = new GenerationQueue(store, adapter);
+    observations.set("variant", { status: "completed" });
+    await queue.tick();
+    assert.equal(store.job("alice", "third")?.resource, "worker:b");
+    assert.equal(store.job("alice", "third")?.status, "waiting");
+    observations.set("second", { status: "completed" });
+    await queue.tick();
+    assert.equal(store.job("alice", "third")?.status, "running");
+    assert.equal(new Set(submitted).size, submitted.length);
+  } finally {
+    store.close();
+  }
+});
+
+test("an unavailable reserved worker holds siblings after cancellation without moving or resubmitting accepted work", async () => {
+  const { store, adapter, observations, submitted } = fixture();
+  adapter.alternatives = () => ["worker:a", "worker:b"];
+  let queue = new GenerationQueue(store, adapter);
+  try {
+    const session = store.createSession("alice");
+    for (const id of ["first", "second"])
+      store.enqueue("alice", session.id, {}, "image", undefined, "worker:a", id, {
+        queueSet: "set",
+        queueBatch: "first",
+      });
+    await queue.tick();
+    assert.deepEqual(submitted, ["first"]);
+    await queue.cancel("alice", "first");
+    await queue.tick();
+    // Second has started only after the cancelled first released its slot.
+    assert.deepEqual(submitted, ["first", "second"]);
+    store.enqueue("alice", session.id, {}, "image", undefined, "worker:a", "third", {
+      queueSet: "set",
+      queueBatch: "first",
+    });
+    adapter.alternatives = () => ["worker:b"];
+    adapter.eligible = async () => "Waiting for its reserved worker.";
+    observations.set("second", { status: "cancelled" });
+    queue = new GenerationQueue(store, adapter);
+    await queue.tick();
+    assert.equal(store.job("alice", "third")?.resource, "worker:a");
+    assert.equal(store.job("alice", "third")?.reason, "Waiting for its reserved worker.");
+    await queue.cancel("alice", "third");
+    await queue.tick();
+    assert.equal(store.job("alice", "third")?.status, "cancelled");
+    assert.deepEqual(submitted, ["first", "second"]);
+  } finally {
+    store.close();
+  }
+});
+
 test("an idle worker with another model loaded takes work waiting behind a busy worker", async () => {
   const queue = fixture();
   const { store, observations, submitted } = queue;

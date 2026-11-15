@@ -95,13 +95,14 @@ export function createMcpDomainRequest({ app, admit, ownsItem }) {
     }
   }
 
-  function generate({ queueSet, parentItemId, ...body }, account) {
+  function generate({ queueSet, queueBatch, parentItemId, ...body }, account) {
     if (parentItemId && !ownsItem(account?.userId || "", parentItemId))
       return { status: 404, payload: { error: "Source result not found." } };
     // External chat work queues after manual Studio requests; its set keeps it together once started.
     return admit(body, account, undefined, {
       priority: queuePriority.mcp,
       queueSet,
+      queueBatch,
       ...(parentItemId ? { parentItemId } : {}),
     });
   }

@@ -136,6 +136,7 @@ test("a request's jobs group as one set that moves and stops together", async ({
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
   const queue = page.getByRole("dialog", { name: "Generations", exact: true });
   // The set is one row: its title and progress, its jobs under it once opened.
+  await expect(queue.getByText("Generations (2)", { exact: true })).toBeVisible();
   const set = queue.getByRole("button", { name: /^Fox Studies/ });
   await expect(set).toContainText("1 of 3 Done");
   // Dragging has loaded once the handles work, so the rows stay mounted.
@@ -168,6 +169,7 @@ test("a request's jobs group as one set that moves and stops together", async ({
       ["single", "queued"],
     ]);
   await expect(set).toBeHidden();
+  await expect(queue.getByText("Generations (1)", { exact: true })).toBeVisible();
   await queue.getByRole("button", { name: "Stop All", exact: true }).click();
   const stopAll = page.getByRole("dialog", { name: "Stop All Generations", exact: true });
   await expect(stopAll).toContainText("Studio stops your 1 unfinished generation.");

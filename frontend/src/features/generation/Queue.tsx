@@ -516,7 +516,7 @@ export type QueueEntry = {
  * The queue's rows in order: each set of several jobs one group, where its first shown job is,
  * Dream's jobs each their own row, after everyone else's.
  */
-function queueEntries(all: QueueJob[]): QueueEntry[] {
+export function queueEntries(all: QueueJob[]): QueueEntry[] {
   const members = new Map<string, QueueJob[]>();
   for (const job of all)
     if (job.queueSet && !job.dream)

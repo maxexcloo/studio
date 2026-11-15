@@ -97,17 +97,24 @@ export function createGenerationAdmission(options: AdmissionOptions) {
         // or fresh random seeds, queued together as one set.
         const copies = splitRuns(input, options.separateRuns?.(input));
         const queueSet = copies.length > 1 ? origin?.queueSet || crypto.randomUUID() : undefined;
+        const firstId = clientId || crypto.randomUUID();
+        const queueBatch = origin?.queueBatch || (copies.length > 1 ? firstId : undefined);
+        const first = queueBatch ? options.store.job(ownerId, queueBatch) : undefined;
+        const resource =
+          first?.resource ||
+          (await step("resource", () => options.resourceFor(input, origin?.priority)));
         const queued: QueuedCopy[] = [];
         for (const [index, copy] of copies.entries())
           queued.push({
             input: copy,
             operation: scope?.operation || (input.kind === "video" ? "animate" : "image"),
             parentJobId: scope?.parentJobId,
-            resource: await step("resource", () => options.resourceFor(copy, origin?.priority)),
-            requestedId: clientId ? (index ? `${clientId}-${index + 1}` : clientId) : undefined,
+            resource,
+            requestedId: index ? (clientId ? `${clientId}-${index + 1}` : undefined) : firstId,
             origin: {
               ...origin,
               ...(queueSet ? { queueSet } : {}),
+              ...(queueBatch ? { queueBatch } : {}),
               // Otherwise a run in its parent's session is made from its parent's result only when it uses it as its reference.
               parentItemId:
                 scope?.parentItemId ??
