@@ -75,11 +75,7 @@ export function registerPresetRoutes(
     async (req, res) => {
       if (write && !requireLocal(req, res)) return;
       res.setHeader("Cache-Control", "no-store");
-      try {
-        await handler(req, res);
-      } catch (error) {
-        res.status(400).json({ ok: false, error: error.message });
-      }
+      await handler(req, res);
     };
   // The list matches by name and size only (never reading a model); opening one image verifies its checksums and updates its gallery copy.
   const matched = async (preset, catalogue, { verify = true } = {}) => {
