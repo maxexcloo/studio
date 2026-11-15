@@ -804,11 +804,15 @@ test("Workers benchmark a running local text model and list each run's figures",
     await expect(page.getByRole("menuitem", { name: "View Log", exact: true })).toBeVisible();
     return page.getByRole("menuitem", { name: "Benchmark", exact: true });
   };
+  const closeMenu = async () => {
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+  };
   // Media has no benchmark, and a stopped model can't run one.
   await expect(await menu("Image")).toHaveCount(0);
-  await page.keyboard.press("Escape");
+  await closeMenu();
   await expect(await menu("Qwen")).toBeDisabled();
-  await page.keyboard.press("Escape");
+  await closeMenu();
   await (await menu("Gemma")).click();
   const dialog = page.getByRole("dialog", { name: "Benchmark Gemma", exact: true });
   await dialog.getByRole("button", { name: "Benchmark", exact: true }).click();
@@ -817,7 +821,7 @@ test("Workers benchmark a running local text model and list each run's figures",
   await expect(results.getByRole("row", { name: "Gemma" }).first()).toContainText("Running");
   // One benchmark at a time.
   await expect(await menu("Gemma")).toBeDisabled();
-  await page.keyboard.press("Escape");
+  await closeMenu();
   await results.getByRole("button", { name: "Actions for Gemma", exact: true }).first().click();
   await page.getByRole("menuitem", { name: "Stop", exact: true }).click();
   const confirm = page.getByRole("dialog", { name: "Stop Benchmark", exact: true });
