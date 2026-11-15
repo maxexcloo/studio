@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 
+import { terminalStatuses } from "../../shared/queue.ts";
 import {
   ownedQuery,
   ownerIdForRequest,
@@ -295,6 +296,27 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const [item] = filterVisibleGallery([galleryItem(params.id)].filter(Boolean), {
       disliked: true,
     });
+    return item && recordBelongsToAccount(item, account)
+      ? { status: 200, payload: { item: resultNumbers.numbered([item])[0] } }
+      : { status: 404, payload: { error: "That item is no longer in the gallery." } };
+  });
+
+  // Viewer links name the account's permanent output number, even before its media is saved.
+  directRoute(app, "GET", "/api/gallery/results/:number", (account, { params }) => {
+    const ownerId = account?.userId || "";
+    const found = /^[1-9]\d{0,8}$/.test(params.number)
+      ? resultNumbers.find(ownerId, Number(params.number))
+      : null;
+    const saved = found && galleryJobItems(found.jobId, ownerId);
+    let item = saved && saved.find((item) => (item.index ?? 0) === found.index);
+    if (item) [item] = filterVisibleGallery([item], { disliked: true });
+    else if (found && !saved.length) {
+      const job = store.job(ownerId, found.jobId);
+      if (job && !job.cleared && job.operation !== "upscale" && !terminalStatuses.has(job.status))
+        item = makePendingItems(job.id, { ...job.input, ownerId, createdAt: job.createdAt })[
+          found.index
+        ];
+    }
     return item && recordBelongsToAccount(item, account)
       ? { status: 200, payload: { item: resultNumbers.numbered([item])[0] } }
       : { status: 404, payload: { error: "That item is no longer in the gallery." } };

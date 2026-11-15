@@ -32,7 +32,7 @@ export function DeleteMediaDialog({
       const gone = new Set(removed);
       // The gallery drops them at once; the refresh below brings counts and neighbours up to date.
       cache.setQueriesData<Pages>({ queryKey: galleryKey }, (data) =>
-        data
+        data?.pages
           ? {
               ...data,
               pages: data.pages.map((page) => ({

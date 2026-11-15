@@ -1284,27 +1284,39 @@ test("The open item is in the URL: Back closes the viewer and a link opens it", 
   page,
 }) => {
   const state = await fixtures(page);
-  state.gallery.push(...results(2));
+  state.gallery.push(...results(2).map((item, index) => ({ ...item, number: 41 + index })));
   // An item not on a loaded page is read on its own.
-  const unlisted = { ...results(1)[0], id: "unlisted", prompt: "Unlisted Result" };
-  await page.route("**/api/gallery/items/unlisted", (route) =>
+  const unlisted = { ...results(1)[0], id: "unlisted", number: 43, prompt: "Unlisted Result" };
+  await page.route("**/api/gallery/results/43", (route) =>
     route.fulfill({ json: { item: unlisted } }),
   );
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await expect(page).toHaveURL(/\/images\?item=browse-0$/);
+  await expect(page).toHaveURL(/\/images\?item=41$/);
   await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
   await page.keyboard.press("ArrowRight");
-  await expect(page).toHaveURL(/\/images\?item=browse-1$/);
+  await expect(page).toHaveURL(/\/images\?item=42$/);
   await page.goBack();
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/images$/);
-  await page.goto("/images?item=unlisted");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+  ).toBeFocused();
+  await page.goForward();
+  await expect(page).toHaveURL(/item=42$/);
+  await expect(viewer).toBeVisible();
+  await page.goto("/images?item=43");
   await expect(viewer.getByRole("img", { name: "Unlisted Result", exact: true })).toBeVisible();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/images$/);
+  await page.goto("/images?item=browse-0");
+  await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/item=41$/);
+  await page.goto("/images?item=999999999");
+  await expect(page.getByText("That item is no longer in the gallery.")).toBeVisible();
+  await expect(viewer).toBeHidden();
 });
 
 test("Desktop gallery controls stay available while scrolling and rating changes preserve search", async ({

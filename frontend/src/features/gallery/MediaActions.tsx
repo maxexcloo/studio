@@ -76,6 +76,7 @@ import { useMediaRating } from "./useMediaRating";
 import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
 import { TrimVideoDialog, type VideoEdit, useVideoEdit } from "./videoEdits";
+import { viewerItemId } from "./viewerLink";
 import type { ViewerAsk } from "./ViewerPrompt";
 
 /**
@@ -444,7 +445,7 @@ export function useMediaActions(
   const openViewer = (ask: ViewerAsk) => {
     onApplied();
     const search = new URLSearchParams(location.search);
-    search.set("item", item.id);
+    search.set("item", viewerItemId(item));
     navigate({ search: `?${search}` }, { state: { viewer: true, ask } });
   };
   const editAsk: EditAsk = edit ?? {

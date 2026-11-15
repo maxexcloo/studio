@@ -21,6 +21,6 @@ export interface DreamActivity {
   action: string;
   question?: string;
   answer?: string;
-  item: { id?: string; title: string; media?: "image" | "video" };
-  other?: { id?: string; title: string; media?: "image" | "video" };
+  item: { id?: string; number?: number; title: string; media?: "image" | "video" };
+  other?: { id?: string; number?: number; title: string; media?: "image" | "video" };
 }
