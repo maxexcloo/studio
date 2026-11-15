@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+
 import { maxPromptCharacters } from "../../shared/queue.ts";
 import {
   type Change,
@@ -68,6 +70,8 @@ interface Router {
 const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "animate", "change", "draft"]);
 const cacheMs = 10 * 60_000;
 const cacheLimit = 500;
+/** Composer ideas avoid this many of the latest shown for the account and kind. */
+const shownIdeas = 9;
 const maxIdea = 160;
 const maxRequest = 500;
 // How an edit's prompt is worded on the model that runs it; without a known model, as a description.
@@ -228,6 +232,8 @@ export function createSuggestions({
   now?: () => number;
 }) {
   const cache = new Map<string, { until: number; value: Promise<Suggestions> }>();
+  /** The latest composer ideas per owner and kind, newest first. */
+  const shown = new Map<string, string[]>();
   function remember(key: string, value: Promise<Suggestions>) {
     for (const [stale, entry] of cache) if (entry.until <= now()) cache.delete(stale);
     // Maps keep insertion order, so the first key is the oldest.
@@ -381,7 +387,13 @@ export function createSuggestions({
           // Signals keep whole prompts; a few opening sentences show the taste.
           .map((signal) => signal.prompt!.slice(0, 300)),
       ),
-    ].slice(0, 5);
+    ];
+    // A different few each time, so ideas don't keep drawing on the same prompts.
+    for (let index = liked.length - 1; index > 0; index--) {
+      const other = randomInt(index + 1);
+      [liked[index], liked[other]] = [liked[other], liked[index]];
+    }
+    liked.length = Math.min(liked.length, 5);
     return {
       known: Boolean(record.summary || liked.length),
       lines: [
@@ -637,7 +649,23 @@ export function createSuggestions({
               ? ["", `They have started this prompt: ${prompt}`]
               : []),
         ].join("\n");
-        return write(model, surface, kind, context, { spicy });
+        if (surface !== "composer") return write(model, surface, kind, context, { spicy });
+        const latest = shown.get(`${ownerId}:${kind}`) ?? [];
+        const ideas = await write(
+          model,
+          surface,
+          kind,
+          latest.length
+            ? `${context}\n\nAlready suggested (offer different ones): ${latest.join("; ")}`
+            : context,
+          { spicy },
+        );
+        if (ideas.reason) return ideas;
+        const fresh = (ideas.suggestions as string[]).filter((idea) => !latest.includes(idea));
+        shown.delete(`${ownerId}:${kind}`);
+        if (shown.size >= cacheLimit) shown.delete(shown.keys().next().value!);
+        shown.set(`${ownerId}:${kind}`, [...fresh, ...latest].slice(0, shownIdeas));
+        return fresh.length ? { suggestions: fresh } : ideas;
       })();
       remember(key, answer);
       return answer;
