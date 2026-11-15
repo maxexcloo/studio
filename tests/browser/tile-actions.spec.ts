@@ -16,7 +16,7 @@ import {
 /** Opens the tile's menu by context click, which every breakpoint has (phones may hide More). */
 async function tileMenu(page: Page) {
   await page
-    .getByRole("button", { name: "Open image: A copper bird", exact: true })
+    .getByRole("button", { name: "Open image: Copper Bird", exact: true })
     .click({ button: "right" });
 }
 
@@ -59,34 +59,34 @@ async function galleryFixture(page: Page) {
   });
   await page.goto("/images");
   await expect(
-    page.getByRole("button", { name: "Open image: A copper bird", exact: true }),
+    page.getByRole("button", { name: "Open image: Copper Bird", exact: true }),
   ).toBeVisible();
   return state;
 }
 
 test("A tile can be liked and read back without opening the viewer", async ({ page }, testInfo) => {
   const state = await galleryFixture(page);
-  const tile = page.getByRole("button", { name: "Open image: A copper bird", exact: true });
+  const tile = page.getByRole("button", { name: "Open image: Copper Bird", exact: true });
   await tile.hover();
   // Phones show a tile's Like once it is liked; until then, selection likes it.
   if (testInfo.project.use.isMobile) {
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
     const selectable = page.getByRole("button", {
-      name: "Select image: A copper bird",
+      name: "Select image: Copper Bird",
       exact: true,
     });
     await selectable.click();
     await selectionAction(page, "Like").click();
-  } else await page.getByRole("button", { name: "Like A copper bird", exact: true }).click();
+  } else await page.getByRole("button", { name: "Like Copper Bird", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Unlike A copper bird", exact: true }),
+    page.getByRole("button", { name: "Unlike Copper Bird", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => state.gallery[0].rating).toBe("liked");
   await expect(page).toHaveURL(/\/images$/);
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await page.reload();
   await expect(
-    page.getByRole("button", { name: "Unlike A copper bird", exact: true }),
+    page.getByRole("button", { name: "Unlike Copper Bird", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -94,9 +94,9 @@ test("Dislike hides a tile, Disliked shows it and Restore brings it back", async
   const state = await galleryFixture(page);
   const select = async () => {
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
-    await page.getByRole("button", { name: "Select image: A copper bird", exact: true }).click();
+    await page.getByRole("button", { name: "Select image: Copper Bird", exact: true }).click();
   };
-  const tile = page.getByRole("button", { name: "Open image: A copper bird", exact: true });
+  const tile = page.getByRole("button", { name: "Open image: Copper Bird", exact: true });
   await select();
   await selectionAction(page, "Dislike").click();
   await expect(tile).toBeHidden();
@@ -144,7 +144,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await expect(page.getByRole("menu")).toBeHidden();
   // The pointer leaves the tile, so hover opens no submenu under it.
   await page.mouse.move(0, 0);
-  const more = page.getByRole("button", { name: "More Actions for A copper bird", exact: true });
+  const more = page.getByRole("button", { name: "More Actions for Copper Bird", exact: true });
   await more.focus();
   await more.press("Enter");
   await expect(page.getByRole("menu")).toBeVisible();
@@ -162,9 +162,9 @@ test("Phones without captions hide More and open the tile menu by holding or the
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Phones only");
   await galleryFixture(page);
-  const tile = page.getByRole("button", { name: "Open image: A copper bird", exact: true });
+  const tile = page.getByRole("button", { name: "Open image: Copper Bird", exact: true });
   await expect(
-    page.getByRole("button", { name: "More Actions for A copper bird", exact: true }),
+    page.getByRole("button", { name: "More Actions for Copper Bird", exact: true }),
   ).toBeHidden();
   const menu = page.getByRole("menu");
   await touch(tile, "touchstart");
@@ -380,7 +380,7 @@ for (const surface of ["tile", "viewer"]) {
     await expect(page.getByRole("dialog", { name: "Presets", exact: true })).toBeHidden();
     await page.keyboard.press("Escape");
     if (surface === "viewer") {
-      await page.getByRole("button", { name: "Open image: A copper bird", exact: true }).click();
+      await page.getByRole("button", { name: "Open image: Copper Bird", exact: true }).click();
       await viewerAction(page, "Edit");
     } else {
       await tileMenu(page);
@@ -443,29 +443,29 @@ test("Similar ranks the gallery by an image from its tile menu or the viewer, as
   await page.getByRole("menuitem", { name: "Similar", exact: true }).click();
   const chip = (label: string) =>
     page.getByRole("button", { name: `Remove ${label} Filter`, exact: true });
-  await expect(chip("Similar to A copper bird")).toBeVisible();
+  await expect(chip("Similar to Copper Bird")).toBeVisible();
   expect(state.galleryRequests.at(-1)).toContain("similar=tile-bird&strictness=similar");
 
   // The chip changes it in place, and Similar ▾ keeps the choice.
-  await page.getByRole("button", { name: "Similar to A copper bird", exact: true }).click();
+  await page.getByRole("button", { name: "Similar to Copper Bird", exact: true }).click();
   await page
     .getByRole("radiogroup", { name: "Strictness", exact: true })
     .getByText("Close", { exact: true })
     .click();
-  await expect(chip("Close to A copper bird")).toBeVisible();
+  await expect(chip("Close to Copper Bird")).toBeVisible();
   await expect.poll(() => state.galleryRequests.at(-1)).toContain("strictness=close");
   await page.keyboard.press("Escape");
 
-  await page.getByRole("button", { name: "Open image: A paper moth", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Paper Moth", exact: true }).click();
   // The chip's choice holds for the next Similar.
   await viewerAction(page, "Similar");
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
-  await expect(chip("Close to A paper moth")).toBeVisible();
+  await expect(chip("Close to Paper Moth")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Open image:/ }).first()).toHaveAccessibleName(
-    "Open image: A paper moth",
+    "Open image: Paper Moth",
   );
 
-  await chip("Close to A paper moth").click();
+  await chip("Close to Paper Moth").click();
   await expect(page).not.toHaveURL(/similar=/);
-  await expect(chip("Close to A paper moth")).toBeHidden();
+  await expect(chip("Close to Paper Moth")).toBeHidden();
 });

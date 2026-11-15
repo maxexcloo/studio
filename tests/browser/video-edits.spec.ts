@@ -30,7 +30,7 @@ test("A video's Edit menu reverses or trims it into a new version", async ({
     return route.fulfill({ status: 201, json: { ok: true, id: "trimmed", jobId: "job-trim" } });
   });
   await page.goto("/video");
-  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   await viewerAction(page, "Edit");
   await page.getByRole("menuitem", { name: "Reverse", exact: true }).click();
   await expect(

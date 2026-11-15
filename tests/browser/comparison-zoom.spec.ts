@@ -34,7 +34,7 @@ test("Comparison zoom keeps both layers aligned while panning and using its keyb
     route.fulfill({ contentType: "image/png", body: upscale }),
   );
   await page.goto("/images");
-  const opener = page.getByRole("button", { name: "Open image: Portrait comparison", exact: true });
+  const opener = page.getByRole("button", { name: "Open image: Portrait Comparison", exact: true });
   await opener.click();
   await compareUpscale(page);
   const dialog = page.getByRole("dialog", { name: "Generation", exact: true });
