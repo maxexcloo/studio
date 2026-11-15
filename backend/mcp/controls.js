@@ -383,6 +383,8 @@ export function resolveLoraName(profile, value) {
   for (const pick of [
     (name) => squash(name) === key,
     (name) => squash(stem(name)) === key || squash(stem(name)) === squash(stem(value)),
+    // A name cut short, as chats write a long file name, when only one file starts with it.
+    (name) => key.length >= 8 && squash(stem(name)).startsWith(squash(stem(value))),
   ]) {
     const found = names.filter(pick);
     if (found.length === 1) return found[0];
