@@ -101,6 +101,7 @@ test("a run creates its Job, reads the summary once it succeeds and refuses a se
   assert.match(String((second as PromiseRejectedResult).reason), /already running/);
   const run = (first as PromiseFulfilledResult<BenchmarkRun>).value;
   assert.equal(run.model, "gemma-4-31b");
+  assert.equal(run.requestedBy, "account:admin");
   assert.equal(run.status, "running");
   assert.deepEqual(calls, ["POST /apis/batch/v1/namespaces/text/jobs"]);
   await assert.rejects(benchmarks.start("gemma", "account:admin"), /already running/);
@@ -166,6 +167,13 @@ test("a failed Job reports why, and Stop deletes a Job still running", async () 
   job = { failed: 1 };
   await benchmarks.stop(third.id);
   assert.equal(third.status, "failed");
+  assert.deepEqual(
+    benchmarks
+      .list()
+      .runs.slice(0, 2)
+      .map((run) => run.id),
+    [third.id, second.id],
+  );
   assert.equal(deleted, "");
 });
 

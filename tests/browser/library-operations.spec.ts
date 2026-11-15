@@ -20,7 +20,7 @@ test("The Library groups its sections under headings and opens on Models", async
   await fixtures(page);
   await page.goto("/library");
   const groups = {
-    "Your Cards": ["Characters", "Outfits", "Scenes"],
+    Cards: ["Characters", "Outfits", "Scenes"],
     "Models & LoRAs": ["Models", "LoRAs", "Unused"],
     Prompting: ["Guides", "Presets", "Profiles", "Prompt Styles"],
     "Add Models": ["Imports", "Downloads"],

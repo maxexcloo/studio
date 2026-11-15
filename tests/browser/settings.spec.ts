@@ -837,6 +837,9 @@ test("Workers benchmark a running local text model and list each run's figures",
   if (!testInfo.project.use.isMobile)
     await expect(results.getByRole("row", { name: "Gemma" })).toContainText("290 tok/s · 8×");
   await expect(results.getByRole("row", { name: "Gemma" })).toContainText("Completed");
+  await expect(results.getByRole("row", { name: "Gemma" })).toContainText(
+    "Requested by account:admin",
+  );
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
   const menu = async (label: string) => {
     await table.getByRole("button", { name: `Actions for ${label}`, exact: true }).click();

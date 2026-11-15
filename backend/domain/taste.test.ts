@@ -143,6 +143,8 @@ test("taste routes read, set avoids for and forget only the caller's own profile
   assert.equal(read.status, 200);
   assert.deepEqual(read.body, {
     summary: "",
+    learnt: { likes: [], styles: [], avoid: [], note: "" },
+    preferences: {},
     likes: [],
     styles: [],
     avoid: [],
@@ -158,7 +160,7 @@ test("taste routes read, set avoids for and forget only the caller's own profile
   const refresh = await request("POST", {});
   assert.equal(refresh.status, 403);
   assert.match(refresh.body.error, /Taste can.t refresh/);
-  // The profile is no free text: the person only says what to avoid.
+  // Summary remains derived from learned words and explicit edits.
   assert.equal((await request("PUT", { summary: "Moody harbours." })).status, 400);
   assert.equal((await request("PUT", { avoid: ["x".repeat(81)] })).status, 400);
   const saved = await request("PUT", { avoid: ["  clowns ", "clowns", "", "text"] });
@@ -166,10 +168,25 @@ test("taste routes read, set avoids for and forget only the caller's own profile
   assert.equal(saved.body.summary, "Avoids clowns, text.");
   // Avoiding keeps the signals the summariser has not taken in yet.
   assert.equal(taste.read("alice").since, 2);
+  assert.equal((await request("PUT", { preferences: { likes: ["x".repeat(81)] } })).status, 400);
+  const edited = await request("PUT", {
+    preferences: { likes: ["lighthouses"], styles: [], note: "Quiet shores." },
+  });
+  assert.deepEqual(edited.body.likes, ["lighthouses"]);
+  assert.deepEqual(edited.body.learnt.likes, []);
+  assert.deepEqual(edited.body.preferences.styles, []);
+  assert.match(edited.body.summary, /Likes lighthouses/);
+  assert.match(edited.body.summary, /Quiet shores/);
+  const restored = await request("PUT", { preferences: { likes: null } });
+  assert.deepEqual(restored.body.likes, []);
+  assert.equal(Object.hasOwn(restored.body.preferences, "likes"), false);
   assert.equal((await request("GET", undefined, "bob")).body.summary, "");
   assert.equal((await request("GET", undefined, "")).body.summary, "");
   const cleared = await request("DELETE");
-  assert.deepEqual([cleared.body.addedAvoid, cleared.body.signals], [[], 0]);
+  assert.deepEqual(
+    [cleared.body.addedAvoid, cleared.body.signals, cleared.body.preferences],
+    [[], 0, {}],
+  );
 });
 
 test("every tenth signal summarises the words in the background, at most every ten minutes, never the scores", async (t) => {
@@ -208,7 +225,7 @@ test("every tenth signal summarises the words in the background, at most every t
         }),
       ]);
   };
-  taste.avoid("alice", ["clowns"]);
+  taste.edit("alice", { addedAvoid: ["clowns"] });
   star("alice", 9);
   await settle();
   assert.equal(calls.length, 0);
@@ -267,6 +284,86 @@ test("every tenth signal summarises the words in the background, at most every t
   };
   await assert.rejects(taste.refresh("alice"), { status: 502, message: /\(timeout\)/ });
   assert.deepEqual(taste.read("alice").likes, ["misty harbours"]);
+});
+
+test("explicit taste edits survive refresh and empty lists remove preferences until returned to learnt", async (t) => {
+  let subject = "harbours";
+  const taste = tasteFixture(t, {
+    updates: () => false,
+    writer: () => ({
+      settings: () => ({}),
+      model: async () => "fixture-text",
+      chat: async () => ({
+        text: JSON.stringify({
+          likes: [subject],
+          styles: ["film"],
+          avoid: [],
+          note: "Coastal scenes.",
+        }),
+      }),
+    }),
+  });
+  taste.record("alice", [tasteSignal("like", "a")]);
+  await taste.refresh("alice");
+  taste.edit("alice", {
+    preferences: { likes: [], styles: ["watercolour"], note: "Quiet beaches." },
+  });
+  subject = "lighthouses";
+  await taste.refresh("alice");
+  const record = taste.read("alice");
+  assert.deepEqual(record.likes, []);
+  assert.deepEqual(record.learnt.likes, ["lighthouses"]);
+  assert.deepEqual(record.styles, ["watercolour"]);
+  assert.deepEqual(record.learnt.styles, ["film"]);
+  assert.match(record.summary, /Styles: watercolour/);
+  assert.match(record.summary, /Quiet beaches/);
+  assert.doesNotMatch(record.summary, /lighthouses|harbours/);
+  taste.edit("alice", { preferences: { likes: null } });
+  assert.deepEqual(taste.read("alice").likes, ["lighthouses"]);
+  assert.deepEqual(taste.read("bob").preferences, {});
+});
+
+test("Clear during a manual refresh wins even with no new signals", async (t) => {
+  let waiting = false;
+  let entered!: () => void;
+  let finish!: () => void;
+  const writing = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const released = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const taste = tasteFixture(t, {
+    updates: () => false,
+    writer: () => ({
+      settings: () => ({}),
+      model: async () => "fixture-text",
+      chat: async () => {
+        if (waiting) {
+          entered();
+          await released;
+        }
+        return {
+          text: JSON.stringify({
+            likes: ["harbours"],
+            styles: [],
+            avoid: [],
+            note: "Coastal scenes.",
+          }),
+        };
+      },
+    }),
+  });
+  taste.record("alice", [tasteSignal("like", "a")]);
+  await taste.refresh("alice");
+  waiting = true;
+  const pending = taste.refresh("alice");
+  await writing;
+  taste.forget("alice");
+  finish();
+  await pending;
+  assert.deepEqual(taste.read("alice").likes, []);
+  assert.equal(taste.read("alice").signals.length, 0);
 });
 
 test("with Taste Updates off, signals never summarise, but Refresh still does", async (t) => {
