@@ -1318,8 +1318,18 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  await page.getByRole("button", { name: "Select All", exact: true }).click();
+  await expect(
+    page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
+  ).toHaveText("90 Selected");
   await page.evaluate(() => window.scrollBy(0, 800));
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await expect(selectionAction(page, "Share")).toBeInViewport({ ratio: 1 });
+  await selectionAction(page, "Share").click();
+  await expect(page.getByRole("menuitem", { name: "Download", exact: true })).toBeVisible();
+  await selectionAction(page, "Share").click();
+  await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
   await expect(disliked).toBeInViewport({ ratio: 1 });
   await expect(page.getByRole("combobox", { name: "Models", exact: true })).toBeInViewport({
     ratio: 1,
@@ -1340,4 +1350,18 @@ test("Desktop gallery controls stay available while scrolling and rating changes
     })
     .toEqual(["Browse", "disliked"]);
   await expect(search).toHaveValue("Browse");
+  await expect(
+    page.getByRole("button", { name: "Remove Disliked Filter", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Date", exact: true }).click();
+  await page.getByRole("option", { name: "Past Week", exact: true }).click();
+  await page.getByRole("switch", { name: "Comparisons", exact: true }).click();
+  await page.getByRole("button", { name: "Clear All", exact: true }).click();
+  await expect(disliked).toHaveAttribute("aria-pressed", "true");
+  await expect
+    .poll(() => {
+      const query = new URLSearchParams(state.galleryRequests.at(-1));
+      return [query.get("q"), query.get("rating"), query.has("since"), query.has("comparisons")];
+    })
+    .toEqual(["Browse", "disliked", false, false]);
 });

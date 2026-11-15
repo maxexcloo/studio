@@ -366,6 +366,14 @@ export function GalleryPage() {
   }, [nearEnd, hasNextPage, isFetching, isFetchNextPageError, fetchNextPage]);
   // A ranking has no runs to group: it shows as a grid.
   const View = view === "runs" && !similar ? RunsView : MediaGrid;
+  const selectionBar = selection.selecting && (
+    <GallerySelectionBar
+      selection={{ ...selection, end: doneSelecting }}
+      tryAgain={tryAgain}
+      menu={menu}
+      onMenuClose={() => setMenu(null)}
+    />
+  );
   return (
     <Stack
       gap="sm"
@@ -512,15 +520,9 @@ export function GalleryPage() {
             </>
           }
         />
+        {!phone && selectionBar}
       </div>
-      {selection.selecting && (
-        <GallerySelectionBar
-          selection={{ ...selection, end: doneSelecting }}
-          tryAgain={tryAgain}
-          menu={menu}
-          onMenuClose={() => setMenu(null)}
-        />
-      )}
+      {phone && selectionBar}
       {gallery.isPending ? (
         <LoadingState fill label="Loading Gallery" />
       ) : gallery.error && !gallery.data ? (

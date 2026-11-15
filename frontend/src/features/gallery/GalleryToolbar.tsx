@@ -57,12 +57,14 @@ export function GalleryToolbar({
   useEffect(() => {
     if (query && phone) setSearching(true);
   }, [query, phone]);
-  const chips = useActiveFilters({ kind, value, onChange }, extraChips);
-  // Clearing the filters, Disliked among them, leaves the Liked or Uploads toggle as it is.
+  const chips = useActiveFilters({ kind, value, onChange }, extraChips).filter(
+    (chip) => phone || chip.key !== "disliked",
+  );
+  // Quick toggles stay on; phones treat Disliked as a filter inside the sheet.
   const clear = () => {
     onChange({
       ...emptyGalleryFilters,
-      rating: value.rating === "liked" ? "liked" : "",
+      rating: !phone || value.rating === "liked" ? value.rating : "",
       uploads: value.uploads,
     });
     for (const chip of extraChips) chip.remove();

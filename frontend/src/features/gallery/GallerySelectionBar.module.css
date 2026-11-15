@@ -1,10 +1,5 @@
-/* The contextual bar follows the toolbar, which keeps the search and filters, and stays under the
- * header, on the header's surface. The prefixed blur comes first: the minifier keeps only the last
- * of the pair. */
+/* Desktop sticks the toolbar and selection together; phones stick this bar below the header. */
 .header {
-  position: sticky;
-  top: var(--app-shell-header-offset, 0px);
-  z-index: 3;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -50,6 +45,9 @@
 }
 
 :root[data-phone] .header {
+  position: sticky;
+  top: var(--app-shell-header-offset, 0px);
+  z-index: 3;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   padding-inline: max(var(--app-shell-padding, 0px), env(safe-area-inset-left))
