@@ -155,7 +155,7 @@ export function OwnAccount() {
           </Text>
         </SettingRow>
       </SettingGroup>
-      <PersonalMcpToken initial={account.data.mcp} />
+      <PersonalMcpToken />
       <Modal opened={editing} onClose={() => setEditing(false)} title={credentialsLabel(own)}>
         <FocusTrap.InitialFocus />
         {editing && (

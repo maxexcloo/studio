@@ -101,7 +101,7 @@ test("Gateway admin access remains unchanged after a failed save and reflects a 
 test("Personal MCP credentials can be issued, viewed again hidden until Show, rotated and revoked", async ({
   page,
 }) => {
-  await accountFixture(page);
+  const state = await accountFixture(page);
   const status = {
     endpoint: "https://studio.example.test/mcp",
     enabled: false,
@@ -115,14 +115,14 @@ test("Personal MCP credentials can be issued, viewed again hidden until Show, ro
     finishLateIssuance = resolve;
   });
   const current = () => (status.viewable ? `browser-fixture-token-${issued}` : "");
+  await page.route("**/api/accounts/me", (route) =>
+    route.fulfill({ json: { ok: true, account: state.ownAccount, mcp: status } }),
+  );
   await page.route("**/api/accounts/mcp-token", async (route) => {
-    if (route.request().method() === "POST") {
-      issued++;
-      Object.assign(status, { enabled: true, viewable: true, createdAt: stamp });
-      if (issued === 3) await lateIssuance;
-      return route.fulfill({ json: { ok: true, token: current(), createdAt: stamp } });
-    }
-    return route.fulfill({ json: { ok: true, ...status } });
+    issued++;
+    Object.assign(status, { enabled: true, viewable: true, createdAt: stamp });
+    if (issued === 3) await lateIssuance;
+    return route.fulfill({ json: { ok: true, token: current(), createdAt: stamp } });
   });
   await page.route("**/api/accounts/mcp-token/reveal", (route) =>
     route.fulfill({ json: { ok: true, token: current() } }),

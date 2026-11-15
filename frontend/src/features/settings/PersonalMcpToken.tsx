@@ -24,7 +24,7 @@ export interface McpTokenStatus {
  * Settings › Account › MCP Access, with Rotate Token and Revoke Token in the section's Danger Zone. The account's
  * own token loads while the section shows, hidden until Show, so Copy works within the tap.
  */
-export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
+export function PersonalMcpToken() {
   const client = useQueryClient();
   const visible = useSettingsSection() === "account";
   const visit = useRef(0);
@@ -34,11 +34,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
   const [confirming, setConfirming] = useState<"rotate" | "revoke" | null>(null);
   const [error, setError] = useState("");
   const { copied, copy } = useCopy();
-  const status = useQuery({
-    queryKey: ["personal-mcp-status"],
-    queryFn: () => api<McpTokenStatus>("/api/accounts/mcp-token"),
-    initialData: initial,
-  });
+  const status = useQuery({ ...ownAccountQuery, select: (data) => data.mcp });
   const viewable = visible && Boolean(status.data?.viewable);
   // The token stays in this mounted view, never in a query or mutation cache, and leaves with it.
   // Each visit to the section starts hidden, even for a token issued while away.
@@ -68,7 +64,6 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
           setShown(true);
         }
       }
-      await client.invalidateQueries({ queryKey: ["personal-mcp-status"] });
       await client.invalidateQueries({ queryKey: ownAccountQuery.queryKey });
     } catch (error) {
       setError(error instanceof Error ? error.message : "Couldn't update the MCP token");
