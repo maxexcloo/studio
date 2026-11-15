@@ -287,7 +287,7 @@ test("While Dream is off, the deck compares gallery images in pairs", async ({ p
   await expect(page.getByRole("status", { name: "Dream Status" })).toContainText("Dream is off.");
   await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
   await page.keyboard.press("ArrowLeft");
-  await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
+  await expect.poll(() => dream.requests.length).toBe(1);
   await page.getByRole("button", { name: "Both", exact: true }).click();
   // The image left over makes no card, and Dream's own results wait until it is on.
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
