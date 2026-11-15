@@ -256,6 +256,7 @@ export async function fixtures(page: Page) {
       return respond({ account: ownAccount });
     }
     if (path === "/api/accounts/admin") return respond(administration);
+    if (path === "/api/runtime/benchmarks") return respond({ configured: false, runs: [] });
     if (path === "/api/gallery/owners") return respond({ ok: true, owners: galleryOwners });
     if (path.startsWith("/api/gallery/owners/") && method === "DELETE") {
       delete galleryOwners[decodeURIComponent(path.split("/")[4])];

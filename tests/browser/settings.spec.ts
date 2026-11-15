@@ -721,6 +721,112 @@ test("Workers keep a stopped workload quiet and stop a running change on request
   expect(cancelled).toEqual(["/api/runtime/operations/stuck/cancel"]);
 });
 
+test("Workers benchmark a running local text model and list each run's figures", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  await page.route("**/api/services/status", (route) =>
+    route.fulfill({
+      json: {
+        services: {},
+        runtime: { configured: true, automaticLifecycle: false, reason: "" },
+      },
+    }),
+  );
+  const workload = (id: string, label: string, kind: string, phase: string) => ({
+    id,
+    label,
+    kind,
+    pool: "gpu",
+    gpus: 1,
+    phase,
+    replicas: phase === "running" ? 1 : 0,
+    ready: phase === "running" ? 1 : 0,
+    acceptedOperations: 0,
+  });
+  await page.route("**/api/runtime", (route) =>
+    route.fulfill({
+      json: {
+        settings: { automatic: false, parkIdleMinutes: 0 },
+        pools: [{ id: "gpu", capacity: 2, used: 1 }],
+        history: [],
+        workloads: [
+          workload("gemma", "Gemma", "text", "running"),
+          workload("image", "Image", "image", "running"),
+          workload("qwen", "Qwen", "text", "parked"),
+        ],
+      },
+    }),
+  );
+  const earlier = {
+    id: "earlier",
+    workload: "gemma",
+    label: "Gemma",
+    model: "gemma-4-31b",
+    status: "completed",
+    requestedBy: "account:admin",
+    startedAt: stamp,
+    finishedAt: stamp,
+    summary: {
+      version: "0.6.1",
+      decode: 61.24,
+      ttftMs: 140.4,
+      aggregate: { level: 8, tps: 290.1 },
+      prefill: { depth: 64000, tps: 4100 },
+    },
+  };
+  let runs: Record<string, unknown>[] = [earlier];
+  const started: unknown[] = [];
+  const stopped: string[] = [];
+  await page.route("**/api/runtime/benchmarks", (route) => {
+    if (route.request().method() === "POST") {
+      started.push(route.request().postDataJSON());
+      const run = { ...earlier, id: "next", status: "running", summary: undefined };
+      runs = [run, ...runs];
+      return route.fulfill({ status: 202, json: run });
+    }
+    return route.fulfill({ json: { configured: true, runs } });
+  });
+  await page.route("**/api/runtime/benchmarks/*/stop", (route) => {
+    stopped.push(new URL(route.request().url()).pathname);
+    runs = runs.map((run) => (run.id === "next" ? { ...run, status: "stopped" } : run));
+    return route.fulfill({ json: runs[0] });
+  });
+  await page.goto("/settings");
+  await section(page, "Settings", "Workers");
+  const results = page.getByRole("table", { name: "Benchmarks", exact: true });
+  await expect(results.getByRole("row", { name: "Gemma" })).toContainText("61.2 tok/s");
+  await expect(results.getByRole("row", { name: "Gemma" })).toContainText("Completed");
+  const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
+  const menu = async (label: string) => {
+    await table.getByRole("button", { name: `Actions for ${label}`, exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: "View Log", exact: true })).toBeVisible();
+    return page.getByRole("menuitem", { name: "Benchmark", exact: true });
+  };
+  // Media has no benchmark, and a stopped model can't run one.
+  await expect(await menu("Image")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(await menu("Qwen")).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await (await menu("Gemma")).click();
+  const dialog = page.getByRole("dialog", { name: "Benchmark Gemma", exact: true });
+  await dialog.getByRole("button", { name: "Benchmark", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(started).toEqual([{ workload: "gemma" }]);
+  await expect(results.getByRole("row", { name: "Gemma" }).first()).toContainText("Running");
+  // One benchmark at a time.
+  await expect(await menu("Gemma")).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await results.getByRole("button", { name: "Actions for Gemma", exact: true }).first().click();
+  await page.getByRole("menuitem", { name: "Stop", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Stop Benchmark", exact: true });
+  await confirm.getByRole("button", { name: "Stop", exact: true }).click();
+  await expect(confirm).toBeHidden();
+  expect(stopped).toEqual(["/api/runtime/benchmarks/next/stop"]);
+  await expect(results.getByRole("row", { name: "Gemma" }).first()).toContainText("Stopped");
+});
+
 test("Status counts running workers, reads a parked service as Stopped and offers no Start", async ({
   page,
 }) => {

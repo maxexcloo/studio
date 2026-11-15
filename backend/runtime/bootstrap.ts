@@ -1,6 +1,8 @@
 import type { Express, RequestHandler } from "express";
 
+import type { BenchmarkRun } from "../../shared/runtime.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
+import { Benchmarks } from "./benchmarks.ts";
 import { RuntimeController, type RuntimeRecord } from "./controller.ts";
 import {
   KubernetesEngine,
@@ -35,33 +37,41 @@ export async function loadRuntime(
   const { pools, workloads } = await discoverWorkloads(environment, send);
   if (!workloads.length) return undefined;
   const engine = new KubernetesEngine(send);
-  const name = "runtime-operations";
-  const controller = new RuntimeController({
-    engine,
-    workloads,
-    pools,
-    ...(dataDir
+  const document = <T>(name: string) =>
+    dataDir
       ? {
           store: {
             read: () => {
               try {
-                return readRuntimeDocument(dataDir, name) as RuntimeRecord;
+                return readRuntimeDocument(dataDir, name) as T;
               } catch (error) {
                 if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
                 throw error;
               }
             },
-            write: (record) => writeRuntimeDocument(dataDir, name, record),
+            write: (value: T) => writeRuntimeDocument(dataDir, name, value),
           },
         }
-      : {}),
+      : {};
+  const controller = new RuntimeController({
+    engine,
+    workloads,
+    pools,
+    ...document<RuntimeRecord>("runtime-operations"),
+  });
+  const benchmarks = new Benchmarks({
+    request: send,
+    workloads,
+    environment,
+    fetchImpl,
+    ...document<BenchmarkRun[]>("runtime-benchmarks"),
   });
   // Restores the last placement after an outside stop; settling idle pools needs automatic control.
   setInterval(() => {
     void controller.reconcile().catch(() => {});
     void controller.settleIdle().catch(() => {});
   }, 30_000).unref();
-  return { controller };
+  return { controller, benchmarks };
 }
 
 /** Mount after account middleware with the existing administrator requirement. */
@@ -72,5 +82,9 @@ export function registerRuntimeStatus(
   requestedBy: (request: Parameters<RequestHandler>[0]) => string,
 ) {
   if (runtime)
-    app.use("/api/runtime", requireAdmin, createRuntimeRouter(runtime.controller, requestedBy));
+    app.use(
+      "/api/runtime",
+      requireAdmin,
+      createRuntimeRouter(runtime.controller, runtime.benchmarks, requestedBy),
+    );
 }

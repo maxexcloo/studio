@@ -18,6 +18,7 @@ import {
   EyeOff,
   Files,
   GalleryHorizontalEnd,
+  Gauge,
   Heart,
   ImageUp,
   ImageUpscale,
@@ -68,6 +69,8 @@ export const icons = {
   animate: Play,
   /** The prompt assistant and its ideas. */
   assistant: Sparkles,
+  /** Measuring a local text model's speed (Settings › Workers). */
+  benchmark: Gauge,
   /** Character cards: their tab, section and Use as Character. */
   character: ContactRound,
   /** The chat site (LibreChat) the navigation links to. */

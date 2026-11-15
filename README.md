@@ -151,6 +151,8 @@ STUDIO_LOCAL_TEXT_MODEL=local/auto
 
 Each deployment's name is its workload id, its node selector names its pool, its resource claim templates give its GPUs, and the one Service selecting its pods gives its address. Optional `studio.excloo.dev/` annotations add `label`, `vision: "true"` for text workloads that read images, and `worker` and `capabilities` for media. Text workloads serve `STUDIO_LOCAL_TEXT_MODEL` and take `STUDIO_TEXT_KEY` for their health check. Anything missing or ambiguous stops Studio at start with the deployment's name; restart Studio after changing a workload. Its service account needs, in each namespace, to list deployments, Services and `resourceclaimtemplates`, read pods and their logs, and update `deployments/scale`. `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
 
+With `STUDIO_BENCHMARK_IMAGE` (a [BetterBench](https://github.com/GGZ14/BetterBench) image), administrators can benchmark a running text workload from Settings › Workers: Studio runs a Job in the workload's namespace whose pods are labelled `app.kubernetes.io/name: betterbench`, so the model's network policy must admit them. `STUDIO_BENCHMARK_SECRET` names the Secret there whose `API_KEY` is the model's key. The service account also needs to create, get and delete Jobs and list pods in that namespace.
+
 Administrators choose the running workloads in **Settings › Workers**, where Automatic Control is off until turned on.
 
 ## Troubleshooting
