@@ -16,7 +16,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { ChevronDown, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState } from "react";
 
-import { loraDefaultStrength, loraFamilyId } from "../../../../shared/profiles";
+import { loraDefaultStrength, loraFamilyId, loraName } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, Profile } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
@@ -82,8 +82,7 @@ const loraTabs = [
 type LoraTab = (typeof loraTabs)[number]["value"];
 /** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
 const defaultStrength = (info: LoraInfo | undefined) => loraDefaultStrength(info, 1);
-export const loraTitle = (info: LoraInfo | undefined, file: string) =>
-  info?.title || file.replace(/\.[^.]+$/, "");
+export const loraTitle = (info: LoraInfo | undefined, file: string) => loraName(file, info);
 /** Whether a LoRA lists the profile's family, however the profile spells it. */
 const fitsFamily = (families: string[], family: string) =>
   families.some((value) => loraFamilyId(value) === loraFamilyId(family));

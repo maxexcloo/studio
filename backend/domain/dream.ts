@@ -563,11 +563,6 @@ function overlap(a: Set<string>, b: Set<string>) {
 /** A short subject for an idea: its title, else its opening words. */
 const subjectOf = (title: unknown, prompt: unknown) =>
   clean(title, 80) || clean(prompt, 400).split(" ").slice(0, 6).join(" ");
-const loraLabel = (name: string) =>
-  name
-    .split(/[\\/]/)
-    .pop()!
-    .replace(/\.safetensors$/i, "");
 const roundTo = (value: number, step: number) => Math.round(value / step) * step;
 const spicyTheme = "Spicy: sensual, explicit content where it suits the scene.";
 
@@ -693,6 +688,8 @@ export function createDream(options: {
   loraLibrary(ownerId: string): DreamLoraLibrary | null;
   /** The LoRAs that can run on the profile (its model family), strengths within published ranges. */
   fitLoras(profile: DreamProfile, loras: DreamLora[]): DreamLora[];
+  /** A LoRA's readable name, as the Library shows it. */
+  loraName(name: string): string;
   /** The Library's imports and Inspiration images the account may see, none where it may not. */
   inspiration(account?: GenerationAccount): DreamInspiration[];
   /**
@@ -1636,7 +1633,7 @@ export function createDream(options: {
       } else if (axis === "profile") ({ profile, note } = otherProfile!);
       else if (axis === "lora") {
         loras = [fresh];
-        note = `Testing ${loraLabel(fresh.name)}`;
+        note = `Testing ${options.loraName(fresh.name)}`;
       } else if (
         axis === "prompt" &&
         kind === "image" &&
@@ -1962,8 +1959,8 @@ export function createDream(options: {
         question: "Which LoRA?",
         axis: "lora",
         sides: [
-          same(`With ${loraLabel(first.name)}`, first.name),
-          same(`Without ${loraLabel(first.name)}`, "none", { loras: loras.slice(1) }),
+          same(`With ${options.loraName(first.name)}`, first.name),
+          same(`Without ${options.loraName(first.name)}`, "none", { loras: loras.slice(1) }),
         ],
       });
       const [changed] = fit(profile, [
@@ -1980,8 +1977,8 @@ export function createDream(options: {
           question: "Which LoRA Strength?",
           axis: "strength",
           sides: [
-            same(`${loraLabel(first.name)} ${first.strength}`, first.strength),
-            same(`${loraLabel(changed.name)} ${changed.strength}`, changed.strength, {
+            same(`${options.loraName(first.name)} ${first.strength}`, first.strength),
+            same(`${options.loraName(changed.name)} ${changed.strength}`, changed.strength, {
               loras: [changed, ...loras.slice(1)],
             }),
           ],
@@ -1993,8 +1990,8 @@ export function createDream(options: {
           question: "Which LoRA?",
           axis: "lora",
           sides: [
-            same(`Without ${loraLabel(liked.name)}`, "none"),
-            same(`With ${loraLabel(liked.name)}`, liked.name, { loras: [liked] }),
+            same(`Without ${options.loraName(liked.name)}`, "none"),
+            same(`With ${options.loraName(liked.name)}`, liked.name, { loras: [liked] }),
           ],
         });
     }
