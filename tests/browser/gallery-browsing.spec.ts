@@ -1550,7 +1550,8 @@ test("Returning after more than a page of incoming results leaves no gap before 
   }));
   const previousReads = cursors.length;
   await visibility(false);
-  await expect(viewer.getByText("1 / 75", { exact: true })).toBeVisible();
+  await expect.poll(() => cursors.length).toBe(previousReads + 2);
+  await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
   expect(cursors.slice(previousReads)).toEqual(["", "60"]);
   await page.keyboard.press("ArrowLeft");
   await expect(page).toHaveURL(/item=browse-0$/);

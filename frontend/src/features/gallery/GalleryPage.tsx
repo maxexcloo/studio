@@ -275,7 +275,7 @@ export function GalleryPage() {
           : items,
     [run, loaded, versions, shown?.id, items],
   );
-  const viewerOrder = useRef<{ scope: string; items: MediaItem[] } | null>(null);
+  const viewerOrder = useRef<{ scope: string; items: MediaItem[]; total?: number } | null>(null);
   const viewerScope = JSON.stringify([listingKey, run, grouped]);
   if (!itemId) viewerOrder.current = null;
   else {
@@ -284,12 +284,14 @@ export function GalleryPage() {
       previous?.scope === viewerScope
         ? reconcileViewerItems(previous.items, candidates)
         : candidates;
+    const reset =
+      previous?.scope !== viewerScope ||
+      !previous.items.length ||
+      (shown && !next.some((item) => mediaIdentity(item) === mediaIdentity(shown)));
     viewerOrder.current = {
       scope: viewerScope,
-      items:
-        shown && !next.some((item) => mediaIdentity(item) === mediaIdentity(shown))
-          ? candidates
-          : next,
+      items: reset ? candidates : next,
+      total: reset ? gallery.data?.pages.at(-1)?.totalApprox : previous.total,
     };
   }
   // The query the shown results answer: placeholder results still answer the previous one.
@@ -675,7 +677,7 @@ export function GalleryPage() {
           item={shown || selected}
           items={viewerOrder.current?.items || candidates}
           related={loaded}
-          total={run || versions ? undefined : gallery.data?.pages.at(-1)?.totalApprox}
+          total={run || versions ? undefined : viewerOrder.current?.total}
           navigate={showItem}
           onReturnFocus={(item) => setFocusItem(item.id)}
           close={closeViewer}
