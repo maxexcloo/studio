@@ -272,6 +272,7 @@ export function PickerHeader<Tab extends string>({
       <div className={classes.headerRow}>
         {tabs && (
           <ScrollingSegments
+            className={classes.tabs}
             aria-label={`${label} View`}
             classNames={{ control: classes.tab }}
             value={tab}
@@ -765,6 +766,7 @@ const ignore = () => {};
  */
 export function SaveButton<T extends SavedItem>({
   noun,
+  label,
   naming,
   current,
   edited,
@@ -777,6 +779,7 @@ export function SaveButton<T extends SavedItem>({
   edited: boolean;
   disabled: boolean;
   onUpdate: (record: T) => Promise<unknown>;
+  label?: string;
 }) {
   const phone = usePhone();
   return (
@@ -792,7 +795,7 @@ export function SaveButton<T extends SavedItem>({
           : naming.name("save")
       }
     >
-      {phone ? "Save" : `Save ${noun}`}
+      {label ?? (phone ? "Save" : `Save ${noun}`)}
     </Button>
   );
 }

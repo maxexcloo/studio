@@ -4,6 +4,7 @@ import {
   loraDefaultStrength,
   maxLoras,
 } from "../../shared/profiles.ts";
+import { availableResolutions, resolutions as resolutionTiers } from "../../shared/resolution.ts";
 import { upscaleQualities } from "../../shared/upscale.ts";
 // Which generate arguments a profile lets MCP adjust; fixed controls are never advertised.
 import { referenceImageSize } from "../generation-defaults.js";
@@ -52,6 +53,18 @@ export function mcpControls(profile) {
       ...(fallback ? { default: fallback } : {}),
     };
   }
+  const resolutions =
+    profile.kind === "image" && options.resolutions?.length
+      ? resolutionTiers.filter((tier) =>
+          options.resolutions.some((value) => value.toUpperCase() === tier),
+        )
+      : availableResolutions(profile);
+  if (resolutions.length)
+    controls.resolution = {
+      options: resolutions,
+      default:
+        resolutions.find((tier) => tier === defaults.resolution?.toUpperCase()) || resolutions[0],
+    };
   controls.count = {
     min: 1,
     max: maxJobsPerCall,

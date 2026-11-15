@@ -135,9 +135,19 @@ test("Personal MCP credentials can be issued, viewed again hidden until Show, ro
   await page.goto("/settings#account");
   await expect(page.getByText(status.endpoint, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Create Token", exact: true }).click();
-  const token = page.getByRole("textbox", { name: "Your MCP Token", exact: true });
+  const token = page.getByRole("textbox", { name: "MCP Token", exact: true });
+  const setting = page.getByRole("region", { name: "MCP Token", exact: true });
+  await expect(setting).toBeVisible();
+  await expect(token).not.toHaveValue(/browser-fixture/);
+  await expect(setting.getByRole("button", { name: "Copy Token", exact: true })).toBeEnabled();
+  await expect(
+    setting.getByRole("button", { name: "Copy URL with Token", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Show", exact: true }).click();
   await expect(token).toHaveValue("browser-fixture-token-1");
-  await expect(page.getByText("Token Active", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Hide", exact: true }).click();
+  await expect(token).not.toHaveValue(/browser-fixture/);
+  await expect(setting.getByText("Token Active", { exact: true })).toBeVisible();
   // Back in Account, the token is hidden until Show.
   await section(page, "Settings", "Users");
   await section(page, "Settings", "Account");
@@ -151,6 +161,8 @@ test("Personal MCP credentials can be issued, viewed again hidden until Show, ro
     .getByRole("dialog", { name: "Rotate Token", exact: true })
     .getByRole("button", { name: "Rotate", exact: true })
     .click();
+  await expect(token).not.toHaveValue(/browser-fixture/);
+  await page.getByRole("button", { name: "Show", exact: true }).click();
   await expect(token).toHaveValue("browser-fixture-token-2");
   await danger.getByRole("button", { name: "Revoke Token", exact: true }).click();
   await page
@@ -439,33 +451,21 @@ test("Account menu names the account by its email and opens the account workspac
   await fixtures(page);
   await signIn(page, { id: "admin", role: "user" });
   await page.goto("/");
-  if (testInfo.project.use.isMobile) {
-    await page.getByRole("button", { name: "More Options", exact: true }).click();
-    // Appearance, Library, Settings, then the account last.
-    await expect(page.getByRole("menuitem")).toContainText([
-      "Appearance",
-      "Settings",
-      "Account",
-      "Sign Out",
-    ]);
-  } else {
-    // Appearance, Library, Settings, Account: each named on hover.
-    const appearance = page.getByRole("button", { name: "Appearance", exact: true });
-    await appearance.hover();
-    await expect(page.getByRole("tooltip", { name: "Appearance", exact: true })).toBeVisible();
-    // A trigger's tooltip gives way to its popup, and the trigger still toggles it.
-    await appearance.click();
-    await expect(appearance).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByRole("tooltip", { name: "Appearance", exact: true })).toBeHidden();
-    await appearance.click();
-    await expect(appearance).toHaveAttribute("aria-expanded", "false");
-    const account = page.getByRole("button", { name: "Account", exact: true });
-    await account.hover();
-    await expect(page.getByRole("tooltip", { name: "Account", exact: true })).toBeVisible();
-    await account.click();
-    await expect(account).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByRole("tooltip", { name: "Account", exact: true })).toBeHidden();
+  const more = page.getByRole("button", { name: "More Options", exact: true });
+  if (!testInfo.project.use.isMobile) {
+    await more.hover();
+    await expect(page.getByRole("tooltip", { name: "More Options", exact: true })).toBeVisible();
   }
+  await more.click();
+  await expect(more).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("tooltip", { name: "More Options", exact: true })).toBeHidden();
+  await expect(page.getByRole("menuitem")).toContainText([
+    "Appearance",
+    "Library",
+    "Settings",
+    "Account",
+    "Sign Out",
+  ]);
   await expect(page.getByText("admin@example.test", { exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Sign Out", exact: true })).toBeEnabled();
   await page.getByRole("menuitem", { name: "Account", exact: true }).click();
