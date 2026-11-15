@@ -339,9 +339,10 @@ export class McpMedia {
         ])
       : await pending;
     if (answer.status >= 200 && answer.status < 300) return answer;
-    // The studio's own validation message names the problem (a LoRA policy, a reference); keep it short.
+    // The studio's own message names the problem (a LoRA policy, a reference, a worker that
+    // doesn't answer); keep it short.
     const reason =
-      [400, 403, 404, 409, 422, 429].includes(answer.status) &&
+      [400, 403, 404, 409, 422, 429, 503].includes(answer.status) &&
       typeof answer.payload?.error === "string"
         ? answer.payload.error.replace(/\s+/g, " ").trim().slice(0, 400)
         : "";
