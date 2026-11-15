@@ -2,6 +2,7 @@ import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 import type { CardKind } from "../../../../shared/characters";
 import type { DigestGroup, Project, Review } from "../../../../shared/projects";
+import type { DreamActivity } from "../../../../shared/taste";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
 
@@ -130,3 +131,8 @@ export const suggestionsQuery = queryOptions({
 });
 export const suggestionPath = (suggestion: { id: string }, action: "accept" | "dismiss") =>
   `/api/dream/suggestions/${encodeURIComponent(suggestion.id)}/${action}`;
+
+export const historyQuery = queryOptions({
+  queryKey: ["dream", "history"],
+  queryFn: () => api<{ items: DreamActivity[] }>("/api/dream/history"),
+});

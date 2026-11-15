@@ -19,6 +19,8 @@ export interface ViewerActions {
   groups: ActionGroups;
   /** The actions named beside their icons. */
   labelled: string[];
+  /** Keep every choice named and equally wide. */
+  equal?: boolean;
 }
 
 /**
@@ -26,8 +28,16 @@ export interface ViewerActions {
  * in sight: where they outgrow the bar the last named ones show as icons alone, and only then do
  * they wrap onto another row.
  */
-export function ViewerActionGroups({ groups, labelled }: Omit<ViewerActions, "label">) {
-  return <ActionBarGroups groups={groups} labelled={labelled} fit stacked={usePhone()} />;
+export function ViewerActionGroups({ groups, labelled, equal }: Omit<ViewerActions, "label">) {
+  return (
+    <ActionBarGroups
+      groups={groups}
+      labelled={labelled}
+      fit={!equal}
+      stacked={usePhone()}
+      equal={equal}
+    />
+  );
 }
 
 /** The viewer's action bar: the prompt field above the shared item actions. */

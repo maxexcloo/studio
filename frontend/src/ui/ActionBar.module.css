@@ -120,3 +120,15 @@
 .switch {
   pointer-events: none;
 }
+
+/* Voting choices keep their names and share the available row equally. */
+.actions[data-equal] {
+  width: 100%;
+  gap: var(--mantine-spacing-xs);
+}
+
+.actions[data-equal] .action {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0 !important;
+}

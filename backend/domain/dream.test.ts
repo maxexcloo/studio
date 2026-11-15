@@ -675,6 +675,34 @@ async function serve(
   };
 }
 
+test("Dream history exposes only the owner's retained Dream activity and available result links", async (t) => {
+  const fx = fixture(t);
+  fx.taste.record("alice", [
+    tasteSignal("keep", "old", { itemId: "missing", title: "Old Result" }),
+  ]);
+  fx.taste.record("alice", [tasteSignal("like", "unrelated", { title: "Private Gallery Rating" })]);
+  fx.taste.record("alice", [
+    tasteSignal("preferred", "comparison", { title: "Unrelated Comparison" }),
+  ]);
+  fx.taste.record("alice", [tasteSignal("calibrate-pass", "gallery", { title: "Gallery Result" })]);
+  fx.taste.record("bob", [tasteSignal("discard", "private", { title: "Bob's Result" })]);
+  const request = await serve(t, fx);
+  const alice = await request("/history");
+  assert.equal(alice.status, 200);
+  assert.deepEqual(
+    alice.body.items.map((item: { action: string }) => item.action),
+    ["Passed Gallery Image", "Kept"],
+  );
+  assert.equal(alice.body.items[1].item.title, "Old Result");
+  assert.equal(alice.body.items[1].item.id, undefined);
+  assert.ok(alice.body.items.every((item: { at: string }) => item.at));
+  const bob = await request("/history", undefined, "GET", "bob");
+  assert.equal(bob.body.items.length, 1);
+  assert.equal(bob.body.items[0].item.title, "Bob's Result");
+  fx.state.access.alice = null;
+  assert.equal((await request("/history")).status, 403);
+});
+
 test("Dream routes are owner-scoped: keep, discard and variations move results and teach the taste profile", async (t) => {
   const fx = fixture(t);
   const { dream, store, state, taste, dreamOnce } = fx;
@@ -710,6 +738,15 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.equal(kept.body.item.dream.state, "kept");
   assert.equal((await request(`/${one}/discard`, {})).status, 409);
   assert.equal((await request(`/${two}/discard`, {})).body.item.dream.state, "discarded");
+  const history = (await request("/history")).body.items;
+  assert.equal(
+    history.find((entry: { action: string }) => entry.action === "Kept").item.id,
+    decodeURIComponent(one),
+  );
+  assert.equal(
+    history.find((entry: { action: string }) => entry.action === "Discarded").item.id,
+    undefined,
+  );
   assert.deepEqual(
     taste.read("alice").signals.map((signal) => [signal.kind, signal.jobId, signal.arm]),
     [

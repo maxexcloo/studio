@@ -694,7 +694,7 @@ const bulk = {
     text: "Failed generations leave the queue. Their records stay in the gallery and can still be retried.",
   },
 } as const;
-/** The queue's own actions on its heading's row: Pause and Clear Failed as icons, Stop All named. */
+/** The queue's own actions on its heading's row. */
 export function QueueActions() {
   const queue = useQueue();
   const action = useQueueAction();
@@ -748,19 +748,19 @@ export function QueueActions() {
         queueAction(bulk["clear-failed"].label, bulk["clear-failed"].icon, () =>
           setConfirming("clear-failed"),
         )}
-      {/* Named in words, apart from the icons, so it never reads as a checkbox. */}
       {stopping > 0 && (
-        <Button
-          size="compact-sm"
-          variant="subtle"
-          color="gray"
-          leftSection={<icons.stop size={14} aria-hidden />}
-          loading={stoppingAll}
-          disabled={stoppingAll}
-          onClick={() => setConfirming("cancel-all")}
-        >
-          Stop All
-        </Button>
+        <Tooltip label="Stop All">
+          <ActionIcon
+            aria-label="Stop All"
+            variant="subtle"
+            color="gray"
+            loading={stoppingAll}
+            disabled={stoppingAll}
+            onClick={() => setConfirming("cancel-all")}
+          >
+            <icons.stop size={16} aria-hidden />
+          </ActionIcon>
+        </Tooltip>
       )}
       <ConfirmDialog
         opened={confirming !== undefined}

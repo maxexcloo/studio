@@ -420,6 +420,7 @@ export function ActionBarGroups({
   menuPosition = "top",
   fit = false,
   stacked = false,
+  equal = false,
 }: {
   groups: ActionGroups;
   labelled?: string[];
@@ -427,6 +428,8 @@ export function ActionBarGroups({
   fit?: boolean;
   /** Spreads icon controls across a phone bar. */
   stacked?: boolean;
+  /** Give every named choice the same share of the row. */
+  equal?: boolean;
 }) {
   const phone = usePhone();
   const row = useRef<HTMLDivElement>(null);
@@ -466,6 +469,7 @@ export function ActionBarGroups({
       data-tight={tight || undefined}
       data-wrap={wrap || undefined}
       data-stacked={stacked || undefined}
+      data-equal={equal || undefined}
     >
       {shown(groups).map((group, index) => {
         const controls = group.map((action) => (

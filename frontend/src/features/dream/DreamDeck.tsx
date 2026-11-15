@@ -1,6 +1,7 @@
 import { ActionIcon, Badge, Button, type ButtonProps, Group, Text, Tooltip } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { loraName } from "../../../../shared/profiles";
 import { post } from "../../api";
@@ -264,7 +265,7 @@ const cardLabel = (card: DeckCard, top: boolean) =>
  * The Dream deck: the oldest unseen result on top, the next beneath it, the batch's progress above.
  * Swipe or press ← to dislike, → to keep, ↑ to keep and queue variations; the bar offers Dislike,
  * Like and Keep. A comparison asks about two results alike but for one thing: tapping an
- * image chooses it, with Undo under the deck for a moment; ← or a left swipe answers A, → B,
+ * image chooses it, with Undo in the toolbar for a moment; ← or a left swipe answers A, → B,
  * ↑ Both and ↓ Neither, and Neither and Both sit under the pair. Tapping a single card (or its View
  * action), or holding or pinching any card (or a side's label), opens it in the viewer over the
  * deck, with all the card's choices (Edit, Animate and More Like This too) in its bar; Dislike,
@@ -278,10 +279,12 @@ export function DreamDeck({
   items,
   pairsOnly,
   empty,
+  undoTarget,
 }: {
   items: DreamItem[];
   pairsOnly: boolean;
   empty: ReactNode;
+  undoTarget: HTMLDivElement | null;
 }) {
   const phone = usePhone();
   const touch = useTouch();
@@ -444,28 +447,30 @@ export function DreamDeck({
       sideBySide={top.kind === "pair"}
     />
   );
-  const undoLine = chosen && (
-    <Group justify="center" gap="xs">
-      <Text size="xs" c="dimmed">
-        Chose {sideLabel(chosen.card, chosen.side)}
-      </Text>
-      <Button
-        size="compact-xs"
-        variant="subtle"
-        leftSection={<icons.undo size={12} />}
-        onClick={undoChosen}
-      >
-        Undo
-      </Button>
-    </Group>
-  );
+  const undo =
+    chosen &&
+    undoTarget &&
+    createPortal(
+      <Tooltip label={`Chose ${sideLabel(chosen.card, chosen.side)}`}>
+        <Button
+          size="compact-xs"
+          variant="subtle"
+          leftSection={<icons.undo size={12} />}
+          aria-description={`Chose ${sideLabel(chosen.card, chosen.side)}`}
+          onClick={undoChosen}
+        >
+          Undo
+        </Button>
+      </Tooltip>,
+      undoTarget,
+    );
   if (!top)
     return gallery.loading ? (
       <LoadingState fill label="Loading Dream" />
     ) : (
       <>
         {empty}
-        {undoLine}
+        {undo}
       </>
     );
   const choices = dreamChoices(top).flat();
@@ -592,17 +597,14 @@ export function DreamDeck({
           {button(choice("both"), { size: "sm" })}
         </Group>
       )}
-      {chosen
-        ? undoLine
-        : // Touch screens swipe and tap, so the keyboard hint shows only with a mouse.
-          !phone &&
-          !touch && (
-            <Text size="xs" c="dimmed" ta="center">
-              {top.kind === "pair"
-                ? "← A · → B · ↑ Both · ↓ Neither"
-                : `← Dislike · → Keep${image && dream ? " · ↑ Keep & Variations" : ""}`}
-            </Text>
-          )}
+      {!phone && !touch && (
+        <Text size="xs" c="dimmed" ta="center">
+          {top.kind === "pair"
+            ? "← A · → B · ↑ Both · ↓ Neither"
+            : `← Dislike · → Keep${image && dream ? " · ↑ Keep & Variations" : ""}`}
+        </Text>
+      )}
+      {undo}
       {viewer}
     </>
   );

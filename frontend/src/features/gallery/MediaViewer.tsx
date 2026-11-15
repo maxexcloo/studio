@@ -784,6 +784,7 @@ export function MediaViewer({
                           : actions.groups
                       }
                       labelled={[...actions.labelled, "side-by-side"]}
+                      equal={actions.equal}
                     />
                   </ActionBarSurface>
                 ) : (
