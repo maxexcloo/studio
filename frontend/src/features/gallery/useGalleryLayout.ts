@@ -215,7 +215,7 @@ export const endHold = (event: React.MouseEvent | React.TouchEvent) => event.pre
 
 /**
  * Phone hold-to-select over any tile with `data-media-id`, using Mantine's touch gesture with
- * movement cancellation. With `onMenu` (tiles without a menu button), holding a single tile outside
+ * movement cancellation. With `onMenu`, holding a single tile outside
  * a selection opens its menu instead. `held` marks the tile whose release must not also open it.
  * The result stays the same object while its arguments do, so memoised tiles skip scroll renders.
  */

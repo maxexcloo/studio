@@ -337,11 +337,11 @@ test("Touch scrolling cancels hold selection and a held tile remains selected af
   test.skip(!testInfo.project.use.isMobile, "Touch gesture applies to phone projects");
   const state = await fixtures(page);
   state.gallery.push(...results(2));
-  // With captions shown, holding selects; without, it opens the tile's menu (tile-actions.spec.ts).
   state.preferences.preferences.tileCaptions = true;
   await page.goto("/images");
-  const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
-  const second = page.getByRole("button", { name: "Open image: Browse Result 1", exact: true });
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  const first = page.getByRole("button", { name: "Select image: Browse Result 0", exact: true });
+  const second = page.getByRole("button", { name: "Select image: Browse Result 1", exact: true });
   // A touch screen's hold is Studio's: no native drag lift takes it first.
   await expect(first).toHaveAttribute("draggable", "false");
   await touch(first, "touchstart");
@@ -1374,14 +1374,15 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await expect(disliked).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("combobox", { name: "Date", exact: true })).toHaveValue("Any Date");
   await expect(page.getByRole("switch", { name: "Comparisons", exact: true })).not.toBeChecked();
-  // The cleared query can already be cached; reloading verifies the saved filters and request.
+  await expect(search).toHaveValue("Browse");
+  // Filters persist across reloads; the transient search does not.
   await page.reload();
   await expect
     .poll(() => {
       const query = new URLSearchParams(state.galleryRequests.at(-1));
       return [query.get("q"), query.get("rating"), query.has("since"), query.has("comparisons")];
     })
-    .toEqual(["Browse", "disliked", false, false]);
+    .toEqual(["", "disliked", false, false]);
 });
 
 test("Incoming results preserve loaded pages, the scroll anchor and selection without a reveal step", async ({
@@ -1883,3 +1884,49 @@ test("The final job completing during pagination defers one head refresh until t
   ).toBeVisible();
   expect(cursors.filter(Boolean)).toEqual(["older"]);
 });
+
+for (const view of ["Grid", "Runs"] as const)
+  for (const captions of [false, true])
+    test(`Phone ${view} holds open item menus with captions ${captions ? "shown" : "hidden"}`, async ({
+      page,
+    }, testInfo) => {
+      test.skip(!testInfo.project.use.isMobile, "Phone touch menus");
+      const state = await fixtures(page);
+      state.preferences.preferences.tileCaptions = captions;
+      state.gallery.push(...results(2));
+      await page.goto("/images");
+      await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+      await page.getByText(view, { exact: true }).click();
+      await page.keyboard.press("Escape");
+      const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
+      const second = page.getByRole("button", { name: "Open image: Browse Result 1", exact: true });
+      await touch(first, "touchstart");
+      await touch(first, "touchmove", 140);
+      await touch(first, "touchend", 140);
+      await touch(second, "touchstart");
+      const menu = page.getByRole("menu");
+      await expect(menu).toBeVisible();
+      await touch(second, "touchend");
+      // Native contextmenu after the hold must not open a second surface.
+      expect(
+        await second.evaluate(
+          (node) =>
+            !node.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })),
+        ),
+      ).toBe(true);
+      await second.dispatchEvent("click");
+      await expect(menu).toHaveCount(1);
+      await expect(menu).toBeVisible();
+      await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
+      await expect(
+        page.getByRole("group", { name: "Gallery Selection", exact: true }),
+      ).toBeHidden();
+      await page.keyboard.press("Escape");
+      await expect(menu).toBeHidden();
+      await first.click();
+      await expect(
+        page
+          .getByRole("dialog", { name: "Generation", exact: true })
+          .getByRole("img", { name: "Browse Result 0", exact: true }),
+      ).toBeVisible();
+    });

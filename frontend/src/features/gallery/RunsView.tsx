@@ -74,7 +74,7 @@ export function RunsView({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [menuItem, setMenuItem] = useState<string | null>(null);
   // As in Grid; a run of several has no menu, so holding it still selects.
-  const hold = useHoldToSelect(items, selection, caption === "none" ? setMenuItem : undefined);
+  const hold = useHoldToSelect(items, selection, setMenuItem);
   const fanning = useRef<string | null>(null);
   const panel = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef<string | null>(null);
