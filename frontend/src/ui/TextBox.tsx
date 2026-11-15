@@ -227,7 +227,7 @@ export function TextBox({
               color="gray"
               size="compact-sm"
               aria-label={`More ${title} Actions`}
-              disabled={tools.length === 0 && edits.length === 0}
+              disabled={tools.length === 0 && (mobile || edits.length === 0)}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
               leftSection={busy ? <Loader size={16} /> : <icons.more size={18} />}
@@ -241,7 +241,7 @@ export function TextBox({
               variant="subtle"
               color="gray"
               aria-label={`More ${title} Actions`}
-              disabled={tools.length === 0 && edits.length === 0}
+              disabled={tools.length === 0 && (mobile || edits.length === 0)}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
             >
@@ -251,8 +251,10 @@ export function TextBox({
         </Menu.Target>
       </PopupTooltip>
       <Menu.Dropdown style={{ overflowY: "auto" }}>
-        <ActionMenuItems groups={[edits]} />
-        {(listed.length > 0 || others.length > 0) && <Menu.Divider />}
+        {!mobile && <ActionMenuItems groups={[edits]} />}
+        {!mobile && edits.length > 0 && (listed.length > 0 || others.length > 0) && (
+          <Menu.Divider />
+        )}
         {listed.map((tool, index) => (
           <Fragment key={tool.id}>
             {index > 0 && <Menu.Divider />}
@@ -299,6 +301,7 @@ export function TextBox({
       {...props}
       ref={ref}
       description={description}
+      variant={mobile && inline ? "unstyled" : props.variant}
       // While the phone editor is open, it alone is the box.
       aria-hidden={editing || undefined}
       value={value}
@@ -341,11 +344,61 @@ export function TextBox({
       })}
     />
   );
+  const editor = (field: ReactNode) => (
+    <div className={classes.editor} data-text-editor>
+      {field}
+      {overlay && <div className={classes.overlay}>{overlay}</div>}
+      {below && <div className={classes.below}>{below}</div>}
+      {/* The tools, then the send, sit just above the keyboard. */}
+      {(tools || send || submit || rightSection) && (
+        <div className={classes.toolbar} onMouseDown={keepFocus}>
+          <div className={classes.editActions} role="group" aria-label={`${title} Tools`}>
+            {editButtons}
+            {menu}
+            {!tools && !send && rightSection}
+          </div>
+          {!submit && send && <div className={classes.sends}>{send}</div>}
+        </div>
+      )}
+      {submit && (
+        <div className={classes.sends}>
+          {/* The form's named sends stand separately from its text tools. */}
+          {submit?.map((each, index) => {
+            const primary = index === submit.length - 1;
+            const Glyph = each.icon ?? ArrowUp;
+            return (
+              <Button
+                key={each.label}
+                aria-label={each.label}
+                variant={primary ? "filled" : "light"}
+                radius="xl"
+                size="sm"
+                leftSection={primary ? undefined : <Glyph size={16} />}
+                rightSection={primary ? <Glyph size={16} /> : undefined}
+                disabled={each.disabled}
+                // Sending before the keyboard drops keeps the text's blur from closing first.
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  if (!each.keepOpen) close();
+                  each.onSubmit();
+                }}
+              >
+                {each.label}
+              </Button>
+            );
+          })}
+        </div>
+      )}
+      {popups && <div className={classes.anchor}>{popups}</div>}
+    </div>
+  );
   return (
     <>
       {busy && spins && <VisuallyHidden role="status">{busy}</VisuallyHidden>}
       {/* A phone box opens its editor, which shows the tools, so only the send stands beside it. */}
-      {(!phone && tools && !inside) || send ? (
+      {mobile && inline ? (
+        editor(textarea)
+      ) : (!phone && tools && !inside) || send ? (
         <div className={classes.columned}>
           {textarea}
           {!editing && !hideTools && (
@@ -359,8 +412,8 @@ export function TextBox({
       ) : (
         textarea
       )}
-      {!editing && overlay}
-      {below}
+      {!editing && !(mobile && inline) && overlay}
+      {!editing && !(mobile && inline) && below}
       {phone && (
         <Modal.Root
           opened={editing}
@@ -397,72 +450,31 @@ export function TextBox({
             <FocusTrap.InitialFocus />
             <Modal.Header>
               <Modal.Title>{title}</Modal.Title>
-              <Button size="compact-sm" variant="subtle" onClick={close}>
-                Done
-              </Button>
+              <Modal.CloseButton aria-label={`Close ${title}`} />
             </Modal.Header>
             <Modal.Body>
-              <Textarea
-                aria-label={title}
-                description={description}
-                placeholder={props.placeholder}
-                maxLength={props.maxLength}
-                spellCheck={props.spellCheck}
-                variant="unstyled"
-                classNames={{ root: classes.field, wrapper: classes.field, input: classes.input }}
-                value={value}
-                onChange={(event) => onChange(event.currentTarget.value)}
-                // Dismissing the keyboard (iOS Done or hide) blurs the text and returns to the page;
-                // a tool's menu taking focus keeps the editor.
-                onBlur={(event) => {
-                  const target = event.relatedTarget as Node | null;
-                  if (
-                    !content.current?.contains(target) &&
-                    !(target as Element | null)?.closest(popupLayer)
-                  )
-                    close();
-                }}
-              />
-              {overlay && <div className={classes.overlay}>{overlay}</div>}
-              {below && <div className={classes.below}>{below}</div>}
-              {/* The tools, then the send, sit just above the keyboard. */}
-              {(tools || send || submit || rightSection) && (
-                <div className={classes.toolbar} onMouseDown={keepFocus}>
-                  <div className={classes.editActions}>
-                    {editButtons}
-                    {menu}
-                    {!tools && !send && rightSection}
-                  </div>
-                  <div className={classes.sends}>
-                    {/* The form's named sends stand in for its compact ones there. */}
-                    {!submit && send}
-                    {/* Named, as the keyboard leaves room: the last send is primary, after an arrow. */}
-                    {submit?.map((each, index) => {
-                      const primary = index === submit.length - 1;
-                      const Glyph = each.icon ?? ArrowUp;
-                      return (
-                        <Button
-                          key={each.label}
-                          aria-label={each.label}
-                          variant={primary ? "filled" : "light"}
-                          radius="xl"
-                          size="sm"
-                          leftSection={primary ? undefined : <Glyph size={16} />}
-                          rightSection={primary ? <Glyph size={16} /> : undefined}
-                          disabled={each.disabled}
-                          // Sending before the keyboard drops keeps the text's blur from closing first.
-                          onPointerDown={(event) => event.preventDefault()}
-                          onClick={() => {
-                            if (!each.keepOpen) close();
-                            each.onSubmit();
-                          }}
-                        >
-                          {each.label}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </div>
+              {editor(
+                <Textarea
+                  aria-label={title}
+                  description={description}
+                  placeholder={props.placeholder}
+                  maxLength={props.maxLength}
+                  spellCheck={props.spellCheck}
+                  variant="unstyled"
+                  classNames={{ root: classes.field, wrapper: classes.field, input: classes.input }}
+                  value={value}
+                  onChange={(event) => onChange(event.currentTarget.value)}
+                  // Dismissing the keyboard (iOS Done or hide) blurs the text and returns to the page;
+                  // a tool's menu taking focus keeps the editor.
+                  onBlur={(event) => {
+                    const target = event.relatedTarget as Node | null;
+                    if (
+                      !content.current?.contains(target) &&
+                      !(target as Element | null)?.closest(popupLayer)
+                    )
+                      close();
+                  }}
+                />,
               )}
             </Modal.Body>
           </Modal.Content>

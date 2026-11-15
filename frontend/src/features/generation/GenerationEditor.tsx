@@ -345,7 +345,13 @@ export function GenerationEditor({
         </div>
         <div className={classes.footer}>
           {fill && inputs}
-          <Group justify="space-between" gap="xs">
+          <Group
+            role="group"
+            aria-label="Generation Actions"
+            justify="space-between"
+            gap="xs"
+            wrap="nowrap"
+          >
             <SegmentedControl
               aria-label="Generation Output"
               radius="xl"
@@ -371,7 +377,7 @@ export function GenerationEditor({
                 ),
               }))}
             />
-            <Group gap="xs" wrap="nowrap" flex={phone ? "1 0 auto" : undefined} justify="flex-end">
+            <Group gap="xs" wrap="nowrap" flex={phone ? 1 : undefined} miw={0} justify="flex-end">
               {phone ? (
                 <ActionIcon
                   variant="subtle"

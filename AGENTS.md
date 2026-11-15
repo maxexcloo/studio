@@ -121,7 +121,8 @@ recur across features.
   selection bar. `MediaActions.tsx` owns their availability and
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
   Submenus match in bar and menu, and assistant menus share `assistMenu`.
-  Bars name Retry, Stop and the menus and show the rest as icons; when they
+  Desktop bars name Retry, Stop and the menus and show the rest as icons;
+  phone bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and
   only then do they wrap, never scrolling.
 - Like and Dislike rate an item and teach taste. A Dislike never deletes: it
@@ -139,7 +140,9 @@ recur across features.
   (`sideways` for a phone held sideways), never their own width queries,
   `visibleFrom` or `hiddenFrom` to tell a phone.
 - Outside click and Escape close only the topmost layer; nothing beneath
-  reacts. A closing layer no longer counts while it fades out.
+  reacts. On phones the first outside tap consumes the pointer and click,
+  leaving the control beneath for the next tap. A closing layer no longer
+  counts while it fades out.
   `ui/popupClicks.ts` owns this: custom handlers defer to `layerAbove(owner)`,
   and dialogs that can have another dialog above use `closeWhenTop`.
 - A trigger's tooltip is a `PopupTooltip` wrapping `Popover.Target` or

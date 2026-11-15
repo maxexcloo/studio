@@ -353,6 +353,12 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   if (phone) await summary.click();
   const surface = phone ? editor : dialog;
   const field = surface.getByRole("textbox", { name: "Instruction", exact: true });
+  if (phone) {
+    await expect(surface.locator("[data-text-editor]")).toBeVisible();
+    await expect(
+      surface.getByRole("group", { name: "Instruction Tools", exact: true }),
+    ).toBeVisible();
+  }
   await field.fill("The bird unfolds its wings.");
   const more = surface.getByRole("button", { name: "More Instruction Actions", exact: true });
   const edit = async (name: string) => {
@@ -371,6 +377,10 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   await expect(field).toHaveValue("The bird unfolds its wings.");
   await more.click();
   await expect(page.getByRole("menu").getByText("Suggestions", { exact: true })).toBeVisible();
+  if (phone) {
+    await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
+  }
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
   await expect(surface).toBeVisible();
@@ -415,22 +425,17 @@ test("Viewer prompt keeps edit actions with no assistant tools and restores its 
   const surface = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
   const more = surface.getByRole("button", { name: "More Prompt Actions", exact: true });
-  if (phone) {
-    await more.click();
-    await expect(page.getByRole("menuitem", { name: "Reset", exact: true })).toHaveCount(0);
-    await page.keyboard.press("Escape");
-  } else await expect(more).toBeDisabled();
+  await expect(more).toBeDisabled();
   await field.fill("A bird at night");
-  await surface.getByRole("button", { name: "More Prompt Actions", exact: true }).click();
-  const menu = page.getByRole("menu");
-  // Desktop already offers Copy in the viewer bar; the phone editor covers that bar.
-  await expect(menu.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(
-    phone ? 1 : 0,
-  );
-  await menu.getByRole("menuitem", { name: "Reset", exact: true }).click();
+  const edit = async (name: string) => {
+    if (phone) return surface.getByRole("button", { name, exact: true }).click();
+    await more.click();
+    await page.getByRole("menuitem", { name, exact: true }).click();
+  };
+  if (phone) await expect(surface.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
+  await edit("Reset");
   await expect(field).toHaveValue("An amber bird");
-  await surface.getByRole("button", { name: "More Prompt Actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Undo", exact: true }).click();
+  await edit("Undo");
   await expect(field).toHaveValue("A bird at night");
 });
 
@@ -1727,8 +1732,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   expect(bounds?.height).toBe(viewport.height);
   const phone = viewport.width < 768;
   if (phone) {
-    // Phones fit every action on the bar's one row; names drop from the last where they outgrow
-    // it, only the four menus having any.
+    // Phone actions remain accessible as icons on one row.
     const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
     const row = [
       "Animate",
@@ -1748,8 +1752,12 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       }),
     );
     expect(new Set(tops.map(Math.round)).size).toBe(1);
-    for (const name of ["Animate", "Edit"])
-      await expect(bar.getByRole("button", { name, exact: true })).toHaveText(name);
+    for (const name of ["Animate", "Edit"]) {
+      await expect(bar.getByRole("button", { name, exact: true })).toHaveText("");
+      await viewerAction(page, name);
+      await expect(page.getByRole("menu")).toBeVisible();
+      await page.keyboard.press("Escape");
+    }
   }
   await viewerAction(page, "Share");
   const download = page.getByRole("menuitem", { name: "Download", exact: true });

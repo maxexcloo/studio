@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { create, fixtures, image, openTheme, promptTool, stamp } from "./fixtures";
+import { create, fixtures, image, openTheme, promptMenu, promptTool, stamp } from "./fixtures";
 
 test("A click outside an open popup only closes it", async ({ page }) => {
   await fixtures(page);
@@ -16,6 +16,22 @@ test("A click outside an open popup only closes it", async ({ page }) => {
   await expect(page).toHaveURL(/\/images$/);
   await videos.click();
   await expect(page).toHaveURL(/\/video$/);
+});
+
+test("A phone tap outside a text menu closes it without submitting the composer", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Phone pointer handling");
+  const state = await fixtures(page);
+  await create(page);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper fox");
+  await promptMenu(page, "Prompt");
+  const generate = page.getByRole("button", { name: "Generate Image", exact: true });
+  await generate.tap();
+  await expect(page.getByRole("menu")).toBeHidden();
+  expect(state.jobs).toHaveLength(0);
+  await generate.tap();
+  await expect.poll(() => state.jobs.length).toBe(1);
 });
 
 test("Chat opens the deployment's chat site in a new tab", async ({ page }) => {

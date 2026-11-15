@@ -194,9 +194,22 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
             </Fragment>
           );
         }
-        if (action.menu)
+        if (action.menu) {
+          // A scrolling dropdown would clip further submenus, which Mantine mounts inside it.
+          const leaf = !action.menu.flat().some((option) => option.menu);
           return (
-            <Menu.Sub key={id} position="right-start">
+            <Menu.Sub
+              key={id}
+              position="right-start"
+              middlewares={
+                leaf
+                  ? {
+                      shift: { crossAxis: true, padding: 12 },
+                      size: { padding: 12 },
+                    }
+                  : undefined
+              }
+            >
               <Menu.Sub.Target>
                 <Menu.Sub.Item
                   color={color}
@@ -207,12 +220,16 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                   {itemLabel(action, describedBy)}
                 </Menu.Sub.Item>
               </Menu.Sub.Target>
-              <Menu.Sub.Dropdown w={menuWidth}>
+              <Menu.Sub.Dropdown
+                w={menuWidth}
+                style={leaf ? { overflowY: "auto", overscrollBehavior: "contain" } : undefined}
+              >
                 {note(action)}
                 <ActionMenuItems groups={action.menu} />
               </Menu.Sub.Dropdown>
             </Menu.Sub>
           );
+        }
         return (
           <Menu.Item
             key={id}
@@ -306,12 +323,10 @@ function OptionsMenu({
 function ActionControl({
   action,
   labelled,
-  stacked,
   menuPosition,
 }: {
   action: Action;
   labelled: boolean;
-  stacked: boolean;
   menuPosition: FloatingPosition;
 }) {
   const { label, icon: Icon, pressed, color, disabled, loading, link, onClick } = action;
@@ -338,47 +353,33 @@ function ActionControl({
   } as const;
   const icon = Icon && <Icon size={labelled ? 16 : 18} fill={pressed ? "currentColor" : "none"} />;
   const emphasis = action.emphasis && { variant: action.emphasis, color: undefined, radius: "xl" };
-  const control =
-    labelled && stacked && !emphasis ? (
-      // The name under the icon, its ▾ beside the name.
-      <Button
-        size="compact-xs"
-        classNames={{ root: classes.stacked, label: classes.stackedLabel }}
-        {...props}
-      >
-        {icon}
-        <span>
-          {label}
-          {chevron && <ChevronDown size={10} />}
-        </span>
-      </Button>
-    ) : labelled ? (
-      <Button
-        size={emphasis ? undefined : "compact-sm"}
-        leftSection={icon}
-        rightSection={chevron ? <ChevronDown size={14} /> : undefined}
-        {...props}
-        {...emphasis}
-      >
-        {label}
-      </Button>
-    ) : chevron ? (
-      // The icon with a small ▾, as round as the plain icons beside it.
-      <Button
-        size="sm"
-        radius="xl"
-        aria-label={label}
-        rightSection={<ChevronDown size={12} />}
-        classNames={{ root: classes.options, section: classes.chevron }}
-        {...props}
-      >
-        {icon}
-      </Button>
-    ) : (
-      <ActionIcon aria-label={label} {...props}>
-        {icon}
-      </ActionIcon>
-    );
+  const control = labelled ? (
+    <Button
+      size={emphasis ? undefined : "compact-sm"}
+      leftSection={icon}
+      rightSection={chevron ? <ChevronDown size={14} /> : undefined}
+      {...props}
+      {...emphasis}
+    >
+      {label}
+    </Button>
+  ) : chevron ? (
+    // The icon with a small ▾, as round as the plain icons beside it.
+    <Button
+      size="sm"
+      radius="xl"
+      aria-label={label}
+      rightSection={<ChevronDown size={12} />}
+      classNames={{ root: classes.options, section: classes.chevron }}
+      {...props}
+    >
+      {icon}
+    </Button>
+  ) : (
+    <ActionIcon aria-label={label} {...props}>
+      {icon}
+    </ActionIcon>
+  );
   const tip = {
     label: reason ? (
       <>
@@ -424,15 +425,16 @@ export function ActionBarGroups({
   labelled?: string[];
   menuPosition?: FloatingPosition;
   fit?: boolean;
-  /** Names sit under their icons, spread across the row (phone bars). */
+  /** Spreads icon controls across a phone bar. */
   stacked?: boolean;
 }) {
+  const phone = usePhone();
   const row = useRef<HTMLDivElement>(null);
   const actions = shown(groups).flat();
-  const named = actions.filter((action) => labelled.includes(action.id));
+  const named = actions.filter((action) => !phone && labelled.includes(action.id));
   // How many labels, from the last, drop to fit the room (the bar's width, which doesn't follow
   // them); it starts again for other actions or another room.
-  const key = actions.map((action) => `${action.id}:${action.label}`).join();
+  const key = `${phone}:${actions.map((action) => `${action.id}:${action.label}`).join()}`;
   const [fitted, setFitted] = useState({ key, room: 0, dropped: 0 });
   const dropped = fitted.key === key ? fitted.dropped : 0;
   const tight = fit && dropped >= named.length;
@@ -471,7 +473,6 @@ export function ActionBarGroups({
             key={action.id}
             action={action}
             labelled={names.has(action.id)}
-            stacked={stacked}
             menuPosition={menuPosition}
           />
         ));

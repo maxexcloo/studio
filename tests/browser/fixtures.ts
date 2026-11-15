@@ -986,7 +986,7 @@ export async function viewerPromptMenu(page: Page) {
 export async function closeTextEditor(page: Page, title: string) {
   const editor = page.getByRole("dialog", { name: title, exact: true });
   if (await editor.isVisible())
-    await editor.getByRole("button", { name: "Done", exact: true }).click();
+    await editor.getByRole("button", { name: `Close ${title}`, exact: true }).click();
 }
 
 /** Opens a tool's options in a box's phone editor through its flat More menu. */

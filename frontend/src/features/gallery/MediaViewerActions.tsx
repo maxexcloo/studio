@@ -22,7 +22,7 @@ export interface ViewerActions {
 }
 
 /**
- * The bar's controls in groups on one row, phones naming them under their icons. Every one stays
+ * The bar's controls in groups on one row, with icons alone on phones. Every one stays
  * in sight: where they outgrow the bar the last named ones show as icons alone, and only then do
  * they wrap onto another row.
  */

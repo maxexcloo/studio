@@ -103,7 +103,7 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
 
 test("The viewer prompt offers Review Prompt, styles, Suggestions with Refresh…, then Custom…", async ({
   page,
-}, testInfo) => {
+}) => {
   await openViewer(page);
   const asked: any[] = [];
   const others = [{ label: "Snowfall", request: "add snow", prompt: "An amber bird in snow" }];
@@ -134,7 +134,6 @@ test("The viewer prompt offers Review Prompt, styles, Suggestions with Refresh�
   await expect(thinking).toBeDisabled();
   release[0]();
   await expect(menu.getByRole("menuitem")).toHaveText([
-    ...(testInfo.project.use.isMobile ? ["Copy"] : []),
     "Review Prompt",
     "Improve",
     ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
@@ -196,9 +195,7 @@ test("Custom Animation suggests what could happen from the image, filling the in
   );
 });
 
-test("The prompt offers Library's fixed changes with the image's suggestions", async ({
-  page,
-}, testInfo) => {
+test("The prompt offers Library's fixed changes with the image's suggestions", async ({ page }) => {
   await openViewer(page);
   const asked: any[] = [];
   await page.route("**/api/assistant", (route) =>
@@ -228,7 +225,6 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
   const menu = await viewerPromptMenu(page);
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText([
-    ...(testInfo.project.use.isMobile ? ["Copy"] : []),
     "Review Prompt",
     ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
     "Refresh…",

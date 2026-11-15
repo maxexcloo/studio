@@ -63,33 +63,9 @@
   margin-inline: 0;
 }
 
-/* Narrow sides leave room for touch screens' wider minimum targets. */
-.actions[data-stacked] .stacked {
-  height: auto;
-  padding: 4px 3px;
-}
-
-.stackedLabel {
-  flex-direction: column;
-  gap: 2px;
-  font-size: var(--mantine-font-size-xs);
-  font-weight: 500;
-}
-
-.stackedLabel > span {
-  display: inline-flex;
-  align-items: center;
-}
-
-/* The ▾ beside a name stays small where touch screens enlarge icons (theme.module.css). */
-.actions[data-stacked] .stackedLabel > span :global(svg.lucide.lucide-chevron-down) {
-  width: 10px;
-  height: 10px;
-}
-
 /* A phone bar's unnamed controls are narrow, keeping their touch height, so every action and the
    leading names fit one row; the theme's touch minimum width is an inline style. */
-.actions[data-stacked] .action:not(.stacked) {
+.actions[data-stacked] .action {
   width: 28px;
   min-width: 0 !important;
   padding-inline: 0;

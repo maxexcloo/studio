@@ -159,7 +159,7 @@ test("New Character saves a name, description and gallery images from the Refere
   // Phones edit the description full screen; desktops type in place.
   const description = page.getByRole("textbox", { name: "Description", exact: true }).last();
   await description.fill("red-haired ranger");
-  const done = page.getByRole("button", { name: "Done", exact: true });
+  const done = page.getByRole("button", { name: "Close Description", exact: true });
   if (await done.isVisible()) await done.click();
   // Add Images opens the gallery choices in a popup of their own.
   await editor.getByRole("button", { name: "Add Images", exact: true }).click();
@@ -205,7 +205,7 @@ test("New Character saves a name, description and gallery images from the Refere
 
 test("Use as Character starts a card from a gallery image in Library › Characters, named and described by the assistant", async ({
   page,
-}) => {
+}, testInfo) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "ranger",
@@ -285,8 +285,7 @@ test("Use as Character starts a card from a gallery image in Library › Charact
     await editorMenu(editor, "Description", "Suggest Description");
   else await promptMenu(editor, "Description");
   await expect(page.getByRole("menuitem")).toHaveText([
-    "Copy",
-    "Clear",
+    ...(testInfo.project.use.isMobile ? [] : ["Copy", "Clear"]),
     "freckled redhead, slim build",
     "green-eyed ranger",
     "red-haired ranger, green cloak",

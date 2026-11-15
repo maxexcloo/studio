@@ -56,6 +56,7 @@
   align-items: center;
   gap: var(--mantine-spacing-xs);
   margin-left: auto;
+  justify-content: flex-end;
 }
 
 .below {
@@ -158,4 +159,34 @@
 
 :global([data-phone]) .tools {
   flex-wrap: wrap;
+}
+
+/* Inline composer fields and the separate phone editor share the same editing surface. */
+.editor {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor > :first-child,
+.editor > :first-child > :has(textarea) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor textarea {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  resize: none;
+}
+
+.editor > .sends {
+  padding-top: var(--mantine-spacing-xs);
 }

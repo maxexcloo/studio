@@ -84,37 +84,6 @@ export const modelInputs = (input: GenerationInput, profiles: Profile[]) => [
   ...profiles.map((profile) => ({ ...inputForProfile(input, profile), seed: input.seed })),
 ];
 
-/** `input` with the LoRA `name` at each strength, 0 leaving it out. */
-export const strengthInputs = (input: GenerationInput, name: string, strengths: number[]) =>
-  strengths.map((strength) => ({
-    ...input,
-    loras: strength
-      ? input.loras.map((lora) =>
-          lora.name === name ? { ...lora, strength, enabled: true } : lora,
-        )
-      : input.loras.filter((lora) => lora.name !== name),
-  }));
-
-const randomSeed = () => String(Math.floor(Math.random() * 2 ** 32));
-
-/** `input` with `count` seeds: its own where it has one, then random ones. */
-export function seedInputs(input: GenerationInput, count: number) {
-  const own = String(input.seed);
-  const seeds = [/^\d+$/.test(own) ? own : randomSeed()];
-  while (seeds.length < count) seeds.push(randomSeed());
-  return seeds.map((seed) => ({ ...input, seed }));
-}
-
-export const promptLines = (prompt: string) =>
-  prompt
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-/** `input` once per line of its prompt. */
-export const promptInputs = (input: GenerationInput) =>
-  promptLines(input.prompt).map((prompt) => ({ ...input, prompt }));
-
 /** Each variant's seed as it runs: its own, else the first variant's that has one, else random (""). */
 function runSeeds(variants: Variant[]) {
   const own = variants.map(({ input }) =>

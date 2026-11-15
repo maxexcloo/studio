@@ -778,7 +778,12 @@ test("Prompt boxes copy and undoably clear, typed in place on phones", async ({
     await expect(prompt).toBeFocused();
   }
   await prompt.fill("A lantern in fog");
-  const button = (name: string) => page.getByRole("button", { name, exact: true });
+  const button = (name: string) =>
+    phone
+      ? page
+          .getByRole("group", { name: "Prompt Tools", exact: true })
+          .getByRole("button", { name, exact: true })
+      : page.getByRole("button", { name, exact: true });
   const edit = async (name: string) => {
     if (phone) return button(name).click();
     const menu = await promptMenu(page, "Prompt");
@@ -786,7 +791,6 @@ test("Prompt boxes copy and undoably clear, typed in place on phones", async ({
   };
   if (!phone) {
     await expect(button("Copy")).toHaveCount(0);
-    await expect(button("Clear")).toHaveCount(0);
   }
   await edit("Copy");
   await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("A lantern in fog");
@@ -817,8 +821,10 @@ test("Prompt boxes copy and undoably clear, typed in place on phones", async ({
   );
   await page.keyboard.type(" at dusk");
   await expect(prompt).toHaveValue("A lantern in fog at dusk");
-  // Typing shows only the text; dismissing the keyboard brings back the header.
-  await expect(generate.getByRole("button", { name: "Close Generate", exact: true })).toBeHidden();
+  // The shared editing surface keeps its close action and text tools reachable while typing.
+  await expect(generate.getByRole("button", { name: "Close Generate", exact: true })).toBeVisible();
+  await expect(generate.getByRole("group", { name: "Prompt Tools", exact: true })).toBeVisible();
+  await expect(generate.locator("[data-text-editor]", { has: prompt })).toBeVisible();
   await prompt.blur();
   // Closing returns the page and its dock where they were.
   await generate.getByRole("button", { name: "Close Generate", exact: true }).click();

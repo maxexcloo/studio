@@ -617,7 +617,7 @@ test("Dream's projects are created, edited, undone and deleted in dialogs", asyn
     await editor.getByRole("textbox", { name: "Avoid", exact: true }).click();
     const sheet = page.getByRole("dialog", { name: "Avoid", exact: true });
     await sheet.getByRole("textbox", { name: "Avoid", exact: true }).fill("people");
-    await sheet.getByRole("button", { name: "Done", exact: true }).click();
+    await sheet.getByRole("button", { name: "Close Avoid", exact: true }).click();
   } else await editor.getByRole("textbox", { name: "Avoid", exact: true }).fill("people");
   await editor.getByRole("checkbox", { name: "Use LoRAs", exact: true }).uncheck();
   await editor.getByRole("button", { name: "Save", exact: true }).click();
