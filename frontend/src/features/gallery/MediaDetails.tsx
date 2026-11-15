@@ -29,7 +29,7 @@ import { charactersQuery, promptCardsQuery } from "../characters/queries";
 import { useStartCard } from "../characters/useCardFrom";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
-import { backendLabel, isProfile, shownProfileName } from "../generation/payload";
+import { backendLabel, isProfile, profileName, shownProfileName } from "../generation/payload";
 import { WritingThinking } from "../generation/PromptWriting";
 import { queueQuery } from "../generation/Queue";
 import { mediaNumber, mediaTitle } from "./mediaLabels";
@@ -164,7 +164,7 @@ function generationDetails(
     return { id, role: "Edit Source", strength: denoise > 0 ? `Denoise ${denoise}` : "" };
   });
   return {
-    profile: recordedModel(item),
+    profile: recordedModel(item) || (recorded ? profileName(recorded) : ""),
     loras: (Array.isArray(settings.loras) ? settings.loras : [])
       .filter((lora) => lora?.name && lora.enabled !== false)
       .map((lora) => ({
@@ -250,6 +250,7 @@ export function useSettingsText(item: MediaItem) {
     [
       item.prompt?.trim(),
       item.negative?.trim() && `Negative Prompt: ${item.negative.trim()}`,
+      time(item.createdAt) && `${item.uploaded ? "Uploaded" : "Created"}: ${time(item.createdAt)}`,
       details.profile && `Profile: ${details.profile}`,
       details.loras.length &&
         `LoRAs: ${details.loras.map((lora) => `${lora.name} ${lora.strength}`).join(", ")}`,

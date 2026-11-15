@@ -248,7 +248,10 @@ test("A saved End-only preset restores its explicit slot without creating a Star
   expect(state.presets[0].input.referenceAssets).toEqual([
     { assetId: "asset-ending", slot: "end" },
   ]);
-  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Generation Actions", exact: true })
+    .getByRole("button", { name: "Clear", exact: true })
+    .click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue("");
   await page.getByRole("button", { name: "Presets", exact: true }).click();
   await loadSaved(page, "End Frame Only");
@@ -370,7 +373,10 @@ test("Clear restores profile defaults and random seed; masked inputs load as Pai
   await expect.poll(() => state.jobs.length).toBe(1);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expandComposer(page);
-  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Generation Actions", exact: true })
+    .getByRole("button", { name: "Clear", exact: true })
+    .click();
   await expect(prompt).toHaveValue("");
   await withSettings(page, async () => {
     await expect(page.getByRole("textbox", { name: "Seed", exact: true })).toHaveValue("");
@@ -544,11 +550,20 @@ test("The chip composer offers supported sizes and settings, follows the output 
   // Edit opens the composer on the staged draft.
   await expect(page.getByRole("button", { name: "Edit Image", exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Generation Actions", exact: true })
+    .getByRole("button", { name: "Clear", exact: true })
+    .click();
   // Clear turns into Undo, which brings the whole staged draft back.
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Generation Actions", exact: true })
+    .getByRole("button", { name: "Undo", exact: true })
+    .click();
   await expect(page.getByRole("button", { name: "Edit Image", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Generation Actions", exact: true })
+    .getByRole("button", { name: "Clear", exact: true })
+    .click();
   await prompt.fill("A wide copper horizon");
   const aspect = page.getByRole("button", { name: "Aspect", exact: true });
   await aspect.click();
