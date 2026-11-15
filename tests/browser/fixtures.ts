@@ -981,15 +981,37 @@ export async function promptMenu(scope: Page | Locator, box: string) {
   return page.getByRole("menu");
 }
 
-/** Opens a tool's options in a box's phone editor, which shows its tools as buttons. */
+/** Opens the viewer's prompt tools, within its full-screen editor on phones. */
+export async function viewerPromptMenu(page: Page) {
+  const field = page
+    .getByRole("dialog", { name: "Generation", exact: true })
+    .getByRole("textbox", { name: "Prompt", exact: true });
+  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+  if ((await field.getAttribute("inputmode")) === "none") {
+    if (!(await editor.isVisible())) await field.click();
+    return promptMenu(editor, "Prompt");
+  }
+  return promptMenu(page, "Prompt");
+}
+
+/** Returns from the shared phone text editor when a test continues on its parent surface. */
+export async function closeTextEditor(page: Page, title: string) {
+  const editor = page.getByRole("dialog", { name: title, exact: true });
+  if (await editor.isVisible())
+    await editor.getByRole("button", { name: "Done", exact: true }).click();
+}
+
+/** Opens a tool's options in a box's phone editor through its flat More menu. */
 export async function editorMenu(scope: Page | Locator, box: string, tool: string) {
   await scope.getByRole("textbox", { name: box, exact: true }).click();
   const page = "page" in scope ? scope.page() : scope;
   await page
     .getByRole("dialog", { name: box, exact: true })
-    .getByRole("button", { name: tool, exact: true })
+    .getByRole("button", { name: `More ${box} Actions`, exact: true })
     .click();
-  return page.getByRole("menu");
+  const menu = page.getByRole("menu");
+  await expect(menu.getByText(tool, { exact: true })).toBeVisible();
+  return menu;
 }
 
 /**

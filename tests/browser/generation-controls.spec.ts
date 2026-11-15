@@ -12,6 +12,7 @@ import {
   loadSaved,
   openPresets,
   profiles,
+  promptMenu,
   renamePreset,
   saveCurrent,
   serveProfiles,
@@ -781,19 +782,35 @@ test("Prompt boxes copy and undoably clear, typed in place on phones", async ({
     await expect(prompt).toBeFocused();
   }
   await prompt.fill("A lantern in fog");
-  // Copy and Clear stand beside the text, out of the ⋯ menu.
   const button = (name: string) => page.getByRole("button", { name, exact: true });
-  await button("Copy Prompt").click();
+  const edit = async (name: string) => {
+    if (phone) return button(name).click();
+    const menu = await promptMenu(page, "Prompt");
+    await menu.getByRole("menuitem", { name, exact: true }).click();
+  };
+  if (!phone) {
+    await expect(button("Copy")).toHaveCount(0);
+    await expect(button("Clear")).toHaveCount(0);
+  }
+  await edit("Copy");
   await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("A lantern in fog");
-  // Clear turns into Undo, which restores the text; typing turns it back into Clear.
-  await button("Clear Prompt").click();
+  await edit("Clear");
   await expect(prompt).toHaveValue("");
-  await button("Undo").click();
+  await edit("Undo");
   await expect(prompt).toHaveValue("A lantern in fog");
-  await button("Clear Prompt").click();
+  await edit("Clear");
   await prompt.fill("A");
-  await expect(button("Clear Prompt")).toBeVisible();
-  await expect(button("Undo")).toHaveCount(0);
+  if (phone) {
+    await expect(button("Clear")).toBeVisible();
+    await expect(button("Undo")).toHaveCount(0);
+    // Inline fields keep the Generate sheet's draft, with no second editor.
+    await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toHaveCount(0);
+  } else {
+    const menu = await promptMenu(page, "Prompt");
+    await expect(menu.getByRole("menuitem", { name: "Clear", exact: true })).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name: "Undo", exact: true })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+  }
   await prompt.fill("A lantern in fog");
   if (!phone) return;
   // A tap on the text, rather than the fill's focus, starts the sheet's typing layout.

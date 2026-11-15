@@ -3,10 +3,13 @@ import { type Page, expect, test } from "@playwright/test";
 import { outfitPart, scenePart, withCharacter } from "../../shared/characters";
 import {
   closeReferences,
+  closeTextEditor,
   create,
+  editorMenu,
   fixtures,
   image,
   profiles,
+  promptMenu,
   serveProfiles,
   signIn,
   stamp,
@@ -257,8 +260,15 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   await editor.getByRole("button", { name: "Suggest Name", exact: true }).click();
   await page.getByRole("menuitem", { name: "Mara", exact: true }).click();
   await expect(name).toHaveValue("Mara");
-  await editor.getByRole("button", { name: "Suggest Description", exact: true }).click();
+  if (
+    (await editor
+      .getByRole("textbox", { name: "Description", exact: true })
+      .getAttribute("inputmode")) === "none"
+  )
+    await editorMenu(editor, "Description", "Suggest Description");
+  else await promptMenu(editor, "Description");
   await page.getByRole("menuitem", { name: "red-haired ranger, green cloak", exact: true }).click();
+  await closeTextEditor(page, "Description");
   await expect(editor.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
     "red-haired ranger, green cloak",
   );

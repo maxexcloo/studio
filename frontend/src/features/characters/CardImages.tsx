@@ -42,7 +42,7 @@ import {
 } from "../generation/references";
 import { ReferenceSlots, referenceCellType } from "../generation/ReferenceSlots";
 import { useReferenceBrowser } from "../generation/useReferenceBrowser";
-import { CardIdeas } from "./CardIdeas";
+import { CardIdeas, useCardIdeas } from "./CardIdeas";
 
 /**
  * A card's editor: a dialog, full screen on phones, whose body scrolls. Above the desktop
@@ -152,6 +152,33 @@ export function CardFields({
         rightSectionWidth="auto"
         rightSectionPointerEvents="all"
       />
+      <CardDescription
+        kind={kind}
+        images={images}
+        value={description}
+        onChange={onDescription}
+        hint={hint}
+        placeholder={placeholder}
+        assisted={Boolean(assistant && images.length > 0)}
+      />
+      <CardImages kind={kind} max={max} note={note} value={images} onChange={onImages} />
+    </>
+  );
+}
+
+function CardDescription({
+  hint,
+  placeholder,
+  assisted,
+  ...props
+}: Omit<Parameters<typeof useCardIdeas>[0], "field"> & {
+  hint: string;
+  placeholder: string;
+  assisted: boolean;
+}) {
+  const ideas = useCardIdeas({ ...props, field: "description" });
+  return (
+    <>
       <TextBox
         label="Description"
         description={hint}
@@ -159,11 +186,12 @@ export function CardFields({
         autosize
         minRows={2}
         maxLength={maxCardDescription}
-        value={description}
-        onChange={onDescription}
-        send={ideas("description", description, onDescription)}
+        value={props.value}
+        onChange={props.onChange}
+        tools={assisted ? [ideas.action] : []}
+        send={ideas.undo}
       />
-      <CardImages kind={kind} max={max} note={note} value={images} onChange={onImages} />
+      {ideas.dialog}
     </>
   );
 }

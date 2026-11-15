@@ -33,21 +33,21 @@
   position: static;
 }
 
-/* The editor's tools scroll sideways; the send stays at the end. */
+/* Editing controls and form sends keep separate rows when the phone has little room. */
 .toolbar {
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--mantine-spacing-xs);
-  margin-inline: calc(-1 * var(--mantine-spacing-xs));
   padding-top: var(--mantine-spacing-xs);
   border-top: 1px solid var(--studio-glass-border);
 }
 
-/* The tools take the room the named sends leave, scrolling rather than running under them. */
-.toolbar > :first-child {
-  flex: 1;
-  min-width: 0;
+.editActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .sends {
@@ -90,7 +90,8 @@
 .tools {
   display: flex;
   flex-shrink: 0;
-  gap: 4px;
+  gap: var(--mantine-spacing-xs);
+  align-items: flex-start;
 }
 
 /* A tool's popup opens from the box's end, where the ⋯ stands. */
@@ -149,4 +150,12 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+:global([data-phone]) .columned:has(.tools) {
+  flex-direction: column;
+}
+
+:global([data-phone]) .tools {
+  flex-wrap: wrap;
 }

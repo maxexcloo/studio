@@ -159,11 +159,12 @@ recur across features.
   waits for a tap.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`.
-- Use the shared `TextBox`. Its tools sit in one ⋯ menu one level deep, a
-  tool's options listed under its name, never in a submenu. Composer fields
-  edit in place; other phone text boxes open the shared full-screen editor,
-  which shows the tools as named buttons above the keyboard. A box without
-  tools has no ⋯, Copy or Clear.
+- Use the shared `TextBox`. Desktop fields expose only ⋯, with Copy and
+  Clear/Reset/Undo alongside the tools in one flat menu, each tool's options
+  under its name. Composer fields edit in place; other phone text boxes open
+  the shared full-screen editor. Phone controls show Copy, Clear/Reset/Undo
+  and More above the keyboard, with tools in More and form sends separate.
+  A box without tools has no ⋯, Copy or Clear.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating
