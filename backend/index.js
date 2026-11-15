@@ -791,10 +791,12 @@ const suggestions = createSuggestions({
   writer: tasteWriter,
   online: textOnline,
   explicit: explicitFor,
-  item: (ownerId, jobId) => filterVisibleGallery(galleryJobItems(jobId, ownerId))[0],
+  item: (ownerId, jobId, itemId) =>
+    filterVisibleGallery(galleryJobItems(jobId, ownerId)).find(
+      (item) => !itemId || item.id === itemId,
+    ),
   image: async (item) => ((await assistantEngine?.supportsVision()) ? smallImage(item) : null),
-  // The viewer asks by job, so every result of the run keeps the same steps.
-  save: (item, nextSteps) => updateGalleryJob(item.jobId, { nextSteps }),
+  save: (item, nextSteps) => updateGalleryJob(galleryKey(item), { nextSteps }),
   ideas: () => flagEnabled("STUDIO_PROMPT_IDEAS"),
   nextSteps: () => flagEnabled("STUDIO_NEXT_STEPS"),
   target: (ownerId, item) =>

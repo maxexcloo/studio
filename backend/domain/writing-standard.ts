@@ -52,6 +52,24 @@ export function contentRule(explicit: boolean) {
     : `Don't make it any more sexual or explicit than the input already is, whatever the instruction says. ${adults("Anyone in sexual or nude content")}`;
 }
 
+/** Creative choices share context and variety rules, while each surface keeps its own task. */
+export function suggestionChoices(kind: "image" | "video" | "card", spicy: boolean) {
+  return [
+    "Infer useful choices from the current prompt and reference images first; taste is secondary and never replaces the current subject. Preserve identity, species, breed, age, ethnicity and the person's own wording except for the particular change offered. Each option is an independent choice, never a change to apply automatically. Choosing one new detail is the suggestion itself; it gives no permission to change unrelated details. If the typed prompt differs from the source picture or caption, its wording describes the proposed result and the picture is source context only.",
+    "Make alternatives meaningfully different in what they offer, not synonyms or near-duplicates with different labels. Avoid repeating already offered ideas, including paraphrases; choose details specific to this context rather than generic improvements.",
+    kind === "card"
+      ? "These choices name or describe the same reference, not alternative appearances: vary the useful visible details stressed, without inventing or changing bodies, clothing, identity or setting. Keep each card kind's scope."
+      : kind === "video"
+        ? "Vary motion, subject action, expression, interaction, camera movement, atmosphere, pace or sound where the scene supports them. Keep the subject's existing appearance and anatomy; static body-shape, wardrobe or setting replacements are not motion ideas."
+        : spicy &&
+          "For a clearly adult human subject, include a non-graphic body-shape, proportion or build alternative where it would be useful and visible, alongside distinct pose, framing, outfit, setting or other relevant choices. Infer a specific alternative from this subject's existing description, not a stock ideal: vary in different directions over refreshes, without treating slimmer, curvier, larger or more muscular as inherently better. A proposed body change replaces only the relevant trait; every unchosen trait stays as written.",
+    spicy &&
+      "Spicy permits context-fitting sensual choices only for clearly adult humans; it does not require every option to be sensual. Never infer adulthood from taste or promote an ambiguous age to adult to justify a suggestion. For minors, ambiguous ages or nonhuman subjects, offer only ordinary non-sexual choices; never sexualise them, add human sexual traits to them or change their age or species.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 /** Quality tags and filler that tell a model nothing; writers leave them out. */
 export const filler = Object.freeze([
   "masterpiece",
