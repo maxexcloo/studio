@@ -48,6 +48,7 @@ export function inputForProfile(previous: GenerationInput, profile: Profile): Ge
     ...initialInput,
     ...profile.defaults,
     prompt: previous.prompt,
+    cardParts: previous.cardParts,
     negative: previous.negative,
     referenceAssets: previous.referenceAssets,
     referenceDetails: previous.referenceDetails,
@@ -101,9 +102,13 @@ export interface Variant {
 export function draftForProfile(
   previous: Draft,
   profile: Profile,
-  next: { references: ReferenceAsset[]; prompt: string },
+  next: { references: ReferenceAsset[]; prompt: string; cardParts?: GenerationInput["cardParts"] },
 ): Draft {
-  const input = { ...inputForProfile(previous.input, profile), prompt: next.prompt };
+  const input = {
+    ...inputForProfile(previous.input, profile),
+    prompt: next.prompt,
+    cardParts: next.cardParts,
+  };
   return {
     ...previous,
     references: next.references,
@@ -121,6 +126,19 @@ const empty: Draft = {
   presetTitle: undefined,
   compare: undefined,
 };
+/** Starts from saved input without inheriting a run's lineage or comparison. */
+export function draftForInput(
+  input: GenerationInput,
+  selection: Pick<Draft, "presetId" | "presetTitle"> = {},
+): Draft {
+  return {
+    ...empty,
+    ...selection,
+    input: { ...initialInput, ...input },
+    operation: input.kind === "video" ? "animate" : "image",
+    references: input.referenceDetails || [],
+  };
+}
 const emptyProfiles: Profile[] = [];
 const initialDrafts: Record<MediaKind, Draft> = {
   image: empty,
@@ -200,6 +218,7 @@ function useGenerationState() {
   return {
     form,
     draft,
+    draftForKind: (kind: MediaKind) => drafts.current[kind],
     setDraft,
     changeKind,
     input: draft.input,

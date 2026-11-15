@@ -9,6 +9,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
 import { PickerGrid, PickerTile } from "../generation/Picker";
+import type { CardParts } from "./cardParts";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import {
   type CharacterCard,
@@ -60,6 +61,7 @@ export function CharacterChoices({
   query,
   references,
   prompt,
+  parts,
   profile,
   switchable = false,
   onChange,
@@ -68,9 +70,15 @@ export function CharacterChoices({
   query: string;
   references: ReferenceAsset[];
   prompt: string;
+  parts?: CardParts;
   profile?: Profile;
   switchable?: boolean;
-  onChange: (next: { references: ReferenceAsset[]; prompt: string; profile?: Profile }) => void;
+  onChange: (next: {
+    references: ReferenceAsset[];
+    prompt: string;
+    cardParts?: CardParts;
+    profile?: Profile;
+  }) => void;
   onLayer: (open: boolean) => void;
 }) {
   const characters = useQuery(charactersQuery);
@@ -106,7 +114,7 @@ export function CharacterChoices({
             onToggle={() => dialogs.edit()}
           />
           {cards.map((card) => {
-            const applied = characterApplied(card, references, prompt);
+            const applied = characterApplied(card, references, prompt, parts);
             return (
               <PickerTile
                 key={card.id}
@@ -118,10 +126,10 @@ export function CharacterChoices({
                 image={card.references[0]?.thumbnailUrl || card.references[0]?.url}
                 placeholder={card.references.length ? undefined : icons.character}
                 onToggle={() => {
-                  if (applied) return onChange(removeCharacter(card, references, prompt));
+                  if (applied) return onChange(removeCharacter(card, references, prompt, parts));
                   if (editor) setSwitched(profileName(editor));
                   onChange({
-                    ...applyCharacter(card, references, prompt, editor || profile),
+                    ...applyCharacter(card, references, prompt, editor || profile, parts),
                     profile: editor,
                   });
                 }}

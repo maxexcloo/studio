@@ -34,7 +34,7 @@ export async function profileDefinitions() {
  * What still uses a model file, so an update removes the old one only when nothing does
  * (Decision 4). `presetModels` is model/catalogue.js's.
  */
-export async function modelFileReferences({ file }, presetModels) {
+export async function modelFileReferences({ file }, presetModels, { includePresets = true } = {}) {
   if (!file) return [];
   const quoted = JSON.stringify(file);
   const users = (await profileDefinitions())
@@ -47,6 +47,7 @@ export async function modelFileReferences({ file }, presetModels) {
     )
       users.push(`the ${profile.displayName || profile.label || profile.id} profile`);
   }
+  if (!includePresets) return users;
   const db = runtimeDatabase(dataDir);
   const saved = db.prepare("SELECT 1 FROM sqlite_schema WHERE name = 'studio_user_presets'").get()
     ? db

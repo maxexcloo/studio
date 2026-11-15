@@ -17,8 +17,8 @@ import {
   referencePatch,
 } from "../generation/payload";
 import { orderedReferences } from "../generation/references";
+import { promptCardApplied, rememberCard, withPromptCard } from "./cardParts";
 import { characterEditor, switchedText } from "./CharacterChoices";
-import { promptCardApplied, withPromptCard } from "./PromptCardChoices";
 import {
   type CharacterCard,
   type PromptCard,
@@ -58,9 +58,15 @@ export function useCardInComposer() {
           referenceDetails(draft.references, draft.input, profile),
           profile,
         );
-        if (characterApplied(card, references, prompt)) return draft;
+        if (characterApplied(card, references, prompt, draft.input.cardParts)) return draft;
         const editor = characterEditor(profile, models.data);
-        const next = applyCharacter(card, references, prompt, editor || profile);
+        const next = applyCharacter(
+          card,
+          references,
+          prompt,
+          editor || profile,
+          draft.input.cardParts,
+        );
         if (editor) {
           switched = profileName(editor);
           return draftForProfile(draft, editor, next);
@@ -71,6 +77,7 @@ export function useCardInComposer() {
           input: {
             ...draft.input,
             prompt: next.prompt,
+            cardParts: next.cardParts,
             ...referencePatch(draft.input, draft.references, next.references, profile),
           },
         };
@@ -83,11 +90,17 @@ export function useCardInComposer() {
         if (promptCardApplied(kind, card, prompt)) return draft;
         const lists = { characters: characters.data, outfits: outfits.data };
         const cards = kind === "outfits" ? outfits.data : scenes.data;
+        const next = withPromptCard(kind, card, prompt, {
+          ...lists,
+          cards,
+          parts: draft.input.cardParts,
+        });
         return {
           ...draft,
           input: {
             ...draft.input,
-            prompt: withPromptCard(kind, card, prompt, { ...lists, cards }),
+            prompt: next,
+            cardParts: rememberCard(draft.input.cardParts, kind, card, next),
           },
         };
       });
