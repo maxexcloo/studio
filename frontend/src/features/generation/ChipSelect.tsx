@@ -1,14 +1,21 @@
 import {
   Button,
   ColorSwatch,
+  Combobox,
+  type ComboboxParsedItem,
   ComboboxPopover,
   type ComboboxPopoverProps,
   Group,
+  ScrollArea,
   Stack,
   Text,
+  defaultOptionsFilter,
+  getParsedComboboxData,
+  isOptionsGroup,
+  useCombobox,
 } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import { useTouch } from "../../ui/usePhone";
 import { chipProps } from "./chip";
@@ -18,8 +25,7 @@ import classes from "./GenerationInputControls.module.css";
 /**
  * A rail chip that opens its option list: the composer's Profile and prompt ideas. `swatch`
  * is a readiness colour beside the name; `target` adds attributes to the chip itself. On touch
- * screens the search waits for a tap: Mantine focuses it on opening, which would raise the keyboard,
- * so it is let go again straight after.
+ * screens the search waits for a tap; desktop opening focuses it for keyboard navigation.
  */
 export function ChipSelect({
   name,
@@ -28,9 +34,26 @@ export function ChipSelect({
   title,
   target,
   searchable,
+  data,
+  value,
+  onChange,
+  dropdownOpened,
   onDropdownOpen,
-  ...props
-}: Omit<ComboboxPopoverProps, "children"> & {
+  onDropdownClose,
+  nothingFoundMessage,
+  renderOption,
+}: Pick<
+  ComboboxPopoverProps,
+  | "data"
+  | "value"
+  | "onChange"
+  | "dropdownOpened"
+  | "onDropdownOpen"
+  | "onDropdownClose"
+  | "nothingFoundMessage"
+  | "renderOption"
+  | "searchable"
+> & {
   name: string;
   label: ReactNode;
   swatch?: string;
@@ -38,33 +61,52 @@ export function ChipSelect({
   target?: Record<string, unknown>;
 }) {
   const touch = useTouch();
+  const [search, setSearch] = useState("");
+  const combobox = useCombobox({
+    opened: dropdownOpened,
+    onDropdownOpen: () => {
+      onDropdownOpen?.();
+      if (searchable && !touch) combobox.focusSearchInput();
+    },
+    onDropdownClose: () => {
+      onDropdownClose?.();
+      combobox.resetSelectedOption();
+    },
+  });
+  const options = defaultOptionsFilter({
+    options: getParsedComboboxData(data),
+    search: searchable ? search : "",
+    limit: Infinity,
+  }) as ComboboxParsedItem[];
+  const empty = options.every((option) => isOptionsGroup(option) && !option.items.length);
+  const render = (option: ComboboxParsedItem): ReactNode =>
+    isOptionsGroup(option) ? (
+      <Combobox.Group key={String(option.group)} label={option.group}>
+        {option.items.map(render)}
+      </Combobox.Group>
+    ) : (
+      <Combobox.Option
+        key={option.value}
+        value={option.value}
+        disabled={option.disabled}
+        active={option.value === value}
+        aria-selected={option.value === value}
+      >
+        {renderOption ? renderOption({ option, checked: option.value === value }) : option.label}
+      </Combobox.Option>
+    );
   return (
-    <ComboboxPopover
-      searchable={searchable}
-      onDropdownOpen={() => {
-        onDropdownOpen?.();
-        // After Mantine's own deferred focus.
-        if (touch && searchable)
-          setTimeout(() =>
-            setTimeout(() => {
-              const field = document.activeElement;
-              if (
-                field instanceof HTMLInputElement &&
-                field.closest(".mantine-ComboboxPopover-dropdown")
-              )
-                field.blur();
-            }),
-          );
+    <Combobox
+      store={combobox}
+      returnFocus
+      width="min(440px, 100vw - 32px)"
+      position="top-start"
+      withinPortal
+      onOptionSubmit={(selected) => {
+        onChange?.(selected);
+        combobox.closeDropdown();
+        setSearch("");
       }}
-      allowDeselect={false}
-      withCheckIcon={false}
-      maxDropdownHeight={320}
-      comboboxProps={{
-        width: "min(440px, 100vw - 32px)",
-        position: "top-start",
-        withinPortal: true,
-      }}
-      {...props}
     >
       <ComboboxPopover.Target>
         <Button
@@ -88,7 +130,26 @@ export function ChipSelect({
           <span className={classes.label}>{label}</span>
         </Button>
       </ComboboxPopover.Target>
-    </ComboboxPopover>
+      <Combobox.Dropdown>
+        {searchable && (
+          <Combobox.Search
+            aria-label={`Search ${name}`}
+            placeholder="Search..."
+            value={search}
+            onChange={(event) => {
+              setSearch(event.currentTarget.value);
+              combobox.resetSelectedOption();
+            }}
+          />
+        )}
+        <ScrollArea.Autosize mah={320} type="scroll">
+          <Combobox.Options>
+            {options.map(render)}
+            {empty && nothingFoundMessage && <Combobox.Empty>{nothingFoundMessage}</Combobox.Empty>}
+          </Combobox.Options>
+        </ScrollArea.Autosize>
+      </Combobox.Dropdown>
+    </Combobox>
   );
 }
 

@@ -1017,6 +1017,36 @@ test("Composer popups on a tablet open with the keyboard down", async ({ page },
   await expect(page.locator("[data-popup] input[type=text]:focus")).toHaveCount(0);
 });
 
+test("Profile search waits for a touch and preserves typing and selection", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Touch search focus");
+  await fixtures(page);
+  await create(page);
+  await page.evaluate(() => {
+    document.addEventListener("focusin", (event) => {
+      if ((event.target as Element).matches("[aria-label='Search Profile']"))
+        document.documentElement.dataset.profileSearchFocused = "true";
+    });
+  });
+  const picker = page.getByRole("combobox", { name: "Profile", exact: true });
+  await picker.tap();
+  const search = page.getByRole("textbox", { name: "Search Profile", exact: true });
+  await expect(search).toBeVisible();
+  await expect(page.locator("html")).not.toHaveAttribute("data-profile-search-focused");
+  await search.tap();
+  await search.fill("No Such Profile");
+  await expect(page.getByText("No Matches", { exact: true })).toBeVisible();
+  await search.fill("Image Quality");
+  await expect(search).toBeFocused();
+  const option = page.getByRole("option", { name: /Image Quality/ });
+  await expect(option).toBeVisible();
+  await option.tap();
+  await expect(picker).toHaveAttribute("aria-expanded", "false");
+  await picker.tap();
+  await expect(search).toHaveValue("");
+});
+
 test("A tablet keeps the open composer's prompt above the keyboard and the header", async ({
   page,
 }, testInfo) => {
