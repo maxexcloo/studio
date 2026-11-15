@@ -19,7 +19,7 @@ import {
  * in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
  * settings (shared/appearance.ts). Keys Studio no longer knows are dropped as the document is read.
  */
-export const preferenceDefaults = Object.freeze({
+const preferenceDefaults = Object.freeze({
   cloudModels: true,
   loras: true,
   spicyPrompts: false,

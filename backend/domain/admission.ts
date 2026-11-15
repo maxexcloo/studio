@@ -34,7 +34,7 @@ interface AdmissionOptions {
 }
 
 /** One copy of a request per image where its profile can't batch, each with its own seed. */
-export function splitRuns(input: GenerationInput, separate?: boolean): GenerationInput[] {
+function splitRuns(input: GenerationInput, separate?: boolean): GenerationInput[] {
   const count = Math.min(8, Math.max(1, Math.round(Number(input.count) || 1)));
   if (!separate || count < 2) return [input];
   const seed = Number(input.seed);

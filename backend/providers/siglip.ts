@@ -11,7 +11,7 @@ import { createModelFiles, createOnnxRunner } from "./onnx.ts";
  * separates matches clearly better than its int8 copy, and the int8 text encoder, whose size is
  * mostly the 256k-token vocabulary.
  */
-export const siglipSource = {
+const siglipSource = {
   repository: "onnx-community/siglip2-base-patch16-224-ONNX",
   // renovate: datasource=git-refs depName=https://huggingface.co/onnx-community/siglip2-base-patch16-224-ONNX
   revision: "ba1f3b0843f24bc5417d38e19c37b287d719b2f4",

@@ -191,7 +191,7 @@ export function optionsFor(info, node, key) {
   return [];
 }
 
-export function hasNode(info, node) {
+function hasNode(info, node) {
   return Boolean(info?.[node]);
 }
 

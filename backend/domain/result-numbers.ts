@@ -115,4 +115,3 @@ export function createResultNumbers({
     },
   };
 }
-export type ResultNumbers = ReturnType<typeof createResultNumbers>;

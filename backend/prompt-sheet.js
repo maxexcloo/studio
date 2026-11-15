@@ -24,7 +24,7 @@ export const sheetRequest = (value) => ({
 });
 
 /** The writer's instructions: the sheet's fixed layout, then what it fills in. */
-export const sheetInstructions = (known) =>
+const sheetInstructions = (known) =>
   [
     "You write one prompt for an image-editing model that receives it together with one reference image of a character, and redraws that character as a character design sheet: the reference for drawing and animating the same character later.",
     known === "seen"

@@ -17,7 +17,7 @@ export const dataDir = currentDataDir();
 
 export const mediaType = "media";
 /** A data folder's media folder: STUDIO_MEDIA_DIR, else its `media`. */
-export const mediaRootFor = (directory) =>
+const mediaRootFor = (directory) =>
   path.resolve(process.env.STUDIO_MEDIA_DIR || path.join(directory, "media"));
 export const mediaRoot = mediaRootFor(dataDir);
 

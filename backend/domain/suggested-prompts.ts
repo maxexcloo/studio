@@ -10,7 +10,7 @@ export interface SuggestedPromptItem extends IdleItem {
   suggestedPrompt?: string;
 }
 /** The assistant gateway (assistant.js). */
-export interface PromptDescriber {
+interface PromptDescriber {
   supportsVision(): Promise<boolean>;
   describe(request: {
     images: ModelImage[];
