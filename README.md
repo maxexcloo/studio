@@ -80,6 +80,8 @@ MCP clients reach `/mcp` in one of three ways:
 
 `STUDIO_MCP_PUBLIC_URL` is the internet-facing host: it takes only personal tokens, and signed result, upload and export links use it. The shared keys work only on the other allowed hosts, such as the in-cluster service name.
 
+`node backend/chat-uploads.js`, run beside LibreChat, saves each image a person attaches in chat as their Upload: it watches LibreChat's images folder (`STUDIO_CHAT_IMAGES_DIR`) and sends new images to `STUDIO_MCP_URL` (such as `http://studio.studio.svc.cluster.local:8787/mcp`) with `STUDIO_MCP_API_KEY`, as the gateway would.
+
 Every MCP action calls the route its UI action calls with the caller's own credential, so ownership, group features and administrator checks apply as in the app.
 
 `STUDIO_CHAT_URL` (such as `https://chat.excloo.com`) adds a Chat item to the navigation that opens that chat site in a new tab; unset, there is none.
