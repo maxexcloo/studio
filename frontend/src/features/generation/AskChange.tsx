@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Menu, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Menu, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
   type QueryKey,
@@ -20,6 +20,7 @@ import {
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
+import { changeSummary } from "./changeSummary";
 import { assistantQuery } from "./PromptAssistant";
 
 import classes from "./AskChange.module.css";
@@ -279,18 +280,28 @@ export function ChangeSuggestions<K extends QueryKey>({
   );
 }
 
-/** The proposed action's name, over the field it fills, so nothing beside the text can hide it. */
+/**
+ * The proposed action's name, over the field it fills, so nothing beside the text can hide it, and
+ * what it changes: the words it changed in `before`, the text it replaced, or else its label.
+ */
 export function ProposalLabel({
   proposal,
+  before = "",
   labels,
 }: {
   proposal: Change;
+  before?: string;
   /** Names an action differently where it means something else, such as the composer's Recreate. */
   labels?: Partial<Record<ChangeAction, string>>;
 }) {
+  const changed =
+    (proposal.action !== "upscale" && changeSummary(before, proposal.prompt)) || proposal.label;
   return (
-    <Badge component="span" variant="light" size="xs" aria-label="Proposed Action">
-      {labels?.[proposal.action] ?? actionLabels[proposal.action]}
-    </Badge>
+    <Text component="span" size="xs" truncate display="block">
+      <Badge component="span" variant="light" size="xs" mr={6} aria-label="Proposed Action">
+        {labels?.[proposal.action] ?? actionLabels[proposal.action]}
+      </Badge>
+      {changed}
+    </Text>
   );
 }

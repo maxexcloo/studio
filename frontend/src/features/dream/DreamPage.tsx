@@ -133,8 +133,6 @@ export function DreamPage() {
               {(Object.keys(viewLabels) as (keyof typeof viewLabels)[]).map((value) => (
                 <Menu.Item
                   key={value}
-                  role="menuitemradio"
-                  aria-checked={view === value}
                   rightSection={view === value ? <Check size={14} /> : undefined}
                   onClick={() => setView(value)}
                 >

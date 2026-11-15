@@ -85,10 +85,9 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
   expect(asked).toHaveLength(1);
 });
 
-test("The viewer's AI menu offers Review Prompt, then Suggestions with Refresh, then Custom…", async ({
+test("The viewer's Edit menu offers Review Prompt, then Suggestions with Refresh, then Custom…", async ({
   page,
-}, testInfo) => {
-  const phone = testInfo.project.use.isMobile;
+}) => {
   await openViewer(page);
   const asked: any[] = [];
   const others = [{ label: "Snowfall", request: "add snow", prompt: "An amber bird in snow" }];
@@ -125,30 +124,21 @@ test("The viewer's AI menu offers Review Prompt, then Suggestions with Refresh, 
   release[1]();
   await expect(menu.getByRole("menuitem", { name: "Snowfall", exact: true })).toBeVisible();
   expect(asked.at(-1)).toEqual({ surface: "viewer", jobId: "job-hub", fresh: true });
-  // With the prompt as it was, Custom… selects it for a change typed over it; phones open the
-  // editor, which asks from a send beside Generate once a change is typed, with Reset beside them.
+  // Custom… asks for the change in a box of its own, leaving the prompt as it was.
   await menu.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   await expect(page.getByRole("menu")).toHaveCount(0);
-  if (phone) {
-    const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
-    const ask = editor.getByRole("button", { name: "Ask for a Change", exact: true });
-    const reset = editor.getByRole("button", { name: "Reset Prompt", exact: true });
-    await expect(ask).toBeDisabled();
-    await expect(reset).toBeDisabled();
-    await editor.getByRole("textbox", { name: "Prompt", exact: true }).fill("make it night");
-    await expect(ask).toBeEnabled();
-    await reset.click();
-    await expect(editor.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
-      "An amber bird",
-    );
-    return;
-  }
-  const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
-  if (page.viewportSize()!.width >= 768) {
-    await expect(field).toBeFocused();
-    await page.keyboard.type("make it night");
-    await expect(field).toHaveValue("make it night");
-  }
+  const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
+  const change = custom.getByRole("textbox", { name: "Change", exact: true });
+  const send = custom.getByRole("button", { name: "Ask", exact: true });
+  await expect(send).toBeDisabled();
+  await change.fill("make it night");
+  await expect(send).toBeEnabled();
+  await custom.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(custom).toHaveCount(0);
+  await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "An amber bird",
+  );
+  expect(asked.filter((body) => body.surface === "change")).toEqual([]);
 });
 
 test("Custom Animation suggests what could happen from the image, filling the instruction", async ({
@@ -182,7 +172,7 @@ test("Custom Animation suggests what could happen from the image, filling the in
   );
 });
 
-test("AI offers Library's fixed changes above the image's suggestions", async ({ page }) => {
+test("Edit offers Library's fixed changes above the image's suggestions", async ({ page }) => {
   await openViewer(page);
   const asked: any[] = [];
   await page.route("**/api/assistant", (route) =>

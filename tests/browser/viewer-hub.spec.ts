@@ -139,9 +139,9 @@ test("A video's prompt field runs its edited prompt again as a video", async ({ 
   expect(state.jobs.at(-1)!.input.kind ?? "video").toBe("video");
 });
 
-test("Ask turns a change in plain words into the chosen action's prompt in place, to run or undo", async ({
+test("Custom… turns a change in plain words into the chosen action's prompt in place, to run or undo", async ({
   page,
-}, testInfo) => {
+}) => {
   const asked: any[] = [];
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
@@ -162,25 +162,22 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
       });
     }),
   );
-  // Phones ask from the full-screen editor, whose header carries the field's actions.
-  const phone = Boolean(testInfo.project.use.isMobile);
-  const surface = phone
-    ? page.getByRole("dialog", { name: "Prompt", exact: true })
-    : viewer.getByRole("group", { name: "Generation Actions", exact: true });
-  if (phone) await viewer.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  const surface = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
-  // The editor asks from a send beside Generate; elsewhere Edit's Custom… asks for what was typed.
-  const askForChange = async () => {
-    if (phone)
-      return surface.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  // Edit's Custom… asks in a box of its own, which keeps the last request.
+  const askForChange = async (request?: string) => {
     await viewerAction(page, "Edit");
     await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
+    const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
+    if (request) await custom.getByRole("textbox", { name: "Change", exact: true }).fill(request);
+    await custom.getByRole("button", { name: "Ask", exact: true }).click();
   };
-  await field.fill("make it night");
-  await askForChange();
-  // The proposal replaces the text in place under the chosen action; Undo restores the request.
+  await askForChange("make it night");
+  // The proposal replaces the prompt in place under the chosen action and what it changed; Undo
+  // restores the prompt.
   await expect(field).toHaveValue("An amber bird at night");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
+  await expect(surface.getByText("+ at night")).toBeVisible();
   expect(asked).toEqual([
     {
       surface: "change",
@@ -190,7 +187,7 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
     },
   ]);
   await surface.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(field).toHaveValue("make it night");
+  await expect(field).toHaveValue("An amber bird");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
   await askForChange();
   await expect(field).toHaveValue("An amber bird at night");

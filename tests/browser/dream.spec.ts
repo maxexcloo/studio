@@ -8,7 +8,7 @@ async function showView(page: Page, name: string) {
   await expect(menu.or(page.getByRole("radiogroup", { name: "Dream View" }))).toBeVisible();
   if (await menu.isVisible()) {
     await menu.click();
-    await page.getByRole("menuitemradio", { name, exact: true }).click();
+    await page.getByRole("menuitem", { name, exact: true }).click();
   } else await page.getByText(name, { exact: true }).click();
 }
 

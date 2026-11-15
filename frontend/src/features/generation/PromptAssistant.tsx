@@ -1,4 +1,4 @@
-import { Button, Group, Modal, Stack, Text } from "@mantine/core";
+import { Button, Group, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -6,10 +6,8 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import type { Action as ToolAction } from "../../ui/ActionBar";
-import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
-import { TextBox } from "../../ui/TextBox";
-import { usePhone } from "../../ui/usePhone";
+import { CustomDialog } from "./CustomDialog";
 
 /** A fixed assistant option from Library › Prompt Styles, in its menu's order. */
 export interface AssistantOption {
@@ -111,10 +109,8 @@ export function usePromptAssistant({
   };
 }) {
   const status = useQuery(assistantQuery);
-  const phone = usePhone();
-  // Custom… asks what to change first; the last request stays for the next time.
+  // Custom… asks what to change first.
   const [asking, setAsking] = useState(false);
-  const [instruction, setInstruction] = useState("");
   // A custom rewrite lands in the prompt box with the caret at its end, ready to edit.
   const editAfter = useRef(false);
   // The style last used comes first and is marked, so repeating it is one click.
@@ -378,7 +374,6 @@ export function usePromptAssistant({
       };
   // A change lands in the prompt as a proposal; the Custom style's rewrite, ready to edit.
   function ask(text: string) {
-    setAsking(false);
     if (change) change.send(text);
     else {
       editAfter.current = true;
@@ -387,56 +382,14 @@ export function usePromptAssistant({
     }
   }
   const dialog = (
-    <Modal
+    <CustomDialog
       opened={asking}
       onClose={() => setAsking(false)}
       title="Custom Improvement"
-      size="sm"
-      fullScreen={phone}
-    >
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          // React carries a submit through the portal to the composer's own form, which would Generate.
-          event.stopPropagation();
-          if (instruction.trim()) ask(instruction.trim());
-        }}
-      >
-        <Stack>
-          <TextBox
-            label="Change"
-            placeholder="What should change, like “make it night”"
-            autosize
-            minRows={3}
-            // The dialog is already full screen on phones.
-            inline
-            data-autofocus
-            value={instruction}
-            onChange={setInstruction}
-            // Enter improves the prompt; Shift+Enter adds a line.
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-              event.preventDefault();
-              event.currentTarget.form?.requestSubmit();
-            }}
-          />
-          {/* A suggestion fills the request and asks at once. */}
-          {change?.suggestions && (
-            <Group>
-              {change.suggestions((request) => {
-                setInstruction(request);
-                ask(request);
-              })}
-            </Group>
-          )}
-          <DialogFooter onCancel={() => setAsking(false)}>
-            <Button type="submit" disabled={!instruction.trim()}>
-              Improve Prompt
-            </Button>
-          </DialogFooter>
-        </Stack>
-      </form>
-    </Modal>
+      action="Improve Prompt"
+      onSend={ask}
+      suggestions={change?.suggestions}
+    />
   );
   const list = suggestions.length ? (
     <Stack gap="xs">

@@ -197,7 +197,8 @@ export class GenerationQueue {
     };
     for (const resource of this.loaded.keys()) at(resource);
     for (const job of this.store.openJobs()) {
-      if (this.acceptedIds.has(job.id))
+      // A started job a restart recovered isn't accepted in this process yet, but still runs.
+      if (this.acceptedIds.has(job.id) || started(job))
         Object.assign(at(job.resource), { busy: true, current: job.id });
       else at(job.resource).queued += 1;
     }

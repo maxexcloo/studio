@@ -275,7 +275,7 @@ function OptionsMenu({
     <Menu
       position={position}
       width={menuWidth}
-      // An option that moves focus itself (AI's Custom… to the prompt) keeps it; otherwise it
+      // An option that moves focus itself (a Custom… dialog) keeps it; otherwise it
       // returns to the control that opened the menu.
       returnFocus={false}
       onClose={() =>

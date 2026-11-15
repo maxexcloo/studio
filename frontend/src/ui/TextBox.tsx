@@ -105,8 +105,6 @@ export function TextBox({
    */
   submit?: {
     label: string;
-    /** A shorter name to show, where the label is long (Ask for a Change shows Ask). */
-    text?: string;
     icon?: LucideIcon;
     disabled: boolean;
     keepOpen?: boolean;
@@ -240,8 +238,7 @@ export function TextBox({
       zIndex={getDefaultZIndex("max")}
       opened={menuOpened}
       onChange={setMenuOpened}
-      // An item that moves focus itself (Ask for a Change… selects the text) keeps it; otherwise it
-      // returns.
+      // An item that moves focus itself keeps it; otherwise it returns.
       returnFocus={false}
       onClose={() =>
         setTimeout(() => {
@@ -465,7 +462,7 @@ export function TextBox({
                             each.onSubmit();
                           }}
                         >
-                          {each.text ?? each.label}
+                          {each.label}
                         </Button>
                       );
                     })}
