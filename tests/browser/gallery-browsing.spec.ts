@@ -144,6 +144,20 @@ test("Select All takes every match across pages, and the search and Liked stay w
   await expect(page.getByRole("button", { name: "Select None", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   await expect(status).toHaveText("65 Selected");
+  if (test.info().project.use.isMobile) {
+    const selection = page.getByRole("group", { name: "Gallery Selection", exact: true });
+    const actions = selection.getByRole("group", { name: "Selected Item Actions", exact: true });
+    await expect(actions.getByRole("button", { name: "Unlike", exact: true })).toBeInViewport({
+      ratio: 1,
+    });
+    await page.evaluate(() => window.scrollBy(0, 800));
+    await expect(actions.getByRole("button", { name: "Unlike", exact: true })).toBeInViewport({
+      ratio: 1,
+    });
+    await expect(
+      selection.getByRole("button", { name: "Clear Selection", exact: true }),
+    ).toBeInViewport({ ratio: 1 });
+  }
   const unlike = page.waitForRequest("**/api/gallery/favorite");
   await selectionAction(page, "Unlike").click();
   expect((await unlike).postDataJSON()).toMatchObject({ rating: null });
