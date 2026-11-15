@@ -59,21 +59,17 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
     if (!requireAdmin(req, res)) return;
     const key = String(req.body?.key || "");
     const value = req.body?.value;
-    try {
-      if (isCatalogueFlag(key)) {
-        if (typeof value !== "boolean") throw new Error("Choose on or off.");
-        res.json({ ok: true, setting: { ...saveFlag(key, value), key } });
-        return;
-      }
-      if (defaultProfileKeys.includes(key)) {
-        const id = String(value || "").trim();
-        if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid profile.");
-        res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key } });
-        return;
-      }
-      res.status(400).json({ ok: false, error: "That setting cannot be changed here." });
-    } catch (error) {
-      res.status(error.status || 400).json({ ok: false, error: error.message });
+    if (isCatalogueFlag(key)) {
+      if (typeof value !== "boolean") throw new Error("Choose on or off.");
+      res.json({ ok: true, setting: { ...saveFlag(key, value), key } });
+      return;
     }
+    if (defaultProfileKeys.includes(key)) {
+      const id = String(value || "").trim();
+      if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid profile.");
+      res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key } });
+      return;
+    }
+    res.status(400).json({ ok: false, error: "That setting cannot be changed here." });
   });
 }

@@ -17,6 +17,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 const { registerMultiUserAuthRoutes, accountForRequest } = await import("./multi-user-auth.js");
 const store = await import("./account-store.js");
 const { ordinaryRouteAllowed } = await import("./multi-user-gate.js");
+const { routeErrors } = await import("./route-access.js");
 
 const routes = {};
 registerMultiUserAuthRoutes(
@@ -58,7 +59,11 @@ function call(handler, req) {
       return this;
     },
   };
-  return Promise.resolve(handler(req, res)).then(() => res);
+  // As the app's last handler answers a route's error.
+  return Promise.resolve()
+    .then(() => handler(req, res))
+    .catch((error) => routeErrors(error, req, res))
+    .then(() => res);
 }
 
 const local = (body = {}, extra = {}) => ({

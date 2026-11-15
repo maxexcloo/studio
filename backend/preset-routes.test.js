@@ -33,6 +33,7 @@ writeRuntimeDocument(dir, "presets", [
 const { registerPresetRoutes } = await import("./preset-routes.js");
 const { downloadPresetImage } = await import("./civitai/library.js");
 const { readImageMetadata } = await import("./image-metadata.js");
+const { routeErrors } = await import("./route-access.js");
 const bytes = Buffer.from("model");
 const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
 let online = true;
@@ -90,6 +91,7 @@ registerPresetRoutes(app, {
     };
   },
 });
+app.use(routeErrors);
 const server = app.listen(0, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 const base = `http://127.0.0.1:${server.address().port}`;

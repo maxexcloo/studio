@@ -525,24 +525,16 @@ export function registerMultiUserAuthRoutes(
     const account = accountForRequest(req);
     if (!account)
       return res.status(401).json({ ok: false, error: "Sign in to manage your MCP token." });
-    try {
-      res.setHeader("Cache-Control", "no-store");
-      res.json({ ok: true, ...rotateAccountMcpToken(account.userId) });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, ...rotateAccountMcpToken(account.userId) });
   });
 
   post("/api/accounts/mcp-token/revoke", (req, res) => {
     const account = accountForRequest(req);
     if (!account)
       return res.status(401).json({ ok: false, error: "Sign in to manage your MCP token." });
-    try {
-      revokeAccountMcpToken(account.userId);
-      res.json({ ok: true, ...accountMcpTokenStatus(account.userId) });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    revokeAccountMcpToken(account.userId);
+    res.json({ ok: true, ...accountMcpTokenStatus(account.userId) });
   });
 
   // Settings › Account: the signed-in account, what it may change, and its MCP token in one request.
@@ -571,41 +563,37 @@ export function registerMultiUserAuthRoutes(
       currentPassword: body.currentPassword,
       newPassword: body.newPassword,
     };
-    try {
-      validateOwnAccountChange(access.userId, changes);
-      // Checking the current password is a guess like a sign-in, so it shares the client's lane.
-      const result = await limiter.attempt(guessLane(req), false, async () => {
-        try {
-          return await updateOwnAccount(access.userId, changes, {
-            keepSessionToken: cookieToken(req),
-          });
-        } catch (error) {
-          if (error.message === wrongCurrentPassword) return null;
-          throw error;
-        }
-      });
-      if (result.reason === "busy" || result.reason === "locked") {
-        res
-          .status(429)
-          .setHeader(
-            "Retry-After",
-            String(Math.max(1, Math.ceil((result.retryAfterMs || 1000) / 1000))),
-          )
-          .json({
-            ok: false,
-            error:
-              result.reason === "locked"
-                ? `Too many attempts. Try again in ${waitWords(result.retryAfterMs)}.`
-                : "Wait a moment, then try again.",
-          });
-        return;
+    validateOwnAccountChange(access.userId, changes);
+    // Checking the current password is a guess like a sign-in, so it shares the client's lane.
+    const result = await limiter.attempt(guessLane(req), false, async () => {
+      try {
+        return await updateOwnAccount(access.userId, changes, {
+          keepSessionToken: cookieToken(req),
+        });
+      } catch (error) {
+        if (error.message === wrongCurrentPassword) return null;
+        throw error;
       }
-      if (!result.ok || !result.value)
-        return res.status(400).json({ ok: false, error: wrongCurrentPassword });
-      res.json({ ok: true, account: result.value });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
+    });
+    if (result.reason === "busy" || result.reason === "locked") {
+      res
+        .status(429)
+        .setHeader(
+          "Retry-After",
+          String(Math.max(1, Math.ceil((result.retryAfterMs || 1000) / 1000))),
+        )
+        .json({
+          ok: false,
+          error:
+            result.reason === "locked"
+              ? `Too many attempts. Try again in ${waitWords(result.retryAfterMs)}.`
+              : "Wait a moment, then try again.",
+        });
+      return;
     }
+    if (!result.ok || !result.value)
+      return res.status(400).json({ ok: false, error: wrongCurrentPassword });
+    res.json({ ok: true, account: result.value });
   });
 
   app.get("/api/accounts/admin", (_req, res, next) => {
@@ -645,35 +633,23 @@ export function registerMultiUserAuthRoutes(
   // Chat Gateway Admin Tools: gateway-linked administrators get MCP's admin tools (off by default).
   post("/api/accounts/gateway-admin", (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
-    try {
-      res.json({ ok: true, adminTools: setGatewayAdminTools(req.body?.on) });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    res.json({ ok: true, adminTools: setGatewayAdminTools(req.body?.on) });
   });
 
   post("/api/accounts/gateway-links", (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
-    try {
-      res.json({
-        ok: true,
-        gateway: setGatewayLink(
-          req.body?.identity,
-          typeof req.body?.accountId === "string" ? req.body.accountId : "",
-        ),
-      });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    res.json({
+      ok: true,
+      gateway: setGatewayLink(
+        req.body?.identity,
+        typeof req.body?.accountId === "string" ? req.body.accountId : "",
+      ),
+    });
   });
 
   post("/api/accounts/gateway-pending/dismiss", (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
-    try {
-      res.json({ ok: true, gateway: dismissGatewayIdentity(req.body?.identity) });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    res.json({ ok: true, gateway: dismissGatewayIdentity(req.body?.identity) });
   });
 
   admin("POST", "/api/accounts/profiles", async (_account, { body }) => {
@@ -699,12 +675,8 @@ export function registerMultiUserAuthRoutes(
 
   post("/api/accounts/users", async (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
-    try {
-      const account = await createLocalAccount({ ...req.body, role: "user" });
-      res.status(201).json({ ok: true, account });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    const account = await createLocalAccount({ ...req.body, role: "user" });
+    res.status(201).json({ ok: true, account });
   });
 
   admin("PATCH", "/api/accounts/users/:id", async (actor, { params, body = {} }) => {

@@ -96,13 +96,9 @@ export function registerLoraRoutes(app, { comfyDownMessage, latestComfyContext }
   app.put("/api/loras/:workflowId", (req, res) => {
     if (!accountMayUseLoras(req))
       return res.status(403).json({ ok: false, error: "LoRAs are off for this account." });
-    try {
-      res.json({
-        ok: true,
-        loras: saveLoraStack(req.params.workflowId, req.body?.loras, ownerIdForRequest(req)),
-      });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    res.json({
+      ok: true,
+      loras: saveLoraStack(req.params.workflowId, req.body?.loras, ownerIdForRequest(req)),
+    });
   });
 }

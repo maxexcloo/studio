@@ -55,12 +55,8 @@ export async function importUpload(upload, record, ownerId = "") {
  */
 export function registerGalleryImportRoute(app, { uploaded = () => {} } = {}) {
   app.post("/api/gallery/import", async (req, res, next) => {
-    try {
-      const upload = await readMultipartUpload(req);
-      req.body = { upload, record: JSON.parse(upload.fields.record || "{}") };
-    } catch (error) {
-      return res.status(400).json({ ok: false, error: error.message });
-    }
+    const upload = await readMultipartUpload(req);
+    req.body = { upload, record: JSON.parse(upload.fields.record || "{}") };
     next();
   });
   directRoute(app, "POST", "/api/gallery/import", async (account, { body }) => {
