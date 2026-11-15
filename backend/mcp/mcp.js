@@ -19,7 +19,7 @@ import { hostAllowed, hostnameOf } from "../request-guard.js";
 import { adminInstructions, registerAdminTools } from "./admin.js";
 import { createChatAssistantMemory, registerAssistantTools } from "./assistant.js";
 import { maxJobsPerCall, mcpGenerationCount } from "./controls.js";
-import { registerGenerateTools } from "./generate.js";
+import { createGuideLog, registerGenerateTools } from "./generate.js";
 import { controlInstructions, registerGpuTools } from "./gpu.js";
 import { registerManageTools } from "./manage.js";
 import { McpMedia, maxUploadMegabytes, resultPage, uploadPage } from "./media.js";
@@ -149,7 +149,7 @@ export function registerMcpRoutes(
       media.invalidateProfiles();
     next();
   });
-  const reviewedGuides = new Map();
+  const reviewedGuides = createGuideLog({ dataDir });
   // Calls to generate in the dedupe window by conversation and arguments (generate dedupes repeats).
   const recentGenerates = new Map();
   // Previews from generate by conversation and arguments, so the same call without preview queues what was shown.
