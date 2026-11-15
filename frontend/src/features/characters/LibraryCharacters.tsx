@@ -1,4 +1,4 @@
-import { Alert, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Alert, SimpleGrid, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
@@ -6,7 +6,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
-import { CardThumbnails } from "./CardImages";
+import { CardThumbnails, LibraryCard } from "./CardImages";
 import { CardSuggestions } from "./CardSuggestions";
 import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
@@ -51,53 +51,36 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
       ) : !cards.length ? (
         <EmptyState>{words ? "No Matches" : "No Characters"}</EmptyState>
       ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} role="list" aria-label="Characters">
+        <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} role="list" aria-label="Characters">
           {cards.map((card) => (
-            <Paper key={card.id} p="sm" withBorder role="listitem" aria-label={card.name}>
-              <Stack gap="xs">
-                <Group gap={6} wrap="nowrap" align="flex-start">
-                  <CardThumbnails
-                    label={`${card.name}'s Images`}
-                    images={card.references.map((asset, index) => ({
-                      key: asset.id,
-                      src: asset.url || asset.thumbnailUrl,
-                      thumbnailUrl: asset.thumbnailUrl,
-                      alt: `${card.name} ${index + 1}`,
-                    }))}
-                  />
-                  <Group ml="auto">
-                    <CharacterMenu
-                      card={card}
-                      onEdit={() => dialogs.edit(card)}
-                      onSheet={() => dialogs.sheet(card)}
-                      onDelete={() => dialogs.remove(card)}
-                      onUse={() => use.character(card)}
-                    />
-                  </Group>
-                </Group>
-                <div>
-                  <Text size="sm" fw={500}>
-                    {card.name}
-                  </Text>
-                  {card.description && (
-                    <Text size="sm" c="dimmed" lineClamp={2}>
-                      {card.description}
-                    </Text>
-                  )}
-                  <Text size="xs" c="dimmed">
-                    {[
-                      characterDetail(card),
-                      card.missing && `${card.missing} deleted from the gallery`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </Text>
-                </div>
-                {sheetViews(card).length > 0 && (
-                  <CardThumbnails label={`${card.name}'s Sheet`} images={sheetViews(card)} views />
-                )}
-              </Stack>
-            </Paper>
+            <LibraryCard
+              key={card.id}
+              name={card.name}
+              images={card.references}
+              menu={
+                <CharacterMenu
+                  card={card}
+                  onEdit={() => dialogs.edit(card)}
+                  onSheet={() => dialogs.sheet(card)}
+                  onDelete={() => dialogs.remove(card)}
+                  onUse={() => use.character(card)}
+                />
+              }
+            >
+              {card.description && (
+                <Text size="sm" c="dimmed" lineClamp={2}>
+                  {card.description}
+                </Text>
+              )}
+              <Text size="xs" c="dimmed">
+                {[characterDetail(card), card.missing && `${card.missing} deleted from the gallery`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+              {sheetViews(card).length > 0 && (
+                <CardThumbnails label={`${card.name}'s Sheet`} images={sheetViews(card)} views />
+              )}
+            </LibraryCard>
           ))}
         </SimpleGrid>
       )}

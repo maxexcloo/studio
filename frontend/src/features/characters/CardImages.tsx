@@ -1,6 +1,9 @@
 import {
+  AspectRatio,
   Badge,
+  Box,
   Button,
+  Card,
   FileButton,
   FocusTrap,
   Group,
@@ -200,6 +203,71 @@ export function CardThumbnails({
       ))}
       {preview.element}
     </Group>
+  );
+}
+
+/**
+ * A card in its Library grid: its first image as the cover, opening every image full size, its ⋯
+ * menu over the corner, then its name and `children` (description, details). A card without
+ * images shows its name beside the menu.
+ */
+export function LibraryCard({
+  name,
+  images,
+  menu,
+  children,
+}: {
+  name: string;
+  images: ReferenceAsset[];
+  menu: ReactNode;
+  children: ReactNode;
+}) {
+  const preview = useImagePreview();
+  const [cover] = images;
+  return (
+    <Card withBorder padding="sm" role="listitem" aria-label={name}>
+      {cover ? (
+        <Card.Section pos="relative">
+          <AspectRatio ratio={1}>
+            <UnstyledButton
+              aria-label={`Preview ${name}`}
+              onClick={() =>
+                preview.open(
+                  images.map((asset, index) => ({
+                    src: asset.url || asset.thumbnailUrl,
+                    thumbnailUrl: asset.thumbnailUrl,
+                    alt: `${name} ${index + 1}`,
+                  })),
+                  0,
+                )
+              }
+            >
+              <Image
+                src={cover.thumbnailUrl || cover.url}
+                alt={name}
+                h="100%"
+                fit="cover"
+                style={{ objectPosition: "top" }}
+                fallbackSrc=""
+              />
+            </UnstyledButton>
+          </AspectRatio>
+          <Box pos="absolute" top={8} right={8}>
+            {menu}
+          </Box>
+        </Card.Section>
+      ) : null}
+      <Stack gap={4} mt={cover ? "sm" : 0}>
+        <Group justify="space-between" wrap="nowrap" align="flex-start">
+          <Text size="sm" fw={500}>
+            {name}
+          </Text>
+          {!cover && menu}
+        </Group>
+        {children}
+      </Stack>
+      {preview.element}
+    </Card>
   );
 }
 
