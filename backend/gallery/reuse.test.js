@@ -394,6 +394,7 @@ test("Radiance reference settings omit unsupported denoise", async () => {
       url: "http://radiance:8000",
       kind: "image",
       backend: "radiance",
+      gpus: 2,
     },
     { id: "comfyui", label: "ComfyUI", url: "http://comfyui:8188", kind: "image" },
   ]);
