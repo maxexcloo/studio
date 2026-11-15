@@ -73,7 +73,7 @@ async function sendWithoutSettings(req, res) {
  * Whether /comfy/`proxyPath` serves `query`'s file: only ComfyUI's image route, for images, videos
  * and sound among its outputs, inputs and previews, and for an account only its own outputs. Its
  * other GET routes (settings, logs, Manager's) are not for the studio's visitors, and neither are
- * dot folders among the outputs (such as an old `.studio-trash`).
+ * dot folders among the outputs.
  */
 function viewable(account, proxyPath, query) {
   const type = String(query.type || "output");
