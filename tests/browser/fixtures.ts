@@ -975,17 +975,13 @@ export async function promptMenu(scope: Page | Locator, box: string) {
   return page.getByRole("menu");
 }
 
-/** Opens the viewer's prompt tools, within its full-screen editor on phones. */
+/** Opens the viewer's named Suggestions control without entering its prompt editor. */
 export async function viewerPromptMenu(page: Page) {
-  const field = page
+  await page
     .getByRole("dialog", { name: "Generation", exact: true })
-    .getByRole("textbox", { name: "Prompt", exact: true });
-  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
-  if ((await field.getAttribute("inputmode")) === "none") {
-    if (!(await editor.isVisible())) await field.click();
-    return promptMenu(editor, "Prompt");
-  }
-  return promptMenu(page, "Prompt");
+    .getByRole("button", { name: "Suggestions", exact: true })
+    .click();
+  return page.getByRole("menu");
 }
 
 /** Returns from the shared phone text editor when a test continues on its parent surface. */
@@ -1014,6 +1010,9 @@ export async function editorMenu(scope: Page | Locator, box: string, tool: strin
  */
 export async function viewerAction(page: Page, label: string, ...options: string[]) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const nested = ({ Report: "Edit", Similar: "Recreate" } as Record<string, string>)[label];
+  if (nested && (await viewer.getByRole("button", { name: label, exact: true }).count()) === 0)
+    return viewerAction(page, nested, label, ...options);
   await viewer
     .getByRole("button", { name: label, exact: true })
     .or(viewer.getByRole("link", { name: label, exact: true }))

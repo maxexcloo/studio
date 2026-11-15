@@ -201,7 +201,7 @@ export function useChangeSuggestions<K extends QueryKey>({
   };
   // The same under a heading, as one group of an assistant menu (assistMenu).
   const group: Action[] = [
-    { id: "suggestions-heading", label: "Suggestions", heading: true },
+    { id: "suggestions-heading", label: "Suggested", heading: true },
     ...options.map((option) => ({ ...option, icon: icons.suggestions })),
     again,
   ];

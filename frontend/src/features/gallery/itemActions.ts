@@ -42,3 +42,27 @@ export const itemActionGroups = (
   (layout === "bar" ? barSections : menuSections).map((ids) =>
     ids.flatMap((id) => actions.filter((action): action is Action => !!action && action.id === id)),
   );
+
+/** Phone viewers keep correction under Edit and discovery under Recreate. */
+export function compactViewerActions(groups: ActionGroups): ActionGroups {
+  const actions = groups.flat();
+  const destinations = new Map([
+    ["report", "edit"],
+    ["similar", "recreate"],
+  ]);
+  const nested = actions.filter((action) =>
+    actions.some((owner) => owner.id === destinations.get(action.id) && owner.menu),
+  );
+  return groups.map((group) =>
+    group
+      .filter((action) => !nested.includes(action))
+      .map((action) => {
+        const extra = nested.filter((child) => destinations.get(child.id) === action.id);
+        if (!extra.length) return action;
+        return {
+          ...action,
+          menu: [...action.menu!.slice(0, -1), extra, ...action.menu!.slice(-1)],
+        };
+      }),
+  );
+}
