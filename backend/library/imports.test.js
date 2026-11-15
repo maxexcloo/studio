@@ -220,7 +220,7 @@ test("a failed resolve is recorded with its reason; an interrupted one fails on 
   const failed = await h.engine.create("https://huggingface.co/org/gated");
   assert.equal(failed.state, "failed");
   assert.match(failed.error, /gated/);
-  assert.deepEqual(warnings, [`[library] Import ${failed.id} (hf-repo) failed: ${failed.error}`]);
+  assert.deepEqual(warnings, [`Import ${failed.id} (hf-repo) failed: ${failed.error}`]);
   assert.equal(failed.grade.value, "partial");
   await assert.rejects(
     h.engine.create("https://example.com/x"),

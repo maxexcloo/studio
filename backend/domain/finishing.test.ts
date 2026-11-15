@@ -182,7 +182,7 @@ test("Finishing waits for idle time, yields a waiting upscale to new work above 
   assert.equal(live().length, 0);
   assert.equal(finishing.waiting("alice"), 1);
   assert.deepEqual(state.logs, [
-    "[Studio] Finish Starred Images waits: The SeedVR2 models aren't installed yet.",
+    "Finish Starred Images waits: The SeedVR2 models aren't installed yet.",
   ]);
 
   state.ready = { faceDetail: false };

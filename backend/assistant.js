@@ -18,6 +18,7 @@ import { replyTitle } from "../shared/titles.ts";
  * or the LoRA pre-filter.
  */
 import { familyUpsampler, maxInstructionCharacters } from "./assistant-presets.js";
+import { logger } from "./crash-log.js";
 import { captionCharacters, captionInstructions, captionTags } from "./domain/captions.ts";
 import { userContent } from "./domain/model-content.ts";
 import { reviewInstructions, reviewReply } from "./domain/review.ts";
@@ -474,7 +475,7 @@ export function createAssistant(
     fetchImpl = fetch,
     // Reasoning models think for tens of seconds before a reply, streamed or not.
     timeoutMs = 90_000,
-    log = console,
+    log = logger,
     now = Date.now,
     resolveSettings = () => gatewaySettings(environment),
     // The running local text model (runtime/services.ts); none without a runtime.

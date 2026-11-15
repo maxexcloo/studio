@@ -7,6 +7,7 @@
 import { z } from "zod";
 
 import { maxPromptCharacters } from "../../shared/queue.ts";
+import { logger } from "../crash-log.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { promptStyleStore } from "../prompt-styles.js";
 import { mcpJson } from "./media.js";
@@ -28,7 +29,7 @@ const key = (owner, prompt) =>
  * `dataDir`, it is kept in its database (owners are account ids or MCP's keyed hashes; prompts are
  * already in the results).
  */
-export function createChatAssistantMemory({ now = Date.now, dataDir = "", log = console } = {}) {
+export function createChatAssistantMemory({ now = Date.now, dataDir = "", log = logger } = {}) {
   const rewrites = new Map();
   const suggested = new Map();
   const fresh = (entry) => (entry && now() - entry.at < rememberMs ? entry : null);
@@ -45,7 +46,7 @@ export function createChatAssistantMemory({ now = Date.now, dataDir = "", log = 
     } catch (error) {
       if (error.code !== "ENOENT")
         log.warn?.(
-          `[mcp] The chat assistant records couldn't be read; starting afresh: ${error.message}`,
+          `The chat assistant records couldn't be read; starting afresh: ${error.message}`,
         );
     }
   }
@@ -58,7 +59,7 @@ export function createChatAssistantMemory({ now = Date.now, dataDir = "", log = 
         suggested: [...suggested].filter(([, value]) => fresh(value)),
       });
     } catch (error) {
-      log.warn?.(`[mcp] The chat assistant records couldn't be saved: ${error.message}`);
+      log.warn?.(`The chat assistant records couldn't be saved: ${error.message}`);
     }
   };
   const keep = (map, id, value) => {

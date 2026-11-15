@@ -1,5 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 
+import { logWarning } from "./crash-log.js";
 import { tracked } from "./event-loop.js";
 import {
   eachGalleryItem,
@@ -128,7 +129,7 @@ function warmGalleryNow() {
   if (warming) return warming;
   warmedRevision = galleryRevisionValue();
   warming = warmGallery()
-    .catch((error) => console.warn(`[Studio] Media warm-up stopped: ${error.message}`))
+    .catch((error) => logWarning(`Media warm-up stopped: ${error.message}`))
     .finally(() => {
       warming = null;
     });

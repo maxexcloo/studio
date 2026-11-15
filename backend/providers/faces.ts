@@ -1,5 +1,6 @@
 import sharp, { type OutputInfo } from "sharp";
 
+import { logger } from "../crash-log.js";
 import { createModelFiles, createOnnxRunner } from "./onnx.ts";
 
 /**
@@ -67,7 +68,7 @@ function similarity(from: number[][], to: number[][]) {
 export function createFaces({
   dataDir,
   fetch,
-  log = console,
+  log = logger,
 }: {
   dataDir: string;
   fetch: (url: string, init?: RequestInit) => Promise<Response>;

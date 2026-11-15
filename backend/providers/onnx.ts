@@ -3,6 +3,7 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Worker } from "node:worker_threads";
 
+import { logger } from "../crash-log.js";
 import type { InferRequest } from "./onnx-worker.ts";
 
 /**
@@ -17,7 +18,7 @@ export function createModelFiles({
   files,
   label,
   fetch,
-  log = console,
+  log = logger,
 }: {
   dataDir: string;
   folder: string;
@@ -69,7 +70,7 @@ export function createModelFiles({
       if (downloaded()) return Promise.resolve();
       download ||= (async () => {
         downloadedBytes = 0;
-        log.info(`[Studio] Downloading the ${label} into ${directory}.`);
+        log.info(`Downloading the ${label} into ${directory}.`);
         for (const name of Object.keys(files)) await fetchFile(name);
         for (const entry of fs.readdirSync(root))
           if (entry !== revision)

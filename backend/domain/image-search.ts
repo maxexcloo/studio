@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { logger } from "../crash-log.js";
 import {
   type IdleDocument,
   type IdleItem,
@@ -99,7 +100,7 @@ export function createImageSearch(options: {
   now?: () => number;
   log?: { info(message: string): void };
 }) {
-  const { encoder, vectors, log = console } = options;
+  const { encoder, vectors, log = logger } = options;
   const work = createIdleWork<IdleItem>({
     ...options,
     name: "Image search",
@@ -141,7 +142,7 @@ export function createImageSearch(options: {
           target = await encoder.embedText(query);
         } catch (error) {
           const reason = (error as Error).message;
-          if (reason !== failed) log.info(`[Studio] Image search skip: ${reason}`);
+          if (reason !== failed) log.info(`Image search skip: ${reason}`);
           failed = reason;
           return null;
         }

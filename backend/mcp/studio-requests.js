@@ -5,6 +5,7 @@ import { outputFilenameBelongsToRequest } from "../account-ownership.js";
 import { accountAccessForId } from "../account-store.js";
 import { comfyFile, inDotFolder, localOutputFile } from "../comfy/comfy.js";
 import { comfyView, outputMime, ownerMediaTypes } from "../comfy/media-routes.js";
+import { logger } from "../crash-log.js";
 import { findDirectRoute } from "../domain/direct-route.ts";
 import { queuePriority } from "../domain/store.ts";
 import { routeLabel, step } from "../event-loop.js";
@@ -82,7 +83,7 @@ export function createMcpDomainRequest({ app, admit, ownsItem }) {
       return await found.run(account, { params: found.params, query, body, stop: signal });
     } catch (error) {
       // As Express answers a route that throws.
-      console.error(`[mcp] ${method} ${routePath} failed:`, error);
+      logger.error(`MCP request ${method} ${routePath} failed`, error);
       return { status: 500, payload: {} };
     }
   }

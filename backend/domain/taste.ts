@@ -1,4 +1,5 @@
 import { maxAvoid, maxAvoids, maxTasteSummary } from "../../shared/taste.ts";
+import { logWarning } from "../crash-log.js";
 import {
   deleteRuntimeDocument,
   readRuntimeDocument,
@@ -757,7 +758,7 @@ export function createTaste({
         )
           void refresh(ownerId).catch(() => undefined);
       } catch (error) {
-        console.warn(`[Studio] A taste signal was not saved: ${(error as Error).message}`);
+        logWarning(`A taste signal was not saved: ${(error as Error).message}`);
       }
     },
     /** Replaces what the person asked Studio to avoid. */

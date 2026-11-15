@@ -7,6 +7,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { logger } from "../crash-log.js";
+
 export const samplesDirectory = fileURLToPath(new URL("../samples", import.meta.url));
 
 const profileFiles = (dir) => {
@@ -26,7 +28,7 @@ export function seedSamples({
   workflowsDir = path.join(dataDir, "workflows"),
   samplesDir = samplesDirectory,
   store,
-  log = console,
+  log = logger,
 }) {
   // Profile history outlives a removed profile, so a folder that ever held one has some.
   const held = fs.existsSync(path.join(dataDir, "history", "profiles"));

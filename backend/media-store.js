@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 
 import { comfy } from "./comfy/comfy.js";
+import { logWarning } from "./crash-log.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { dataDir, mediaPath, mediaSubfolder, mediaUrls } from "./media-paths.js";
 import { runtimeDatabase } from "./persistence/runtime.ts";
@@ -25,7 +26,7 @@ export function noteIngested(jobIds) {
         "DELETE FROM studio_ingested_jobs WHERE rowid <= (SELECT rowid FROM studio_ingested_jobs ORDER BY rowid DESC LIMIT 1 OFFSET ?)",
       ).run(maxIngested);
   } catch (error) {
-    console.warn(`[Studio] Could not record ingested runs: ${error.message}`);
+    logWarning(`Could not record ingested runs: ${error.message}`);
   }
 }
 /**
@@ -88,7 +89,7 @@ export async function ingestRunResults(worker, results, ownerId = "", { strict =
       return moved || { output, comfyFile: null };
     } catch (error) {
       if (strict) throw error;
-      console.warn(`[Studio] Keeping an output in ComfyUI: ${error.message}`);
+      logWarning(`Keeping an output in ComfyUI: ${error.message}`);
       return { output, comfyFile: null };
     }
   };
@@ -122,7 +123,7 @@ export async function ingestRecords(worker, records) {
       comfyFiles.push(moved.comfyFile);
       return moved.output;
     } catch (error) {
-      console.warn(`[Studio] Keeping a recovered output in ComfyUI: ${error.message}`);
+      logWarning(`Keeping a recovered output in ComfyUI: ${error.message}`);
       return null;
     }
   };
@@ -180,8 +181,8 @@ export async function removeComfyFiles(backend, files) {
   } catch (error) {
     if (!missingWorker.has(backend)) {
       missingWorker.add(backend);
-      console.warn(
-        `[Studio] ComfyUI (${backend}) kept its copies: install the Studio worker node (comfyui/studio_worker) to remove them. ${error.status === 404 ? "" : error.message}`.trim(),
+      logWarning(
+        `ComfyUI (${backend}) kept its copies: install the Studio worker node (comfyui/studio_worker) to remove them. ${error.status === 404 ? "" : error.message}`.trim(),
       );
     }
     return { deleted: 0, skipped: list.length };
