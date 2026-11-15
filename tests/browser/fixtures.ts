@@ -981,7 +981,7 @@ export async function viewerPromptMenu(page: Page) {
     .getByRole("dialog", { name: "Generation", exact: true })
     .getByRole("button", { name: "Suggestions", exact: true })
     .click();
-  return page.getByRole("menu");
+  return page.getByRole("menu", { name: "Suggestions", exact: true });
 }
 
 /** Returns from the shared phone text editor when a test continues on its parent surface. */

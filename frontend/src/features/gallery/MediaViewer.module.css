@@ -61,6 +61,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  overscroll-behavior-x: contain;
   /* It holds focus only for the viewer's keys while navigation replaces the focused media. */
   outline: none;
 }

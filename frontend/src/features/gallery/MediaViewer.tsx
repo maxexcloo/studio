@@ -290,6 +290,27 @@ export function MediaViewer({
   const toggleChrome = () => setChromeHidden((hidden) => !hidden);
   // Navigation replaces the media, and focus on it would fall out of the viewer beyond its keys.
   const stage = useRef<HTMLDivElement>(null);
+  const containStage = useCallback((view: HTMLDivElement | null) => {
+    stage.current = view;
+    if (!view) return;
+    // Safari can take an edge swipe for history navigation despite touch-action on the media.
+    const containEdge = (event: TouchEvent) => {
+      if (event.touches.length !== 1 || layerAbove(view)) return;
+      const target = event.target as Element;
+      if (
+        target.closest("a, button, input, textarea, select") &&
+        (!target.closest("[data-zoom-mode]") || target.closest("[data-zoom-controls]"))
+      )
+        return;
+      const x = event.touches[0].clientX;
+      if (x <= 20 || x >= window.innerWidth - 20) event.preventDefault();
+    };
+    view.addEventListener("touchstart", containEdge, { passive: false });
+    return () => {
+      view.removeEventListener("touchstart", containEdge);
+      stage.current = null;
+    };
+  }, []);
   // Hidden chrome leaves the whole screen to the media: the stage moves its centre to the screen's,
   // measured again as the stage resizes, the screen turning included.
   useLayoutEffect(() => {
@@ -625,7 +646,7 @@ export function MediaViewer({
                 </Tooltip>
               </Group>
             </Group>
-            <div ref={stage} className={classes.stage} tabIndex={-1}>
+            <div ref={containStage} className={classes.stage} tabIndex={-1}>
               {showTogether ? (
                 // Each side opens alone; the current one, whose details show, is outlined.
                 <div className={classes.together}>
