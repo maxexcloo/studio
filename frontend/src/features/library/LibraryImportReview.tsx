@@ -24,7 +24,7 @@ import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { type LibraryPreset, inspirationQuery } from "../generation/inspiration";
 import { InspirationPreset } from "./InspirationPreset";
-import { catalogueQuery, definitionsKey, importsQuery } from "./queries";
+import { catalogueQuery, editableProfilesQuery, importsQuery } from "./queries";
 
 interface Availability {
   note?: string;
@@ -147,7 +147,7 @@ export function LibraryImportReview({
       void client.invalidateQueries({ queryKey: inspirationQuery.queryKey });
       if (variables.action === "draft-profile") {
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
-        void client.invalidateQueries({ queryKey: [...definitionsKey, "profile"] });
+        void client.invalidateQueries({ queryKey: editableProfilesQuery.queryKey });
       }
       if (result.failures?.length)
         notifications.show({

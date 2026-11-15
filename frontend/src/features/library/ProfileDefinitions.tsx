@@ -22,18 +22,13 @@ import {
   definitionPath,
 } from "./DefinitionEditor";
 import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
-import { type ProfileStats, definitionsKey, profileStatsQuery } from "./queries";
-
-interface ProfileRow {
-  id: string;
-  name?: string;
-  family?: string;
-  kind?: string;
-  version: number;
-  aiDrafted?: boolean;
-  /** A combined profile's current backend. */
-  backend?: string;
-}
+import {
+  type ProfileRow,
+  type ProfileStats,
+  definitionsKey,
+  editableProfilesQuery,
+  profileStatsQuery,
+} from "./queries";
 interface GuideRow {
   packId: string;
   /** The pack's name, else the label of a family it guides, else its id (GET /api/profiles/guides). */
@@ -103,10 +98,7 @@ interface Editing {
 function useDefinitions() {
   // Family names come with the models list; following it re-labels once they arrive.
   useQuery(modelsQuery);
-  const profileList = useQuery({
-    queryKey: [...definitionsKey, "profile"],
-    queryFn: () => api<{ profiles: ProfileRow[] }>("/api/profiles/editable"),
-  });
+  const profileList = useQuery(editableProfilesQuery);
   const guideList = useQuery({
     queryKey: [...definitionsKey, "guide"],
     queryFn: () => api<{ packs: GuideRow[] }>("/api/profiles/guides"),
