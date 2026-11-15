@@ -153,3 +153,25 @@ test("submission fills a missing negative from the guide and preserves the calle
   assert.equal(run({ negative: "  keep my wording  " }).negative, "  keep my wording  ");
   assert.equal(run({ cfg: 1 }).negative, "");
 });
+
+test("an unavailable LoRA inventory refuses an enabled stack instead of dropping it", () => {
+  const raw = JSON.parse(
+    fs.readFileSync(new URL("./samples/flux2-real-dream-image-edit.json", import.meta.url)),
+  );
+  raw.studio.id = "stack-inventory";
+  raw.studio.capabilities.lora = true;
+  saveImportedWorkflow(raw);
+  const input = {
+    ...request,
+    workflow: "custom:stack-inventory",
+    model: "custom:stack-inventory",
+    referenceAssets: [{ slot: "reference", assetId: "upload-id" }],
+    loras: [{ name: "effect.safetensors", strength: 1 }],
+  };
+  assert.throws(() => sanitizeGenerateBody(input, exact), /no LoRA inventory/);
+  const body = sanitizeGenerateBody(
+    { ...input, loras: [{ ...input.loras[0], enabled: false }] },
+    exact,
+  );
+  assert.deepEqual(body.loras, []);
+});
