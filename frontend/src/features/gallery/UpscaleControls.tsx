@@ -8,7 +8,7 @@ import type {
   UpscaleResponse,
   UpscaleStatus,
 } from "../../../../shared/upscale";
-import { api, failure, post } from "../../api";
+import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import type { Action } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
@@ -81,7 +81,6 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
       });
       void cache.invalidateQueries({ queryKey: downloadsQuery.queryKey });
     },
-    onError: failure,
   });
   const download = admin && detector?.nodesInstalled ? detector.download : undefined;
   const downloadFaceDetector = download && {
