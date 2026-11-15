@@ -290,10 +290,13 @@ export function MediaGrid({
     if (!layout || shownFocus.current === focusItem) return;
     const index = tileIndex(focusItem);
     if (index < 0) return;
+    // A grouped tile is marked by the version it shows.
+    const original = items[index].id;
+    const id = versions?.get(original)?.[shown[original]]?.id || original;
     shownFocus.current = focusItem;
-    pendingFocus.current = focusItem;
+    pendingFocus.current = id;
     scrollToTile(index);
-    if (focusTile(host.current, focusItem)) pendingFocus.current = null;
+    if (focusTile(host.current, id)) pendingFocus.current = null;
   }, [focusItem, layout]);
   const within = (top: number, height: number) => top < span.bottom && top + height > span.top;
   return (
