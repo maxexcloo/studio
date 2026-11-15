@@ -1269,7 +1269,7 @@ test("Models and Generate keep an old per-backend id's controls after the defaul
   assert.equal(f.submitted[0].width, 2048);
 });
 
-test("Generate attaches a compact guide once per account unless it read the selected profile, not discovery or another profile", async (t) => {
+test("Generate attaches a compact guide once per account unless it read the selected profile's whole guide, not its gist, discovery or another profile", async (t) => {
   const f = await fixture(t);
   await f.profiles([
     {
@@ -1302,10 +1302,13 @@ test("Generate attaches a compact guide once per account unless it read the sele
   );
   const bob = await f.client("bob");
   await call(bob, "models", { profile_id: imageProfile.id });
+  assert.ok(guideOf(await call(bob, "generate", args)), "a gist from Models leaves the guide due");
+  const dave = await f.client("dave");
+  await call(dave, "models", { profile_id: imageProfile.id, full_guide: true });
   assert.equal(
-    guideOf(await call(bob, "generate", args)),
+    guideOf(await call(dave, "generate", args)),
     undefined,
-    "a guide read through Models is not repeated",
+    "a whole guide read through Models is not repeated",
   );
   assert.ok(
     guideOf(await call(await f.client("carol"), "generate", args)),
@@ -1321,7 +1324,7 @@ test("Generate attaches a compact guide once per account unless it read the sele
   const now = Date.now();
   t.mock.method(Date, "now", () => now + 30 * 60_000);
   assert.ok(guideOf(await call(alice, "generate", args)), "the guide returns after half an hour");
-  assert.equal(f.submitted.length, 13);
+  assert.equal(f.submitted.length, 14);
 });
 
 test("Models caches each owner's catalogue for the TTL instead of rescanning per call", async (t) => {

@@ -687,7 +687,8 @@ export function registerGenerateTools({
           ...(loras.length ? {} : { loras_note: await noMatch(lora_query, total) }),
         });
       }
-      review(refs, profile.id);
+      // Only the whole guide counts as read; generate still sends it after the gist.
+      if (full_guide) review(refs, profile.id);
       // Defaults only for adjustable controls: a fixed value is not something to choose.
       const defaults = Object.fromEntries(
         Object.entries({ ...profile.defaults, count: controls.count.default }).filter(
