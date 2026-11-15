@@ -1663,3 +1663,100 @@ test("A pending output becomes saved media without losing the viewer or its retu
   await expect(page.locator('[data-media-id="working-0"]')).toHaveCount(0);
   await expect(page.locator('[data-media-id="saved-output"]')).toBeFocused();
 });
+
+for (const navigation of ["arrows", "keyboard", "swipe"] as const)
+  test(`Dislike preserves viewer neighbours, Undo and bounds with ${navigation}`, async ({
+    page,
+  }, testInfo) => {
+    const phone = testInfo.project.use.isMobile === true;
+    test.skip(navigation === "arrows" && phone, "Phones use swipes instead of arrow buttons");
+    test.skip(navigation === "swipe" && !phone, "Phone touch navigation");
+    const state = await fixtures(page);
+    state.gallery.push(...results(3));
+    await page.goto("/images?item=browse-1");
+    const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+    await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+    async function move(direction: "next" | "previous") {
+      if (navigation === "arrows")
+        await viewer
+          .getByRole("button", {
+            name: direction === "next" ? "Next Generation" : "Previous Generation",
+            exact: true,
+          })
+          .click();
+      else if (navigation === "keyboard")
+        await page.keyboard.press(direction === "next" ? "ArrowRight" : "ArrowLeft");
+      else {
+        const photo = viewer.getByRole("img");
+        const start = direction === "next" ? 220 : 60;
+        const end = direction === "next" ? 60 : 220;
+        const pointer = {
+          pointerId: 7,
+          pointerType: "touch",
+          button: 0,
+          clientY: 250,
+          isPrimary: true,
+        };
+        await photo.dispatchEvent("pointerdown", { ...pointer, clientX: start });
+        await photo.dispatchEvent("pointermove", { ...pointer, clientX: end });
+        await photo.dispatchEvent("pointerup", { ...pointer, clientX: end });
+      }
+    }
+    const refreshed = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/gallery",
+    );
+    await viewer.getByRole("button", { name: "Dislike", exact: true }).focus();
+    await page.keyboard.press("Space");
+    await expect.poll(() => state.gallery[1].rating).toBe("disliked");
+    await refreshed;
+    await expect(
+      page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+    ).toHaveCount(0);
+    await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+    await move("next");
+    await expect(page).toHaveURL(/item=browse-2$/);
+    await expect(viewer.getByRole("img", { name: "Browse Result 2", exact: true })).toBeVisible();
+    await move("previous");
+    await expect(page).toHaveURL(/item=browse-1$/);
+    await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect.poll(() => state.gallery[1].rating).toBeUndefined();
+    await expect(
+      page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+    ).toHaveCount(1);
+    await move("previous");
+    await expect(page).toHaveURL(/item=browse-0$/);
+    await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
+    await move("previous");
+    await expect(page).toHaveURL(/item=browse-0$/);
+    await move("next");
+    await expect(page).toHaveURL(/item=browse-1$/);
+    await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+    await move("next");
+    await expect(page).toHaveURL(/item=browse-2$/);
+    await expect(viewer.getByRole("img", { name: "Browse Result 2", exact: true })).toBeVisible();
+    await move("next");
+    await expect(page).toHaveURL(/item=browse-2$/);
+    await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Open image: Browse Result 2", exact: true }),
+    ).toBeFocused();
+  });
+
+test("Closing a disliked item focuses its next visible gallery neighbour", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(3));
+  await page.goto("/images?item=browse-1");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+  await viewer.getByRole("button", { name: "Dislike", exact: true }).focus();
+  await page.keyboard.press("Space");
+  await expect.poll(() => state.gallery[1].rating).toBe("disliked");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+  ).toHaveCount(0);
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 2", exact: true }),
+  ).toBeFocused();
+});

@@ -36,3 +36,15 @@ test("viewer reconciliation removes excluded results and retains updated metadat
   const liked = { ...a, rating: "liked" as const };
   assert.deepEqual(reconcileViewerItems([a, b], [liked]), [liked]);
 });
+
+test("a disliked current item keeps both neighbours through navigation and Undo", () => {
+  const a = item("a"),
+    b = item("b"),
+    c = item("c");
+  const disliked = { ...b, rating: "disliked" as const };
+  const held = reconcileViewerItems([a, b, c], [a, c], [disliked]);
+  assert.deepEqual(held, [a, disliked, c]);
+  assert.equal(held[held.indexOf(disliked) + 1], c);
+  assert.equal(held[held.indexOf(c) - 1], disliked);
+  assert.deepEqual(reconcileViewerItems(held, [a, b, c]), [a, b, c]);
+});

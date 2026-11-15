@@ -275,14 +275,23 @@ export function GalleryPage() {
           : items,
     [run, loaded, versions, shown?.id, items],
   );
-  const viewerOrder = useRef<{ scope: string; items: MediaItem[]; total?: number } | null>(null);
+  const viewerOrder = useRef<{
+    scope: string;
+    items: MediaItem[];
+    retained: Map<string, MediaItem>;
+    total?: number;
+  } | null>(null);
   const viewerScope = JSON.stringify([listingKey, run, grouped]);
   if (!itemId) viewerOrder.current = null;
   else {
     const previous = viewerOrder.current;
+    const retained = new Map(previous?.scope === viewerScope ? previous.retained : []);
+    // Dislike hides the current tile, but it remains a neighbour until this viewer closes.
+    if (shown) retained.set(mediaIdentity(shown), shown);
+    for (const candidate of candidates) retained.delete(mediaIdentity(candidate));
     const next =
       previous?.scope === viewerScope
-        ? reconcileViewerItems(previous.items, candidates)
+        ? reconcileViewerItems(previous.items, candidates, [...retained.values()])
         : candidates;
     const reset =
       previous?.scope !== viewerScope ||
@@ -291,9 +300,11 @@ export function GalleryPage() {
     viewerOrder.current = {
       scope: viewerScope,
       items: reset ? candidates : next,
+      retained,
       total: reset ? gallery.data?.pages.at(-1)?.totalApprox : previous.total,
     };
   }
+  const viewerItems = viewerOrder.current?.items || candidates;
   // The query the shown results answer: placeholder results still answer the previous one.
   const [resultsKey, setResultsKey] = useState(() => JSON.stringify(listingKey));
   if (!gallery.isPlaceholderData && resultsKey !== JSON.stringify(listingKey))
@@ -675,11 +686,24 @@ export function GalleryPage() {
       {selected && (
         <MediaViewer
           item={shown || selected}
-          items={viewerOrder.current?.items || candidates}
+          items={viewerItems}
           related={loaded}
           total={run || versions ? undefined : viewerOrder.current?.total}
           navigate={showItem}
-          onReturnFocus={(item) => setFocusItem(item.id)}
+          onReturnFocus={(item) => {
+            const visible = new Set(loaded.map((candidate) => candidate.id));
+            if (visible.has(item.id)) return setFocusItem(item.id);
+            const index = viewerItems.findIndex(
+              (candidate) => mediaIdentity(candidate) === mediaIdentity(item),
+            );
+            const neighbour =
+              viewerItems.slice(index + 1).find((candidate) => visible.has(candidate.id)) ||
+              viewerItems
+                .slice(0, index)
+                .reverse()
+                .find((candidate) => visible.has(candidate.id));
+            setFocusItem(neighbour?.id || null);
+          }}
           close={closeViewer}
         />
       )}
