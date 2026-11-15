@@ -69,12 +69,15 @@
   display: none;
 }
 
-:global([data-typing]) .editor[data-fill]:has(.fields:focus-within) .footer > [role="group"] {
+:global([data-typing])
+  .editor[data-fill]:has(.fields:focus-within)
+  .footer
+  > [aria-label="Generation Inputs"] {
   display: none;
 }
 
 /* The chips fade back in as typing ends, rather than snapping into place. */
-.editor[data-fill] .footer > [role="group"] {
+.editor[data-fill] .footer > [aria-label="Generation Inputs"] {
   animation: return var(--studio-motion-duration) var(--studio-ease-enter);
 }
 

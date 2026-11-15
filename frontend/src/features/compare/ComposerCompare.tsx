@@ -1,215 +1,324 @@
-import { Button, Menu, SegmentedControl, Tooltip } from "@mantine/core";
+import {
+  Button,
+  Checkbox,
+  Divider,
+  Group,
+  MultiSelect,
+  NumberInput,
+  SegmentedControl,
+  Select,
+  Stack,
+  Text,
+  Tooltip,
+} from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, X } from "lucide-react";
 import { useState } from "react";
 
-import { isCloudProfile, loraName } from "../../../../shared/profiles";
-import { menuWidth } from "../../theme";
-import type { GenerationInput, Profile } from "../../types";
-import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
+import { compareVariants } from "../../../../shared/compare";
+import { loraDefaultStrength, loraName } from "../../../../shared/profiles";
+import {
+  type Resolution,
+  availableResolutions,
+  withResolution,
+} from "../../../../shared/resolution";
+import type { GenerationInput } from "../../types";
 import { icons } from "../../ui/icons";
-import { plural } from "../../ui/plural";
+import { TextBox } from "../../ui/TextBox";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "../generation/chip";
 import { useGeneration } from "../generation/GenerationProvider";
-import { loraInfoQuery } from "../generation/LoraPicker";
-import { modelFamilyLabel } from "../generation/modelFamily";
-import { profileName } from "../generation/payload";
+import { compatibleLoras, loraInfoQuery } from "../generation/LoraPicker";
+import { profileForBackend, profileName } from "../generation/payload";
+import { ChipPopup } from "../generation/Picker";
+import { profileOptions } from "../generation/ProfilePicker";
+import {
+  letter,
+  loraInputs,
+  promptInputs,
+  promptLines,
+  seedInputs,
+  strengthInputs,
+} from "./inputs";
 import {
   addVariant,
   canAddVariant,
   compareInputs,
   draftVariants,
   fitsComparison,
-  letter,
   modelInputs,
-  promptInputs,
-  promptLines,
   removeVariant,
-  seedInputs,
   showVariant,
-  strengthInputs,
   useDraftComparison,
 } from "./variants";
 
-const noModels: string[] = [];
-const strengthOptions = [0, 0.4, 0.6, 0.8, 1, 1.2];
+const noChoices: string[] = [];
 const defaultStrengths = [0, 0.6, 0.8, 1];
-const seedCounts = ["2", "3", "4", "6"];
+const strengthOptions = [0, 0.4, 0.6, 0.8, 1, 1.2];
+const axes = ["Models", "LoRAs", "LoRA Strengths", "Resolutions", "Seeds", "Prompts"];
 
-const toggled = <T,>(list: T[], value: T) =>
-  list.includes(value) ? list.filter((each) => each !== value) : [...list, value];
+const modelName = (name: string) =>
+  name
+    .split(" · ")
+    .filter((part) => !/^\d+\s*(?:steps?|refs?|references?)$/i.test(part))
+    .join(" · ");
 
-/**
- * The composer's Compare ▾: duplicates or removes the variant being edited, or builds a whole
- * comparison from it across models, a LoRA's strengths, seeds or the prompt's lines.
- */
+/** Chooses one comparison axis and its values, then stages editable variants in the composer. */
 export function CompareMenu() {
   const { draft, setDraft, profiles, profile } = useGeneration();
-  const loraInfo = useQuery(loraInfoQuery).data?.loras;
-  const [models, setModels] = useRemembered("compare-models", noModels);
+  const metadata = useQuery(loraInfoQuery);
+  const info = metadata.data?.loras ?? {};
+  const [opened, setOpened] = useState(false);
+  const [axis, setAxis] = useRemembered("compare-axis", "Models");
+  const [models, setModels] = useRemembered("compare-models", noChoices);
+  const [loras, setLoras] = useRemembered("compare-loras", noChoices);
+  const [withoutLora, setWithoutLora] = useRemembered("compare-without-lora", true);
   const [strengths, setStrengths] = useRemembered("compare-strengths", defaultStrengths);
+  const [loraFile, setLoraFile] = useRemembered("compare-strength-lora", "");
+  const [sizes, setSizes] = useRemembered("compare-resolutions", noChoices);
   const [seeds, setSeeds] = useRemembered("compare-seeds", "4");
-  const [loraFile, setLoraFile] = useState<string>();
+  const [prompts, setPrompts] = useState<string | null>(null);
   const { input } = draft;
-  const active = draft.compare?.active ?? 0;
-  const compare = (inputs: GenerationInput[]) =>
-    setDraft((previous) => compareInputs(previous, inputs));
-  const run = (id: string, label: string, inputs: () => GenerationInput[], count: number) => ({
-    id,
-    label,
-    icon: icons.compare,
-    disabled: !fitsComparison(count),
-    onClick: () => compare(inputs()),
-  });
-
-  const others = profiles.filter(
-    (each) => each.kind === "image" && each.ready !== false && each.id !== profile?.id,
-  );
+  const effective = profileForBackend(profile, input.profileBackend, draft.references.length > 0);
+  const available = profiles.filter((each) => each.kind === "image" && each.ready !== false);
+  const others = available.filter((each) => each.id !== profile?.id);
   const chosen = others.filter((each) => models.includes(each.id));
-  const facts = (each: Profile) =>
-    `${modelFamilyLabel(each.family, each.familyName)} · ${isCloudProfile(each) ? "Cloud" : "Local GPU"}`;
-  const loras = input.loras.filter((lora) => lora.enabled !== false);
-  const lora = loras.find((each) => each.name === loraFile) ?? loras[0];
-  const lines = promptLines(input.prompt).length;
-  const variantActions: Action[] = [
-    {
-      id: "add-variant",
-      label: draft.compare ? `Duplicate Variant ${letter(active)}` : "Add Variant",
-      icon: icons.duplicate,
-      disabled: !canAddVariant(draft),
-      onClick: () => setDraft(addVariant),
-    },
-  ];
-  if (draft.compare)
-    variantActions.push(
-      {
-        id: "remove-variant",
-        label: `Remove Variant ${letter(active)}`,
-        icon: X,
-        onClick: () => setDraft(removeVariant),
-      },
-      {
-        id: "stop-comparing",
-        label: "Stop Comparing",
-        icon: icons.clear,
-        onClick: () => setDraft((value) => ({ ...value, compare: undefined })),
-      },
-    );
-  const builders: Action[] = [
-    {
-      id: "compare-models",
-      label: "Compare Models",
-      icon: icons.compareSideBySide,
-      disabled: !others.length,
-      menu: [
-        others.map((each) => ({
-          id: `model-${each.id}`,
-          label: profileName(each),
-          description: facts(each),
-          checked: models.includes(each.id),
-          keepOpen: true,
-          onClick: () => setModels(toggled(models, each.id)),
-        })),
-        [
-          run(
-            "run-models",
-            `Compare ${plural(chosen.length + 1, "Model")}`,
-            () => modelInputs(input, chosen),
-            chosen.length + 1,
-          ),
-        ],
-      ],
-    },
-  ];
-  if (lora)
-    builders.push({
-      id: "compare-strengths",
-      label: "Compare LoRA Strengths",
-      icon: icons.loras,
-      menu: [
-        loras.length > 1
-          ? [
-              {
-                id: "strength-lora",
-                label: "LoRA",
-                choice: {
-                  value: lora.name,
-                  options: loras.map((each) => ({
-                    value: each.name,
-                    label: loraName(each.name, loraInfo?.[each.name]),
-                  })),
-                  onChange: setLoraFile,
-                },
-              },
-            ]
-          : [],
-        strengthOptions.map((strength) => ({
-          id: `strength-${strength}`,
-          label: strength ? `Strength ${strength}` : "Without LoRA",
-          checked: strengths.includes(strength),
-          keepOpen: true,
-          onClick: () => setStrengths(toggled(strengths, strength).sort((a, b) => a - b)),
-        })),
-        [
-          run(
-            "run-strengths",
-            `Compare ${plural(strengths.length, "Strength")}`,
-            () => strengthInputs(input, lora.name, strengths),
-            strengths.length,
-          ),
-        ],
-      ],
-    });
-  builders.push(
-    {
-      id: "compare-seeds",
-      label: "Compare Seeds",
-      icon: icons.variations,
-      menu: [
-        [
-          {
-            id: "seed-count",
-            label: "Seeds",
-            choice: {
-              value: seeds,
-              options: seedCounts.map((count) => ({ value: count, label: count })),
-              onChange: setSeeds,
-            },
-          },
-        ],
-        [
-          run(
-            "run-seeds",
-            `Compare ${seeds} Seeds`,
-            () => seedInputs(input, Number(seeds)),
-            Number(seeds),
-          ),
-        ],
-      ],
-    },
-    {
-      ...run("compare-prompts", "Compare Prompts", () => promptInputs(input), lines),
-      icon: icons.prompt,
-      description: "One variant per line of the prompt",
-    },
+  const modelOptions = profileOptions(
+    others.map((each) => ({
+      ...each,
+      displayName: modelName(profileName(each)),
+    })),
   );
-  const groups: ActionGroups = [variantActions, builders];
+  const compatible = effective?.capabilities.lora ? compatibleLoras(effective, info) : [];
+  const loraOptions = compatible
+    .map((file) => ({ value: file, label: loraName(file, info[file]) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  const selectedLoras = compatible.filter((file) => loras.includes(file));
+  const native = effective?.options?.resolutions ?? [];
+  const sizeOptions = (native.length ? native : availableResolutions(effective, input)).map(
+    (value) => ({ value, label: value.toUpperCase() }),
+  );
+  const selectedSizes = sizes.filter((value) =>
+    sizeOptions.some((option) => option.value === value),
+  );
+  const text = prompts ?? input.prompt;
+  const count =
+    axis === "Models"
+      ? chosen.length + 1
+      : axis === "LoRAs"
+        ? selectedLoras.length + Number(withoutLora)
+        : axis === "LoRA Strengths"
+          ? compatible.includes(loraFile)
+            ? strengths.length
+            : 0
+          : axis === "Resolutions"
+            ? selectedSizes.length
+            : axis === "Seeds"
+              ? Number(seeds)
+              : promptLines(text).length;
+  const close = () => setOpened(false);
+  const stage = () => {
+    let inputs: GenerationInput[];
+    if (axis === "Models") inputs = modelInputs(input, chosen);
+    else if (axis === "LoRAs")
+      inputs = loraInputs(
+        input,
+        selectedLoras.map((name) => ({
+          name,
+          strength:
+            input.loras.find((lora) => lora.name === name)?.strength ??
+            loraDefaultStrength(info[name], 1),
+        })),
+        withoutLora,
+      );
+    else if (axis === "LoRA Strengths") inputs = strengthInputs(input, loraFile, strengths);
+    else if (axis === "Resolutions")
+      inputs = selectedSizes.map((size) =>
+        native.length
+          ? { ...input, resolution: size }
+          : withResolution({ ...input, resolutionTier: size as Resolution }, effective),
+      );
+    else if (axis === "Seeds") inputs = seedInputs(input, Number(seeds));
+    else inputs = promptInputs({ ...input, prompt: text });
+    setDraft((previous) => compareInputs(previous, inputs));
+    close();
+  };
+  const selection = {
+    comboboxProps: { withinPortal: false },
+    searchable: true,
+    maxDropdownHeight: 240,
+  };
   return (
-    <Menu position="top-start" width={menuWidth} withinPortal>
-      <Menu.Target>
+    <ChipPopup
+      title="Compare"
+      opened={opened}
+      onOpenedChange={setOpened}
+      width={360}
+      target={
         <Button
           {...chipProps}
+          onClick={() => setOpened(!opened)}
           leftSection={<icons.compare size={15} />}
           rightSection={<ChevronDown size={14} />}
         >
           Compare
         </Button>
-      </Menu.Target>
-      <Menu.Dropdown>
-        <ActionMenuItems groups={groups} />
-      </Menu.Dropdown>
-    </Menu>
+      }
+      footer={{
+        start: (
+          <Button fullWidth disabled={!fitsComparison(count)} onClick={stage}>
+            Start Comparing
+          </Button>
+        ),
+      }}
+    >
+      <Stack gap="sm">
+        <Select
+          label="What to Vary"
+          data={axes}
+          value={axis}
+          allowDeselect={false}
+          comboboxProps={{ withinPortal: false }}
+          onChange={(value) => setAxis(value!)}
+        />
+        {axis === "Models" && (
+          <>
+            <MultiSelect
+              {...selection}
+              label="Models"
+              placeholder="Choose models"
+              data={modelOptions}
+              value={chosen.map((each) => each.id)}
+              onChange={setModels}
+              maxValues={compareVariants.max - 1}
+              nothingFoundMessage="No models found"
+            />
+            <Text size="xs" c="dimmed">
+              Includes the current model, {profile && modelName(profileName(profile))}.
+            </Text>
+          </>
+        )}
+        {axis === "LoRAs" && (
+          <>
+            <MultiSelect
+              {...selection}
+              label="LoRAs"
+              placeholder="Choose LoRAs"
+              data={loraOptions}
+              value={selectedLoras}
+              onChange={setLoras}
+              maxValues={compareVariants.max - Number(withoutLora)}
+              nothingFoundMessage="No compatible LoRAs"
+            />
+            <Checkbox
+              label="Include Without Selected LoRAs"
+              checked={withoutLora}
+              onChange={(event) => setWithoutLora(event.currentTarget.checked)}
+            />
+          </>
+        )}
+        {axis === "LoRA Strengths" && (
+          <>
+            <Select
+              {...selection}
+              label="LoRA"
+              placeholder="Choose a LoRA"
+              data={loraOptions}
+              value={compatible.includes(loraFile) ? loraFile : null}
+              onChange={(value) => setLoraFile(value!)}
+              allowDeselect={false}
+              nothingFoundMessage="No compatible LoRAs"
+            />
+            <MultiSelect
+              label="Strengths"
+              data={strengthOptions.map((strength) => ({
+                value: String(strength),
+                label: strength ? String(strength) : "Without LoRA",
+              }))}
+              value={strengths.map(String)}
+              onChange={(values) => setStrengths(values.map(Number).sort((a, b) => a - b))}
+              comboboxProps={{ withinPortal: false }}
+            />
+          </>
+        )}
+        {axis === "Resolutions" && (
+          <MultiSelect
+            label="Resolutions"
+            data={sizeOptions}
+            value={selectedSizes}
+            onChange={setSizes}
+            comboboxProps={{ withinPortal: false }}
+            nothingFoundMessage="No native resolutions available"
+          />
+        )}
+        {axis === "Seeds" && (
+          <NumberInput
+            label="Seeds"
+            min={compareVariants.min}
+            max={compareVariants.max}
+            value={Number(seeds)}
+            onChange={(value) => setSeeds(String(value))}
+          />
+        )}
+        {axis === "Prompts" && (
+          <TextBox
+            label="Prompts"
+            description="One variant per line."
+            autosize
+            minRows={3}
+            maxRows={6}
+            inline
+            tools={[]}
+            value={text}
+            onChange={setPrompts}
+          />
+        )}
+        <Text size="xs" c="dimmed">
+          {count} variants · choose {compareVariants.min}–{compareVariants.max} to compare.
+        </Text>
+        <Divider />
+        <Group gap="xs">
+          <Button
+            variant="subtle"
+            size="compact-sm"
+            leftSection={<icons.duplicate size={16} />}
+            disabled={!canAddVariant(draft)}
+            onClick={() => {
+              setDraft(addVariant);
+              close();
+            }}
+          >
+            {draft.compare ? `Duplicate Variant ${letter(draft.compare.active)}` : "Add Variant"}
+          </Button>
+          {draft.compare && (
+            <>
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                leftSection={<X size={16} />}
+                onClick={() => {
+                  setDraft(removeVariant);
+                  close();
+                }}
+              >
+                Remove Variant {letter(draft.compare.active)}
+              </Button>
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                leftSection={<icons.clear size={16} />}
+                onClick={() => {
+                  setDraft((value) => ({ ...value, compare: undefined }));
+                  close();
+                }}
+              >
+                Stop Comparing
+              </Button>
+            </>
+          )}
+        </Group>
+      </Stack>
+    </ChipPopup>
   );
 }
 

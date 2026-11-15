@@ -3,10 +3,13 @@ import { type Page, expect, test } from "@playwright/test";
 import { outfitPart, scenePart, withCharacter } from "../../shared/characters";
 import {
   closeReferences,
+  closeTextEditor,
   create,
+  editorMenu,
   fixtures,
   image,
   profiles,
+  promptMenu,
   serveProfiles,
   signIn,
   stamp,
@@ -156,7 +159,7 @@ test("New Character saves a name, description and gallery images from the Refere
   // Phones edit the description full screen; desktops type in place.
   const description = page.getByRole("textbox", { name: "Description", exact: true }).last();
   await description.fill("red-haired ranger");
-  const done = page.getByRole("button", { name: "Done", exact: true });
+  const done = page.getByRole("button", { name: "Close Description", exact: true });
   if (await done.isVisible()) await done.click();
   // Add Images opens the gallery choices in a popup of their own.
   await editor.getByRole("button", { name: "Add Images", exact: true }).click();
@@ -202,7 +205,7 @@ test("New Character saves a name, description and gallery images from the Refere
 
 test("Use as Character starts a card from a gallery image in Library › Characters, named and described by the assistant", async ({
   page,
-}) => {
+}, testInfo) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "ranger",
@@ -274,8 +277,15 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   await editor.getByRole("button", { name: "Suggest Name", exact: true }).click();
   await page.getByRole("menuitem", { name: "Mara", exact: true }).click();
   await expect(name).toHaveValue("Mara");
-  await editor.getByRole("button", { name: "Suggest Description", exact: true }).click();
+  if (
+    (await editor
+      .getByRole("textbox", { name: "Description", exact: true })
+      .getAttribute("inputmode")) === "none"
+  )
+    await editorMenu(editor, "Description", "Suggest Description");
+  else await promptMenu(editor, "Description");
   await expect(page.getByRole("menuitem")).toHaveText([
+    ...(testInfo.project.use.isMobile ? [] : ["Copy", "Clear"]),
     "freckled redhead, slim build",
     "green-eyed ranger",
     "red-haired ranger, green cloak",
@@ -286,6 +296,7 @@ test("Use as Character starts a card from a gallery image in Library › Charact
     "Custom…",
   ]);
   await page.getByRole("menuitem", { name: "red-haired ranger, green cloak", exact: true }).click();
+  await closeTextEditor(page, "Description");
   await expect(editor.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
     "red-haired ranger, green cloak",
   );

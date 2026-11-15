@@ -106,7 +106,10 @@ export function usePromptAssistant({
   change?: {
     send: (request: string) => void;
     pending: boolean;
-    suggestions?: (pick: (request: string) => void) => ReactNode;
+    suggestions?: (
+      pick: (request: string) => void,
+      render: (action: ToolAction) => ReactNode,
+    ) => ReactNode;
   };
 }) {
   const status = useQuery(assistantQuery);

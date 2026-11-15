@@ -1,7 +1,9 @@
-import { Button, Group, Modal, Stack } from "@mantine/core";
-import { type ReactNode, useState } from "react";
+import { Button, Modal, Stack } from "@mantine/core";
+import { type ReactNode, useId, useState } from "react";
 
+import type { Action } from "../../ui/ActionBar";
 import { DialogFooter } from "../../ui/ConfirmDialog";
+import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 
@@ -28,65 +30,74 @@ export function CustomDialog({
   label?: string;
   placeholder?: string;
   onSend: (request: string) => void;
-  suggestions?: (pick: (request: string) => void) => ReactNode;
+  suggestions?: (
+    pick: (request: string) => void,
+    render: (action: Action) => ReactNode,
+  ) => ReactNode;
   zIndex?: number;
 }) {
   const phone = usePhone();
+  const id = useId();
   const [request, setRequest] = useState("");
   const send = (text: string) => {
     onClose();
     onSend(text);
   };
+  const form = (tools: Action[] = []) => (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        // React carries a submit through the portal to the composer's own form, which would Generate.
+        event.stopPropagation();
+        if (request.trim()) send(request.trim());
+      }}
+    >
+      <Stack>
+        <TextBox
+          label={label}
+          placeholder={placeholder}
+          autosize
+          minRows={3}
+          // The dialog is already full screen on phones.
+          inline
+          tools={tools}
+          data-autofocus
+          value={request}
+          onChange={setRequest}
+          // Enter sends; Shift+Enter adds a line.
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            event.currentTarget.form?.requestSubmit();
+          }}
+        />
+        <DialogFooter onCancel={onClose}>
+          <Button type="submit" disabled={!request.trim()}>
+            {action}
+          </Button>
+        </DialogFooter>
+      </Stack>
+    </form>
+  );
   return (
     <Modal
       opened={opened}
-      onClose={onClose}
+      id={id}
+      onClose={closeWhenTop(id, onClose)}
       title={title}
       size="sm"
       fullScreen={phone}
       zIndex={zIndex}
     >
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          // React carries a submit through the portal to the composer's own form, which would Generate.
-          event.stopPropagation();
-          if (request.trim()) send(request.trim());
-        }}
-      >
-        <Stack>
-          <TextBox
-            label={label}
-            placeholder={placeholder}
-            autosize
-            minRows={3}
-            // The dialog is already full screen on phones.
-            inline
-            data-autofocus
-            value={request}
-            onChange={setRequest}
-            // Enter sends; Shift+Enter adds a line.
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-              event.preventDefault();
-              event.currentTarget.form?.requestSubmit();
-            }}
-          />
-          {suggestions && (
-            <Group>
-              {suggestions((picked) => {
-                setRequest(picked);
-                send(picked);
-              })}
-            </Group>
-          )}
-          <DialogFooter onCancel={onClose}>
-            <Button type="submit" disabled={!request.trim()}>
-              {action}
-            </Button>
-          </DialogFooter>
-        </Stack>
-      </form>
+      {suggestions
+        ? suggestions(
+            (picked) => {
+              setRequest(picked);
+              send(picked);
+            },
+            (action) => form([action]),
+          )
+        : form()}
     </Modal>
   );
 }

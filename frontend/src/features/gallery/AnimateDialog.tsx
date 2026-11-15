@@ -1,10 +1,11 @@
 import { Alert, Button, Modal, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import type { MediaItem } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
+import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { useChangeSuggestions } from "../generation/AskChange";
@@ -36,6 +37,7 @@ export function AnimateDialog({
   onClose: () => void;
 }) {
   const phone = usePhone();
+  const id = useId();
   const iteration = useMediaIteration(item);
   const run = iterate ?? iteration.mutate;
   const [review] = useAnimateReview();
@@ -65,10 +67,27 @@ export function AnimateDialog({
     return () => writing.current?.abort();
   }, []);
   const written = writer.data;
+  const animate = () => {
+    if (!instruction.trim()) return;
+    if (review) return write();
+    run({ kind: "animate", theme, instruction: instruction.trim() });
+    onClose();
+  };
+  const submitPrompt = () => {
+    if (!written || !prompt.trim()) return;
+    run({
+      kind: "animate",
+      theme,
+      instruction: instruction.trim() || undefined,
+      written: { prompt: prompt.trim(), model: written.model, thinking: written.thinking },
+    });
+    onClose();
+  };
   return (
     <Modal
       opened
-      onClose={onClose}
+      id={id}
+      onClose={closeWhenTop(id, onClose)}
       title={asking ? "Custom Animation" : "Review Prompt"}
       size={asking ? "sm" : "md"}
       fullScreen={phone}
@@ -77,10 +96,8 @@ export function AnimateDialog({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            if (!instruction.trim()) return;
-            if (review) return write();
-            run({ kind: "animate", theme, instruction: instruction.trim() });
-            onClose();
+            event.stopPropagation();
+            animate();
           }}
         >
           <Stack>
@@ -92,7 +109,14 @@ export function AnimateDialog({
               data-autofocus
               value={instruction}
               onChange={setInstruction}
-              tools={offered ? [ideas.action] : undefined}
+              tools={offered ? [ideas.action] : []}
+              submit={[
+                {
+                  label: review ? "Write Prompt" : "Animate",
+                  disabled: !instruction.trim(),
+                  onSubmit: animate,
+                },
+              ]}
             />
             <DialogFooter onCancel={onClose}>
               <Button type="submit" disabled={!instruction.trim()}>
@@ -107,14 +131,8 @@ export function AnimateDialog({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            if (!written || !prompt.trim()) return;
-            run({
-              kind: "animate",
-              theme,
-              instruction: instruction.trim() || undefined,
-              written: { prompt: prompt.trim(), model: written.model, thinking: written.thinking },
-            });
-            onClose();
+            event.stopPropagation();
+            submitPrompt();
           }}
         >
           <Stack>
@@ -132,6 +150,8 @@ export function AnimateDialog({
                   data-autofocus
                   value={prompt}
                   onChange={setPrompt}
+                  tools={[]}
+                  submit={[{ label: "Run", disabled: !prompt.trim(), onSubmit: submitPrompt }]}
                 />
                 <Text size="sm" c="dimmed">
                   {written.profileLabel}

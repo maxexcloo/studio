@@ -117,13 +117,15 @@ export function PromptFields({
       ? {
           send: ask.sendRequest,
           pending: ask.pending,
-          suggestions: (pick) => (
+          suggestions: (pick, render) => (
             <ChangeSuggestions
               query={draftStepsQuery(input.kind, base.trim())}
               fresh={() => askDraftSteps(input.kind, base.trim(), true)}
               disabled={!base.trim() || ask.pending}
               onPick={pick}
-            />
+            >
+              {render}
+            </ChangeSuggestions>
           ),
         }
       : undefined,
