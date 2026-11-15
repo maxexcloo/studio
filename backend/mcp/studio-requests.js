@@ -9,7 +9,7 @@ import { logger } from "../crash-log.js";
 import { findDirectRoute } from "../domain/direct-route.ts";
 import { queuePriority } from "../domain/store.ts";
 import { routeLabel, step } from "../event-loop.js";
-import { galleryJobItems } from "../gallery/store.js";
+import { filterVisibleGallery, galleryJobItems } from "../gallery/store.js";
 import { mediaType, outputMediaPattern } from "../media-paths.js";
 import { mcpAccount, multiUserEnabled } from "../multi-user-auth.js";
 import { multiUserRefusal, publicAccountPaths } from "../multi-user-gate.js";
@@ -18,8 +18,15 @@ import { mcpOutputPath } from "./media.js";
 /** A signed MCP result link's file for its owner, as `{ content, mime }`, or null. */
 export async function resolveSignedMcpResult(owner, jobId, index) {
   if (!accountAccessForId(owner)?.authenticated) return null;
-  const item = galleryJobItems(jobId, owner).find(
-    (entry) => entry.ownerId === owner && entry.index === index && entry.status === "done",
+  const [item] = filterVisibleGallery(
+    galleryJobItems(jobId, owner).filter(
+      (entry) =>
+        entry.ownerId === owner &&
+        entry.index === index &&
+        entry.status === "done" &&
+        (!entry.dream || entry.dream.state === "kept"),
+    ),
+    { disliked: true },
   );
   if (!item || !mcpOutputPath(item.url)) return null;
   const source = new URL(item.url, "http://localhost");
