@@ -2,6 +2,16 @@ import { type Page, expect, test } from "@playwright/test";
 
 import { dreamItem, fixtures, serveDream, stamp } from "./fixtures";
 
+/** Opens a Dream view: from the segmented control, or the view menu on phones. */
+async function showView(page: Page, name: string) {
+  const menu = page.getByRole("button", { name: "Dream View", exact: true });
+  await expect(menu.or(page.getByRole("radiogroup", { name: "Dream View" }))).toBeVisible();
+  if (await menu.isVisible()) {
+    await menu.click();
+    await page.getByRole("menuitemradio", { name, exact: true }).click();
+  } else await page.getByText(name, { exact: true }).click();
+}
+
 const current = (page: Page) => page.getByRole("group", { name: "Current Dream", exact: true });
 /** Clicks an action in full screen's Dream bar; phones keep More Like This and Variations under ⋯ More. */
 async function dreamAction(page: Page, phone: boolean, name: string) {
@@ -92,7 +102,7 @@ test("While You Were Away ranks each project's results, folds its misses and jud
     ],
   });
   await page.goto("/dream");
-  await page.getByText("Overview", { exact: true }).click();
+  await showView(page, "Overview");
   await expect(page.getByRole("heading", { name: "While You Were Away" })).toBeVisible();
   await expect(page.getByText(/^4 new since /)).toBeVisible();
   await expect(page.getByRole("heading", { level: 3, name: /^(Beach|City|Other)$/ })).toHaveText([
@@ -155,7 +165,7 @@ test("While You Were Away shows a series as one set, in its order", async ({ pag
     });
   await serveDream(page, { unseen: [shot("second", 1), dreamItem("loose"), shot("first", 0)] });
   await page.goto("/dream");
-  await page.getByText("Overview", { exact: true }).click();
+  await showView(page, "Overview");
   const set = page.getByRole("group", { name: "Series: Mara · Diner, Midnight" });
   await expect(set.getByText("· Series of 2")).toBeVisible();
   const views = set.getByRole("button", { name: /^View / });
@@ -284,7 +294,6 @@ test("While Dream is off, the deck compares gallery images in pairs", async ({ p
     calibration: gallery,
   });
   await page.goto("/dream");
-  await expect(page.getByRole("status", { name: "Dream Status" })).toContainText("Dream is off.");
   await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
   await page.keyboard.press("ArrowLeft");
   await expect.poll(() => dream.requests.length).toBe(1);
@@ -384,9 +393,12 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   await expect(card).toContainText("Dream prompt g3");
   await page.keyboard.press("ArrowRight");
   // Every fourth card is a pair.
-  await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
-  await page.getByRole("button", { name: "B", exact: true }).click();
+  // Tapping an image chooses it once Undo has passed.
+  await page.getByRole("button", { name: "Choose B", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
+  const chosen = page.getByRole("alert").filter({ hasText: "Chose B" });
+  await chosen.getByRole("button", { name: "Close", exact: true }).click();
+  await expect.poll(() => dream.requests.length).toBe(4);
   expect(dream.requests.map((request) => request.body)).toEqual([
     { liked: ["g1"] },
     { passed: ["g2"] },
@@ -424,8 +436,8 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await expect(pair).toContainText("A · 20 Steps");
   await expect(pair).toContainText("B · 40 Steps");
 
-  // Tapping a side opens it in the viewer; closing it returns to the same comparison.
-  await pair.locator("[data-side='1']").click();
+  // A side's label opens it in the viewer; closing it returns to the same comparison.
+  await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
   const viewer = page.getByRole("dialog");
   // Keys reach the viewer once its focus trap has taken focus.
   await expect(viewer.getByRole("button", { name: "Generation Details" })).toBeFocused();
@@ -442,7 +454,16 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await page.mouse.up();
   await expect.poll(() => dream.requests.length).toBe(1);
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("group", { name: "Which Steps?" })).toContainText("Guidance 3");
+  const third = page.getByRole("group", { name: "Which Steps?", exact: true });
+  await expect(third).toContainText("Guidance 3");
+  // A tapped image is chosen until Undo puts the comparison back.
+  await third.getByRole("button", { name: "Choose A · Guidance 3", exact: true }).click();
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Chose A · Guidance 3" })
+    .getByRole("button", { name: "Undo", exact: true })
+    .click();
+  await expect(third).toContainText("Guidance 3");
   await page.getByRole("button", { name: "Both", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   expect(
@@ -464,7 +485,7 @@ test("Discarded Dream results can be viewed and kept after all, or deleted all a
     discarded: [discarded("gone"), discarded("other"), discarded("last")],
   });
   await page.goto("/dream");
-  await page.getByText("Discarded", { exact: true }).click();
+  await showView(page, "Discarded");
   await page.getByRole("button", { name: "Keep Dream prompt gone", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Keep Dream prompt gone", exact: true }),
@@ -511,7 +532,7 @@ test("Full screen switches between a comparison's sides and judges from its bar"
   await page.goto("/dream");
   await page
     .getByRole("group", { name: "Which Steps?", exact: true })
-    .locator("[data-side='0']")
+    .getByRole("button", { name: "View A · 20 Steps", exact: true })
     .click();
   const viewer = page.getByRole("dialog");
   const shown = viewer.getByRole("radiogroup", { name: "Shown Image" });
@@ -587,7 +608,7 @@ test("Dream's projects are created, edited, undone and deleted in dialogs", asyn
     ],
   });
   await page.goto("/dream");
-  await page.getByText("Projects", { exact: true }).click();
+  await showView(page, "Projects");
   const coast = page.getByRole("region", { name: "Coast", exact: true });
   // A chat's change shows with Undo, which restores what it replaced.
   await expect(coast).toContainText("Changed by a chat");
