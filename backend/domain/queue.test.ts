@@ -247,6 +247,30 @@ test("restart follows only recorded provider jobs and never resubmits uncertain 
   }
 });
 
+test("stopping leaves a running job to its worker, and a restart follows it to the end", async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "studio-queue-"));
+  const filename = path.join(dir, "studio.sqlite");
+  const first = fixture(filename);
+  const session = first.store.createSession("alice");
+  const job = first.store.enqueue("alice", session.id, {}, "image");
+  await first.queue.tick();
+  // The worker stops answering: the next observation never returns.
+  first.adapter.observe = () => new Promise(() => {});
+  void first.queue.tick();
+  first.queue.stop();
+  first.store.close();
+  const restored = fixture(filename);
+  try {
+    restored.observations.set(job.id, { status: "completed", outputs: [{ url: "/media/a.png" }] });
+    await restored.queue.tick();
+    assert.equal(restored.store.job("alice", job.id)?.status, "completed");
+    assert.deepEqual(restored.submitted, []);
+  } finally {
+    restored.store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 /** Completes running work tick by tick until the queue is idle. */
 async function drain({ store, queue, observations }: ReturnType<typeof fixture>, passes = 20) {
   for (let pass = 0; pass < passes; pass++) {
@@ -551,7 +575,7 @@ test("a job is not observed while its submission is in flight, and a cancel then
     assert.deepEqual(observed, [job.id]);
   } finally {
     release.resolve();
-    await queue.stop();
+    queue.stop();
     store.close();
   }
 });
@@ -800,7 +824,7 @@ test("a slow submission does not block a later independent resource or duplicate
     await firstTick;
   } finally {
     release.resolve();
-    await queue.stop();
+    queue.stop();
     store.close();
   }
 });
@@ -826,7 +850,7 @@ test("cancellation while readiness is pending releases its acquired runtime admi
     assert.deepEqual(events, [`released:${job.id}`]);
   } finally {
     ready.resolve();
-    await queue.stop();
+    queue.stop();
     store.close();
   }
 });
@@ -898,7 +922,7 @@ test("the writing stage streams into the item, then queues the written prompt", 
     });
     assert.equal(written.progress, undefined);
   } finally {
-    await queue.stop();
+    queue.stop();
     store.close();
   }
 });
@@ -927,7 +951,7 @@ test("at most two prompts are written at once; the next waits in order", async (
     assert.equal(store.job("alice", third.id)?.reason, "");
     for (const step of steps.values()) step.resolve();
   } finally {
-    await queue.stop();
+    queue.stop();
     store.close();
   }
 });
@@ -952,7 +976,7 @@ test("a writing failure fails the item with its reason; cancelling stops the wri
     const cancelled = store.enqueue("alice", session.id, { prompt: "", writing }, "animate");
     await queue.tick();
     await queue.cancel("alice", cancelled.id);
-    await queue.stop();
+    queue.stop();
     assert.equal(store.job("alice", failing.id)?.status, "failed");
     assert.equal(
       store.job("alice", failing.id)?.reason,

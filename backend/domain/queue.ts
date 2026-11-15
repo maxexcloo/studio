@@ -143,7 +143,6 @@ const videoWaitReason = "Waiting for another video to finish.";
 
 /** Only this database's recorded IDs reach the provider adapter. Restart never resubmits accepted work. */
 export class GenerationQueue {
-  private runs = new Set<Promise<void>>();
   private observing = new Set<string>();
   private scheduling = new Set<string>();
   private checkingEligibility = new Set<string>();
@@ -219,13 +218,16 @@ export class GenerationQueue {
     }
   }
 
-  async stop() {
+  /**
+   * Starts nothing more. Runs in flight aren't awaited: a started generation carries on in its
+   * worker and job recovery saves it after a restart, and an interrupted prompt stays in its
+   * writing stage and is written afresh.
+   */
+  stop() {
     this.stopped = true;
     clearInterval(this.timer);
     this.timer = undefined;
-    // An interrupted prompt stays in its writing stage and is written afresh after a restart.
     for (const controller of this.writing.values()) controller.abort();
-    await Promise.all(this.runs);
   }
 
   /**
@@ -254,7 +256,7 @@ export class GenerationQueue {
       shown[key] += piece;
       pending ??= setTimeout(flush, Math.max(0, saved + progressMs - Date.now()));
     };
-    const run = (async () => {
+    void (async () => {
       try {
         if (!this.writer) throw new Error("The prompt assistant is not configured.");
         const written = await this.writer(initial, {
@@ -282,22 +284,13 @@ export class GenerationQueue {
         // The written job queues for its worker, and the freed slot starts the next write.
         void this.tick();
       }
-    })()
-      .catch(() => undefined)
-      .finally(() => this.runs.delete(run));
-    this.runs.add(run);
+    })().catch(() => undefined);
   }
 
   /** One scheduling pass; a failure is logged, never thrown, so callers can start one freely. */
   tick(): Promise<void> {
     if (this.stopped) return Promise.resolve();
-    const run = this.run()
-      .catch(this.tickFailed)
-      .finally(() => {
-        this.runs.delete(run);
-      });
-    this.runs.add(run);
-    return run;
+    return this.run().catch(this.tickFailed);
   }
 
   /**
