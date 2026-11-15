@@ -17,13 +17,14 @@ import { useRememberedKey } from "../auth/useRemembered";
 import { setFamilyLabels } from "./modelFamily";
 import { isProfile, profileForBackend, referencePatch } from "./payload";
 
+export async function fetchModels(cached: boolean) {
+  const models = await api<Models>(cached ? "/api/models?cached=1" : "/api/models");
+  setFamilyLabels(models.familyLabels);
+  return models;
+}
 export const modelsQuery = queryOptions({
   queryKey: ["models"],
-  queryFn: async () => {
-    const models = await api<Models>("/api/models?cached=1");
-    setFamilyLabels(models.familyLabels);
-    return models;
-  },
+  queryFn: () => fetchModels(true),
 });
 export const initialInput: GenerationInput = {
   kind: "image",
