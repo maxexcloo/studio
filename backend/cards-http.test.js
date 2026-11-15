@@ -122,6 +122,43 @@ test(
       });
       assert.equal(refused.status, 400);
     }
+    // A character keeps an adult age and its story; one waiting on its portrait may have no image.
+    const pending = await call("/api/characters", {
+      method: "POST",
+      cookie: cookies.artist,
+      body: {
+        ...card,
+        name: "Ivo",
+        referenceIds: [],
+        age: 40,
+        likes: "rain",
+        portrait: { jobId: "job-ivo" },
+      },
+    });
+    assert.equal(pending.status, 201, pending.body.error);
+    assert.deepEqual(
+      [pending.body.character.age, pending.body.character.likes, pending.body.character.portrait],
+      [40, "rain", { jobId: "job-ivo", status: "making" }],
+    );
+    for (const story of [
+      { age: 16 },
+      { job: "x".repeat(501) },
+      { backstory: "a 15 year old runaway" },
+    ])
+      assert.equal(
+        (
+          await call("/api/characters", {
+            method: "POST",
+            cookie: cookies.artist,
+            body: { ...card, name: "Kit", ...story },
+          })
+        ).status,
+        400,
+      );
+    await call(`/api/characters/${pending.body.character.id}`, {
+      method: "DELETE",
+      cookie: cookies.artist,
+    });
     const updated = await call(`/api/characters/${id}`, {
       method: "PUT",
       cookie: cookies.artist,

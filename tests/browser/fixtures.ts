@@ -650,6 +650,7 @@ export async function fixtures(page: Page) {
       const list = cards[cardKind];
       const noun = cardKind.slice(0, -1);
       const card = (fields: any, id: string) => ({
+        ...fields,
         id,
         name: fields.name,
         description: fields.description,

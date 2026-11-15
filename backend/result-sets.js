@@ -37,6 +37,8 @@ export function registerResultSetRoutes(app, { store, admit, item }) {
       resultSet: _set,
       ...input
     } = job.input;
+    // Its character and chat context carry over; each new prompt is untitled.
+    const { variation: _variation, ...kept } = set;
     const jobIds = [];
     for (let offset = 0; offset < variations; offset++) {
       const result = await admit(
@@ -45,7 +47,7 @@ export function registerResultSetRoutes(app, { store, admit, item }) {
           prompt: "",
           seed: "",
           writing: { kind: "set" },
-          resultSet: { id: set.id, title: set.title, source: set.source, index: next + offset },
+          resultSet: { ...kept, index: next + offset },
         },
         account,
         { sessionId: job.sessionId, operation: job.operation },
