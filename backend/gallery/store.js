@@ -255,12 +255,26 @@ function* galleryRows(query = {}, after = null) {
 /**
  * The query's items, read a batch at a time: in gallery order within the gallery, then Dream's
  * pool, then uploads. The order index leads with those, so each batch seeks; across them every
- * batch would sort the whole table.
+ * batch would sort the whole table. With `after` (a gallery key), only those after its record,
+ * or all of them once it is gone.
  */
-export function* eachGalleryItem(query = {}) {
+export function* eachGalleryItem(query = {}, after) {
+  const from =
+    after &&
+    statement(`SELECT ${keyColumns}, uploaded, dream_pool FROM studio_gallery WHERE key = ?`).get(
+      after,
+    );
   for (const uploaded of query.uploaded === undefined ? [false, true] : [query.uploaded])
-    for (const dreamPool of query.dreamPool === undefined ? [false, true] : [query.dreamPool])
-      for (const row of galleryRows({ ...query, uploaded, dreamPool })) yield parse(row);
+    for (const dreamPool of query.dreamPool === undefined ? [false, true] : [query.dreamPool]) {
+      const place = Number(uploaded) * 2 + Number(dreamPool);
+      const fromPlace = from ? from.uploaded * 2 + from.dream_pool : -1;
+      if (place < fromPlace) continue;
+      const rows = galleryRows(
+        { ...query, uploaded, dreamPool },
+        place === fromPlace ? rowKey(from) : null,
+      );
+      for (const row of rows) yield parse(row);
+    }
 }
 
 export function countGalleryItems(query = {}) {

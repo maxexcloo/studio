@@ -117,8 +117,11 @@ export function createIdleWork<Item extends IdleItem>(options: {
   unavailable(): Promise<string>;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  /** Every gallery record newest first, or only those made from `since` (ms) and pending ones. */
-  items(since?: number): Iterable<Item>;
+  /**
+   * Every gallery record newest first, or only those made from `since` (ms) and pending ones, or
+   * those after the record `after` in that order.
+   */
+  items(since?: number, after?: Item): Iterable<Item>;
   /**
    * Counts saved gallery changes: after a walk that found nothing, a change walks only recent
    * records, and the whole gallery is walked again only after `recheckMs`.
@@ -160,6 +163,11 @@ export function createIdleWork<Item extends IdleItem>(options: {
   // again; `changes` is the gallery's count when a walk last found nothing.
   const cleared = { state: "", changes: undefined as number | undefined, at: -Infinity };
   let nothing = cleared;
+  // Where whole walks resume: after the record before the last one taken, as the newer ones were
+  // passed over, until the pass changes, a run steps aside or `recheckMs` passes (`at` is when a
+  // walk last began at the top).
+  const top = { state: "", at: -Infinity, after: undefined as Item | undefined };
+  let resume = top;
   const running = () => options.continuous || pass?.state === "running";
   const counting = () => !options.continuous && pass?.state === "running";
 
@@ -248,10 +256,22 @@ export function createIdleWork<Item extends IdleItem>(options: {
     const recent = !whole && changes !== nothing.changes;
     const walk = whole || recent;
     const finishedBefore = finished;
+    const passState = `${all}|${pass?.scope}|${pass?.startedAt}`;
+    if (whole && (!options.changes || resume.state !== passState || now() - resume.at > recheckMs))
+      resume = { state: passState, at: now(), after: undefined };
+    let passed: Item | undefined;
+    function* noting(items: Iterable<Item>) {
+      for (const item of items) {
+        yield item;
+        passed = item;
+      }
+    }
     if (walk)
       for await (const candidate of eligible(
         all,
-        recent ? options.items(nothing.at - recentMs) : undefined,
+        recent
+          ? options.items(nothing.at - recentMs)
+          : noting(options.items(undefined, resume.after)),
       ))
         if (!inflight.has(key(candidate))) {
           item = candidate;
@@ -262,7 +282,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
     if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
     if (item && inflight.has(key(item))) return "busy";
     if (!item) {
-      if (!inflight.size && walk) nothing = { state, changes, at: whole ? now() : nothing.at };
+      if (!inflight.size && walk) nothing = { state, changes, at: whole ? resume.at : nothing.at };
       if (counting() && !inflight.size) {
         pass = { ...pass!, state: "finished", endedAt: stamp() };
         persist();
@@ -270,7 +290,10 @@ export function createIdleWork<Item extends IdleItem>(options: {
       return "none";
     }
     // More may wait beyond the recent records, so the next tick walks the whole gallery again.
-    if (whole) nothing = cleared;
+    if (whole) {
+      nothing = cleared;
+      if (passed) resume = { ...resume, after: passed };
+    }
     if (!all) last = time;
     const controller = new AbortController();
     inflight.set(key(item), controller);
@@ -284,6 +307,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
       inflight.delete(key(item));
       finished += 1;
     });
+    if (result === "yielded") resume = top;
     if (all && running() && (result === "done" || result === "failed")) spawn();
     return result;
   }
@@ -310,6 +334,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
       if (streak.length >= failureStreak) {
         // Not these items' fault: give them back and wait before trying again.
         for (const failure of streak) failed.delete(failure);
+        resume = top;
         if (all && counting()) pass!.failed -= streak.length - 1;
         streak = [];
         backoff = { until: now() + backoffMs, reason };
