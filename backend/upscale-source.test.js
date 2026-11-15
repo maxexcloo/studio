@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
-import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { recordedObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
 import { writeGalleryRows } from "./persistence/gallery-rows.ts";
 import { closeRuntimeDatabase, runtimeDatabase } from "./persistence/runtime.ts";
 
@@ -31,12 +31,7 @@ test(
       fs.ftruncateSync(fd, modelFiles[name].bytes);
       fs.closeSync(fd);
     }
-    const fixture = fs
-      .readdirSync(path.join(here, "fixtures"))
-      .filter((name) => name.startsWith("object_info-comfyui-"))
-      .sort()
-      .at(-1);
-    const info = JSON.parse(fs.readFileSync(path.join(here, "fixtures", fixture), "utf8"));
+    const info = recordedObjectInfo();
     const combo = (values) => ["COMBO", { options: values }];
     info.SeedVR2LoadDiTModel = {
       input: {

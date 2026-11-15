@@ -3,24 +3,15 @@
  * finishes every run shortly after it is queued with a plain picture, or holds it with `hold`. For
  * tests that need finished runs and for `mise run dev:demo`.
  */
-import fs from "node:fs";
-import path from "node:path";
 
 import sharp from "sharp";
 
-import { startFakeComfy } from "./fake-comfy.js";
+import { recordedObjectInfo, startFakeComfy } from "./fake-comfy.js";
 import { testImageProfile, testVideoProfile, writeTestWorkflows } from "./test-workflows.js";
-
-const here = import.meta.dirname;
-const snapshot = fs
-  .readdirSync(here)
-  .filter((name) => name.startsWith("object_info-comfyui-"))
-  .sort()
-  .at(-1);
 
 export async function startDemoWorker(dataDir, { hold = false } = {}) {
   writeTestWorkflows(dataDir);
-  const objectInfo = JSON.parse(fs.readFileSync(path.join(here, snapshot), "utf8"));
+  const objectInfo = recordedObjectInfo();
   objectInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = [
     testImageProfile.studio.defaults.model,
     testVideoProfile.studio.defaults.model,

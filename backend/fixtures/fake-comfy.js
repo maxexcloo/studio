@@ -4,7 +4,19 @@
  * prompt waits until the test finishes it, so a test can send progress first.
  */
 import crypto from "node:crypto";
+import fs from "node:fs";
 import http from "node:http";
+import path from "node:path";
+
+/** A fresh copy of the newest recorded ComfyUI /object_info (fixtures/object_info-comfyui-*.json). */
+export function recordedObjectInfo() {
+  const name = fs
+    .readdirSync(import.meta.dirname)
+    .filter((file) => file.startsWith("object_info-comfyui-"))
+    .sort()
+    .at(-1);
+  return JSON.parse(fs.readFileSync(path.join(import.meta.dirname, name), "utf8"));
+}
 
 function frame(text) {
   const payload = Buffer.from(text);

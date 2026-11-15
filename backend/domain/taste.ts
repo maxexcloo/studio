@@ -145,13 +145,13 @@ export interface TasteRecord extends StoredTaste, TasteReadOut {
   /** By attribute: `profile:<id>`, `lora:<name>@<strength>`, `tag:<tag>`, `aspect:<ratio>`, `steps:<profile>:<n>`, `cfg:<profile>:<n>`. */
   scores: Map<string, TasteScore>;
 }
-/** The assistant gateway's chat (assistant.js), which returns its reply without reasoning. */
 /** What an account's prompt writing asks for (account-policy.js `promptWriter`). */
 export interface PromptWriter {
   picked?: string;
   uncensored: boolean;
 }
 
+/** The assistant gateway's chat (assistant.js), which returns its reply without reasoning. */
 export interface TasteWriter<Content = string> {
   settings(): unknown;
   /**

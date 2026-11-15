@@ -88,7 +88,7 @@ export function MediaJobStatus({
       ) : null}
       {job && (
         <Group justify="center">
-          <QueueJobAction job={job} onRetried={onRetried} />
+          <QueueJobAction job={job} items={[item]} onRetried={onRetried} />
         </Group>
       )}
     </Stack>

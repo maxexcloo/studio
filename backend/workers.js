@@ -20,6 +20,12 @@ const capabilityIds = new Set(workerCapabilities.map((item) => item.id));
 
 const maxWorkers = 32;
 
+/** The header that proves a request to a Studio worker comes from Studio (STUDIO_WORKER_TOKEN). */
+export const workerTokenHeader = () =>
+  process.env.STUDIO_WORKER_TOKEN
+    ? { "X-Studio-Worker-Token": process.env.STUDIO_WORKER_TOKEN }
+    : {};
+
 export class WorkerConfigError extends Error {}
 
 /** A plain HTTP(S) origin (and path) for a worker: "pc.local:8188", a bare port or a full URL. */
