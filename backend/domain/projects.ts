@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { cleanBrief } from "../../shared/chat-brief.ts";
 import {
   type Project,
   type ProjectContent,
@@ -43,7 +44,7 @@ export function projectPatch(body: unknown): ProjectPatch {
     if (!patch.name) throw failure("Name the project.", 400);
   }
   if (brief !== undefined) {
-    const { subjects, styles, avoid, ...other } = brief || {};
+    const { subjects, styles, avoid, ethnicity, age, body, rules, loras, ...other } = brief || {};
     if (Object.keys(other).length)
       throw failure(`Unknown brief field ${Object.keys(other)[0]}.`, 400);
     patch.brief = Object.fromEntries(
@@ -51,6 +52,16 @@ export function projectPatch(body: unknown): ProjectPatch {
         .filter(([, value]) => value !== undefined)
         .map(([key, value]) => [key, text(value, key, maxProjectBrief)]),
     );
+    for (const [key, value] of Object.entries({ ethnicity, age, body, rules }))
+      if (value !== undefined)
+        Object.assign(patch.brief, { [key]: text(value, key, maxProjectBrief) });
+    if (loras !== undefined) {
+      try {
+        patch.brief.loras = cleanBrief({ loras }).loras || [];
+      } catch (error) {
+        throw failure((error as Error).message, 400);
+      }
+    }
   }
   if (constraints !== undefined) {
     const { profiles, loras, aspect, resolution, ...other } = constraints || {};

@@ -2,6 +2,31 @@ import { expect, test } from "@playwright/test";
 
 import { fixtures, image, openTheme, section, signIn, stamp } from "./fixtures";
 
+test("Chat Brief edits and restores the account's standing rules", async ({ page }) => {
+  const state = await fixtures(page);
+  await signIn(page, { id: "member", role: "user" });
+  await page.goto("/settings#preferences");
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Chat Brief", exact: true });
+  await editor.getByRole("textbox", { name: "Subjects", exact: true }).fill("Portraits");
+  await editor.getByRole("textbox", { name: "Ethnicity", exact: true }).fill("Asian");
+  await editor
+    .getByRole("textbox", { name: "Banned Changes & Rules", exact: true })
+    .fill("Keep the outfit");
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(editor).toBeHidden();
+  expect(state.preferences.preferences.chatBrief).toMatchObject({
+    subjects: "Portraits",
+    ethnicity: "Asian",
+    rules: "Keep the outfit",
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(
+    editor.getByRole("textbox", { name: "Banned Changes & Rules", exact: true }),
+  ).toHaveValue("Keep the outfit");
+});
+
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({
   page,
 }) => {

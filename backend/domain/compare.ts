@@ -175,6 +175,7 @@ export function registerCompareRoutes(
     items: GalleryItem[],
     labels?: string[],
     itemIds?: string[],
+    extra: Pick<ComparisonRecord, "axis" | "projectId"> = {},
   ) {
     const seeds = new Set(
       jobIds.map((id, index) => {
@@ -192,6 +193,7 @@ export function registerCompareRoutes(
       ...(itemIds ? { itemIds } : {}),
       ...(labels ? { labels } : {}),
       vote: null,
+      ...extra,
     };
     save(record);
     return record;
@@ -261,8 +263,8 @@ export function registerCompareRoutes(
       ? res.json(show(record, items))
       : res.status(404).json({ ok: false, error: "That comparison is unavailable." });
   });
-  // MCP records its multi-model runs through this one, and Compare Selected the chosen images
-  // (`itemIds`, one per job).
+  // MCP records its multi-model and one-thing runs through this one (with the `axis` they vary
+  // and the chat's project), and Compare Selected the chosen images (`itemIds`, one per job).
   directRoute(app, "POST", "/api/comparisons", (account, { body }) => {
     const strings = (value: unknown) =>
       Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
@@ -271,7 +273,7 @@ export function registerCompareRoutes(
       itemIds: strings(body?.itemIds),
     });
     if (!items) return galleryOff;
-    const { jobIds, labels, itemIds } = body || {};
+    const { jobIds, labels, itemIds, axis, projectId } = body || {};
     if (
       !Array.isArray(jobIds) ||
       !sized(jobIds) ||
@@ -288,6 +290,11 @@ export function registerCompareRoutes(
         status: 400,
         payload: { ok: false, error: `Choose ${range} different images.` },
       };
+    if (
+      (axis !== undefined && !labelsValid([axis], 1)) ||
+      (projectId !== undefined && (typeof projectId !== "string" || !projectId))
+    )
+      return { status: 400, payload: { ok: false, error: "Name the axis and project as text." } };
     const ownerId = account?.userId || "";
     const image = (id: string) => {
       const job = store.job(ownerId, id);
@@ -299,7 +306,10 @@ export function registerCompareRoutes(
       items.some((item) => item.id === id && item.jobId === jobIds[index] && item.type === "image");
     if (!jobIds.every(image) || (itemIds && !itemIds.every(chosen)))
       return { status: 404, payload: { ok: false, error: "A comparison image is unavailable." } };
-    const record = create(ownerId, jobIds, items, labels as string[] | undefined, itemIds);
+    const record = create(ownerId, jobIds, items, labels as string[] | undefined, itemIds, {
+      ...(axis ? { axis: String(axis).trim() } : {}),
+      ...(projectId ? { projectId } : {}),
+    });
     return { status: 201, payload: show(record, items) };
   });
   // The variants run as one queue set, sharing the first numeric seed (else a random one) unless

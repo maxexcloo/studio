@@ -47,6 +47,8 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
   const user = { userId: "user", role: "user" };
   for (const [method, path] of [
     ["GET", "/api/gallery"],
+    ["GET", "/api/chat-brief"],
+    ["PATCH", "/api/chat-brief"],
     ["GET", "/api/gallery/filters"],
     ["POST", "/api/gallery/delete"],
     ["POST", "/api/gallery/recreate"],
