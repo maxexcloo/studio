@@ -15,3 +15,24 @@
 .viewLabel {
   gap: 6px;
 }
+
+:root:not([data-phone]) .toolbar {
+  position: sticky;
+  top: var(--app-shell-header-offset, var(--app-shell-header-height));
+  z-index: 5;
+  margin-inline: calc(-1 * var(--app-shell-padding));
+  padding: var(--mantine-spacing-xs) var(--app-shell-padding);
+  background: var(--studio-glass-chrome);
+  backdrop-filter: var(--studio-glass-filter);
+  -webkit-backdrop-filter: var(--studio-glass-filter);
+  border-bottom: 1px solid var(--studio-glass-border);
+}
+
+:root:not([data-phone]) .toolbar::after {
+  content: "";
+  position: absolute;
+  inset: 100% 0 auto;
+  height: var(--mantine-spacing-sm);
+  background: linear-gradient(var(--studio-glass-chrome), transparent);
+  pointer-events: none;
+}
