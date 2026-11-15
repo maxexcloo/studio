@@ -75,6 +75,25 @@ import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
 import { type VideoEdit, useVideoEdit } from "./videoEdits";
 
+/**
+ * An action whose options come to one runs that option itself, so no submenu holds just one.
+ * Animate stays a menu, as its themes load after it shows.
+ */
+function withoutLoneOption(action: Action): Action {
+  const options = action.menu?.flat() ?? [];
+  if (options.length !== 1 || action.note || action.id === "animate") return action;
+  const [option] = options;
+  return {
+    ...action,
+    menu: undefined,
+    link: option.link,
+    onClick: option.onClick,
+    keepOpen: option.keepOpen,
+    disabled: action.disabled || option.disabled,
+    loading: action.loading || option.loading,
+  };
+}
+
 // Seeded themes have their own icons; others share Animate's.
 const themeIcons: Record<string, LucideIcon> = {
   cinematic: Camera,
@@ -693,7 +712,9 @@ export function useMediaActions(
         onClick: () => favorite.mutate(),
       }),
   ];
-  return itemActionGroups(actions);
+  return itemActionGroups(
+    actions.filter((entry): entry is Action => !!entry).map(withoutLoneOption),
+  );
 }
 
 /**

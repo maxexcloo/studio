@@ -460,6 +460,8 @@ export function ActionBarGroups({
     if (!fit) return;
     const observer = new ResizeObserver(() => setFitted((last) => ({ ...last })));
     observer.observe(row.current!.parentElement!);
+    // Names measured before the font loaded fit again with it.
+    void document.fonts.ready.then(() => setFitted((last) => ({ ...last, room: 0 })));
     return () => observer.disconnect();
   }, [fit]);
   return (
