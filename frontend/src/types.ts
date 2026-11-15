@@ -13,7 +13,7 @@ export interface Profile {
   familyName?: string;
   baseModel?: string;
   variantLabel?: string;
-  recipe?: { modelLabel?: string; label?: string };
+  recipe?: { modelLabel?: string; label?: string; conditioning?: string };
   workerIds?: string[];
   maxLoras?: number;
   provider?: string;

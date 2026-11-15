@@ -1,7 +1,7 @@
-import { guidingRoles, loraDefaultStrength } from "../../shared/profiles.ts";
+import { guidingRoles, loraCompatibility, loraDefaultStrength } from "../../shared/profiles.ts";
 // Which generate arguments a profile lets MCP adjust; fixed controls are never advertised.
 import { referenceImageSize } from "../generation-defaults.js";
-import { loraCompatibility, strengthRange } from "../lora/policy.js";
+import { strengthRange } from "../lora/policy.js";
 import { keptTriggers } from "../lora/prompts.js";
 
 /** Images per prompt a chat gets unless the user asks for a number (videos get one); the studio UI keeps its own default. */
