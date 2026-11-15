@@ -19,6 +19,8 @@ interface Entry {
   depth?: number;
 }
 
+type StripEntry = Entry & { label: string; version?: boolean };
+
 /** A run the viewer queued, and the item it was started on. */
 export interface QueuedRun {
   job: string;
@@ -90,7 +92,10 @@ export function useRunFamily(item: MediaItem, runs: QueuedRun[], related: MediaI
   }, [jobs, item, runs, related]);
 }
 
-/** The set strip, the version strip and the actions under the viewer image. */
+/**
+ * The strip and the actions under the viewer image. In a set the strip holds the set's results, the
+ * shown result's versions standing in its place; outside one it holds the versions.
+ */
 export function MediaViewerDock({
   item,
   family,
@@ -112,33 +117,47 @@ export function MediaViewerDock({
   const branched = new Set(sources).size < sources.length;
   const [shown, setShown] = useState(() => ({ root, keys: new Set(family.map(({ key }) => key)) }));
   if (shown.root !== root) setShown({ root, keys: new Set(family.map(({ key }) => key)) });
+  // Versions count from the original, at the end; a branch names the version it came from.
+  const versions: StripEntry[] =
+    family.length > 1
+      ? family.map((entry, index) => {
+          const from = family.findIndex(({ key }) => key === entry.source);
+          return {
+            ...entry,
+            label: entry.item
+              ? `Show Version ${family.length - index}${
+                  from > index + 1 ? `, from Version ${family.length - from}` : ""
+                }`
+              : "Version in Progress",
+          };
+        })
+      : [];
+  const versionKeys = new Set(versions.map(({ key }) => key));
+  const entries: StripEntry[] =
+    set.length > 1
+      ? set.flatMap<StripEntry>((result, index) =>
+          result.id === item.id && versions.length
+            ? versions.map((entry) => ({ ...entry, version: true }))
+            : versionKeys.has(result.id)
+              ? []
+              : [
+                  {
+                    key: result.id,
+                    item: result,
+                    label: `Show ${mediaTitle(result)} (${index + 1} of ${set.length})`,
+                  },
+                ],
+        )
+      : versions;
   return (
     <div className={classes.dock} data-chrome>
-      {set.length > 1 && (
+      {entries.length > 1 && (
         <ResultStrip
-          label={`Set: ${item.resultSet?.title}`}
-          entries={set.map((result) => ({ key: result.id, item: result }))}
+          label={set.length > 1 ? `Set: ${item.resultSet?.title}` : "Versions"}
+          entries={entries}
           current={item}
-          name={(result, position) => `Show ${mediaTitle(result!)} (${position} of ${set.length})`}
-          choose={choose}
-        />
-      )}
-      {family.length > 1 && (
-        <ResultStrip
-          label="Versions"
-          entries={family}
-          current={item}
-          // Versions count from the original, at the end; a branch names the version it came from.
-          name={(result, position) => {
-            if (!result) return "Version in Progress";
-            const { source } = family[position - 1];
-            const from = family.findIndex(({ key }) => key === source);
-            return `Show Version ${family.length + 1 - position}${
-              from > position ? `, from Version ${family.length - from}` : ""
-            }`;
-          }}
           depths={branched}
-          entering={(key) => shown.root === root && !shown.keys.has(key)}
+          entering={(key) => versionKeys.has(key) && shown.root === root && !shown.keys.has(key)}
           choose={choose}
         />
       )}
@@ -152,17 +171,15 @@ function ResultStrip({
   label,
   entries,
   current,
-  name,
   entering,
   depths,
   choose,
 }: {
   label: string;
-  entries: Entry[];
+  entries: StripEntry[];
   current: MediaItem;
-  name: (result: MediaItem | undefined, position: number) => string;
   entering?: (key: string) => boolean;
-  /** Marks each entry's generations from the original. */
+  /** Marks each version's generations from the original. */
   depths?: boolean;
   choose?: (item: MediaItem) => void;
 }) {
@@ -198,7 +215,7 @@ function ResultStrip({
         px={2}
         py={2}
       >
-        {entries.map(({ key, item: result, depth }, index) => {
+        {entries.map(({ key, item: result, depth, label, version }) => {
           const shown = result?.id === current.id;
           return (
             <Thumbnail
@@ -206,8 +223,9 @@ function ResultStrip({
               result={result}
               shown={shown}
               entering={entering?.(key)}
+              version={version}
               depth={depths ? depth : undefined}
-              label={name(result, index + 1)}
+              label={label}
               onClick={() => result && !shown && choose?.(result)}
             />
           );
@@ -221,6 +239,7 @@ function Thumbnail({
   result,
   shown,
   entering,
+  version,
   depth,
   label,
   onClick,
@@ -228,6 +247,8 @@ function Thumbnail({
   result?: MediaItem;
   shown?: boolean;
   entering?: boolean;
+  /** A version standing in a set result's place. */
+  version?: boolean;
   depth?: number;
   label: string;
   onClick: () => void;
@@ -239,6 +260,7 @@ function Thumbnail({
       className={classes.variation}
       data-current={shown || undefined}
       data-entering={entering || undefined}
+      data-version={version || undefined}
       aria-current={shown || undefined}
       aria-label={label}
       disabled={!result}
