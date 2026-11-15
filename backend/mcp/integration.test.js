@@ -128,6 +128,8 @@ async function fixture(
     reviewWaitSeconds = 0,
     // When each job is expected to end, as Studio's progress reports it; none by default.
     jobEtaMs,
+    // How many jobs run before each new one, for a queue whose end Studio can't schedule.
+    jobAhead,
     generateDedupeMs = 0,
     environment: extra = {},
     dataDir: existingDir,
@@ -210,6 +212,7 @@ async function fixture(
       outputs: completeOnSubmit ? [{ url: "/comfy/view?filename=immediate.png" }] : [],
       settings: req.body,
       ...(jobEtaMs === undefined ? {} : { progress: { endsAt: Date.now() + jobEtaMs } }),
+      ...(jobAhead === undefined ? {} : { status: "queued", ahead: jobAhead, progress: undefined }),
     });
     const job = jobs.get(id);
     job.owner = uploader(req);
@@ -269,38 +272,45 @@ async function fixture(
             terms.every((term) => item.filename.toLowerCase().includes(term)),
         ),
       });
+    // Pages of `limit` from `cursor` (the next item's place), with the match count.
+    const all = [...jobs.values()]
+      .reverse()
+      .flatMap(
+        (job) =>
+          job.gallery ??
+          (job.status === "done"
+            ? job.outputs.map((output, index) => ({
+                id: `${job.id}:${index}`,
+                jobId: job.id,
+                index,
+                number: numbered(job, index),
+                status: "done",
+                type: job.kind,
+                prompt: job.settings?.prompt,
+                ...(job.title ? { title: job.title } : {}),
+                ...(job.rating ? { rating: job.rating } : {}),
+                ...(job.caption ? { caption: job.caption } : {}),
+                settings: job.settings,
+                ...output,
+              }))
+            : [{ id: `${job.id}:pending`, jobId: job.id, status: "pending", type: job.kind }]),
+      )
+      .filter(
+        (item) =>
+          item.status === "pending" ||
+          ((!req.query.type || item.type === req.query.type) &&
+            (!req.query.rating || item.rating === req.query.rating) &&
+            terms.every((term) =>
+              `${item.title || ""} ${item.prompt || ""}`.toLowerCase().includes(term),
+            )),
+      );
+    const from = Number(req.query.cursor || 0);
+    const to = from + (Number(req.query.limit) || 200);
     res.json({
-      items: [...jobs.values()]
-        .reverse()
-        .flatMap(
-          (job) =>
-            job.gallery ??
-            (job.status === "done"
-              ? job.outputs.map((output, index) => ({
-                  id: `${job.id}:${index}`,
-                  jobId: job.id,
-                  index,
-                  number: numbered(job, index),
-                  status: "done",
-                  type: job.kind,
-                  prompt: job.settings?.prompt,
-                  ...(job.title ? { title: job.title } : {}),
-                  ...(job.rating ? { rating: job.rating } : {}),
-                  ...output,
-                }))
-              : [{ id: `${job.id}:pending`, jobId: job.id, status: "pending", type: job.kind }]),
-        )
-        .filter(
-          (item) =>
-            item.status === "pending" ||
-            ((!req.query.type || item.type === req.query.type) &&
-              (!req.query.rating || item.rating === req.query.rating) &&
-              terms.every((term) =>
-                `${item.title || ""} ${item.prompt || ""}`.toLowerCase().includes(term),
-              )),
-        ),
-      hasMore: false,
-      nextCursor: "",
+      items: all.slice(from, to),
+      hasMore: to < all.length,
+      nextCursor: to < all.length ? String(to) : "",
+      totalApprox: all.length,
     });
   });
   app.get("/api/gallery/jobs/:id", (req, res) => {
@@ -1048,7 +1058,7 @@ test("media and administrator credentials discover only their own friendly tools
   // Schemas state the per-call limit their descriptions give.
   const generateSchema = tools.find((tool) => tool.name === "generate").inputSchema.properties;
   assert.equal(generateSchema.count.maximum, 10);
-  assert.equal(generateSchema.prompts.anyOf[0].maxItems, 10);
+  assert.equal(generateSchema.prompts.anyOf[0].maxItems, 30);
   assert.doesNotMatch(media.getInstructions(), /GPU|\bapply\b/);
   assert.match(admin.getInstructions(), /get approval before apply/);
   assert.doesNotMatch(admin.getInstructions(), /\bgenerate\b|\bresult\b/);
@@ -1080,9 +1090,10 @@ test("media and administrator credentials discover only their own friendly tools
     // description was tightened, then raised to 17,150 for generate's 18+ floor, to 18,050 for
     // project, to 18,120 for its character_sheet, to 19,000 for variants and result numbers and to
     // 19,300 for one call per step (models' profile_ids, review's also) and to 19,850 for applying
-    // a person's rules in proportion with the shape of liked portraits, and to 20,050 for naming a
-    // person's age and ethnicity first.
-    JSON.stringify(tools).length + media.getInstructions().length < 20050,
+    // a person's rules in proportion with the shape of liked portraits, to 20,050 for naming a
+    // person's age and ethnicity first, and to 20,250 for Search's dislikes, pages and summary and
+    // for leaving LoRA strengths to vary.
+    JSON.stringify(tools).length + media.getInstructions().length < 20250,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -2157,10 +2168,10 @@ test("invalid generation controls, references and excessive batches fail before 
     { profile_id: "unavailable-profile" },
     { prompts: [] },
     { prompts: [""] },
-    { prompts: Array.from({ length: 11 }, (_, index) => `Prompt ${index}`) },
+    { prompts: Array.from({ length: 31 }, (_, index) => `Prompt ${index}`) },
     { count: 0 },
     { count: 11 },
-    { count: 6, prompts: ["One", "Two"] },
+    { count: 8, prompts: ["One", "Two", "Three", "Four"] },
     { cfg: 21 },
     { denoise: 1.1 },
     { sampler: "unsupported" },
@@ -2195,7 +2206,7 @@ test("invalid generation controls, references and excessive batches fail before 
         count: 12,
       }),
     ),
-    "Fix the generate arguments: count: Too big: expected number to be <=10. One call queues at most 10 images (prompts × count); split a bigger set into calls made one after another.",
+    "Fix the generate arguments: count: Too big: expected number to be <=10. count is at most 10 per prompt, and one call queues at most 30 images (prompts × count); split a bigger set into calls made one after another.",
   );
   // A control that changes the result is refused where the profile has none; one it sets itself is left out.
   await f.profiles([{ ...imageProfile, capabilities: {} }]);
@@ -3341,11 +3352,18 @@ test("Generate takes LoRA names alone, fills the recommended strength and refuse
     { name: "fixture-effect.safetensors", strength: 0.8, enabled: true },
     { name: "fixture-unknown.safetensors", strength: 0.4, enabled: true },
   ]);
+  // A LoRA for another family without an equivalent here is left out, and the reply says so.
+  const left = await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A tree"],
+    loras: [{ name: "fixture-other" }],
+  });
+  assert.match(
+    texts(left),
+    /Left out fixture-other: it is for SDXL and Fixture Image has no equivalent\./,
+  );
+  assert.deepEqual(f.submitted.at(-1).loras, []);
   for (const [name, message] of [
-    [
-      "fixture-other",
-      "fixture-other is for SDXL, not Fixture Image; choose a LoRA from models for this profile.",
-    ],
     ["fixture-turbo", "fixture-turbo is applied by Studio itself; leave it out of loras."],
     [
       "glow-effect",
@@ -3380,9 +3398,43 @@ test("Generate takes LoRA names alone, fills the recommended strength and refuse
   });
   assert.equal(
     nowhere.content[0].text,
-    "No ready image profile can use unheard-of. Call models with lora_query to look it up.",
+    "No LoRA named unheard-of for Fixture Image. Call models with lora_query to look one up.",
   );
-  assert.equal(f.submitted.length, 2);
+  assert.equal(f.submitted.length, 3);
+});
+
+test("A set's prompts spread LoRA strengths left to Studio within their range, keeping the caller's", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const prompts = ["A tree", "A fox", "A pond", "A hill"];
+  const strengths = () =>
+    f.submitted
+      .splice(0)
+      .map((body) => body.loras.map(({ name, strength }) => `${name.split(".")[0]} ${strength}`));
+  await generate(client, {
+    prompts,
+    loras: [{ name: "fixture-effect" }, { name: "fixture-unknown", strength: 0.4 }],
+  });
+  assert.deepEqual(strengths(), [
+    ["fixture-effect 0.8", "fixture-unknown 0.4"],
+    ["fixture-effect 0.5", "fixture-unknown 0.4"],
+    ["fixture-effect 1", "fixture-unknown 0.4"],
+    ["fixture-effect 0.8", "fixture-unknown 0.4"],
+  ]);
+  // Centred on the strength the account liked; with two left to Studio, the fourth leaves one out.
+  f.app.get("/api/taste", (_req, res) =>
+    res.json({ loras: [{ name: "fixture-effect.safetensors", strength: 1, score: 2 }] }),
+  );
+  await generate(client, {
+    prompts,
+    loras: [{ name: "fixture-effect" }, { name: "fixture-unknown" }],
+  });
+  assert.deepEqual(strengths(), [
+    ["fixture-effect 1", "fixture-unknown 0.7"],
+    ["fixture-effect 0.6", "fixture-unknown 0.55"],
+    ["fixture-effect 1.1", "fixture-unknown 0.85"],
+    ["fixture-effect 1"],
+  ]);
 });
 
 test("negative prompts reach the submission only where they take effect", async (t) => {
@@ -3839,25 +3891,17 @@ test("Reuse leaves out a saved LoRA made for another model family and says so", 
   assert.deepEqual(f.submitted[1].loras, [
     { name: "fixture-effect.safetensors", strength: 0.6, enabled: true },
   ]);
-  // Generate itself still refuses one by name.
-  const refused = await call(client, "generate", {
-    profile_id: imageProfile.id,
-    prompts: ["A heron"],
-    loras: [{ name: "fixture-other" }],
-  });
-  assert.equal(refused.isError, true);
-  assert.match(texts(refused), /fixture-other is for SDXL, not Fixture Image/);
 });
 
-test("Status and reuse give a result's full prompt where generate shortens it", async (t) => {
+test("Status gives a result's full prompt, which generate and reuse don't echo", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   const prompt = `A heron ${"standing in still water ".repeat(12)}at dawn`;
   const queued = await call(client, "generate", { kind: "image", prompts: [prompt], count: 1 });
-  assert.match(texts(queued), /Prompt: A heron [^\n]+…$/);
+  assert.doesNotMatch(texts(queued), /A heron/);
   finish(f);
   assert.equal(data(await call(client, "status", { job_id: "#1" })).prompt, prompt);
-  assert.match(texts(await call(client, "reuse", { job_id: "#1" })), /Prompt: A heron .+ at dawn$/);
+  assert.doesNotMatch(texts(await call(client, "reuse", { job_id: "#1" })), /A heron/);
 });
 
 test("Reuse runs a result again with its profile and settings, a new seed and an optional prompt, without Models", async (t) => {
@@ -4095,7 +4139,13 @@ test("Search finds the account's own finished work through the gallery search, a
     kind: "video",
     rating: "liked",
     outputs: [{ url: "/comfy/view?filename=waves.mp4" }],
-    settings: { prompt: "Red waves rolling in", profileId: videoProfile.id },
+    caption: { tags: ["sea", "dusk"] },
+    settings: {
+      prompt: "Red waves rolling in",
+      profileId: videoProfile.id,
+      modelName: "Fixture Video",
+      loras: [{ name: "styles/fixture-effect.safetensors", strength: 0.8 }],
+    },
   });
   f.jobs.set("studio-kite", { id: "studio-kite", status: "running", kind: "image", outputs: [] });
   const search = async (client, args) => {
@@ -4107,7 +4157,7 @@ test("Search finds the account's own finished work through the gallery search, a
   assert.deepEqual(f.requests.findLast((request) => request.path === "/gallery").query, {
     q: "red",
     includeFailed: "0",
-    limit: "200",
+    limit: "8",
   });
   assert.deepEqual(hits, [
     ["studio-waves", 0],
@@ -4115,10 +4165,10 @@ test("Search finds the account's own finished work through the gallery search, a
     ["studio-lantern", 1],
     [heron, 0],
   ]);
-  assert.match(texts(result), /^4 matches, newest first\./);
+  assert.match(texts(result), /^4 of 6 matches, newest first\./);
   assert.match(
     texts(result),
-    /- \[#5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · Red Lantern · /,
+    /- \[#5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · Red Lantern · fixture-image$/m,
   );
   assert.match(texts(result), /\[#1\]\([^)]+\) · .*A red heron/);
   // The images come as one contact sheet, drawn when opened.
@@ -4134,13 +4184,27 @@ test("Search finds the account's own finished work through the gallery search, a
   assert.deepEqual(f.requests.findLast((request) => request.path === "/gallery").query, {
     q: "",
     includeFailed: "0",
-    limit: "200",
+    limit: "8",
     rating: "liked",
     model: "wan",
     aspect: "landscape",
   });
   assert.deepEqual(liked.hits, [["studio-waves", 0]]);
   assert.match(texts(liked.result), /\) ♥/);
+  // A page says how many match and how to get the next, reading past unfinished work.
+  const page = await search(alice, { query: "red", limit: 3 });
+  assert.match(texts(page.result), /^3 of 6 matches, newest first; pass cursor "4" for more\./);
+  assert.deepEqual(
+    (await search(alice, { query: "red", limit: 3, cursor: data(page.result).cursor })).hits,
+    [[heron, 0]],
+  );
+  // A summary reads every match for what they share.
+  const summary = await call(alice, "search", { liked: true, summary: true });
+  assert.match(
+    texts(summary),
+    /^1 liked results\. Profiles: Fixture Video \(1\)\. LoRAs: Fixture Effect \(1\)\. Subjects: dusk \(1\), sea \(1\)\.$/,
+  );
+  assert.equal((await call(alice, "search", { liked: true, disliked: true })).isError, true);
   assert.deepEqual((await search(alice, { query: "paper lantern", limit: 1 })).hits, [
     ["studio-lantern", 0],
   ]);
@@ -4838,20 +4902,35 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
     ["#1", "#2", "#3", "#4"],
   );
   assert.ok(performance.now() - started < 5000);
-  const excess = await call(client, "generate", {
+  // Over a batch, the set queues in batches, one result set numbered throughout.
+  const split = await call(client, "generate", {
     kind: "image",
-    prompts: prompts.slice(0, 2),
-    count: 6,
+    prompts: prompts.slice(0, 3),
+    count: 4,
+    seed: 10,
   });
+  assert.match(texts(split), /Queued 12 images in batches of up to 8\./);
+  const batches = f.submitted.slice(4);
+  assert.deepEqual(
+    batches.map((body) => [body.prompt, body.resultSet.index, body.seed]),
+    [
+      ["A plush bear", 0, "10"],
+      ["A plush fox", 1, "14"],
+      ["A plush owl", 2, "18"],
+    ],
+  );
+  assert.equal(new Set(batches.map((body) => body.resultSet.id)).size, 1);
+  assert.equal(new Set(batches.map((body) => body.queueSet)).size, 2);
+  const excess = await call(client, "generate", { kind: "image", prompts, count: 8 });
   assert.equal(excess.isError, true);
   assert.equal(
     texts(excess),
-    "count is images per prompt, so 2 prompts × count 6 would queue 12 images; one call queues at most 10. For 2 different images, pass the 2 prompts without count, or split them into calls whose prompts × count is at most 10.",
+    "count is images per prompt, so 4 prompts × count 8 would queue 32 images; one call queues at most 30. For 4 different images, pass the 4 prompts without count, or split them into calls whose prompts × count is at most 30.",
   );
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "generate");
-  assert.match(generate.description, /at most 10 images per call\./);
+  assert.match(generate.description, /at most 30 images per call\./);
   assert.match(generate.inputSchema.properties.count.description, /default 2 for one image prompt/);
-  assert.equal(f.submitted.length, 4);
+  assert.equal(f.submitted.length, 7);
 });
 
 test("a Generate count is one batched job where the profile batches, else a job per image", async (t) => {
@@ -5549,12 +5628,25 @@ test("Review takes several results in one call, one image each and the brief onc
   assert.equal(f.submitted.length, 3, "reviewing queues nothing");
 });
 
+test("Generate's reply says how long the queue ahead should take at the profile's pace", async (t) => {
+  const f = await fixture(t, { jobAhead: 2, jobEtaMs: 60_000 });
+  const client = await f.client();
+  const queued = await call(client, "generate", {
+    kind: "image",
+    prompts: ["A heron"],
+    count: 1,
+  });
+  assert.match(texts(queued), /^Queued on Fixture Image, ready in about 3 min with 2 jobs ahead\./);
+  assert.equal(queued.structuredContent.jobs_ahead, 2);
+  assert.equal(queued.structuredContent.eta_seconds, 180);
+});
+
 test("Review does not poll or download a pending result, and refuses video", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   const pending = jobId(await generate(client));
   const result = await call(client, "review", { job_id: pending });
-  assert.equal(result.structuredContent.status, "running");
+  assert.equal(result.structuredContent.waiting[0].status, "running");
   assert.equal(
     result.content.some((item) => item.type === "image"),
     false,
@@ -5678,7 +5770,7 @@ test("Review waits for a result due within the wait, and says plainly when one i
   assert.ok(performance.now() - started < 2000, "doesn't wait for a result minutes away");
   assert.match(
     texts(early),
-    /^#1 is still running, so there is no image to review yet\..*\[#1\]\(https:\/\/studio\.example\.test\/mcp\/results\//,
+    /^Not finished yet, so not reviewed: \[#1\]\(https:\/\/studio\.example\.test\/mcp\/results\/\w+\) running, ready in about 5 min\. Reply now/,
   );
   // Due in a moment, as when the user asks right after a result renders: review waits and sees it.
   f.jobs.get(id).progress = { endsAt: Date.now() + 300 };
@@ -5687,6 +5779,20 @@ test("Review waits for a result due within the wait, and says plainly when one i
   const later = await call(client, "review", { job_id: "#1" });
   assert.ok(performance.now() - started < 5000, "returns once the result finishes");
   assert.equal(later.content.filter((item) => item.type === "image").length, 1);
+  // What is ready is reviewed; the rest is listed with its wait, without holding up the reply.
+  const queued = jobId(await generate(client));
+  Object.assign(f.jobs.get(queued), { status: "queued", progress: undefined, ahead: 3 });
+  started = performance.now();
+  const mixed = await call(client, "review", { job_id: "#1", also: ["#2"] });
+  assert.ok(performance.now() - started < 2000, "doesn't wait for work queued behind others");
+  assert.equal(mixed.content.filter((item) => item.type === "image").length, 1);
+  assert.match(
+    texts(mixed),
+    /Not finished yet, so not reviewed: \[#2\]\([^)]+\) queued, 3 jobs ahead\. Reply with the review of the rest/,
+  );
+  assert.deepEqual(mixed.structuredContent.waiting, [
+    { job_id: queued, ref: "#2", status: "queued", jobs_ahead: 3 },
+  ]);
 });
 
 test("Reuse preserves the seed for a requested revision only, and refuses an unknown seed or changed profile", async (t) => {
@@ -6517,11 +6623,11 @@ test("each_profile with a tier covers every ready model of that tier in one call
     kind: "image",
     each_profile: true,
     prompts: ["A lighthouse"],
-    count: 4,
+    count: 8,
   });
   assert.match(
     texts(many),
-    /^4 models × 4 images each would queue 16; one call queues at most 10\./,
+    /^4 models × 8 images each would queue 32; one call queues at most 30\./,
   );
   assert.equal(f.submitted.length, 1);
 });
@@ -6642,6 +6748,15 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   );
   assert.deepEqual(seen.at(-1).body, { ids: ["/comfy/view?filename=b.png"], rating: "disliked" });
   assert.equal(seen.at(-1).authorization, `Bearer ${userToken}`);
+  // A pick such as "1b" names one output by its letter, beside another ref's.
+  assert.deepEqual(
+    data(await call(mine, "gallery", { action: "like", results: ["#1b", "result 1 a"] })),
+    { liked: 2, results: ["#1"] },
+  );
+  assert.deepEqual(seen.at(-1).body, {
+    ids: ["/comfy/view?filename=a.png", "/comfy/view?filename=b.png"],
+    rating: "liked",
+  });
   assert.equal(data(await call(mine, "gallery", { action: "delete", results: [id] })).deleted, 2);
   assert.deepEqual(data(await call(mine, "gallery", { action: "clear_failed" })), { cleared: 2 });
   // Reuse upscale enlarges a finished output by its gallery item.

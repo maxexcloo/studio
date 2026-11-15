@@ -19,7 +19,7 @@ import { livePrompting } from "../profile/store.js";
 import { hostAllowed, hostnameOf } from "../request-guard.js";
 import { adminInstructions, registerAdminTools } from "./admin.js";
 import { createChatAssistantMemory, registerAssistantTools } from "./assistant.js";
-import { maxJobsPerCall, mcpGenerationCount } from "./controls.js";
+import { maxJobsPerCall, maxSplitJobs, mcpGenerationCount } from "./controls.js";
 import { createGuideLog, registerGenerateTools } from "./generate.js";
 import { controlInstructions, registerGpuTools } from "./gpu.js";
 import { registerManageTools } from "./manage.js";
@@ -28,8 +28,8 @@ import { createChatChoices, registerProjectTool } from "./project.js";
 import { registerResultTools } from "./results.js";
 import { registerVariantsTool } from "./variants.js";
 
-// Review waits up to this long for a result Studio expects to finish within it.
-const defaultReviewWaitSeconds = 30;
+// Review waits up to this long in all for results Studio doesn't expect to finish later.
+const defaultReviewWaitSeconds = 20;
 // An identical generate from the same conversation within this window is the same request (see generate).
 const generateDedupeWindowMs = 120_000;
 // Every client gets the same workflow rules from Studio itself, so a client needs no prompt prefix; tool descriptions
@@ -50,7 +50,7 @@ const conciseError = (message) => {
     .map((line) => /^(.+) at (\S+)$/.exec(line)?.slice(1).reverse().join(": ") || line);
   // An oversized set is the usual mistake; say how to split it.
   const split = issues.some((issue) => /^(?:count|prompts): Too big/.test(issue))
-    ? ` One call queues at most ${maxJobsPerCall} images (prompts × count); split a bigger set into calls made one after another.`
+    ? ` count is at most ${maxJobsPerCall} per prompt, and one call queues at most ${maxSplitJobs} images (prompts × count); split a bigger set into calls made one after another.`
     : "";
   return `Fix the ${match[1]} arguments: ${issues.join("; ")}.${split}`;
 };
@@ -360,7 +360,7 @@ export function registerMcpRoutes(
         chatChoices,
       });
       registerResultTools({ tool, server, media, actor, resolveOutput, reviewWaitSeconds });
-      registerManageTools({ tool, server, media, owner, refs, resolve });
+      registerManageTools({ tool, server, media, owner, refs, resolve, resolveOutput });
       registerProjectTool({ tool, server, media, owner, chat: actor.conversation, namedInTier });
       registerVariantsTool({
         tool,
