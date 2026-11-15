@@ -167,7 +167,12 @@ function where(query = {}) {
     );
   if (query.prompt !== undefined) add("json_extract(value, '$.prompt') = ?", query.prompt);
   if (query.titled) add("json_extract(value, '$.title') IS NOT NULL");
-  if (query.since) add("(status = 'pending' OR created_ms >= ?)", Number(query.since));
+  // Two seeks, as an OR across columns would walk the whole gallery for a few recent items.
+  if (query.since)
+    add(
+      "rowid IN (SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_status WHERE status = 'pending' UNION SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_created WHERE created_ms >= ?)",
+      Number(query.since),
+    );
   // Naming both buckets lets the order index seek the time range rather than compute each row's.
   if (query.before !== undefined) add("bucket IN (0, 1) AND created_ms <= ?", Number(query.before));
   if (query.idPrefix)
