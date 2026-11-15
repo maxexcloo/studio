@@ -46,6 +46,24 @@ export const loraFamilyId = (family: unknown) => {
   return id === "flux3_klein" ? "flux3" : id;
 };
 
+/**
+ * A LoRA's readable name: its catalogue title, else its file name cleaned up (no folder or
+ * extension, spaces for underscores and hyphens, Title Case), so people never read
+ * "pawg_krea2.safetensors".
+ */
+export function loraName(file: string, info?: { title?: unknown } | null) {
+  const title = typeof info?.title === "string" ? info.title.trim() : "";
+  if (title) return title;
+  return String(file || "")
+    .split(/[\\/]/)
+    .pop()!
+    .replace(/\.(safetensors|ckpt|pt|pth|bin|gguf)$/i, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/(^|\s)([a-z])/g, (_, space, letter) => space + letter.toUpperCase());
+}
+
 /** A recommendation does not require complete publisher bounds for the strength control. */
 export const loraDefaultStrength = (
   info:

@@ -10,7 +10,7 @@ import path from "node:path";
 import express from "express";
 
 import { characterImageIds } from "../shared/characters.ts";
-import { isCloudProfile } from "../shared/profiles.ts";
+import { isCloudProfile, loraName } from "../shared/profiles.ts";
 import { canAdmin, clientOf } from "./access.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import {
@@ -570,7 +570,7 @@ registerGalleryReadRoutes(app, {
   similar: (item, strictness) => imageSearch.similar(item, strictness),
 });
 
-registerLoraRoutes(app, { comfyDownMessage, loadComfyContext });
+registerLoraRoutes(app, { comfyDownMessage, latestComfyContext });
 
 // Taste profiles (domain/taste.ts) learn from stars, compare votes and iterations on a result.
 // A gone or disabled account's prompts never reach the text model.
@@ -879,6 +879,7 @@ const dream = createDream({
     return loadLoraLibrary(ownerId);
   },
   // As submit validation (validation.js) would judge them: another family's LoRA is dropped.
+  loraName: (name) => loraName(name, catalogueLoraInfo(name)),
   fitLoras: (profile, loras) =>
     loras.flatMap((lora) => {
       const info = catalogueLoraInfo(lora.name);

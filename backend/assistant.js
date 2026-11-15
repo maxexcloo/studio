@@ -1,4 +1,5 @@
 import { cardKinds, maxCardDescription } from "../shared/characters.ts";
+import { loraName } from "../shared/profiles.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { replyTitle } from "../shared/titles.ts";
 /**
@@ -32,7 +33,7 @@ import {
   writerGuide,
 } from "./domain/writing-standard.ts";
 import { cleanTriggers } from "./lora/catalogue.js";
-import { loraCompatibility, loraName, strengthRange } from "./lora/policy.js";
+import { loraCompatibility, strengthRange } from "./lora/policy.js";
 import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
 import { promptStyleStore } from "./prompt-styles.js";
 
