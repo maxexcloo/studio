@@ -6,11 +6,17 @@ const ideas = [
   "A lighthouse in rolling fog at blue hour",
   "A harbour market under paper lanterns",
   "Fishing boats asleep on a glassy bay",
+  "Clouds above a quiet coast",
+  "Dawn on a rocky beach",
+  "Boats under stars",
 ];
 const steps = [
   { label: "Warmer Light", request: "make the light warmer", prompt: "An amber bird, warm light" },
   { label: "Closer Crop", request: "crop closer", prompt: "A close crop of an amber bird" },
   { label: "Night Version", request: "set it at night", prompt: "An amber bird at night" },
+  { label: "Rain", request: "add rain", prompt: "A bird in rain" },
+  { label: "Fog", request: "add fog", prompt: "A bird in fog" },
+  { label: "Amber Sky", request: "add an amber sky", prompt: "A bird under an amber sky" },
 ];
 /** Answers `/api/suggestions` like Studio does for an account with a taste profile. */
 async function suggest(page: Page) {
@@ -73,7 +79,7 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
   // The phone sheet gives typing the whole screen; its chip row returns as the keyboard drops.
   if (testInfo.project.use.isMobile) await prompt.blur();
   await chip.click();
-  await expect(page.getByRole("option")).toHaveText(ideas);
+  await expect(page.getByRole("option")).toHaveText([...ideas].sort((a, b) => a.localeCompare(b)));
   expect(asked).toEqual([{ surface: "composer", kind: "image" }]);
   await page.getByRole("option", { name: ideas[1] }).click();
   await expect(prompt).toHaveValue(ideas[1]);
@@ -110,7 +116,7 @@ test("The viewer's Edit menu offers Review Prompt, then Suggestions with Refresh
   release[0]();
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
-    ...steps.map((step) => step.label),
+    ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
     "Refresh…",
     "Custom…",
     "Use as Character",
@@ -205,7 +211,7 @@ test("Edit offers Library's fixed changes above the image's suggestions", async 
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
-    ...steps.map((step) => step.label),
+    ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
     "Refresh…",
     "Softer Shadows",
     "Custom…",
@@ -225,7 +231,14 @@ test("Animate offers motions written for the image, then its templates and Custo
   page,
 }) => {
   const state = await openViewer(page);
-  const motion = [{ label: "Wings Unfold", request: "The bird spreads its wings and takes off." }];
+  const motion = [
+    { label: "Wings Unfold", request: "The bird spreads its wings and takes off." },
+    { label: "Slow Push In", request: "The camera moves closer." },
+    { label: "Head Turn", request: "The bird turns its head." },
+    { label: "Clouds Drift", request: "Clouds pass behind the bird." },
+    { label: "Bird Sings", request: "The bird sings." },
+    { label: "Feathers Rustle", request: "A breeze ruffles the feathers." },
+  ];
   const asked: any[] = [];
   await page.route("**/api/suggestions", (route) => {
     const body = route.request().postDataJSON();
@@ -245,7 +258,7 @@ test("Animate offers motions written for the image, then its templates and Custo
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
-    "Wings Unfold",
+    ...motion.map((idea) => idea.label).sort((a, b) => a.localeCompare(b)),
     "Refresh…",
     "Action",
     "Cinematic Camera",
