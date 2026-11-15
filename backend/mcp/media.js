@@ -1598,7 +1598,7 @@ export class McpMedia {
     const controls = mcpControls(
       references.length ? { ...profile, ...profile.imageModes?.reference } : profile,
     );
-    if (controls.width && controls.height && item.width > 0 && item.height > 0)
+    if (controls.aspect && item.width > 0 && item.height > 0)
       Object.assign(args, mcpSize(profile, { aspect: `${item.width}:${item.height}` }));
     return { profile, args };
   }
@@ -1692,7 +1692,7 @@ export class McpMedia {
       ...(length ? videoLength(profile, length) : {}),
     };
     const controls = mcpControls(profile);
-    const size = controls.width && controls.height ? frameSize(base, width, height) : null;
+    const size = controls.aspect ? frameSize(base, width, height) : null;
     if (
       size &&
       (size.width !== profile.defaults?.width || size.height !== profile.defaults?.height)

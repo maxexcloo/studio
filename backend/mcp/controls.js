@@ -4,8 +4,8 @@ import { referenceImageSize } from "../generation-defaults.js";
 import { loraCompatibility, strengthRange } from "../lora/policy.js";
 import { keptTriggers } from "../lora/prompts.js";
 
-/** Chat asks for one output unless the user asks for more; the studio UI keeps its own default. */
-export const mcpGenerationCount = 1;
+/** Images per prompt a chat gets unless the user asks for a number (videos get one); the studio UI keeps its own default. */
+export const mcpGenerationCount = 2;
 /** Images one generate call may queue: every prompt times count. */
 export const maxJobsPerCall = 10;
 
@@ -35,13 +35,19 @@ export function mcpControls(profile) {
   const defaults = profile.defaults || {};
   const options = profile.options || {};
   const controls = {};
-  for (const key of ["width", "height"])
-    if (!fixedRange(constraints[key]))
-      controls[key] = rangeOf(constraints[key], { min: 64 }, defaults[key]);
+  // Sizes are the profile's own presets, as the composer offers them, never a free width and height.
+  if (!fixedRange(constraints.width) || !fixedRange(constraints.height)) {
+    const presets = profile.aspectPresets || [];
+    const fallback = profile.aspectDefault || presets.find((item) => item.default)?.label;
+    controls.aspect = {
+      options: presets.map((item) => item.label),
+      ...(fallback ? { default: fallback } : {}),
+    };
+  }
   controls.count = {
     min: 1,
     max: maxJobsPerCall,
-    default: mcpGenerationCount,
+    default: profile.kind === "video" ? 1 : mcpGenerationCount,
     note: `prompts × count is at most ${maxJobsPerCall} per call.`,
   };
   if (caps.seed !== false) controls.seed = { min: 0 };
@@ -149,8 +155,6 @@ export function assertAdjustable(profile, args) {
   const controls = mcpControls(profile);
   const adjustable = Object.keys(controls).join(", ");
   for (const field of [
-    "width",
-    "height",
     "seed",
     "steps",
     "cfg",
@@ -180,7 +184,7 @@ export function assertAdjustable(profile, args) {
       `${field} cannot be adjusted for ${profile.label || profile.id}.${reason} Adjustable controls: ${adjustable}.`,
     );
   }
-  for (const field of ["width", "height", "steps", "cfg", "denoise"]) {
+  for (const field of ["steps", "cfg", "denoise"]) {
     const value = args[field];
     const range = controls[field];
     if (value === undefined || !range) continue;
@@ -519,20 +523,25 @@ const orientations = {
 };
 /**
  * The width and height for an aspect ("landscape", "portrait", "square" or a ratio such as 16:9):
- * the profile's own preset for the aspect, which the run's resolution then scales. Null without
- * an aspect, so the saved size applies.
+ * the profile's own preset for the aspect, which the run's resolution then scales. Without an
+ * aspect, the profile's default preset where it has one (as the composer starts), else null so the
+ * saved size applies.
  */
-export function mcpSize(profile, { aspect } = {}) {
+export function mcpSize(profile, { aspect = profile.aspectDefault } = {}) {
   if (!aspect) return null;
   const defaults = profile.defaults || {};
   const presets = (profile.aspectPresets || []).filter((item) => item.w > 0 && item.h > 0);
   let width = Number(defaults.width) || 1024;
   let height = Number(defaults.height) || width;
   const key = String(aspect).trim().toLowerCase().slice(0, 20);
+  const named = presets.find((item) => item.label.toLowerCase() === key);
+  if (named) return { width: named.w, height: named.h };
   const orientation = orientations[key];
   const ratio = /^(\d+(?:\.\d+)?)\s*[:x×/]\s*(\d+(?:\.\d+)?)$/.exec(key);
   if (!orientation && !(ratio && Number(ratio[1]) > 0 && Number(ratio[2]) > 0))
-    throw new Error(`Choose aspect from landscape, portrait, square or a ratio such as 16:9.`);
+    throw new Error(
+      `Choose aspect from ${[...presets.map((item) => item.label), "landscape", "portrait", "square"].join(", ")}.`,
+    );
   const shape = (w, h) => (w > h ? "landscape" : w < h ? "portrait" : "square");
   const wanted = orientation ? null : Number(ratio[1]) / Number(ratio[2]);
   // The profile's own preset when one fits, in its own order; otherwise the ratio at its default pixel count.

@@ -43,8 +43,7 @@ const profile = {
 test("adjustable controls omit fixed, single-option and unsupported Generate arguments", () => {
   const controls = mcpControls(profile);
   assert.deepEqual(Object.keys(controls), [
-    "width",
-    "height",
+    "aspect",
     "count",
     "seed",
     "steps",
