@@ -46,6 +46,8 @@ export interface QueueAdapter {
   settled?(job: OwnedJob): Promise<void>;
   /** Other resources that could run this queued job now, best first (an idle worker takes it). */
   alternatives?(job: OwnedJob): string[];
+  /** How many jobs a resource runs at once; one unless it says more (a worker's `slots`). */
+  slots?(resource: string): number;
 }
 
 /** What the writing stage streams into the item's progress while the prompt is written. */
@@ -117,8 +119,8 @@ export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
 export const modelOf = (input: GenerationInput) => String(input.profileId || input.model || "");
 
 /**
- * A resource's load: whether work runs there (`current`, its job's id), how many jobs wait for it
- * and the model it last ran.
+ * A resource's load: whether its slots are all taken (`current`, the last started job's id), how
+ * many jobs wait for it and the model it last ran.
  */
 export interface ResourceLoad {
   busy: boolean;
@@ -195,13 +197,21 @@ export class GenerationQueue {
       return loads.get(resource)!;
     };
     for (const resource of this.loaded.keys()) at(resource);
+    const running = new Map<string, number>();
     for (const job of this.store.openJobs()) {
       // A started job a restart recovered isn't accepted in this process yet, but still runs.
-      if (this.acceptedIds.has(job.id) || started(job))
-        Object.assign(at(job.resource), { busy: true, current: job.id });
-      else at(job.resource).queued += 1;
+      if (this.acceptedIds.has(job.id) || started(job)) {
+        running.set(job.resource, (running.get(job.resource) ?? 0) + 1);
+        if (running.get(job.resource)! >= this.slots(job.resource))
+          Object.assign(at(job.resource), { busy: true, current: job.id });
+        else at(job.resource);
+      } else at(job.resource).queued += 1;
     }
     return loads;
+  }
+
+  private slots(resource: string) {
+    return this.adapter.slots?.(resource) ?? 1;
   }
 
   /** Forgets what a resource has loaded: its worker stopped, restarted or went offline. */
@@ -389,11 +399,13 @@ export class GenerationQueue {
     );
     // Read again: jobs were added, observed or cancelled while the observations were awaited.
     const all = this.store.schedulable(reuseBypassLimit);
-    const occupied = new Set(
-      all
-        .filter((job) => !terminalStatuses.has(job.status) && this.acceptedIds.has(job.id))
-        .map((job) => job.resource),
-    );
+    const running = new Map<string, number>();
+    for (const job of all)
+      if (!terminalStatuses.has(job.status) && this.acceptedIds.has(job.id))
+        running.set(job.resource, (running.get(job.resource) ?? 0) + 1);
+    const free = (resource: string) => this.slots(resource) - (running.get(resource) ?? 0);
+    // Resources whose every slot runs a job; the rest take work.
+    const occupied = new Set([...running.keys()].filter((resource) => free(resource) <= 0));
     const isStarted = (job: OwnedJob) => this.acceptedIds.has(job.id) || started(job);
     // A started MCP set finishes before other work of its tier and below, so its jobs stay
     // contiguous; manual work still goes first.
@@ -452,6 +464,7 @@ export class GenerationQueue {
       [...groups].map(async ([resource, candidates]) => {
         // Resource groups run independently. A slow cloud request or offline worker cannot hold the scheduler.
         this.scheduling.add(resource);
+        let room = free(resource);
         try {
           for (let job of candidates) {
             let reason: string | undefined;
@@ -510,6 +523,8 @@ export class GenerationQueue {
             } finally {
               this.submitting.delete(job.id);
             }
+            // A resource with another free slot starts its next candidate in this pass.
+            if (--room > 0) continue;
             for (const pending of candidates) {
               const latest = this.store.job(pending.ownerId, pending.id)!;
               if (["queued", "waiting"].includes(latest.status) && !this.acceptedIds.has(latest.id))
