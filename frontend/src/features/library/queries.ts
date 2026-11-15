@@ -16,6 +16,21 @@ export const catalogueQuery = queryOptions({
 /** The profiles, guides and guide bindings lists all sit under this key. */
 export const definitionsKey = ["definition-list"];
 
+export interface ProfileRow {
+  id: string;
+  name?: string;
+  family?: string;
+  kind?: string;
+  version: number;
+  aiDrafted?: boolean;
+  /** A combined profile's current backend. */
+  backend?: string;
+}
+export const editableProfilesQuery = queryOptions({
+  queryKey: [...definitionsKey, "profile"],
+  queryFn: () => api<{ profiles: ProfileRow[] }>("/api/profiles/editable"),
+});
+
 export interface ModelDownload {
   id: string;
   file: string;
