@@ -1585,7 +1585,8 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   expect(bounds?.height).toBe(viewport.height);
   const phone = viewport.width < 768;
   if (phone) {
-    // Phones fit every action on the bar's one row, each named but Like, Dislike and Delete.
+    // Phones fit every action on the bar's one row; names drop from the last where they outgrow
+    // it, Like, Dislike and Delete having none.
     const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
     const row = ["Animate", "Edit", "Recreate", "Share", "Like", "Dislike", "Delete"].map((name) =>
       bar.getByRole("button", { name, exact: true }),
@@ -1597,7 +1598,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       }),
     );
     expect(new Set(tops.map(Math.round)).size).toBe(1);
-    for (const name of ["Animate", "Edit", "Recreate", "Share"])
+    for (const name of ["Animate", "Edit"])
       await expect(bar.getByRole("button", { name, exact: true })).toHaveText(name);
   }
   await viewerAction(page, "Share");

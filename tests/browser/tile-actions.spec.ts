@@ -9,7 +9,6 @@ import {
   profiles,
   selectionAction,
   serveProfiles,
-  showOnly,
   stamp,
   touch,
   viewerAction,
@@ -104,13 +103,18 @@ test("Dislike hides a tile, Disliked shows it and Restore brings it back", async
   await expect.poll(() => state.gallery[0].rating).toBe("disliked");
   // Undo is offered while the dislike's notification shows.
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
-  await showOnly(page, "Disliked");
+  // Disliked is a switch in Filters, shown as a removable chip.
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByRole("switch", { name: "Disliked", exact: true }).click();
+  await page.keyboard.press("Escape");
   await expect(tile).toBeVisible();
   await select();
   await selectionAction(page, "Restore").click();
   await expect(tile).toBeHidden();
   await expect.poll(() => state.gallery[0].rating).toBeUndefined();
-  await showOnly(page, "All");
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByRole("switch", { name: "Disliked", exact: true }).click();
+  await page.keyboard.press("Escape");
   await expect(tile).toBeVisible();
 });
 

@@ -776,9 +776,8 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   const phone = test.info().project.use.isMobile;
   await expect(await toolbarSearch(page)).toHaveValue(phone ? "" : "birds");
   await search.press("Escape");
-  // Liked, Disliked and Uploads are toolbar toggles, one at a time.
+  // Liked and Uploads are toolbar toggles, one at a time.
   await showOnly(page, "Liked");
-  await showOnly(page, "Disliked");
   await showOnly(page, "Uploads");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   // The view (Grid or Runs) leads the popup.

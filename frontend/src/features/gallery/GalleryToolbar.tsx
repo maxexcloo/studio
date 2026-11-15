@@ -25,7 +25,7 @@ import { useGalleryColumns } from "./useGalleryLayout";
 import classes from "./GalleryFilters.module.css";
 
 /**
- * The gallery's one toolbar row: search, Filter ▾, Liked, Disliked and Uploads, the active filters as removable chips, the result
+ * The gallery's one toolbar row: search, Filter ▾, Liked and Uploads, the active filters as removable chips, the result
  * count, the zoom slider (desktop; phones pinch) and `actions` (Upload ▾, Select). Phones show the chips in a row below
  * and open the search from its icon into the full row. Search narrows within the filters; filter changes keep the query.
  */
@@ -63,9 +63,13 @@ export function GalleryToolbar({
     if (query && phone) setSearching(true);
   }, [query, phone]);
   const chips = useActiveFilters({ kind, value, onChange }, extraChips);
-  // Clearing the filters leaves the Liked, Disliked or Uploads toggle as it is.
+  // Clearing the filters, Disliked among them, leaves the Liked or Uploads toggle as it is.
   const clear = () => {
-    onChange({ ...emptyGalleryFilters, rating: value.rating, uploads: value.uploads });
+    onChange({
+      ...emptyGalleryFilters,
+      rating: value.rating === "liked" ? "liked" : "",
+      uploads: value.uploads,
+    });
     for (const chip of extraChips) chip.remove();
   };
   const toolbar = useRef<HTMLDivElement>(null);
@@ -183,18 +187,15 @@ export function GalleryToolbar({
           toggles={toggles}
         />
       </ChipPopup>
-      {/* Liked, Disliked and Uploads show one at a time. */}
-      {(["liked", "disliked"] as const).map((rating) => (
-        <FilterToggle
-          key={rating}
-          label={rating === "liked" ? "Liked" : "Disliked"}
-          icon={rating === "liked" ? icons.like : icons.dislike}
-          on={value.rating === rating}
-          onToggle={() =>
-            onChange({ ...value, rating: value.rating === rating ? "" : rating, uploads: false })
-          }
-        />
-      ))}
+      {/* Liked, Disliked (in Filters) and Uploads show one at a time. */}
+      <FilterToggle
+        label="Liked"
+        icon={icons.like}
+        on={value.rating === "liked"}
+        onToggle={() =>
+          onChange({ ...value, rating: value.rating === "liked" ? "" : "liked", uploads: false })
+        }
+      />
       <FilterToggle
         label="Uploads"
         icon={icons.uploads}

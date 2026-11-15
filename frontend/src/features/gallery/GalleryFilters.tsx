@@ -206,8 +206,8 @@ interface FilterProps {
 }
 
 /**
- * The active filters as removable chips, one per value, plus any `extra` view choices. Liked,
- * Disliked and Uploads have none: their own toggle or tab shows them.
+ * The active filters as removable chips, one per value, plus any `extra` view choices. Liked
+ * and Uploads have none: their own toggle or tab shows them.
  */
 export function useActiveFilters(
   { kind, value, onChange }: FilterProps,
@@ -217,6 +217,9 @@ export function useActiveFilters(
   const date = dates.find((option) => option.value === value.date)?.chip;
   return [
     ...(date ? [{ key: "date", label: date, remove: () => onChange({ ...value, date: "" }) }] : []),
+    ...(value.rating === "disliked"
+      ? [{ key: "disliked", label: "Disliked", remove: () => onChange({ ...value, rating: "" }) }]
+      : []),
     ...(value.comparisons
       ? [
           {
@@ -396,7 +399,7 @@ export function FilterToggle({
 /**
  * The filters, shared by the gallery's Filter popup and the reference picker: the gallery's `view`
  * (Grid or Runs) with the view's own `toggles` (such as All Versions) under it, then the date and
- * each facet. Liked, Disliked and Uploads sit outside it, as the gallery's toggles and the picker's tabs.
+ * each facet. Liked and Uploads sit outside it, as the gallery's toggles and the picker's tabs.
  * Choices apply at once.
  */
 export function GalleryFilterPanel({

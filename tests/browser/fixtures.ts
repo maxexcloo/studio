@@ -1076,10 +1076,10 @@ export async function withSettings(page: Page, steps: () => Promise<void>) {
   await closePopup(page, "Settings");
 }
 
-/** Shows the gallery's Liked, Disliked or Uploads alone with its toolbar toggle, or All with none. */
-export async function showOnly(page: Page, choice: "All" | "Liked" | "Disliked" | "Uploads") {
+/** Shows the gallery's Liked or Uploads alone with its toolbar toggle, or All with neither. */
+export async function showOnly(page: Page, choice: "All" | "Liked" | "Uploads") {
   const toggle = (name: string) => page.getByRole("button", { name, exact: true });
-  for (const name of ["Liked", "Disliked", "Uploads"]) {
+  for (const name of ["Liked", "Uploads"]) {
     const on = (await toggle(name).getAttribute("aria-pressed")) === "true";
     if (on !== (name === choice)) await toggle(name).click();
     await expect(toggle(name)).toHaveAttribute("aria-pressed", String(name === choice));

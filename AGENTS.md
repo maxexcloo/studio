@@ -249,8 +249,8 @@ the primary component reference and verify APIs against the installed version.
   loaded pages, and it confirms deletion. A finished action ends
   the selection, keeping selected only the items it failed for; opening a menu does not.
 - Like and Dislike rate an item and teach taste; a Dislike never deletes. It hides
-  the item from the gallery, Dream and search with Undo, and the gallery's
-  Disliked toggle shows it, where Dislike reads Restore. Report Issue… asks
+  the item from the gallery, Dream and search with Undo, and the Disliked switch
+  in the gallery's Filters shows it, where Dislike reads Restore. Report Issue… asks
   what is wrong, has the assistant fix it as an edit or a run on its seed,
   queues that as a version and dislikes the original with the issue.
 - Details sections show their content in full rather than scrolling it in a
