@@ -1557,6 +1557,8 @@ export function createDream(options: {
     /** Why a reply can't be used, or "" when it can. */
     const problem = (prompt: string, title: string) => {
       if (!prompt) return "Your reply had no usable prompt.";
+      const minor = options.minorAge(prompt);
+      if (minor) return `"${minor}" reads as someone under 18; every person is an adult.`;
       if (series)
         return shots.some((shot) => normalised(shot) === normalised(prompt))
           ? "You repeated an earlier result of the series."

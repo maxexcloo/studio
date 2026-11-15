@@ -240,6 +240,13 @@ export function createGenerationQueue({
     store,
     {
       ...generationAdapter,
+      // Retries, recovered work and anything queued before the check tightened meet it here too.
+      submit: (job) => {
+        const refusal = minorAgeRefusal(job.input.prompt);
+        return refusal
+          ? Promise.resolve({ status: "failed", reason: refusal })
+          : generationAdapter.submit(job);
+      },
       // A local generation may move to another idle worker that runs it until it starts.
       alternatives: (job) => {
         const capability = job.input.kind === "video" ? "video" : "image";

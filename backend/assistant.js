@@ -35,6 +35,7 @@ import {
 import { cleanTriggers } from "./lora/catalogue.js";
 import { loraCompatibility, strengthRange } from "./lora/policy.js";
 import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
+import { minorAgeRefusal } from "./minor-age.js";
 import { promptStyleStore } from "./prompt-styles.js";
 
 const gatewayKeys = [
@@ -87,6 +88,15 @@ export const reasoningEfforts = {
 };
 const maxCandidates = 20;
 const maxExamples = 6;
+// Calls whose replies are prompts, prompt ideas or card text; Dream's writer checks its own.
+const promptCalls = new Set([
+  "animate",
+  "character",
+  "describe",
+  "rewrite",
+  "sheet",
+  "suggestions",
+]);
 const lookupTtlMs = 10 * 60_000;
 const failedLookupTtlMs = 60_000;
 
@@ -722,6 +732,8 @@ export function createAssistant(
     const what = `Prompt assistant ${options.call} with ${options.model}`;
     try {
       const reply = await request(options);
+      const refusal = promptCalls.has(options.call) && minorAgeRefusal(reply.text);
+      if (refusal) throw new AssistantError(refusal, { status: 400 });
       const by = reply.served && reply.served !== options.model ? ` (${reply.served})` : "";
       log.info?.(`${what}${by} in ${reply.ms} ms`);
       return reply;
@@ -770,6 +782,8 @@ export function createAssistant(
       .trim()
       .slice(0, maxPromptCharacters);
     if (!original) throw new AssistantError("Enter a prompt to rewrite.", { status: 400 });
+    const refusal = minorAgeRefusal(`${original}\n${asked}`);
+    if (refusal) throw new AssistantError(refusal, { status: 400 });
     const model = await modelFor("rewrite", explicit, writer);
     const started = now();
     const images = Array.isArray(references) ? references.filter((image) => image?.data) : [];
@@ -818,6 +832,8 @@ export function createAssistant(
       return { ...base, prompt: written, source: "assistant", ms: now() - started };
     } catch (error) {
       rethrowCancel(error);
+      // A refused rewrite says why rather than falling back to the prompt.
+      if (error instanceof AssistantError && error.status === 400) throw error;
       return {
         ...base,
         prompt: original,
