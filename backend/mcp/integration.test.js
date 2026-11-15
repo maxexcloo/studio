@@ -3046,6 +3046,21 @@ test(
   },
 );
 
+test("MCP preserves tierless configured pixel defaults", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client("default-sizing");
+  for (const size of [2048, 3104]) {
+    await f.profiles([
+      { ...imageProfile, defaults: { ...imageProfile.defaults, width: size, height: size } },
+    ]);
+    await generate(client);
+    const submitted = f.submitted.at(-1);
+    assert.deepEqual([submitted.width, submitted.height], [size, size]);
+    assert.equal(submitted.resolutionTier, undefined);
+    assert.equal(submitted.autoUpscale, null);
+  }
+});
+
 test("MCP advertises and submits the provider's own native resolution options", async (t) => {
   const f = await fixture(t);
   const client = await f.client("provider-sizing");

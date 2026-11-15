@@ -66,10 +66,10 @@ export function availableResolutions(profile?: SizedProfile, input?: SizedInput)
   });
 }
 
-/** A remembered tier follows the profile's available choices when the profile or shape changes. */
+/** Missing or unsupported remembered tiers keep the input's pixel dimensions. */
 export function selectedResolution(input: SizedInput, profile?: SizedProfile) {
   const choices = availableResolutions(profile, input);
-  return choices.find((tier) => tier === input.resolutionTier) || choices[0];
+  return choices.find((tier) => tier === input.resolutionTier);
 }
 
 /** `size`'s aspect with its long edge at the tier, each side rounded to the profile's multiple. */
