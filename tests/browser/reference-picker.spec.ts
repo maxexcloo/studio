@@ -7,6 +7,7 @@ import {
   expandComposer,
   fixtures,
   image,
+  pickerTab,
   profiles,
   serveProfiles,
   showUploads,
@@ -404,4 +405,106 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   }
   await expect(picker).toBeVisible();
   await expect(chosen).toHaveAttribute("aria-pressed", "true");
+});
+
+test("The first Uploads tile keeps its target through cancellation and failure, then places the upload", async ({
+  page,
+}) => {
+  const state = await setup(page);
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  const picker = page.getByRole("region", { name: "References", exact: true });
+  await expect(picker.getByRole("radio", { name: "Liked", exact: true })).toHaveCount(0);
+  await expect(picker.getByRole("button", { name: "Upload Reference", exact: true })).toHaveCount(
+    0,
+  );
+  await picker.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
+  await showUploads(page);
+  const grid = picker.getByRole("list", { name: "References Choices", exact: true });
+  const upload = grid
+    .getByRole("listitem")
+    .first()
+    .getByRole("button", { name: "Upload Reference", exact: true });
+  await expect(upload).toBeVisible();
+  const chooser = page.waitForEvent("filechooser");
+  await upload.click();
+  await (await chooser).setFiles([]);
+  expect(state.referenceRequests).toHaveLength(0);
+  expect(state.gallery.filter((item) => item.uploaded)).toHaveLength(0);
+  let fail = true;
+  await page.route("**/api/reference-assets/upload", async (route) => {
+    if (fail) await route.fulfill({ status: 503, json: { error: "Fixture upload unavailable" } });
+    else await route.fallback();
+  });
+  const file = { name: "end.png", mimeType: "image/png", buffer: Buffer.from("fixture") };
+  await picker.locator('input[type="file"]').setInputFiles(file);
+  await expect(page.getByText("Fixture upload unavailable", { exact: true })).toBeVisible();
+  await expect(upload).toBeEnabled();
+  await expect(picker.getByRole("button", { name: "Slot 3 · End", exact: true })).toBeVisible();
+  fail = false;
+  await picker.locator('input[type="file"]').setInputFiles(file);
+  await expect(
+    picker.getByRole("button", { name: "Reference 3 · End", exact: true }),
+  ).toBeVisible();
+  await expect(
+    grid
+      .getByRole("listitem")
+      .first()
+      .getByRole("button", { name: "Upload Reference", exact: true }),
+  ).toBeVisible();
+  await expect(
+    grid.getByRole("button", { name: "Remove reference: Upload 1", exact: true }),
+  ).toBeVisible();
+  await pickerTab(page, "References", "Gallery");
+  await picker.getByRole("button", { name: "Use reference: Alpha", exact: true }).click();
+  await closeReferences(page);
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.referenceAssets).toEqual([
+    { assetId: "asset-alpha", slot: "start" },
+    { assetId: "asset-upload", slot: "end" },
+  ]);
+});
+
+test("Virtualised uploads retain their asset IDs and numbering after the leading upload tile", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(
+    ...Array.from({ length: 100 }, (_, index) => ({
+      id: `owned-upload-${index}`,
+      uploaded: true,
+      type: "image",
+      status: "done",
+      prompt: "",
+      url: image,
+      thumbnailUrl: image,
+      width: 1024,
+      height: 1024,
+      createdAt: stamp,
+    })),
+  );
+  await create(page);
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await showUploads(page);
+  const picker = page.getByRole("region", { name: "References", exact: true });
+  const grid = picker.getByRole("list", { name: "References Choices", exact: true });
+  await expect(
+    grid
+      .getByRole("listitem")
+      .first()
+      .getByRole("button", { name: "Upload Reference", exact: true }),
+  ).toBeVisible();
+  await expect(async () => {
+    await grid.evaluate((element) => {
+      const viewport = element.closest<HTMLElement>(".mantine-ScrollArea-viewport")!;
+      viewport.scrollTop = viewport.scrollHeight;
+    });
+    await expect(
+      grid.getByRole("button", { name: "Use reference: Upload 100", exact: true }),
+    ).toBeVisible();
+  }).toPass();
+  await expect(grid.getByRole("button", { name: "Upload Reference", exact: true })).toHaveCount(0);
+  await grid.getByRole("button", { name: "Use reference: Upload 100", exact: true }).click();
+  await expect.poll(() => state.referenceRequests).toEqual([{ galleryItemId: "owned-upload-99" }]);
+  expect(await grid.getByRole("listitem").count()).toBeLessThan(100);
 });
