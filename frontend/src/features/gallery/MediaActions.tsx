@@ -417,8 +417,8 @@ export function useMediaActions(
   // Motions written for this image, asked for only once its Animate menu opens.
   const [motionsFor, setMotionsFor] = useState<string>();
   const motions = useChangeSuggestions({
-    query: motionIdeasQuery(item.jobId ?? ""),
-    fresh: () => askMotionIdeas(item.jobId!, true),
+    query: motionIdeasQuery(item.jobId ?? "", item.id),
+    fresh: () => askMotionIdeas(item.jobId!, true, item.id),
     enabled: motionsFor === item.id,
     disabled: !animation.data,
     onPick: (instruction) =>
@@ -458,8 +458,8 @@ export function useMediaActions(
   // Tile suggestions load when Edit opens; the viewer prompt owns its own suggestions.
   const [stepsFor, setStepsFor] = useState<string>();
   const steps = useChangeSuggestions({
-    query: nextStepsQuery(item.jobId ?? ""),
-    fresh: () => askNextSteps(item.jobId!, true),
+    query: nextStepsQuery(item.jobId ?? "", undefined, item.id),
+    fresh: () => askNextSteps(item.jobId!, true, undefined, item.id),
     enabled: editAssisted && image && stepsFor === item.id,
     disabled: editAsk.pending,
     onPick: editAsk.pick,

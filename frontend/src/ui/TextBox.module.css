@@ -33,13 +33,13 @@
   position: static;
 }
 
-/* Editing controls and form sends keep separate rows when the phone has little room. */
+/* Named tools and form sends share a row, wrapping only when they outgrow the surface. */
 .toolbar {
   flex-shrink: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--mantine-spacing-xs);
+  gap: 0;
   padding-top: var(--mantine-spacing-xs);
   border-top: 1px solid var(--studio-glass-border);
 }
@@ -185,8 +185,4 @@
   font-size: 1.0625rem;
   line-height: 1.55;
   resize: none;
-}
-
-.editor > .sends {
-  padding-top: var(--mantine-spacing-xs);
 }

@@ -470,3 +470,20 @@ test("Account menu names the account by its email and opens the account workspac
   await page.getByRole("menuitem", { name: "Account", exact: true }).click();
   await expect(page).toHaveURL(/\/settings#account$/);
 });
+
+test("The Studio header keeps its home link with modes and account controls on phones", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.goto("/video");
+  const header = page.getByRole("banner");
+  const home = header.getByRole("link", { name: "Studio.", exact: true });
+  await expect(home).toBeVisible();
+  await expect(
+    header.getByRole("navigation", { name: "Creative Modes", exact: true }),
+  ).toBeVisible();
+  await expect(header.getByRole("button", { name: "Appearance", exact: true })).toBeVisible();
+  await expect(header.getByRole("button", { name: "More Options", exact: true })).toBeVisible();
+  await home.click();
+  await expect(page).toHaveURL(/\/images$/);
+});

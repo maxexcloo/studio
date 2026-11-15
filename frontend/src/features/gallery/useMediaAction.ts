@@ -48,8 +48,8 @@ interface AnimateChoice {
 
 /** Animate's Review Prompt: templates write the prompt for editing before it runs; off until chosen. */
 export const useAnimateReview = () => useRemembered<boolean>("animate-review", false);
-/** Edit's Review Prompt: a change's proposal fills the viewer's prompt before it runs; on until chosen. */
-export const useEditReview = () => useRemembered<boolean>("viewer-review-first", true);
+/** Edit's Review Prompt: a change's proposal fills the viewer's prompt before it runs; off until chosen. */
+export const useEditReview = () => useRemembered<boolean>("viewer-review-first", false);
 /** How Edit asks for a change: the viewer asks in its prompt field; a tile opens the viewer to. */
 export interface EditAsk {
   pending: boolean;

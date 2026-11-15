@@ -66,7 +66,7 @@ export function useCardIdeas({
   const groups = assistMenu({
     templates: [],
     suggestions: [
-      { id: "heading", label: "Suggestions", heading: true },
+      { id: "heading", label: "Suggested", heading: true },
       ...(loading
         ? [{ id: "loading", label: "Loading…", disabled: true }]
         : options.length
