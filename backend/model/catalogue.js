@@ -62,8 +62,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
 
   // One fetch of a worker's context at a time: callers that arrive meanwhile share it.
   const shareContextRequest = sharedRequests();
-  // A large node list can take several seconds to cross between sites.
-  const catalogueReadTimeoutMs = 30_000;
+  const catalogueReadTimeoutMs = 5000;
   // Each worker's latest failed context read, reused briefly so admission, routing and
   // eligibility do not each wait out the deadline of a hung worker in turn.
   const contextFailures = new Map();
@@ -104,7 +103,8 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
   async function fetchComfyContext(backend) {
     const signal = AbortSignal.timeout(catalogueReadTimeoutMs);
     const [info, stats] = await Promise.all([
-      comfy(backend, "/object_info", { signal }),
+      // The node list is megabytes and may take seconds to cross between sites once it starts.
+      comfy(backend, "/object_info", { answerWithin: catalogueReadTimeoutMs }),
       comfy(backend, "/system_stats", { signal }).catch(() => ({})),
     ]).catch((error) => {
       contextFailures.set(backend, { error, at: Date.now() });
