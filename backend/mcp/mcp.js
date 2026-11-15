@@ -462,6 +462,29 @@ export function registerMcpRoutes(
           .status(404)
           .json({ error: "Studio MCP takes a bearer credential; there is no OAuth here." }),
       );
+    // An image a person attached in chat (chat-uploads.js), saved as their Upload; before /mcp/:token takes the path.
+    app.post(
+      "/mcp/uploads",
+      guard,
+      express.raw({ type: () => true, limit: maxUploadMegabytes * 1_000_000 }),
+      async (req, res) => {
+        const { scope, owner } = req.mcpActor;
+        if (scope !== "media" || !owner)
+          return res.status(403).json({
+            error: scope === "unlinked" ? unlinkedMessage : "Only a person's media access uploads.",
+          });
+        try {
+          const { asset } = await media.store(
+            owner,
+            Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0),
+            String(req.query.name || "chat-image"),
+          );
+          res.status(201).json({ asset });
+        } catch (error) {
+          res.status(400).json({ error: error.message });
+        }
+      },
+    );
     // The same endpoint at /mcp/<token> is a full MCP URL of its own, for clients that can send no headers.
     for (const route of ["/mcp", "/mcp/:token"]) {
       app.options(route, preflight);
