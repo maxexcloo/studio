@@ -44,7 +44,7 @@ const steps = [
   {
     name: "legacyShapes",
     run: legacyShapes,
-    changes: (plan) => plan.arms + plan.notes,
+    changes: (plan) => plan.arms + plan.notes + (plan.editsFile ? 1 : 0),
     online: true,
   },
 ];

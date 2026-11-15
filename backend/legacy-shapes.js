@@ -1,9 +1,13 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { runtimeDatabase } from "./persistence/runtime.ts";
 
 /**
  * The migrate-runtime step that rewrites shapes older builds stored: a Dream result made before
  * arms were recorded exploited the taste profile (`dream.arm: "exploit"`), and a taste profile
- * written as prose keeps it as its `note` rather than `summary`. Safe while Studio runs: its writes
+ * written as prose keeps it as its `note` rather than `summary`. It also deletes
+ * `workflows/.studio-edits.json`, which profile history replaced. Safe while Studio runs: its writes
  * are synchronous on the server's own database. Plans by default; `apply` writes. A second run
  * finds nothing.
  */
@@ -20,8 +24,12 @@ export function legacyShapes(dataDir, { apply = false } = {}) {
       "SELECT name, value FROM studio_documents WHERE name LIKE 'taste:%' AND json_type(value, '$.summary') IS NOT NULL",
     )
     .all();
-  const result = { applied: apply, arms, notes: tastes.length };
-  if (!apply || !(arms + tastes.length)) return result;
+  const edits = path.join(dataDir, "workflows", ".studio-edits.json");
+  const editsFile = fs.existsSync(edits);
+  const result = { applied: apply, arms, notes: tastes.length, editsFile };
+  if (!apply) return result;
+  if (editsFile) fs.rmSync(edits);
+  if (!(arms + tastes.length)) return result;
   const write = db.prepare("UPDATE studio_documents SET value = ? WHERE name = ?");
   db.exec("BEGIN IMMEDIATE");
   try {

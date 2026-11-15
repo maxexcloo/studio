@@ -25,9 +25,16 @@ test("legacyShapes records old Dream results' arm and moves a taste summary to i
     { id: "plain" },
   ]);
   writeRuntimeDocument(dataDir, "taste:alice", { signals: [], summary: "Likes fog." });
+  fs.mkdirSync(path.join(dataDir, "workflows"));
+  fs.writeFileSync(path.join(dataDir, "workflows", ".studio-edits.json"), "{}");
   writeRuntimeDocument(dataDir, "taste:bob", { signals: [], note: "Likes rain." });
-  assert.deepEqual(legacyShapes(dataDir), { applied: false, arms: 1, notes: 1 });
-  assert.deepEqual(legacyShapes(dataDir, { apply: true }), { applied: true, arms: 1, notes: 1 });
+  assert.deepEqual(legacyShapes(dataDir), { applied: false, arms: 1, notes: 1, editsFile: true });
+  assert.deepEqual(legacyShapes(dataDir, { apply: true }), {
+    applied: true,
+    arms: 1,
+    notes: 1,
+    editsFile: true,
+  });
   assert.deepEqual(
     readGalleryRows(runtimeDatabase(dataDir)).sort((a, b) => a.id.localeCompare(b.id)),
     [
@@ -40,5 +47,10 @@ test("legacyShapes records old Dream results' arm and moves a taste summary to i
     signals: [],
     note: "Likes fog.",
   });
-  assert.deepEqual(legacyShapes(dataDir, { apply: true }), { applied: true, arms: 0, notes: 0 });
+  assert.deepEqual(legacyShapes(dataDir, { apply: true }), {
+    applied: true,
+    arms: 0,
+    notes: 0,
+    editsFile: false,
+  });
 });
