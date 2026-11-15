@@ -192,7 +192,7 @@ import {
 } from "./references.js";
 import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
-import { adminRefusal, requireAdmin } from "./route-access.js";
+import { adminRefusal, requireAdmin, routeErrors } from "./route-access.js";
 import { registerMigrationRoutes } from "./runtime-migrations.js";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createSwapRouter } from "./runtime/routes.ts";
@@ -284,18 +284,6 @@ const directCloud =
     reference: async (account, id) =>
       (await bytesForReferenceAccount(account || undefined, id)).buffer,
   });
-// A body that is not valid JSON, or too big, gets a plain JSON answer, not Express's HTML page with a stack trace and file paths.
-app.use((error, _req, res, next) => {
-  if (!error || (error.type !== "entity.parse.failed" && error.type !== "entity.too.large"))
-    return next(error);
-  res.status(error.type === "entity.too.large" ? 413 : 400).json({
-    ok: false,
-    error:
-      error.type === "entity.too.large"
-        ? "That request is too large."
-        : "That request wasn't valid JSON.",
-  });
-});
 // Gallery pages and model lists travel compressed to phones and tablets; this computer skips the work.
 app.use(compressJson({ skip: (req) => clientOf(req).thisComputer }));
 const store = new Store(runtimeDatabase(dataDir));
@@ -1186,6 +1174,7 @@ app.all("/api/*splat", (_req, res) =>
 );
 
 if (fs.existsSync(dist)) serveApp(app, dist);
+app.use(routeErrors);
 
 setTimeout(
   () =>

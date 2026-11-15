@@ -41,11 +41,7 @@ export function registerPreferenceRoutes(app) {
         });
     if (patch.spicyPrompts === true && !grants.spicyPrompts)
       return res.status(400).json({ ok: false, error: "Spicy Prompts needs Uncensored Models." });
-    try {
-      saveAccountPreferences(ownerIdForRequest(req), patch);
-      res.json(show(req));
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    saveAccountPreferences(ownerIdForRequest(req), patch);
+    res.json(show(req));
   });
 }

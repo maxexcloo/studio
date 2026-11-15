@@ -65,47 +65,35 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
 
   app.post("/api/workflows/import/preview", async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    try {
-      const raw = req.body?.workflow || req.body;
-      const { info } = await loadComfyContext(defaultWorkerId()).catch(() => ({ info: {} }));
-      res.json({ ok: true, preview: previewWorkflowImport(raw, req.body?.filename || "", info) });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    const raw = req.body?.workflow || req.body;
+    const { info } = await loadComfyContext(defaultWorkerId()).catch(() => ({ info: {} }));
+    res.json({ ok: true, preview: previewWorkflowImport(raw, req.body?.filename || "", info) });
   });
 
   app.post("/api/workflows/import", async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    try {
-      const raw = req.body?.workflow || req.body;
-      const { info } = await loadComfyContext(defaultWorkerId()).catch(() => ({ info: {} }));
-      // The review's own notes (the node list, what was guessed) aren't part of the workflow.
-      const { nodes: _nodes, guessed: _guessed, ...metadata } = req.body?.metadata || {};
-      const normalized =
-        (Array.isArray(raw?.nodes) && Array.isArray(raw?.links)) || raw?.prompt
-          ? {
-              graph: previewWorkflowImport(raw, req.body?.filename || "", info).graph,
-              studio: metadata,
-            }
-          : raw;
-      const workflow = saveImportedWorkflow(normalized, metadata);
-      const { graph: _graph, ...summary } = workflow;
-      res.json({ ok: true, workflow: summary });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    const raw = req.body?.workflow || req.body;
+    const { info } = await loadComfyContext(defaultWorkerId()).catch(() => ({ info: {} }));
+    // The review's own notes (the node list, what was guessed) aren't part of the workflow.
+    const { nodes: _nodes, guessed: _guessed, ...metadata } = req.body?.metadata || {};
+    const normalized =
+      (Array.isArray(raw?.nodes) && Array.isArray(raw?.links)) || raw?.prompt
+        ? {
+            graph: previewWorkflowImport(raw, req.body?.filename || "", info).graph,
+            studio: metadata,
+          }
+        : raw;
+    const workflow = saveImportedWorkflow(normalized, metadata);
+    const { graph: _graph, ...summary } = workflow;
+    res.json({ ok: true, workflow: summary });
   });
 
   app.delete("/api/workflows/:id", (req, res) => {
     if (!requireAdmin(req, res)) return;
-    try {
-      const result = deleteImportedWorkflow(req.params.id.replace(/^custom:/, ""));
-      const preferences = loadWorkflowPreferences();
-      delete preferences.lastUsed[`custom:${result.id}`];
-      saveWorkflowPreferences(preferences);
-      res.json(result);
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    const result = deleteImportedWorkflow(req.params.id.replace(/^custom:/, ""));
+    const preferences = loadWorkflowPreferences();
+    delete preferences.lastUsed[`custom:${result.id}`];
+    saveWorkflowPreferences(preferences);
+    res.json(result);
   });
 }

@@ -17,6 +17,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 const { registerMultiUserAuthRoutes, accountForRequest, mcpAccount } =
   await import("./multi-user-auth.js");
 const { readRuntimeDocument } = await import("./persistence/runtime.ts");
+const { routeErrors } = await import("./route-access.js");
 
 const routes = {};
 registerMultiUserAuthRoutes(
@@ -60,7 +61,11 @@ function call(handler, req) {
   };
   // As the gate does before any account route (multi-user-gate.js).
   accountForRequest(req);
-  return Promise.resolve(handler(req, res)).then(() => res);
+  // As the app's last handler answers a route's error.
+  return Promise.resolve()
+    .then(() => handler(req, res))
+    .catch((error) => routeErrors(error, req, res))
+    .then(() => res);
 }
 
 const local = (body = {}) => ({

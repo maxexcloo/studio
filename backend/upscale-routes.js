@@ -262,22 +262,16 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
   );
 
   app.post("/api/upscale/toggle", (req, res) => {
-    try {
-      const itemId = String(req.body?.galleryItemId || "");
-      const [ownedItem] = recordsForRequest(galleryItems({ ids: [itemId] }), req);
-      if (req.studioAccount && !ownedItem)
-        return res
-          .status(404)
-          .json({ ok: false, error: "This image is no longer in the gallery." });
-      const item = toggleUpscaleView(itemId, req.body?.active);
-      res.json({
-        ok: true,
-        upscaleActive: Boolean(item.upscaleActive),
-        revision: galleryRevisionValue(),
-      });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
+    const itemId = String(req.body?.galleryItemId || "");
+    const [ownedItem] = recordsForRequest(galleryItems({ ids: [itemId] }), req);
+    if (req.studioAccount && !ownedItem)
+      return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
+    const item = toggleUpscaleView(itemId, req.body?.active);
+    res.json({
+      ok: true,
+      upscaleActive: Boolean(item.upscaleActive),
+      revision: galleryRevisionValue(),
+    });
   });
 
   /** Whether a worker can run a smart upscale at this quality now, or the reason it cannot. */

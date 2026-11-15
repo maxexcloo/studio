@@ -66,3 +66,20 @@ function adminAccount(account) {
 export function fromChat(account) {
   return account?.credential === "mcp-admin";
 }
+
+/**
+ * The app's last handler: a route's error, or a body that is not valid JSON or too big, answers as
+ * JSON (400 unless it carries a status), never Express's HTML page with a stack trace and file paths.
+ */
+export function routeErrors(error, _req, res, next) {
+  if (res.headersSent) return next(error);
+  res.status(error.status || 400).json({
+    ok: false,
+    error:
+      error.type === "entity.too.large"
+        ? "That request is too large."
+        : error.type === "entity.parse.failed"
+          ? "That request wasn't valid JSON."
+          : error.message,
+  });
+}
