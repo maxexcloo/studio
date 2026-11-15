@@ -15,7 +15,7 @@ import {
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { ChevronDown, type LucideIcon, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { loraName, profileNameParts } from "../../../../shared/profiles";
 import { api } from "../../api";
@@ -490,8 +490,11 @@ export function GalleryFilterPanel({
       </Group>
     </Input.Wrapper>
   );
+  const Panel = inline ? Group : Stack;
+  const Pair = inline ? Fragment : "div";
+  const pairProps = inline ? {} : { className: classes.filterPair };
   return (
-    <Stack gap="md" className={inline ? classes.inlinePanel : undefined}>
+    <Panel gap={inline ? "xs" : "md"} py={inline ? "xs" : undefined}>
       {facets.error && (
         <Button
           {...chipProps}
@@ -519,7 +522,7 @@ export function GalleryFilterPanel({
           </Input.Wrapper>
         ))}
       {!inline && view && <Divider />}
-      <div className={classes.filterPair}>
+      <Pair {...pairProps}>
         {inline ? (
           <Select
             aria-label="Date"
@@ -544,22 +547,22 @@ export function GalleryFilterPanel({
           </Input.Wrapper>
         )}
         {lists.tag.length > 0 && many("tag", "Tags")}
-      </div>
+      </Pair>
       {!inline && <Divider />}
-      <div className={classes.filterPair}>
+      <Pair {...pairProps}>
         {many("model", "Models")}
         {many("lora", "LoRAs")}
-      </div>
+      </Pair>
       {(options.aspect.length > 0 || options.size.length > 0) && (
         <>
           {!inline && <Divider />}
-          <div className={classes.filterPair}>
+          <Pair {...pairProps}>
             {options.aspect.length > 0 &&
               (inline ? many("aspect", "Aspect Ratio") : choices("aspect", "Aspect Ratio"))}
             {options.size.length > 0 && (inline ? many("size", "Size") : choices("size", "Size"))}
-          </div>
+          </Pair>
         </>
       )}
-    </Stack>
+    </Panel>
   );
 }

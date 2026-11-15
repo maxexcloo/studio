@@ -64,18 +64,6 @@
   gap: var(--mantine-spacing-md);
 }
 
-.inlinePanel {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--mantine-spacing-xs);
-  padding-block: var(--mantine-spacing-xs);
-}
-
-.inlinePanel .filterPair {
-  display: contents;
-}
-
 .facet {
   flex: 1 1 9rem;
   min-width: 0;

@@ -256,12 +256,16 @@ test("Improve Prompt lists its styles alphabetically with descriptions and Custo
   );
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A bird in snow");
-  // Copy and Clear share the flat menu with each tool's options under its name.
   const menu = await promptMenu(page, "Prompt");
   await expect(menu.getByText("Improve Prompt", { exact: true })).toBeVisible();
+  const phone = await page.getByRole("group", { name: "Prompt Tools", exact: true }).isVisible();
+  if (phone) {
+    const tools = page.getByRole("group", { name: "Prompt Tools", exact: true });
+    await expect(tools.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
+    await expect(tools.getByRole("button", { name: "Clear", exact: true })).toBeVisible();
+  }
   await expect(menu.getByRole("menuitem")).toHaveText([
-    "Copy",
-    "Clear",
+    ...(phone ? [] : ["Copy", "Clear"]),
     "Candid",
     "Enhance",
     /^Portrait/,
