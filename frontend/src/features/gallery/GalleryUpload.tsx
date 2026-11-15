@@ -44,8 +44,8 @@ async function entryFiles(entry: FileSystemEntry): Promise<File[]> {
 }
 
 /**
- * Uploads each supported image and video in turn, with its progress and then the outcome (listing
- * any file that failed) as one notification. `onUploaded` hears when at least one arrived.
+ * Uploads each supported image and video in turn, with its progress and then any file that failed
+ * or was skipped as one notification. `onUploaded` hears when at least one arrived.
  */
 export function useGalleryUpload(onUploaded: () => void) {
   const client = useQueryClient();
@@ -89,28 +89,31 @@ export function useGalleryUpload(onUploaded: () => void) {
     ]
       .filter(Boolean)
       .join(" ");
-    notifications.update({
-      id,
-      loading: false,
-      withCloseButton: true,
-      color: failed.length ? "red" : undefined,
-      autoClose: failed.length ? false : 4000,
-      message: (
-        <Stack gap={2}>
-          <Text size="sm">{summary}</Text>
-          {failed.slice(0, listedFailures).map((line) => (
-            <Text key={line} size="xs" c="dimmed">
-              {line}
-            </Text>
-          ))}
-          {failed.length > listedFailures && (
-            <Text size="xs" c="dimmed">
-              and {failed.length - listedFailures} more
-            </Text>
-          )}
-        </Stack>
-      ),
-    });
+    // The uploads show in the gallery; only what didn't arrive needs saying.
+    if (!failed.length && !skipped) notifications.hide(id);
+    else
+      notifications.update({
+        id,
+        loading: false,
+        withCloseButton: true,
+        color: failed.length ? "red" : undefined,
+        autoClose: failed.length ? false : 4000,
+        message: (
+          <Stack gap={2}>
+            <Text size="sm">{summary}</Text>
+            {failed.slice(0, listedFailures).map((line) => (
+              <Text key={line} size="xs" c="dimmed">
+                {line}
+              </Text>
+            ))}
+            {failed.length > listedFailures && (
+              <Text size="xs" c="dimmed">
+                and {failed.length - listedFailures} more
+              </Text>
+            )}
+          </Stack>
+        ),
+      });
     if (!uploaded) return;
     void client.invalidateQueries({ queryKey: ["gallery"] });
     onUploaded();

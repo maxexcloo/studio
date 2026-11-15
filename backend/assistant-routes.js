@@ -433,8 +433,8 @@ export function registerAssistantRoutes(
     };
   });
 
-  // A card's assistant work from its images: Describe Image and Rate Images in the card editors,
-  // Use as Character, and the MCP `cards` tool. Each needs a text model that reads images.
+  // A card's assistant work from its images: name and description ideas and Rate Images in the
+  // card editors, and the MCP `cards` tool. Each needs a text model that reads images.
   async function cardImages(account, assetIds, stop, work) {
     if (!allowed(account, "promptAssistant")) return refuse(403, promptAssistantOff).refusal;
     if (!allowed(account, "characters"))
@@ -461,6 +461,27 @@ export function registerAssistantRoutes(
     if (!kind) return refuse(400, "Name a card kind: characters, outfits or scenes.").refusal;
     return cardImages(account, [body?.assetId], stop, ([image], explicit) =>
       engine.character({ kind, image, explicit, signal: stop }),
+    );
+  });
+  directRoute(app, "POST", "/api/assistant/cards/ideas", (account, { body, stop }) => {
+    const kind = cardKind(body?.kind);
+    if (!kind) return refuse(400, "Name a card kind: characters, outfits or scenes.").refusal;
+    if (!["name", "description"].includes(body?.field))
+      return refuse(400, "Ask for names or descriptions.").refusal;
+    const ids = Array.isArray(body?.assetIds) ? body.assetIds : [];
+    if (!ids.length || ids.length > cardKinds[kind].images.max)
+      return refuse(400, `Send 1 to ${cardKinds[kind].images.max} images.`).refusal;
+    const avoid = Array.isArray(body?.avoid) ? body.avoid.map(String).slice(0, 20) : [];
+    return cardImages(account, ids, stop, (images, explicit) =>
+      engine.cardIdeas({
+        kind,
+        field: body.field,
+        images,
+        request: String(body?.request || ""),
+        avoid,
+        explicit,
+        signal: stop,
+      }),
     );
   });
   directRoute(app, "POST", "/api/assistant/cards/rate", (account, { body, stop }) => {

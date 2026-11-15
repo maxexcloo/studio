@@ -1,4 +1,4 @@
-import { Alert, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Alert, SimpleGrid, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
@@ -6,7 +6,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
-import { CardThumbnails } from "./CardImages";
+import { LibraryCard } from "./CardImages";
 import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCardDialogs";
 import { type PromptCardKind, promptCardsQuery } from "./queries";
 import { useCardFrom } from "./useCardFrom";
@@ -54,44 +54,26 @@ export function LibraryPromptCards({
       ) : !cards.length ? (
         <EmptyState>{words ? "No Matches" : `No ${label}`}</EmptyState>
       ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} role="list" aria-label={label}>
+        <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} role="list" aria-label={label}>
           {cards.map((card) => (
-            <Paper key={card.id} p="sm" withBorder role="listitem" aria-label={card.name}>
-              <Stack gap={4}>
-                <Group justify="space-between" wrap="nowrap" align="flex-start">
-                  {card.references.length ? (
-                    <CardThumbnails
-                      label={`${card.name}'s Images`}
-                      images={card.references.map((asset, index) => ({
-                        key: asset.id,
-                        src: asset.url || asset.thumbnailUrl,
-                        thumbnailUrl: asset.thumbnailUrl,
-                        alt: `${card.name} ${index + 1}`,
-                      }))}
-                    />
-                  ) : (
-                    <Text size="sm" fw={500}>
-                      {card.name}
-                    </Text>
-                  )}
-                  <PromptCardMenu
-                    kind={kind}
-                    card={card}
-                    onEdit={() => dialogs.edit(card)}
-                    onDelete={() => dialogs.remove(card)}
-                    onUse={() => use.promptCard(kind, card)}
-                  />
-                </Group>
-                {card.references.length > 0 && (
-                  <Text size="sm" fw={500}>
-                    {card.name}
-                  </Text>
-                )}
-                <Text size="sm" c="dimmed" lineClamp={3}>
-                  {card.description}
-                </Text>
-              </Stack>
-            </Paper>
+            <LibraryCard
+              key={card.id}
+              name={card.name}
+              images={card.references}
+              menu={
+                <PromptCardMenu
+                  kind={kind}
+                  card={card}
+                  onEdit={() => dialogs.edit(card)}
+                  onDelete={() => dialogs.remove(card)}
+                  onUse={() => use.promptCard(kind, card)}
+                />
+              }
+            >
+              <Text size="sm" c="dimmed" lineClamp={3}>
+                {card.description}
+              </Text>
+            </LibraryCard>
           ))}
         </SimpleGrid>
       )}

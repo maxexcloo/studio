@@ -61,8 +61,8 @@ function runs(counts, noise, gap) {
 
 /**
  * The panels of a sheet drawn to the layout prompt-sheet.js asks for, as `{ role, left, top,
- * width, height }` in the image's pixels: the face column's top close-up (`face`), the turnaround's
- * three figures (`front`, `side`, `back`) and the gear row (`gear`) when there is one. Panels are
+ * width, height }` in the image's pixels: the face column's top close-up (`face`) and the
+ * turnaround's three figures (`front`, `side`, `back`). Panels are
  * found by the background between them; where the gaps aren't clear, by the layout's proportions.
  */
 export async function sheetPanels(buffer) {
@@ -140,12 +140,7 @@ export async function sheetPanels(buffer) {
   const face = faces.length && drawn(0, first, split, end);
   // Its margin stops short of the close-up under it.
   if (face) panels.push(["face", face, end]);
-  // The gear row sits under the turnaround, past a gap across the lower half.
-  const below = widestGap(rows(split, 0, w, h), 0, h * 0.45, h * 0.92);
-  const gear = below === null ? null : drawn(split, below, w, h);
-  const bottom = gear && gear[3] - gear[1] > h * 0.06 ? below : h;
-  if (bottom < h) panels.push(["gear", gear]);
-  let figures = runs(columns(split, 0, w, bottom), noise(bottom), w * 0.01)
+  let figures = runs(columns(split, 0, w, h), noise(h), w * 0.01)
     .filter(([start, end]) => end - start > w * 0.03)
     .map(([start, end]) => [split + start, split + end]);
   // Three figures; more means something else drawn between them, so the three widest.
@@ -164,7 +159,7 @@ export async function sheetPanels(buffer) {
     ]);
   }
   for (const [index, role] of ["front", "side", "back"].entries()) {
-    const box = drawn(figures[index][0], 0, figures[index][1], bottom);
+    const box = drawn(figures[index][0], 0, figures[index][1], h);
     if (box) panels.push([role, box]);
   }
   // Each panel with a margin of background, in the image's own pixels.

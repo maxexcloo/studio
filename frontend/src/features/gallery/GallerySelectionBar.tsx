@@ -13,7 +13,6 @@ import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { assistMenu } from "../generation/AskChange";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import { showQueued } from "../settings/accountPreferences";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { mediaDownload } from "./download";
 import { itemAction, itemActionGroups, namedItemActions } from "./itemActions";
@@ -105,7 +104,6 @@ export function GallerySelectionBar({
           error ??= reason;
         });
       if (error) failure(error);
-      if (failed.length < finishedImages.length) showQueued(client);
       settle(failed);
     },
   });
