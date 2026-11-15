@@ -285,7 +285,7 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
   await adding.getByRole("combobox", { name: "Family", exact: true }).click();
   await page.getByRole("option", { name: "All Families", exact: true }).click();
   // The list scrolls inside itself, keeping the search and the footer in sight.
-  await adding.getByRole("button", { name: "extra-9", exact: true }).scrollIntoViewIfNeeded();
+  await adding.getByRole("button", { name: "Extra 9", exact: true }).scrollIntoViewIfNeeded();
   await expect(search).toBeInViewport();
   await expect(adding.getByRole("button", { name: "Apply", exact: true })).toBeInViewport();
   await adding.getByRole("button", { name: "Detail Slider", exact: true }).click();
