@@ -1,4 +1,12 @@
-import { maxAvoid, maxAvoids, maxTasteSummary } from "../../shared/taste.ts";
+import {
+  type TastePreferenceChanges,
+  type TastePreferences,
+  type TasteWords,
+  maxAvoid,
+  maxAvoids,
+  maxTasteSummary,
+  tasteWordLimits,
+} from "../../shared/taste.ts";
 import { logWarning } from "../crash-log.js";
 import {
   deleteRuntimeDocument,
@@ -101,16 +109,9 @@ interface TasteItem {
   caption?: { text?: unknown; tags?: unknown };
   dream?: { arm?: unknown; pair?: { value?: unknown } };
 }
-/** What the summariser keeps of one account's taste in words; it never sets a score. */
-interface TasteWords {
-  likes: string[];
-  styles: string[];
-  /** What the summariser learnt they pass over; the person's own avoids are `addedAvoid`. */
-  avoid: string[];
-  note: string;
-}
 /** One account's stored taste: the signals it learns from, newest first, and the summariser's words. */
 interface StoredTaste extends TasteWords {
+  preferences: TastePreferences;
   /** When the summariser last wrote. */
   updatedAt: string;
   signals: TasteSignal[];
@@ -141,6 +142,7 @@ interface TasteReadOut {
  * so they decay with time) read out, and a summary for suggestions and Dream's writer.
  */
 export interface TasteRecord extends StoredTaste, TasteReadOut {
+  learnt: TasteWords;
   summary: string;
   /** By attribute: `profile:<id>`, `lora:<name>@<strength>`, `tag:<tag>`, `aspect:<ratio>`, `steps:<profile>:<n>`, `cfg:<profile>:<n>`. */
   scores: Map<string, TasteScore>;
@@ -217,6 +219,7 @@ const describe = (signal: TasteSignal) =>
     .join("; ");
 const owner = (account: RouteAccount) => account?.userId || "";
 const empty = (): StoredTaste => ({
+  preferences: {},
   updatedAt: "",
   signals: [],
   since: 0,
@@ -629,6 +632,7 @@ export function createTaste({
     if (!saved) return empty();
     const taste = { ...empty(), ...saved };
     return {
+      preferences: taste.preferences,
       updatedAt: taste.updatedAt,
       signals: taste.signals,
       since: taste.since,
@@ -644,7 +648,14 @@ export function createTaste({
     const taste = load(ownerId);
     const scores = tasteScores(taste.signals, now());
     const out = readOut(taste.signals, scores);
-    return { ...taste, ...out, scores, summary: summaryOf(taste, out) };
+    const effective = { ...taste, ...taste.preferences };
+    const learnt = {
+      likes: taste.likes,
+      styles: taste.styles,
+      avoid: taste.avoid,
+      note: taste.note,
+    };
+    return { ...effective, ...out, learnt, scores, summary: summaryOf(effective, out) };
   }
   const write = (ownerId: string, taste: StoredTaste) =>
     writeRuntimeDocument(dataDir, name(ownerId), taste);
@@ -699,17 +710,21 @@ export function createTaste({
     }
     const own = new Set(before.addedAvoid.map((entry) => entry.toLowerCase()));
     const words: TasteWords = {
-      likes: phrases(reply?.likes, 12),
-      styles: phrases(reply?.styles, 8),
-      avoid: phrases(reply?.avoid, 8).filter((entry) => !own.has(entry.toLowerCase())),
+      likes: phrases(reply?.likes, tasteWordLimits.likes),
+      styles: phrases(reply?.styles, tasteWordLimits.styles),
+      avoid: phrases(reply?.avoid, tasteWordLimits.avoid).filter(
+        (entry) => !own.has(entry.toLowerCase()),
+      ),
       note:
-        typeof reply?.note === "string" ? reply.note.replace(/\s+/g, " ").trim().slice(0, 400) : "",
+        typeof reply?.note === "string"
+          ? reply.note.replace(/\s+/g, " ").trim().slice(0, tasteWordLimits.note)
+          : "",
     };
     if (!words.likes.length && !words.styles.length && !words.note)
       throw failure("The text model's reply was unusable. Try again.", 502);
     const current = load(ownerId);
     // A Clear while the model wrote wins over its reply.
-    if (current.since < before.since) return read(ownerId);
+    if (!current.signals.length || current.since < before.since) return read(ownerId);
     write(ownerId, {
       ...current,
       ...words,
@@ -769,9 +784,22 @@ export function createTaste({
         logWarning(`A taste signal was not saved: ${(error as Error).message}`);
       }
     },
-    /** Replaces what the person asked Studio to avoid. */
-    avoid(ownerId: string, addedAvoid: string[]) {
-      write(ownerId, { ...load(ownerId), addedAvoid });
+    /** Explicit edits survive summarisation; null returns a field to what Studio learnt. */
+    edit(
+      ownerId: string,
+      changes: { addedAvoid?: string[]; preferences?: TastePreferenceChanges },
+    ) {
+      const current = load(ownerId);
+      const preferences = { ...current.preferences };
+      for (const [key, value] of Object.entries(changes.preferences || {})) {
+        if (value === null) delete preferences[key as keyof TasteWords];
+        else Object.assign(preferences, { [key]: value });
+      }
+      write(ownerId, {
+        ...current,
+        ...(changes.addedAvoid && { addedAvoid: changes.addedAvoid }),
+        preferences,
+      });
       return read(ownerId);
     },
     forget(ownerId: string) {
@@ -781,12 +809,14 @@ export function createTaste({
 }
 export type Taste = ReturnType<typeof createTaste>;
 
-/** The caller's own taste profile: read, set what to avoid, summarise and forget. */
+/** The caller's own taste profile: read, edit preferences, summarise and forget. */
 export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
   const show = (account: RouteAccount, record: TasteRecord) => ({
     status: 200,
     payload: {
       summary: record.summary,
+      learnt: record.learnt,
+      preferences: record.preferences,
       likes: record.likes,
       styles: record.styles,
       avoid: record.avoid,
@@ -804,10 +834,12 @@ export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
   directRoute(app, "GET", "/api/taste", (account) => show(account, taste.read(owner(account))));
   directRoute(app, "PUT", "/api/taste", (account, { body }) => {
     const avoid = body?.avoid;
+    const preferences = body?.preferences;
     if (
-      !Array.isArray(avoid) ||
-      avoid.length > maxAvoids ||
-      avoid.some((entry) => typeof entry !== "string" || entry.trim().length > maxAvoid)
+      avoid !== undefined &&
+      (!Array.isArray(avoid) ||
+        avoid.length > maxAvoids ||
+        avoid.some((entry: unknown) => typeof entry !== "string" || entry.trim().length > maxAvoid))
     )
       return {
         status: 400,
@@ -816,7 +848,42 @@ export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
           error: `Avoid at most ${maxAvoids} things of up to ${maxAvoid} characters each.`,
         },
       };
-    return show(account, taste.avoid(owner(account), phrases(avoid, maxAvoids)));
+    if (
+      (avoid === undefined && preferences === undefined) ||
+      (preferences !== undefined &&
+        (!preferences ||
+          typeof preferences !== "object" ||
+          Array.isArray(preferences) ||
+          Object.entries(preferences).some(([key, value]) => {
+            if (!Object.hasOwn(tasteWordLimits, key)) return true;
+            if (value === null) return false;
+            if (key === "note")
+              return typeof value !== "string" || value.length > tasteWordLimits.note;
+            return (
+              !Array.isArray(value) ||
+              value.length > tasteWordLimits[key as "likes" | "styles" | "avoid"] ||
+              value.some((entry) => typeof entry !== "string" || entry.trim().length > maxAvoid)
+            );
+          })))
+    )
+      return { status: 400, payload: { ok: false, error: "Supply valid taste preferences." } };
+    const clean = Object.fromEntries(
+      Object.entries(preferences || {}).map(([key, value]) => [
+        key,
+        value === null
+          ? null
+          : key === "note"
+            ? (value as string).trim()
+            : phrases(value, tasteWordLimits[key as "likes" | "styles" | "avoid"]),
+      ]),
+    );
+    return show(
+      account,
+      taste.edit(owner(account), {
+        ...(avoid !== undefined && { addedAvoid: phrases(avoid, maxAvoids) }),
+        preferences: clean,
+      }),
+    );
   });
   directRoute(app, "POST", "/api/taste/refresh", async (account) => {
     try {

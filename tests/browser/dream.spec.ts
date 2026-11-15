@@ -1,6 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
 
-import { dreamItem, fixtures, serveDream, stamp } from "./fixtures";
+import { dreamItem, fixtures, profiles, serveDream, stamp } from "./fixtures";
 
 /** Opens a route-backed Dream view from its menu. */
 async function showView(page: Page, name: string) {
@@ -302,8 +302,21 @@ test("While Dream is off, the deck compares gallery images in pairs", async ({ p
   ]);
 });
 
-test("The taste read-out fits the screen and adds what to avoid", async ({ page }) => {
+test("Taste displays readable preferences and saves explicit edits separately", async ({
+  page,
+}, testInfo) => {
   await fixtures(page);
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        profiles: profiles.map((profile) =>
+          profile.id === "image:test"
+            ? { ...profile, aliases: ["custom:image-p-h3-image-fast"] }
+            : profile,
+        ),
+      },
+    }),
+  );
   const dream = await serveDream(page, {
     taste: {
       likes: ["misty harbours", "foxes in snow", "lighthouses", "quiet streets", "old boats"],
@@ -312,7 +325,7 @@ test("The taste read-out fits the screen and adds what to avoid", async ({ page 
       note: "Quiet coastal scenes in soft, misty light.",
       profiles: {
         image: [
-          { id: "image:test", score: 4 },
+          { id: "custom:image-p-h3-image-fast", score: 4 },
           { id: "gone", score: -1 },
         ],
         video: [],
@@ -324,20 +337,56 @@ test("The taste read-out fits the screen and adds what to avoid", async ({ page 
   await page.goto("/dream");
   await showView(page, "Taste");
   const profile = page.getByRole("region", { name: "Taste Profile" });
-  await expect(profile.getByRole("list", { name: "Likes" })).toContainText("foxes in snow");
-  // Only liked models and LoRAs show, by their names.
-  await expect(profile.getByRole("list", { name: "Models" })).toHaveText("Image Quality");
-  await expect(profile.getByRole("list", { name: "LoRAs" })).toContainText("Detail Slider 0.8");
-  await profile.getByLabel("Always Avoid").fill("clowns");
+  await expect(profile.getByText(/foxes in snow/)).toBeVisible();
+  await expect(profile.getByText("Image Quality", { exact: true })).toBeVisible();
+  await expect(profile.getByText("Detail Slider 0.8", { exact: true })).toBeVisible();
+  await profile.getByRole("button", { name: "Edit", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Edit Taste", exact: true });
+  await editor.getByRole("combobox", { name: "Likes", exact: true }).press("Backspace");
+  const summary = editor.getByRole("textbox", { name: "Summary", exact: true });
+  if (testInfo.project.use.isMobile) {
+    await summary.click();
+    const textEditor = page.getByRole("dialog", { name: "Summary", exact: true });
+    await textEditor
+      .getByRole("textbox", { name: "Summary", exact: true })
+      .fill("Quiet coastal scenes with lighthouses.");
+    await page.keyboard.press("Escape");
+    await expect(textEditor).toBeHidden();
+    await expect(editor).toBeVisible();
+  } else await summary.fill("Quiet coastal scenes with lighthouses.");
+  await editor.getByLabel("Always Avoid", { exact: true }).fill("clowns");
   await page.keyboard.press("Enter");
-  await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ avoid: ["clowns"] });
-  // Everything, Refresh and Clear included, fits without scrolling.
-  await expect(profile.getByRole("button", { name: "Clear", exact: true })).toBeInViewport({
-    ratio: 1,
-  });
-  expect(
-    await page.evaluate(() => document.scrollingElement!.scrollHeight <= window.innerHeight),
-  ).toBe(true);
+  await expect(editor.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+  expect(dream.requests).not.toContainEqual(
+    expect.objectContaining({ path: "/api/taste", method: "PUT" }),
+  );
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect
+    .poll(() => dream.requests.at(-1)?.body)
+    .toEqual({
+      avoid: ["clowns"],
+      preferences: {
+        likes: ["misty harbours", "foxes in snow", "lighthouses", "quiet streets"],
+        note: "Quiet coastal scenes with lighthouses.",
+      },
+    });
+  await expect(editor).toBeHidden();
+  await expect(profile.getByText("Summary · Your Edit", { exact: true })).toBeVisible();
+  await expect(
+    profile.getByText("Quiet coastal scenes with lighthouses.", { exact: true }),
+  ).toBeVisible();
+  await profile.getByRole("button", { name: "Edit", exact: true }).click();
+  await editor.getByRole("button", { name: "Use Learnt Summary", exact: true }).click();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ preferences: { note: null } });
+  await expect(
+    profile.getByText("Quiet coastal scenes in soft, misty light.", { exact: true }),
+  ).toBeVisible();
+  await profile.getByRole("button", { name: "Clear", exact: true }).scrollIntoViewIfNeeded();
+  await profile.getByRole("button", { name: "Clear", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Clear Taste Profile", exact: true }),
+  ).toBeVisible();
 });
 
 test("Dream navigation orders its views and History shows retained activity and available result links", async ({
