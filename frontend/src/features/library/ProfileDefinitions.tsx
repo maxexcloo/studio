@@ -50,7 +50,7 @@ const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ?
 
 const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
 
-/** Runs, failures, stars and typical time; Failing when most recent runs failed. */
+/** Runs, failures, likes and typical time; Failing when most recent runs failed. */
 function ProfileUse({ stats }: { stats?: ProfileStats }) {
   if (!stats)
     return (

@@ -158,7 +158,7 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
     });
   });
 
-  // Library › Profiles: each profile's runs, failures, stars and speed across every account.
+  // Library › Profiles: each profile's runs, failures, likes and speed across every account.
   app.get("/api/stats/profiles", async (req, res) => {
     if (!requireAdmin(req, res)) return;
     res.json({ ok: true, profiles: profileStats(await recentRuns()) });

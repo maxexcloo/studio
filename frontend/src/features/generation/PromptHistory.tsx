@@ -18,7 +18,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { History, Pin, PinOff } from "lucide-react";
+import { History } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { api, post } from "../../api";
@@ -34,14 +34,14 @@ interface PromptEntry {
   text: string;
   at: string;
   uses: number;
-  pinned?: boolean;
+  liked?: boolean;
 }
 interface HistoryData {
   prompts: PromptEntry[];
   enabled: boolean;
 }
 type HistoryEdit =
-  | { action: "pin"; text: string; pinned: boolean }
+  | { action: "like"; text: string; liked: boolean }
   | { action: "forget"; text: string }
   | { action: "clear" };
 
@@ -53,20 +53,20 @@ const promptHistoryQuery = (kind: PromptKind) =>
   });
 const promptKey = (text: string) => text.replace(/\s+/g, " ").trim().toLocaleLowerCase();
 
-/** The edit applied locally, as the server applies it, so pins and forgets show at once. */
+/** The edit applied locally, as the server applies it, so likes and forgets show at once. */
 function editHistory(data: HistoryData, edit: HistoryEdit): HistoryData {
   if (edit.action === "clear")
-    return { ...data, prompts: data.prompts.filter((entry) => entry.pinned) };
+    return { ...data, prompts: data.prompts.filter((entry) => entry.liked) };
   const key = promptKey(edit.text);
   const found = data.prompts.some((entry) => promptKey(entry.text) === key);
   if (edit.action === "forget")
     return { ...data, prompts: data.prompts.filter((entry) => promptKey(entry.text) !== key) };
   if (!found)
-    return edit.pinned
+    return edit.liked
       ? {
           ...data,
           prompts: [
-            { text: edit.text.trim(), at: new Date().toISOString(), uses: 0, pinned: true },
+            { text: edit.text.trim(), at: new Date().toISOString(), uses: 0, liked: true },
             ...data.prompts,
           ],
         }
@@ -74,7 +74,7 @@ function editHistory(data: HistoryData, edit: HistoryEdit): HistoryData {
   return {
     ...data,
     prompts: data.prompts.map((entry) =>
-      promptKey(entry.text) === key ? { ...entry, pinned: edit.pinned || undefined } : entry,
+      promptKey(entry.text) === key ? { ...entry, liked: edit.liked || undefined } : entry,
     ),
   };
 }
@@ -110,7 +110,7 @@ function optimistic<T>(
   };
 }
 
-/** Keep Recent Prompts, shared by the composer's history and Settings. Off forgets unpinned prompts. */
+/** Keep Recent Prompts, shared by the composer's history and Settings. Off forgets unliked prompts. */
 export function useKeepRecentPrompts(enabled = true) {
   const client = useQueryClient();
   const history = useQuery({ ...promptHistoryQuery("positive"), enabled });
@@ -118,7 +118,7 @@ export function useKeepRecentPrompts(enabled = true) {
     mutationFn: (on: boolean) => post("/api/prompts/enabled", { enabled: on }),
     ...optimistic<boolean>(client, ["positive", "negative"], (data, on) => ({
       enabled: on,
-      prompts: on ? data.prompts : data.prompts.filter((entry) => entry.pinned),
+      prompts: on ? data.prompts : data.prompts.filter((entry) => entry.liked),
     })),
   });
   return { history, change };
@@ -145,31 +145,31 @@ export function usePromptHistory({
   const keep = useKeepRecentPrompts(opened);
   const edit = useMutation({
     mutationFn: (input: HistoryEdit) =>
-      post<HistoryData>(`/api/prompts/${input.action}`, {
+      // Like's route keeps its earlier name.
+      post<HistoryData>(`/api/prompts/${input.action === "like" ? "pin" : input.action}`, {
         ...input,
         action: undefined,
         kind,
-        ...(input.action === "clear" ? { keepPinned: true } : {}),
+        ...(input.action === "clear" ? { keepLiked: true } : {}),
       }),
     ...optimistic<HistoryEdit>(client, [kind], editHistory),
   });
-  const pin = (text: string, pinned: boolean) => edit.mutate({ action: "pin", text, pinned });
+  const like = (text: string, liked: boolean) => edit.mutate({ action: "like", text, liked });
   const title = kind === "negative" ? "Recent Negative Prompts" : "Recent Prompts";
   const filtered = (history.data?.prompts || [])
     .filter((entry) => entry.text.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
     .sort(
       (a, b) =>
-        Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
-        Date.parse(b.at) - Date.parse(a.at),
+        Number(Boolean(b.liked)) - Number(Boolean(a.liked)) || Date.parse(b.at) - Date.parse(a.at),
     );
   const visible = query.trim()
     ? filtered.slice(0, 60)
     : [
-        ...filtered.filter((entry) => entry.pinned),
-        ...filtered.filter((entry) => !entry.pinned).slice(0, 60),
+        ...filtered.filter((entry) => entry.liked),
+        ...filtered.filter((entry) => !entry.liked).slice(0, 60),
       ];
-  const currentPinned = history.data?.prompts.some(
-    (entry) => entry.pinned && promptKey(entry.text) === promptKey(value),
+  const currentLiked = history.data?.prompts.some(
+    (entry) => entry.liked && promptKey(entry.text) === promptKey(value),
   );
   const optionsKey = visible.map((entry) => entry.text).join("\n");
   useEffect(() => {
@@ -204,7 +204,7 @@ export function usePromptHistory({
             size="compact-sm"
             variant="subtle"
             aria-label="Clear Recent"
-            disabled={!history.data?.prompts.some((entry) => !entry.pinned)}
+            disabled={!history.data?.prompts.some((entry) => !entry.liked)}
             onClick={() => edit.mutate({ action: "clear" })}
           >
             Clear
@@ -215,10 +215,10 @@ export function usePromptHistory({
         start: (
           <Button
             variant="default"
-            disabled={!value.trim() || currentPinned}
-            onClick={() => pin(value, true)}
+            disabled={!value.trim() || currentLiked}
+            onClick={() => like(value, true)}
           >
-            Pin Current Prompt
+            Like Current Prompt
           </Button>
         ),
       }}
@@ -237,7 +237,7 @@ export function usePromptHistory({
           onKeyDown={(event) => {
             if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
               event.preventDefault();
-              if (value.trim() && !currentPinned) pin(value, true);
+              if (value.trim() && !currentLiked) like(value, true);
             }
           }}
         >
@@ -271,18 +271,19 @@ export function usePromptHistory({
                         {entry.text}
                       </Text>
                       <Text size="xs" c="dimmed">
-                        {entry.pinned ? "Pinned · " : ""}
+                        {entry.liked ? "Liked · " : ""}
                         {entry.uses} {entry.uses === 1 ? "Use" : "Uses"}
                       </Text>
                     </Combobox.Option>
-                    <Tooltip label={entry.pinned ? "Unpin Prompt" : "Pin Prompt"}>
+                    <Tooltip label={entry.liked ? "Unlike Prompt" : "Like Prompt"}>
                       <ActionIcon
-                        aria-label={entry.pinned ? "Unpin Prompt" : "Pin Prompt"}
-                        variant={entry.pinned ? "light" : "subtle"}
-                        color={entry.pinned ? undefined : "gray"}
-                        onClick={() => pin(entry.text, !entry.pinned)}
+                        aria-label={entry.liked ? "Unlike Prompt" : "Like Prompt"}
+                        aria-pressed={Boolean(entry.liked)}
+                        variant={entry.liked ? "light" : "subtle"}
+                        color={entry.liked ? undefined : "gray"}
+                        onClick={() => like(entry.text, !entry.liked)}
                       >
-                        {entry.pinned ? <PinOff size={16} /> : <Pin size={16} />}
+                        <icons.like size={16} fill={entry.liked ? "currentColor" : "none"} />
                       </ActionIcon>
                     </Tooltip>
                     <Tooltip label="Forget Prompt">

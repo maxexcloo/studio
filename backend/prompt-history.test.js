@@ -82,14 +82,14 @@ test("using a prompt again moves it to the top instead of repeating it", () => {
   assert.equal(history.listPrompts().length, 3, "an empty prompt is not kept");
 });
 
-test("pinned prompts outlive the cap; the rest keep the newest", () => {
-  history.setPromptPinned("A red fox", true);
+test("liked prompts outlive the cap; the rest keep the newest", () => {
+  history.setPromptLiked("A red fox", true);
   let entries = history.listPrompts();
   const start = Date.now();
   for (let index = 0; index < history.historyLimit + 20; index += 1)
     entries = history.addPrompt(entries, `prompt ${index}`, start + index * 1000);
-  assert.equal(entries.filter((entry) => !entry.pinned).length, history.historyLimit);
-  assert.ok(entries.some((entry) => entry.pinned && entry.text === "A  red fox"));
+  assert.equal(entries.filter((entry) => !entry.liked).length, history.historyLimit);
+  assert.ok(entries.some((entry) => entry.liked && entry.text === "A  red fox"));
   assert.equal(entries[0].text, `prompt ${history.historyLimit + 19}`);
 });
 
@@ -101,13 +101,13 @@ test("forgetting spares prompts the gallery still shows", () => {
   assert.ok(!saved("prompt-history").includes("a green frog"));
 });
 
-test("clearing keeps pinned prompts unless asked not to", () => {
+test("clearing keeps liked prompts unless asked not to", () => {
   history.clearPromptHistory();
   assert.deepEqual(
     history.listPrompts().map((entry) => entry.text),
     ["A  red fox"],
   );
-  history.clearPromptHistory({ keepPinned: false });
+  history.clearPromptHistory({ keepLiked: false });
   assert.deepEqual(history.listPrompts(), []);
   history.resetPromptHistoryCache();
   assert.deepEqual(
@@ -118,21 +118,21 @@ test("clearing keeps pinned prompts unless asked not to", () => {
   assert.ok(!saved("prompt-history").includes("red fox"), "cleared from the saved list too");
 });
 
-test("turned off, nothing new is kept and the recent prompts go; starred ones stay, and it survives a restart", () => {
-  history.clearPromptHistory({ keepPinned: false });
-  history.recordPrompt("a kept star");
-  history.setPromptPinned("a kept star", true);
+test("turned off, nothing new is kept and the recent prompts go; liked ones stay, and it survives a restart", () => {
+  history.clearPromptHistory({ keepLiked: false });
+  history.recordPrompt("a kept like");
+  history.setPromptLiked("a kept like", true);
   history.recordPrompt("a passing thought");
   history.setPromptHistoryEnabled(false);
   assert.equal(history.promptHistoryEnabled(), false);
   assert.deepEqual(
     history.listPrompts().map((entry) => entry.text),
-    ["a kept star"],
+    ["a kept like"],
   );
   history.recordPrompt("not remembered");
   assert.deepEqual(
     history.listPrompts().map((entry) => entry.text),
-    ["a kept star"],
+    ["a kept like"],
   );
   assert.equal(
     saved("prompt-history").includes("a passing thought"),
@@ -140,13 +140,16 @@ test("turned off, nothing new is kept and the recent prompts go; starred ones st
     "gone from the saved list too",
   );
 
+  // The saved key predates Like.
+  assert.ok(saved("prompt-history").includes('"pinned":true'));
   history.resetPromptHistoryCache();
   assert.equal(history.promptHistoryEnabled(), false, "still off after a restart");
+  assert.equal(history.listPrompts()[0].liked, true);
   history.setPromptHistoryEnabled(true);
   history.recordPrompt("remembered again");
   assert.deepEqual(
     history.listPrompts().map((entry) => entry.text),
-    ["remembered again", "a kept star"],
+    ["remembered again", "a kept like"],
   );
 });
 
@@ -172,7 +175,7 @@ test("negative history is independent of the positive one", () => {
     ["Blur and noise"],
   );
   history.recordPrompt("Extra fingers", "negative");
-  history.setPromptPinned("Extra fingers", true, "negative");
+  history.setPromptLiked("Extra fingers", true, "negative");
   assert.deepEqual(history.listPrompts(), positives);
   history.forgetPrompts(["Blur and noise"], new Set(), "negative");
   assert.ok(!saved("negative-prompt-history").includes("Blur and noise"));

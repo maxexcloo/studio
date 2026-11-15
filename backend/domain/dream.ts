@@ -170,9 +170,9 @@ export interface DreamProfile {
   /** The LoRA files this profile can load. */
   options?: { loras?: string[] };
 }
-/** The account's LoRA library: thumbs up or down per LoRA and saved strengths per workflow. */
+/** The account's LoRA library: liked or disliked per LoRA and saved strengths per workflow. */
 export interface DreamLoraLibrary {
-  ratings: Record<string, "up" | "down">;
+  ratings: Record<string, "liked" | "disliked">;
   strengths: Record<string, Record<string, number>>;
 }
 export interface DreamLora {
@@ -1205,14 +1205,14 @@ export function createDream(options: {
     );
   };
   /**
-   * The account's thumbs-up LoRAs for the profile, or with `unrated` those it has not rated yet
-   * (never thumbs-down ones), in random order at their saved strength; none without LoRA access.
+   * The account's liked LoRAs for the profile, or with `unrated` those it has not rated yet
+   * (never disliked ones), in random order at their saved strength; none without LoRA access.
    */
   function libraryLoras(ownerId: string, profile: DreamProfile, unrated = false) {
     const library = options.loraLibrary(ownerId);
     if (!library) return [];
     const names = (profile.options?.loras || []).filter(
-      (name) => library.ratings[name] === (unrated ? undefined : "up"),
+      (name) => library.ratings[name] === (unrated ? undefined : "liked"),
     );
     return fit(
       profile,
@@ -1225,8 +1225,8 @@ export function createDream(options: {
   }
   /**
    * For a share of exploited ideas, one LoRA the profile can load drawn by its taste score (a
-   * thumbs up adds one) less its recent share (`spread`), at the strength that scored best, else
-   * its saved strength; never a thumbs-down one, and none without LoRA access.
+   * a like adds one) less its recent share (`spread`), at the strength that scored best, else
+   * its saved strength; never a disliked one, and none without LoRA access.
    */
   function exploitLoras(
     ownerId: string,
@@ -1240,7 +1240,7 @@ export function createDream(options: {
     const candidates = fit(
       profile,
       (profile.options?.loras || [])
-        .filter((name) => library.ratings[name] !== "down")
+        .filter((name) => library.ratings[name] !== "disliked")
         .map((name) => ({
           name,
           strength:
@@ -1251,7 +1251,7 @@ export function createDream(options: {
     const lora = drawn(
       candidates.map((lora): [DreamLora, number] => [
         lora,
-        ((learnt.get(lora.name)?.score ?? 0) + (library.ratings[lora.name] === "up" ? 1 : 0)) *
+        ((learnt.get(lora.name)?.score ?? 0) + (library.ratings[lora.name] === "liked" ? 1 : 0)) *
           weigh(`lora:${lora.name}`),
       ]),
     );
@@ -1767,7 +1767,7 @@ export function createDream(options: {
       }
       if (inspiration) {
         // An inspired idea runs on its import's profile where ready, with its LoRAs where they
-        // fit, unless the account gave them a thumbs down.
+        // fit, unless the account disliked them.
         profile =
           catalogue.profiles.find(
             (item) => kindOf(item) === "image" && item.id === inspiration.profileId,
@@ -1777,7 +1777,7 @@ export function createDream(options: {
           ? fit(
               profile,
               inspiration.loras
-                .filter((lora) => ratings[lora.name] !== "down")
+                .filter((lora) => ratings[lora.name] !== "disliked")
                 .map((lora) => ({ ...lora, enabled: true as const })),
             )
           : [];

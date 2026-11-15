@@ -5,10 +5,10 @@ import {
   listPrompts,
   promptHistoryEnabled,
   setPromptHistoryEnabled,
-  setPromptPinned,
+  setPromptLiked,
 } from "./prompt-history.js";
 
-/** Each account's prompt history (prompt-history.js): list, pin, forget and clear. */
+/** Each account's prompt history (prompt-history.js): list, like, forget and clear. */
 export function registerPromptHistoryRoutes(app) {
   app.get("/api/prompts", (req, res) => {
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
@@ -28,9 +28,9 @@ export function registerPromptHistoryRoutes(app) {
   app.post("/api/prompts/pin", (req, res) => {
     res.json({
       ok: true,
-      prompts: setPromptPinned(
+      prompts: setPromptLiked(
         String(req.body?.text || ""),
-        Boolean(req.body?.pinned),
+        Boolean(req.body?.liked),
         req.body?.kind,
         ownerIdForRequest(req),
       ),
@@ -53,7 +53,7 @@ export function registerPromptHistoryRoutes(app) {
     res.json({
       ok: true,
       prompts: clearPromptHistory(
-        { keepPinned: req.body?.keepPinned !== false },
+        { keepLiked: req.body?.keepLiked !== false },
         req.body?.kind,
         ownerIdForRequest(req),
       ),
