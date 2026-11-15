@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { logWarning } from "../crash-log.js";
 import {
   backendIdsOf,
   metadataFromJson,
@@ -303,9 +304,7 @@ export function repointProfiles(from, to, { by = "update" } = {}) {
       moved.push(profile.name);
     } catch (error) {
       // It keeps the old file, which then stays for it.
-      console.warn(
-        `[library] Couldn't move the ${profile.name} profile to ${to}: ${error.message}`,
-      );
+      logWarning(`Couldn't move the ${profile.name} profile to ${to}: ${error.message}`);
     }
   }
   return moved;

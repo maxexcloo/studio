@@ -19,6 +19,7 @@ import path from "node:path";
 
 import { limitedBody } from "../civitai/access.js";
 import { civitaiFileSpec, civitaiModelFiles } from "../civitai/import.js";
+import { logger } from "../crash-log.js";
 import { currentDataDir } from "../data-dir.js";
 import { hfAccessNote } from "../hf-access.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
@@ -233,7 +234,7 @@ export function createUpdateChecker({
   references = async () => [],
   removeFile,
   now = Date.now,
-  log = console,
+  log = logger,
 } = {}) {
   let state = null;
   let checking = null;
@@ -480,10 +481,10 @@ export function createUpdateChecker({
           provenance: true,
         });
       } catch (error) {
-        log.warn?.(`[library] Couldn't move the catalogue entry for ${key}: ${error.message}`);
+        log.warn?.(`Couldn't move the catalogue entry for ${key}: ${error.message}`);
       }
       const moved = await Promise.resolve(repoint(applied.from, applied.to)).catch((error) => {
-        log.warn?.(`[library] Couldn't move profiles off ${applied.from.file}: ${error.message}`);
+        log.warn?.(`Couldn't move profiles off ${applied.from.file}: ${error.message}`);
         return [];
       });
       const movedNote = moved.length

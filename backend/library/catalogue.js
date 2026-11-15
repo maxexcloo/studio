@@ -17,6 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { logger } from "../crash-log.js";
 import { currentDataDir } from "../data-dir.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
 import { isObject } from "../values.js";
@@ -292,7 +293,7 @@ export function createCatalogueStore({
   dataDir = currentDataDir(),
   environment = process.env,
   familiesFromMetadata = () => [],
-  log = console,
+  log = logger,
 } = {}) {
   const file = path.join(dataDir, "library", "catalogue.json");
   const manifestPrefix = () =>
@@ -530,9 +531,9 @@ export function createCatalogueStore({
   /** The boot migration: logs its dry run, then syncs. Safe to run on every start. */
   function migrate() {
     const preview = sync({ dryRun: true });
-    if (preview.changed.length || !fs.existsSync(file))
+    if (preview.changed.length)
       log.info?.(
-        `[library] Catalogue: merging ${preview.changed.map((name) => `${name} (${preview.counts[name]})`).join(", ") || "nothing new"} into library/catalogue.json; the manifest stays as it is.`,
+        `Catalogue: merging ${preview.changed.map((name) => `${name} (${preview.counts[name]})`).join(", ")} into library/catalogue.json; the manifest stays as it is.`,
       );
     return sync();
   }

@@ -32,6 +32,7 @@ import path from "node:path";
 import { withCatalogueSources } from "../catalogue-downloads.js";
 import { civitaiJson } from "../civitai/access.js";
 import { versionResource } from "../civitai/import.js";
+import { logWarning } from "../crash-log.js";
 import { currentDataDir } from "../data-dir.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { familyFromName } from "../family-catalogue.js";
@@ -510,9 +511,7 @@ export function registerLibraryRoutes(
   });
   if (schedule) {
     const check = () =>
-      updates
-        .check()
-        .catch((error) => console.warn(`[library] The update check failed: ${error.message}`));
+      updates.check().catch((error) => logWarning(`The update check failed: ${error.message}`));
     setTimeout(check, 10 * 60 * 1000).unref?.();
     setInterval(check, dailyMs).unref?.();
     setInterval(() => {

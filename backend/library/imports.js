@@ -19,6 +19,7 @@
  */
 import crypto from "node:crypto";
 
+import { logger } from "../crash-log.js";
 import { currentDataDir } from "../data-dir.js";
 import { imageRecipe, readImageMetadata } from "../image-metadata.js";
 import { runtimeDatabase } from "../persistence/runtime.ts";
@@ -41,7 +42,7 @@ export function importId(at = Date.now()) {
 export function createImportStore({
   dataDir = currentDataDir(),
   limit = importLimit,
-  log = console,
+  log = logger,
 } = {}) {
   const db = runtimeDatabase(dataDir);
   const write = (record) =>
@@ -71,7 +72,7 @@ export function createImportStore({
         }
         index.set(id, record);
       } catch (error) {
-        log.warn?.(`[library] Skipped unreadable import ${id}: ${error.message}`);
+        log.warn?.(`Skipped unreadable import ${id}: ${error.message}`);
       }
     }
     prune();
@@ -101,7 +102,7 @@ export function createImportStore({
     record.updatedAt = now();
     write(record);
     if (record.state === "failed" && failures.get(record.id) !== record.error)
-      log.warn?.(`[library] Import ${record.id} (${record.input?.kind}) failed: ${record.error}`);
+      log.warn?.(`Import ${record.id} (${record.input?.kind}) failed: ${record.error}`);
     if (record.state === "failed") failures.set(record.id, record.error);
     else failures.delete(record.id);
     index.set(record.id, record);

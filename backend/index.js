@@ -49,6 +49,7 @@ import {
 import { registerComfyMediaRoutes } from "./comfy/media-routes.js";
 import { cancelPrompt } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
+import { logEvent, logWarning } from "./crash-log.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { appVersion } from "./data-dir.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
@@ -232,9 +233,7 @@ for (const [name, migrate] of [
   try {
     migrate();
   } catch (error) {
-    console.warn(
-      `[Studio] The ${name} store couldn't take in the older files yet: ${error.message}`,
-    );
+    logWarning(`The ${name} store couldn't take in the older files yet: ${error.message}`);
   }
 }
 // GPU deployments Studio scales (runtime/bootstrap.ts); the control MCP tools and Settings › Workers drive it.
@@ -1229,26 +1228,25 @@ server.listen(Number(port), host, () => {
   const shownHost =
     host === "0.0.0.0" || host === "::" || host === "127.0.0.1" ? "localhost" : host;
   const pagePort = devPort || listening;
-  console.log(
-    `Studio ${appVersion || "development"}\nOpen http://${shownHost.includes(":") ? `[${shownHost}]` : shownHost}:${pagePort}`,
-  );
+  logEvent("Studio started", { version: appVersion || "development", port: listening });
+  // A container's own addresses mean nothing to whoever reads its log.
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      `Open http://${shownHost.includes(":") ? `[${shownHost}]` : shownHost}:${pagePort}`,
+    );
+    // Listening beyond this computer: say where a phone can open it.
+    if (multiUserEnabled && networkListening && (host === "0.0.0.0" || host === "::"))
+      for (const entry of Object.values(os.networkInterfaces()).flatMap((entries) => entries || []))
+        if (entry.family === "IPv4" && !entry.internal)
+          console.log(`    ➜  Network   http://${entry.address}:${pagePort}`);
+  }
   // Each worker's node list takes a large ComfyUI a second to send: read it now, not on the first request.
   if (listWorkers().length)
     void tracked("Catalogue warm-up", () => catalogue.mediaModels()).catch(() => {});
   void (async () => {
-    // Listening beyond this computer: say where a phone can open it.
-    if (multiUserEnabled && networkListening && (host === "0.0.0.0" || host === "::")) {
-      const addresses = Object.values(os.networkInterfaces())
-        .flatMap((entries) => entries || [])
-        .filter((entry) => entry.family === "IPv4" && !entry.internal)
-        .map((entry) => `http://${entry.address}:${pagePort}`);
-      for (const address of addresses) console.log(`    ➜  Network   ${address}`);
-    }
     // No workers is a setup of its own: say so.
     if (!listWorkers().length) {
-      console.log(
-        "    No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_NAMESPACES.\n",
-      );
+      logWarning("No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_NAMESPACES.");
       return;
     }
     // Starting before ComfyUI is fine, but say so instead of leaving people to guess.
@@ -1260,9 +1258,7 @@ server.listen(Number(port), host, () => {
       () => false,
     );
     if (!answering)
-      console.log(
-        `    ComfyUI isn't answering at ${comfyUrl} yet. The studio connects once it starts.\n`,
-      );
+      logWarning(`ComfyUI isn't answering at ${comfyUrl} yet. The studio connects once it starts.`);
   })().catch(() => {});
   // Tells a parent process (the server tests) where this one listens.
   process.send?.({ type: "ready", version: appVersion, url: `http://${shownHost}:${pagePort}` });

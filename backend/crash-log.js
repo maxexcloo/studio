@@ -26,6 +26,14 @@ export function logWarning(message, extra) {
   return write("warn", message, extra);
 }
 
+/** For modules that take a `log` with console's shape: info, warn and error as lines like these. */
+export const logger = {
+  info: (message) => logEvent(message),
+  warn: (message) => logWarning(message),
+  error: (message, error) =>
+    write("error", message, error === undefined ? undefined : describe(error)),
+};
+
 function describe(error) {
   if (error instanceof Error)
     return {

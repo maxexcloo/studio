@@ -1,3 +1,4 @@
+import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamOwnership } from "./dream-ownership.js";
 
@@ -74,7 +75,7 @@ function summary(results, apply) {
  * it returns every step's plan; with it, it applies the online-safe steps against Studio's data
  * folder and refuses the others that have work. `{ ok, apply, steps: { <name>: result } }`.
  */
-export function registerMigrationRoutes(app, { dataDir, adminRefusal, log = console }) {
+export function registerMigrationRoutes(app, { dataDir, adminRefusal, log = logger }) {
   directRoute(app, "POST", "/api/maintenance/migrations", async (account, { body }) => {
     const refused = adminRefusal(account);
     if (refused) return refused;

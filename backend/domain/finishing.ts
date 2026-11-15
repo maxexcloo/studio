@@ -1,4 +1,5 @@
 import type { FinishingSettings, FinishingStatus, UpscaleQuality } from "../../shared/upscale.ts";
+import { logger } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import type { DomainResponse } from "./admission.ts";
@@ -69,7 +70,7 @@ export function createFinishing(options: {
   cancel(ownerId: string, jobId: string): Promise<unknown>;
   log?: { info(message: string): void };
 }) {
-  const { store, log = console } = options;
+  const { store, log = logger } = options;
   const name = (ownerId: string) => `finishing:${ownerId}`;
   function read(ownerId: string): FinishingRecord {
     try {
@@ -102,7 +103,7 @@ export function createFinishing(options: {
 
   let noted = "";
   function note(reason: string) {
-    if (reason && reason !== noted) log.info(`[Studio] Finish Starred Images waits: ${reason}`);
+    if (reason && reason !== noted) log.info(`Finish Starred Images waits: ${reason}`);
     noted = reason;
   }
   let ticking = false;
@@ -143,7 +144,7 @@ export function createFinishing(options: {
         });
         if (result.status >= 400)
           log.info(
-            `[Studio] Finish Starred Images skips ${itemId}: ${String(result.payload.error || result.status)}`,
+            `Finish Starred Images skips ${itemId}: ${String(result.payload.error || result.status)}`,
           );
         next = index + 1;
         return;

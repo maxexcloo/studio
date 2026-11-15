@@ -1,3 +1,4 @@
+import { logger } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 /** A gallery record the idle work reads; the work's own fields are the caller's. */
 export interface IdleItem {
@@ -135,7 +136,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
   now?: () => number;
   log?: { info(message: string): void };
 }) {
-  const { now = Date.now, log = console } = options;
+  const { now = Date.now, log = logger } = options;
   const key = (item: Item) => item.url || item.id || "";
   const day = (time: number) => new Date(time).toDateString();
   const stamp = () => new Date(now()).toISOString();
@@ -152,7 +153,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
   let finishes: number[] = [];
   let noted = "";
   const note = (reason: string) => {
-    if (reason !== noted) log.info(`[Studio] ${options.name} skip: ${reason}`);
+    if (reason !== noted) log.info(`${options.name} skip: ${reason}`);
     noted = reason;
   };
   // The last whole walk that found nothing to do, so an idle tick doesn't read the whole gallery

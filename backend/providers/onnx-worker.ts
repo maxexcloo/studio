@@ -21,6 +21,8 @@ export interface InferRequest {
 
 process.env.ORT_DISABLE_TELEMETRY = "1";
 const ort = await import("onnxruntime-node");
+// Its warnings (such as a telemetry ID it can't save) are noise here; errors still show.
+ort.env.logLevel = "error";
 const sessions = new Map<string, Promise<InferenceSession>>();
 
 function session(model: string) {

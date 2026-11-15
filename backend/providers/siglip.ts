@@ -2,6 +2,7 @@ import fs from "node:fs";
 
 import sharp from "sharp";
 
+import { logger } from "../crash-log.js";
 import type { InferRequest } from "./onnx-worker.ts";
 import { createModelFiles, createOnnxRunner } from "./onnx.ts";
 
@@ -35,7 +36,7 @@ const textLength = 64;
 export function createSiglip({
   dataDir,
   fetch,
-  log = console,
+  log = logger,
 }: {
   dataDir: string;
   fetch: (url: string, init?: RequestInit) => Promise<Response>;

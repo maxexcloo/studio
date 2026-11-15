@@ -1,3 +1,4 @@
+import { logWarning } from "./crash-log.js";
 import { dataDir } from "./gallery/store.js";
 import { addRun, estimateRun, isWarm, timingKey } from "./generation-timing.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
@@ -28,7 +29,7 @@ function save(label) {
   try {
     writeRuntimeDocument(dataDir, "timings", timings);
   } catch (error) {
-    console.warn(`[Studio] Could not save ${label} timing: ${error.message}`);
+    logWarning(`Could not save ${label} timing: ${error.message}`);
   }
 }
 

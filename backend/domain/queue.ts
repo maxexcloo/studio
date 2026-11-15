@@ -6,6 +6,7 @@ import {
   pausedReason,
   terminalStatuses,
 } from "../../shared/queue.ts";
+import { logEvent, logWarning } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 import { logFailure } from "./log-failure.ts";
 import { type OwnedJob, Store, everyone, pendingStatuses, queuePriority } from "./store.ts";
@@ -613,7 +614,7 @@ export class GenerationQueue {
             : targets.at(-1));
       if (!target) continue;
       taken.add(target);
-      console.log(`[Studio] Moved job ${job.id} from ${job.resource} to ${target}`);
+      logEvent(`Moved job ${job.id} from ${job.resource} to ${target}`);
       all[index] = this.store.save({
         ...job,
         resource: target,
@@ -675,12 +676,12 @@ export class GenerationQueue {
       outcome = await this.adapter.cancel(pending);
     } catch (error) {
       // The request stays recorded; recovery confirms the cancellation once the worker answers.
-      console.warn(`[Studio] Could not confirm cancelling job ${id}: ${(error as Error).message}`);
+      logWarning(`Could not confirm cancelling job ${id}: ${(error as Error).message}`);
       throw error;
     }
     const latest = this.store.job(ownerId, id)!;
     if (outcome?.status !== "cancelled" || terminalStatuses.has(latest.status)) return latest;
-    console.warn(`[Studio] Cancelled job ${id} without its worker: ${outcome.reason}`);
+    logWarning(`Cancelled job ${id} without its worker: ${outcome.reason}`);
     const cancelled = this.store.save({
       ...latest,
       status: "cancelled",

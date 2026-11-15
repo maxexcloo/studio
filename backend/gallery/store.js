@@ -5,6 +5,7 @@ import path from "node:path";
 import { replyTitle } from "../../shared/titles.ts";
 import { recordBelongsToAccount } from "../account-ownership.js";
 import { localOutputFile } from "../comfy/comfy.js";
+import { logWarning } from "../crash-log.js";
 import { currentDataDir } from "../data-dir.js";
 import { createResultNumbers } from "../domain/result-numbers.ts";
 import { generationRecord } from "../generation-record.js";
@@ -861,7 +862,7 @@ export function deleteGalleryFiles(items) {
           deleted += 1;
         }
       } catch (error) {
-        console.warn(`[Studio] Could not delete a gallery file: ${error.message}`);
+        logWarning(`Could not delete a gallery file: ${error.message}`);
         skipped += 1;
       }
       continue;
@@ -875,7 +876,7 @@ export function deleteGalleryFiles(items) {
           deleted += 1;
         }
       } catch (error) {
-        console.warn(`[Studio] Could not delete a gallery file: ${error.message}`);
+        logWarning(`Could not delete a gallery file: ${error.message}`);
         skipped += 1;
       }
     }

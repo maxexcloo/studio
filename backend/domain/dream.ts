@@ -16,6 +16,7 @@ import {
   maxPromptCharacters,
 } from "../../shared/queue.ts";
 import { replyTitle } from "../../shared/titles.ts";
+import { logger } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
@@ -738,7 +739,7 @@ export function createDream(options: {
   random?: (size: number) => number;
   log?: { info(message: string): void };
 }) {
-  const { store, now = Date.now, random = randomInt, log = console } = options;
+  const { store, now = Date.now, random = randomInt, log = logger } = options;
   /** True for about `percent` in every hundred draws. */
   const chance = (percent: number) => random(100) < percent;
   const pick = <T>(items: T[]) => items[random(items.length)];
@@ -2235,7 +2236,7 @@ export function createDream(options: {
         ? ""
         : state.reason || (state.status === "paused" ? "Paused." : "");
     if (text && noted.get(ownerId) !== text)
-      log.info(`[Studio] Dream skips ${ownerId ? `account ${ownerId}` : "Studio"}: ${text}`);
+      log.info(`Dream skips ${ownerId ? `account ${ownerId}` : "Studio"}: ${text}`);
     noted.set(ownerId, text);
   }
   /** Cancels Dream jobs that have not started, for these owners or all. */
