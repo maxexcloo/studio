@@ -2,14 +2,10 @@ import { type Page, expect, test } from "@playwright/test";
 
 import { dreamItem, fixtures, serveDream, stamp } from "./fixtures";
 
-/** Opens a Dream view: from the segmented control, or the view menu on phones. */
+/** Opens a route-backed Dream view from its menu. */
 async function showView(page: Page, name: string) {
-  const menu = page.getByRole("button", { name: "Dream View", exact: true });
-  await expect(menu.or(page.getByRole("radiogroup", { name: "Dream View" }))).toBeVisible();
-  if (await menu.isVisible()) {
-    await menu.click();
-    await page.getByRole("menuitem", { name, exact: true }).click();
-  } else await page.getByText(name, { exact: true }).click();
+  await page.getByRole("button", { name: "Dream View", exact: true }).click();
+  await page.getByRole("menuitem", { name, exact: true }).click();
 }
 
 const current = (page: Page) => page.getByRole("group", { name: "Current Dream", exact: true });
@@ -326,7 +322,7 @@ test("The taste read-out fits the screen and adds what to avoid", async ({ page 
     },
   });
   await page.goto("/dream");
-  await page.getByRole("button", { name: "Taste", exact: true }).click();
+  await showView(page, "Taste");
   const profile = page.getByRole("region", { name: "Taste Profile" });
   await expect(profile.getByRole("list", { name: "Likes" })).toContainText("foxes in snow");
   // Only liked models and LoRAs show, by their names.
@@ -342,6 +338,49 @@ test("The taste read-out fits the screen and adds what to avoid", async ({ page 
   expect(
     await page.evaluate(() => document.scrollingElement!.scrollHeight <= window.innerHeight),
   ).toBe(true);
+});
+
+test("Dream navigation orders its views and History shows retained activity and available result links", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await serveDream(page, {
+    history: [
+      {
+        at: stamp,
+        action: "Chose Both",
+        question: "Which Steps?",
+        answer: "both 20 Steps and 40 Steps",
+        item: { id: "a", title: "Fox A" },
+        other: { title: "Unavailable Fox B" },
+      },
+      { at: "2026-10-22T12:00:00.000Z", action: "Kept", item: { title: "Older Fox" } },
+    ],
+  });
+  await page.goto("/dream");
+  await page.getByRole("button", { name: "Dream View", exact: true }).click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Deck",
+    "Overview",
+    "Projects",
+    "Taste",
+    "Discards",
+    "History",
+  ]);
+  await page.getByRole("menuitem", { name: "History", exact: true }).click();
+  await expect(page).toHaveURL(/\/dream\/history$/);
+  const history = page.getByRole("table", { name: "Dream History" });
+  await expect(history).toBeVisible();
+  await expect(history.getByRole("link", { name: "Fox A", exact: true })).toHaveAttribute(
+    "href",
+    "/images?item=a",
+  );
+  await expect(history.getByText("Unavailable Fox B", { exact: true })).toBeVisible();
+  await expect(history.getByText("both 20 Steps and 40 Steps", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(history).toBeVisible();
+  await showView(page, "Deck");
+  await expect(page).toHaveURL(/\/dream$/);
 });
 
 test("Dream says why it can't run", async ({ page }) => {
@@ -394,7 +433,10 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   // Tapping an image chooses it once Undo has passed.
   await page.getByRole("button", { name: "Choose B", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  await expect(page.getByText("Chose B", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toHaveAttribute(
+    "aria-description",
+    "Chose B",
+  );
   await expect.poll(() => dream.requests.length, { timeout: 10_000 }).toBe(5);
   expect(dream.requests.map((request) => request.body)).toEqual([
     { liked: ["g1"] },
@@ -437,6 +479,12 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   // A side's label opens it in the viewer; closing it returns to the same comparison.
   await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
   const viewer = page.getByRole("dialog");
+  const answers = viewer.getByRole("group", { name: "Comparison Answers" });
+  for (const name of ["Neither", "A", "B", "Both"]) {
+    const answer = answers.getByRole("button", { name, exact: true });
+    await expect(answer).toBeInViewport({ ratio: 1 });
+    await expect(answer.locator(".mantine-Button-label")).toHaveText(name);
+  }
   // Keys reach the viewer once its focus trap has taken focus.
   await expect(viewer.getByRole("button", { name: "Generation Details" })).toBeFocused();
   await page.keyboard.press("Escape");
@@ -456,8 +504,13 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await expect(third).toContainText("Guidance 3");
   // A tapped image is chosen until Undo puts the comparison back.
   await third.getByRole("button", { name: "Choose A · Guidance 3", exact: true }).click();
-  await expect(page.getByText("Chose A · Guidance 3", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toHaveAttribute(
+    "aria-description",
+    "Chose A · Guidance 3",
+  );
+  const undo = page.getByRole("button", { name: "Undo", exact: true });
+  await expect(undo.locator("xpath=../..")).toHaveClass(/toolbar/);
+  await undo.click();
   await expect(third).toContainText("Guidance 3");
   await page.getByRole("button", { name: "Both", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
@@ -480,7 +533,7 @@ test("Discarded Dream results can be viewed and kept after all, or deleted all a
     discarded: [discarded("gone"), discarded("other"), discarded("last")],
   });
   await page.goto("/dream");
-  await showView(page, "Discarded");
+  await showView(page, "Discards");
   await page.getByRole("button", { name: "Keep Dream prompt gone", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Keep Dream prompt gone", exact: true }),

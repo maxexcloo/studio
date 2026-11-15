@@ -419,6 +419,7 @@ export function ActionBarGroups({
   menuPosition = "top",
   fit = false,
   stacked = false,
+  equal = false,
 }: {
   groups: ActionGroups;
   labelled?: string[];
@@ -426,6 +427,8 @@ export function ActionBarGroups({
   fit?: boolean;
   /** Names sit under their icons, spread across the row (phone bars). */
   stacked?: boolean;
+  /** Give every named choice the same share of the row. */
+  equal?: boolean;
 }) {
   const row = useRef<HTMLDivElement>(null);
   const actions = shown(groups).flat();
@@ -464,6 +467,7 @@ export function ActionBarGroups({
       data-tight={tight || undefined}
       data-wrap={wrap || undefined}
       data-stacked={stacked || undefined}
+      data-equal={equal || undefined}
     >
       {shown(groups).map((group, index) => {
         const controls = group.map((action) => (

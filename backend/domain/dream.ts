@@ -17,6 +17,7 @@ import {
   maxPromptCharacters,
   pendingStatuses,
 } from "../../shared/queue.ts";
+import type { DreamActivity } from "../../shared/taste.ts";
 import { replyTitle } from "../../shared/titles.ts";
 import { logger } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
@@ -2497,6 +2498,57 @@ export function createDream(options: {
 
   return {
     read,
+    history(ownerId: string): DreamActivity[] {
+      const labels = {
+        "calibrate-like": "Chose Gallery Image",
+        "calibrate-pass": "Passed Gallery Image",
+        compare: "Compared",
+        delete: "Deleted",
+        discard: "Discarded",
+        dislike: "Disliked",
+        iterate: "Iterated",
+        keep: "Kept",
+        like: "Liked",
+        "pair-both": "Chose Both",
+        "pair-neither": "Chose Neither",
+        preferred: "Chose",
+        report: "Reported",
+        undislike: "Restored",
+        unlike: "Unliked",
+      };
+      const choice = (signal: TasteChoice): DreamActivity["item"] => {
+        const item = signal.itemId && options.items(ownerId, [signal.itemId])[0];
+        return {
+          ...(item && item.dream?.state !== "discarded" ? { id: signal.itemId } : {}),
+          title: signal.title || signal.prompt || "Result",
+          media: signal.media,
+        };
+      };
+      return options.taste
+        .read(ownerId)
+        .signals.filter(
+          (signal) =>
+            signal.arm ||
+            signal.question ||
+            [
+              "calibrate-like",
+              "calibrate-pass",
+              "discard",
+              "keep",
+              "pair-both",
+              "pair-neither",
+            ].includes(signal.kind),
+        )
+        .map((signal) => ({
+          at: signal.at,
+          action: labels[signal.kind],
+          question: signal.question,
+          answer: signal.answer,
+          item: choice(signal),
+          ...((signal.over || signal.also) && { other: choice((signal.over || signal.also)!) }),
+        }))
+        .sort((a, b) => b.at.localeCompare(a.at));
+    },
     tick,
     write: writeJob,
     start() {
