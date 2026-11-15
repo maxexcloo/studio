@@ -639,6 +639,7 @@ const generationRoutes = createGenerationSubmission({
   loadComfyContext,
   mediaModels,
   comfyDownMessage,
+  prompting: assistant.guide,
 });
 
 // The queue's writing stage (prompt-stage.js): prompts the assistant writes for a generation.
