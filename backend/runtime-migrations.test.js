@@ -33,6 +33,7 @@ test("the migrations route answers administrators with every step's plan, and lo
   assert.deepEqual(await post({ apply: true }, "user"), { code: 403, body: refusal.payload });
   const steps = (applied) => ({
     dreamAnimationStars: { applied, stars: 0, owners: {} },
+    mcpOwnership: { applied, document: false, rows: {}, conflicts: [] },
   });
   assert.deepEqual(await post({}), {
     code: 200,
@@ -43,7 +44,7 @@ test("the migrations route answers administrators with every step's plan, and lo
     body: { ok: true, apply: true, steps: steps(true) },
   });
   assert.deepEqual(lines, [
-    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do",
-    "[migrations] Apply: dreamAnimationStars: 0 nothing to do",
+    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do",
+    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do",
   ]);
 });

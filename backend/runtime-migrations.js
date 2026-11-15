@@ -2,6 +2,7 @@ import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
 import { dreamOwnership } from "./dream-ownership.js";
+import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -17,6 +18,12 @@ const steps = [
     name: "dreamAnimationStars",
     run: dreamAnimationStars,
     changes: (plan) => plan.stars,
+    online: true,
+  },
+  {
+    name: "mcpOwnership",
+    run: mcpOwnershipRows,
+    changes: (plan) => (plan.document ? 1 : 0),
     online: true,
   },
 ];
