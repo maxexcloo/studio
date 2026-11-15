@@ -22,6 +22,7 @@ function fixture(
     switches?: { ideas?: boolean; nextSteps?: boolean };
     picked?: string;
     fixed?: Record<string, string[]>;
+    edits?: "instruction" | "description";
   } = {},
 ) {
   const calls: Message[][] = [];
@@ -84,7 +85,7 @@ function fixture(
         ? {
             label: "Flux 2",
             guide: { summary: "Subject first.", sampling: {} },
-            edits: "instruction",
+            edits: options.edits ?? "instruction",
           }
         : null,
     promptWriter: () => ({ picked: options.picked, uncensored: false }),
@@ -217,7 +218,36 @@ test("Animate's motion ideas come from the image, each its own instruction, and 
   // The viewer's next steps are still their own.
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
   assert.equal(calls.length, 2);
-  assert.match(calls[1][0].content, /next steps/);
+  assert.match(calls[1][0].content, /a different area/);
+});
+
+test("viewer next steps vary: one per area, specific, and spicy only where the account may", async () => {
+  const step = (area: string, label: string) => ({ area, label, request: label, prompt: label });
+  const reply = () =>
+    JSON.stringify({
+      steps: [
+        step("hair", "Hair Up"),
+        step("hair", "Pink Bob"),
+        step("outfit", "Red Satin Dress"),
+        step("lighting", "Neon Rim Light"),
+      ],
+    });
+  const { calls, suggestions } = fixture({ reply });
+  const labels = async (owner: string, jobId: string) =>
+    (await suggestions.suggest(owner, { surface: "viewer", jobId })).suggestions.map(
+      (found) => (found as { label: string }).label,
+    );
+  assert.deepEqual(await labels("alice", "job-a"), [
+    "Hair Up",
+    "Red Satin Dress",
+    "Neon Rim Light",
+  ]);
+  assert.match(calls[0][0].content, /\(body, face, hair, outfit, pose, setting, lighting, camera;/);
+  assert.match(calls[0][0].content, /never a vague style or mood tweak/);
+  assert.match(calls[0][0].content, /state the new result in absolute words/);
+  assert.doesNotMatch(calls[0][0].content, /sensual or explicit for this image/);
+  await labels("bob", "job-b");
+  assert.match(calls[1][0].content, /sensual or explicit for this image/);
 });
 
 test("suggestions never repeat a fixed option in the same menu, and the writer is told them", async () => {
@@ -394,6 +424,29 @@ test("a requested change picks one of the offered actions and rewrites the promp
   // Upscale keeps the prompt as it was.
   answer = { action: "upscale", label: "Sharper", prompt: "ignored" };
   assert.equal(((await ask(["upscale"])).suggestions[0] as Change).prompt, "A harbour at dawn");
+});
+
+test("a change lands where an edit can make it, else recreates with the seed, written in place", async () => {
+  const reply = () => JSON.stringify({ action: "recreate", label: "Bigger Bust", prompt: "x" });
+  const ask = async (edits: "instruction" | "description") => {
+    const { calls, suggestions } = fixture({ reply, edits });
+    await suggestions.suggest("alice", {
+      surface: "change",
+      jobId: "job-a",
+      request: "bigger bust",
+      actions: ["edit", "recreate"],
+    });
+    return calls[0][0].content;
+  };
+  // An editing model makes local changes to a person; a partial redraw keeps their shapes.
+  const editing = await ask("instruction");
+  assert.match(editing, /- edit: [^\n]*local changes \(face, expression, hair, clothing/);
+  assert.match(editing, /- recreate: [^\n]*same seed/);
+  const redraw = await ask("description");
+  assert.match(redraw, /- edit: [^\n]*only for light, colour, weather and texture/);
+  assert.match(redraw, /- recreate: [^\n]*to the person \(body, figure, face/);
+  // The prompt changes the words concerned, in absolute terms, and nothing else.
+  assert.match(redraw, /rewrite the words it concerns in place[^\n]*never "a redder dress"/);
 });
 
 test("a requested change is written by the account's Text model", async () => {
