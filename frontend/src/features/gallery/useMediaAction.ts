@@ -257,7 +257,7 @@ export type Iteration =
   | { kind: "regenerate" }
   | { kind: "repeat" }
   | { kind: "animate"; theme: string; instruction?: string; written?: WrittenPrompt }
-  | { kind: "prompt"; prompt: string; operation: PromptOperation };
+  | { kind: "prompt"; prompt: string; operation: PromptOperation; sameSeed?: boolean };
 /** A motion prompt the assistant wrote for review, as edited: it runs exactly as given. */
 export interface WrittenPrompt {
   prompt: string;
@@ -298,6 +298,7 @@ export function useIterate() {
     if (note || choice?.note) notifications.show({ message: note || choice?.note });
     const prompt = given?.prompt ?? (animate ? (written?.prompt ?? "") : draft.input.prompt);
     const repeat = iteration.kind === "repeat";
+    const sameSeed = repeat || Boolean(given?.sameSeed);
     // A given prompt keeps the item's Count, as the composer would; an edit or animation runs once.
     const count = given
       ? given.operation === "image"
@@ -308,7 +309,7 @@ export function useIterate() {
         : composer.count;
     const payload = {
       ...generationInput(
-        { ...draft.input, prompt, seed: repeat ? (seed ?? "") : "", count },
+        { ...draft.input, prompt, seed: sameSeed ? (seed ?? "") : "", count },
         profile,
         draft.references,
       ),

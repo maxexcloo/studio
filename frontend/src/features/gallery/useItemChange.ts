@@ -13,8 +13,9 @@ interface ChangeContext {
 
 /**
  * Ask for a Change on a finished item, as the viewer's field offers it: an image edits,
- * recreates or animates, a video animates again, and either upscales where its actions can.
- * `run` carries out the proposal with its (perhaps edited) prompt.
+ * recreates with its seed, so only the change differs, or animates, a video animates again, and
+ * either upscales where its actions can. `run` carries out the proposal with its (perhaps edited)
+ * prompt.
  */
 export function useItemChange<T>(
   item: MediaItem,
@@ -57,6 +58,7 @@ export function useItemChange<T>(
         prompt: prompt.trim(),
         operation:
           action === "edit" ? "refine" : action === "animate" && !video ? "animate" : "image",
+        sameSeed: action === "recreate",
       });
     ask.done();
   }

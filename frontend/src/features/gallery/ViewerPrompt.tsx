@@ -19,6 +19,7 @@ import {
   proposedClass,
   useChangeSuggestions,
 } from "../generation/AskChange";
+import { CustomDialog } from "../generation/CustomDialog";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import { useItemChange } from "./useItemChange";
@@ -30,16 +31,15 @@ import classes from "./MediaViewer.module.css";
  * The viewer's prompt and its assistance, shared by the prompt field and the bar's AI menu. The
  * field holds the item's prompt: editing it and pressing Enter or Generate runs it with the item's
  * settings as a new version, and Improve Prompt rewrites it in one of the assistant's styles. AI
- * (`ai`) offers Review Prompt, the image's next steps, Custom…, which asks for the text typed
- * over the prompt as a change in plain words (`useItemChange`), and Refresh Suggestions. Under
- * Review Prompt, the remembered default, a change's proposal fills the field until Run runs it or
- * Undo restores what was typed; without it, the proposal runs at once.
+ * (`ai`) offers Review Prompt, the image's next steps, Custom…, which asks for a change in plain
+ * words typed in its own box (`useItemChange`), and Refresh Suggestions. Under Review Prompt, the
+ * remembered default, a change's proposal fills the field until Run runs it or Undo restores what
+ * was typed; without it, the proposal runs at once.
  */
 export function useViewerPrompt(
   item: MediaItem,
   { groups, iterate }: { groups: ActionGroups; iterate: (iteration: Iteration) => void },
 ) {
-  const phone = usePhone();
   const original = typedPrompt(item);
   const [prompt, setPrompt] = useState(original);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -95,15 +95,16 @@ export function useViewerPrompt(
       setPrompt(result.prompt);
     },
   });
-  // Text typed over the prompt is the change Custom… asks for; otherwise it selects the prompt for
-  // one typed over it, and phones open the editor.
-  const typed = Boolean(prompt.trim()) && prompt !== original;
-  const custom = () => {
-    if (typed) return ask.send(prompt, prompt.trim());
-    if (phone) return field.current?.click();
-    field.current?.focus();
-    field.current?.select();
-  };
+  const [customOpen, setCustomOpen] = useState(false);
+  const custom = (
+    <CustomDialog
+      opened={customOpen}
+      onClose={() => setCustomOpen(false)}
+      title="Custom Change"
+      action={review ? "Ask" : "Run"}
+      onSend={(request) => ask.send(request, prompt)}
+    />
+  );
   const ai: Action | null =
     (ask.available || assistantLoading) && item.jobId
       ? {
@@ -141,7 +142,7 @@ export function useViewerPrompt(
                 label: "Custom…",
                 icon: icons.custom,
                 disabled: ask.pending,
-                onClick: custom,
+                onClick: () => setCustomOpen(true),
               },
             ],
           }),
@@ -168,7 +169,7 @@ export function useViewerPrompt(
         ],
       }
     : null;
-  return { item, original, prompt, setPrompt, field, ask, typed, ai, improveTool, improve };
+  return { item, original, prompt, setPrompt, field, ask, custom, ai, improveTool, improve };
 }
 
 export type ViewerPromptState = ReturnType<typeof useViewerPrompt>;
@@ -184,7 +185,7 @@ export function ViewerPrompt({
   pending?: Iteration;
 }) {
   const phone = usePhone();
-  const { item, original, prompt, setPrompt, field, ask, typed, improveTool, improve } = state;
+  const { item, original, prompt, setPrompt, field, ask, custom, improveTool, improve } = state;
   const change = ask.proposal;
   const video = item.type === "video";
   const running = pending?.kind === "prompt";
@@ -213,28 +214,14 @@ export function ViewerPrompt({
       ask.undo();
     }
   }
-  // Phones ask or generate from the editor's named sends, and a proposal's Undo and Run show there
-  // too; at rest, Undo and Run stand beside the field.
+  // Phones generate from the editor's send, and a proposal's Undo and Run show there too; at rest,
+  // Undo and Run stand beside the field.
   const sends = change
     ? [
         { label: "Undo", icon: icons.undo, disabled: false, keepOpen: true, onSubmit: ask.undo },
         submit,
       ]
-    : [
-        ...(ask.available && phone
-          ? [
-              {
-                label: "Ask for a Change",
-                text: "Ask",
-                icon: icons.assistant,
-                disabled: !typed || ask.pending,
-                keepOpen: true,
-                onSubmit: () => ask.send(prompt, prompt.trim()),
-              },
-            ]
-          : []),
-        submit,
-      ];
+    : [submit];
   const send = (
     <>
       {change && <UndoButton onClick={ask.undo} />}
@@ -249,33 +236,36 @@ export function ViewerPrompt({
     </>
   );
   return (
-    <TextBox
-      ref={field}
-      aria-label="Prompt"
-      placeholder={`Describe the ${video ? "video" : "image"}, or ask for a change`}
-      variant="unstyled"
-      autosize
-      oneLine
-      minRows={1}
-      maxRows={4}
-      className={change ? `${classes.prompt} ${proposedClass}` : classes.prompt}
-      description={change && <ProposalLabel proposal={change} />}
-      value={prompt}
-      readOnly={change?.action === "upscale"}
-      onChange={setPrompt}
-      onKeyDown={keys}
-      tools={improveTool ? [improveTool] : []}
-      copy={false}
-      reset={original}
-      send={send}
-      busy={
-        ask.pending
-          ? "Asking for a Change…"
-          : improve.isPending
-            ? "Improving the prompt…"
-            : undefined
-      }
-      submit={sends}
-    />
+    <>
+      <TextBox
+        ref={field}
+        aria-label="Prompt"
+        placeholder={`Describe the ${video ? "video" : "image"}`}
+        variant="unstyled"
+        autosize
+        oneLine
+        minRows={1}
+        maxRows={4}
+        className={change ? `${classes.prompt} ${proposedClass}` : classes.prompt}
+        description={change && <ProposalLabel proposal={change} before={ask.typed} />}
+        value={prompt}
+        readOnly={change?.action === "upscale"}
+        onChange={setPrompt}
+        onKeyDown={keys}
+        tools={improveTool ? [improveTool] : []}
+        copy={false}
+        reset={original}
+        send={send}
+        busy={
+          ask.pending
+            ? "Asking for a Change…"
+            : improve.isPending
+              ? "Improving the prompt…"
+              : undefined
+        }
+        submit={sends}
+      />
+      {custom}
+    </>
   );
 }

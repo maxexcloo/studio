@@ -157,11 +157,11 @@ the primary component reference and verify APIs against the installed version.
   icons beside the sends, as in the composer, and its header holds only the
   title and Done. A box without tools has no ⋯, Copy or Clear. Suggestions holds Refresh Suggestions
   under its options. The viewer's prompt has Improve Prompt (every style but
-  Custom), resets to the item's prompt rather than clearing, and its phone
-  editor sends Ask for a Change beside Generate. It rests on one line ending in
-  an ellipsis and shows the whole prompt while focused. Its other assistance is
-  the viewer bar's AI, after Recreate, an assistant menu whose Custom… asks for a
-  change typed over the prompt, with Review Prompt remembered.
+  Custom) and resets to the item's prompt rather than clearing. It rests on one
+  line ending in an ellipsis and shows the whole prompt while focused. Its other
+  assistance is the viewer bar's AI, after Recreate, an assistant menu whose
+  Custom… asks for a change in its own small dialog, never typed over the
+  prompt, with Review Prompt remembered.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating
@@ -206,7 +206,7 @@ the primary component reference and verify APIs against the installed version.
   prompt writing, the only one; its aliases route themselves, so it has no
   fallback or notice. Studio's own calls keep their automatic route.
 - Replacing unsaved work with a preset asks first. Assistant proposals
-  replace text in place with a label and Undo, leaving a review pause before
+  replace text in place with Undo and a label naming the action and the words changed, leaving a review pause before
   the proposed action runs, unless the viewer's Review Prompt is off. Suggestions never move layout or act on their own.
   Ideas for an empty prompt are one Suggestions ▾ chip in the
   box's chip row, after References (`usePromptIdeas`); nothing floats over the

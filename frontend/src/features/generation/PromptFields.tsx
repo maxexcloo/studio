@@ -146,7 +146,9 @@ export function PromptFields({
           classNames={{ root: classes.root, wrapper: classes.wrapper, input: classes.input }}
           className={proposal ? proposedClass : undefined}
           // The proposal's action names it over the prompt; Generate runs it.
-          description={proposal && <ProposalLabel proposal={proposal} labels={draftLabels} />}
+          description={
+            proposal && <ProposalLabel proposal={proposal} before={base} labels={draftLabels} />
+          }
           variant="unstyled"
           aria-label="Prompt"
           data-autofocus={autoFocus || undefined}
