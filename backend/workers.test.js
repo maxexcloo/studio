@@ -85,12 +85,14 @@ test("without STUDIO_WORKERS, the image and video workloads give one worker per 
       name: "Primary",
       url: "http://comfyui:8188",
       capabilities: ["image", "video", "upscale", "models"],
+      slots: 1,
     },
     {
       id: "comfyui-video",
       name: "Video",
       url: "http://comfyui-video:8188",
       capabilities: ["video"],
+      slots: 1,
     },
   ]);
   const listed = [{ id: "local", url: "http://local:8188", capabilities: ["image"] }];

@@ -2,7 +2,8 @@ import crypto from "node:crypto";
 
 /**
  * Studio's ComfyUI workers: none, one or many, each with a stable id, a name,
- * an address and what it runs. Every request to one names it (comfy/comfy.js).
+ * an address, what it runs and how many jobs at once (`slots`). Every request
+ * to one names it (comfy/comfy.js).
  *
  * The deployment defines them: `STUDIO_WORKERS` (a JSON list), else the media
  * workloads Studio found in Kubernetes (runtime/workloads.ts).
@@ -103,8 +104,12 @@ export function normalizeWorker(raw, { taken = new Set(), where = "Worker" } = {
     while (taken.has(id) || !validId(id))
       id = `${base.slice(0, 33)}-${crypto.randomBytes(3).toString("hex")}`;
   }
+  // How many jobs it runs at once: one, or one per GPU where each serves its own model.
+  const slots = raw.slots ?? 1;
+  if (!Number.isInteger(slots) || slots < 1)
+    throw new WorkerConfigError(`${where} needs a whole number of slots, 1 or more.`);
   taken.add(id);
-  return { id, name: name || defaultName(capabilities), url, capabilities };
+  return { id, name: name || defaultName(capabilities), url, capabilities, slots };
 }
 
 function defaultName(capabilities) {

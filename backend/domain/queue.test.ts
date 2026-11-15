@@ -146,6 +146,29 @@ test("one local video runs at a time across workers; images and cloud videos go 
   }
 });
 
+test("a worker with two slots runs two jobs at once, the third waiting for one to finish", async () => {
+  const { store, adapter, submitted, observations } = fixture();
+  const queue = new GenerationQueue(store, {
+    ...adapter,
+    slots: (resource) => (resource === "worker:radiance" ? 2 : 1),
+  });
+  try {
+    const session = store.createSession("alice");
+    const enqueue = () =>
+      store.enqueue("alice", session.id, {}, "image", undefined, "worker:radiance").id;
+    const [first, second, third] = [enqueue(), enqueue(), enqueue()];
+    await queue.tick();
+    assert.deepEqual(submitted, [first, second]);
+    assert.equal(store.job("alice", third)?.status, "waiting");
+    assert.equal(queue.loads().get("worker:radiance")?.busy, true);
+    observations.set(first, { status: "completed", outputs: [] });
+    await queue.tick();
+    assert.deepEqual(submitted, [first, second, third]);
+  } finally {
+    store.close();
+  }
+});
+
 test("failed output persistence retains saving state and blocks conflicting work", async () => {
   const { store, queue, adapter, observations, submitted } = fixture();
   try {
