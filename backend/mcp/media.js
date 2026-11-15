@@ -293,8 +293,17 @@ export class McpMedia {
   get publicUrl() {
     return typeof this.publicBase === "function" ? this.publicBase() : this.publicBase;
   }
+  /**
+   * Writes the ownership document once for every change made in this turn: it holds every link
+   * and job ever made (megabytes), and one generate call makes several links.
+   */
   save() {
-    writeRuntimeDocument(this.dataDir, "mcp-ownership", this.state);
+    if (this.saving) return;
+    this.saving = true;
+    setImmediate(() => {
+      this.saving = false;
+      writeRuntimeDocument(this.dataDir, "mcp-ownership", this.state);
+    });
   }
   digest(value) {
     return crypto.createHmac("sha256", this.key).update(value).digest("hex");
