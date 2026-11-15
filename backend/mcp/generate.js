@@ -213,6 +213,8 @@ export function registerGenerateTools({
       ? waitingNote(profile, (await media.profiles(profile.kind, owner)).some(isCloudProfile))
       : "";
   /** A submission's reply: finished markdown when every job ends within the wait, otherwise result links for the queued jobs, which end the agent's turn. */
+  // What a submission left out (media.queue), said before anything else so the chat can tell the user.
+  const ignoredNote = (submission) => (submission.ignored ? `${submission.ignored} ` : "");
   const respond = async (
     submission,
     profile,
@@ -271,8 +273,8 @@ export function registerGenerateTools({
     ].join(" · ");
     const message =
       submission.status === "queued"
-        ? `Queued on ${label}${left ? `, ready in ${aboutTime(left)}` : ""}. ${note}${await waiting(profile)}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. When the user later asks to see results, call result. Never poll or resubmit. ${followUp}`
-        : `${submission.error} ${note}Share the links; never resubmit.`;
+        ? `Queued on ${label}${left ? `, ready in ${aboutTime(left)}` : ""}. ${ignoredNote(submission)}${note}${await waiting(profile)}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. When the user later asks to see results, call result. Never poll or resubmit. ${followUp}`
+        : `${submission.error} ${ignoredNote(submission)}${note}Share the links; never resubmit.`;
     return {
       content: [{ type: "text", text: `${message}\n\n${pending}${prompts}` }, ...extra],
       structuredContent: {
@@ -322,7 +324,7 @@ export function registerGenerateTools({
     ).map((endsAt) => (endsAt === null ? 0 : Math.max(0, endsAt - now)));
     const lines = sets.map(
       ({ profile, queued }, index) =>
-        `${profile.label || profile.id}: ${queued.error || queued.jobs.map(link).join(" · ")}${left[index] ? ` (${aboutTime(left[index])})` : ""}`,
+        `${profile.label || profile.id}: ${queued.error || queued.jobs.map(link).join(" · ")}${left[index] ? ` (${aboutTime(left[index])})` : ""}${queued.ignored ? ` ${queued.ignored}` : ""}`,
     );
     const first = sets.find(({ queued }) => queued.jobs?.length)?.queued.jobs[0].ref || "result 1";
     const waits = [...new Set(await Promise.all(sets.map(({ profile }) => waiting(profile))))].join(

@@ -525,10 +525,32 @@ export class McpMedia {
   /**
    * Queues one job per prompt and count. `record` keeps the user's request and exact source result.
    */
-  async queue(owner, args, scope = "", record = {}) {
+  async queue(owner, request, scope = "", record = {}) {
+    let profile = (await this.profiles("all", owner)).find(
+      (item) => item.id === request.profile_id,
+    );
+    if (!profile) throw new Error("Choose a ready profile from models.");
+    if (profile.backend)
+      profile = this.profileForBackend(
+        profile,
+        runBackend(
+          profile.backendOptions,
+          profile.backend,
+          request.profile_backend,
+          Boolean(request.reference_asset_ids?.length),
+        ),
+      );
+    const cloud = isCloudVideo(profile);
+    if (cloud) await this.checkCloudJobs();
+    if (cloud && this.cloudPause())
+      throw new Error(
+        `${cloudQuotaMessage} The cloud provider refused recent jobs, so Studio queues no cloud video for about ${this.cloudPause()} more minute${this.cloudPause() > 1 ? "s" : ""}. Tell the user video needs the local video worker until the quota returns.`,
+      );
+    if (request.reference_asset_ids?.length)
+      profile = { ...profile, ...profile.imageModes?.reference };
+    const { controls: adjustable, args, ignored } = assertAdjustable(profile, request);
     const {
       profile_id,
-      profile_backend,
       prompts,
       // One generate call's result set ({ id, title, source }) and each prompt's own title, in order.
       result_set,
@@ -557,28 +579,6 @@ export class McpMedia {
       face_detail = false,
       resolution,
     } = args;
-    let profile = (await this.profiles("all", owner)).find((item) => item.id === profile_id);
-    if (!profile) throw new Error("Choose a ready profile from models.");
-    if (profile.backend)
-      profile = this.profileForBackend(
-        profile,
-        runBackend(
-          profile.backendOptions,
-          profile.backend,
-          profile_backend,
-          reference_asset_ids.length > 0,
-        ),
-      );
-    const cloud = isCloudVideo(profile);
-    if (cloud) await this.checkCloudJobs();
-    if (cloud && this.cloudPause())
-      throw new Error(
-        `${cloudQuotaMessage} The cloud provider refused recent jobs, so Studio queues no cloud video for about ${this.cloudPause()} more minute${this.cloudPause() > 1 ? "s" : ""}. Tell the user video needs the local video worker until the quota returns.`,
-      );
-    if (reference_asset_ids.length) profile = { ...profile, ...profile.imageModes?.reference };
-    // Fixed controls are refused by name, with the adjustable alternatives, instead of being dropped;
-    // a supplied value equal to a fixed one passes unchanged.
-    const adjustable = assertAdjustable(profile, args);
     const controls = {};
     if (negative_prompt !== undefined && adjustable.negative_prompt)
       controls.negative = negative_prompt;
@@ -754,11 +754,17 @@ export class McpMedia {
                 status: "partially_queued",
                 jobs: queued,
                 error: `Further submission failed; retain returned jobs before retrying. ${error.message}`,
+                ...(ignored ? { ignored } : {}),
               };
             throw error;
           }
         }
-      return { status: "queued", jobs: queued, estimate: await estimate };
+      return {
+        status: "queued",
+        jobs: queued,
+        estimate: await estimate,
+        ...(ignored ? { ignored } : {}),
+      };
     } finally {
       release();
     }
