@@ -1,16 +1,34 @@
 // More Like This Set: new variations queued into an MCP result set, each prompt written by the
-// queue's writing stage (prompt-set.js) as the set's other prompts steer it.
+// queue's writing stage (prompt-set.js), keeping the selected source's subject and theme.
 import { directRoute } from "./domain/direct-route.ts";
 
 const variations = 2;
 
-/** The prompts an MCP result set holds so far, among its session's jobs, oldest first. */
+/** The selected source, followed through continuations, and the set's prompts for variety. */
 export function setPrompts(store, job) {
   const id = job.input.resultSet?.id;
-  return store
-    .jobs(job.ownerId, job.sessionId)
-    .filter((other) => other.input.resultSet?.id === id && other.input.prompt)
-    .map((other) => String(other.input.prompt));
+  let source = job;
+  const seen = new Set();
+  while (source.input.writing?.kind === "set") {
+    if (!source.parentJobId || seen.has(source.id))
+      throw new Error("That result set's source is unavailable.");
+    seen.add(source.id);
+    source = store.job(job.ownerId, source.parentJobId);
+    if (!source || source.sessionId !== job.sessionId || source.input.resultSet?.id !== id)
+      throw new Error("That result set's source is unavailable.");
+  }
+  return {
+    source: source.input.prompt,
+    prompts: store
+      .jobs(job.ownerId, job.sessionId)
+      .filter(
+        (other) =>
+          other.input.resultSet?.id === id &&
+          other.input.prompt &&
+          other.input.prompt !== source.input.prompt,
+      )
+      .map((other) => String(other.input.prompt)),
+  };
 }
 
 /**
@@ -50,7 +68,12 @@ export function registerResultSetRoutes(app, { store, admit, item }) {
           resultSet: { ...kept, index: next + offset },
         },
         account,
-        { sessionId: job.sessionId, operation: job.operation },
+        {
+          sessionId: job.sessionId,
+          operation: job.operation,
+          parentJobId: job.id,
+          parentItemId: found.id,
+        },
       );
       if (result.status >= 400)
         return jobIds.length ? { status: 200, payload: { jobIds } } : result;
