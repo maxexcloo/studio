@@ -15,11 +15,14 @@ const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const flick = 0.6;
 // A press that moves less than this is a tap.
 const tap = 6;
+// A still press this long (ms) is a hold.
+const holdTime = 500;
 
 /**
  * The top card follows a finger or pointer, tilting with the drag, and flies out past a third of
  * its width in a direction `hints` names (the word showing while dragging that way); below that it
- * springs back, and a tap calls `onTap` with the element pressed. Buttons and keys fly it out the
+ * springs back. A tap calls `onTap` with the element pressed, and a hold or a second finger (a
+ * pinch) calls `onHold` with it; its release does nothing more. Buttons and keys fly it out the
  * same way through `fly`. Motion follows the shared animation-speed token; with Off or reduced
  * motion it decides without animating.
  */
@@ -29,6 +32,7 @@ export function SwipeCard({
   fly,
   onSwipe,
   onTap,
+  onHold,
   label,
   hints,
   pair,
@@ -39,6 +43,7 @@ export function SwipeCard({
   fly?: RefObject<Fly | null>;
   onSwipe?: (direction: Direction) => void;
   onTap?: (target: HTMLElement) => void;
+  onHold?: (target: HTMLElement) => void;
   label: string;
   hints: Partial<Record<Direction, string>>;
   /** Two images side by side, each answering for one side. */
@@ -58,6 +63,17 @@ export function SwipeCard({
     vy: number;
   } | null>(null);
   const leaving = useRef(false);
+  const holding = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(holding.current), []);
+  /** Ends the press as a hold: the card settles and the release opens nothing. */
+  function hold() {
+    clearTimeout(holding.current);
+    const target = drag.current?.target;
+    if (!target) return;
+    drag.current = null;
+    settle();
+    onHold?.(target);
+  }
   /** The direction a drag leans: its larger axis, where that way is allowed. */
   function lean(dx: number, dy: number): Direction | null {
     const direction: Direction =
@@ -137,7 +153,10 @@ export function SwipeCard({
       aria-hidden={depth ? true : undefined}
       onPointerDown={(event) => {
         if (depth || leaving.current || event.button !== 0) return;
+        if (drag.current && drag.current.id !== event.pointerId) return hold();
         if ((event.target as HTMLElement).closest("button, a")) return;
+        clearTimeout(holding.current);
+        holding.current = setTimeout(hold, holdTime);
         event.currentTarget.setPointerCapture(event.pointerId);
         event.currentTarget.style.transition = "none";
         drag.current = {
@@ -157,6 +176,7 @@ export function SwipeCard({
         if (!current || current.id !== event.pointerId) return;
         const dx = event.clientX - current.x;
         const dy = event.clientY - current.y;
+        if (Math.abs(dx) >= tap || Math.abs(dy) >= tap) clearTimeout(holding.current);
         const elapsed = Math.max(1, event.timeStamp - current.t);
         drag.current = {
           ...current,
@@ -171,6 +191,7 @@ export function SwipeCard({
       onPointerUp={(event) => {
         const current = drag.current;
         if (!current || current.id !== event.pointerId) return;
+        clearTimeout(holding.current);
         const { dx, dy, vx, vy, target } = current;
         if (Math.abs(dx) < tap && Math.abs(dy) < tap) {
           drag.current = null;
@@ -189,6 +210,7 @@ export function SwipeCard({
         void out(direction).then(() => onSwipe?.(direction));
       }}
       onPointerCancel={() => {
+        clearTimeout(holding.current);
         if (!drag.current) return;
         drag.current = null;
         settle();

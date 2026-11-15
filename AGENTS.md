@@ -312,8 +312,10 @@ the primary component reference and verify APIs against the installed version.
   comparisons and calibration, keyed on desktop; Overview's While You Were Away
   lists each project's unseen results by how well they fit its brief, misses
   folded last and kept. Its cards and the deck's bar offer only large Pass,
-  Super Like (keep and star) and Like, or a comparison's A and B larger than
-  Neither and Both; the viewer's bar offers every choice. Familiar ideas vary
+  Super Like (keep and star) and Like; a comparison's images fill its card and
+  are its A and B, a tap choosing one with Undo and a hold, pinch or its label
+  opening it in the viewer, over compact Neither and Both. The viewer's bar
+  offers every choice. Familiar ideas vary
   one thing of a starred or liked image on its profile, LoRAs and settings; a
   project's brief steers them rather than replacing them.
   Calibration uses only the account's own Studio generations and leaves the
