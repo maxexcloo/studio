@@ -238,6 +238,11 @@ export function MediaGrid({
     [layout],
   );
   useScrollAnchor(host, places, `${columns}:${width}:${byDay}:${results}`);
+  /** The tile showing an item, which may be one of a grouped tile's versions. */
+  const tileIndex = (id: string) =>
+    items.findIndex(
+      (item) => item.id === id || versions?.get(item.id)?.some((version) => version.id === id),
+    );
   /** Scrolls a tile into view only as far as it must, as a focus move does. */
   const scrollToTile = useCallback(
     (index: number) => {
@@ -267,10 +272,7 @@ export function MediaGrid({
   useLayoutEffect(() => {
     if (!layout) return;
     anchor((id) => {
-      const index = items.findIndex(
-        (item) => item.id === id || versions?.get(item.id)?.some((version) => version.id === id),
-      );
-      const tile = layout.tiles[index];
+      const tile = layout.tiles[tileIndex(id)];
       return tile && host.current
         ? { start: gridTop(host.current) + tile.top, size: tile.height }
         : undefined;
@@ -286,7 +288,7 @@ export function MediaGrid({
   useLayoutEffect(() => {
     if (!focusItem) return void (shownFocus.current = null);
     if (!layout || shownFocus.current === focusItem) return;
-    const index = items.findIndex((item) => item.id === focusItem);
+    const index = tileIndex(focusItem);
     if (index < 0) return;
     shownFocus.current = focusItem;
     pendingFocus.current = focusItem;
