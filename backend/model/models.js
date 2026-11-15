@@ -460,7 +460,12 @@ export function inferModels(
       maxLoras: workflow.loraStack?.max,
       backend: workflow.backend,
       // Radiance truncates a LoRA above rank 64, so the picker says so.
-      ...(workflow.loraStack?.adapter === "radiance-tags-v1" ? { loraNote: "Up to rank 64" } : {}),
+      ...(workflow.loraStack?.adapter === "radiance-tags-v1"
+        ? {
+            loraNote:
+              "Radiance approximates combined LoRAs above rank 64. Use ComfyUI for exact application.",
+          }
+        : {}),
     });
     const reason = configuredOnly ? "" : unready(workflow);
     if (reason)

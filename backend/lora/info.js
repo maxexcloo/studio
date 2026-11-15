@@ -1,7 +1,7 @@
 import { comfy } from "../comfy/comfy.js";
 import { families as modelFamilies } from "../family-catalogue.js";
 import { catalogueStore } from "../library/catalogue.js";
-import { defaultWorkerId, isRadianceWorker, workerById } from "../workers.js";
+import { isRadianceWorker, workerById } from "../workers.js";
 import { enrichLocalLoraInfo, enrichLoraInfo, withFamilyRefinements } from "./catalogue.js";
 
 // Imported-only model families still need precise adapter compatibility labels.
@@ -177,8 +177,8 @@ export function loraInfo(name) {
  * `remote: false` (a worker that isn't answering) keeps to what is remembered.
  */
 export async function loraInfos(worker, names = [], { concurrency = 6, remote: ask = true } = {}) {
-  // Radiance reads the LoRA folder ComfyUI does, but only ComfyUI hands out its metadata.
-  if (isRadianceWorker(workerById(worker))) worker = defaultWorkerId();
+  // Radiance uses catalogue metadata without waking a ComfyUI worker that has given up its GPUs.
+  if (isRadianceWorker(workerById(worker))) ask = false;
   const result = {};
   const remote = [];
   for (const name of names) {
@@ -208,8 +208,8 @@ export async function loraInfos(worker, names = [], { concurrency = 6, remote: a
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, reader));
   // One catalogue view for the whole list, rather than a manifest check per LoRA.
   const view = loraCatalogue().loraView();
-  for (const [name, info] of Object.entries(result))
-    result[name] = catalogueLoraInfo(name, info, view);
+  for (const name of names)
+    result[name] = catalogueLoraInfo(name, result[name] || { families: [], triggers: [] }, view);
   return result;
 }
 

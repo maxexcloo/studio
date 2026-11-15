@@ -63,15 +63,21 @@ function ensureOption(info, node, key, value, label) {
 
 function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", limit = maxLoras) {
   if (!profile?.capabilities?.lora) return [];
+  const raw = Array.isArray(input.loras) ? input.loras : [];
   const installed = optionsFor(info, "LoraLoader", "lora_name");
-  if (!installed.length) return [];
+  if (!installed.length) {
+    if (raw.some((item) => item?.enabled !== false && item?.name))
+      throw new Error(
+        "The worker has no LoRA inventory. Rescan models before submitting this stack.",
+      );
+    return [];
+  }
   const strengthRange = nodeRange(info, "LoraLoader", "strength_model", {
     default: 0.7,
     min: -100,
     max: 100,
     step: 0.01,
   });
-  const raw = Array.isArray(input.loras) ? input.loras : [];
   const sanitized = [];
   // Disabled entries don't take a slot: apply the workflow's limit to enabled LoRAs only.
   for (const item of raw.filter((entry) => entry && entry.enabled !== false).slice(0, limit)) {
