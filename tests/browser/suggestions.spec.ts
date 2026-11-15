@@ -345,7 +345,8 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
     return surface;
   };
   const edited = "An amber bird over a misty harbour";
-  const surface = await editPrompt(edited);
+  // Desktop's Reset menu caches suggestions too; keep that draft separate from the later request.
+  const surface = await editPrompt("An amber bird in bright sunlight");
   if (phone) await surface.getByRole("button", { name: "Reset", exact: true }).click();
   else {
     const tools = await promptMenu(viewer, "Prompt");
