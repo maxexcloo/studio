@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import type { BenchmarkRun } from "../../shared/runtime.ts";
 import { Benchmarks, benchmarkJob, parseBenchmarkLog } from "./benchmarks.ts";
 import type { Workload } from "./controller.ts";
 import type { KubernetesRequest } from "./kubernetes.ts";
@@ -23,7 +24,7 @@ test("the Job benchmarks the workload's own endpoint with the key from its names
     name: "studio-benchmark-1a2b3c4d",
     workload: gemma,
     model: "gemma-4-31b",
-    image: "ghcr.io/maxexcloo/betterbench:source-abc",
+    image: "ghcr.io/maxexcloo/betterbench:v0.6.1-1",
     secret: "text",
   });
   assert.equal(job.metadata.namespace, "text");
@@ -31,9 +32,11 @@ test("the Job benchmarks the workload's own endpoint with the key from its names
   const pod = job.spec.template.spec;
   assert.equal(pod.restartPolicy, "Never");
   assert.equal(pod.automountServiceAccountToken, false);
+  // runAsNonRoot accepts only a numeric user.
+  assert.equal(pod.securityContext.runAsUser, 1000);
   assert.equal(job.spec.template.metadata.labels["app.kubernetes.io/name"], "betterbench");
   const [container] = pod.containers;
-  assert.equal(container.image, "ghcr.io/maxexcloo/betterbench:source-abc");
+  assert.equal(container.image, "ghcr.io/maxexcloo/betterbench:v0.6.1-1");
   assert.deepEqual(container.command.slice(-2), [
     "http://gemma.text.svc.cluster.local:8000/v1",
     "gemma-4-31b",
@@ -83,14 +86,20 @@ test("a run creates its Job, reads the summary once it succeeds and refuses a se
     request,
     workloads: [gemma],
     environment: {
-      STUDIO_BENCHMARK_IMAGE: "ghcr.io/maxexcloo/betterbench:source-abc",
+      STUDIO_BENCHMARK_IMAGE: "ghcr.io/maxexcloo/betterbench:v0.6.1-1",
       STUDIO_BENCHMARK_SECRET: "text",
       STUDIO_TEXT_KEY: "fixture-text",
     },
     fetchImpl,
     pollMs: 60_000,
   });
-  const run = await benchmarks.start("gemma", "account:admin");
+  // A second start while the first checks its model is refused.
+  const [first, second] = await Promise.allSettled([
+    benchmarks.start("gemma", "account:admin"),
+    benchmarks.start("gemma", "account:admin"),
+  ]);
+  assert.match(String((second as PromiseRejectedResult).reason), /already running/);
+  const run = (first as PromiseFulfilledResult<BenchmarkRun>).value;
   assert.equal(run.model, "gemma-4-31b");
   assert.equal(run.status, "running");
   assert.deepEqual(calls, ["POST /apis/batch/v1/namespaces/text/jobs"]);
@@ -106,15 +115,16 @@ test("a run creates its Job, reads the summary once it succeeds and refuses a se
   assert.ok(calls.includes("GET /api/v1/namespaces/text/pods/bench-pod/log"));
 });
 
-test("a failed Job reports its last log line, and a stopped one deletes the Job", async () => {
+test("a failed Job reports why, and Stop deletes a Job still running", async () => {
   let deleted = "";
+  let job: Record<string, unknown> = { failed: 1 };
   const request: KubernetesRequest = async (method, path, body) => {
     if (method === "POST") return { status: 201, body };
     if (method === "DELETE") {
       deleted = path;
       return { status: 200, body: {} };
     }
-    if (path.includes("/jobs/")) return { status: 200, body: { status: { failed: 1 } } };
+    if (path.includes("/jobs/")) return { status: 200, body: { status: job } };
     if (path.includes("/log"))
       return { status: 200, body: "phases: decode\nHTTP 401 Unauthorized\n" };
     return { status: 200, body: { items: [{ metadata: { name: "bench-pod" } }] } };
@@ -131,6 +141,17 @@ test("a failed Job reports its last log line, and a stopped one deletes the Job"
   assert.equal(benchmarks.list().runs[0].status, "failed");
   assert.equal(benchmarks.list().runs[0].error, "HTTP 401 Unauthorized");
 
+  job = {
+    failed: 1,
+    conditions: [
+      { type: "Failed", reason: "DeadlineExceeded", message: "Job was active too long" },
+    ],
+  };
+  await benchmarks.start("gemma", "local");
+  await benchmarks.poll();
+  assert.equal(benchmarks.list().runs[0].error, "Job was active too long");
+
+  job = {};
   const second = await benchmarks.start("gemma", "local");
   await benchmarks.stop(second.id);
   assert.equal(second.status, "stopped");
@@ -138,6 +159,14 @@ test("a failed Job reports its last log line, and a stopped one deletes the Job"
     deleted,
     new RegExp(`/jobs/studio-benchmark-${second.id}\\?propagationPolicy=Background$`),
   );
+
+  // A Job that ended before Stop keeps its outcome and isn't deleted.
+  deleted = "";
+  const third = await benchmarks.start("gemma", "local");
+  job = { failed: 1 };
+  await benchmarks.stop(third.id);
+  assert.equal(third.status, "failed");
+  assert.equal(deleted, "");
 });
 
 test("a stopped model refuses a benchmark before any Job starts", async () => {

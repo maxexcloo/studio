@@ -109,7 +109,7 @@ export interface BenchmarkSummary {
   /** Throughput at the highest concurrency level. */
   aggregate: { level: number; tps: number } | null;
   /** Median prompt processing at the deepest prompt measured. */
-  prefill: { depth: number; tps: number | null } | null;
+  prefill: { depth: number; tps: number } | null;
 }
 
 /** One BetterBench run against a local text workload (`/api/runtime/benchmarks`). */

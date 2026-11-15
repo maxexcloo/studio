@@ -723,7 +723,7 @@ test("Workers keep a stopped workload quiet and stop a running change on request
 
 test("Workers benchmark a running local text model and list each run's figures", async ({
   page,
-}) => {
+}, testInfo) => {
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
   await page.route("**/api/services/status", (route) =>
@@ -797,6 +797,9 @@ test("Workers benchmark a running local text model and list each run's figures",
   await section(page, "Settings", "Workers");
   const results = page.getByRole("table", { name: "Benchmarks", exact: true });
   await expect(results.getByRole("row", { name: "Gemma" })).toContainText("61.2 tok/s");
+  // Phones leave out the secondary figures.
+  if (!testInfo.project.use.isMobile)
+    await expect(results.getByRole("row", { name: "Gemma" })).toContainText("290 tok/s · 8×");
   await expect(results.getByRole("row", { name: "Gemma" })).toContainText("Completed");
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
   const menu = async (label: string) => {

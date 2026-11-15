@@ -75,7 +75,7 @@ export function BenchmarkResults() {
       void client.invalidateQueries({ queryKey: benchmarksQuery.queryKey });
     },
   });
-  if (!status?.runs.length) return null;
+  if (!status?.configured) return null;
   return (
     <SettingGroup title="Benchmarks">
       <DataTable
@@ -140,15 +140,13 @@ export function BenchmarkResults() {
             hideOnPhone: true,
             sortValue: (run) => run.summary?.aggregate?.tps,
             cell: (run) => (
-              <Text
-                size="sm"
-                title={
-                  run.summary?.aggregate
-                    ? `At ${run.summary.aggregate.level} concurrent requests`
-                    : undefined
-                }
-              >
+              <Text size="sm">
                 {rate(run.summary?.aggregate?.tps)}
+                {run.summary?.aggregate && (
+                  <Text span size="xs" c="dimmed">
+                    {` · ${run.summary.aggregate.level}×`}
+                  </Text>
+                )}
               </Text>
             ),
           },

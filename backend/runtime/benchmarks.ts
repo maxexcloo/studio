@@ -1,7 +1,13 @@
 import { randomBytes } from "node:crypto";
 
 import type { BenchmarkRun, BenchmarkStatus, BenchmarkSummary } from "../../shared/runtime.ts";
-import { RuntimeRequestError, RuntimeUnavailable, type Workload } from "./controller.ts";
+import {
+  RuntimeConflict,
+  RuntimeRequestError,
+  RuntimeUnavailable,
+  type Workload,
+  memoryStore,
+} from "./controller.ts";
 import type { KubernetesRequest } from "./kubernetes.ts";
 
 type Environment = Record<string, string | undefined>;
@@ -68,7 +74,12 @@ export function benchmarkJob({
         spec: {
           restartPolicy: "Never",
           automountServiceAccountToken: false,
-          securityContext: { runAsNonRoot: true, seccompProfile: { type: "RuntimeDefault" } },
+          securityContext: {
+            // The image's user by number, as runAsNonRoot can't check a named one.
+            runAsUser: 1000,
+            runAsNonRoot: true,
+            seccompProfile: { type: "RuntimeDefault" },
+          },
           containers: [
             {
               name: podLabel,
@@ -117,17 +128,14 @@ export function parseBenchmarkLog(text: string): BenchmarkSummary | undefined {
       raw.aggregate && figure(raw.aggregate.tps) !== null
         ? { level: Number(raw.aggregate.level), tps: raw.aggregate.tps }
         : null,
-    prefill: raw.prefill
-      ? { depth: Number(raw.prefill.depth), tps: figure(raw.prefill.tps) }
-      : null,
+    prefill:
+      raw.prefill && figure(raw.prefill.tps) !== null
+        ? { depth: Number(raw.prefill.depth), tps: raw.prefill.tps }
+        : null,
   };
 }
 
 const brief = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 240);
-const memoryStore = (): BenchmarkStore => {
-  let runs: BenchmarkRun[] | undefined;
-  return { read: () => runs, write: (value) => (runs = structuredClone(value)) };
-};
 
 /**
  * Benchmarks Studio's local text workloads one at a time with a BetterBench Job, which runs beside
@@ -136,6 +144,8 @@ const memoryStore = (): BenchmarkStore => {
 export class Benchmarks {
   readonly configured: boolean;
   private runs: BenchmarkRun[];
+  /** Holds the one run's place while its model is checked, before the run exists. */
+  private starting = false;
   private polling?: NodeJS.Timeout;
   private options: {
     request: KubernetesRequest;
@@ -153,7 +163,7 @@ export class Benchmarks {
     this.configured = Boolean(environment.STUDIO_BENCHMARK_IMAGE);
     if (this.configured && !environment.STUDIO_BENCHMARK_SECRET)
       throw new Error("STUDIO_BENCHMARK_SECRET is required with STUDIO_BENCHMARK_IMAGE.");
-    this.options.store ??= memoryStore();
+    this.options.store ??= memoryStore<BenchmarkRun[]>();
     this.runs = this.options.store.read() ?? [];
     // A Job outlives a Studio restart: keep following the one that was running.
     if (this.runs.some((run) => run.status === "running")) this.follow();
@@ -170,9 +180,15 @@ export class Benchmarks {
     this.runs = this.runs.slice(0, historyLimit);
     this.options.store!.write(this.runs);
   }
+  /** The run's Job, while its workload is still configured. */
   private jobFor(run: BenchmarkRun) {
     const workload = this.options.workloads.find((item) => item.id === run.workload);
-    return { name: `studio-benchmark-${run.id}`, namespace: workload?.namespace ?? "" };
+    return (
+      workload && {
+        name: `studio-benchmark-${run.id}`,
+        namespace: encodeURIComponent(workload.namespace),
+      }
+    );
   }
 
   private async call(method: "GET" | "POST" | "DELETE", path: string, body?: unknown) {
@@ -195,18 +211,24 @@ export class Benchmarks {
       const id = response.ok ? (await response.json())?.data?.[0]?.id : undefined;
       if (typeof id === "string" && id) return id;
     } catch {}
-    throw Object.assign(new Error(`${workload.label} isn't answering: start it first.`), {
-      status: 409,
-    });
+    throw new RuntimeConflict(`${workload.label} isn't answering: start it first.`);
   }
 
   async start(id: string, requestedBy: string) {
-    if (!this.configured)
-      throw Object.assign(new Error("Benchmarks need STUDIO_BENCHMARK_IMAGE."), { status: 404 });
+    if (!this.configured) throw new RuntimeRequestError("Benchmarks need STUDIO_BENCHMARK_IMAGE.");
     const workload = this.options.workloads.find((item) => item.id === id && item.kind === "text");
     if (!workload) throw new RuntimeRequestError("workload must be a local text workload.");
-    if (this.runs.some((run) => run.status === "running"))
-      throw Object.assign(new Error("A benchmark is already running."), { status: 409 });
+    if (this.starting || this.runs.some((run) => run.status === "running"))
+      throw new RuntimeConflict("A benchmark is already running.");
+    this.starting = true;
+    try {
+      return await this.create(workload, requestedBy);
+    } finally {
+      this.starting = false;
+    }
+  }
+
+  private async create(workload: Workload, requestedBy: string) {
     const model = await this.servedModel(workload);
     const run: BenchmarkRun = {
       // Short and lower-case: it names the Job.
@@ -218,10 +240,10 @@ export class Benchmarks {
       requestedBy,
       startedAt: this.now,
     };
-    const job = this.jobFor(run);
+    const job = this.jobFor(run)!;
     const response = await this.call(
       "POST",
-      `/apis/batch/v1/namespaces/${encodeURIComponent(job.namespace)}/jobs`,
+      `/apis/batch/v1/namespaces/${job.namespace}/jobs`,
       benchmarkJob({
         name: job.name,
         workload,
@@ -232,7 +254,7 @@ export class Benchmarks {
     );
     if (response.status === 403)
       throw new RuntimeUnavailable(
-        `Studio's service account may not create Jobs in ${job.namespace}; apply its benchmark role there.`,
+        `Studio's service account may not create Jobs in ${workload.namespace}; apply its benchmark role there.`,
       );
     if (response.status < 200 || response.status >= 300)
       throw new RuntimeUnavailable(`Kubernetes returned HTTP ${response.status} for the Job.`);
@@ -242,15 +264,16 @@ export class Benchmarks {
     return run;
   }
 
-  /** Deletes the running Job and its pod; the run reads Stopped. */
+  /** Deletes the running Job and its pod, unless it has just ended; the run reads Stopped. */
   async stop(id: string) {
     const run = this.runs.find((item) => item.id === id);
-    if (!run) throw Object.assign(new Error("No benchmark has that id."), { status: 404 });
+    if (!run) throw new RuntimeRequestError("No benchmark has that id.");
+    await this.poll();
     if (run.status !== "running") return run;
-    const job = this.jobFor(run);
+    const job = this.jobFor(run)!;
     const response = await this.call(
       "DELETE",
-      `/apis/batch/v1/namespaces/${encodeURIComponent(job.namespace)}/jobs/${job.name}?propagationPolicy=Background`,
+      `/apis/batch/v1/namespaces/${job.namespace}/jobs/${job.name}?propagationPolicy=Background`,
     );
     if (response.status !== 404 && (response.status < 200 || response.status >= 300))
       throw new RuntimeUnavailable(`Kubernetes returned HTTP ${response.status} for the Job.`);
@@ -271,7 +294,10 @@ export class Benchmarks {
     this.polling.unref();
   }
 
-  /** Checks the running Job: when it ends, reads its summary, or its last line as the failure. */
+  /**
+   * Checks the running Job. When it ends, reads its summary; a failure reads as Kubernetes' reason
+   * (a deadline, or the container's OOMKilled) or else the log's last line.
+   */
   async poll() {
     const run = this.runs.find((item) => item.status === "running");
     if (!run) {
@@ -280,38 +306,47 @@ export class Benchmarks {
       return;
     }
     const job = this.jobFor(run);
-    const namespace = encodeURIComponent(job.namespace);
-    const state = await this.call("GET", `/apis/batch/v1/namespaces/${namespace}/jobs/${job.name}`);
+    if (!job) return this.finish(run, { status: "failed", error: "Its workload is gone." });
+    const { name, namespace } = job;
+    const state = await this.call("GET", `/apis/batch/v1/namespaces/${namespace}/jobs/${name}`);
     if (state.status === 404)
       return this.finish(run, { status: "failed", error: "Its Job no longer exists." });
     if (state.status !== 200) return;
     const status = (state.body as Record<string, any>).status ?? {};
     if (!status.succeeded && !status.failed) return;
-    const log = await this.log(namespace, job.name);
+    const { log, killed } = await this.log(namespace, name);
     const summary = status.succeeded ? parseBenchmarkLog(log) : undefined;
     if (summary) return this.finish(run, { status: "completed", summary });
-    const last = log.split("\n").filter(Boolean).at(-1);
     const condition = (status.conditions ?? []).find(
-      (item: { type: string; message?: string }) => item.type === "Failed",
+      (item: { type: string; reason?: string }) => item.type === "Failed",
     );
+    // BackoffLimitExceeded says only that the pod failed; its log says why.
+    const reason = condition?.reason !== "BackoffLimitExceeded" && condition?.message;
     this.finish(run, {
       status: "failed",
-      error: brief(last || condition?.message || "BetterBench gave no result."),
+      error: brief(
+        reason ||
+          (killed && "It ran out of memory (OOMKilled).") ||
+          log.split("\n").filter(Boolean).at(-1) ||
+          "BetterBench gave no result.",
+      ),
     });
   }
 
-  /** The Job's pod log tail; the summary is its last line. */
+  /** The Job's pod log tail, whose last line is the summary, and whether it ran out of memory. */
   private async log(namespace: string, job: string) {
     const pods = await this.call(
       "GET",
       `/api/v1/namespaces/${namespace}/pods?labelSelector=${encodeURIComponent(`batch.kubernetes.io/job-name=${job}`)}`,
     );
-    const pod = ((pods.body as Record<string, any>)?.items ?? [])[0]?.metadata?.name;
-    if (!pod) return "";
+    const pod = ((pods.body as Record<string, any>)?.items ?? [])[0];
+    if (!pod) return { log: "", killed: false };
+    const killed = pod.status?.containerStatuses?.[0]?.state?.terminated?.reason === "OOMKilled";
     const response = await this.call(
       "GET",
-      `/api/v1/namespaces/${namespace}/pods/${encodeURIComponent(pod)}/log?tailLines=20`,
+      `/api/v1/namespaces/${namespace}/pods/${encodeURIComponent(pod.metadata.name)}/log?tailLines=20`,
     );
-    return response.status === 200 && typeof response.body === "string" ? response.body : "";
+    const log = response.status === 200 && typeof response.body === "string" ? response.body : "";
+    return { log, killed };
   }
 }
