@@ -364,6 +364,13 @@ test("Stop saves an in-flight cloud image and skips further unsubmitted images",
 
 test("animating an image sends it as the first frame, shaped by the image, within provider limits", async () => {
   const store = new Store(openDatabase(":memory:"));
+  // A portrait JPEG phone photo, stored landscape with an EXIF rotation.
+  const photo = await sharp({
+    create: { width: 1000, height: 600, channels: 3, background: "blue" },
+  })
+    .jpeg()
+    .withMetadata({ orientation: 6 })
+    .toBuffer();
   const remote = fixture();
   const node = {
     class_type: "GrokMedia",
@@ -384,20 +391,13 @@ test("animating an image sends it as the first frame, shaped by the image, withi
     buildProfile: (profile) => profile,
     accountForOwner: () => null,
     mayUseProfile: () => true,
-    reference: async () => new Uint8Array(),
+    reference: async () => photo,
     composePrompt: (_mode, prompt) => prompt,
   });
-  // A portrait JPEG phone photo, stored landscape with an EXIF rotation.
-  const photo = await sharp({
-    create: { width: 1000, height: 600, channels: 3, background: "blue" },
-  })
-    .jpeg()
-    .withMetadata({ orientation: 6 })
-    .toBuffer();
   const animate = {
     profileId: "custom:grok-video",
     prompt: "The waves roll in",
-    startImage: `data:image/jpeg;base64,${photo.toString("base64")}`,
+    referenceAssets: [{ assetId: "photo", slot: "image" }],
   };
   const run = async (input: Record<string, unknown>) => {
     const session = store.createSession("");

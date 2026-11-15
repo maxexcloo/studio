@@ -51,7 +51,7 @@ test("signals snapshot the whole result, newest first, capped per account", (t) 
       seed: 42,
     },
     caption: { tags: ["fox", "snow"] },
-    dream: { pair: { value: 20 } },
+    dream: { arm: "exploit", pair: { value: 20 } },
   };
   assert.deepEqual(tasteSignal("keep", "job-1", itemValues(item)), {
     kind: "keep",

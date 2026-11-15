@@ -103,7 +103,7 @@ test("versions list, show, revert as a new version and approve an AI draft", asy
   const { call, changed } = await serve(t);
   fs.mkdirSync(userWorkflowsDir, { recursive: true });
   fs.writeFileSync(path.join(userWorkflowsDir, "krea-test.json"), profile("Seed"));
-  profileStore().migrate();
+  profileStore().record("krea-test", profile("Seed"), { origin: "seed" });
   const first = editor.readEditableProfile("krea-test");
   const drafted = editor.saveEditableProfile("krea-test", profile("Drafted"), {
     baseHash: first.hash,
@@ -338,7 +338,7 @@ test("the manifest joins the bundle when there is one", (t) => {
   fs.writeFileSync(manifest, '[{"path":"loras/a.safetensors","sha256":"x"}]\n');
   const built = buildExport({
     workflowsDir: path.join(scratch, "workflows"),
-    profiles: createProfileStore({ dataDir: scratch, log: {} }),
+    profiles: createProfileStore({ dataDir: scratch }),
     guides: { read: () => null },
     manifestFile: manifest,
   });

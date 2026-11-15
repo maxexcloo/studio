@@ -1,54 +1,10 @@
 import crypto from "node:crypto";
 
 import { accountOutputSubfolder } from "./account-ownership.js";
-import { comfy } from "./comfy/comfy.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { outputFolderName } from "./data-names.js";
-import { families } from "./family-catalogue.js";
 import { inpaintGraph } from "./inpaint.js";
-import { prepareInputImage } from "./input-image-sizing.js";
-import { startImageDataUrl } from "./start-images.js";
 import { selectImageMode } from "./workflow-modes.js";
-
-export async function uploadReferenceImage(dataUrl, body = {}) {
-  if (!dataUrl || !dataUrl.includes(",")) return "";
-  const [header, data] = dataUrl.split(",", 2);
-  const match = header.match(/data:(.*?);base64/);
-  let type = match?.[1] || "image/png";
-  const family = families[body.family];
-  const directImg2img = family?.img2img && !family.references;
-  const prepared = await prepareInputImage(
-    { buffer: Buffer.from(data, "base64"), mime: type, name: "start-image" },
-    {
-      pixels: body.autoResizeInputs !== false ? Number(body.width) * Number(body.height) : 0,
-      step: directImg2img ? family.sizeStep || 8 : 1,
-    },
-  );
-  if (directImg2img && prepared.width) {
-    body.requestedSize ||= { width: body.width, height: body.height };
-    body.width = prepared.width;
-    body.height = prepared.height;
-  }
-  type = prepared.mime;
-  const ext = type.includes("jpeg") ? "jpg" : type.includes("webp") ? "webp" : "png";
-  const filename = `studio-reference-${crypto.randomUUID()}.${ext}`;
-  const bytes = prepared.buffer;
-  const form = new FormData();
-  form.append("image", new Blob([bytes], { type }), filename);
-  form.append("type", "input");
-  const uploaded = await comfy(body.comfyBackend, "/upload/image", {
-    method: "POST",
-    body: form,
-  });
-  const comfyName = uploaded.name || filename;
-  body.stagedInputNames = [...(body.stagedInputNames || []), comfyName];
-  return comfyName;
-}
-
-async function uploadBodyStartImage(body) {
-  const dataUrl = body.startImage || startImageDataUrl(body.startImageId);
-  return dataUrl ? uploadReferenceImage(dataUrl, body) : "";
-}
 
 export function composeWorkflowPrompt(workflow, userPrompt = "") {
   const composition = workflow?.promptComposition;
@@ -132,12 +88,8 @@ async function applyMappedInputs(graph, workflow, body) {
       setMappedInput(graph, mediaInput.strength, reference.strength);
   }
   const stagedReference = (body.referenceAssets || []).find((item) => item?.comfyName)?.comfyName;
-  if (!mappedReference && controls.startImage) {
-    const imageName =
-      stagedReference ||
-      (body.startImage || body.startImageId ? await uploadBodyStartImage(body) : "");
-    if (imageName) setMappedInput(graph, controls.startImage, imageName);
-  }
+  if (!mappedReference && controls.startImage && stagedReference)
+    setMappedInput(graph, controls.startImage, stagedReference);
 }
 
 function enabledLoras(body, limit) {

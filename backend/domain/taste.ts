@@ -430,8 +430,7 @@ export function itemValues(item: TasteItem): ChoiceValues {
     title: item.title,
     caption: item.caption?.text,
     tags: item.caption?.tags,
-    // A Dream result made before arms were recorded exploited the taste profile.
-    ...(item.dream ? { arm: item.dream.arm || "exploit", value: item.dream.pair?.value } : {}),
+    ...(item.dream ? { arm: item.dream.arm, value: item.dream.pair?.value } : {}),
   };
 }
 
@@ -626,13 +625,9 @@ export function createTaste({
 }) {
   const name = (ownerId: string) => `taste:${ownerId}`;
   function load(ownerId: string): StoredTaste {
-    const saved = readRuntimeDocument(dataDir, name(ownerId)) as
-      | (Partial<StoredTaste> & { summary?: string })
-      | undefined;
+    const saved = readRuntimeDocument(dataDir, name(ownerId)) as Partial<StoredTaste> | undefined;
     if (!saved) return empty();
     const taste = { ...empty(), ...saved };
-    // A profile written as prose before the words were kept apart keeps it as its note until the
-    // summariser next writes; the next write drops the old field.
     return {
       updatedAt: taste.updatedAt,
       signals: taste.signals,
@@ -640,7 +635,7 @@ export function createTaste({
       likes: taste.likes,
       styles: taste.styles,
       avoid: taste.avoid,
-      note: saved.note ?? saved.summary ?? "",
+      note: taste.note,
       addedAvoid: taste.addedAvoid,
     };
   }

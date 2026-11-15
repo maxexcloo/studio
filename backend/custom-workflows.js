@@ -459,7 +459,7 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
   const items = [];
   // profile/store.js keeps each Studio profile's version and AI-Drafted marker beside them.
   const versions = readJson(path.join(dir, ".studio-meta.json")) || {};
-  // Dotfiles beside the profiles (.studio-edits.json, .studio-meta.json) are Studio's records, not workflows.
+  // Dotfiles beside the profiles (.studio-meta.json, .studio-aliases.json) are Studio's records, not workflows.
   const files = fs.existsSync(dir)
     ? fs.readdirSync(dir).filter((name) => name.endsWith(".json") && !name.startsWith("."))
     : [];
