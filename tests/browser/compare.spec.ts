@@ -282,7 +282,7 @@ test("Compare stages compatible LoRAs from an empty stack and only the model's n
   await variants(page).getByText("B", { exact: true }).click();
   const resolutions = await axis(page, "Resolutions");
   const sizes = resolutions.getByRole("combobox", { name: "Resolutions", exact: true });
-  await sizes.click();
+  await resolutions.locator(".mantine-MultiSelect-input").click();
   await expect(page.getByRole("option")).toHaveText(["1K", "2K"]);
   await page.getByRole("option", { name: "1K", exact: true }).click();
   await page.getByRole("option", { name: "2K", exact: true }).click();
@@ -312,7 +312,7 @@ test("Compare preserves provider resolution enum values without converting them 
   await prompt(page).fill("A copper fox");
   const setup = await axis(page, "Resolutions");
   const choices = setup.getByRole("combobox", { name: "Resolutions", exact: true });
-  await choices.click();
+  await setup.locator(".mantine-MultiSelect-input").click();
   await expect(page.getByRole("option")).toHaveText(["1K", "2K"]);
   await page.getByRole("option", { name: "1K", exact: true }).click();
   await page.getByRole("option", { name: "2K", exact: true }).click();
