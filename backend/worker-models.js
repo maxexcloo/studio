@@ -1,4 +1,4 @@
-import { modelLibraryWorker, noWorkerMessage } from "./workers.js";
+import { modelLibraryWorker, noWorkerMessage, workerTokenHeader } from "./workers.js";
 
 // Model downloads go to the worker with Model Library (workers.js), not simply the first worker.
 const libraryUrl = () => modelLibraryWorker()?.url || "";
@@ -22,11 +22,9 @@ async function request(endpoint, init = {}, workerUrl = libraryUrl()) {
   if (!process.env.STUDIO_WORKER_TOKEN)
     throw new Error("STUDIO_WORKER_TOKEN is required for the worker model library.");
   if (!workerUrl) throw new Error(noWorkerMessage("models"));
-  const headers = new Headers(init.headers);
-  headers.set("X-Studio-Worker-Token", process.env.STUDIO_WORKER_TOKEN || "");
   const response = await fetch(`${workerUrl}/studio/worker/models${endpoint}`, {
     ...init,
-    headers,
+    headers: { ...init.headers, ...workerTokenHeader() },
     redirect: "error",
     signal: init.signal || AbortSignal.timeout(endpoint === "/file" ? 2 * 60 * 60 * 1000 : 30000),
   });

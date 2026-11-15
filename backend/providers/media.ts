@@ -3,6 +3,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 import type { QueueMedia } from "../../shared/queue.ts";
+import { modelOf } from "../domain/queue.ts";
 import type { OwnedJob } from "../domain/store.ts";
 import { mediaUrls } from "../media-paths.js";
 import { digest } from "../values.js";
@@ -34,7 +35,7 @@ export function providerMediaWriter(
         providerPrompt,
         Model: model,
         provider: "cliproxyapi",
-        profileId: String(job.input.profileId || job.input.model || ""),
+        profileId: modelOf(job.input),
         width: dimensions!.width,
         height: dimensions!.height,
       };
