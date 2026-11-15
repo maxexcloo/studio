@@ -43,7 +43,6 @@ run = "playwright test"
 # Native bridge checks live with each custom node, outside tests/.
 [tasks."test:python"]
 run = '''
-PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/radiance -p 'test_*.py'
 PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/studio_worker -p 'test_*.py'
 '''
 

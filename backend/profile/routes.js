@@ -61,8 +61,8 @@ import { removeProfile } from "./remove.js";
 /**
  * `profiles()` and `guides()` give the profile/store.js stores, `promptStyles()` prompt-styles.js's; `objectInfo(kind)` ComfyUI's
  * object_info for revert's check; `exportOptions()` what writeExport needs besides the stores;
- * `onSaved(id)` runs after any change that affects who sees which profile; `accountName(account)`
- * names who made a change.
+ * `onSaved(id)` runs after any change that affects who sees which profile; `onConverted(by)` after a
+ * converted Radiance model joins its profile; `accountName(account)` names who made a change.
  */
 export function registerProfileRoutes(
   app,
@@ -73,6 +73,7 @@ export function registerProfileRoutes(
     objectInfo = async () => null,
     exportOptions = () => ({}),
     onSaved = () => {},
+    onConverted = () => {},
     accountName = () => "",
   },
 ) {
@@ -331,6 +332,7 @@ export function registerProfileRoutes(
     apply: async (id, model, by) => {
       addRadianceBackend(id, model, by);
       await onSaved(id);
+      await onConverted(by);
     },
   });
   route("GET", "/api/profiles/radiance", () => conversions.state());

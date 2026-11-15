@@ -113,7 +113,7 @@ export function withRadianceBackend(raw, model) {
 
 /**
  * The fine-tune's file: a Hugging Face file link, a Civitai download link with its `fileId`, or a
- * Civitai model link, whose version's fp8 file is preferred.
+ * Civitai model link, whose version's bf16 file is preferred: IQ8R quantises best from full precision.
  */
 export async function resolveFineTune(value, { json = civitaiJson, request = hfFetch } = {}) {
   let url;
@@ -133,7 +133,7 @@ export async function resolveFineTune(value, { json = civitaiJson, request = hfF
   const fileId = download && url.searchParams.get("fileId");
   const file = fileId
     ? files.find((item) => String(item.id) === fileId)
-    : files.find((item) => /^fp8$/i.test(item.metadata?.fp || "")) ||
+    : files.find((item) => /^bf16$/i.test(item.metadata?.fp || "")) ||
       files.find((item) => item.primary) ||
       files[0];
   const spec = file && civitaiFileSpec(version, file);
@@ -178,7 +178,7 @@ export function radianceConversions({
     last = { ...conversion, applied: false };
     if (conversion.status === "done" && conversion.note?.profile) {
       try {
-        await apply(conversion.note.profile, `${conversion.name}.rad`, conversion.note.by || "");
+        await apply(conversion.note.profile, conversion.name, conversion.note.by || "");
         last.applied = true;
         await worker({ action: "clear", name: conversion.name });
       } catch (error) {

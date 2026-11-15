@@ -141,6 +141,7 @@ function workload(
         }
       : {}),
     ...(annotation("worker") ? { worker: annotation("worker") } : {}),
+    ...(annotation("backend") ? { backend: annotation("backend") } : {}),
     ...(capabilities?.length ? { capabilities } : {}),
   };
 }
