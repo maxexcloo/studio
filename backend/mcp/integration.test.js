@@ -1632,15 +1632,19 @@ test("a call of several results is one titled set, each prompt titled by the cha
     ],
   );
   assert.equal(sets[0].id, sets[1].id);
-  // Without a title the set is named from the request; one untitled result alone is no set.
-  await generate(client, { request: "owls in the snow please", prompts: ["An owl", "Two owls"] });
-  assert.equal(f.submitted.at(-1).resultSet.title, "Owls in the snow please");
+  // Automatic names describe the content, never a truncated request; a lone untitled result is no set.
+  await generate(client, {
+    request: "Generate images of a tiny owl in the snow please",
+    prompts: ["A snowy owl", "Two owls"],
+  });
+  assert.equal(f.submitted.at(-1).resultSet.title, "Snowy Owl");
   assert.notEqual(f.submitted.at(-1).resultSet.id, sets[0].id);
   await generate(client, { prompts: ["A lone tree"], count: 1 });
   assert.equal(f.submitted.at(-1).resultSet, undefined);
   // A titled result is a set of one under its title, which names the result too.
-  await generate(client, { title: "Alone", prompts: ["A lone tree"], count: 1 });
-  assert.equal(f.submitted.at(-1).resultSet.variation, "Alone");
+  await generate(client, { title: "my favourite tree", prompts: ["A lone tree"], count: 1 });
+  assert.equal(f.submitted.at(-1).resultSet.title, "my favourite tree");
+  assert.equal(f.submitted.at(-1).resultSet.variation, "my favourite tree");
   // The chat's context stays on the results, and reuse carries it to a follow-up.
   const context = {
     character: { name: "Mara", description: "Red-haired ranger" },
@@ -5430,7 +5434,7 @@ test('replies label links Result N with one All Results page, and Result "all" s
     html,
     /<h2>Woodland<\/h2><h3>#1 · Bear Hug<\/h3><figure id="result-1"><a href="#view-1"[^>]*><img src="[A-Za-z0-9]{10}"/,
   );
-  assert.match(html, /<h3>#2 · A fox<\/h3>/);
+  assert.match(html, /<h3>#2 · Fox<\/h3>/);
   assert.equal(html.match(/<h2>/g).length, 1);
   assert.equal(html.match(/Still generating/g).length, 2);
   // One set's page is titled by it, and a result's page by its set and its own title; prompts fold.
@@ -5458,7 +5462,7 @@ test('replies label links Result N with one All Results page, and Result "all" s
   );
   assert.match(
     html,
-    /id="view-2"[^>]*aria-label="Woodland › A fox \(2 of 2\)">.*?href="#view-1" aria-label="Previous Result"/,
+    /id="view-2"[^>]*aria-label="Woodland › Fox \(2 of 2\)">.*?href="#view-1" aria-label="Previous Result"/,
   );
   assert.doesNotMatch(html, /<script/);
   const shown = await call(client, "result", { job_id: "all" });

@@ -1,5 +1,4 @@
 import {
-  ActionIcon,
   Button,
   FloatingIndicator,
   Group,
@@ -8,16 +7,15 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Image, Library, Video } from "lucide-react";
+import { Image, Video } from "lucide-react";
 import { useId, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { Link } from "react-router";
 
-import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
+import { useAppearance } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
 import { StudioLogo } from "../../ui/StudioLogo";
 import { usePhone } from "../../ui/usePhone";
 import { useAccount, useGroupFeature } from "../auth/AccountGate";
-import { AccountMenu } from "../auth/AccountMenu";
 import { dreamCountQuery } from "../dream/queries";
 import { HeaderOptions } from "./HeaderOptions";
 import { StatusAction } from "./ServiceStatus";
@@ -29,10 +27,6 @@ const modes = [
   { to: "/dream", label: "Dream", icon: icons.dream },
   { to: "/images", label: "Images", icon: Image },
   { to: "/video", label: "Videos", icon: Video },
-];
-const navigation = [
-  { to: "/library", label: "Library", icon: Library },
-  { to: "/settings", label: "Settings", icon: icons.settings },
 ];
 function ModeSwitcher({ mode }: { mode: string }) {
   const phone = usePhone();
@@ -127,7 +121,6 @@ function ModeSwitcher({ mode }: { mode: string }) {
 export function AppHeader({ mode }: { mode: string }) {
   const { appearance } = useAppearance();
   const phone = usePhone();
-  const location = useLocation();
   useFinishedAway();
   return (
     <Group
@@ -148,32 +141,7 @@ export function AppHeader({ mode }: { mode: string }) {
         <StatusAction />
       </Group>
       <ModeSwitcher mode={mode} />
-      {/* Appearance, Library, Settings, User: alphabetical. */}
-      {phone ? (
-        <HeaderOptions />
-      ) : (
-        <Group gap="xs">
-          <AppearanceMenu />
-          {navigation.map((item) => {
-            const active = location.pathname.startsWith(item.to);
-            return (
-              <Tooltip key={item.to} label={item.label}>
-                <ActionIcon
-                  component={Link}
-                  to={item.to}
-                  state={{ backgroundLocation: location }}
-                  variant={active ? "light" : "subtle"}
-                  color={active ? undefined : "gray"}
-                  aria-label={item.label}
-                >
-                  <item.icon size={19} />
-                </ActionIcon>
-              </Tooltip>
-            );
-          })}
-          <AccountMenu />
-        </Group>
-      )}
+      <HeaderOptions />
     </Group>
   );
 }

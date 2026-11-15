@@ -5,22 +5,25 @@ import { Link, useLocation } from "react-router";
 
 import { AppearanceControls } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { AccountMenuContent } from "../auth/AccountMenu";
 
 // The outer popover and inner menu each retain a ref to the same DOM anchor.
-const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(function OptionsTarget(
-  { onStyle },
-  ref,
-) {
+const OptionsTarget = forwardRef<
+  HTMLButtonElement,
+  { appearanceOpened: boolean; onStyle: () => void }
+>(function OptionsTarget({ appearanceOpened, onStyle }, ref) {
   const [opened, setOpened] = useState(false);
   const location = useLocation();
   return (
     <Menu opened={opened} onChange={setOpened} position="bottom-end" shadow="md">
-      <Menu.Target>
-        <ActionIcon ref={ref} aria-label="More Options" variant="subtle" color="gray">
-          <icons.more size={20} />
-        </ActionIcon>
-      </Menu.Target>
+      <PopupTooltip label="More Options" disabled={appearanceOpened}>
+        <Menu.Target>
+          <ActionIcon ref={ref} aria-label="More Options" variant="subtle" color="gray">
+            <icons.more size={20} />
+          </ActionIcon>
+        </Menu.Target>
+      </PopupTooltip>
       <Menu.Dropdown>
         <AccountMenuContent>
           <Menu.Item
@@ -66,9 +69,9 @@ export function HeaderOptions() {
       shadow="md"
     >
       <Popover.Target>
-        <OptionsTarget onStyle={() => setStyle(true)} />
+        <OptionsTarget appearanceOpened={style} onStyle={() => setStyle(true)} />
       </Popover.Target>
-      <Popover.Dropdown>
+      <Popover.Dropdown data-composer-layer>
         <AppearanceControls />
       </Popover.Dropdown>
     </Popover>

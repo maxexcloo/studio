@@ -1,5 +1,10 @@
-.modes {
+.bar {
   position: relative;
+}
+.modes {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   border: 1px solid var(--mantine-color-default-border);
   padding: 0.25rem;
   border-radius: var(--mantine-radius-xl);
@@ -17,11 +22,6 @@
 .mode[aria-current="page"] {
   --button-hover: transparent;
 }
-:where(:root:not([data-phone])) .modes {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-}
 
 .home {
   color: inherit;
@@ -29,13 +29,14 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Phones tighten the bar so More Options stays on screen beside the modes. Group sets its gap inline. */
+/* Phones reserve both sides of the centred modes for Status and More Options. */
 :where(:root[data-phone]) .bar {
   gap: 4px !important;
 }
 :where(:root[data-phone]) .modes {
   padding: 2px;
 }
-:where(:root[data-phone]) .home :global(.mantine-Title-root) {
-  font-size: 1.25rem;
+
+:where(:root[data-phone]) .home {
+  display: none;
 }

@@ -479,7 +479,7 @@ test("An MCP result set is one titled run whose viewer names each result's place
 }, testInfo) => {
   // Phones show only the place; Details names the set.
   const place = (title: string, index: number) =>
-    testInfo.project.use.isMobile ? `${index} / 3` : `Variety Test › ${title} (${index} of 3)`;
+    testInfo.project.use.isMobile ? `${index} / 3` : `${title} · ${index} / 3`;
   const state = await fixtures(page);
   const set = { id: "set-a", title: "Variety Test", source: "LibreChat" };
   // Newest first, as the gallery lists them; the second prompt has no title of its own.
