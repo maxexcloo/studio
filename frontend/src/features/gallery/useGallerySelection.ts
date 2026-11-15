@@ -1,6 +1,7 @@
 import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MediaItem } from "../../types";
+import { mediaIdentity } from "./mediaSource";
 
 /**
  * Selection acts on loaded records, including across virtualised rows. A group (a run in Runs)
@@ -25,13 +26,24 @@ export function useGallerySelection(
     setPending(null);
     anchor.current = null;
   }, [resetKey]);
+  const previousItems = useRef(items);
   useEffect(() => {
     const visible = new Set(items.map((item) => item.id));
-    setSelected((current) =>
-      current && [...current].some((id) => !visible.has(id))
-        ? new Set([...current].filter((id) => visible.has(id)))
-        : current,
+    const slots = new Map(items.map((item) => [mediaIdentity(item), item.id]));
+    const replacements = new Map(
+      previousItems.current.map((item) => [item.id, slots.get(mediaIdentity(item))]),
     );
+    previousItems.current = items;
+    if (anchor.current) anchor.current = replacements.get(anchor.current) || anchor.current;
+    setSelected((current) => {
+      if (!current) return current;
+      const next = new Set(
+        [...current].flatMap((id) => (visible.has(id) ? id : replacements.get(id) || [])),
+      );
+      return next.size === current.size && [...next].every((id) => current.has(id))
+        ? current
+        : next;
+    });
   }, [ids]);
   // Once every match has loaded, the waiting quick select applies to all of them.
   useEffect(() => {
