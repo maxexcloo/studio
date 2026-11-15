@@ -1,12 +1,9 @@
 import { Alert, Button, Group, Loader, Progress, Stack, Text } from "@mantine/core";
-import { useState } from "react";
 
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem } from "../../types";
-import { icons } from "../../ui/icons";
 import { WritingStream } from "../generation/PromptWriting";
 import { QueueJobAction, progressPercent, statusLabels, useQueue } from "../generation/Queue";
-import { useTryAgain } from "./useTryAgain";
 
 /** Only a matching account-owned durable queue record can expose retry or cancellation. */
 export function MediaJobStatus({
@@ -18,8 +15,6 @@ export function MediaJobStatus({
   onRetried?: (jobId: string) => void;
 }) {
   const queue = useQueue();
-  const tryAgain = useTryAgain([item]);
-  const [retrying, setRetrying] = useState(false);
   const job = item.jobId ? queue.data?.jobs.find((job) => job.id === item.jobId) : undefined;
   const savedError = "error" in item && typeof item.error === "string" ? item.error : "";
   const loading = Boolean(item.jobId && !job && (queue.isPending || queue.isFetching));
@@ -93,28 +88,7 @@ export function MediaJobStatus({
       ) : null}
       {job && (
         <Group justify="center">
-          {job.status === "failed" ? (
-            <Button
-              variant="default"
-              size="sm"
-              radius="xl"
-              leftSection={<icons.retry size={16} />}
-              loading={retrying}
-              onClick={async () => {
-                setRetrying(true);
-                try {
-                  const replacement = (await tryAgain([job.id])).get(job.id);
-                  if (replacement) onRetried?.(replacement);
-                } finally {
-                  setRetrying(false);
-                }
-              }}
-            >
-              Retry
-            </Button>
-          ) : (
-            <QueueJobAction job={job} />
-          )}
+          <QueueJobAction job={job} onRetried={onRetried} />
         </Group>
       )}
     </Stack>
