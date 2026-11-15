@@ -238,7 +238,7 @@ export function GalleryPage() {
   }, [listingKey, gallery]);
   const selection = useGallerySelection(
     items,
-    JSON.stringify([kind, search, filters, similar, strictness]),
+    JSON.stringify([kind, search, filters, similar, strictness, setId]),
     {
       complete: !gallery.hasNextPage,
       load: loadEveryMatch,

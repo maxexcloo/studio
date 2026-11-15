@@ -160,6 +160,37 @@ test("Select All takes every match across pages, and the search and Liked stay w
   await expect(page.getByRole("group", { name: "Gallery Selection" })).toHaveCount(0);
 });
 
+test("Removing the Set filter clears selected items while keeping selection mode", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(
+    ...results(2).map((item, index) => ({
+      ...item,
+      ...(index === 0 ? { resultSet: { id: "set-a", title: "Variety Test", index: 0 } } : {}),
+    })),
+  );
+  await page.goto("/images?set=set-a");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+  ).toHaveCount(0);
+  const select = page.getByRole("button", { name: "Select Items", exact: true });
+  await select.click();
+  await page.getByRole("button", { name: "Select image: Browse Result 0", exact: true }).click();
+  const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
+  await expect(status).toHaveText("1 Selected");
+  await page.getByRole("button", { name: "Remove Set: Variety Test Filter", exact: true }).click();
+  await expect(page).toHaveURL(/\/images$/);
+  await expect(
+    page.getByRole("button", { name: "Select image: Browse Result 1", exact: true }),
+  ).toBeVisible();
+  await expect(status).toHaveText("0 Selected");
+  await expect(select).toHaveAttribute("aria-pressed", "true");
+});
+
 test("Ctrl+scroll zooms the grid around the tile under the pointer and is remembered", async ({
   page,
 }, testInfo) => {
