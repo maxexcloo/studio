@@ -32,14 +32,20 @@ import { compatibleLoras, loraInfoQuery } from "../generation/LoraPicker";
 import { profileForBackend, profileName } from "../generation/payload";
 import { ChipPopup } from "../generation/Picker";
 import { profileOptions } from "../generation/ProfilePicker";
-import { loraInputs, promptInputs, promptLines, seedInputs, strengthInputs } from "./inputs";
+import {
+  letter,
+  loraInputs,
+  promptInputs,
+  promptLines,
+  seedInputs,
+  strengthInputs,
+} from "./inputs";
 import {
   addVariant,
   canAddVariant,
   compareInputs,
   draftVariants,
   fitsComparison,
-  letter,
   modelInputs,
   removeVariant,
   showVariant,

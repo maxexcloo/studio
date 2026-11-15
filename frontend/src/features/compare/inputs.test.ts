@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { GenerationInput } from "../../types";
-import { loraInputs, promptInputs, seedInputs, strengthInputs } from "./inputs.ts";
+import { loraInputs, promptInputs, seedInputs, strengthInputs, variantLabels } from "./inputs.ts";
 
 const input: GenerationInput = {
   kind: "image",
@@ -77,4 +77,22 @@ test("seed and prompt comparisons preserve every setting outside their selected 
     ["A fox", "A bird"],
   );
   for (const variant of prompts) assert.deepEqual({ ...variant, prompt: input.prompt }, input);
+});
+
+test("variant labels show provider resolution enums and native pixel sizes that differ", () => {
+  const names = { profile: () => "Same Model", lora: (name: string) => name };
+  const values = ["1k", "2k"].map((resolution) => ({
+    input: { ...input, resolution },
+    references: [],
+  }));
+  assert.deepEqual(variantLabels(values, names), ["1K", "2K"]);
+  assert.deepEqual(
+    values.map(({ input }) => input.resolution),
+    ["1k", "2k"],
+  );
+  const native = [1024, 2048].map((size) => ({
+    input: { ...input, width: size, height: size },
+    references: [],
+  }));
+  assert.deepEqual(variantLabels(native, names), ["1024×1024", "2048×2048"]);
 });

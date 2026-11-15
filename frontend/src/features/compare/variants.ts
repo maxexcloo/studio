@@ -27,9 +27,8 @@ import {
   usesNegative,
 } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
+import { letter, runSeeds, variantLabels } from "./inputs";
 import type { Comparison } from "./queries";
-
-export const letter = (index: number) => String.fromCharCode(65 + index);
 
 /** Every variant of `draft`, the one being edited as it stands; just it outside a comparison. */
 export function draftVariants(draft: Draft): Variant[] {
@@ -83,70 +82,6 @@ export const modelInputs = (input: GenerationInput, profiles: Profile[]) => [
   input,
   ...profiles.map((profile) => ({ ...inputForProfile(input, profile), seed: input.seed })),
 ];
-
-/** Each variant's seed as it runs: its own, else the first variant's that has one, else random (""). */
-function runSeeds(variants: Variant[]) {
-  const own = variants.map(({ input }) =>
-    /^\d+$/.test(String(input.seed)) ? String(input.seed) : "",
-  );
-  const shared = own.find(Boolean) ?? "";
-  return own.map((seed) => seed || shared);
-}
-
-/**
- * Each variant named by what sets it apart from the others ("Flux Dev · 30 Steps"), or by its
- * letter when nothing recorded here does.
- */
-export function variantLabels(
-  variants: Variant[],
-  names: { profile: (input: GenerationInput) => string; lora: (name: string) => string },
-) {
-  const enabled = (input: GenerationInput) => input.loras.filter((lora) => lora.enabled !== false);
-  const strength = (input: GenerationInput, name: string) =>
-    enabled(input).find((lora) => lora.name === name)?.strength;
-  const loraNames = [
-    ...new Set(variants.flatMap(({ input }) => enabled(input).map((l) => l.name))),
-  ];
-  const changedLoras = loraNames.filter(
-    (name) => new Set(variants.map(({ input }) => strength(input, name))).size > 1,
-  );
-  const prompts = variants.map(({ input }) => JSON.stringify([input.prompt, input.negative]));
-  const seeds = runSeeds(variants);
-  type Facet = (variant: Variant, index: number) => string;
-  const differs = (facet: Facet) =>
-    new Set(variants.map((variant, index) => facet(variant, index))).size > 1;
-  const profile: Facet = ({ input }) => names.profile(input);
-  // Another profile brings its own settings, so they name a variant only on the same profile.
-  const settings: Facet[] = differs(profile)
-    ? []
-    : [
-        ({ input }) => `${input.steps} Steps`,
-        ({ input }) => `Guidance ${input.cfg}`,
-        ({ input }) => `${input.width}×${input.height}`,
-      ];
-  const facets: Facet[] = [
-    profile,
-    (_, index) => `Prompt ${letter(prompts.indexOf(prompts[index]))}`,
-    ({ input }) =>
-      changedLoras
-        .map((name) => {
-          const value = strength(input, name);
-          return `${names.lora(name)} ${value === undefined ? "Off" : value}`;
-        })
-        .join(", "),
-    ...settings,
-    (_, index) => `Seed ${seeds[index]}`,
-    ({ references }) => `${references.length} References`,
-  ];
-  const differing = facets.filter(differs);
-  return variants.map(
-    (variant, index) =>
-      differing
-        .map((facet) => facet(variant, index))
-        .join(" · ")
-        .slice(0, 80) || `Variant ${letter(index)}`,
-  );
-}
 
 /** The composer's comparison: its variants, their labels and why it can't run yet, if it can't. */
 export function useDraftComparison() {

@@ -110,8 +110,9 @@ recur across features.
   Delete last, and share their sizing and item style. An action's settings sit
   in its menu, not a separate dialog. An option whose label alone is ambiguous
   carries a one-line `description`, except in item action menus.
-- Sections sort alphabetically, except settings first, Like before Dislike,
-  Refresh and Custom… last and Delete last.
+- Media categories use Images, Videos, Text. Other unordered peers sort
+  alphabetically, except settings first, Like before Dislike, Refresh and
+  Custom… last and Delete last.
 - Labels name the verb alone where the menu or box already says what it acts
   on (Upscale, Share, Clear; not Clear Prompt), adding a word only where the
   verb alone is ambiguous (Stop Upscale, Edit in Composer). One action keeps
@@ -122,7 +123,7 @@ recur across features.
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
   Submenus match in bar and menu, and assistant menus share `assistMenu`.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
-  phone bars use icons with accessible names and menu indicators. When they
+  phone media item bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and
   only then do they wrap, never scrolling.
 - Like and Dislike rate an item and teach taste. A Dislike never deletes: it

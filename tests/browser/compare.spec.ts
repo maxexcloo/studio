@@ -324,6 +324,7 @@ test("Compare preserves provider resolution enum values without converting them 
     "1k",
     "2k",
   ]);
+  expect(state.comparisons[0].requests.map((variant: any) => variant.label)).toEqual(["1K", "2K"]);
 });
 
 test("Test LoRA in the Library sweeps a LoRA's strength in the composer", async ({ page }) => {

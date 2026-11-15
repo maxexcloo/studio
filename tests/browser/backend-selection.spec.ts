@@ -108,9 +108,7 @@ test("A text-only Radiance default sends a run with references to ComfyUI", asyn
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Follow the reference");
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText(
-    "0 of 4 Enabled",
-  );
+  await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText("0/4");
   await closeLoras(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await showUploads(page);
@@ -129,9 +127,7 @@ test("A text-only Radiance default sends a run with references to ComfyUI", asyn
   await closeReferences(page);
   // The reference moves the run to ComfyUI, with its controls and limits.
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText(
-    "0 of 8 Enabled",
-  );
+  await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText("0/8");
   await closeLoras(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
