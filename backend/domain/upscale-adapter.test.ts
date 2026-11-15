@@ -5,9 +5,12 @@ import path from "node:path";
 import test from "node:test";
 
 import { openDatabase } from "../persistence/runtime.ts";
-import { GenerationQueue, type QueueAdapter } from "./queue.ts";
+import { GenerationQueue, type QueueAdapter, routeAdapters } from "./queue.ts";
 import { Store } from "./store.ts";
-import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./upscale-adapter.ts";
+import { createUpscaleQueueAdapter } from "./upscale-adapter.ts";
+
+const upscaleOr = (other: QueueAdapter, upscale: QueueAdapter) =>
+  routeAdapters((job) => (job.operation === "upscale" ? upscale : other));
 
 const finishedTasks = () => new Promise<void>((resolve) => setImmediate(resolve));
 
@@ -67,7 +70,7 @@ test("recorded upscale resumes its own prompt and completes with its saved outpu
       },
     });
   }
-  let queue = new GenerationQueue(store, withUpscaleAdapter(other, adapter(false)));
+  let queue = new GenerationQueue(store, upscaleOr(other, adapter(false)));
   try {
     await queue.tick();
     await finishedTasks();
@@ -76,7 +79,7 @@ test("recorded upscale resumes its own prompt and completes with its saved outpu
     queue.stop();
     store.close();
     store = new Store(openDatabase(filename));
-    queue = new GenerationQueue(store, withUpscaleAdapter(other, adapter(true)));
+    queue = new GenerationQueue(store, upscaleOr(other, adapter(true)));
     await queue.tick();
     await finishedTasks();
     await queue.tick();
