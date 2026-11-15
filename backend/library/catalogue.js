@@ -112,6 +112,7 @@ function rawFromEdit(edit = {}) {
     "negative",
     "uncensored",
     "type",
+    "hidden",
   ])
     if (edit[key] !== undefined) raw[key] = edit[key];
   if (edit.triggers !== undefined) raw.triggers = edit.triggers;
@@ -155,6 +156,8 @@ const editableFields = new Set([
   "licence",
   "links",
   "compatibility",
+  // An administrator hid a LoRA from pickers and defaults; existing stacks still run it.
+  "hidden",
   // An administrator removed the entry (library/routes.js): it stays out of the catalogue until undone.
   "removed",
 ]);
@@ -199,6 +202,10 @@ function cleanCataloguePatch(patch, { provenance = false } = {}) {
       case "uncensored":
         if (typeof value !== "boolean") throw new Error("uncensored must be true or false.");
         clean.uncensored = value;
+        break;
+      case "hidden":
+        if (value !== true) throw new Error("hidden is true, or null to offer it again.");
+        clean.hidden = true;
         break;
       case "removed":
         if (value !== true) throw new Error("removed is true, or null to restore the entry.");
@@ -429,6 +436,7 @@ export function createCatalogueStore({
         ? { note: pick("note", text(provider?.note, 500)) }
         : {}),
       ...(pick("guidance") ? { guidance: pick("guidance") } : {}),
+      ...(fields.hidden ? { hidden: true } : {}),
       ...(pick("compatibility", provider?.compatibility)
         ? { compatibility: pick("compatibility", provider?.compatibility) }
         : {}),

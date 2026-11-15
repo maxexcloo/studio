@@ -891,7 +891,7 @@ const dream = createDream({
       const strength = range
         ? Math.min(range.max, Math.max(range.min, lora.strength))
         : lora.strength;
-      return optionalLoraPolicyIssue({ name: lora.name, strength }, info, profile)
+      return info?.hidden || optionalLoraPolicyIssue({ name: lora.name, strength }, info, profile)
         ? []
         : [{ ...lora, strength }];
     }),
