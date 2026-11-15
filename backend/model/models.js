@@ -1,4 +1,4 @@
-import { loraFamilyId } from "../../shared/profiles.ts";
+import { loraFamilyId, maxLoras } from "../../shared/profiles.ts";
 import { missingNodes, nodeRange, optionsFor, textRange } from "../comfy/comfy.js";
 import {
   loadCustomWorkflows,
@@ -92,7 +92,7 @@ export function buildProfile({
   constraints = {},
   mediaInputs = [],
   aspectPolicy = "manual",
-  maxLoras = 8,
+  maxLoras: loras = maxLoras,
   imageModes: modes = {},
   native = {},
   editReferences = false,
@@ -194,7 +194,7 @@ export function buildProfile({
   };
   // How many LoRAs the workflow's loader accepts (rgthree stacks take 4).
   if (profile.capabilities.lora !== false)
-    profile.maxLoras = Math.max(1, Math.min(8, Number(maxLoras) || 8));
+    profile.maxLoras = Math.max(1, Math.min(maxLoras, Number(loras) || maxLoras));
   return profile;
 }
 

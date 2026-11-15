@@ -1,9 +1,10 @@
 import { pausedReason } from "../shared/queue.ts";
+import { upscaleQualities } from "../shared/upscale.ts";
 import { listSchedule } from "./domain/eta.ts";
 import { jobs, queueClearsAt } from "./jobs.js";
 import { generationEstimate, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
-import { upscalePlan, upscaleQualities } from "./upscale.js";
+import { upscalePlan } from "./upscale.js";
 import { listWorkers } from "./workers.js";
 
 /**

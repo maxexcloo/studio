@@ -12,6 +12,7 @@ import { useIsMutating } from "@tanstack/react-query";
 import { ArrowUp, Image as ImageIcon, Video } from "lucide-react";
 import { type ReactNode, Suspense, lazy, useLayoutEffect, useRef, useState } from "react";
 
+import { maxLoras } from "../../../../shared/profiles";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -77,7 +78,7 @@ export function submitBlockedReason({
     : profile?.capabilities.startImage
       ? 1
       : 0;
-  const loraMaximum = profile?.maxLoras ?? 8;
+  const loraMaximum = profile?.maxLoras ?? maxLoras;
   const requiredReference = profile?.mediaInputs?.some(
     (slot) =>
       slot.required &&

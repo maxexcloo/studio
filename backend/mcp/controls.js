@@ -1,4 +1,10 @@
-import { guidingRoles, loraCompatibility, loraDefaultStrength } from "../../shared/profiles.ts";
+import {
+  guidingRoles,
+  loraCompatibility,
+  loraDefaultStrength,
+  maxLoras,
+} from "../../shared/profiles.ts";
+import { upscaleQualities } from "../../shared/upscale.ts";
 // Which generate arguments a profile lets MCP adjust; fixed controls are never advertised.
 import { referenceImageSize } from "../generation-defaults.js";
 import { strengthRange } from "../lora/policy.js";
@@ -70,7 +76,7 @@ export function mcpControls(profile) {
       controls[key] = { options: list, ...(defaults[key] ? { default: defaults[key] } : {}) };
   }
   if (caps.lora !== false && Array.isArray(options.loras) && options.loras.length)
-    controls.loras = { max: profile.maxLoras || 8 };
+    controls.loras = { max: profile.maxLoras || maxLoras };
   const slots = profile.mediaInputs || [];
   if (slots.length)
     controls.reference_asset_ids = {
@@ -99,7 +105,7 @@ export function mcpControls(profile) {
     };
   if (profile.kind === "image") {
     controls.upscale_quality = {
-      options: ["fast", "balanced", "high"],
+      options: upscaleQualities,
       note: "Only when the user asks to upscale or enlarge.",
     };
     controls.face_detail = {
@@ -552,7 +558,7 @@ export function prepareLoras(profile, infos = {}, loras = [], notes = []) {
   const short = shortNames(profile);
   const label = profile.label || profile.id;
   // Refused, not trimmed: generate's own check keeps only the first ones, which would drop the caller's picks silently.
-  const max = Math.max(1, Math.min(8, Number(profile.maxLoras) || 8));
+  const max = Math.max(1, Math.min(maxLoras, Number(profile.maxLoras) || maxLoras));
   if (loras.length > max)
     throw new Error(`${label} takes at most ${max} LoRAs; pass ${max} or fewer.`);
   const stack = [];
