@@ -1023,6 +1023,8 @@ test("media and administrator credentials discover only their own friendly tools
     media.getInstructions(),
     /real flaws means subtle texture .* never a plainer, older/,
   );
+  // A person's age and ethnicity lead, since one named late is often lost in the image.
+  assert.match(media.getInstructions(), /age and ethnicity in the prompt's first words/);
   assert.match(
     media.getInstructions(),
     /call reuse with its ref and your revised prompt, not a new generate/,
@@ -1082,8 +1084,9 @@ test("media and administrator credentials discover only their own friendly tools
     // description was tightened, then raised to 17,150 for generate's 18+ floor, to 18,050 for
     // project, to 18,120 for its character_sheet, to 19,000 for variants and result numbers and to
     // 19,300 for one call per step (models' profile_ids, review's also) and to 19,850 for applying
-    // a person's rules in proportion with the shape of liked portraits.
-    JSON.stringify(tools).length + media.getInstructions().length < 19850,
+    // a person's rules in proportion with the shape of liked portraits, and to 20,050 for naming a
+    // person's age and ethnicity first.
+    JSON.stringify(tools).length + media.getInstructions().length < 20050,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });

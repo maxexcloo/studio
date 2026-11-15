@@ -16,6 +16,10 @@ export const fidelity =
 export const keepDescriptions =
   "Keep the person's own descriptions of people and things (face, body, skin, hair, clothing) word for word; change them only where the instruction asks.";
 
+/** A person's age and ethnicity lead and stay, since a late or dropped one is often lost in the image. */
+export const subjectFirst =
+  "Name each person's age and ethnicity in the prompt's first words, show the ethnicity in their face (eye shape, nose, skin tone) and keep both through every rewrite and change.";
+
 /**
  * A person's rules applied in proportion, so a batch keeps what they like: an attractiveness word
  * and one small real mark score best, a face rewritten plain or older worst.
