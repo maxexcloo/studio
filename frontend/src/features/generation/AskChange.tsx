@@ -237,7 +237,7 @@ export const assistMenu = ({
         templates.length || custom.length
           ? [
               { id: "templates-heading", label: "Templates", heading: true },
-              ...templates,
+              ...templates.toSorted((a, b) => String(a.label).localeCompare(String(b.label))),
               ...custom,
             ]
           : [],

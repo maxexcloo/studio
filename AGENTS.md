@@ -154,7 +154,7 @@ the primary component reference and verify APIs against the installed version.
   Prompts). The menu is one level deep: a tool's options (suggested changes,
   Improve Prompt's styles, each with its description) are listed first under its
   name, never in a submenu, then the other tools as one group. Improve Prompt's
-  styles, like Animate's templates, are Library › Prompt Styles' records, in order.
+  styles, like Animate's templates, are Library › Prompt Styles' records, sorted alphabetically.
   A box that opens the phone editor has no ⋯ beside it: the editor shows the
   tools as named buttons in a bar above the keyboard, then Copy and Clear as
   icons beside the sends, as in the composer, and its header holds only the
