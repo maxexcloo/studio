@@ -280,16 +280,17 @@ the primary component reference and verify APIs against the installed version.
   stops at the first and last item. A result from a run of several, like its
   Open All, flips through only that run's results; other results flip through
   the gallery. A set's results stand together, newest first, in the gallery,
-  Runs and the viewer's set strip, which shows only that set on one row,
-  scrolling sideways to keep the current result in view. Closing reveals and
+  Runs and the viewer's one strip, which shows only that set on one row, the
+  shown result's versions standing smaller in its place (outside a set, its
+  versions alone), scrolling sideways to keep the current result in view. Closing reveals and
   focuses the current tile.
-- On touch screens a tap on the media hides the viewer's chrome (top bar, arrows, strips, prompt,
+- On touch screens a tap on the media hides the viewer's chrome (top bar, arrows, strip, prompt,
   actions and Details) with a fade, as Photos does, and another tap shows it; desktop keeps it.
   A picture's tap waits out the double tap, and pinches, drags, long presses and swipes do not
   count; swipes still navigate and keep it hidden until the viewer closes. A tap on a video whose
   controls are hidden also shows them; taps while they show work them. Escape, a viewer key,
   Details, a tap beside the media and focus reaching hidden chrome bring it back. Open menus and
-  sheets and loading actions stay in sight; strips hide, even with results still loading. With
+  sheets and loading actions stay in sight; the strip hides, even with results still loading. With
   nothing else in sight the media glides to the middle of the screen at its fitted size.
 - Viewing and upscale comparison share `MediaZoom`. Mask zoom and pan preserve
   pixels and undo history. Display, thumbnails, sharing and downloads respect
