@@ -45,27 +45,30 @@ const unique = (values) =>
     a.localeCompare(b),
   );
 
-// Summaries of an account's whole gallery cost a walk over it, so each is kept until it changes.
+// Summaries of an account's whole gallery cost a walk over it, so each is kept until it changes,
+// and while results keep arriving it is rebuilt at most once a minute: a filter menu a minute behind
+// is fine, a walk after every result is not.
 const summaries = new Map();
 const keptSummaries = 20;
+const summaryMs = 60_000;
 
-/** `build(items)` over the request's own visible items the query narrows, kept until the gallery changes. */
+/** `build(items)` over the request's own visible items the query narrows, kept as above. */
 function ownedSummary(req, name, query, build) {
   const owned = ownedQuery(req.studioAccount);
-  const key = JSON.stringify([galleryChangeCount(), name, owned, query]);
-  if (!summaries.has(key)) {
-    if (summaries.size >= keptSummaries) summaries.delete(summaries.keys().next().value);
-    const items = owned ? eachGalleryItem({ ...owned, ...query, dreamPool: false }) : [];
-    summaries.set(
-      key,
-      build(
-        (function* () {
-          for (const item of items) if (filterVisibleGallery([item]).length) yield item;
-        })(),
-      ),
-    );
-  }
-  return summaries.get(key);
+  const key = JSON.stringify([name, owned, query]);
+  const kept = summaries.get(key);
+  const changes = galleryChangeCount();
+  if (kept && (kept.changes === changes || Date.now() - kept.at < summaryMs)) return kept.value;
+  summaries.delete(key);
+  if (summaries.size >= keptSummaries) summaries.delete(summaries.keys().next().value);
+  const items = owned ? eachGalleryItem({ ...owned, ...query, dreamPool: false }) : [];
+  const value = build(
+    (function* () {
+      for (const item of items) if (filterVisibleGallery([item]).length) yield item;
+    })(),
+  );
+  summaries.set(key, { changes, at: Date.now(), value });
+  return value;
 }
 
 export function galleryJobResponse(store, account, id, settings = false) {
