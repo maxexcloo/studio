@@ -439,6 +439,19 @@ export function MediaViewer({
   ]
     .filter(Boolean)
     .join(" · ");
+  const detailsPanel = (
+    <MediaDetails
+      item={displayed}
+      related={related}
+      open={
+        navigate &&
+        ((next) => {
+          setCompare(false);
+          navigate(next);
+        })
+      }
+    />
+  );
   const toggleDetails = () => {
     setChromeHidden(false);
     if (phone) setSheet(true);
@@ -822,17 +835,7 @@ export function MediaViewer({
                         {subtitle}
                       </Text>
                     </Stack>
-                    <MediaDetails
-                      item={displayed}
-                      related={related}
-                      open={
-                        navigate &&
-                        ((next) => {
-                          setCompare(false);
-                          navigate(next);
-                        })
-                      }
-                    />
+                    {detailsPanel}
                   </Stack>
                 </ScrollArea>
               </aside>
@@ -862,17 +865,7 @@ export function MediaViewer({
               <Text size="xs" c="dimmed" mt={2}>
                 {subtitle}
               </Text>
-              <MediaDetails
-                item={displayed}
-                related={related}
-                open={
-                  navigate &&
-                  ((next) => {
-                    setCompare(false);
-                    navigate(next);
-                  })
-                }
-              />
+              {detailsPanel}
             </Stack>
           </Drawer>
         )}
