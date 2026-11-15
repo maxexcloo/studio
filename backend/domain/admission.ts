@@ -80,7 +80,12 @@ export function createGenerationAdmission(options: AdmissionOptions) {
       if (!job) {
         const checked = await step("validate", () => options.validate(input, account));
         if (checked.status >= 400) return checked;
-        const title = String(input.prompt || "Generation").slice(0, 100);
+        const title = String(
+          (origin?.priority === queuePriority.mcp &&
+            (input.resultSet as { title?: string } | undefined)?.title) ||
+            input.prompt ||
+            "Generation",
+        ).slice(0, 100);
         // MCP work (its queue tier) joins its conversation's session; other unscoped work gets its own.
         const session = () =>
           (
