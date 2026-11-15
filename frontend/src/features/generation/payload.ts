@@ -4,8 +4,8 @@ import {
   runBackend,
   slotCapacity,
   slotGroups,
-} from "../../../../shared/profiles";
-import { selectedResolution, withResolution } from "../../../../shared/resolution";
+} from "../../../../shared/profiles.ts";
+import { selectedResolution, withResolution } from "../../../../shared/resolution.ts";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 
 /** Whether `profile` is the one a recorded id names, including an id merged into it. */

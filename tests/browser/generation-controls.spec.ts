@@ -850,12 +850,14 @@ test("Image presets draw at the chosen resolution within profile constraints", a
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A wide landscape");
   const aspect = page.getByRole("button", { name: "Aspect", exact: true });
-  await expect(aspect).toHaveText("Square · 1K");
+  await expect(aspect).toHaveText("Square · 1024 × 1024");
   await aspect.click();
+  const resolution = page.getByRole("radiogroup", { name: "Resolution", exact: true });
+  await expect(resolution.getByRole("radio", { name: "Custom", exact: true })).toBeChecked();
+  await resolution.locator("label").filter({ hasText: "1K" }).click();
   // The preset gives the shape; 1K sets its long edge, rounded to the profile's step.
   await page.getByRole("button", { name: "Landscape 1024 × 704", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Width", exact: true })).toBeHidden();
-  const resolution = page.getByRole("radiogroup", { name: "Resolution", exact: true });
   await expect(resolution.getByRole("radio", { name: "2K", exact: true })).toHaveCount(0);
   await expect(resolution.getByRole("radio", { name: "4K", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
