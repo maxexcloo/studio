@@ -351,6 +351,26 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
 }
 
 /**
+ * The local profiles Dream may run from an account's catalogue (modelsForAccount): every ready one
+ * the composer offers except those on a worker stopped on purpose. A worker whose node list did not
+ * arrive in time still counts, as Dream asks whether each kind's worker answers before using this.
+ * Each kind's default is the catalogue's where Dream may run it, else its first such profile.
+ */
+export function dreamCatalogue(models) {
+  const profiles = (models.profiles || []).filter(
+    (profile) =>
+      profile.ready !== false && profile.availability !== "parked" && !isCloudProfile(profile),
+  );
+  const defaults = {};
+  for (const kind of ["image", "video"]) {
+    const key = `${kind}Model`;
+    const own = profiles.filter((profile) => profile.kind === kind);
+    defaults[key] = (own.find((profile) => profile.id === models.defaults?.[key]) || own[0])?.id;
+  }
+  return { profiles, defaults };
+}
+
+/**
  * The account's default image and video profiles on the side its Images and Videos preferences
  * choose (account-preferences.js; Local unless Cloud): the deployment's default where it is on that
  * side and can run, else that side's first that can. A side with none that can run (no cloud
