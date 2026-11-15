@@ -1,14 +1,14 @@
-import { Box } from "@mantine/core";
+import { Box, Group } from "@mantine/core";
 import { type Ref, type RefObject, useRef } from "react";
 
 import type { MediaItem } from "../../types";
 import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "../../ui/ActionBar";
 import { usePhone } from "../../ui/usePhone";
-import { namedItemActions } from "./itemActions";
+import { compactViewerActions, namedItemActions } from "./itemActions";
 import { useMediaActions, useMediaDialogs } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import type { Iteration } from "./useMediaAction";
-import { ViewerPrompt, useViewerPrompt } from "./ViewerPrompt";
+import { ViewerPrompt, ViewerSuggestions, useViewerPrompt } from "./ViewerPrompt";
 
 import classes from "./MediaViewer.module.css";
 
@@ -28,12 +28,13 @@ export interface ViewerActions {
  * in sight by dropping the last names where they outgrow the bar, then wrapping if needed.
  */
 export function ViewerActionGroups({ groups, labelled, equal }: Omit<ViewerActions, "label">) {
+  const phone = usePhone();
   return (
     <ActionBarGroups
-      groups={groups}
+      groups={phone && !equal ? compactViewerActions(groups) : groups}
       labelled={labelled}
       fit={!equal}
-      stacked={usePhone()}
+      stacked={phone}
       equal={equal}
     />
   );
@@ -99,9 +100,17 @@ export function MediaViewerActions({
       onClick={(event) => event.stopPropagation()}
     >
       {item.jobId && (
-        <Box className={classes.promptRow} display={promptHidden ? "none" : undefined}>
-          <ViewerPrompt state={prompt} iterate={iterate} pending={pending} />
-        </Box>
+        <Group
+          className={classes.promptRow}
+          wrap="nowrap"
+          gap="xs"
+          display={promptHidden ? "none" : undefined}
+        >
+          <Box flex={1} miw={0}>
+            <ViewerPrompt state={prompt} iterate={iterate} pending={pending} />
+          </Box>
+          <ViewerSuggestions state={prompt} />
+        </Group>
       )}
       <ViewerActionGroups groups={groups} labelled={namedItemActions} />
       {dialogs}

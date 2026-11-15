@@ -1,13 +1,15 @@
-import { notifications } from "@mantine/notifications";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { Button, Menu } from "@mantine/core";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronDown } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import type { Change } from "../../../../shared/suggestions";
-import { api } from "../../api";
+import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
-import type { Action, ActionGroups } from "../../ui/ActionBar";
+import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import {
@@ -32,11 +34,10 @@ export type ViewerAsk = { request: string } | { custom: true };
 
 /**
  * The viewer's prompt and its assistance. The field holds the item's prompt: editing it and
- * pressing Enter or Generate runs it with the item's settings as a new version, and Improve Prompt
- * rewrites it in one of the assistant's styles or asks for a suggestion, template or Custom…
- * change through `useItemChange`. Tile Edit choices use the same request path. Under Review
- * Prompt, the remembered default, a change's proposal fills the field until Run runs it or Undo
- * restores what was typed; without it, the proposal runs at once.
+ * pressing Enter or Generate runs it with the item's settings as a new version. Suggestions asks
+ * for a suggestion, template or Custom… change through `useItemChange`; tile Edit choices use
+ * the same request path. Review Prompt is off until chosen: when on, a proposal fills the field
+ * until Run runs it or Undo restores what was typed; otherwise, the proposal runs at once.
  */
 export function useViewerPrompt(
   item: MediaItem,
@@ -67,7 +68,7 @@ export function useViewerPrompt(
   // Under review the field shows the request while it is asked for.
   const pick = (request: string) => {
     if (review) setPrompt(request);
-    ask.send(request, review ? request : prompt);
+    ask.send(request, prompt);
   };
   const [customOpen, setCustomOpen] = useState(false);
   // A tile's Edit menu opened the viewer with its choice, asked once the assistant is ready.
@@ -81,21 +82,6 @@ export function useViewerPrompt(
     else pick(asked.request);
   }, [asked, ask.available]);
   const assistant = useQuery(assistantQuery).data;
-  const profileId = String(item.settings?.profileId || "");
-  const improve = useMutation({
-    mutationFn: (preset: string) =>
-      api<{ prompt?: string; source?: string; reason?: string }>("/api/assistant/rewrite", {
-        method: "POST",
-        body: JSON.stringify({ profileId, prompt, preset, stream: false }),
-      }),
-    onSuccess: (result) => {
-      if (result.source === "fallback" || !result.prompt)
-        return void notifications.show({
-          message: `The prompt assistant is unavailable (${result.reason || "no reply"}).`,
-        });
-      setPrompt(result.prompt);
-    },
-  });
   const custom = (
     <CustomDialog
       opened={customOpen}
@@ -110,77 +96,85 @@ export function useViewerPrompt(
     pick,
     custom: () => setCustomOpen(true),
   };
-  // Improve Prompt's styles, but Custom, whose place Edit's Custom… takes.
-  const styles =
-    assistant?.available && profileId
-      ? assistant.presets.filter((style) => style.id !== "custom")
-      : [];
+  // Capture the current draft when either menu opens, without asking on every keystroke.
+  const [suggestionSource, setSuggestionSource] = useState<{ item: string; prompt: string }>();
+  const suggestionPrompt = suggestionSource?.item === item.id ? suggestionSource.prompt : original;
   const suggestions = useChangeSuggestions({
-    query: nextStepsQuery(item.jobId ?? ""),
-    fresh: () => askNextSteps(item.jobId!, true),
-    enabled: ask.available && item.type === "image",
+    query: nextStepsQuery(item.jobId ?? "", suggestionPrompt, item.id),
+    fresh: () => askNextSteps(item.jobId!, true, suggestionPrompt, item.id),
+    enabled: ask.available && item.type === "image" && suggestionSource?.item === item.id,
     disabled: ask.pending,
     onPick: pick,
   });
-  const improveTool: Action | null =
-    assistant?.available && (styles.length || ask.available)
-      ? {
-          id: "improve",
-          label: "Improve Prompt",
-          icon: icons.assistant,
-          menu: [
-            ...(ask.available
-              ? [
-                  [
-                    {
-                      id: "review",
-                      label: "Review Prompt",
-                      icon: icons.review,
-                      checked: review,
-                      keepOpen: true,
-                      onClick: () => setReview(!review),
-                    },
-                  ],
-                ]
-              : []),
-            styles.map((style) => ({
-              id: `improve:${style.id}`,
-              label: style.label,
-              description: style.description,
-              disabled: improve.isPending || ask.pending || !prompt.trim(),
-              onClick: () => improve.mutate(style.id),
-            })),
-            ...assistMenu({
-              suggestions: ask.available && item.type === "image" ? suggestions.group : [],
-              templates: ask.available
-                ? (assistant.changes ?? []).map((change) => ({
-                    id: `change:${change.id}`,
-                    label: change.label,
-                    icon: icons.suggestions,
-                    disabled: ask.pending,
-                    onClick: () => pick(change.instruction),
-                  }))
-                : [],
-              custom: ask.available
-                ? [
-                    {
-                      id: "custom",
-                      label: "Custom…",
-                      icon: icons.custom,
-                      disabled: ask.pending,
-                      onClick: () => setCustomOpen(true),
-                    },
-                  ]
-                : [],
-              last: [],
-            }),
+  const suggestionsTool: Action | null = ask.available
+    ? {
+        id: "suggestions",
+        label: "Suggestions",
+        icon: icons.suggestions,
+        onOpen: () => setSuggestionSource({ item: item.id, prompt: ask.typed ?? prompt }),
+        menu: assistMenu({
+          settings: [
+            {
+              id: "review",
+              label: "Review Prompt",
+              icon: icons.review,
+              checked: review,
+              keepOpen: true,
+              onClick: () => setReview(!review),
+            },
           ],
-        }
-      : null;
-  return { item, original, prompt, setPrompt, field, ask, custom, edit, improveTool, improve };
+          suggestions: item.type === "image" ? suggestions.group : [],
+          templates: (assistant?.changes ?? []).map((change) => ({
+            id: `change:${change.id}`,
+            label: change.label,
+            icon: icons.suggestions,
+            disabled: ask.pending,
+            onClick: () => pick(change.instruction),
+          })),
+          custom: [
+            {
+              id: "custom",
+              label: "Custom…",
+              icon: icons.custom,
+              disabled: ask.pending,
+              onClick: () => setCustomOpen(true),
+            },
+          ],
+          last: [],
+        }),
+      }
+    : null;
+  return { item, original, prompt, setPrompt, field, ask, custom, edit, suggestionsTool };
 }
 
 export type ViewerPromptState = ReturnType<typeof useViewerPrompt>;
+
+/** The same choices as the prompt's tools, available without opening its phone editor. */
+export function ViewerSuggestions({ state }: { state: ViewerPromptState }) {
+  const action = state.suggestionsTool;
+  if (!action) return null;
+  return (
+    <Menu position="top-end" width={menuWidth} onOpen={action.onOpen}>
+      <PopupTooltip label="Suggestions">
+        <Menu.Target>
+          <Button
+            variant="subtle"
+            color="gray"
+            size="compact-xs"
+            leftSection={<icons.suggestions size={16} />}
+            rightSection={<ChevronDown size={12} />}
+            loading={state.ask.pending}
+          >
+            Suggestions
+          </Button>
+        </Menu.Target>
+      </PopupTooltip>
+      <Menu.Dropdown>
+        <ActionMenuItems groups={action.menu!} />
+      </Menu.Dropdown>
+    </Menu>
+  );
+}
 
 /** The prompt field, at the top of the viewer's action bar. At rest it is one line; focused, all. */
 export function ViewerPrompt({
@@ -193,7 +187,7 @@ export function ViewerPrompt({
   pending?: Iteration;
 }) {
   const phone = usePhone();
-  const { item, original, prompt, setPrompt, field, ask, custom, improveTool, improve } = state;
+  const { item, original, prompt, setPrompt, field, ask, custom, suggestionsTool } = state;
   const change = ask.proposal;
   const video = item.type === "video";
   const running = pending?.kind === "prompt";
@@ -260,17 +254,11 @@ export function ViewerPrompt({
         readOnly={change?.action === "upscale"}
         onChange={setPrompt}
         onKeyDown={keys}
-        tools={improveTool ? [improveTool] : []}
+        tools={suggestionsTool ? [suggestionsTool] : []}
         copy={false}
         reset={original}
         send={send}
-        busy={
-          ask.pending
-            ? "Asking for a Change…"
-            : improve.isPending
-              ? "Improving the prompt…"
-              : undefined
-        }
+        busy={ask.pending ? "Asking for a Change…" : undefined}
         submit={sends}
       />
       {custom}

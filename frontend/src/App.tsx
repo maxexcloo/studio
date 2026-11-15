@@ -13,7 +13,7 @@ import { useAppearance } from "./ui/Appearance";
 import { LoadingState } from "./ui/LoadingState";
 import { closeWhenTop } from "./ui/popupClicks";
 import { useDialogKeyboard } from "./ui/useKeyboard";
-import { usePhone } from "./ui/usePhone";
+import { usePhone, useSideways } from "./ui/usePhone";
 const ComparePage = lazy(() =>
   import("./features/compare/ComparePage").then((module) => ({ default: module.ComparePage })),
 );
@@ -32,6 +32,7 @@ function Workspace() {
   const location = useLocation();
   const navigate = useNavigate();
   const phone = usePhone();
+  const sideways = useSideways();
   useDialogKeyboard();
   const overlay =
     location.pathname === "/library"
@@ -65,7 +66,7 @@ function Workspace() {
   const mode = (overlay ? background : location).pathname;
   if (mode.startsWith("/dream") && !dream) return <Navigate to="/images" replace />;
   return (
-    <AppShell header={{ height: 68 }} padding={{ base: "sm", md: "lg" }}>
+    <AppShell header={{ height: phone && !sideways ? 112 : 68 }} padding={{ base: "sm", md: "lg" }}>
       <AppShell.Header>
         <AppHeader mode={mode} />
       </AppShell.Header>

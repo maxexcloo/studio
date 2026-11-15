@@ -170,6 +170,9 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
       });
     }),
   );
+  await viewerPromptMenu(page);
+  await page.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
+  await page.keyboard.press("Escape");
   const surface = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
   // The prompt's Custom… asks in a box of its own, which keeps the last request.
@@ -193,6 +196,8 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
       jobId: "job-hub",
       request: "make it night",
       actions: ["edit", "recreate", "animate", "upscale"],
+      prompt: "An amber bird",
+      itemId: "hub",
     },
   ]);
   await surface.getByRole("button", { name: "Undo", exact: true }).click();
@@ -249,6 +254,7 @@ test("Report fixes the image as a new version and dislikes the original with the
       jobId: "job-hub",
       request: "Fix what is wrong, keeping everything else: Hands: six toes",
       actions: ["edit", "recreate"],
+      itemId: "hub",
     },
   ]);
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -292,6 +298,7 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
     }),
   );
   await viewerPromptMenu(page);
+  await page.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   await closeTextEditor(page, "Prompt");
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
@@ -303,11 +310,13 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
       jobId: "job-hub",
       request: "add rain",
       actions: ["edit", "recreate", "animate", "upscale"],
+      prompt: "An amber bird",
+      itemId: "hub",
     },
   ]);
-  // Undo returns the request the suggestion filled in.
+  // Undo restores the prompt before the suggestion.
   await viewer.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(field).toHaveValue("add rain");
+  await expect(field).toHaveValue("An amber bird");
 });
 
 test("The viewer's prompt rests on one line and shows the whole prompt while focused", async ({
@@ -1762,7 +1771,6 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       "Like",
       "Dislike",
       "Share",
-      "Similar",
       "Delete",
     ].map((name) => bar.getByRole("button", { name, exact: true }));
     const tops = await Promise.all(
@@ -2051,4 +2059,27 @@ test("The desktop viewer bar keeps its actions on one row in a narrow window", a
     return Math.round(box.y + box.height / 2);
   };
   await expect.poll(() => middle("Delete")).toBe(await middle("Animate"));
+});
+
+test("Phone viewer keeps Report under Edit and Similar under Recreate", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Phone action grouping");
+  const { viewer } = await seed(page);
+  const bar = viewer.getByRole("group", { name: "Generation Actions", exact: true });
+  await expect(bar.getByRole("button", { name: "Suggestions", exact: true })).toBeVisible();
+  await expect(bar.getByRole("button", { name: "Report", exact: true })).toHaveCount(0);
+  await expect(bar.getByRole("button", { name: "Similar", exact: true })).toHaveCount(0);
+  const edit = bar.getByRole("button", { name: "Edit", exact: true });
+  await edit.click();
+  await expect(page.getByRole("menuitem", { name: "Report", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(edit).toBeFocused();
+  await viewerAction(page, "Edit", "Report");
+  const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
+  await expect(report).toBeVisible();
+  await report.getByRole("button", { name: "Cancel", exact: true }).click();
+  await viewerAction(page, "Recreate", "Similar");
+  await expect(viewer).toBeHidden();
+  await expect(page).toHaveURL(/similar=hub/);
 });
