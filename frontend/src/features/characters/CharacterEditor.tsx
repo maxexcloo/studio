@@ -1,20 +1,43 @@
-import { Alert, Button, Group, Input, Loader, Paper, Stack, Text } from "@mantine/core";
+import {
+  Alert,
+  Button,
+  Group,
+  Input,
+  Loader,
+  NumberInput,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+} from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
-import { maxCharacterImages, sheetRoles } from "../../../../shared/characters";
+import {
+  type CharacterTrait,
+  maxCharacterAge,
+  maxCharacterImages,
+  maxCharacterTrait,
+  minCharacterAge,
+  sheetRoles,
+} from "../../../../shared/characters";
 import type { ReferenceAsset } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
+import { TextBox } from "../../ui/TextBox";
 import { chipProps } from "../generation/chip";
 import { CardDialog, CardFields, CardForm, CardThumbnails } from "./CardImages";
 import { type CharacterCard, charactersQuery, useMakeSheet, useSaveCharacter } from "./queries";
 
-/** What a new card starts from, such as Use as Character's image. */
+/** What a new card starts from, such as Use as Character's image and what its chat called it. */
 export interface CharacterStart {
   references: ReferenceAsset[];
+  name?: string;
+  description?: string;
 }
+
+type Story = Partial<Record<CharacterTrait, string>> & { age?: number };
 
 /**
  * New Character and Edit Character: a name, a short description and 1–4 images, chosen from the
@@ -58,8 +81,17 @@ function CharacterForm({
   start?: CharacterStart;
   onClose: () => void;
 }) {
-  const [name, setName] = useState(character?.name || "");
-  const [description, setDescription] = useState(character?.description || "");
+  const [name, setName] = useState(character?.name || start?.name || "");
+  const [description, setDescription] = useState(
+    character?.description || start?.description || "",
+  );
+  const [story, setStory] = useState<Story>({
+    age: character?.age,
+    job: character?.job,
+    backstory: character?.backstory,
+    likes: character?.likes,
+    dislikes: character?.dislikes,
+  });
   const [images, setImages] = useState<ReferenceAsset[]>(
     character?.references || start?.references || [],
   );
@@ -77,6 +109,7 @@ function CharacterForm({
           {
             name: name.trim(),
             description: description.trim(),
+            ...story,
             referenceIds: images.map((asset) => asset.id),
           },
           { onSuccess: onClose },
@@ -96,6 +129,7 @@ function CharacterForm({
         images={images}
         onImages={setImages}
       />
+      <CharacterStory story={story} onStory={setStory} />
       {current && (
         <EditorSection
           label="Sheet"
@@ -195,5 +229,48 @@ function EditorSection({
         </Paper>
       )}
     </Input.Wrapper>
+  );
+}
+
+/** A character's age and story: shown on its card, never sent to a model. */
+function CharacterStory({ story, onStory }: { story: Story; onStory: (story: Story) => void }) {
+  const text = (key: CharacterTrait) => ({
+    maxLength: maxCharacterTrait,
+    value: story[key] || "",
+    onChange: (value: string) => onStory({ ...story, [key]: value }),
+  });
+  return (
+    <>
+      <Group grow align="flex-start">
+        <NumberInput
+          label="Age"
+          min={minCharacterAge}
+          max={maxCharacterAge}
+          allowDecimal={false}
+          value={story.age ?? ""}
+          onChange={(value) =>
+            onStory({ ...story, age: typeof value === "number" ? value : undefined })
+          }
+        />
+        <TextInput
+          label="Job"
+          {...text("job")}
+          onChange={(event) => text("job").onChange(event.currentTarget.value)}
+        />
+      </Group>
+      <TextBox label="Backstory" autosize minRows={2} {...text("backstory")} />
+      <Group grow align="flex-start">
+        <TextInput
+          label="Likes"
+          {...text("likes")}
+          onChange={(event) => text("likes").onChange(event.currentTarget.value)}
+        />
+        <TextInput
+          label="Dislikes"
+          {...text("dislikes")}
+          onChange={(event) => text("dislikes").onChange(event.currentTarget.value)}
+        />
+      </Group>
+    </>
   );
 }

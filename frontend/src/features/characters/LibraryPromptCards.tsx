@@ -27,7 +27,7 @@ export function LibraryPromptCards({
   const label = `${noun}s`;
   const listing = useQuery(promptCardsQuery(kind));
   const dialogs = usePromptCardDialogs(kind);
-  const start = useCardFrom((asset) => dialogs.edit(undefined, [asset]));
+  const start = useCardFrom((asset, named) => dialogs.edit(undefined, [asset], named));
   const use = useCardInComposer();
   const [query, setQuery] = useState("");
   const words = query.trim().toLowerCase();

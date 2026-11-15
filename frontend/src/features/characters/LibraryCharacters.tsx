@@ -11,7 +11,7 @@ import { CardSuggestions } from "./CardSuggestions";
 import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import { sheetViews } from "./CharacterEditor";
-import { charactersQuery } from "./queries";
+import { type CharacterCard, charactersQuery } from "./queries";
 import { useCardFrom } from "./useCardFrom";
 import { useCardInComposer } from "./useCardInComposer";
 
@@ -25,7 +25,9 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
   const dialogs = useCharacterDialogs();
   const use = useCardInComposer();
   const [query, setQuery] = useState("");
-  const start = useCardFrom((asset) => dialogs.edit(undefined, { references: [asset] }));
+  const start = useCardFrom((asset, named) =>
+    dialogs.edit(undefined, { references: [asset], ...named }),
+  );
   const words = query.trim().toLowerCase();
   const cards = (characters.data || []).filter(
     (card) => !words || `${card.name} ${card.description}`.toLowerCase().includes(words),
@@ -72,6 +74,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                   {card.description}
                 </Text>
               )}
+              <CharacterStory card={card} />
               <Text size="xs" c="dimmed">
                 {[characterDetail(card), card.missing && `${card.missing} deleted from the gallery`]
                   .filter(Boolean)
@@ -87,4 +90,20 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
       {dialogs.dialogs}
     </>
   );
+}
+
+/** A card's age, job, backstory, likes and dislikes, where it has them. */
+function CharacterStory({ card }: { card: CharacterCard }) {
+  const lines = [
+    [card.age && `Age ${card.age}`, card.job].filter(Boolean).join(" · "),
+    card.backstory,
+    [card.likes && `Likes ${card.likes}`, card.dislikes && `Dislikes ${card.dislikes}`]
+      .filter(Boolean)
+      .join(" · "),
+  ].filter(Boolean);
+  return lines.map((line) => (
+    <Text key={line} size="sm" c="dimmed" lineClamp={3}>
+      {line}
+    </Text>
+  ));
 }

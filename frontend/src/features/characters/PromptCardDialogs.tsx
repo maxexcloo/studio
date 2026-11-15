@@ -14,6 +14,7 @@ import {
   useDeletePromptCard,
   useSavePromptCard,
 } from "./queries";
+import type { CardNamed } from "./useCardFrom";
 
 /** Each kind's words: its name in titles, and what its description should hold. */
 export const promptCardText = {
@@ -31,14 +32,18 @@ export const promptCardText = {
 
 /**
  * New, Edit and Delete for outfit or scene cards: `edit` and `remove` open their dialog, which
- * `dialogs` renders; a new card may start with `references`. `onLayer` hears when one opens or closes over a sheet.
+ * `dialogs` renders; a new card may start with `references` and what a chat `named` it. `onLayer` hears when one opens or closes over a sheet.
  */
 export function usePromptCardDialogs(
   kind: PromptCardKind,
   onLayer: (open: boolean) => void = () => {},
 ) {
   const { noun } = promptCardText[kind];
-  const [editing, setEditing] = useState<{ card?: PromptCard; references?: ReferenceAsset[] }>();
+  const [editing, setEditing] = useState<{
+    card?: PromptCard;
+    references?: ReferenceAsset[];
+    named?: CardNamed;
+  }>();
   const [deleting, setDeleting] = useState<PromptCard | null>(null);
   const deletion = useDeletePromptCard(kind);
   const closeEditor = () => {
@@ -50,8 +55,8 @@ export function usePromptCardDialogs(
     onLayer(false);
   };
   return {
-    edit: (card?: PromptCard, references?: ReferenceAsset[]) => {
-      setEditing({ card, references });
+    edit: (card?: PromptCard, references?: ReferenceAsset[], named?: CardNamed) => {
+      setEditing({ card, references, named });
       onLayer(true);
     },
     remove: (card: PromptCard) => {
@@ -72,6 +77,7 @@ export function usePromptCardDialogs(
               kind={kind}
               card={editing.card}
               references={editing.references}
+              named={editing.named}
               onClose={closeEditor}
             />
           )}
@@ -97,16 +103,18 @@ function PromptCardForm({
   kind,
   card,
   references,
+  named,
   onClose,
 }: {
   kind: PromptCardKind;
   card?: PromptCard;
   references?: ReferenceAsset[];
+  named?: CardNamed;
   onClose: () => void;
 }) {
   const { hint, placeholder } = promptCardText[kind];
-  const [name, setName] = useState(card?.name || "");
-  const [description, setDescription] = useState(card?.description || "");
+  const [name, setName] = useState(card?.name || named?.name || "");
+  const [description, setDescription] = useState(card?.description || named?.description || "");
   const [images, setImages] = useState<ReferenceAsset[]>(card?.references || references || []);
   const save = useSavePromptCard(kind, card?.id);
   return (

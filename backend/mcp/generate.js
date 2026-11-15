@@ -8,10 +8,13 @@ import {
   cardImageSlots,
   characterImages,
   characterProfiles,
+  characterTraits,
   composePrompt,
   identitySlot,
   keepsCharacterFaces,
   keepsIdentity,
+  maxNewCharacters,
+  minCharacterAge,
   startImageSlot,
   withCharacter,
 } from "../../shared/characters.ts";
@@ -105,6 +108,17 @@ const theme = z
   .describe(`One of ${themeIds().join(", ")}.`);
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
 const setTitle = z.string().trim().min(1).max(80);
+// Kept short in the schema: gallery/records.js storedResultSet trims what it stores.
+const cardContext = z.object({ name: z.string(), description: z.string().optional() });
+// Stored on the results, where Studio offers to save the character, outfit and scene as cards.
+const chatContext = z
+  .object({
+    character: cardContext.optional(),
+    outfit: cardContext.optional(),
+    scene: cardContext.optional(),
+    series: z.string().optional(),
+  })
+  .describe("Who and what it shows; series names a story or project.");
 const promptList = z.array(z.string().trim().min(1)).min(1).max(maxSplitJobs);
 /** A JSON array sent as one string, or a single prompt. */
 const promptListText = z.string().transform((text) => {
@@ -189,6 +203,7 @@ export function registerGenerateTools({
   media,
   actor,
   resolveOutput,
+  referenceAsset,
   publicUrl,
   generateDedupeMs,
   reviewedGuides,
@@ -857,6 +872,7 @@ export function registerGenerateTools({
         .describe("Run as written; count images each."),
       title: setTitle.optional(),
       titles: z.array(setTitle).max(maxSplitJobs).optional().describe("One per prompt."),
+      context: chatContext.optional(),
       preview: z.boolean().optional(),
       count: jobCount
         .optional()
@@ -978,7 +994,11 @@ export function registerGenerateTools({
     if (!card) throw new Error(`No character "${value}". Call models to list them.`);
     const referenceIds = card.references.map((asset) => asset.id);
     if (!referenceIds.length)
-      throw new Error(`${card.name} has no images left. Ask the user to add some in Studio.`);
+      throw new Error(
+        card.portrait?.status === "making"
+          ? `${card.name}'s portrait isn't finished yet. Try again once it is.`
+          : `${card.name} has no images left. Ask the user to add some in Studio.`,
+      );
     media.adopt(owner, refs, { assets: referenceIds });
     return { ...card, referenceIds };
   };
@@ -1010,16 +1030,12 @@ export function registerGenerateTools({
       profile_ids,
       each_profile,
       title,
+      context,
       ...args
     } = constrained.args;
-    // A result's number or option letter ("#12", "B") passes its image as a reference.
     if (args.reference_asset_ids)
       args.reference_asset_ids = await Promise.all(
-        args.reference_asset_ids.map(async (id) => {
-          if (!media.namesResult(id)) return media.referenceId(id);
-          const found = await resolveOutput(id, signal);
-          return (await media.resultReference(owner, found.jobId, found.index || 0)).asset.id;
-        }),
+        args.reference_asset_ids.map((id) => referenceAsset(id, signal)),
       );
     const sheet = args.character_sheet === true;
     delete args.character_sheet;
@@ -1381,16 +1397,23 @@ export function registerGenerateTools({
         ],
       };
     }
-    // A call of several results is one titled set, with the character it was made with; the
-    // gallery titles each prompt's results by titles, or by its prompt where they are missing.
-    const resultSet = jobs > 1 && {
+    // A call of several results, or one the chat titled or described, is one titled set, with the
+    // character it was made with and the chat's context; the gallery titles each prompt's results
+    // by titles, by a one-prompt call's title, or by its prompt where they are missing.
+    const resultSet = (jobs > 1 || title || args.titles || context) && {
       id: crypto.randomUUID(),
       // A character's set is named for it unless the chat named the set.
       title: title || card?.name || replyTitle(request) || promptWords(args.prompts[0]),
       source: actor.client || "MCP",
       ...(card ? { character: { id: card.id, name: card.name } } : {}),
+      ...(context ? { context } : {}),
     };
-    for (const item of plans) if (resultSet) item.plan.result_set = resultSet;
+    for (const item of plans)
+      if (resultSet) {
+        item.plan.result_set = resultSet;
+        if (title && !item.plan.titles && item.plan.prompts.length === 1)
+          item.plan.titles = [title];
+      }
     // Request and prompts together: the prompts run, and the request stays on the record.
     const recordOf = ({ plan }) => {
       const assistant = actor.assistant
@@ -1469,10 +1492,12 @@ export function registerGenerateTools({
       length: z.number().optional(),
       runs_on: z.enum(["local", "cloud"]).optional(),
       upscale_quality: z.enum(["fast", "balanced", "high"]).optional(),
+      title: setTitle.optional(),
     },
     async (
       {
         job_id,
+        title,
         output_index: chosenIndex,
         mode,
         upscale_quality,
@@ -1508,6 +1533,7 @@ export function registerGenerateTools({
           length,
           runs_on,
           upscale_quality,
+          title,
         })
           .filter(([, value]) => value)
           .map(([name]) => name);
@@ -1533,7 +1559,16 @@ export function registerGenerateTools({
       if (upscale_quality && mode !== "upscale")
         throw new Error("upscale_quality is for mode upscale. Call reuse again.");
       if (mode === "upscale") {
-        if (wanted || prompt || request || profile_id || preserve_seed || theme || count > 1)
+        if (
+          wanted ||
+          prompt ||
+          request ||
+          profile_id ||
+          preserve_seed ||
+          theme ||
+          count > 1 ||
+          title
+        )
           throw new Error(
             "mode upscale takes only job_id, output_index and upscale_quality. Call reuse again.",
           );
@@ -1643,6 +1678,19 @@ export function registerGenerateTools({
         Object.assign(plan.args, { prompts: [""], write });
         source = "studio";
       }
+      // A follow-up keeps its source's character and chat context, as a set of one titled by the call.
+      const set = item.resultSet;
+      const kept = set?.context;
+      if (title || kept) {
+        plan.args.result_set = {
+          id: crypto.randomUUID(),
+          title: title || set?.title || promptWords(plan.args.prompts?.[0] || item.prompt),
+          source: actor.client || "MCP",
+          ...(set?.character ? { character: set.character } : {}),
+          ...(kept ? { context: kept } : {}),
+        };
+        if (title) plan.args.titles = [title];
+      }
       // A plain run again keeps the result's prompt, so it keeps how that prompt was written (Recreate does the same).
       const carried = !prompt && !moved ? item.assistant || recorded?.assistant : null;
       const submission = await submit(plan.profile, plan.args, {
@@ -1663,6 +1711,89 @@ export function registerGenerateTools({
         source,
         `${plan.tierNote || ""}${dropped}`,
       );
+    },
+  );
+  tool(
+    server,
+    "create_characters",
+    "create characters",
+    `Up to ${maxNewCharacters} new character cards in one call: name, description (lasting looks), optional age and story, and portrait (your prompt for their first image). sheets then makes each sheet.`,
+    {
+      characters: z
+        .array(
+          z.object({
+            // Lengths and the age's ceiling are checked where the card is saved (cards.js).
+            name: z.string(),
+            description: z.string(),
+            portrait: z.string(),
+            age: z.number().int().min(minCharacterAge).optional(),
+            ...Object.fromEntries(characterTraits.map((key) => [key, z.string().optional()])),
+          }),
+        )
+        .min(1)
+        .max(maxNewCharacters),
+      sheets: z.boolean().optional(),
+      profile_id: z.string().min(1).optional(),
+    },
+    async ({ characters, sheets, profile_id }, signal) => {
+      const { characters: existing = [] } = await media.request(
+        "GET",
+        "/api/characters",
+        undefined,
+        owner,
+        { signal },
+      );
+      // Checked before any portrait queues, so a retried call makes no second set.
+      const taken = characters.filter(({ name }) => findCard(existing, name));
+      if (taken.length)
+        throw new Error(
+          `${taken.map(({ name }) => name).join(", ")} already exist${taken.length === 1 ? "s" : ""}: pick other names, or change them with cards update.`,
+        );
+      for (const { portrait, ...card } of characters) {
+        const refusal = minorAgeRefusal(Object.values(card).join("\n"));
+        if (refusal) throw new Error(refusal);
+      }
+      const names = characters.map(({ name }) => name);
+      const reply = await generateOnce(
+        {
+          prompts: characters.map(({ portrait }) => portrait),
+          titles: names,
+          title: names.join(", ").slice(0, 80),
+          count: 1,
+          ...(profile_id ? { profile_id } : {}),
+        },
+        signal,
+        [],
+      );
+      const jobs = reply.structuredContent?.jobs || [];
+      const saved = [];
+      for (const [index, { portrait: _prompt, ...card }] of characters.entries()) {
+        if (!jobs[index]) break;
+        const made = await media.request(
+          "POST",
+          "/api/characters",
+          {
+            ...card,
+            referenceIds: [],
+            portrait: { jobId: jobs[index].job_id, ...(sheets ? { sheet: true } : {}) },
+          },
+          owner,
+          { signal },
+        );
+        saved.push(made.character.name);
+      }
+      const [text, ...rest] = reply.content;
+      return {
+        ...reply,
+        content: [
+          {
+            type: "text",
+            text: `Saved ${saved.join(", ")} in Library › Characters; each portrait becomes its card's first image when it finishes${sheets ? ", then Studio makes its sheet" : ""}. ${text.text}`,
+          },
+          ...rest,
+        ],
+        structuredContent: { ...reply.structuredContent, characters: saved },
+      };
     },
   );
   return { namedInTier };

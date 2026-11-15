@@ -9,7 +9,9 @@ import sharp from "sharp";
 import { sheetView } from "../shared/characters.ts";
 
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-character-sheets-"));
-const { sheetPanels, sheetProfile, sheetReferences } = await import("./character-sheets.js");
+const { createCharacterSheets, sheetPanels, sheetProfile, sheetReferences } =
+  await import("./character-sheets.js");
+const { createCard, listCards } = await import("./cards.js");
 
 /** A sheet drawn to prompt-sheet.js's layout: boxes of colour on a light grey background. */
 async function drawnSheet({ touching = false } = {}) {
@@ -135,4 +137,36 @@ test("a run takes the sheet's view its prompt names, and a subject video takes t
     mediaInputs: [{ id: "reference", role: "start" }],
   };
   assert.equal(run("She dances", { profile: frames })[0].assetId, "own");
+});
+
+test("a new character's finished portrait becomes its first image, then its sheet queues as its owner", async () => {
+  const account = { userId: "artist" };
+  const card = createCard(account, "characters", {
+    name: "Mara",
+    description: "red-haired ranger",
+    age: 31,
+    job: "Scout",
+    portrait: { jobId: "portrait-job", sheet: true },
+  });
+  assert.deepEqual([card.referenceIds, card.age, card.job], [[], 31, "Scout"]);
+  const admitted = [];
+  const sheets = createCharacterSheets({
+    admit: async (input, as) => {
+      admitted.push([input.referenceAssets[0].assetId, as]);
+      return { status: 200, payload: { jobId: "sheet-job" } };
+    },
+    profiles: async () => [
+      { id: "qwen", kind: "image", family: "qwen_image_21", mediaInputs: [{ id: "image" }] },
+    ],
+    account: (ownerId) => ({ userId: ownerId }),
+  });
+  // Someone else's result of the same job id never becomes the card's.
+  const result = { jobId: "portrait-job", type: "image", status: "done" };
+  await sheets.completed([{ ...result, id: "theirs", ownerId: "other" }]);
+  await sheets.completed([{ ...result, id: "portrait-1", ownerId: "artist" }]);
+  const [kept] = listCards("characters", "artist");
+  assert.deepEqual(kept.referenceIds, ["portrait-1"]);
+  assert.equal(kept.portrait, undefined);
+  assert.equal(kept.sheet.jobId, "sheet-job");
+  assert.deepEqual(admitted, [["portrait-1", account]]);
 });

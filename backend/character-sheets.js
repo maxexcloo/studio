@@ -212,11 +212,63 @@ export function sheetReferences({ references, prompt, cards, profile, madeWith =
 
 /**
  * Make Sheet's route and its finishing step. `profiles(account)` are the generation profiles the
- * account may use; `admit` is domain/admission.ts's. `completed(items)` hears each finished job's
- * results, keeping a sheet's panels on its character.
+ * account may use; `admit` is domain/admission.ts's; `account(ownerId)` is the owner's account to
+ * queue a sheet as once its portrait is made (null once it is gone). `completed(items)` hears each
+ * finished job's results, keeping a new character's portrait and a sheet's panels on the card.
  */
-export function createCharacterSheets({ admit, profiles }) {
+export function createCharacterSheets({ admit, profiles, account: accountFor }) {
   const splitting = new Set();
+
+  /** Queues `card`'s sheet from its first image, as admit answers, with the profile it runs on. */
+  async function queueSheet(account, card) {
+    const profile = sheetProfile(await profiles(account));
+    if (!profile)
+      return {
+        status: 409,
+        payload: { ok: false, error: "Make Sheet needs Qwen-Image 2.1, which isn't ready." },
+      };
+    const admitted = await admit(
+      {
+        ...profile.defaults,
+        autoUpscale: null,
+        kind: "image",
+        profileId: profile.id,
+        ...(profile.backend ? { profileBackend: profile.backend } : {}),
+        model: profile.model,
+        workflow: profile.workflow,
+        loras: [],
+        referenceAssets: [{ assetId: card.referenceIds[0], slot: profile.mediaInputs[0].id }],
+        ...sheetSize,
+        prompt: "",
+        seed: "",
+        count: 1,
+        writing: { kind: "sheet", name: card.name, description: card.description },
+      },
+      account,
+    );
+    if (admitted.status >= 400) return admitted;
+    const jobId = String(admitted.payload.jobId);
+    const character = updateCharacter(account?.userId || "", card.id, (current) => ({
+      ...current,
+      sheet: { jobId, at: new Date().toISOString() },
+    }));
+    return { status: 200, jobId, profile, character };
+  }
+
+  /** Keeps a new character's finished portrait as its first image, then queues its sheet if asked. */
+  async function keepPortrait(ownerId, card, item) {
+    const character = updateCharacter(ownerId, card.id, (current) =>
+      current.portrait?.jobId === item.jobId && !current.referenceIds.length
+        ? (({ portrait: _done, ...rest }) => ({ ...rest, referenceIds: [item.id] }))(current)
+        : current,
+    );
+    if (!card.portrait.sheet || character?.referenceIds[0] !== item.id) return;
+    const account = accountFor(ownerId);
+    if (account === null) return;
+    const queued = await queueSheet(account, character);
+    if (queued.status >= 400)
+      logWarning(`Make Sheet: ${card.id}'s sheet was not queued: ${queued.payload.error}`);
+  }
 
   /** Cuts a finished sheet into its panels and keeps them on its character. */
   async function keep(ownerId, card, item) {
@@ -256,65 +308,38 @@ export function createCharacterSheets({ admit, profiles }) {
             status: 404,
             payload: { ok: false, error: "No such character." },
           };
-        const profile = sheetProfile(await profiles(account));
-        if (!profile)
+        if (!card.referenceIds.length)
           return {
             status: 409,
-            payload: {
-              ok: false,
-              error: "Make Sheet needs Qwen-Image 2.1, which isn't ready.",
-            },
+            payload: { ok: false, error: `${card.name} has no image to draw a sheet from yet.` },
           };
-        const admitted = await admit(
-          {
-            ...profile.defaults,
-            autoUpscale: null,
-            kind: "image",
-            profileId: profile.id,
-            ...(profile.backend ? { profileBackend: profile.backend } : {}),
-            model: profile.model,
-            workflow: profile.workflow,
-            loras: [],
-            referenceAssets: [
-              {
-                assetId: card.referenceIds[0],
-                slot: profile.mediaInputs[0].id,
-              },
-            ],
-            ...sheetSize,
-            prompt: "",
-            seed: "",
-            count: 1,
-            writing: {
-              kind: "sheet",
-              name: card.name,
-              description: card.description,
-            },
-          },
-          account,
-        );
-        if (admitted.status >= 400) return admitted;
-        const jobId = String(admitted.payload.jobId);
-        const character = updateCharacter(ownerId, card.id, (current) => ({
-          ...current,
-          sheet: { jobId, at: new Date().toISOString() },
-        }));
+        const queued = await queueSheet(account, card);
+        if (queued.status >= 400) return queued;
         return {
           status: 200,
           payload: {
             ok: true,
-            jobId,
-            profile: profile.label || profile.id,
-            character: shownCard(account, character),
+            jobId: queued.jobId,
+            profile: queued.profile.label || queued.profile.id,
+            character: shownCard(account, queued.character),
           },
         };
       });
     },
-    /** Keeps the panels of each finished sheet among `items`, once. */
+    /** Keeps each finished portrait and the panels of each finished sheet among `items`, once. */
     async completed(items) {
       for (const item of items) {
-        if (item.type !== "image" || item.status !== "done" || isGalleryHidden(item)) continue;
         const ownerId = item.ownerId || "";
+        const waiting = listCards("characters", ownerId).find(
+          (each) => each.portrait?.jobId === item.jobId && !each.referenceIds.length,
+        );
+        if (item.type !== "image" || item.status !== "done" || isGalleryHidden(item)) continue;
+        if (waiting) {
+          await keepPortrait(ownerId, waiting, item).catch((error) =>
+            logWarning(`Character portrait: ${waiting.id}: ${error.message}`),
+          );
+          continue;
+        }
         const card = listCards("characters", ownerId).find(
           (each) => each.sheet?.jobId === item.jobId && !each.sheet.panels,
         );
