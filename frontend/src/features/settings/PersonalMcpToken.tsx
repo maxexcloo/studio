@@ -93,6 +93,7 @@ export function PersonalMcpToken() {
             <Button
               size="compact-sm"
               variant="default"
+              leftSection={<icons.add size={16} />}
               loading={busy}
               disabled={busy}
               onClick={() => void change(false)}

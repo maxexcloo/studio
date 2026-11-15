@@ -17,6 +17,7 @@ import { type ReactNode, useEffect, useState } from "react";
 
 import { api, post } from "../../api";
 import type { Account } from "../../types";
+import { icons } from "../../ui/icons";
 import { StudioLogo } from "../../ui/StudioLogo";
 import type { McpTokenStatus } from "../settings/PersonalMcpToken";
 
@@ -186,7 +187,13 @@ export function AccountGate({ children }: { children: ReactNode }) {
                     onChange={(e) => setPassword(e.currentTarget.value)}
                   />
                   {signIn.error && <Alert color="red">{signIn.error.message}</Alert>}
-                  <Button type="submit" loading={signIn.isPending} fullWidth mt="sm">
+                  <Button
+                    type="submit"
+                    leftSection={bootstrap ? <icons.add size={16} /> : undefined}
+                    loading={signIn.isPending}
+                    fullWidth
+                    mt="sm"
+                  >
                     {bootstrap ? "Create Administrator" : "Sign In"}
                   </Button>
                 </Stack>

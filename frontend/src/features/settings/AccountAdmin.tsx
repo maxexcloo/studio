@@ -243,7 +243,7 @@ function NewAccount({
         </Stack>
         {create.error && <Alert color="red">{create.error.message}</Alert>}
         <DialogFooter pending={create.isPending} onCancel={onCancel}>
-          <Button type="submit" loading={create.isPending}>
+          <Button type="submit" leftSection={<icons.add size={16} />} loading={create.isPending}>
             Create User
           </Button>
         </DialogFooter>
