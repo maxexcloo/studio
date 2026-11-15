@@ -1012,15 +1012,12 @@ test("media and administrator credentials discover only their own friendly tools
     media.getInstructions(),
     /"N sets of K" is N distinct prompts with count K in one call; asked for variety, vary framing, angle, pose, outfit and setting/,
   );
-  // A chat keeps the user's own description and their no-LoRAs choice from turn to turn.
+  // A chat keeps the user's own description, and LoRAs run only when asked.
   assert.match(
     media.getInstructions(),
     /own descriptions .* word for word, changing only what they ask/,
   );
-  assert.match(
-    media.getInstructions(),
-    /if the user declines LoRAs, pass loras: \[\] for the rest of the chat/,
-  );
+  assert.match(media.getInstructions(), /a LoRA only when the user names one or clearly wants one/);
   assert.match(
     media.getInstructions(),
     /call reuse with its ref and your revised prompt, not a new generate/,
@@ -1199,8 +1196,8 @@ test("Models uses only this studio, filters readiness and kind, and returns deta
   assert.deepEqual(detail.controls.cfg, { min: 0, max: 20, default: 0 });
   assert.deepEqual(detail.controls.sampler.options, ["euler", "dpmpp_2m"]);
   assert.equal(detail.controls.scheduler, undefined, "a single scheduler is fixed");
-  assert.equal(detail.defaults.count, 1);
-  assert.equal(detail.controls.count.default, 1);
+  assert.equal(detail.defaults.count, 2);
+  assert.equal(detail.controls.count.default, 2);
   assert.equal(detail.prompting, undefined);
   await failure(client, "models", { profile_id: "another-studio-profile" });
   // A guessed id or a label finds the profile; a miss names the closest profiles in one reply.
@@ -1267,7 +1264,6 @@ test("Models and Generate keep an old per-backend id's controls after the defaul
   assert.equal(detail.backend, "comfyui");
   assert.equal(detail.references.max, 10);
   assert.equal(detail.controls.loras.max, 8);
-  assert.equal(detail.defaults.width, 2048);
   await call(client, "generate", { profile_id: "custom:old-comfy", prompts: ["A fox"] });
   assert.equal(f.submitted[0].profileBackend, "comfyui");
   assert.equal(f.submitted[0].width, 2048);
@@ -1504,7 +1500,7 @@ test("a prompt holding generation instructions is refused with the count to pass
   assert.equal(f.submitted.at(-1).prompt, "Create two cats on a sofa");
 });
 
-test("omitted counts queue one image or video job; a count is one image batch, or a job per video", async (t) => {
+test("omitted counts queue two images as one batch or one video job; a count is one image batch, or a job per video", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   for (const profile of [imageProfile, videoProfile]) {
@@ -1515,7 +1511,7 @@ test("omitted counts queue one image or video job; a count is one image batch, o
     assert.equal(result.jobs.length, 1);
     assert.deepEqual(
       f.submitted.slice(-1).map((body) => [body.kind, body.count]),
-      [[profile.kind, 1]],
+      [[profile.kind, profile.kind === "image" ? 2 : 1]],
     );
     const pair = await generate(client, { profile_id: profile.id, count: 2 });
     const batched = profile.kind === "image";
@@ -2503,7 +2499,7 @@ test("reference-mode capabilities override text controls without losing the prof
   assert.equal(details.controls.denoise, undefined);
   assert.deepEqual(details.imageModes.reference.controls.negative_prompt, {});
   assert.ok(details.imageModes.reference.controls.denoise);
-  assert.ok(details.loras.some((line) => line.startsWith("fixture-effect ")));
+  assert.equal(details.loras_total, 2);
   const refused = await call(client, "generate", {
     profile_id: imageProfile.id,
     prompts: ["A tree"],
@@ -2883,6 +2879,11 @@ test("MCP advertises native sizing and submits tiled 2K with an explicit referen
     aspectPolicy: "reference",
     family: "flux3",
     native: { "2k": "yes" },
+    constraints: {
+      ...imageProfile.constraints,
+      width: { min: 64, max: 4096, step: 8 },
+      height: { min: 64, max: 4096, step: 8 },
+    },
   };
   await f.profiles([profile]);
   const detail = data(await call(client, "models", { profile_id: profile.id }));
@@ -2895,11 +2896,10 @@ test("MCP advertises native sizing and submits tiled 2K with an explicit referen
   );
   const assetId = uploaded.asset?.id || uploaded.id;
   await generate(client, {
-    height: 1152,
+    aspect: "16:9",
     reference_asset_ids: [assetId],
     reference_role: "reference",
     resolution: "2K",
-    width: 2048,
   });
   assert.equal(f.submitted[0].referenceRole, "reference");
   assert.equal(f.submitted[0].tiledDecode, true);
@@ -2908,10 +2908,9 @@ test("MCP advertises native sizing and submits tiled 2K with an explicit referen
   // An edit is framed by its reference, as the composer frames it: the 64×48 reference's 4:3 at
   // the profile's pixel count, whatever size the call asked for.
   await generate(client, {
-    height: 1152,
+    aspect: "16:9",
     reference_asset_ids: [assetId],
     reference_role: "edit",
-    width: 2048,
   });
   assert.equal(f.submitted[1].referenceRole, "edit");
   assert.deepEqual([f.submitted[1].width, f.submitted[1].height], [728, 544]);
@@ -3173,12 +3172,12 @@ test("the Result wait ends promptly when the client cancels or disconnects, with
   );
 });
 
-test("Models indexes every compatible LoRA compactly and details only the LoRAs looked up", async (t) => {
+test("Models counts a profile's LoRAs without listing them and details only the LoRAs looked up", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   const detail = data(await call(client, "models", { profile_id: imageProfile.id }));
-  // Short names, the trigger word to prompt with, and no infrastructure or other-architecture LoRAs.
-  assert.deepEqual(detail.loras, ["fixture-effect [glowfx]", "fixture-unknown (unverified)"]);
+  // No infrastructure or other-architecture LoRAs, and no list to pick from unless the user asks.
+  assert.equal(detail.loras, undefined);
   assert.equal(detail.loras_total, 2);
   const full = {
     name: "fixture-effect",
@@ -3251,11 +3250,7 @@ test("Models indexes every compatible LoRA compactly and details only the LoRAs 
     assert.equal(fixed.controls[key], undefined, key);
   for (const key of ["steps", "cfg"]) assert.equal(fixed.defaults[key], undefined, key);
   for (const [field, value, pattern] of [
-    [
-      "steps",
-      20,
-      /steps cannot be adjusted.*fixed at 4.*Adjustable controls: width, height, count, seed/,
-    ],
+    ["steps", 20, /steps cannot be adjusted.*fixed at 4.*Adjustable controls: aspect, count, seed/],
     ["cfg", 3, /cfg cannot be adjusted.*fixed at 1/],
     ["negative_prompt", "Blur", /negative_prompt cannot be adjusted.*no negative prompt input/],
   ]) {
@@ -4809,7 +4804,7 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
   );
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "generate");
   assert.match(generate.description, /at most 10 images per call\./);
-  assert.equal(generate.inputSchema.properties.count.description, "Images per prompt; default 1.");
+  assert.match(generate.inputSchema.properties.count.description, /default 2 for one image prompt/);
   assert.equal(f.submitted.length, 4);
 });
 
@@ -4927,9 +4922,13 @@ test("result numbers are the account's in every chat, and a job id from another 
     defaults: { image: imageProfile.id, video: localFirstFrame.id },
   });
   const old = await chat(t, f, "alice", "old-chat");
-  const earlier = data(await call(old, "generate", { kind: "image", prompts: ["A cat"] }));
+  const earlier = data(
+    await call(old, "generate", { kind: "image", prompts: ["A cat"], count: 1 }),
+  );
   const current = await chat(t, f, "alice", "new-chat");
-  const egg = data(await call(current, "generate", { kind: "image", prompts: ["An egg"] }));
+  const egg = data(
+    await call(current, "generate", { kind: "image", prompts: ["An egg"], count: 1 }),
+  );
   assert.equal(egg.jobs[0].ref, "#2");
   finish(f);
   // "animate #2" means the result Studio shows as #2, whichever chat made it.
@@ -4948,7 +4947,7 @@ test("result numbers are the account's in every chat, and a job id from another 
 test("variants offers lettered options of a result, records the pick and takes letters and numbers", async (t) => {
   const f = await fixture(t);
   const client = await chat(t, f, "alice", "fox-chat");
-  data(await call(client, "generate", { kind: "image", prompts: ["A fox at noon"] }));
+  data(await call(client, "generate", { kind: "image", prompts: ["A fox at noon"], count: 1 }));
   finish(f);
   const runs = [];
   const votes = [];
@@ -5079,23 +5078,66 @@ test("aspect picks the profile's own preset and resolution its long edge", async
   assert.equal(f.submitted.at(-1).tiledDecode, true);
   assert.equal(f.submitted.at(-1).autoUpscale, null);
   assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
-  // An exact size sent beside an aspect wins, rather than costing the chat a retry.
-  assert.deepEqual(await size({ aspect: "portrait", width: 768, height: 1024 }), [768, 1024]);
+  // A free width and height are not arguments: the preset decides, on the profile's grid.
+  assert.deepEqual(await size({ aspect: "portrait", width: 777, height: 1001 }), [576, 1024]);
   // Not drawn at 4K: drawn at 2K, then upscaled.
   assert.deepEqual(await size({ resolution: "4K" }), [1536, 2048]);
   assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: "high", target: 4096 });
-  for (const [args, message] of [
-    [{ aspect: "sideways" }, /Choose aspect from landscape, portrait, square/],
-    [{ aspect: "landscape", width: 1344 }, /Pass aspect, or both width and height/],
-  ]) {
-    const refused = await call(client, "generate", { kind: "image", prompts: ["An egg"], ...args });
-    assert.equal(refused.isError, true);
-    assert.match(texts(refused), message);
-  }
+  const refused = await call(client, "generate", {
+    kind: "image",
+    prompts: ["An egg"],
+    aspect: "sideways",
+  });
+  assert.equal(refused.isError, true);
+  assert.match(texts(refused), /Choose aspect from 1:1, 16:9, 9:16, 4:3, 3:4, landscape/);
   const schema = (await client.listTools()).tools.find((tool) => tool.name === "generate")
     .inputSchema.properties;
-  assert.match(schema.aspect.description, /prefer to width\/height/);
+  assert.equal(schema.width, undefined);
   assert.deepEqual(schema.resolution.enum, ["1K", "2K", "4K"]);
+  // Models offers the presets by name, starting on the family's own default preset.
+  const detail = data(await call(client, "models", { profile_id: "native" }));
+  assert.deepEqual(detail.controls.aspect, { options: presets.map((item) => item.label) });
+  await f.profiles([{ ...native, aspectDefault: "16:9" }], {
+    defaults: { image: "native", video: videoProfile.id },
+  });
+  assert.deepEqual(
+    data(await call(client, "models", { profile_id: "native" })).controls.aspect.default,
+    "16:9",
+  );
+  assert.deepEqual(await size({}), [1024, 576], "the family's default preset without aspect");
+});
+
+test("a vague generate runs two images on its family's fastest profile at the default preset, without LoRAs", async (t) => {
+  const f = await fixture(t);
+  const presets = [
+    { label: "1:1", w: 1024, h: 1024, default: true },
+    { label: "16:9", w: 1360, h: 768 },
+  ];
+  const quality = {
+    ...structuredClone(imageProfile),
+    id: "flux-quality",
+    label: "Flux · Quality",
+    defaults: { ...imageProfile.defaults, width: 1024, height: 1024 },
+    aspectPresets: presets,
+  };
+  const fast = { ...quality, id: "flux-fast", label: "Flux · Fast" };
+  await f.profiles([quality, fast], { defaults: { image: quality.id, video: videoProfile.id } });
+  const client = await f.client();
+  const run = async (args) => {
+    await call(client, "generate", { prompts: ["A fox"], request: "a fox", ...args }).then(data);
+    const { profileId, count, loras, width, height } = f.submitted.at(-1);
+    return { profileId, count, loras, size: [width, height] };
+  };
+  const vague = { profileId: fast.id, count: 2, loras: [], size: [1024, 1024] };
+  assert.deepEqual(await run({}), vague);
+  // A Quality id the chat chose itself runs Fast unless the request asks for quality.
+  assert.deepEqual(await run({ profile_id: quality.id }), vague);
+  assert.equal(
+    (await run({ profile_id: quality.id, request: "a fox, best quality" })).profileId,
+    quality.id,
+  );
+  assert.equal((await run({ tier: "quality" })).profileId, quality.id);
+  assert.equal((await run({ count: 1 })).count, 1);
 });
 
 test('replies label links Result N with one All Results page, and Result "all" shows the conversation', async (t) => {
