@@ -1408,6 +1408,7 @@ test("Incoming results preserve loaded pages, the scroll anchor and selection wi
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
   const firstHeight = await page
     .locator("[data-gallery-view]")
     .evaluate((host) => host.style.height);
@@ -1426,13 +1427,11 @@ test("Incoming results preserve loaded pages, the scroll anchor and selection wi
   await page.mouse.down();
   await page.mouse.move(track.x + track.width / 2, track.y + track.height * 0.6, { steps: 4 });
   await page.mouse.up();
-  const tile = page.getByRole("button", { name: "Open image: Browse Result 70", exact: true });
-  await tile.scrollIntoViewIfNeeded();
-  await page.getByRole("button", { name: "Select Items", exact: true }).click();
   const selectedTile = page.getByRole("button", {
     name: "Select image: Browse Result 70",
     exact: true,
   });
+  await selectedTile.scrollIntoViewIfNeeded();
   await selectedTile.click();
   await expect(selectedTile).toHaveAttribute("aria-pressed", "true");
   const before = await selectedTile.boundingBox();
@@ -1699,15 +1698,15 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
     await page.goto("/images?item=browse-1");
     const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
     await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
-    async function move(direction: "next" | "previous") {
-      if (navigation === "arrows")
-        await viewer
-          .getByRole("button", {
-            name: direction === "next" ? "Next Generation" : "Previous Generation",
-            exact: true,
-          })
-          .click();
-      else if (navigation === "keyboard")
+    async function move(direction: "next" | "previous", atBound = false) {
+      if (navigation === "arrows") {
+        const arrow = viewer.getByRole("button", {
+          name: direction === "next" ? "Next Generation" : "Previous Generation",
+          exact: true,
+        });
+        if (atBound) await expect(arrow).toBeDisabled();
+        else await arrow.click();
+      } else if (navigation === "keyboard")
         await page.keyboard.press(direction === "next" ? "ArrowRight" : "ArrowLeft");
       else {
         const photo = viewer.getByRole("img");
@@ -1717,10 +1716,14 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
         // the same viewer navigation, including bounds, that follows it.
         expect(
           await photo.evaluate((target, x) => {
-            const touch = new Touch({ identifier: 7, target, clientX: x, clientY: 250 });
-            return target.dispatchEvent(
-              new TouchEvent("touchstart", { bubbles: true, cancelable: true, touches: [touch] }),
-            );
+            const contact = { identifier: 7, target, clientX: x, clientY: 250 };
+            const event = new Event("touchstart", { bubbles: true, cancelable: true });
+            Object.defineProperties(event, {
+              touches: { value: [contact] },
+              targetTouches: { value: [contact] },
+              changedTouches: { value: [contact] },
+            });
+            return target.dispatchEvent(event);
           }, start),
         ).toBe(false);
         const pointer = {
@@ -1761,7 +1764,7 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
     await move("previous");
     await expect(page).toHaveURL(/item=browse-0$/);
     await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
-    await move("previous");
+    await move("previous", true);
     await expect(page).toHaveURL(/item=browse-0$/);
     await move("next");
     await expect(page).toHaveURL(/item=browse-1$/);
@@ -1769,7 +1772,7 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
     await move("next");
     await expect(page).toHaveURL(/item=browse-2$/);
     await expect(viewer.getByRole("img", { name: "Browse Result 2", exact: true })).toBeVisible();
-    await move("next");
+    await move("next", true);
     await expect(page).toHaveURL(/item=browse-2$/);
     await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
     await expect(
