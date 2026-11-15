@@ -28,13 +28,13 @@ import type { GenerationInput, Profile, Rating } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { modelFamilyLabel } from "../../ui/modelFamily";
 import { OrderedItems } from "../../ui/OrderedItems";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "./chip";
 import { useGeneration } from "./GenerationProvider";
 import { type LoraLibrary, loraLibraryQuery } from "./loraLibrary";
+import { modelFamilyLabel } from "./modelFamily";
 import { isProfile, profileForBackend } from "./payload";
 import {
   ChipContent,

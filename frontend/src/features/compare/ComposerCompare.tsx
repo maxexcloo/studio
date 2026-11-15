@@ -8,11 +8,11 @@ import { menuWidth } from "../../theme";
 import type { GenerationInput, Profile } from "../../types";
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
-import { modelFamilyLabel } from "../../ui/modelFamily";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "../generation/chip";
 import { useGeneration } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
+import { modelFamilyLabel } from "../generation/modelFamily";
 import { profileName } from "../generation/payload";
 import {
   addVariant,
