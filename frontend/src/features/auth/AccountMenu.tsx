@@ -7,7 +7,7 @@ import { Link, useLocation } from "react-router";
 import { post } from "../../api";
 import { ownAccountQuery, useAccount } from "./AccountGate";
 
-/** The account's name, Account and Sign Out, last after any `children` (the header menu's items). */
+/** The account heading and Account, then workspace links and the final Sign Out action. */
 export function AccountMenuContent({ children }: { children?: ReactNode }) {
   const location = useLocation(),
     client = useQueryClient();
@@ -24,8 +24,6 @@ export function AccountMenuContent({ children }: { children?: ReactNode }) {
   const name = multi ? own.data?.account.username || "Your Account" : "Single-User Development";
   return (
     <>
-      {children}
-      {children && <Menu.Divider />}
       <Menu.Label>{name}</Menu.Label>
       <Menu.Item
         component={Link}
@@ -35,14 +33,18 @@ export function AccountMenuContent({ children }: { children?: ReactNode }) {
       >
         Account
       </Menu.Item>
+      {children}
       {multi && (
-        <Menu.Item
-          leftSection={<LogOut size={16} />}
-          disabled={signOut.isPending}
-          onClick={() => signOut.mutate()}
-        >
-          Sign Out
-        </Menu.Item>
+        <>
+          <Menu.Divider />
+          <Menu.Item
+            leftSection={<LogOut size={16} />}
+            disabled={signOut.isPending}
+            onClick={() => signOut.mutate()}
+          >
+            Sign Out
+          </Menu.Item>
+        </>
       )}
     </>
   );

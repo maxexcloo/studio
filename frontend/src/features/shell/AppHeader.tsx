@@ -11,7 +11,7 @@ import { Image, Video } from "lucide-react";
 import { useId, useState } from "react";
 import { Link } from "react-router";
 
-import { useAppearance } from "../../ui/Appearance";
+import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
 import { StudioLogo } from "../../ui/StudioLogo";
 import { usePhone } from "../../ui/usePhone";
@@ -45,7 +45,7 @@ function ModeSwitcher({ mode }: { mode: string }) {
   return (
     <Group
       ref={setRoot}
-      gap={2}
+      gap={phone ? 0 : 2}
       component="nav"
       aria-label="Creative Modes"
       className={classes.modes}
@@ -125,7 +125,7 @@ export function AppHeader({ mode }: { mode: string }) {
   return (
     <Group
       h="100%"
-      px={{ base: "sm", sm: "lg" }}
+      px={phone ? 0 : "lg"}
       gap="xs"
       justify="space-between"
       wrap="nowrap"
@@ -141,7 +141,10 @@ export function AppHeader({ mode }: { mode: string }) {
         <StatusAction />
       </Group>
       <ModeSwitcher mode={mode} />
-      <HeaderOptions />
+      <Group gap={phone ? 0 : "xs"} wrap="nowrap">
+        <AppearanceMenu />
+        <HeaderOptions />
+      </Group>
     </Group>
   );
 }
