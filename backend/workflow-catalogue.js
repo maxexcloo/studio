@@ -29,15 +29,12 @@ function ofExistingProfiles({ lastUsed }) {
 
 export function loadWorkflowPreferences() {
   if (preferencesCache) return preferencesCache;
-  try {
-    const raw = readRuntimeDocument(dataDir, "workflow-preferences");
-    preferencesCache = ofExistingProfiles({
-      lastUsed: raw.lastUsed && typeof raw.lastUsed === "object" ? raw.lastUsed : {},
-    });
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    preferencesCache = { lastUsed: {} };
-  }
+  const raw = readRuntimeDocument(dataDir, "workflow-preferences");
+  preferencesCache = raw
+    ? ofExistingProfiles({
+        lastUsed: raw.lastUsed && typeof raw.lastUsed === "object" ? raw.lastUsed : {},
+      })
+    : { lastUsed: {} };
   return preferencesCache;
 }
 

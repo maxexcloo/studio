@@ -392,13 +392,8 @@ function markerOf(key) {
 let hiddenGalleryIds = loadHiddenGalleryIds();
 
 function loadHiddenGalleryIds() {
-  let raw;
-  try {
-    raw = readRuntimeDocument(dataDir, "gallery-hidden");
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    return new Map();
-  }
+  const raw = readRuntimeDocument(dataDir, "gallery-hidden");
+  if (!raw) return new Map();
   const entries = Array.isArray(raw)
     ? raw.filter((key) => !String(key).startsWith("/comfy/view?")).map((key) => [key, Date.now()])
     : Object.entries(raw || {}).map(([key, value]) => [key, Number(value) || 0]);

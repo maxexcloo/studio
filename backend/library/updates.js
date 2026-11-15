@@ -240,17 +240,8 @@ export function createUpdateChecker({
   let checking = null;
   const load = () => {
     if (state) return state;
-    try {
-      const saved = readRuntimeDocument(dataDir, "library-updates");
-      state =
-        saved && typeof saved === "object"
-          ? { checkedAt: "", byEntry: {}, applied: {}, ...saved }
-          : null;
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-      state = null;
-    }
-    state ||= { checkedAt: "", byEntry: {}, applied: {} };
+    const saved = readRuntimeDocument(dataDir, "library-updates");
+    state = { checkedAt: "", byEntry: {}, applied: {}, ...(typeof saved === "object" && saved) };
     return state;
   };
   const save = () => writeRuntimeDocument(dataDir, "library-updates", load());

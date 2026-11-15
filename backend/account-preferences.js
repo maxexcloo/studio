@@ -42,12 +42,7 @@ const documentName = (ownerId) => `preferences:${ownerId}`;
 /** The values the account has saved, without defaults. */
 function saved(ownerId = "") {
   if (!cache.has(ownerId)) {
-    let value = {};
-    try {
-      value = readRuntimeDocument(dataDir, documentName(ownerId));
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
+    const value = readRuntimeDocument(dataDir, documentName(ownerId)) ?? {};
     cache.set(ownerId, Object.fromEntries(Object.entries(value).filter(([key]) => known(key))));
   }
   return cache.get(ownerId);

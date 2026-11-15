@@ -172,12 +172,12 @@ export function assertCurrentStorage(dataDir: string): void {
     );
 }
 
+/** A document's value, or undefined without one. */
 export function readRuntimeDocument(dataDir: string, name: string): unknown {
   const row = runtimeDatabase(dataDir)
     .prepare("SELECT value FROM studio_documents WHERE name = ?")
     .get(name) as { value: string } | undefined;
-  if (!row) throw Object.assign(new Error(`No saved ${name}`), { code: "ENOENT" });
-  return JSON.parse(row.value);
+  return row ? JSON.parse(row.value) : undefined;
 }
 
 export function writeRuntimeDocument(dataDir: string, name: string, value: unknown): void {
@@ -188,16 +188,9 @@ export function writeRuntimeDocument(dataDir: string, name: string, value: unkno
     .run(name, JSON.stringify(value));
 }
 
-/**
- * A document's value, or undefined without one. A folder without a database stays without one, so
- * dry runs read through this.
- */
+/** readRuntimeDocument, except a folder without a database stays without one, so dry runs read through this. */
 export function savedDocument(dataDir: string, name: string): unknown {
-  if (!fs.existsSync(databaseFile(dataDir))) return undefined;
-  const row = runtimeDatabase(dataDir)
-    .prepare("SELECT value FROM studio_documents WHERE name = ?")
-    .get(name) as { value: string } | undefined;
-  return row ? JSON.parse(row.value) : undefined;
+  return fs.existsSync(databaseFile(dataDir)) ? readRuntimeDocument(dataDir, name) : undefined;
 }
 
 /** Every account's `name` document (ownerDocumentName), read like savedDocument. */

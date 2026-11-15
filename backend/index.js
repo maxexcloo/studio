@@ -543,14 +543,7 @@ const assistantEngine = registerAssistantRoutes(app, {
   liked: assistant.liked,
 });
 
-const readComparisons = () => {
-  try {
-    return readRuntimeDocument(dataDir, "comparisons");
-  } catch (error) {
-    if (error.code === "ENOENT") return [];
-    throw error;
-  }
-};
+const readComparisons = () => readRuntimeDocument(dataDir, "comparisons") ?? [];
 registerGalleryReadRoutes(app, {
   store,
   compared: (ownerId) => {
@@ -1018,14 +1011,7 @@ async function smallImage(item) {
 // The gallery as idle work walks it (domain/idle-work.ts).
 const idleItems = (since, after) => eachGalleryItem({ since }, after && galleryKey(after));
 // Gallery captions (domain/captions.ts) let search match what an image shows.
-const runtimeLoad = (name) => () => {
-  try {
-    return readRuntimeDocument(dataDir, name);
-  } catch (error) {
-    if (error.code === "ENOENT") return null;
-    throw error;
-  }
-};
+const runtimeLoad = (name) => () => readRuntimeDocument(dataDir, name) ?? null;
 const captioner = createCaptioner({
   enabled: () => flagEnabled("STUDIO_GALLERY_CAPTIONS"),
   writer: assistantEngine,

@@ -73,17 +73,13 @@ export function createFinishing(options: {
   const { store, log = logger } = options;
   const name = (ownerId: string) => `finishing:${ownerId}`;
   function read(ownerId: string): FinishingRecord {
-    try {
-      const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as Partial<FinishingRecord>;
-      return {
-        waiting: saved.waiting || [],
-        settings: { ...defaultFinishingSettings, ...saved.settings },
-      };
-    } catch (error) {
-      if ((error as { code?: string }).code === "ENOENT")
-        return { settings: { ...defaultFinishingSettings }, waiting: [] };
-      throw error;
-    }
+    const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as
+      | Partial<FinishingRecord>
+      | undefined;
+    return {
+      waiting: saved?.waiting || [],
+      settings: { ...defaultFinishingSettings, ...saved?.settings },
+    };
   }
   const write = (ownerId: string, record: FinishingRecord) =>
     writeRuntimeDocument(options.dataDir, name(ownerId), record);
