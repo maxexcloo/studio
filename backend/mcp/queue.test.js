@@ -154,7 +154,7 @@ test("parallel MCP sets persist and execute as whole FIFO sets across restart wh
     expected,
   );
   for (const [index, job] of f.jobs().entries())
-    assert.equal(f.media.state.jobs[job.id], ["alice", "bob", "carol"][Math.floor(index / 2)]);
+    assert.equal(f.media.rows.jobOwner(job.id), ["alice", "bob", "carol"][Math.floor(index / 2)]);
   const firstStarted = deferred();
   const releaseFirst = deferred();
   const execution = await f.execute({ firstStarted, releaseFirst });
@@ -235,7 +235,7 @@ test("a failed MCP submission keeps its owned ID and releases the next complete 
   release.resolve();
   await assert.rejects(first, /Fixture admission failed/);
   const queued = await next;
-  assert.equal(f.media.state.jobs[f.requests[0].body.clientJobId], "alice");
+  assert.equal(f.media.rows.jobOwner(f.requests[0].body.clientJobId), "alice");
   assert.equal(queued.jobs.length, 2);
   assert.deepEqual(
     f.requests.map(({ body }) => body.prompt),

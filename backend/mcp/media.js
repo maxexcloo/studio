@@ -13,7 +13,8 @@ import { animateProfile, frameSize } from "../animate-profile.js";
 import { step } from "../event-loop.js";
 import { compatibleLoras, loraCompatibility } from "../lora/policy.js";
 import { recommendedNegative } from "../lora/prompts.js";
-import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
+import { mcpLinkKey, mcpOwnership } from "../persistence/mcp-ownership.ts";
+import { runtimeDatabase, savedDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
 import { imageMimes } from "../reference-names.js";
 import {
@@ -67,7 +68,6 @@ const numberPattern = /^\s*#?\s*(\d{1,9})\s*$/;
 const chatNumberPattern = /^\s*(?:result|r)\s*#?\s*(\d{1,7})\s*$/i;
 /** A lettered option of the conversation's latest variants ("B", "option B"). */
 const letterPattern = /^\s*(?:option\s+)?([A-J])\s*$/i;
-const maxReferenceScopes = 5000;
 // Chat hosts such as LibreChat cannot hand an attached file to a tool.
 const attachedImageHint =
   "LibreChat can't pass attached files to tools: call upload_link, ask the user to upload the image there, then pass its reference_asset_id to generate.";
@@ -112,8 +112,6 @@ const cloudQuotaMessage = "Cloud video unavailable (quota).";
 const cloudRefusal =
   /\b(?:401|402|403|429)\b|quota|unauthori[sz]ed|forbidden|insufficient|credit|billing|rate.?limit|exhausted/i;
 const isCloudVideo = (profile) => profile?.kind === "video" && isCloudProfile(profile);
-// Request records behind each MCP job, for Reuse tweaks and the result page; the oldest go first.
-const maxPromptRecords = 5000;
 const aborted = () => {
   const error = new Error(
     "The wait ended because the request was cancelled. The generation continues; collect it later with result.",
@@ -223,87 +221,36 @@ export class McpMedia {
     this.profileRequests = new Map();
     this.enqueuePhase = Promise.resolve();
     this.dataDir = dataDir;
-    try {
-      this.state = readRuntimeDocument(dataDir, "mcp-ownership");
-    } catch (error) {
-      if (error.code !== "ENOENT")
-        throw new Error("MCP ownership data could not be read. Restore it before enabling MCP.");
-      this.state = {
-        version: 1,
-        signingKey: crypto.randomBytes(32).toString("base64url"),
-        jobs: {},
-        assets: {},
-      };
-    }
-    if (
-      this.state.version !== 1 ||
-      !this.state.jobs ||
-      !this.state.assets ||
-      !this.state.signingKey
-    )
-      throw new Error("Invalid MCP ownership data.");
-    // Which jobs each conversation holds, in order; files written before it simply start without them.
-    if (!this.state.refs || typeof this.state.refs !== "object" || Array.isArray(this.state.refs))
-      this.state.refs = {};
-    // Each job's Studio result numbers by output (domain/result-numbers.ts), as Studio gave them.
-    if (
-      !this.state.numbers ||
-      typeof this.state.numbers !== "object" ||
-      Array.isArray(this.state.numbers)
-    )
-      this.state.numbers = {};
-    if (
-      !this.state.links ||
-      typeof this.state.links !== "object" ||
-      Array.isArray(this.state.links)
-    )
-      this.state.links = {};
-    if (
-      !this.state.prompts ||
-      typeof this.state.prompts !== "object" ||
-      Array.isArray(this.state.prompts)
-    )
-      this.state.prompts = {};
-    // Each used upload link's reference → the asset its image became.
-    if (
-      !this.state.uploads ||
-      typeof this.state.uploads !== "object" ||
-      Array.isArray(this.state.uploads)
-    )
-      this.state.uploads = {};
+    this.ownership = mcpOwnership(runtimeDatabase(dataDir));
+    // Until migrate-runtime's mcpOwnership step moves the old document into rows, MCP refuses work
+    // rather than miss its records.
+    this.moving = this.oldDocument();
     this.cloudUnavailableUntil = 0;
-    this.linkIds = new Map(
-      Object.entries(this.state.links).map(([id, link]) => [
-        link.all
-          ? this.linkKey(link.audience, link.owner, `refs:${link.scope}`, "all")
-          : link.sheet
-            ? this.linkKey(
-                link.audience,
-                link.owner,
-                `sheet:${JSON.stringify(link.sheet)}`,
-                "sheet",
-              )
-            : this.linkKey(link.audience, link.owner, link.jobId, link.index),
-        id,
-      ]),
+    this.key = signingKey || savedDocument(dataDir, "mcp-signing-key");
+    if (!this.key) {
+      if (this.moving)
+        throw new Error(
+          "MCP's records are still in the mcp-ownership document: apply migrate-runtime's mcpOwnership step first.",
+        );
+      this.key = crypto.randomBytes(32).toString("base64url");
+      writeRuntimeDocument(dataDir, "mcp-signing-key", this.key);
+    }
+  }
+  /** MCP's records (persistence/mcp-ownership.ts), each change written as it happens. */
+  get rows() {
+    if (this.moving && (this.moving = this.oldDocument()))
+      throw new Error("Studio is moving its MCP records; try again in a minute.");
+    return this.ownership;
+  }
+  oldDocument() {
+    return Boolean(
+      runtimeDatabase(this.dataDir)
+        .prepare("SELECT 1 FROM studio_documents WHERE name = 'mcp-ownership'")
+        .get(),
     );
-    this.key = signingKey || this.state.signingKey;
-    this.save();
   }
   get publicUrl() {
     return typeof this.publicBase === "function" ? this.publicBase() : this.publicBase;
-  }
-  /**
-   * Writes the ownership document once for every change made in this turn: it holds every link
-   * and job ever made (megabytes), and one generate call makes several links.
-   */
-  save() {
-    if (this.saving) return;
-    this.saving = true;
-    setImmediate(() => {
-      this.saving = false;
-      writeRuntimeDocument(this.dataDir, "mcp-ownership", this.state);
-    });
   }
   digest(value) {
     return crypto.createHmac("sha256", this.key).update(value).digest("hex");
@@ -314,10 +261,9 @@ export class McpMedia {
   own(owner, id, kind = "jobs") {
     if (
       typeof id !== "string" ||
-      !Object.hasOwn(this.state[kind], id) ||
       !(kind === "assets"
-        ? [this.state[kind][id]].flat().includes(owner)
-        : this.state[kind][id] === owner)
+        ? this.rows.assetOwners(id).includes(owner)
+        : this.rows.jobOwner(id) === owner)
     )
       throw new Error(
         `Choose ${kind === "jobs" ? "a job" : "a reference"} submitted by this account to this studio.`,
@@ -574,7 +520,7 @@ export class McpMedia {
   }
   /** The request behind an MCP job and the prompt it ran, when Studio recorded them. */
   promptRecord(jobId) {
-    return Object.hasOwn(this.state.prompts, jobId) ? this.state.prompts[jobId] : null;
+    return this.rows.prompt(jobId) ?? null;
   }
   /**
    * Queues one job per prompt and count. `record` keeps the user's request and exact source result.
@@ -759,8 +705,7 @@ export class McpMedia {
           };
           try {
             // Persist the client id before dispatch, so a failed call cannot lose job ownership.
-            this.state.jobs[id] = owner;
-            this.save();
+            this.rows.setJobOwner(id, owner);
             const result = await this.request(
               "POST",
               "/api/generate",
@@ -781,12 +726,9 @@ export class McpMedia {
               owner,
             );
             if (!result.jobId) throw new Error("Studio did not return a job ID.");
-            if (
-              Object.hasOwn(this.state.jobs, result.jobId) &&
-              this.state.jobs[result.jobId] !== owner
-            )
+            if (![undefined, owner].includes(this.rows.jobOwner(result.jobId)))
               throw new Error("Studio returned a job owned by another account.");
-            this.state.jobs[result.jobId] = owner;
+            this.rows.setJobOwner(result.jobId, owner);
             this.noteNumbers(result.items || []);
             // The chat's part in the prompt (RewritePrompt's preset, chosen SuggestLoras picks) stays with the job on disk.
             this.recordPrompt(result.jobId, {
@@ -796,7 +738,6 @@ export class McpMedia {
               ...(record.request ? { request: record.request } : {}),
               ...(record.assistant ? { assistant: record.assistant } : {}),
             });
-            this.save();
             queued.push({
               job_id: result.jobId,
               ...this.handle(owner, scope, result.jobId),
@@ -883,10 +824,9 @@ export class McpMedia {
       return cursor;
     });
   }
+  /** Keeps the request behind an MCP job, for Reuse tweaks and the result page. */
   recordPrompt(jobId, record) {
-    const keys = Object.keys(this.state.prompts);
-    if (keys.length >= maxPromptRecords) delete this.state.prompts[keys[0]];
-    this.state.prompts[jobId] = record;
+    this.rows.setPrompt(jobId, record);
   }
   async galleryJob(jobId, owner = "", options = {}) {
     // Settings name the profile for the result's header.
@@ -956,7 +896,7 @@ export class McpMedia {
           typeof item.jobId === "string" &&
           item.jobId &&
           mcpOutputPath(item.url) &&
-          (!Object.hasOwn(this.state.jobs, item.jobId) || this.state.jobs[item.jobId] === owner),
+          [undefined, owner].includes(this.rows.jobOwner(item.jobId)),
       )
       .slice(0, limit);
     this.adopt(owner, scope, { jobs: [...new Set(hits.map((item) => item.jobId))] });
@@ -980,8 +920,8 @@ export class McpMedia {
         owner,
         { signal },
       );
-      const holders = this.state.assets[asset?.id];
-      if (!asset?.id || (holders && ![holders].flat().includes(owner))) continue;
+      const holders = asset?.id ? this.rows.assetOwners(asset.id) : [];
+      if (!asset?.id || (holders.length && !holders.includes(owner))) continue;
       hits.push({ ...item, assetId: asset.id });
     }
     this.adopt(owner, "", { assets: hits.map((item) => item.assetId) });
@@ -992,26 +932,9 @@ export class McpMedia {
     return this.digest(`refs\n${owner}\n${conversation}`).slice(0, 32);
   }
   /** Adds a job to this scope's results, in order; its place is never reused. */
-  reference(owner, scope, jobId, persist = true) {
+  reference(owner, scope, jobId) {
     const key = scope || this.referenceScope(owner);
-    let entry = this.state.refs[key];
-    if (!entry) {
-      const keys = Object.keys(this.state.refs);
-      if (keys.length >= maxReferenceScopes)
-        delete this.state.refs[
-          keys.reduce((oldest, item) =>
-            (this.state.refs[item].at || 0) < (this.state.refs[oldest].at || 0) ? item : oldest,
-          )
-        ];
-      entry = this.state.refs[key] = { next: 1, jobs: {} };
-    }
-    const existing = Object.entries(entry.jobs).find(([, id]) => id === jobId)?.[0];
-    if (existing) return Number(existing);
-    const number = entry.next++;
-    entry.jobs[number] = jobId;
-    entry.at = Date.now();
-    if (persist) this.save();
-    return number;
+    return this.rows.refNumber(key, jobId) ?? this.rows.addRef(key, jobId);
   }
   /** A job's reference ("#12") and its signed watch page, returned with the submission. */
   handle(owner, scope, jobId) {
@@ -1020,35 +943,33 @@ export class McpMedia {
   }
   /** Keeps the result numbers Studio gave an owner's items; resolve reads only owned jobs'. */
   noteNumbers(items) {
-    let changed = false;
-    for (const item of items) {
-      if (!item?.jobId || !item.number) continue;
-      const numbers = (this.state.numbers[item.jobId] ||= []);
-      if (numbers[outputIndex(item)] === item.number) continue;
-      numbers[outputIndex(item)] = item.number;
-      changed = true;
-    }
-    if (changed) this.save();
+    for (const item of items)
+      if (
+        item?.jobId &&
+        item.number &&
+        this.numberOf(item.jobId, outputIndex(item)) !== item.number
+      )
+        this.rows.setNumber(item.jobId, outputIndex(item), item.number);
   }
   /** A job output's result number, if Studio gave it. */
   numberOf(jobId, index = 0) {
-    return this.state.numbers[jobId]?.[index];
+    return this.rows.number(jobId, index);
   }
   /**
    * Gives an account's own Studio jobs and references to it here, so tools take
    * them, and adds the jobs to this scope's results in their order; anything another owner has is left.
    */
   adopt(owner, scope, { jobs = [], assets = [] }) {
-    for (const id of jobs) {
-      if (Object.hasOwn(this.state.jobs, id) && this.state.jobs[id] !== owner) continue;
-      this.state.jobs[id] = owner;
-      this.reference(owner, scope, id, false);
-    }
-    for (const id of assets)
-      this.state.assets[id] = [
-        ...new Set([...(this.state.assets[id] ? [this.state.assets[id]].flat() : []), owner]),
-      ];
-    this.save();
+    const rows = this.rows;
+    rows.batch(() => {
+      for (const id of jobs) {
+        const held = rows.jobOwner(id);
+        if (held !== undefined && held !== owner) continue;
+        if (held === undefined) rows.setJobOwner(id, owner);
+        this.reference(owner, scope, id);
+      }
+      for (const id of assets) rows.addAssetOwner(id, owner);
+    });
   }
   /** Current comparisons of these jobs, with the exact chosen output ready for Reuse. */
   async comparisons(owner, jobIds, { scope = "", signal } = {}) {
@@ -1062,14 +983,14 @@ export class McpMedia {
       { signal },
     );
     const visible = comparisons.filter((comparison) =>
-      comparison.variants.every(
-        ({ jobId }) => !Object.hasOwn(this.state.jobs, jobId) || this.state.jobs[jobId] === owner,
+      comparison.variants.every(({ jobId }) =>
+        [undefined, owner].includes(this.rows.jobOwner(jobId)),
       ),
     );
     const adopted = [
       ...new Set(visible.flatMap(({ variants }) => variants.map(({ jobId }) => jobId))),
     ].filter(
-      (jobId) => !Object.hasOwn(this.state.jobs, jobId) || !this.inScope(owner, scope, jobId),
+      (jobId) => this.rows.jobOwner(jobId) === undefined || !this.inScope(owner, scope, jobId),
     );
     if (adopted.length) this.adopt(owner, scope, { jobs: adopted });
     this.noteNumbers(visible.flatMap(({ variants }) => variants.map(({ item }) => item)));
@@ -1106,12 +1027,12 @@ export class McpMedia {
     const short = /^(?:https?:\/\/\S+\/mcp\/results\/)?([A-Za-z0-9]{10})(?:\.jpg)?$/.exec(
       String(value || "").trim(),
     )?.[1];
-    const linked = short && Object.hasOwn(this.state.links, short) ? this.state.links[short] : null;
+    const linked = short ? this.rows.link(short) : undefined;
     if (linked?.jobId && linked.owner === owner)
       return { jobId: linked.jobId, ...(linked.page ? {} : { index: linked.index }) };
     const chatNumber = Number(chatNumberPattern.exec(String(value || ""))?.[1]);
     if (chatNumber) {
-      const jobId = this.state.refs[scope || this.referenceScope(owner)]?.jobs?.[chatNumber];
+      const jobId = this.rows.refJob(scope || this.referenceScope(owner), chatNumber);
       if (!jobId)
         throw new Error(
           `There is no result ${chatNumber} in this conversation. Use its #number or job_id.`,
@@ -1120,7 +1041,7 @@ export class McpMedia {
     }
     const letter = letterPattern.exec(String(value || ""))?.[1];
     if (letter) {
-      const offer = this.state.refs[scope || this.referenceScope(owner)]?.offer;
+      const offer = this.rows.offer(scope || this.referenceScope(owner));
       const jobId = offer?.jobs[letter.toUpperCase().charCodeAt(0) - 65];
       if (!jobId)
         throw new Error(
@@ -1130,12 +1051,10 @@ export class McpMedia {
     }
     const number = Number(numberPattern.exec(String(value || ""))?.[1]);
     if (!number) return { jobId: value };
-    const known = Object.entries(this.state.numbers).find(
-      ([jobId, numbers]) => this.state.jobs[jobId] === owner && numbers.includes(number),
-    );
+    const known = this.rows.numbered(owner, number);
     if (known) {
-      this.adopt(owner, scope, { jobs: [known[0]] });
-      return { jobId: known[0], index: known[1].indexOf(number) };
+      this.adopt(owner, scope, { jobs: [known.jobId] });
+      return known;
     }
     let found;
     try {
@@ -1144,7 +1063,7 @@ export class McpMedia {
       if (error.aborted) throw error;
       throw new Error(`There is no result #${number}. Use a number Studio showed, or a job_id.`);
     }
-    if (Object.hasOwn(this.state.jobs, found.jobId) && this.state.jobs[found.jobId] !== owner)
+    if (![undefined, owner].includes(this.rows.jobOwner(found.jobId)))
       throw new Error(`There is no result #${number}.`);
     this.adopt(owner, scope, { jobs: [found.jobId] });
     this.noteNumbers([{ jobId: found.jobId, index: found.index, number }]);
@@ -1169,9 +1088,7 @@ export class McpMedia {
   }
   /** Remembers a conversation's latest lettered options, which "A", "B"… then name. */
   offer(owner, scope, comparison, jobs) {
-    const entry = this.state.refs[scope || this.referenceScope(owner)];
-    entry.offer = { comparison, jobs };
-    this.save();
+    this.rows.setOffer(scope || this.referenceScope(owner), { comparison, jobs });
   }
   /**
    * Records the user's pick among options (`found` from resolve: a letter, or a number in a
@@ -1179,9 +1096,10 @@ export class McpMedia {
    * pick to its brief. Answers the comparison as Studio shows it, with `brief` where it changed.
    */
   async pick(owner, scope, found, signal) {
-    const entry = this.state.refs[scope || this.referenceScope(owner)];
-    const comparison = entry?.offer?.jobs.includes(found.jobId)
-      ? entry.offer.comparison
+    const key = scope || this.referenceScope(owner);
+    const offer = this.rows.offer(key);
+    const comparison = offer?.jobs.includes(found.jobId)
+      ? offer.comparison
       : (await this.comparisons(owner, [found.jobId], { scope, signal }))[0]?.id;
     if (!comparison) throw new Error("That result is not among any options; nothing to pick.");
     const voted = await this.request(
@@ -1191,16 +1109,13 @@ export class McpMedia {
       owner,
       { signal },
     );
-    if (entry?.offer?.comparison === comparison) {
-      entry.offer.picked = found.jobId;
-      this.save();
-    }
+    if (offer?.comparison === comparison)
+      this.rows.setOffer(key, { ...offer, picked: found.jobId });
     return voted;
   }
   /** Whether a job is among this conversation's results. */
   inScope(owner, scope, jobId) {
-    const entry = this.state.refs[scope || this.referenceScope(owner)];
-    return Boolean(entry && Object.values(entry.jobs).includes(jobId));
+    return this.rows.refNumber(scope || this.referenceScope(owner), jobId) !== undefined;
   }
   /** A job's reference, its first output's number ("#12"), once Studio gave it. */
   refOf(jobId) {
@@ -1342,8 +1257,7 @@ export class McpMedia {
     if (!this.uploadLinks.delete(claims.nonce)) throw new Error("Invalid upload link.");
     try {
       const { asset } = await this.store(claims.owner, file.buffer, file.name, { credential });
-      this.state.uploads[claims.reference] = asset.id;
-      this.save();
+      this.rows.setUpload(claims.reference, asset.id);
       return asset;
     } catch (error) {
       if (claims.expires > Date.now()) this.uploadLinks.set(claims.nonce, claims.expires);
@@ -1353,13 +1267,22 @@ export class McpMedia {
   /** A reference_asset_id, with an upload link's reference resolved to the asset its image became. */
   referenceId(id) {
     if (!uploadReferencePattern.test(id)) return id;
-    if (Object.hasOwn(this.state.uploads, id)) return this.state.uploads[id];
+    const asset = this.rows.upload(id);
+    if (asset) return asset;
     throw new Error(
       "The user hasn't uploaded the image through its upload link yet. Ask them to, then call again; if the link has expired, call upload_link for a new one.",
     );
   }
-  linkKey(audience, owner, jobId, index) {
-    return JSON.stringify([audience, owner, jobId, index ?? "page"]);
+  /** A new short link id, ten random base62 characters. */
+  newLinkId() {
+    let id;
+    do
+      id = Array.from(
+        { length: 10 },
+        () => shortAlphabet[crypto.randomInt(shortAlphabet.length)],
+      ).join("");
+    while (this.rows.link(id));
+    return id;
   }
   /**
    * A short opaque link id for an output (or a job's watch page), reused for the same output.
@@ -1367,24 +1290,15 @@ export class McpMedia {
    */
   shortId(owner, jobId, index) {
     const audience = this.publicUrl;
-    const key = this.linkKey(audience, owner, jobId, index);
-    const existing = this.linkIds.get(key);
+    const existing = this.rows.linkId(mcpLinkKey(audience, owner, jobId, index));
     if (existing) return existing;
-    let id;
-    do
-      id = Array.from(
-        { length: 10 },
-        () => shortAlphabet[crypto.randomInt(shortAlphabet.length)],
-      ).join("");
-    while (Object.hasOwn(this.state.links, id));
-    this.state.links[id] = {
+    const id = this.newLinkId();
+    this.rows.addLink(id, {
       audience,
       owner,
       jobId,
       ...(index === undefined ? { page: true } : { index }),
-    };
-    this.linkIds.set(key, id);
-    this.save();
+    });
     return id;
   }
   /** A job's watch page: shows progress until done, then its outputs, without the chat. */
@@ -1403,18 +1317,10 @@ export class McpMedia {
   /** A short link id for several results at once (a page or a sheet), reused for the same key. */
   groupLink(owner, key, kind, record) {
     const audience = this.publicUrl;
-    const linkKey = this.linkKey(audience, owner, key, kind);
-    let id = this.linkIds.get(linkKey);
+    let id = this.rows.linkId(mcpLinkKey(audience, owner, key, kind));
     if (!id) {
-      do
-        id = Array.from(
-          { length: 10 },
-          () => shortAlphabet[crypto.randomInt(shortAlphabet.length)],
-        ).join("");
-      while (Object.hasOwn(this.state.links, id));
-      this.state.links[id] = { audience, owner, ...record };
-      this.linkIds.set(linkKey, id);
-      this.save();
+      id = this.newLinkId();
+      this.rows.addLink(id, { audience, owner, ...record });
     }
     return id;
   }
@@ -1425,7 +1331,7 @@ export class McpMedia {
   claims(token) {
     const short = shortPattern.exec(String(token || ""));
     if (short) {
-      const link = Object.hasOwn(this.state.links, short[1]) ? this.state.links[short[1]] : null;
+      const link = this.rows.link(short[1]);
       if (
         !link ||
         link.audience !== this.publicUrl ||
@@ -2038,14 +1944,9 @@ export class McpMedia {
   }
   /** A conversation's most recent results by number, each with its job status; unreadable jobs are skipped. */
   async scopeJobs(owner, scope, { signal, credential } = {}) {
-    const entry = this.state.refs[scope || this.referenceScope(owner)];
-    const numbers = Object.keys(entry?.jobs || {})
-      .map(Number)
-      .sort((left, right) => left - right)
-      .slice(-maxListedResults);
+    const refs = this.rows.latestRefs(scope || this.referenceScope(owner), maxListedResults);
     const jobs = await Promise.all(
-      numbers.map(async (number) => {
-        const jobId = entry.jobs[number];
+      refs.map(async ({ jobId }) => {
         try {
           const job = await this.job(owner, jobId, 0, { signal, credential });
           return { ref: this.refOf(jobId) || "Result", jobId, job };
