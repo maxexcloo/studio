@@ -102,7 +102,7 @@ export function createMcpDomainRequest({ app, admit, ownsItem }) {
     return admit(body, account, undefined, {
       priority: queuePriority.mcp,
       queueSet,
-      queueBatch,
+      ...(queueBatch ? { queueBatch } : {}),
       ...(parentItemId ? { parentItemId } : {}),
     });
   }
