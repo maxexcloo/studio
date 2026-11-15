@@ -114,10 +114,9 @@ export function studioCloudProfiles(options: ProfileOptions) {
         status: 403,
       });
     const references = (input.referenceAssets || []).filter((item: Value) => item.assetId);
-    const referenceId = references[0]?.assetId || input.startImageId;
+    const referenceId = references[0]?.assetId;
     const workflow = workflowFor(profile.id)!;
-    const selectedMode =
-      workflow.imageModes?.[referenceId || input.startImage ? "reference" : "generate"] || workflow;
+    const selectedMode = workflow.imageModes?.[referenceId ? "reference" : "generate"] || workflow;
     const defaults = {
       ...profile.defaults,
       ...Object.fromEntries(
@@ -143,8 +142,6 @@ export function studioCloudProfiles(options: ProfileOptions) {
       throw new Error("Video duration must be between 1 and 15 seconds.");
     let reference: Uint8Array | undefined;
     if (referenceId) reference = await options.reference(account, referenceId);
-    else if (input.startImage)
-      reference = Buffer.from(String(input.startImage).split(",")[1], "base64");
     let width = Number(input.width ?? defaults.width);
     let height = Number(input.height ?? defaults.height);
     if (reference) {

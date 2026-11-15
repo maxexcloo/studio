@@ -52,11 +52,10 @@ export function workUnits(body = {}) {
 
 /** What else shapes a run's time besides its size: the images it reads, and decoding in tiles. */
 export function runVariant(body = {}) {
-  // The start image is the first reference when there are references, so it counts once.
   const images = Array.isArray(body.referenceAssets)
     ? body.referenceAssets.length
     : Math.max(0, Number(body.refs) || 0);
-  return { refs: Math.max(images, body.startImageId ? 1 : 0), tiled: Boolean(body.tiledDecode) };
+  return { refs: images, tiled: Boolean(body.tiledDecode) };
 }
 
 export const median = (values) => {

@@ -264,18 +264,17 @@ test("a tiled decode's tail is learned apart from a whole one", () => {
   const now = Date.parse("2026-09-27T10:07:00Z");
   assert.equal(estimateRun(history, body(), { now }).tailMs, 1000);
   assert.equal(estimateRun(history, body({ tiledDecode: true }), { now }).tailMs, 2500);
-  assert.deepEqual(
-    runVariant(body({ tiledDecode: true, referenceAssets: [{}, {}], startImageId: "a" })),
-    { refs: 2, tiled: true },
-    "the start image is the first reference",
-  );
+  assert.deepEqual(runVariant(body({ tiledDecode: true, referenceAssets: [{}, {}] })), {
+    refs: 2,
+    tiled: true,
+  });
   assert.deepEqual(runVariant({ refs: "1" }), { refs: 1, tiled: false }, "as the estimate asks it");
 });
 
 test("runs that read an image are learned apart once there are enough", () => {
   // A start image at 0.6 denoise samples 12 of 20 steps, and encodes it first.
   const plain = { timing: { setupMs: 3000 } };
-  const fromImage = { body: { startImageId: "a" }, timing: { steps: 12, setupMs: 5000 } };
+  const fromImage = { body: { referenceAssets: [{}] }, timing: { steps: 12, setupMs: 5000 } };
   const now = Date.parse("2026-09-27T10:10:00Z");
   const few = runsOf([...times(4, plain), fromImage, fromImage]);
   assert.equal(

@@ -111,7 +111,7 @@ function sanitizeInpaint(input, profile, referenceAssets) {
   };
 }
 
-export function validateReferenceSlots(references, profile, input = {}) {
+export function validateReferenceSlots(references, profile) {
   const slots = profile.mediaInputs || [];
   // Plain img2img advertises one start image through its capability rather than named slots.
   if (!slots.length && profile.capabilities?.startImage) {
@@ -122,12 +122,11 @@ export function validateReferenceSlots(references, profile, input = {}) {
     if (!slots.some((slot) => slot.id === reference.slot))
       throw new Error(`The selected profile does not accept reference slot "${reference.slot}".`);
   }
-  for (const [index, slot] of slots.entries()) {
+  for (const slot of slots) {
     const supplied = references.filter((reference) => reference.slot === slot.id).length;
-    const legacy = index === 0 && Boolean(input.startImage || input.startImageId);
     const minimum = Number(slot.min || (slot.required ? 1 : 0));
     const maximum = Number(slot.max || 1);
-    if (supplied < minimum && !legacy)
+    if (supplied < minimum)
       throw new Error(`${slot.label || "Reference image"} is required for this workflow.`);
     if (supplied > maximum)
       throw new Error(
@@ -167,7 +166,7 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
         })
         .filter((item) => item.assetId)
     : [];
-  validateReferenceSlots(referenceAssets, customWorkflow, input);
+  validateReferenceSlots(referenceAssets, customWorkflow);
   const missing = missingNodes(info, customWorkflow.requiredNodes);
   if (missing.length)
     throw new Error(`ComfyUI is missing nodes this model needs: ${missing.join(", ")}`);
@@ -307,9 +306,6 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     ...(isResolution(input.resolutionTier) ? { resolutionTier: input.resolutionTier } : {}),
     frames: kind === "video" ? videoFrames(input.frames, frameRange) : 0,
     fps: snapInteger(input.fps, fpsRange.default, fpsRange),
-    startImage: String(input.startImage || ""),
-    startImageId: String(input.startImageId || ""),
-    startImageName: String(input.startImageName || ""),
     referenceAssets,
     autoResizeInputs: input.autoResizeInputs !== false,
     inpaint: sanitizeInpaint(input, available, referenceAssets),

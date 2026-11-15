@@ -28,9 +28,6 @@ function fixture(t) {
   write("library/catalogue.json", {
     version: 1,
     layers: {
-      // Folded by an earlier release, which saved them back empty.
-      admin: {},
-      seed: {},
       definitions: {
         "loras/style.safetensors": {
           title: "Seed Style",

@@ -352,8 +352,7 @@ export const resultNumbers = createResultNumbers({
  * out of ComfyUI's history. Their keys are output names, and a list of what
  * was deleted should not say what was deleted: each marker is stored as a
  * keyed digest (HMAC-SHA256 under data/.gallery-marker-key), which can be
- * checked against a name but never read back into one. Lists from before are
- * turned into digests the first time they are read.
+ * checked against a name but never read back into one.
  */
 const markerKeyPath = path.join(dataDir, ".gallery-marker-key");
 const markerPrefix = "h:";
@@ -390,26 +389,7 @@ function markerOf(key) {
 let hiddenGalleryIds = loadHiddenGalleryIds();
 
 function loadHiddenGalleryIds() {
-  const raw = readRuntimeDocument(dataDir, "gallery-hidden");
-  if (!raw) return new Map();
-  const entries = Array.isArray(raw)
-    ? raw.filter((key) => !String(key).startsWith("/comfy/view?")).map((key) => [key, Date.now()])
-    : Object.entries(raw || {}).map(([key, value]) => [key, Number(value) || 0]);
-  const plain = entries.filter(([key]) => !String(key).startsWith(markerPrefix));
-  const markers = new Map(
-    entries.map(([key, value]) => [
-      String(key).startsWith(markerPrefix) ? key : markerOf(key),
-      value,
-    ]),
-  );
-  if (plain.length || Array.isArray(raw)) {
-    try {
-      persistHiddenMarkers(Object.fromEntries(markers));
-    } catch {
-      // Stays as it was until the next save.
-    }
-  }
-  return markers;
+  return new Map(Object.entries(readRuntimeDocument(dataDir, "gallery-hidden") ?? {}));
 }
 
 function persistHiddenMarkers(value) {

@@ -12,30 +12,19 @@ import {
   workflowMissingFiles,
 } from "../custom-workflows.js";
 import { directRoute } from "../domain/direct-route.ts";
-import { readJsonFile, writeBytesFile, writeJsonFile } from "../json-store.js";
+import { writeBytesFile } from "../json-store.js";
 import { adminRefusal, fromChat } from "../route-access.js";
 import { hashOf, profileStore, validId } from "./store.js";
 
 /**
  * Studio owns editable runtime profiles and their version history; ai is a read-only seed.
  */
-export const editsFile = () => path.join(userWorkflowsDir, ".studio-edits.json");
 const fileFor = (id) => path.join(userWorkflowsDir, `${id}.json`);
 const metaOf = (raw) => raw?.studio;
 
-function readEdits() {
-  try {
-    const saved = readJsonFile(editsFile());
-    return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
-  } catch {
-    return {};
-  }
-}
-
-/** Every profile file Studio holds, by its file name, with whether Studio edited it. */
+/** Every profile file Studio holds, by its file name. */
 export function listEditableProfiles() {
   if (!fs.existsSync(userWorkflowsDir)) return [];
-  const edits = readEdits();
   const versions = profileStore({ workflowsDir: userWorkflowsDir }).metas();
   return fs
     .readdirSync(userWorkflowsDir)
@@ -57,7 +46,6 @@ export function listEditableProfiles() {
         kind: meta.kind === "video" ? "video" : "image",
         family: String(meta.family || ""),
         readable: Boolean(raw),
-        edited: edits[id] || null,
         version: version?.version || 0,
         origin: version?.origin || "seed",
         aiDrafted: version?.aiDrafted === true,
@@ -78,7 +66,6 @@ export function readEditableProfile(id) {
     id,
     text,
     hash: hashOf(text),
-    edited: readEdits()[id] || null,
     version: profileStore({ workflowsDir: userWorkflowsDir }).meta(id),
   };
 }
@@ -93,9 +80,8 @@ export function profileIdTaken(id) {
 }
 
 /**
- * Adds a new profile file (an AI draft from a checkpoint import), checked like any edit. It is
- * listed in `.studio-edits.json` too, so no seed deploy would ever write over it, and becomes the
- * profile's next version with its origin and AI-Drafted marker.
+ * Adds a new profile file (an AI draft from a checkpoint import), checked like any edit. It becomes
+ * the profile's first version with its origin and AI-Drafted marker.
  */
 export function createEditableProfile(
   id,
@@ -113,15 +99,10 @@ export function createEditableProfile(
   if (!checked.ok) throw Object.assign(new Error(checked.errors[0]), { status: 400, checked });
   const next = String(text).endsWith("\n") ? String(text) : `${text}\n`;
   writeBytesFile(fileFor(id), next);
-  const at = new Date().toISOString();
-  const edits = readEdits();
-  edits[id] = { editedAt: at, by: String(by || ""), baseHash: "" };
-  writeJsonFile(editsFile(), edits);
   profileStore({ workflowsDir: userWorkflowsDir }).record(id, next, {
     by,
     origin,
     aiDrafted,
-    at,
     note,
   });
   return { ...readEditableProfile(id), warnings: checked.warnings };
@@ -257,24 +238,10 @@ export function saveEditableProfile(
     );
   const checked = validateProfileText(id, text, { info });
   if (!checked.ok) throw Object.assign(new Error(checked.errors[0]), { status: 400, checked });
-  const at = new Date();
   // Saved as written, so the diff the editor showed is the change on disk.
   const next = String(text).endsWith("\n") ? String(text) : `${text}\n`;
   writeBytesFile(fileFor(id), next);
-  const edits = readEdits();
-  edits[id] = {
-    editedAt: at.toISOString(),
-    by: String(by || ""),
-    baseHash: edits[id]?.baseHash || current.hash,
-  };
-  writeJsonFile(editsFile(), edits);
   const store = profileStore({ workflowsDir: userWorkflowsDir });
-  // Profiles saved before versioning start their history with the text they replace.
-  if (!store.meta(id))
-    store.record(id, current.text, {
-      origin: edits[id].baseHash === current.hash ? "seed" : "studio",
-      by: "seed",
-    });
   store.record(id, next, { by, origin, aiDrafted });
   return { ...readEditableProfile(id), warnings: checked.warnings, version: store.meta(id) };
 }

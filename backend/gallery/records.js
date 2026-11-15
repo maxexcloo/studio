@@ -212,7 +212,6 @@ export function generationSettings(body) {
     vae: body.vae || "",
     clipType: body.clipType || "",
     weightDtype: body.weightDtype || "",
-    referenceImageName: body.startImageName || "",
     autoResizeInputs: body.autoResizeInputs !== false,
     ...(body.requestedSize
       ? { width: body.requestedSize.width, height: body.requestedSize.height }

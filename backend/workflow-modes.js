@@ -1,10 +1,6 @@
 // Keep validation and graph construction on the same image mode.
 export function hasReferenceImage(body) {
-  return Boolean(
-    body.startImage ||
-    body.startImageId ||
-    (body.referenceAssets || []).some((item) => item?.assetId || item?.comfyName),
-  );
+  return Boolean((body.referenceAssets || []).some((item) => item?.assetId || item?.comfyName));
 }
 
 export function resolveImageMode(workflow, body) {
@@ -21,7 +17,6 @@ export function selectImageMode(workflow, body) {
 
   const slots = selected.mediaInputs || [];
   const supplied = new Set(references.map((item) => item.slot));
-  if (slots.length && (body.startImage || body.startImageId)) supplied.add(slots[0].id);
   for (const slot of slots) {
     if (supplied.has(slot.id)) {
       if (slot.follows && !supplied.has(slot.follows))

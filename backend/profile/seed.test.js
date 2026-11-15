@@ -21,7 +21,7 @@ const samples = fs
 
 test("the samples seed an empty data folder once, as Studio's own versioned profiles", (t) => {
   const data = scratch(t);
-  const store = createProfileStore({ dataDir: data, log: quiet });
+  const store = createProfileStore({ dataDir: data });
   assert.ok(samples.length);
   assert.deepEqual(seedSamples({ dataDir: data, store, log: quiet }), samples);
   for (const id of samples) {
@@ -37,7 +37,7 @@ test("a data folder that holds a profile gets no samples", (t) => {
   const data = scratch(t);
   fs.mkdirSync(path.join(data, "workflows"));
   fs.writeFileSync(path.join(data, "workflows", "own.json"), "{}");
-  const store = createProfileStore({ dataDir: data, log: quiet });
+  const store = createProfileStore({ dataDir: data });
   assert.deepEqual(seedSamples({ dataDir: data, store, log: quiet }), []);
   assert.deepEqual(fs.readdirSync(path.join(data, "workflows")), ["own.json"]);
 });

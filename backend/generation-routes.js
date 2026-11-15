@@ -347,17 +347,6 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
         body.prompt = prompt;
       }
     }
-    // An older page (or a draft restored from before the reference library) can
-    // send only the image's id; treat it as the reference instead of losing it.
-    if (!body.referenceAssets?.length && body.startImageId && !body.startImage) {
-      // Not a library id (an old start-image upload): keep the legacy path for it.
-      body.referenceAssets = await stageReferenceAssetsForAccount(
-        backend,
-        account,
-        [{ slot: "reference", assetId: body.startImageId }],
-        { unique: Boolean(body.ownerId), generation: body },
-      ).catch(() => []);
-    }
     if (body.referenceAssets?.length && !body.referenceAssets.every((item) => item.comfyName)) {
       try {
         body.referenceAssets = await stageReferenceAssetsForAccount(
@@ -540,19 +529,13 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
               error: "Choose reference images belonging to this account.",
             },
           };
-        const start = input.startImageId || input.startImage;
-        if (start && !referenceExistsForAccount(account, start))
-          return {
-            status: 400,
-            payload: { ok: false, error: "The start image does not belong to this account." },
-          };
-        if (routed.profile.capabilities?.startImageRequired && !references.length && !start)
+        if (routed.profile.capabilities?.startImageRequired && !references.length)
           return {
             status: 400,
             payload: { ok: false, error: "A reference image is required for this workflow." },
           };
         try {
-          validateReferenceSlots(references, routed.profile, input);
+          validateReferenceSlots(references, routed.profile);
         } catch (error) {
           return { status: 400, payload: { ok: false, error: error.message } };
         }
