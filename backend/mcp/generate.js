@@ -22,6 +22,7 @@ import { resolutions } from "../../shared/resolution.ts";
 import { promptWords, replyTitle } from "../../shared/titles.ts";
 import { accessFeatures } from "../account-policy.js";
 import { minorAgeRefusal } from "../minor-age.js";
+import { savedDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { canonicalProfileId } from "../profile/store.js";
 import { promptStyleStore } from "../prompt-styles.js";
 import {
@@ -126,6 +127,41 @@ const maxShownGuideCharacters = 500;
 // generates or minutes on the same model; a compact guide costs about as much context as one reply.
 const guideResendGenerates = 8;
 const guideResendMs = 30 * 60_000;
+const maxGuideKeys = 4096;
+
+/**
+ * Which guides each conversation has been sent, in the runtime store so a rollout or another
+ * replica doesn't resend them. `due` counts a use and reports whether the guide is due; it reads
+ * and writes synchronously, so concurrent calls attach a guide once.
+ */
+export function createGuideLog({ dataDir }) {
+  const all = () => savedDocument(dataDir, "mcp-guides") ?? {};
+  const save = (saved) => {
+    const keys = Object.keys(saved);
+    for (const old of keys.slice(0, Math.max(0, keys.length - maxGuideKeys))) delete saved[old];
+    writeRuntimeDocument(dataDir, "mcp-guides", saved);
+  };
+  return {
+    due(key) {
+      const saved = all();
+      const sent = saved[key];
+      if (sent && sent.uses < guideResendGenerates && Date.now() - sent.at < guideResendMs) {
+        sent.uses++;
+        save(saved);
+        return false;
+      }
+      delete saved[key];
+      saved[key] = { at: Date.now(), uses: 1 };
+      save(saved);
+      return true;
+    },
+    forget(key) {
+      const saved = all();
+      delete saved[key];
+      save(saved);
+    },
+  };
+}
 const maxListedLoras = 30;
 /**
  * A profile guide as one paragraph: the family's summary, rules, pitfalls and example, then its
@@ -170,19 +206,7 @@ export function registerGenerateTools({
   const { owner, refs, conversation } = actor;
   // A guide goes to each conversation (each MCP session without a conversation header, else the account).
   const guideKey = (refs, profileId) => JSON.stringify([refs, profileId]);
-  /** Counts a use of a guide and reports whether it is due; synchronous, so concurrent calls attach it once. */
-  const review = (refs, profileId) => {
-    const key = guideKey(refs, profileId);
-    const sent = reviewedGuides.get(key);
-    if (sent && sent.uses < guideResendGenerates && Date.now() - sent.at < guideResendMs) {
-      sent.uses++;
-      return false;
-    }
-    reviewedGuides.delete(key);
-    if (reviewedGuides.size >= 4096) reviewedGuides.delete(reviewedGuides.keys().next().value);
-    reviewedGuides.set(key, { at: Date.now(), uses: 1 });
-    return true;
-  };
+  const review = (refs, profileId) => reviewedGuides.due(guideKey(refs, profileId));
   /** What to say about a queued profile whose worker isn't running; Cloud only as a suggestion the account can take. */
   const waiting = async (profile) =>
     workerState[profile.availability]
@@ -482,7 +506,7 @@ export function registerGenerateTools({
       return { queued, guide: fresh ? compactGuide(profile.prompting) : "" };
     } catch (error) {
       // A refused submission delivered no guide, so the next attempt carries it.
-      if (fresh) reviewedGuides.delete(guideKey(refs, profile.id));
+      if (fresh) reviewedGuides.forget(guideKey(refs, profile.id));
       throw error;
     }
   };

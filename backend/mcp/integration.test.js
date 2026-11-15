@@ -21,7 +21,7 @@ import { withPreferredDefaults } from "../model/catalogue.js";
 import { readRuntimeDocument } from "../persistence/runtime.ts";
 import { RuntimeController } from "../runtime/controller.ts";
 import { KubernetesEngine } from "../runtime/kubernetes.ts";
-import { registerGenerateTools } from "./generate.js";
+import { createGuideLog, registerGenerateTools } from "./generate.js";
 import { presetPlacement } from "./gpu.js";
 import { registerMcpRoutes } from "./mcp.js";
 import { McpMedia } from "./media.js";
@@ -1325,6 +1325,14 @@ test("Generate attaches a compact guide once per account unless it read the sele
   t.mock.method(Date, "now", () => now + 30 * 60_000);
   assert.ok(guideOf(await call(alice, "generate", args)), "the guide returns after half an hour");
   assert.equal(f.submitted.length, 14);
+});
+
+test("a sent guide outlasts a restart, so a rollout doesn't resend it", (t) => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-mcp-guides-"));
+  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
+  assert.equal(createGuideLog({ dataDir }).due("chat-model"), true);
+  assert.equal(createGuideLog({ dataDir }).due("chat-model"), false);
+  assert.equal(createGuideLog({ dataDir }).due("another-chat-model"), true);
 });
 
 test("Models caches each owner's catalogue for the TTL instead of rescanning per call", async (t) => {
@@ -6295,7 +6303,7 @@ test("a pending Generate stays deduplicated, then expires from its settled reply
     },
     actor: { owner: "alice", refs: "chat-1" },
     generateDedupeMs: 120_000,
-    reviewedGuides: new Map(),
+    reviewedGuides: { due: () => true, forget: () => {} },
     recentGenerates: new Map(),
     previews: new Map(),
     chatChoices: { read: () => ({}), remember: () => {} },
