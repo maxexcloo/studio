@@ -13,6 +13,7 @@ const {
   validateWorkflow,
 } = await import("./workflow-catalogue.js");
 const { userWorkflowsDir } = await import("./custom-workflows.js");
+const { readRuntimeDocument } = await import("./persistence/runtime.ts");
 
 const save = { class_type: "SaveImage", inputs: { filename_prefix: "studio" } };
 
@@ -47,7 +48,7 @@ test("a Grok profile's single cloud node needs no Save Image", () => {
   assert.deepEqual(warnings, []);
 });
 
-test("favourites and last use keep only profiles that still exist", () => {
+test("likes and last use keep only profiles that still exist", () => {
   fs.mkdirSync(userWorkflowsDir, { recursive: true });
   fs.writeFileSync(
     path.join(userWorkflowsDir, "kept.json"),
@@ -55,7 +56,7 @@ test("favourites and last use keep only profiles that still exist", () => {
   );
   saveWorkflowPreferences(
     {
-      favorites: ["custom:kept", "custom:gone"],
+      liked: ["custom:kept", "custom:gone"],
       lastUsed: { "custom:kept": "2026-11-01", "custom:gone": "2026-10-01" },
     },
     { immediate: true },
@@ -63,7 +64,12 @@ test("favourites and last use keep only profiles that still exist", () => {
   markWorkflowUsed("custom:removed");
   flushWorkflowPreferences();
   assert.deepEqual(loadWorkflowPreferences(), {
-    favorites: ["custom:kept"],
+    liked: ["custom:kept"],
     lastUsed: { "custom:kept": "2026-11-01" },
   });
+  // The saved key predates Like.
+  assert.deepEqual(
+    readRuntimeDocument(process.env.STUDIO_DATA_DIR, "workflow-preferences").favorites,
+    ["custom:kept"],
+  );
 });

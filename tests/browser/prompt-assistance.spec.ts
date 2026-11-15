@@ -356,13 +356,13 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   expect(state.jobs[0].input.prompt).toBe("A castle at night");
 });
 
-test("Prompt history reuses positive and negative prompts independently and persists pinning", async ({
+test("Prompt history reuses positive and negative prompts independently and persists likes", async ({
   page,
 }) => {
   await fixtures(page);
   const histories = {
-    positive: [{ text: "Earlier landscape", at: stamp, uses: 2, pinned: false }],
-    negative: [{ text: "Earlier exclusions", at: stamp, uses: 1, pinned: false }],
+    positive: [{ text: "Earlier landscape", at: stamp, uses: 2, liked: false }],
+    negative: [{ text: "Earlier exclusions", at: stamp, uses: 1, liked: false }],
   };
   await page.route("**/api/prompts**", (route) => {
     const request = route.request(),
@@ -373,7 +373,7 @@ test("Prompt history reuses positive and negative prompts independently and pers
       "positive") as keyof typeof histories;
     if (url.pathname.endsWith("/pin")) {
       const entry = histories[kind].find((entry) => entry.text === body.text);
-      if (entry) entry.pinned = body.pinned;
+      if (entry) entry.liked = body.liked;
     }
     if (url.pathname.endsWith("/forget"))
       histories[kind] = histories[kind].filter((entry) => entry.text !== body.text);
@@ -385,8 +385,8 @@ test("Prompt history reuses positive and negative prompts independently and pers
   await negative.fill("Keep these exclusions");
   await promptTool(page, "Prompt", "Recent Prompts");
   let panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
-  await panel.getByRole("button", { name: "Pin Prompt", exact: true }).click();
-  await expect(panel.getByRole("button", { name: "Unpin Prompt", exact: true })).toBeVisible();
+  await panel.getByRole("button", { name: "Like Prompt", exact: true }).click();
+  await expect(panel.getByRole("button", { name: "Unlike Prompt", exact: true })).toBeVisible();
   const historySearch = panel.getByRole("textbox", { name: "Search Prompt History", exact: true });
   await historySearch.fill("landscape");
   await historySearch.press("ArrowDown");
@@ -398,10 +398,10 @@ test("Prompt history reuses positive and negative prompts independently and pers
   await panel.getByRole("option", { name: "Use Prompt: Earlier exclusions", exact: true }).click();
   await expect(negative).toHaveValue("Earlier exclusions");
   await expect(prompt).toHaveValue("Earlier landscape");
-  expect(histories.positive[0].pinned).toBe(true);
+  expect(histories.positive[0].liked).toBe(true);
 });
 
-test("Recent Prompts pins and switches at once, and a refused change is undone", async ({
+test("Recent Prompts likes and switches at once, and a refused change is undone", async ({
   page,
 }) => {
   await fixtures(page);
@@ -410,7 +410,7 @@ test("Recent Prompts pins and switches at once, and a refused change is undone",
       text: string;
       at: string;
       uses: number;
-      pinned?: boolean;
+      liked?: boolean;
     }[],
     enabled: true,
   };
@@ -420,22 +420,22 @@ test("Recent Prompts pins and switches at once, and a refused change is undone",
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/pin")) {
       await held;
-      history.prompts[0].pinned = true;
+      history.prompts[0].liked = true;
     }
     if (path.endsWith("/enabled")) {
       const { enabled } = route.request().postDataJSON();
       // Switching off saves; switching back on fails the way a dropped connection did.
       if (enabled) return route.fulfill({ status: 502, body: "Bad Gateway" });
-      history = { prompts: history.prompts.filter((entry) => entry.pinned), enabled };
+      history = { prompts: history.prompts.filter((entry) => entry.liked), enabled };
     }
     return route.fulfill({ json: history });
   });
   await create(page);
   await promptTool(page, "Prompt", "Recent Prompts");
   const panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
-  // The pin shows while the server is still answering.
-  await panel.getByRole("button", { name: "Pin Prompt", exact: true }).click();
-  await expect(panel.getByRole("button", { name: "Unpin Prompt", exact: true })).toBeVisible();
+  // The like shows while the server is still answering.
+  await panel.getByRole("button", { name: "Like Prompt", exact: true }).click();
+  await expect(panel.getByRole("button", { name: "Unlike Prompt", exact: true })).toBeVisible();
   release();
   const save = panel.getByRole("switch", { name: "Save Recent Prompts", exact: true });
   await save.click();

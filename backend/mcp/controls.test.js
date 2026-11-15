@@ -135,8 +135,8 @@ test("LoRA discovery indexes compatible optional effects compactly and bounds lo
     "PixelArtRedmond",
     "ink — Wash Painting [inkstyle]",
   ]);
-  // Thumbs up lead and thumbs down trail, each alphabetical.
-  const ratings = { "styles/ink.safetensors": "up", "lora_1234_v2.safetensors": "down" };
+  // Liked lead and disliked trail, each alphabetical.
+  const ratings = { "styles/ink.safetensors": "liked", "lora_1234_v2.safetensors": "disliked" };
   assert.deepEqual(
     mcpLoras(subject, infos, { ratings }).loras.map((line) => line.split(" ")[0]),
     ["ink", "PixelArtRedmond", "lora_1234_v2"],

@@ -6821,7 +6821,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   );
   f.app.post(
     "/api/loras/library/ops",
-    record("lora-ops", { library: { ratings: { "fixture-effect.safetensors": "up" } } }),
+    record("lora-ops", { library: { ratings: { "fixture-effect.safetensors": "liked" } } }),
   );
   assert.equal(data(await call(mine, "taste")).summary, "Moody light");
   await call(mine, "taste", { action: "save", avoid: ["clowns"] });
@@ -6831,13 +6831,13 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
       await call(mine, "taste", {
         action: "rate_lora",
         lora: "fixture-effect.safetensors",
-        rating: "up",
+        rating: "like",
       }),
     ),
-    { lora: "fixture-effect.safetensors", rating: "up" },
+    { lora: "fixture-effect.safetensors", rating: "liked" },
   );
   assert.deepEqual(seen.at(-1).body, {
-    ops: [{ op: "rating", name: "fixture-effect.safetensors", rating: "up" }],
+    ops: [{ op: "rating", name: "fixture-effect.safetensors", rating: "liked" }],
   });
   assert.ok(seen.every((entry) => entry.authorization.startsWith("Bearer ")));
 });

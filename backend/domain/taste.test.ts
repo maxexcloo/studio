@@ -231,7 +231,7 @@ test("every tenth signal summarises the words in the background, at most every t
   );
   assert.equal(
     record.summary,
-    "Likes misty harbours. Styles: film grain. Avoids clowns, crowds. Favourite models: flux-2. Favourite LoRAs: film. Quiet coastal scenes.",
+    "Likes misty harbours. Styles: film grain. Avoids clowns, crowds. Liked models: flux-2. Liked LoRAs: film. Quiet coastal scenes.",
   );
   assert.equal(record.scores.get("profile:flux-2")!.score, 15);
   assert.equal(scores.get("profile:flux-2")!.score, 13.5);

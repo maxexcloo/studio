@@ -79,7 +79,7 @@ const mcpBearerRoutes = [
   ["POST", /^\/api\/assistant\/(?:loras|negative|rewrite)$/],
   // generate's finish estimate.
   ["GET", /^\/api\/estimate$/],
-  // The account's LoRA thumbs up and down, which order every LoRA list MCP shows.
+  // The account's LoRA likes and dislikes, which order every LoRA list MCP shows.
   ["GET", /^\/api\/loras\/library$/],
   ["POST", /^\/api\/generate$/],
   ["GET", /^\/api\/jobs\/[\w-]+$/],

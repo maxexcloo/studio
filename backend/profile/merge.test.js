@@ -76,7 +76,7 @@ fs.writeFileSync(
 );
 saveWorkflowPreferences(
   {
-    favorites: [`custom:${oldId}`],
+    liked: [`custom:${oldId}`],
     lastUsed: { [`custom:${oldId}`]: "2026-10-01" },
   },
   { immediate: true },
@@ -132,7 +132,7 @@ test("merging needs the preview's hash, backs up, aliases, and is safe to repeat
   assert.ok(!fs.existsSync(path.join(userWorkflowsDir, `${oldId}.json`)));
   assert.equal(profileStore().aliases()[oldId].to, keptId);
   assert.ok(profileStore().versions(oldId).length >= 1);
-  assert.deepEqual(loadWorkflowPreferences().favorites, [`custom:${keptId}`]);
+  assert.deepEqual(loadWorkflowPreferences().liked, [`custom:${keptId}`]);
   assert.deepEqual(Object.keys(loadWorkflowPreferences().lastUsed), [`custom:${keptId}`]);
   for (const [name, body] of Object.entries(ownerFiles))
     assert.equal(fs.readFileSync(path.join(temporary, name), "utf8"), body);

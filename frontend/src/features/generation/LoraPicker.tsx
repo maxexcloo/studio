@@ -13,12 +13,12 @@ import {
   Text,
 } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import { loraDefaultStrength, loraFamilyId, loraName } from "../../../../shared/profiles";
 import { api, post } from "../../api";
-import type { GenerationInput, Profile } from "../../types";
+import type { GenerationInput, Profile, Rating } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -28,7 +28,7 @@ import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "./chip";
 import { useGeneration } from "./GenerationProvider";
-import { type LoraLibrary, type LoraRating, loraLibraryQuery } from "./loraLibrary";
+import { type LoraLibrary, loraLibraryQuery } from "./loraLibrary";
 import { isProfile, profileForBackend } from "./payload";
 import {
   ChipContent,
@@ -73,11 +73,10 @@ const typeNames: Record<string, string> = {
   character: "Character",
   concept: "Concept",
 };
-/** Which LoRAs the picker lists: every one the profile can load, or the thumbs up among them. */
+/** Which LoRAs the picker lists: every one the profile can load, or the liked among them. */
 const loraTabs = [
   { value: "all", label: "All" },
-  // The stored tab value keeps its earlier name.
-  { value: "favourites", label: "Starred" },
+  { value: "liked", label: "Liked" },
 ] as const;
 type LoraTab = (typeof loraTabs)[number]["value"];
 /** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
@@ -93,7 +92,7 @@ export const compatibleLoras = (profile: Profile | undefined, metadata: Record<s
     return !families.length || fitsFamily(families, profile!.family);
   });
 
-const ratingOrder = (rating?: LoraRating) => (rating === "up" ? 0 : rating === "down" ? 2 : 1);
+const ratingOrder = (rating?: Rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);
 /** The LoRA choices' orders: by rating (the default every LoRA list shares), or by name. */
 type LoraSort = "rating" | "name-asc" | "name-desc";
 const loraSortLabels: Record<LoraSort, string> = {
@@ -101,10 +100,9 @@ const loraSortLabels: Record<LoraSort, string> = {
   "name-asc": "Name A–Z",
   "name-desc": "Name Z–A",
 };
-/** Every LoRA list's order: thumbs up, then unrated, then thumbs down, each by title. */
+/** Every LoRA list's order: liked, then unrated, then disliked, each by title. */
 const byRating =
-  (ratings: Record<string, LoraRating>, title: (file: string) => string) =>
-  (a: string, b: string) =>
+  (ratings: Record<string, Rating>, title: (file: string) => string) => (a: string, b: string) =>
     ratingOrder(ratings[a]) - ratingOrder(ratings[b]) || title(a).localeCompare(title(b));
 
 export function useLoraPicker() {
@@ -236,7 +234,7 @@ function useRating() {
   return useMutation({
     // Ratings are set, not toggled, and run in order, so the last tap wins.
     scope: { id: "lora-library" },
-    mutationFn: ({ name, rating }: { name: string; rating: LoraRating | null }) =>
+    mutationFn: ({ name, rating }: { name: string; rating: Rating | null }) =>
       post<{ library: LoraLibrary }>("/api/loras/library/ops", {
         ops: [{ op: "rating", name, rating }],
       }),
@@ -254,8 +252,8 @@ function useRating() {
     onError: () => cache.invalidateQueries({ queryKey: loraLibraryQuery.queryKey }),
   });
 }
-/** A LoRA's thumbs up and down for the account; tapping the pressed one clears it. */
-export function LoraThumbs({ file, title }: { file: string; title: string }) {
+/** A LoRA's Like and Dislike for the account; tapping the pressed one clears it. */
+export function LoraRatings({ file, title }: { file: string; title: string }) {
   const library = useQuery(loraLibraryQuery);
   const rate = useRating();
   const current = library.data?.library.ratings?.[file];
@@ -263,8 +261,8 @@ export function LoraThumbs({ file, title }: { file: string; title: string }) {
     <Group gap={4} wrap="nowrap">
       {(
         [
-          ["up", "Thumbs Up", ThumbsUp, "green"],
-          ["down", "Thumbs Down", ThumbsDown, "red"],
+          ["liked", "Like", icons.like, "green"],
+          ["disliked", "Dislike", icons.dislike, "red"],
         ] as const
       ).map(([rating, label, Icon, color]) => (
         <ActionIcon
@@ -327,7 +325,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   // A tab remembered from before shows All.
   const tab = loraTabs.some((item) => item.value === picker.tab) ? picker.tab : "all";
   const listed =
-    tab === "favourites" ? available.filter((file) => ratings[file] === "up") : available;
+    tab === "liked" ? available.filter((file) => ratings[file] === "liked") : available;
   const families = [...new Set(listed.flatMap(familiesOf).map(loraFamilyId))].sort((a, b) =>
     modelFamilyLabel(a).localeCompare(modelFamilyLabel(b)),
   );
@@ -366,11 +364,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
           ],
     );
   const empty =
-    terms || family !== "all"
-      ? "No Matches"
-      : tab === "favourites"
-        ? "No Starred LoRAs"
-        : "No LoRAs";
+    terms || family !== "all" ? "No Matches" : tab === "liked" ? "No Liked LoRAs" : "No LoRAs";
   // Loading and empty states take the scroll pane's place, centred in its space.
   const state = info.isPending ? (
     <LoadingState fill label="Loading LoRAs" />
@@ -381,7 +375,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   );
   const choices = shown.length > 0 && (
     // A list on every breakpoint, so names, families and types scan down one column; clicking a
-    // row adds or removes its LoRA, and the thumbs beside it rate without toggling it.
+    // row adds or removes its LoRA, and Like and Dislike beside it rate without toggling it.
     <PickerGrid label="LoRA Choices" rows>
       {shown.map((file) => (
         <PickerTile
@@ -403,7 +397,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
           selected={selected.has(file)}
           row
           onToggle={() => toggle(file)}
-          action={<LoraThumbs file={file} title={title(file)} />}
+          action={<LoraRatings file={file} title={title(file)} />}
         />
       ))}
     </PickerGrid>
