@@ -24,7 +24,7 @@ test("MCP generation uses shared durable admission and owned reads without HTTP"
     async saveOutputs() {},
   });
   // Persist admission without a background submit racing assertions.
-  await queue.stop();
+  queue.stop();
   const accounts = new Map([
     ["alice", { authenticated: true, role: "user", userId: "alice" }],
     ["bob", { authenticated: true, role: "user", userId: "bob" }],
@@ -122,7 +122,7 @@ test("MCP generation uses shared durable admission and owned reads without HTTP"
     assert.equal(calls.length, 7);
     assert.deepEqual(submitted, []);
   } finally {
-    await queue.stop();
+    queue.stop();
     store.close();
     rmSync(directory, { recursive: true, force: true });
   }

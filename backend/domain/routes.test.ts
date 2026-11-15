@@ -103,7 +103,7 @@ test("Cancel All isolates the owner and retains accepted work until cancellation
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    await queue.stop();
+    queue.stop();
     store.close();
   }
 });
@@ -303,7 +303,7 @@ test("Unfinished Items lists every account's unfinished jobs and ends stuck ones
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    await queue.stop();
+    queue.stop();
     store.close();
   }
 });

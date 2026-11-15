@@ -73,7 +73,7 @@ test("recorded upscale resumes its own prompt and completes with its saved outpu
     await finishedTasks();
     assert.equal(store.job("alice", job.id)!.providerJobId, "accepted-upscale");
     assert.deepEqual(submitted, []);
-    await queue.stop();
+    queue.stop();
     store.close();
     store = new Store(openDatabase(filename));
     queue = new GenerationQueue(store, withUpscaleAdapter(other, adapter(true)));
@@ -88,7 +88,7 @@ test("recorded upscale resumes its own prompt and completes with its saved outpu
     assert.deepEqual(released, [job.id]);
     assert.deepEqual(submitted, [next.id]);
   } finally {
-    await queue.stop();
+    queue.stop();
     store.close();
     rmSync(directory, { recursive: true, force: true });
   }
@@ -144,7 +144,7 @@ test("only the owner's accepted upscale is cancelled, and admission stays held u
     assert.deepEqual(released, [job.id]);
   } finally {
     finish();
-    await queue.stop();
+    queue.stop();
     store.close();
   }
 });
@@ -194,7 +194,7 @@ test("an explicitly refused upscale can retry, while a lost acknowledgement is n
     await queue.cancel("alice", retry.id);
     assert.equal(store.job("alice", retry.id)!.status, "running");
   } finally {
-    await queue.stop();
+    queue.stop();
     store.close();
   }
 });
