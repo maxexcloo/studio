@@ -173,7 +173,7 @@ test("New Character saves a name, description and gallery images from the Refere
     .filter({ has: page.getByRole("button", { name: "Add image: Portrait of a ranger" }) })
     .getByRole("button", { name: "Preview", exact: true })
     .click();
-  const preview = page.getByRole("dialog", { name: /^Portrait of a ranger/ });
+  const preview = page.getByRole("dialog", { name: /^Portrait of a Ranger/ });
   await expect(preview).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();

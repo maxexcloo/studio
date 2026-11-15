@@ -1,6 +1,17 @@
-import { ActionIcon, Group, Modal, Text, Tooltip, getDefaultZIndex } from "@mantine/core";
-import { Suspense, lazy, useId, useState } from "react";
+import {
+  ActionIcon,
+  Group,
+  Modal,
+  ScrollArea,
+  Text,
+  Tooltip,
+  UnstyledButton,
+  getDefaultZIndex,
+} from "@mantine/core";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { Suspense, lazy, useEffect, useId, useState } from "react";
 
+import { promptWords } from "../../../../shared/titles";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
@@ -13,6 +24,7 @@ export interface PreviewImage {
   src: string;
   thumbnailUrl?: string;
   alt: string;
+  title?: string;
 }
 
 /**
@@ -58,6 +70,10 @@ function ImagePreview({
 }) {
   const id = useId();
   const image = images[index];
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => setExpanded(false), [image?.src, opened]);
+  const title = image && (image.title || promptWords(image.alt) || "Image");
+  const Chevron = expanded ? ChevronUp : ChevronDown;
   const step = (by: number) => {
     const next = index + by;
     if (next >= 0 && next < images.length) onIndex(next);
@@ -70,20 +86,30 @@ function ImagePreview({
       fullScreen
       title={
         image && (
-          <Text size="sm" fw={500}>
-            {image.alt}
-            {images.length > 1 && (
-              <Text span c="dimmed" inherit>
-                {` · ${index + 1} of ${images.length}`}
+          <Tooltip label={expanded ? "Hide Description" : "Show Description"}>
+            <UnstyledButton
+              w="100%"
+              aria-expanded={expanded}
+              aria-controls={`${id}-description`}
+              onClick={() => setExpanded((value) => !value)}
+              style={{ display: "flex", alignItems: "center", gap: "var(--mantine-spacing-xs)" }}
+            >
+              <Text component="span" size="sm" fw={500} truncate style={{ flex: 1, minWidth: 0 }}>
+                {title}
+                {images.length > 1 && ` · ${index + 1} of ${images.length}`}
               </Text>
-            )}
-          </Text>
+              <Chevron size={16} aria-hidden style={{ flexShrink: 0 }} />
+            </UnstyledButton>
+          </Tooltip>
         )
       }
       // Over the card dialog it opens from.
       zIndex={getDefaultZIndex("max")}
       styles={{
         content: { display: "flex", flexDirection: "column" },
+        header: { flexShrink: 0 },
+        title: { flex: 1, minWidth: 0 },
+        close: { flexShrink: 0 },
         body: { display: "flex", flexDirection: "column", flex: 1, minHeight: 0, padding: 0 },
       }}
       onKeyDown={(event) => {
@@ -91,6 +117,19 @@ function ImagePreview({
         if (event.key === "ArrowRight") step(1);
       }}
     >
+      {expanded && (
+        <ScrollArea.Autosize
+          id={`${id}-description`}
+          mah="25vh"
+          px="md"
+          pb="sm"
+          style={{ flexShrink: 0 }}
+        >
+          <Text size="sm" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+            {image?.alt}
+          </Text>
+        </ScrollArea.Autosize>
+      )}
       {image && (
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
           <Suspense fallback={<LoadingState label="Loading Image" fill />}>
