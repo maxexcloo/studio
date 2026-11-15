@@ -1071,6 +1071,11 @@ test("media and administrator credentials discover only their own friendly tools
   const generateSchema = tools.find((tool) => tool.name === "generate").inputSchema.properties;
   assert.equal(generateSchema.count.maximum, 10);
   assert.equal(generateSchema.prompts.anyOf[0].maxItems, 30);
+  assert.match(generateSchema.title.description, /Title Case/);
+  assert.match(
+    media.getInstructions(),
+    /Name sets for the chat topic\/title; reuse unless the user renames/,
+  );
   assert.doesNotMatch(media.getInstructions(), /GPU|\bapply\b/);
   assert.match(admin.getInstructions(), /get approval before apply/);
   assert.doesNotMatch(admin.getInstructions(), /\bgenerate\b|\bresult\b/);
@@ -1655,6 +1660,31 @@ test("a call of several results is one titled set, each prompt titled by the cha
   finish(f);
   await call(client, "reuse", { job_id: jobId(made), prompt: "Mara at dawn" });
   assert.deepEqual(f.submitted.at(-1).resultSet.context, context);
+});
+
+test("a chat's supplied set name survives later turns and client reconnects without renaming earlier sets", async (t) => {
+  const f = await fixture(t);
+  const first = await chat(t, f, "alice", "fox-chat");
+  await generate(first, { title: "Moonlit Fox Studies", prompts: ["A fox by a stream"] });
+  const original = structuredClone(f.submitted.at(-1).resultSet);
+  const reconnected = await chat(t, f, "alice", "fox-chat");
+  await generate(reconnected, { prompts: ["A fox beneath a tree"] });
+  assert.equal(f.submitted.at(-1).resultSet.title, "Moonlit Fox Studies");
+  assert.equal(f.submitted.at(-1).resultSet.variation, undefined);
+  assert.notEqual(f.submitted.at(-1).resultSet.id, original.id);
+  await generate(reconnected, { title: "my chosen name", prompts: ["A fox on a hill"] });
+  assert.equal(f.submitted.at(-1).resultSet.title, "my chosen name");
+  await generate(reconnected, { prompts: ["A fox near a cottage"] });
+  assert.equal(f.submitted.at(-1).resultSet.title, "my chosen name");
+  assert.deepEqual(f.submitted[0].resultSet, original);
+  // A different conversation or account never inherits the name.
+  await generate(await chat(t, f, "alice", "other-chat"), {
+    prompts: ["A harbour scene"],
+    count: 2,
+  });
+  assert.equal(f.submitted.at(-1).resultSet.title, "Harbour Scene");
+  await generate(await chat(t, f, "bob", "fox-chat"), { prompts: ["A mountain lake"], count: 2 });
+  assert.equal(f.submitted.at(-1).resultSet.title, "Mountain Lake");
 });
 
 test("partial queue failures retain successful owned jobs without retrying the submission", async (t) => {

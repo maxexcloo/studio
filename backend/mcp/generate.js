@@ -1559,8 +1559,8 @@ export function registerGenerateTools({
     for (const item of plans)
       if (resultSet) {
         item.plan.result_set = resultSet;
-        if (title && !item.plan.titles && item.plan.prompts.length === 1)
-          item.plan.titles = [title];
+        if (input.title && !item.plan.titles && item.plan.prompts.length === 1)
+          item.plan.titles = [input.title];
       }
     // Request and prompts together: the prompts run, and the request stays on the record.
     const recordOf = ({ plan }) => {
