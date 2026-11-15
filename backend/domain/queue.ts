@@ -51,7 +51,7 @@ export interface QueueAdapter {
 }
 
 /** What the writing stage streams into the item's progress while the prompt is written. */
-export interface WritingProgress {
+interface WritingProgress {
   thinking: string;
   prompt: string;
 }
@@ -122,7 +122,7 @@ export const modelOf = (input: GenerationInput) => String(input.profileId || inp
  * A resource's load: whether its slots are all taken (`current`, the last started job's id), how
  * many jobs wait for it and the model it last ran.
  */
-export interface ResourceLoad {
+interface ResourceLoad {
   busy: boolean;
   current?: string;
   queued: number;

@@ -67,7 +67,7 @@ export interface DreamOrigin {
  * A recurring character, outfit or scene Dream proposes from the results the person liked, shown in
  * Library › Characters until it is accepted (which makes the card) or dismissed.
  */
-export interface DreamSuggestion {
+interface DreamSuggestion {
   id: string;
   kind: CardKind;
   name: string;
@@ -96,7 +96,7 @@ interface DreamSeries {
  * One side of a Dream comparison: two results alike but for one thing (with the same seed), shown
  * together and answered with A, B, Both or Neither to the question about what varies.
  */
-export interface DreamPair {
+interface DreamPair {
   id: string;
   side: 0 | 1;
   question: string;
@@ -175,7 +175,7 @@ export interface DreamLoraLibrary {
   ratings: Record<string, "liked" | "disliked">;
   strengths: Record<string, Record<string, number>>;
 }
-export interface DreamLora {
+interface DreamLora {
   name: string;
   strength: number;
   enabled: true;
@@ -593,7 +593,7 @@ const suggestionKinds: Record<string, CardKind> = {
   scene: "scenes",
 };
 /** How a card is remembered among those taken or turned down: `<kind>:<name>`, lowercased. */
-export const cardKey = (kind: CardKind, name: string) => `${kind}:${normalised(name)}`;
+const cardKey = (kind: CardKind, name: string) => `${kind}:${normalised(name)}`;
 /**
  * The usable suggestions in the text model's reply: a known kind, a name and description within a
  * card's limits, stating no age under 18, recurring in at least two of the `liked` results it

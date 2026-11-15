@@ -8,14 +8,14 @@ import { syncGallerySchema } from "./gallery-rows.ts";
 
 const databases = new Map<string, DatabaseSync>();
 /** The JSON stores runtime-json-v1 moved into SQLite. */
-export const legacyFiles = ["accounts.json", "gallery.json", "gallery-hidden.json"] as const;
+const legacyFiles = ["accounts.json", "gallery.json", "gallery-hidden.json"] as const;
 export const databaseFile = (dataDir: string) => path.join(dataDir, "studio.sqlite");
 /**
  * The JSON files json-stores-v1 moved into SQLite, relative to the data folder, `.bak` copies
  * included: documents, each account's prompt histories and LoRA stacks
  * (in `accounts/<key>/`, at the top in single-user mode), import records and ingested runs.
  */
-export const jsonStoreSource =
+const jsonStoreSource =
   /^(?:(workflow-preferences|timings|model-types|presets|library\/updates|mcp-assistant|comparisons|mcp-ownership)|(?:accounts\/([0-9a-f]{64})\/)?(prompt-history|negative-prompt-history|lora-stacks)|library\/imports\/(imp-[a-z0-9]{6,40})|media-ingested)\.json(\.bak)?$/;
 
 const jsonStoresMigration = "json-stores-v1";

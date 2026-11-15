@@ -1,17 +1,11 @@
-import fs from "node:fs";
 import zlib from "node:zlib";
 
 /**
- * PNG text chunks, read and written without decoding the image.
- *
- * Reading walks the chunk headers and only loads the text ones (tEXt, zTXt,
- * iTXt) and IHDR, so a 20 MB image costs a few small reads. Writing appends a
- * text chunk before IEND, replacing any earlier chunk with the same keyword.
+ * PNG text chunks, written without decoding the image: a text chunk goes before IEND, replacing
+ * any earlier chunk with the same keyword (image-metadata.js reads them).
  */
 
 const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-// A text chunk bigger than this is not a prompt; skip it rather than load it.
-const maxTextChunk = 4 * 1024 * 1024;
 
 function isPng(buffer) {
   return Buffer.isBuffer(buffer) && buffer.length >= 8 && buffer.subarray(0, 8).equals(signature);
@@ -39,54 +33,6 @@ function decodeText(type, data) {
     return null;
   }
   return null;
-}
-
-/**
- * Size and text chunks of a PNG file. Null when the file is not a PNG.
- * `text` maps each keyword to its value (the first one wins).
- */
-export function readPngInfo(file) {
-  let fd;
-  try {
-    fd = fs.openSync(file, "r");
-    const head = Buffer.alloc(8);
-    if (fs.readSync(fd, head, 0, 8, 0) !== 8 || !head.equals(signature)) return null;
-    const size = fs.fstatSync(fd).size;
-    const info = { width: 0, height: 0, text: {} };
-    let offset = 8;
-    const header = Buffer.alloc(8);
-    while (offset + 12 <= size) {
-      if (fs.readSync(fd, header, 0, 8, offset) !== 8) break;
-      const length = header.readUInt32BE(0);
-      const type = header.toString("latin1", 4, 8);
-      if (type === "IEND") break;
-      if (type === "IHDR" && length >= 8) {
-        const dims = Buffer.alloc(8);
-        fs.readSync(fd, dims, 0, 8, offset + 8);
-        info.width = dims.readUInt32BE(0);
-        info.height = dims.readUInt32BE(4);
-      } else if (
-        (type === "tEXt" || type === "zTXt" || type === "iTXt") &&
-        length <= maxTextChunk
-      ) {
-        const data = Buffer.alloc(length);
-        fs.readSync(fd, data, 0, length, offset + 8);
-        const text = decodeText(type, data);
-        if (text && !(text.keyword in info.text)) info.text[text.keyword] = text.value;
-      }
-      offset += 12 + length;
-    }
-    return info;
-  } catch {
-    return null;
-  } finally {
-    if (fd !== undefined)
-      try {
-        fs.closeSync(fd);
-      } catch {
-        /* already closed */
-      }
-  }
 }
 
 function chunk(type, data) {
@@ -147,55 +93,4 @@ export function withPngText(buffer, keyword, value) {
     offset = end;
   }
   return ended ? Buffer.concat(parts) : null;
-}
-
-/* ------------------------------------------------------ A1111 parameters */
-
-/**
- * Reads the "parameters" text AUTOMATIC1111, Forge and Civitai use:
- * the prompt, an optional "Negative prompt:" line, then "Key: value, …".
- */
-export function parseA1111Parameters(text = "") {
-  const source = String(text || "")
-    .replace(/\r\n?/g, "\n")
-    .trim();
-  if (!source) return null;
-  const lines = source.split("\n");
-  let settingsLine = "";
-  // The settings line is the last one that starts with "Steps:".
-  const last = lines.length - 1;
-  if (/^Steps:\s*\d+/.test(lines[last] || "")) settingsLine = lines.pop();
-  const body = lines.join("\n");
-  const negativeAt = body.search(/(^|\n)Negative prompt:/);
-  const prompt = (negativeAt >= 0 ? body.slice(0, negativeAt) : body).trim();
-  const negative =
-    negativeAt >= 0
-      ? body
-          .slice(negativeAt)
-          .replace(/^\n?Negative prompt:\s*/, "")
-          .trim()
-      : "";
-  const settings = {};
-  // Values can be quoted (and contain commas) in newer versions.
-  for (const match of settingsLine.matchAll(
-    /\s*([\w ][\w ()/.-]*?):\s*("(?:\\.|[^"])*"|[^,]*)(?:,|$)/g,
-  )) {
-    const key = match[1].trim();
-    if (!key) continue;
-    settings[key] = match[2].trim().replace(/^"(.*)"$/s, "$1");
-  }
-  const [width, height] = String(settings.Size || "")
-    .split("x")
-    .map(Number);
-  return {
-    prompt,
-    negative,
-    model: settings.Model || "",
-    steps: Number(settings.Steps) || 0,
-    sampler: settings.Sampler || "",
-    cfg: Number(settings["CFG scale"]) || 0,
-    seed: settings.Seed || "",
-    width: width || 0,
-    height: height || 0,
-  };
 }

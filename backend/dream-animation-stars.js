@@ -22,7 +22,7 @@ const sourceKey = (video) => {
 const near = (a, b) => Math.abs(Date.parse(a) - Date.parse(b)) <= sameMoment;
 
 /** The starred Dream results whose star came from a Dream video animating them. */
-export function dreamAnimationStarred(items, signals = () => []) {
+function dreamAnimationStarred(items, signals = () => []) {
   const byKey = new Map(items.map((item) => [galleryKey(item), item]));
   const animated = new Map();
   for (const video of items) {

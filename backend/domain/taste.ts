@@ -120,7 +120,7 @@ interface StoredTaste extends TasteWords {
   addedAvoid: string[];
 }
 /** An attribute's decayed score and how many signals moved it, for how sure Studio is of it. */
-export interface TasteScore {
+interface TasteScore {
   score: number;
   count: number;
 }
@@ -298,7 +298,7 @@ export function pairAttributes(axis: string, a: TasteChoice, b: TasteChoice) {
 }
 
 /** Each attribute's score from the signals, each signal halving in weight every 60 days. */
-export function tasteScores(signals: TasteSignal[], at: number) {
+function tasteScores(signals: TasteSignal[], at: number) {
   const scores = new Map<string, TasteScore>();
   for (const signal of signals) {
     const decay = 0.5 ** (Math.max(0, at - Date.parse(signal.at)) / halfLifeMs) || 0;

@@ -58,7 +58,7 @@ const cardInstructions = {
   scenes: `Describe the setting in the image so an image model can place someone else in it: the place and its notable details, the light and the time of day. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "rainy city street at night, neon signs, wet asphalt reflections". Leave out any people, their clothing and poses, and the photographic style.`,
 };
 // How many names or descriptions a card field's magic menu offers at once.
-export const cardIdeaCount = 5;
+const cardIdeaCount = 5;
 // A card's name and description ideas from its images (the card editors' ▾ beside each field).
 const cardIdeaInstructions = {
   name: (kind) =>
@@ -144,7 +144,7 @@ export function gatewaySettings(environment = process.env) {
 }
 
 /** Both text consumers accept a gateway root, /v1 base or full completion endpoint. */
-export function gatewayAddress(value, setting) {
+function gatewayAddress(value, setting) {
   let url;
   try {
     url = new URL(value);

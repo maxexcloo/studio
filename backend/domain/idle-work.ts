@@ -15,7 +15,7 @@ export interface IdleItem {
  */
 export const pictured = (item: IdleItem) =>
   item.type === "image" || (item.type === "video" && Boolean(item.uploaded));
-export type IdleTick =
+type IdleTick =
   | "off"
   | "busy"
   | "spaced"
@@ -32,9 +32,9 @@ export type IdleTick =
  * ones. The work's `wanted` decides what each means for it.
  */
 export type PassScope = "all" | "outdated" | "missing";
-export const passScopes: PassScope[] = ["all", "outdated", "missing"];
+const passScopes: PassScope[] = ["all", "outdated", "missing"];
 /** The pass an item is weighed for: its scope, and when it started (for `all`). */
-export interface PassTarget {
+interface PassTarget {
   scope: PassScope;
   startedAt: string;
 }
@@ -50,7 +50,7 @@ export interface IdleDocument {
   pass?: IdlePass;
   trickle?: { day: string; count: number };
 }
-export interface IdleStatus {
+interface IdleStatus {
   state: "ready" | "running" | "waiting" | "stopped" | "finished" | "unavailable";
   /** Whether a pass is under way (also while it waits or is unavailable). */
   active: boolean;
