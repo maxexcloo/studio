@@ -16,7 +16,7 @@ const raw = (loraStack, id = "radiance-loras") => ({
     1: {
       class_type: "RadianceImageGenerate",
       inputs: {
-        model: "krea-2-turbo-fp8.rad",
+        model: "krea-2-turbo-iq8r",
         prompt: "",
         seed: 0,
         width: 1024,

@@ -8,20 +8,21 @@ import {
   workerAvailability,
   workerReachable,
 } from "../comfy/backends.js";
-import { comfy, optionsFor } from "../comfy/comfy.js";
+import { comfy, noteComfyFetchError, noteComfyReachable, optionsFor } from "../comfy/comfy.js";
 import { logWarning } from "../crash-log.js";
 import { customWorkflowsRevision } from "../custom-workflows.js";
 import { step } from "../event-loop.js";
 import { families } from "../family-catalogue.js";
 import { uncensoredLoraNames } from "../lora/info.js";
 import { canonicalProfileId, profileAliasBackend, profileStore } from "../profile/store.js";
+import { RadianceClient, radianceInfo } from "../providers/radiance.ts";
 import { parkedWorkers } from "../runtime/services.ts";
 import { sharedRequests } from "../shared-requests.js";
 import { profileStats, recentRuns } from "../stats.js";
 import {
-  capabilityForProfile,
   defaultWorker,
   defaultWorkerId,
+  isRadianceWorker,
   listWorkers,
   noWorkerMessage,
   workerById,
@@ -103,6 +104,8 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
 
   async function fetchComfyContext(backend) {
     const signal = AbortSignal.timeout(catalogueReadTimeoutMs);
+    const worker = workerById(backend);
+    if (isRadianceWorker(worker)) return fetchRadianceContext(worker, signal);
     const [info, stats] = await Promise.all([
       // The node list is megabytes and may take seconds to cross between sites once it starts.
       comfy(backend, "/object_info", { answerWithin: catalogueReadTimeoutMs }),
@@ -122,11 +125,32 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
       { signal },
     ).catch(() => null);
     const result = { info, stats, fetchedAt: Date.now() };
-    const worker = workerById(backend);
     if (worker) {
       contextCaches.set(backend, result);
       store.saveWorkerModels(backend, worker.url, { info, stats });
     }
+    return result;
+  }
+
+  /** A Radiance worker's context: its two nodes, listing the models it serves, and their states. */
+  async function fetchRadianceContext(worker, signal) {
+    let models;
+    try {
+      models = await new RadianceClient(worker.url).models(signal);
+      noteComfyReachable(worker.id);
+    } catch (error) {
+      contextFailures.set(worker.id, { error, at: Date.now() });
+      noteComfyFetchError(worker.id, error);
+      throw error;
+    }
+    contextFailures.delete(worker.id);
+    const result = {
+      info: radianceInfo(models),
+      stats: { radiance: models },
+      fetchedAt: Date.now(),
+    };
+    contextCaches.set(worker.id, result);
+    store.saveWorkerModels(worker.id, worker.url, { info: result.info, stats: result.stats });
     return result;
   }
 
@@ -223,7 +247,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
           ...(cached?.profiles || []).filter((profile) => !profile.id.startsWith("custom:")),
           ...configured.profiles,
         ]
-          .filter((profile) => worker.capabilities.includes(capabilityForProfile(profile)))
+          .filter((profile) => allowedProfile(worker, profile))
           .map((profile) => ({
             ...profile,
             ready: undefined,

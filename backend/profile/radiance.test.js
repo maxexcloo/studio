@@ -39,13 +39,13 @@ fs.mkdirSync(userWorkflowsDir, { recursive: true });
 fs.writeFileSync(path.join(userWorkflowsDir, `${id}.json`), JSON.stringify(profile));
 
 test("a converted model joins the profile as a text-only Radiance backend", () => {
-  const raw = JSON.parse(withRadianceBackend(profile, "fine-tune-fp8.rad"));
+  const raw = JSON.parse(withRadianceBackend(profile, "fine-tune-iq8r"));
   assert.equal(raw.studio.backend, "radiance");
   assert.equal(raw.studio.uncensored, true);
   const comfyui = metadataFromJson(raw, `${id}.json`, { backend: "comfyui" });
   assert.equal(comfyui.mediaInputs.length, 1);
   const radiance = metadataFromJson(raw, `${id}.json`, { backend: "radiance" });
-  assert.equal(radiance.defaults.model, "fine-tune-fp8.rad");
+  assert.equal(radiance.defaults.model, "fine-tune-iq8r");
   assert.deepEqual([radiance.defaults.width, radiance.defaults.height], [864, 1152]);
   assert.deepEqual(radiance.mediaInputs, []);
   assert.equal(raw.studio.backends.radiance.graph[1].class_type, "RadianceImageGenerate");
@@ -57,7 +57,7 @@ test("a converted model joins the profile as a text-only Radiance backend", () =
   );
 });
 
-test("Civitai links resolve to one exact file, preferring fp8", async () => {
+test("Civitai links resolve to one exact file, preferring bf16", async () => {
   const file = (fileId, fp, primary = false) => ({
     id: fileId,
     name: `fine-tune-${fp}.safetensors`,
@@ -71,7 +71,7 @@ test("Civitai links resolve to one exact file, preferring fp8", async () => {
     id: 20,
     modelId: 10,
     model: { name: "Fine Tune", type: "Checkpoint" },
-    files: [file(1, "bf16", true), file(2, "fp8")],
+    files: [file(1, "fp8", true), file(2, "bf16")],
   };
   const json = async (pathname) =>
     pathname === "models/10" ? { modelVersions: [{ id: 20 }] } : version;
@@ -99,13 +99,13 @@ test("a finished conversion adds the backend once and clears the worker", async 
       return { conversion };
     },
   });
-  const started = await conversions.start(id, { url: "link", name: "fine-tune-fp8", by: "Admin" });
+  const started = await conversions.start(id, { url: "link", name: "fine-tune-iq8r", by: "Admin" });
   assert.equal(started.conversion.status, "running");
   assert.deepEqual(Object.keys(calls[0].tokens).sort(), ["civitai", "hf"]);
   assert.equal(calls[0].size, 5);
   conversion = { ...conversion, status: "done" };
   const [first, second] = await Promise.all([conversions.state(), conversions.state()]);
-  assert.deepEqual(applied, [[id, "fine-tune-fp8.rad", "Admin"]]);
+  assert.deepEqual(applied, [[id, "fine-tune-iq8r", "Admin"]]);
   assert.equal(first.conversion.applied, true);
   assert.equal(second.conversion.applied, true);
   assert.equal(calls.at(-1).action, "clear");
@@ -116,9 +116,9 @@ test("a finished conversion adds the backend once and clears the worker", async 
   );
   // The profile file itself is untouched until the worker reports the model installed.
   assert.equal(JSON.parse(readEditableProfile(id).text).studio.backends, undefined);
-  await conversions.start(id, { url: "link", name: "fine-tune-fp8", by: "Admin" });
+  await conversions.start(id, { url: "link", name: "fine-tune-iq8r", by: "Admin" });
   conversion = null;
   assert.match((await conversions.state()).conversion.error, /worker restarted/);
-  const saved = addRadianceBackend(id, "fine-tune-fp8.rad", "Admin");
+  const saved = addRadianceBackend(id, "fine-tune-iq8r", "Admin");
   assert.deepEqual(Object.keys(JSON.parse(saved.text).studio.backends), ["comfyui", "radiance"]);
 });

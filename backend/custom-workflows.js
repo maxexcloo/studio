@@ -3,14 +3,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { guidingRoles, profileBackendLabels, sharedProfileFields } from "../shared/profiles.ts";
-import { dataDir } from "./gallery/store.js";
+import { currentDataDir } from "./data-dir.js";
 import { writeJsonFile } from "./json-store.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { chainReferenceSlots } from "./reference-chains.js";
 
 export { profileBackendLabels, sharedProfileFields };
 
-export const userWorkflowsDir = path.join(dataDir, "workflows");
+export const userWorkflowsDir = path.join(currentDataDir(), "workflows");
 
 // Windows keeps these names for devices, with any extension: `con.json` can never be a file.
 const windowsReserved = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/;
@@ -394,6 +394,8 @@ const loaderOptionKeys = {
   CLIPLoader: ["clip_name"],
   VAELoader: ["vae_name"],
   UpscaleModelLoader: ["model_name"],
+  RadianceImageGenerate: ["model"],
+  RadianceVideoGenerate: ["model"],
 };
 
 /** What each loader reads, in words, and the models subfolder ComfyUI reads it from. */
@@ -403,6 +405,8 @@ const loaderKinds = {
   CLIPLoader: ["text encoder", "text_encoders"],
   VAELoader: ["VAE", "vae"],
   UpscaleModelLoader: ["upscale model", "upscale_models"],
+  RadianceImageGenerate: ["Radiance model", ""],
+  RadianceVideoGenerate: ["Radiance model", ""],
 };
 
 function schemaOptions(info, classType, input) {
@@ -437,9 +441,10 @@ export function workflowMissingFiles(workflow, info = {}) {
 
 export function workflowOptionIssues(workflow, info = {}) {
   // Said as the file and where it goes; node ids mean nothing outside the graph editor.
-  return workflowMissingFiles(workflow, info).map(
-    ({ file, kind, folder }) =>
-      `Missing ${kind}: ${file}. Put it in ComfyUI's models/${folder} folder.`,
+  return workflowMissingFiles(workflow, info).map(({ file, kind, folder }) =>
+    folder
+      ? `Missing ${kind}: ${file}. Put it in ComfyUI's models/${folder} folder.`
+      : `Radiance doesn't serve ${file}.`,
   );
 }
 

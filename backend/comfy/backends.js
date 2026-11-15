@@ -1,14 +1,21 @@
 import { logWarning } from "../crash-log.js";
+import { getCustomWorkflow } from "../custom-workflows.js";
+import { radianceImageNode, radianceVideoNode } from "../providers/radiance.ts";
 import {
   capabilityForProfile,
   defaultWorkerId,
+  isRadianceWorker,
   listWorkers,
   noWorkerMessage,
   pickWorker,
   workerById,
 } from "../workers.js";
 
-export const configuredBackends = () => listWorkers().map((worker) => worker.id);
+/** The ComfyUI workers' ids; Radiance workers keep no queue or history to recover from. */
+export const configuredBackends = () =>
+  listWorkers()
+    .filter((worker) => !isRadianceWorker(worker))
+    .map((worker) => worker.id);
 export const isDefaultBackend = (backend) => Boolean(backend) && backend === defaultWorkerId();
 
 /** The address of worker `id`. */
@@ -89,7 +96,24 @@ export const noteWorkerProfiles = (id, profiles = []) => {
 };
 
 /**
- * The worker for a job: `capability` it needs, the `profileId` it runs (a
+ * Whether profile `profileId` runs on Radiance nodes on `backend` (its default without one), and so
+ * only on a Radiance worker; every other profile runs only on ComfyUI workers.
+ */
+export function runsOnRadiance(profileId, backend = "") {
+  const graph = profileId ? getCustomWorkflow(profileId, backend || undefined)?.graph : null;
+  return Object.values(graph || {}).some((node) =>
+    [radianceImageNode, radianceVideoNode].includes(node?.class_type),
+  );
+}
+
+/** The workers of the kind (Radiance or ComfyUI) that runs `profileId` on `backend`. */
+const workersFor = (profileId, backend) => {
+  const radiance = runsOnRadiance(profileId, backend);
+  return listWorkers().filter((worker) => isRadianceWorker(worker) === radiance);
+};
+
+/**
+ * The worker for a job: `capability` it needs, the `profileId` it runs on `backend` (a
  * worker that already has it wins), capabilities it would rather have
  * (`prefers`, such as upscale for Smart upscale) and, for queued work, the
  * queue's `loads` by resource with the job's `model` and whether it is
@@ -97,16 +121,17 @@ export const noteWorkerProfiles = (id, profiles = []) => {
  */
 export function routeJob(
   capability,
-  { profileId = "", prefers = [], loads = new Map(), model = "", last = false } = {},
+  { profileId = "", backend = "", prefers = [], loads = new Map(), model = "", last = false } = {},
 ) {
+  const key = profileOnBackendKey(profileId, backend);
   return pickWorker(capability, {
+    workers: workersFor(profileId, backend),
     prefers,
     load: (id) => loads.get(`worker:${id}`) || null,
     model,
     last,
     online: workerReachable,
-    hasModel: (id) =>
-      profileId && inventories.has(id) ? inventories.get(id).has(profileId) : null,
+    hasModel: (id) => (profileId && inventories.has(id) ? inventories.get(id).has(key) : null),
   });
 }
 
@@ -114,31 +139,30 @@ export function routeJob(
  * The workers that could take a queued job now: capable, not known to be down and not known to
  * lack its profile, in list order.
  */
-export const readyWorkers = (capability, profileId = "") =>
-  listWorkers().filter(
+export const readyWorkers = (capability, profileId = "", backend = "") => {
+  const key = profileOnBackendKey(profileId, backend);
+  return workersFor(profileId, backend).filter(
     (worker) =>
       worker.capabilities.includes(capability) &&
       workerReachable(worker.id) !== false &&
-      !(profileId && inventories.has(worker.id) && !inventories.get(worker.id).has(profileId)),
+      !(profileId && inventories.has(worker.id) && !inventories.get(worker.id).has(key)),
   );
+};
 
 /**
  * The workers queued work may move to: ready ones, except a worker Studio scales (`scaled`) that
  * isn't answering. Moved to a stopped worker, work would start a GPU switch for it, and a worker
  * due a retry would take it back and forth.
  */
-export const moveTargets = (capability, profileId, scaled) =>
-  readyWorkers(capability, profileId).filter(
+export const moveTargets = (capability, profileId, backend, scaled) =>
+  readyWorkers(capability, profileId, backend).filter(
     (worker) => workerReachable(worker.id) || !scaled(worker),
   );
 
 /** routeJob for a profile, or an error that says plainly why nothing can run it. */
 export function routeProfile(profile, options = {}) {
   const capability = capabilityForProfile(profile);
-  const worker = routeJob(capability, {
-    profileId: profileOnBackendKey(profile?.id || "", options.backend),
-    ...options,
-  });
+  const worker = routeJob(capability, { ...options, profileId: profile?.id || "" });
   if (!worker)
     throw Object.assign(new Error(noWorkerMessage(capability)), {
       status: 503,
@@ -150,11 +174,15 @@ export function routeProfile(profile, options = {}) {
 
 const isLocalVideoProfile = (profile) => capabilityForProfile(profile) === "video";
 
-/** Whether `worker` may run `profile`: local video on video workers, everything else on image workers. */
+/**
+ * Whether `worker` may run `profile`: local video on video workers, everything else on image
+ * workers, and on a Radiance worker only what one of its backends runs on Radiance.
+ */
 export const allowedProfile = (worker, profile) =>
-  isLocalVideoProfile(profile)
-    ? worker.capabilities.includes("video")
-    : worker.capabilities.includes("image");
+  worker.capabilities.includes(isLocalVideoProfile(profile) ? "video" : "image") &&
+  (profile.backendOptions?.map((option) => option.id) || [""]).some(
+    (backend) => runsOnRadiance(profile.id, backend) === isRadianceWorker(worker),
+  );
 
 /**
  * One catalogue from every worker's own: each worker contributes the profiles

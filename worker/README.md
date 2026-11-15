@@ -1,8 +1,8 @@
 # Studio Worker
 
 Build from the Studio checkout with `docker build -f worker/Dockerfile -t studio-worker .`.
-The image contains ComfyUI, the Radiance bridge, Studio custom nodes and isolated
-Radiance libraries. `source.json` pins ComfyUI; `sources.json` pins custom nodes.
+The image contains ComfyUI, Studio custom nodes and Radiance's `rad-convert` with
+its isolated libraries. `source.json` pins ComfyUI; `sources.json` pins custom nodes.
 Studio's custom nodes live in `comfyui/` and are copied directly from this
 checkout into `/root/ComfyUI/custom_nodes/` during the worker build.
 
