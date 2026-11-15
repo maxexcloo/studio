@@ -169,6 +169,57 @@ test("a worker with two slots runs two jobs at once, the third waiting for one t
   }
 });
 
+test("a run without progress for 10 minutes is stopped, failed and queued once on a free worker", async () => {
+  const { store, adapter, submitted, observations, events } = fixture();
+  const queue = new GenerationQueue(store, {
+    ...adapter,
+    alternatives: () => ["worker:primary", "worker:secondary"],
+  });
+  let at = 0;
+  queue.now = () => at;
+  try {
+    const session = store.createSession("alice");
+    const hung = store.enqueue(
+      "alice",
+      session.id,
+      { kind: "image" },
+      "image",
+      undefined,
+      "worker:primary",
+      undefined,
+      { priority: queuePriority.dream },
+    ).id;
+    await queue.tick();
+    const stuck = { status: "running" as const, progress: { value: 7, max: 8 } };
+    observations.set(hung, stuck);
+    await queue.tick();
+    at = 9 * 60_000;
+    await queue.tick();
+    assert.equal(store.job("alice", hung)?.status, "running");
+    at = 10 * 60_000;
+    await queue.tick();
+    assert.equal(store.job("alice", hung)?.status, "failed");
+    assert.equal(store.job("alice", hung)?.reason, "Stopped: no progress for 10 min.");
+    assert.ok(events.includes(`released:${hung}`));
+    const retry = store.jobs("alice").find((job) => job.id !== hung)!;
+    assert.deepEqual(
+      [retry.resource, retry.priority, retry.stallRetry],
+      ["worker:secondary", queuePriority.dream, true],
+    );
+    await queue.tick();
+    assert.deepEqual(submitted, [hung, retry.id]);
+    // A retry that stalls too only fails.
+    observations.set(retry.id, stuck);
+    await queue.tick();
+    at = 21 * 60_000;
+    await queue.tick();
+    assert.equal(store.job("alice", retry.id)?.status, "failed");
+    assert.equal(store.jobs("alice").length, 2);
+  } finally {
+    store.close();
+  }
+});
+
 test("failed output persistence retains saving state and blocks conflicting work", async () => {
   const { store, queue, adapter, observations, submitted } = fixture();
   try {
