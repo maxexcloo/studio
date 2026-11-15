@@ -8,6 +8,8 @@
  *     proxy) instead of huggingface.co.
  */
 
+import { limitedBody } from "./civitai/access.js";
+
 const tokenKeys = ["HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"];
 
 /** The credential for Hugging Face downloads, or "". */
@@ -79,4 +81,27 @@ export async function hfFetch(input, init = {}, { env = process.env, transport =
     url = new URL(location, url);
   }
   throw new Error("Hugging Face kept redirecting the download.");
+}
+
+/**
+ * A Hugging Face repository's revision (`owner/name`, a branch or commit) with its files' blobs,
+ * through `request` (hfFetch with the saved token).
+ */
+export async function hfRevision(repo, revision, { request = hfFetch } = {}) {
+  const [owner, name] = String(repo).split("/");
+  const response = await request(
+    `https://huggingface.co/api/models/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/revision/${encodeURIComponent(revision)}?blobs=true`,
+    { signal: AbortSignal.timeout(30000) },
+  );
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(
+      [401, 403].includes(response.status)
+        ? hfAccessNote(repo)
+        : response.status === 404
+          ? "That Hugging Face repository or revision doesn't exist."
+          : `Hugging Face metadata is unavailable (HTTP ${response.status}).`,
+    );
+  }
+  return JSON.parse((await limitedBody(response, 8 * 1024 * 1024)).toString());
 }
