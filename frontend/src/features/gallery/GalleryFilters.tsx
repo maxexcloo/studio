@@ -1,12 +1,14 @@
 import {
   Badge,
   Button,
+  Divider,
   Group,
   Input,
   MultiSelect,
   Popover,
   Scroller,
   SegmentedControl,
+  Select,
   Stack,
   Text,
   Tooltip,
@@ -408,7 +410,8 @@ export function GalleryFilterPanel({
   onChange,
   view,
   toggles,
-}: FilterProps & { view?: ReactNode; toggles?: ReactNode }) {
+  inline = false,
+}: FilterProps & { view?: ReactNode; toggles?: ReactNode; inline?: boolean }) {
   const { facets, options } = useFacetOptions(kind, value);
   // Tags list the most used first, each with its count, and keep a chosen tag no longer among them.
   const counts = new Map(options.tag.map((option) => [option.value, option.count]));
@@ -420,11 +423,13 @@ export function GalleryFilterPanel({
     ],
   };
   // A clean name stands for all its recorded values; typing any part of it finds it.
-  const many = (key: "model" | "lora" | "tag", label: string) => (
+  const many = (key: Facet, label: string) => (
     <MultiSelect
-      size="sm"
-      label={label}
-      placeholder={value[key].length ? undefined : "Any"}
+      size={inline ? "xs" : "sm"}
+      className={inline ? classes.facet : undefined}
+      aria-label={label}
+      label={inline ? undefined : label}
+      placeholder={value[key].length ? undefined : inline ? label : "Any"}
       data={lists[key]}
       renderOption={
         key === "tag"
@@ -455,7 +460,7 @@ export function GalleryFilterPanel({
       nothingFoundMessage="No Matches"
       rightSection={value[key].length ? undefined : <ChevronDown size={14} />}
       rightSectionPointerEvents="none"
-      comboboxProps={{ withinPortal: false }}
+      comboboxProps={{ withinPortal: inline }}
     />
   );
   const choices = (key: "size" | "aspect", label: string) => (
@@ -486,7 +491,7 @@ export function GalleryFilterPanel({
     </Input.Wrapper>
   );
   return (
-    <Stack gap="md">
+    <Stack gap="md" className={inline ? classes.inlinePanel : undefined}>
       {facets.error && (
         <Button
           {...chipProps}
@@ -499,30 +504,62 @@ export function GalleryFilterPanel({
           Couldn't Load Filters
         </Button>
       )}
-      {view && (
-        <Input.Wrapper label="View">
-          <Stack gap="xs" mt={4} className={classes.toggles}>
+      {view &&
+        (inline ? (
+          <Group gap="xs">
             {view}
             {toggles}
-          </Stack>
-        </Input.Wrapper>
+          </Group>
+        ) : (
+          <Input.Wrapper label="View">
+            <Stack gap="xs" mt={4} className={classes.toggles}>
+              {view}
+              {toggles}
+            </Stack>
+          </Input.Wrapper>
+        ))}
+      {!inline && view && <Divider />}
+      <div className={classes.filterPair}>
+        {inline ? (
+          <Select
+            aria-label="Date"
+            className={classes.date}
+            size="xs"
+            value={value.date}
+            onChange={(date) => onChange({ ...value, date: date as GalleryDate })}
+            data={dates.map(({ value, chip }) => ({ value, label: chip || "Any Date" }))}
+            allowDeselect={false}
+          />
+        ) : (
+          <Input.Wrapper label="Date">
+            <SegmentedControl
+              aria-label="Date"
+              fullWidth
+              size="xs"
+              mt={4}
+              value={value.date}
+              onChange={(date) => onChange({ ...value, date: date as GalleryDate })}
+              data={dates.map(({ value, label }) => ({ value, label }))}
+            />
+          </Input.Wrapper>
+        )}
+        {lists.tag.length > 0 && many("tag", "Tags")}
+      </div>
+      {!inline && <Divider />}
+      <div className={classes.filterPair}>
+        {many("model", "Models")}
+        {many("lora", "LoRAs")}
+      </div>
+      {(options.aspect.length > 0 || options.size.length > 0) && (
+        <>
+          {!inline && <Divider />}
+          <div className={classes.filterPair}>
+            {options.aspect.length > 0 &&
+              (inline ? many("aspect", "Aspect Ratio") : choices("aspect", "Aspect Ratio"))}
+            {options.size.length > 0 && (inline ? many("size", "Size") : choices("size", "Size"))}
+          </div>
+        </>
       )}
-      <Input.Wrapper label="Date">
-        <SegmentedControl
-          aria-label="Date"
-          fullWidth
-          size="xs"
-          mt={4}
-          value={value.date}
-          onChange={(date) => onChange({ ...value, date: date as GalleryDate })}
-          data={dates.map(({ value, label }) => ({ value, label }))}
-        />
-      </Input.Wrapper>
-      {lists.tag.length > 0 && many("tag", "Tags")}
-      {many("model", "Models")}
-      {many("lora", "LoRAs")}
-      {options.aspect.length > 0 && choices("aspect", "Aspect Ratio")}
-      {options.size.length > 0 && choices("size", "Size")}
     </Stack>
   );
 }

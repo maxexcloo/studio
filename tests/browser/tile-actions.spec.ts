@@ -103,17 +103,29 @@ test("Dislike hides a tile, Disliked shows it and Restore brings it back", async
   await expect.poll(() => state.gallery[0].rating).toBe("disliked");
   // Undo is offered while the dislike's notification shows.
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
-  // Disliked is a switch in Filters, shown as a removable chip.
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("switch", { name: "Disliked", exact: true }).click();
+  // Phones keep Disliked in Filters; desktop exposes it beside Liked.
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page
+    .getByRole(test.info().project.use.isMobile ? "switch" : "button", {
+      name: "Disliked",
+      exact: true,
+    })
+    .click();
   await page.keyboard.press("Escape");
   await expect(tile).toBeVisible();
   await select();
   await selectionAction(page, "Restore").click();
   await expect(tile).toBeHidden();
   await expect.poll(() => state.gallery[0].rating).toBeUndefined();
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("switch", { name: "Disliked", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page
+    .getByRole(test.info().project.use.isMobile ? "switch" : "button", {
+      name: "Disliked",
+      exact: true,
+    })
+    .click();
   await page.keyboard.press("Escape");
   await expect(tile).toBeVisible();
 });
