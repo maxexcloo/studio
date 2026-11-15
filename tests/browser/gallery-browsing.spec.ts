@@ -1383,3 +1383,282 @@ test("Desktop gallery controls stay available while scrolling and rating changes
     })
     .toEqual(["Browse", "disliked", false, false]);
 });
+
+test("Incoming results preserve loaded pages, the scroll anchor and selection without a reveal step", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const original = results(120);
+  let incoming: typeof original = [];
+  const requests: string[] = [];
+  await page.route("**/api/gallery?**", (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get("cursor") || "";
+    requests.push(cursor);
+    return route.fulfill({
+      json: {
+        items: cursor ? original.slice(60) : [...incoming, ...original].slice(0, 60),
+        nextCursor: cursor ? "" : "older",
+        hasMore: !cursor,
+        totalApprox: original.length + incoming.length,
+      },
+    });
+  });
+  await page.goto("/images");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+  const firstHeight = await page
+    .locator("[data-gallery-view]")
+    .evaluate((host) => host.style.height);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(() => requests.includes("older")).toBe(true);
+  await expect
+    .poll(() => page.locator("[data-gallery-view]").evaluate((host) => host.style.height))
+    .not.toBe(firstHeight);
+  // Exercise the date scrubber too: it must stay interactive over the sticky toolbar.
+  await page.evaluate(() => window.scrollBy(0, 1));
+  const scrubber = page.getByRole("scrollbar", { name: "Gallery Dates", exact: true });
+  await expect(scrubber).toHaveAttribute("data-active", "true");
+  const track = (await scrubber.boundingBox())!;
+  const thumb = (await scrubber.locator("div").first().boundingBox())!;
+  await page.mouse.move(thumb.x + thumb.width / 2, thumb.y + thumb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(track.x + track.width / 2, track.y + track.height * 0.6, { steps: 4 });
+  await page.mouse.up();
+  const tile = page.getByRole("button", { name: "Open image: Browse Result 70", exact: true });
+  await tile.scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  const selectedTile = page.getByRole("button", {
+    name: "Select image: Browse Result 70",
+    exact: true,
+  });
+  await selectedTile.click();
+  await expect(selectedTile).toHaveAttribute("aria-pressed", "true");
+  const before = await selectedTile.boundingBox();
+  const heightBefore = await page
+    .locator("[data-gallery-view]")
+    .evaluate((host) => host.style.height);
+  const previousReads = requests.length;
+  incoming = results(5).map((item, index) => ({
+    ...item,
+    id: `incoming-${index}`,
+    prompt: `Incoming ${index}`,
+  }));
+  state.jobs.push({
+    id: "incoming",
+    sessionId: "s",
+    operation: "image",
+    status: "completed",
+    input: { prompt: "Incoming", profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  await expect.poll(() => requests.length).toBeGreaterThan(previousReads);
+  await expect
+    .poll(() => page.locator("[data-gallery-view]").evaluate((host) => host.style.height))
+    .not.toBe(heightBefore);
+  await expect(
+    page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
+  ).toHaveText("1 Selected");
+  await expect(selectedTile).toHaveAttribute("aria-pressed", "true");
+  await expect
+    .poll(async () => Math.abs((await selectedTile.boundingBox())!.y - before!.y))
+    .toBeLessThan(2);
+  expect(requests.filter(Boolean)).toEqual(["older"]);
+  await expect(page.getByRole("button", { name: /^\d+ New$/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(
+    page.getByRole("button", { name: "Open image: Incoming 0", exact: true }),
+  ).toBeVisible();
+});
+
+test("Incoming results keep the viewer on its current item and return focus to that tile", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(30));
+  await page.goto("/images");
+  const tile = page.getByRole("button", { name: "Open image: Browse Result 10", exact: true });
+  await tile.click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByRole("img", { name: "Browse Result 10", exact: true })).toBeVisible();
+  const previousReads = state.galleryRequests.length;
+  state.gallery.unshift({ ...results(1)[0], id: "incoming-viewer", prompt: "Incoming In Viewer" });
+  state.jobs.push({
+    id: "incoming-viewer",
+    sessionId: "s",
+    operation: "image",
+    status: "completed",
+    input: { prompt: "Incoming", profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  await expect.poll(() => state.galleryRequests.length).toBeGreaterThan(previousReads);
+  await expect(viewer.getByRole("img", { name: "Browse Result 10", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/item=browse-10$/);
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(tile).toBeFocused();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(
+    page.getByRole("button", { name: "Open image: Incoming In Viewer", exact: true }),
+  ).toBeVisible();
+});
+
+test("Returning after more than a page of incoming results leaves no gap before held items", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const original = results(10);
+  let incoming: typeof original = [];
+  const cursors: string[] = [];
+  await page.route("**/api/gallery?**", (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get("cursor") || "";
+    cursors.push(cursor);
+    const matches = [...incoming, ...original];
+    const start = Number(cursor);
+    return route.fulfill({
+      json: {
+        items: matches.slice(start, start + 60),
+        hasMore: start + 60 < matches.length,
+        nextCursor: start + 60 < matches.length ? String(start + 60) : "",
+        totalApprox: matches.length,
+      },
+    });
+  });
+  await page.goto("/images?item=browse-0");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
+  const visibility = (hidden: boolean) =>
+    page.evaluate((hidden) => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => (hidden ? "hidden" : "visible"),
+      });
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
+      document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
+    }, hidden);
+  await visibility(true);
+  incoming = results(65).map((item, index) => ({
+    ...item,
+    id: `away-${index}`,
+    prompt: `Away ${index}`,
+  }));
+  const previousReads = cursors.length;
+  await visibility(false);
+  await expect(viewer.getByText("1 / 75", { exact: true })).toBeVisible();
+  expect(cursors.slice(previousReads)).toEqual(["", "60"]);
+  await page.keyboard.press("ArrowLeft");
+  await expect(page).toHaveURL(/item=browse-0$/);
+  await page.keyboard.press("ArrowRight");
+  await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await page
+    .locator("[data-gallery-view]")
+    .evaluate((host) =>
+      window.scrollTo(
+        0,
+        host.getBoundingClientRect().top + window.scrollY + (host.clientHeight * 64) / 75,
+      ),
+    );
+  await expect(
+    page.getByRole("button", { name: "Open image: Away 64", exact: true }),
+  ).toBeVisible();
+});
+
+test("Viewer navigation keeps decoded media visible while the next image loads and advances once", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const nextUrl = "/sample-media/delayed-next.svg";
+  state.gallery.push(
+    results(1)[0],
+    { ...results(2)[1], url: nextUrl, thumbnailUrl: nextUrl },
+    { ...results(3)[2], id: "third" },
+  );
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let requested = false;
+  await page.route("**/sample-media/delayed-next.svg", async (route) => {
+    requested = true;
+    await pending;
+    await route.fulfill({
+      contentType: "image/svg+xml",
+      body: decodeURIComponent(image.slice(image.indexOf(",") + 1)),
+    });
+  });
+  await page.goto("/images?item=browse-0");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const previous = viewer.getByRole("img", { name: "Browse Result 0", exact: true });
+  await expect(previous).toBeVisible();
+  await previous.evaluate((node: HTMLImageElement) => node.decode());
+  try {
+    await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/item=browse-1$/);
+    await expect.poll(() => requested).toBe(true);
+    await expect(previous).toBeVisible();
+    await expect(previous).toHaveAttribute("src", image);
+  } finally {
+    release();
+  }
+  await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toHaveAttribute(
+    "src",
+    nextUrl,
+  );
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/item=third$/);
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/item=third$/);
+  await page.keyboard.press("ArrowLeft");
+  await expect(page).toHaveURL(/item=browse-1$/);
+});
+
+test("A pending output becomes saved media without losing the viewer or its return focus", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    ...results(1)[0],
+    id: "working-0",
+    jobId: "working",
+    index: 0,
+    status: "pending",
+    url: "",
+  });
+  state.jobs.push({
+    id: "working",
+    sessionId: "s",
+    operation: "image",
+    status: "running",
+    input: { prompt: "Browse Result 0", profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  await page.goto("/images?item=working-0");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer).toBeVisible();
+  state.gallery[0] = {
+    ...state.gallery[0],
+    id: "saved-output",
+    number: 501,
+    status: "done",
+    url: image,
+  };
+  state.jobs[0].status = "completed";
+  await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/item=501$/);
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeFocused();
+  await expect(page.locator('[data-media-id="working-0"]')).toHaveCount(0);
+  await expect(page.locator('[data-media-id="saved-output"]')).toBeFocused();
+});

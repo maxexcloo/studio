@@ -1,5 +1,4 @@
-import { Button, Title } from "@mantine/core";
-import { ArrowUp } from "lucide-react";
+import { Title } from "@mantine/core";
 import {
   type Dispatch,
   type KeyboardEvent,
@@ -17,6 +16,7 @@ import {
 
 import type { MediaItem } from "../../types";
 import { dayHeading, mediaDay } from "./mediaLabels";
+import { mediaIdentity } from "./mediaSource";
 import { MediaTile } from "./MediaTile";
 import { useGalleryLayout, useHoldToSelect, useScrollAnchor } from "./useGalleryLayout";
 import type { GallerySelection } from "./useGallerySelection";
@@ -120,52 +120,6 @@ const layOut = (
   place({ tiles: [], sections: [], height: 0, lanes: [] }, items, columns, cell, gap, byDay);
 
 /**
- * The items to show: new work arriving at the start waits above the grid while its top is out of
- * view or the page is being scrolled, so nothing moves under the person (a browser keeps scrolling
- * past a position set mid-gesture), and shows once the top is in view and scrolling has stopped, or
- * at once from `release` (the "N New" button). Other changes show at once.
- */
-function useHeldNewWork(items: MediaItem[], host: RefObject<HTMLDivElement | null>) {
-  const [settled, setSettled] = useState(true);
-  const [releasing, setReleasing] = useState(false);
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const atTop = () => (host.current?.getBoundingClientRect().top ?? 0) >= 0;
-    const update = () => {
-      setSettled(false);
-      clearTimeout(timer);
-      // Settled: the grid's top in view and no scrolling for a moment.
-      timer = setTimeout(() => setSettled(atTop()), 600);
-    };
-    setSettled(atTop());
-    window.addEventListener("scroll", update, { passive: true });
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("scroll", update);
-    };
-  }, [host]);
-  const first = useRef<string | undefined>(undefined);
-  const open = settled || releasing;
-  const start = open
-    ? 0
-    : Math.max(
-        0,
-        items.findIndex((item) => item.id === first.current),
-      );
-  const shown = useMemo(() => (start ? items.slice(start) : items), [items, start]);
-  first.current = shown[0]?.id;
-  if (releasing && !start) setReleasing(false);
-  return {
-    items: shown,
-    held: start,
-    release: () => {
-      window.scrollTo({ top: 0 });
-      setReleasing(true);
-    },
-  };
-}
-
-/**
  * The part of the grid within a screen of the viewport, or of the `root` it scrolls in, in grid
  * coordinates, in steps so scrolling renders only as tiles come and go. Tiles have known sizes, so
  * nothing is measured.
@@ -207,7 +161,7 @@ const gridTop = (host: HTMLElement) => host.getBoundingClientRect().top + window
  * gallery in time order) heads each day and adds the date scrubber.
  */
 export function MediaGrid({
-  items: all,
+  items,
   results,
   open,
   selection,
@@ -221,7 +175,6 @@ export function MediaGrid({
   byDay = false,
 }: GalleryViewProps) {
   const { columns, host, width, cell, gap, anchor } = useGalleryLayout();
-  const { items, held, release } = useHeldNewWork(all, host);
   // The version each tile shows while flipping, by the tile's original.
   const [shown, setShown] = useState<Record<string, number>>({});
   const pendingFocus = useRef<string | null>(null);
@@ -234,7 +187,8 @@ export function MediaGrid({
   );
   const span = useWindowSpan(host, layout?.height || 0);
   const places = useMemo(
-    () => layout && new Map(layout.tiles.map((tile, index) => [items[index].id, tile.top])),
+    () =>
+      layout && new Map(layout.tiles.map((tile, index) => [mediaIdentity(items[index]), tile.top])),
     [layout],
   );
   useScrollAnchor(host, places, `${columns}:${width}:${byDay}:${results}`);
@@ -301,18 +255,6 @@ export function MediaGrid({
   const within = (top: number, height: number) => top < span.bottom && top + height > span.top;
   return (
     <>
-      {held > 0 && (
-        <div className={classes.held}>
-          <Button
-            size="compact-sm"
-            radius="xl"
-            leftSection={<ArrowUp size={14} />}
-            onClick={release}
-          >
-            {held} New
-          </Button>
-        </div>
-      )}
       <div
         ref={host}
         data-gallery-view
@@ -339,7 +281,7 @@ export function MediaGrid({
           const original = items[index];
           return (
             <GridCell
-              key={original.id}
+              key={mediaIdentity(original)}
               original={original}
               index={index}
               left={tile.left}

@@ -10,7 +10,7 @@ import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
 import { type GalleryViewProps, focusTile } from "./MediaGrid";
 import { mediaTitle } from "./mediaLabels";
-import { mediaSource } from "./mediaSource";
+import { mediaIdentity, mediaSource } from "./mediaSource";
 import { MediaTile } from "./MediaTile";
 import { inRunOrder, runKey } from "./resultSets";
 import { useGalleryLayout, useHoldToSelect, useScrollAnchor } from "./useGalleryLayout";
@@ -37,7 +37,7 @@ function groupRuns(items: MediaItem[]) {
     else if (!item.resultSet && item.jobId && last?.items[0].jobId === item.jobId)
       last.items.push(item);
     else {
-      const run = { key: `${runKey(item) || ""}:${item.id}`, items: [item] };
+      const run = { key: `${runKey(item) || ""}:${mediaIdentity(item)}`, items: [item] };
       runs.push(run);
       if (item.resultSet) sets.set(item.resultSet.id, run);
     }
@@ -302,7 +302,7 @@ const RunsRow = memo(function RunsRow({
     >
       {row.panel.items.map((item) => (
         <MediaTile
-          key={item.id}
+          key={mediaIdentity(item)}
           item={item}
           selection={selection}
           hold={hold}
@@ -355,7 +355,7 @@ const RunsRow = memo(function RunsRow({
                       const media = mediaSource(item);
                       const source = media.thumbnailUrl || item.preview || media.url;
                       return (
-                        <div key={item.id} className={classes.layer}>
+                        <div key={mediaIdentity(item)} className={classes.layer}>
                           {source && item.type === "image" && (
                             <img src={source} alt="" loading="lazy" draggable={false} />
                           )}

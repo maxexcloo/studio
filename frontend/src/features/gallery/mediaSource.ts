@@ -55,3 +55,21 @@ export function currentMedia(items: MediaItem[], item: MediaItem) {
     item
   );
 }
+
+/** A generation output keeps its slot while its pending record becomes saved media. */
+export const mediaIdentity = (item: MediaItem) =>
+  item.jobId && item.index !== undefined ? `${item.jobId}:${item.index}` : item.id;
+
+/** Keep an open viewer's order, updating records and appending only newly paged older items. */
+export function reconcileViewerItems(previous: MediaItem[], incoming: MediaItem[]) {
+  const known = new Set(previous.map(mediaIdentity));
+  const current = new Map(incoming.map((item) => [mediaIdentity(item), item]));
+  let boundary = -1;
+  incoming.forEach((item, index) => {
+    if (known.has(mediaIdentity(item))) boundary = index;
+  });
+  return [
+    ...previous.flatMap((item) => current.get(mediaIdentity(item)) || []),
+    ...incoming.slice(boundary + 1).filter((item) => !known.has(mediaIdentity(item))),
+  ];
+}

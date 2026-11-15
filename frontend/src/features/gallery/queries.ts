@@ -24,7 +24,12 @@ export interface GalleryListing {
   strictness?: string;
   setId?: string;
 }
-export function galleryPage(listing: GalleryListing, cursor: string, limit = 60) {
+export function galleryPage(
+  listing: GalleryListing,
+  cursor: string,
+  limit = 60,
+  signal?: AbortSignal,
+) {
   const params = new URLSearchParams({
     limit: String(limit),
     cursor,
@@ -37,7 +42,7 @@ export function galleryPage(listing: GalleryListing, cursor: string, limit = 60)
     params.set("strictness", listing.strictness || "");
   }
   if (listing.setId) params.set("set", listing.setId);
-  return api<GalleryResultsPage>(`/api/gallery?${params}`);
+  return api<GalleryResultsPage>(`/api/gallery?${params}`, { signal });
 }
 /** A gallery listing a page at a time; `limit` sizes each page after the first. */
 export const galleryQuery = (
@@ -55,7 +60,7 @@ export const galleryQuery = (
       listing.setId || null,
     ],
     initialPageParam: "",
-    queryFn: ({ pageParam }) => galleryPage(listing, pageParam, limit(pageParam)),
+    queryFn: ({ pageParam, signal }) => galleryPage(listing, pageParam, limit(pageParam), signal),
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
   });
 

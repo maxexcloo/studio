@@ -185,9 +185,8 @@ export function useGalleryLayout() {
 /**
  * Keeps the gallery's scroll position on the tiles in view while tiles arrive or leave above them
  * (results landing, work queued): the first tile at or below the viewport's top stays where it was.
- * Only someone with the grid's top in view sees new tiles slide in; new work at the start waits
- * above until then (MediaGrid's useHeldNewWork). `places` are each tile's top in grid
- * coordinates; a new `key` (a zoom, a resize, a search) lays out afresh and holds nothing.
+ * With the grid's top in view, new tiles appear above the existing ones. `places` are each tile's
+ * top in grid coordinates; a new `key` (a zoom, a resize, a search) lays out afresh and holds nothing.
  */
 export function useScrollAnchor(
   host: React.RefObject<HTMLDivElement | null>,

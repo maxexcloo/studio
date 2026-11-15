@@ -15,10 +15,12 @@ export function useMediaZoom({
   width,
   height,
   disabled = false,
+  resetKey,
 }: {
   width: number;
   height: number;
   disabled?: boolean;
+  resetKey?: string;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const picture = useRef<HTMLButtonElement>(null);
@@ -78,6 +80,10 @@ export function useMediaZoom({
     if (direction < 0) void transform.current?.zoomOut(0.2, duration);
     else void transform.current?.zoomIn(0.2, duration);
   }
+  useLayoutEffect(() => {
+    changeMode("Fit");
+    layout("Fit", 0);
+  }, [resetKey]);
   // Lays out while the image loads too, so its placeholder already sits where the image will.
   useLayoutEffect(() => {
     const observer = new ResizeObserver(() => layout(modeRef.current, 0));
