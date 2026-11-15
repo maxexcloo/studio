@@ -22,16 +22,17 @@ export function useCardFrom(start: (asset: ReferenceAsset, named?: CardNamed) =>
   const navigate = useNavigate();
   const state = location.state as { cardFrom?: string; cardNamed?: CardNamed } | null;
   const from = state?.cardFrom;
+  // The name travels with the call: the route state is cleared before the image is taken.
   const take = useMutation({
-    mutationFn: (galleryItemId: string) =>
+    mutationFn: ({ galleryItemId }: { galleryItemId: string; named?: CardNamed }) =>
       post<{ asset: ReferenceAsset }>("/api/reference-assets/from-gallery", { galleryItemId }),
-    onSuccess: ({ asset }) => start(asset, state?.cardNamed),
+    onSuccess: ({ asset }, { named }) => start(asset, named),
   });
   const started = useRef("");
   useEffect(() => {
     if (!from || started.current === from) return;
     started.current = from;
-    take.mutate(from);
+    take.mutate({ galleryItemId: from, named: state?.cardNamed });
     // The image is taken; a reload or Back opens the section without starting another card.
     navigate(location, {
       replace: true,
