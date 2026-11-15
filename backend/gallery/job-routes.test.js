@@ -60,6 +60,11 @@ test("exact job results exclude unrelated and deleted outputs and expose prompts
       url: "/comfy/view?filename=visible.png&type=media",
     },
   ]);
+  const viewer = await (await fetch(`${base}/api/gallery/results/1`)).json();
+  assert.equal(viewer.item.id, "visible.png");
+  assert.equal(viewer.item.prompt, "private prompt text");
+  // A deleted file never falls back to its queue record or another output.
+  assert.equal((await fetch(`${base}/api/gallery/results/2`)).status, 404);
   // MCP asks for the prompt and settings only to run a result again.
   const detailed = await (await fetch(`${base}/api/gallery/jobs/chosen?settings=1`)).json();
   assert.deepEqual(

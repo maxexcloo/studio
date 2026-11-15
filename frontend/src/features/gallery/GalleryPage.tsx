@@ -30,14 +30,13 @@ import { emptyGalleryFilters } from "./GalleryFilters";
 import { GallerySelectionBar } from "./GallerySelectionBar";
 import { GalleryToolbar } from "./GalleryToolbar";
 import { GalleryUpload, droppedFiles, useGalleryUpload } from "./GalleryUpload";
-import { galleryItemQuery } from "./MediaDetails";
 import { MediaGrid } from "./MediaGrid";
 import { mediaDetail, mediaTitle } from "./mediaLabels";
 import { currentMedia } from "./mediaSource";
 import { MediaTileActions } from "./MediaTileActions";
 import { MediaViewer } from "./MediaViewer";
 import { MorePages } from "./MorePages";
-import { galleryKey, galleryPage, galleryQuery } from "./queries";
+import { galleryKey, galleryPage, galleryQuery, viewerItemQuery } from "./queries";
 import { inRunOrder, runKey } from "./resultSets";
 import { RunsView } from "./RunsView";
 import {
@@ -49,6 +48,7 @@ import {
 import { useGallerySelection } from "./useGallerySelection";
 import { useTryAgain } from "./useTryAgain";
 import { versionGroups } from "./versions";
+import { viewerItemId } from "./viewerLink";
 
 import classes from "./GalleryPage.module.css";
 
@@ -203,15 +203,31 @@ export function GalleryPage() {
   );
   // A linked item not on a loaded page is read on its own; one that leaves the gallery while
   // shown stays until the viewer moves on.
-  const listed = itemId ? loaded.find((candidate) => candidate.id === itemId) : undefined;
-  const linked = useQuery({
-    ...galleryItemQuery(itemId),
+  const listed = itemId
+    ? loaded.find((candidate) => viewerItemId(candidate) === itemId || candidate.id === itemId)
+    : undefined;
+  const link = useQuery({
+    ...viewerItemQuery(itemId),
     enabled: Boolean(itemId && !listed && !gallery.isPending),
-  }).data?.item;
+  });
   const lastShown = useRef<MediaItem | null>(null);
   const selected =
-    listed || linked || (itemId && lastShown.current?.id === itemId ? lastShown.current : null);
+    listed ||
+    link.data?.item ||
+    (itemId && lastShown.current && viewerItemId(lastShown.current) === itemId
+      ? lastShown.current
+      : null);
   lastShown.current = selected;
+  useEffect(() => {
+    if (!selected || viewerItemId(selected) === itemId) return;
+    setParams(
+      (next) => {
+        next.set("item", viewerItemId(selected));
+        return next;
+      },
+      { replace: true, state: location.state },
+    );
+  }, [selected, itemId, setParams, location.state]);
   // Every generation shows by default; turning All Versions off collapses each version chain into
   // one Grid tile showing its original. Runs always shows all.
   const queue = useQuery(queueQuery).data?.jobs;
@@ -263,7 +279,7 @@ export function GalleryPage() {
     setRun(run);
     latest.current.setParams(
       (next) => {
-        next.set("item", item.id);
+        next.set("item", viewerItemId(item));
         return next;
       },
       { state: { viewer: true } },
@@ -299,7 +315,7 @@ export function GalleryPage() {
       if (run && runKey(item) !== run) setRun(runKey(item));
       setParams(
         (next) => {
-          next.set("item", item.id);
+          next.set("item", viewerItemId(item));
           return next;
         },
         { replace: true, state: location.state },
@@ -523,6 +539,16 @@ export function GalleryPage() {
         {!phone && selectionBar}
       </div>
       {phone && selectionBar}
+      {itemId &&
+        !gallery.isPending &&
+        !selected &&
+        (link.isError ? (
+          <Alert color="red" title="Couldn't Open Result" withCloseButton onClose={closeViewer}>
+            {link.error.message}
+          </Alert>
+        ) : (
+          <LoadingState label="Loading Result" />
+        ))}
       {gallery.isPending ? (
         <LoadingState fill label="Loading Gallery" />
       ) : gallery.error && !gallery.data ? (
