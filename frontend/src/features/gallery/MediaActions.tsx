@@ -590,19 +590,6 @@ export function useMediaActions(
                   },
                 ],
             [
-              // Compare Models stages this image's prompt across models in the composer; Open
-              // Comparison shows the side-by-side view it belongs to.
-              ...(image
-                ? [
-                    {
-                      id: "compare-models",
-                      label: "Compare Models",
-                      icon: icons.compare,
-                      disabled: variants.isPending,
-                      onClick: () => variants.mutate(),
-                    },
-                  ]
-                : []),
               ...moreLikeSet,
               ...(image && comparison
                 ? [
@@ -618,7 +605,21 @@ export function useMediaActions(
                   ]
                 : []),
             ],
-            [recreateAction],
+            [
+              // Stages this image's prompt across models in the composer.
+              ...(image
+                ? [
+                    {
+                      id: "compare-models",
+                      label: "Compare in Composer",
+                      icon: icons.compare,
+                      disabled: variants.isPending,
+                      onClick: () => variants.mutate(),
+                    },
+                  ]
+                : []),
+              recreateAction,
+            ],
           ]
         : undefined,
     }),
