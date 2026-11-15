@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { mediaTitle } from "../../frontend/src/features/gallery/mediaLabels";
 import {
   closeReferences,
   expandComposer,
@@ -418,11 +419,11 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
     await expect(selection.getByRole("status")).toHaveText("1 Selected");
     expect(attempts).toEqual(["batch-a", "batch-b"]);
     await expect(
-      page.getByRole("checkbox", { name: "Select Failed third", exact: true }),
+      page.getByRole("checkbox", { name: "Select Failed Third", exact: true }),
     ).toBeChecked();
     // The accepted retry's new tiles replace its failed ones.
     await expect(
-      page.getByRole("checkbox", { name: "Select Failed first", exact: true }),
+      page.getByRole("checkbox", { name: "Select Failed First", exact: true }),
     ).toHaveCount(0);
     failSecond = false;
     await retry.click();
@@ -450,12 +451,12 @@ test("Runs fan a stacked run out in place and open it to flip through", async ({
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByText("Runs", { exact: true }).click();
   await page.keyboard.press("Escape");
-  const stack = page.getByRole("button", { name: "Run: Bird study 0, 3 Images", exact: true });
+  const stack = page.getByRole("button", { name: "Run: Bird Study 0, 3 Images", exact: true });
   await stack.click();
   await expect(stack).toHaveAttribute("aria-expanded", "true");
-  const run = page.getByRole("region", { name: "Run: Bird study 0", exact: true });
-  await expect(run.getByRole("button", { name: /^Open image: Bird study/ })).toHaveCount(3);
-  await run.getByRole("button", { name: "Open image: Bird study 2", exact: true }).click();
+  const run = page.getByRole("region", { name: "Run: Bird Study 0", exact: true });
+  await expect(run.getByRole("button", { name: /^Open image: Bird Study/ })).toHaveCount(3);
+  await run.getByRole("button", { name: "Open image: Bird Study 2", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   // A run's result flips through that run alone, as Open All does from its first.
   await expect(viewer.getByText(/^\d \/ 3$/)).toBeVisible();
@@ -480,6 +481,7 @@ test("An MCP result set is one titled run whose viewer names each result's place
     testInfo.project.use.isMobile ? `${index} / 3` : `${title} · ${index} / 3`;
   const state = await fixtures(page);
   const set = { id: "set-a", title: "Variety Test", source: "LibreChat" };
+  const untitled = mediaTitle({ prompt: "Set prompt 1, detailed" });
   // Newest first, as the gallery lists them; the second prompt has no title of its own.
   state.gallery.push(
     ...[
@@ -502,7 +504,7 @@ test("An MCP result set is one titled run whose viewer names each result's place
     page.getByRole("button", { name: "Open image: Fox Wizard", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Open image: Set prompt 1", exact: true }),
+    page.getByRole("button", { name: `Open image: ${untitled}`, exact: true }),
   ).toBeVisible();
   // Runs stacks the set under its title, newest first.
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
@@ -514,7 +516,7 @@ test("An MCP result set is one titled run whose viewer names each result's place
   await expect(tiles).toHaveCount(3);
   expect(await tiles.evaluateAll((all) => all.map((tile) => tile.ariaLabel))).toEqual([
     "Open image: Bear Hug",
-    "Open image: Set prompt 1",
+    `Open image: ${untitled}`,
     "Open image: Fox Wizard",
   ]);
   // The viewer names the result's place in its set and jumps along the set's strip.
@@ -534,8 +536,8 @@ test("An MCP result set is one titled run whose viewer names each result's place
   await expect(
     viewer.getByRole("img", { name: "Set prompt 0, detailed", exact: true }),
   ).toBeVisible();
-  await strip.getByRole("listitem", { name: "Show Set prompt 1 (2 of 3)", exact: true }).click();
-  await expect(viewer.getByText(place("Set prompt 1", 2), { exact: true })).toBeVisible();
+  await strip.getByRole("listitem", { name: `Show ${untitled} (2 of 3)`, exact: true }).click();
+  await expect(viewer.getByText(place(untitled, 2), { exact: true })).toBeVisible();
 });
 
 test("Select Set picks a set's results to upscale together", async ({ page }) => {
@@ -623,10 +625,10 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
   await expect(page.getByText("Sampling · 50%", { exact: true })).toHaveCount(2);
   await expect(page.getByText("The worker ran out of memory.", { exact: true })).toBeVisible();
   // One Stop for the two-output run.
-  await expect(page.getByRole("button", { name: "Stop Live study", exact: true })).toHaveCount(1);
-  await page.getByRole("button", { name: "Stop Live study", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Stop Live Study", exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "Stop Live Study", exact: true }).click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
-  await page.getByRole("button", { name: "Retry Failed study", exact: true }).click();
+  await page.getByRole("button", { name: "Retry Failed Study", exact: true }).click();
   await expect(page.locator('[data-media-id="failed"]')).toHaveCount(0);
   await expect(page.locator('[data-media-id="retried"]')).toBeVisible();
   expect(state.gallery.map((item) => item.id)).not.toContain("failed");
@@ -1184,11 +1186,11 @@ test("The viewer's set strip shows only its own set", async ({ page }) => {
     })),
   );
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: Prompt a-1", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Prompt A-1", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const strip = viewer.getByRole("list", { name: "Set: Set A", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
-  await strip.getByRole("listitem", { name: "Show Prompt a-0 (2 of 2)", exact: true }).click();
+  await strip.getByRole("listitem", { name: "Show Prompt A-0 (2 of 2)", exact: true }).click();
   await expect(viewer.getByRole("img", { name: "Prompt a-0", exact: true })).toBeVisible();
 });
 
