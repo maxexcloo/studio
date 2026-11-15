@@ -66,7 +66,7 @@ import {
 
 /** One icon per meaning: every action, mode and recurring control takes its icon from here. */
 export const icons = {
-  /** Making a new record, such as New Character. */
+  /** Adding something: a new record, such as New Character, or a reference to an empty slot. */
   add: Plus,
   animate: Play,
   /** The prompt assistant and its ideas. */
@@ -138,6 +138,7 @@ export const icons = {
   report: Flag,
   /** Returning a text to where it started, such as the viewer's prompt. */
   reset: RotateCcw,
+  /** Starting or resuming work, beside Pause or Stop. */
   resume: CirclePlay,
   retry: RotateCw,
   /** Showing a written prompt for editing before it runs (Review Prompt). */

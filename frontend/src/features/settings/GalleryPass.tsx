@@ -1,6 +1,5 @@
 import { Button, Progress, Select, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ScanText } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
@@ -144,7 +143,7 @@ export function GalleryPass({
         <Button
           size="compact-sm"
           variant="default"
-          leftSection={<ScanText size={16} />}
+          leftSection={<icons.resume size={16} />}
           loading={change.isPending}
           disabled={!data || data.state === "unavailable" || !data.scopes[scope]}
           onClick={() => change.mutate("start")}
