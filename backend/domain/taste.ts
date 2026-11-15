@@ -626,13 +626,10 @@ export function createTaste({
 }) {
   const name = (ownerId: string) => `taste:${ownerId}`;
   function load(ownerId: string): StoredTaste {
-    let saved: Partial<StoredTaste> & { summary?: string };
-    try {
-      saved = readRuntimeDocument(dataDir, name(ownerId)) as typeof saved;
-    } catch (error) {
-      if ((error as { code?: string }).code === "ENOENT") return empty();
-      throw error;
-    }
+    const saved = readRuntimeDocument(dataDir, name(ownerId)) as
+      | (Partial<StoredTaste> & { summary?: string })
+      | undefined;
+    if (!saved) return empty();
     const taste = { ...empty(), ...saved };
     // A profile written as prose before the words were kept apart keeps it as its note until the
     // summariser next writes; the next write drops the old field.

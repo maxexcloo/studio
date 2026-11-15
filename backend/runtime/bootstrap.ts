@@ -41,14 +41,7 @@ export async function loadRuntime(
     dataDir
       ? {
           store: {
-            read: () => {
-              try {
-                return readRuntimeDocument(dataDir, name) as T;
-              } catch (error) {
-                if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-                throw error;
-              }
-            },
+            read: () => readRuntimeDocument(dataDir, name) as T | undefined,
             write: (value: T) => writeRuntimeDocument(dataDir, name, value),
           },
         }
