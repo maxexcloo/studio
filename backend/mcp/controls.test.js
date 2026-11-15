@@ -67,17 +67,18 @@ test("adjustable controls omit fixed, single-option and unsupported Generate arg
   assert.equal(mcpControls({ ...profile, kind: "video" }).upscale_quality, undefined);
 });
 
-test("negative prompts are refused with an explanation where CFG 1 ignores them", () => {
+test("negative prompts are left out with an explanation where CFG 1 ignores them", () => {
   assert.equal(cfgIgnoresNegative(1), true);
   assert.equal(cfgIgnoresNegative(0), false);
   assert.doesNotThrow(() => assertAdjustable(profile, { negative_prompt: "blurry" }));
-  assert.throws(
-    () =>
-      assertAdjustable(
-        { ...profile, defaults: { ...profile.defaults, cfg: 1 } },
-        { negative_prompt: "blurry" },
-      ),
-    /no effect at cfg 1.*Set cfg above 1 \(up to 30\)/,
+  const atOne = assertAdjustable(
+    { ...profile, defaults: { ...profile.defaults, cfg: 1 } },
+    { negative_prompt: "blurry", prompts: ["a lighthouse"] },
+  );
+  assert.deepEqual(atOne.args, { prompts: ["a lighthouse"] });
+  assert.match(
+    atOne.ignored,
+    /negative_prompt was left out: it has no effect at cfg 1.*cfg above 1 \(up to 30\)/,
   );
   assert.doesNotThrow(() =>
     assertAdjustable(
@@ -189,7 +190,7 @@ test("Generate LoRA names resolve without folder, extension or case and take the
   );
 });
 
-test("a distilled profile without CFG offers no cfg and refuses one with a clear note", () => {
+test("a distilled profile without CFG offers no cfg and leaves one out with a clear note", () => {
   const distilled = {
     ...profile,
     id: "image:tesserafine-fast",
@@ -198,9 +199,11 @@ test("a distilled profile without CFG offers no cfg and refuses one with a clear
     defaults: { ...profile.defaults, cfg: 1 },
   };
   assert.equal(mcpControls(distilled).cfg, undefined);
-  assert.throws(
-    () => assertAdjustable(distilled, { cfg: 3 }),
-    /cfg cannot be adjusted for Tesserafine Fast\. This profile is guidance-distilled and runs at its own CFG; leave cfg out\./,
+  const left = assertAdjustable(distilled, { cfg: 3 });
+  assert.deepEqual(left.args, {});
+  assert.equal(
+    left.ignored,
+    "cfg was left out: This profile is guidance-distilled and runs at its own CFG; leave cfg out.",
   );
   // The reference mode decides on its own.
   const modes = {
