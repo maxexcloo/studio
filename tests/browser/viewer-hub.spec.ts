@@ -169,11 +169,11 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
     : viewer.getByRole("group", { name: "Generation Actions", exact: true });
   if (phone) await viewer.getByRole("textbox", { name: "Prompt", exact: true }).click();
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
-  // The editor asks from a send beside Generate; elsewhere AI's Custom… asks for what was typed.
+  // The editor asks from a send beside Generate; elsewhere Edit's Custom… asks for what was typed.
   const askForChange = async () => {
     if (phone)
       return surface.getByRole("button", { name: "Ask for a Change", exact: true }).click();
-    await viewerAction(page, "AI");
+    await viewerAction(page, "Edit");
     await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   };
   await field.fill("make it night");
@@ -205,7 +205,7 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });
 
-test("AI offers the image's next steps as changes, and picking one asks at once", async ({
+test("Edit offers the image's next steps as changes, and picking one asks at once", async ({
   page,
 }) => {
   const asked: any[] = [];
@@ -236,7 +236,7 @@ test("AI offers the image's next steps as changes, and picking one asks at once"
       });
     }),
   );
-  await viewerAction(page, "AI");
+  await viewerAction(page, "Edit");
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(field).toHaveValue("An amber bird in rain");
@@ -413,7 +413,9 @@ test("The strip shows iterations of iterations as a tree, newest first and the o
   await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
 
-test("Similar › More Like This Set asks for new variations of a result's set", async ({ page }) => {
+test("Recreate › Similar › More Like This Set asks for new variations of a result's set", async ({
+  page,
+}) => {
   const asked: unknown[] = [];
   await seed(page, { resultSet: { id: "set-a", title: "Variety Test", index: 0 } }, (page) =>
     page.route("**/api/result-sets/more", (route) => {
@@ -421,9 +423,7 @@ test("Similar › More Like This Set asks for new variations of a result's set",
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "Similar");
-  // Similar leads its menu.
-  await expect(page.getByRole("menuitem")).toHaveText(["Similar", "More Like This Set"]);
+  await viewerAction(page, "Recreate", "Similar");
   await page.getByRole("menuitem", { name: "More Like This Set", exact: true }).click();
   await expect.poll(() => asked).toEqual([{ itemId: "hub" }]);
 });
@@ -431,10 +431,9 @@ test("Similar › More Like This Set asks for new variations of a result's set",
 test("More Like This Set is offered only for a result in a set", async ({ page }) => {
   await seed(page);
   // Similar's menu still holds its strictness and its run.
-  await viewerAction(page, "Similar");
-  await expect(page.getByRole("menuitem")).toHaveText(["Similar"]);
-  await page.keyboard.press("Escape");
-  await viewerAction(page, "Recreate");
+  await viewerAction(page, "Recreate", "Similar");
+  await expect(page.getByRole("radiogroup", { name: "Strictness", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Similar", exact: true })).toHaveCount(2);
   await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
     0,
@@ -990,16 +989,9 @@ test("Copy ▾ lists Details then Prompt, and each copies its text", async ({ pa
       vae: "models/vae/ae.safetensors",
     },
   });
-  await viewerAction(page, "Copy");
-  // Its options sort alphabetically.
-  await expect(page.getByRole("menuitem", { name: /^(Prompt|Details)$/ })).toHaveText([
-    "Details",
-    "Prompt",
-  ]);
-  await page.getByRole("menuitem", { name: "Prompt", exact: true }).click();
+  await viewerAction(page, "Share", "Copy Prompt");
   await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("An amber bird");
-  await viewerAction(page, "Copy");
-  await page.getByRole("menuitem", { name: "Details", exact: true }).click();
+  await viewerAction(page, "Share", "Copy Details");
   await expect
     .poll(() => page.evaluate(() => (window as any).copied))
     .toBe(
@@ -1132,7 +1124,7 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
     "src",
     "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=play",
   );
-  await viewerAction(page, "Download");
+  await viewerAction(page, "Share", "Download");
   await expect(page.getByRole("menuitem", { name: "Video", exact: true })).toHaveAttribute(
     "href",
     "/comfy/view?filename=clip.mp4&subfolder=&type=studio",
@@ -1546,30 +1538,27 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   expect(bounds?.height).toBe(viewport.height);
   const phone = viewport.width < 768;
   if (phone) {
-    // Phones fit every action on the bar's one row.
+    // Phones fit every action on the bar's one row, each named but Star and Delete.
     const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
-    const row = [
-      "Animate",
-      "Edit",
-      "Recreate",
-      "Upscale",
-      "Copy",
-      "Download",
-      "Compare",
-      "Similar",
-      "Star",
-      "Delete",
-    ].map((name) =>
-      bar
-        .getByRole("button", { name, exact: true })
-        .or(bar.getByRole("link", { name, exact: true })),
+    const row = ["Animate", "Edit", "Recreate", "Share", "Star", "Delete"].map((name) =>
+      bar.getByRole("button", { name, exact: true }),
     );
-    const tops = await Promise.all(row.map(async (control) => (await control.boundingBox())!.y));
+    const tops = await Promise.all(
+      row.map(async (control) => {
+        const box = (await control.boundingBox())!;
+        return box.y + box.height / 2;
+      }),
+    );
     expect(new Set(tops.map(Math.round)).size).toBe(1);
+    for (const name of ["Animate", "Edit", "Recreate", "Share"])
+      await expect(bar.getByRole("button", { name, exact: true })).toHaveText(name);
   }
-  const download = dialog.getByRole("link", { name: "Download", exact: true });
+  await viewerAction(page, "Share");
+  const download = page.getByRole("menuitem", { name: "Download", exact: true });
   await expect(download).toHaveAttribute("href", image);
   await expect(download).toHaveAttribute("download", "studio-viewer.png");
+  await dialog.getByRole("button", { name: "Share", exact: true }).click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
   // Phones swipe instead of showing the arrows.
   const next = dialog.getByRole("button", { name: "Next Generation", exact: true });
   if (phone) await expect(next).toHaveCount(0);

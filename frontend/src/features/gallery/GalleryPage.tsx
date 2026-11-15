@@ -344,10 +344,11 @@ export function GalleryPage() {
         item={item}
         opened={opened}
         onOpenedChange={onOpenedChange}
+        onSelect={() => selection.toggle([item])}
         hideMore={hideMore}
       />
     ),
-    [hideMore],
+    [hideMore, selection],
   );
   const openSelectionMenu = useCallback((x: number, y: number) => setMenu({ x, y }), []);
   const tryAgainItem = useCallback(

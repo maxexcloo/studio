@@ -110,9 +110,9 @@ export function dreamChoices(card: DeckCard): Choice[][] {
 
 /**
  * The choices as the viewer's action groups, on one row in the item bar's order: Animate and Edit,
- * then More Like This and Variations, then the verdicts at the end, Pass, Super Like and Like, with
- * Like the filled one. Desktop names every action; phones name Pass and Like and keep More Like
- * This and Variations under ⋯ More. A comparison names all its answers, A and B large.
+ * then Recreate ▾ holding Variations and More Like This, then the verdicts at the end, Pass, Super
+ * Like and Like, with Like the filled one. Phones leave Super Like's name to its star. A comparison
+ * names all its answers, A and B large.
  */
 export function viewerChoices(
   card: DeckCard,
@@ -135,17 +135,19 @@ export function viewerChoices(
     };
   const all = choices.flat();
   const pick = (...ids: string[]) => ids.flatMap((id) => all.filter((choice) => choice.id === id));
-  const dream = pick("more-like-this", "variations");
+  const dream = pick("variations", "more-like-this");
   const groups: ActionGroups = [
-    pick("animate", "edit"),
-    phone && dream.length
-      ? [{ id: "more", label: "More", icon: icons.more, menu: [dream] }]
-      : dream,
+    [
+      ...pick("animate", "edit"),
+      ...(dream.length
+        ? [{ id: "recreate", label: "Recreate", icon: icons.recreate, menu: [dream] }]
+        : []),
+    ],
     pick("discard", "star", "keep"),
   ];
   return {
     label: "Dream Actions",
     groups,
-    labelled: phone ? ["discard", "keep"] : all.map((choice) => choice.id),
+    labelled: ["animate", "edit", "recreate", "discard", ...(phone ? [] : ["star"]), "keep"],
   };
 }

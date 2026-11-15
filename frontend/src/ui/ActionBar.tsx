@@ -83,34 +83,6 @@ export type ActionGroups = Action[][];
 const shown = (groups: ActionGroups) => groups.filter((group) => group.length > 0);
 const hasOptions = (action: Action) => Boolean(action.menu && shown(action.menu).length);
 
-// A control with options is wider than a plain icon: it carries a ▾.
-const width = (action: Action) => (hasOptions(action) && action.icon !== icons.more ? 1.5 : 1);
-
-/**
- * A phone bar on one row: the `kept` actions in their groups, the last ending with ⋯ More, which
- * holds the rest in their groups while it has any. With `room` (in plain icons) every action shows
- * while they all fit; past it the `kept` ones, then the others in order while they fit beside More.
- */
-export function withMore(groups: ActionGroups, kept: string[], room = 0): ActionGroups {
-  const all = shown(groups).flat();
-  const used = (actions: Action[]) => actions.reduce((sum, action) => sum + width(action), 0);
-  const keep = new Set(kept);
-  if (room && used(all) <= room) all.forEach((action) => keep.add(action.id));
-  else if (room) {
-    let taken = 1 + used(all.filter((action) => keep.has(action.id)));
-    for (const action of all)
-      if (!keep.has(action.id) && taken + width(action) <= room) {
-        keep.add(action.id);
-        taken += width(action);
-      }
-  }
-  const bar = shown(groups.map((group) => group.filter((action) => keep.has(action.id))));
-  const more = groups.map((group) => group.filter((action) => !keep.has(action.id)));
-  if (!more.some((group) => group.length)) return bar;
-  const button: Action = { id: "more", label: "More", icon: icons.more, menu: more };
-  return bar.length ? [...bar.slice(0, -1), [...bar[bar.length - 1], button]] : [[button]];
-}
-
 /** The action with this id in the groups or any of their options, for keyboard shortcuts. */
 export function findAction(groups: ActionGroups, id: string): Action | undefined {
   for (const action of groups.flat()) {
@@ -342,10 +314,12 @@ function OptionsMenu({
 function ActionControl({
   action,
   labelled,
+  stacked,
   menuPosition,
 }: {
   action: Action;
   labelled: boolean;
+  stacked: boolean;
   menuPosition: FloatingPosition;
 }) {
   const { label, icon: Icon, pressed, color, disabled, loading, link, onClick } = action;
@@ -372,33 +346,47 @@ function ActionControl({
   } as const;
   const icon = Icon && <Icon size={labelled ? 16 : 18} fill={pressed ? "currentColor" : "none"} />;
   const emphasis = action.emphasis && { variant: action.emphasis, color: undefined, radius: "xl" };
-  const control = labelled ? (
-    <Button
-      size={emphasis ? undefined : "compact-sm"}
-      leftSection={icon}
-      rightSection={chevron ? <ChevronDown size={14} /> : undefined}
-      {...props}
-      {...emphasis}
-    >
-      {label}
-    </Button>
-  ) : chevron ? (
-    // The icon with a small ▾, as round as the plain icons beside it.
-    <Button
-      size="sm"
-      radius="xl"
-      aria-label={label}
-      rightSection={<ChevronDown size={12} />}
-      classNames={{ root: classes.options, section: classes.chevron }}
-      {...props}
-    >
-      {icon}
-    </Button>
-  ) : (
-    <ActionIcon aria-label={label} {...props}>
-      {icon}
-    </ActionIcon>
-  );
+  const control =
+    labelled && stacked && !emphasis ? (
+      // The name under the icon, its ▾ beside the name.
+      <Button
+        size="compact-xs"
+        classNames={{ root: classes.stacked, label: classes.stackedLabel }}
+        {...props}
+      >
+        {icon}
+        <span>
+          {label}
+          {chevron && <ChevronDown size={10} />}
+        </span>
+      </Button>
+    ) : labelled ? (
+      <Button
+        size={emphasis ? undefined : "compact-sm"}
+        leftSection={icon}
+        rightSection={chevron ? <ChevronDown size={14} /> : undefined}
+        {...props}
+        {...emphasis}
+      >
+        {label}
+      </Button>
+    ) : chevron ? (
+      // The icon with a small ▾, as round as the plain icons beside it.
+      <Button
+        size="sm"
+        radius="xl"
+        aria-label={label}
+        rightSection={<ChevronDown size={12} />}
+        classNames={{ root: classes.options, section: classes.chevron }}
+        {...props}
+      >
+        {icon}
+      </Button>
+    ) : (
+      <ActionIcon aria-label={label} {...props}>
+        {icon}
+      </ActionIcon>
+    );
   const tip = {
     label: reason ? (
       <>
@@ -438,14 +426,14 @@ export function ActionBarGroups({
   labelled = [],
   menuPosition = "top",
   fit = false,
-  compact = false,
+  stacked = false,
 }: {
   groups: ActionGroups;
   labelled?: string[];
   menuPosition?: FloatingPosition;
   fit?: boolean;
-  /** Fits every action across the row at a smaller size (the phone viewer's bar). */
-  compact?: boolean;
+  /** Names sit under their icons, spread across the row (phone bars). */
+  stacked?: boolean;
 }) {
   const row = useRef<HTMLDivElement>(null);
   const actions = shown(groups).flat();
@@ -481,7 +469,7 @@ export function ActionBarGroups({
       data-fit={fit || undefined}
       data-tight={tight || undefined}
       data-wrap={wrap || undefined}
-      data-compact={compact || undefined}
+      data-stacked={stacked || undefined}
     >
       {shown(groups).map((group, index) => {
         const controls = group.map((action) => (
@@ -489,6 +477,7 @@ export function ActionBarGroups({
             key={action.id}
             action={action}
             labelled={names.has(action.id)}
+            stacked={stacked}
             menuPosition={menuPosition}
           />
         ));

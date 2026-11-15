@@ -101,7 +101,7 @@ the primary component reference and verify APIs against the installed version.
   says what it acts on (Upscale, Share, Copy, Clear, Reset; not Upscale Image or Clear Prompt),
   adding a word only where the verb alone is ambiguous (Stop Upscale, Edit in Composer), and one
   action keeps one label everywhere. Clear and Reset turn into Undo until the text next changes.
-  Assistant menus (AI, Animate) share `assistMenu`: settings, the fixed options from Library
+  Assistant menus (Animate, the viewer's Edit) share `assistMenu`: settings, the fixed options from Library
   records under their heading, the suggestions written for the item under Suggestions with
   Refresh Suggestions, then Custom… and the menu's run. Animate asks for motions only when opened.
 
@@ -159,9 +159,9 @@ the primary component reference and verify APIs against the installed version.
   under its options. The viewer's prompt has Improve Prompt (every style but
   Custom), resets to the item's prompt rather than clearing, and its phone
   editor sends Ask for a Change beside Generate. It rests on one line ending in
-  an ellipsis and shows the whole prompt while focused. Its other assistance is
-  the viewer bar's AI, after Recreate, an assistant menu whose Custom… asks for a
-  change typed over the prompt, with Review Prompt remembered.
+  an ellipsis and shows the whole prompt while focused. Its other assistance
+  opens the viewer's Edit ▾, whose Custom… asks for a change typed over the
+  prompt, with Review Prompt remembered.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating
@@ -231,19 +231,22 @@ the primary component reference and verify APIs against the installed version.
 - The viewer is the iteration hub for finished and unfinished work, using the
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
   and `itemActions.ts` the order for every bar and menu, the selection bar
-  offering those that act on several: Animate, Edit, Recreate, Upscale | Copy,
-  Download | Compare, Similar | Star, Delete. Compare ▾ holds Compare Models, then Open
-  Comparison where the item belongs to one. Edit holds Use as Character (starting a card in
-  Library › Characters) and Use as Reference, then what changes the item itself (Edit in
-  Composer, or a video's Trim and the like). Recreate holds Run Again and Run Again, Same Seed,
-  which queue from where they are, then Recreate in Composer; menu options expand in place on phones and touch screens. The phone viewer bar fits every action
-  on one row at a compact size, without More; elsewhere the viewer bar shows
-  every action on one row: where they outgrow it the last named actions drop to icons
-  alone, and only then do they wrap onto another row, never using More or scrolling. The phone bar drops its prompt field
-  while Details is open. Gallery selection uses the shared contextual selection
-  bar under the search and filters, which stay in place; its quick selects take
-  every match, not only loaded pages, and it confirms deletion. The phone bar shows
-  every action while they fit and keeps ⋯ More for the rest. A finished action ends
+  offering those that act on several, with no ⋯ More anywhere: Animate ▾, Edit ▾,
+  Recreate ▾ | Share ▾ | Star, Delete. Edit holds the viewer's prompt assistance
+  (Review Prompt, Library's changes, Suggestions, Custom…), then Upscale, Edit in
+  Composer, Use as Reference and Use as Character (starting a card in Library ›
+  Characters), or a video's Trim and the like. Recreate holds Run Again and Run
+  Again, Same Seed, which queue from where they are, then Compare Models, Open
+  Comparison where the item belongs to one and Similar, then Recreate in Composer.
+  Options expand in place on phones and touch screens. Share holds Copy Prompt, Copy Details, Download and, where the device shares
+  files, Share. A tile's context menu starts with Select, which starts selecting
+  with that item. Bars name every action but Star and Delete: phones under their
+  icons across one row, elsewhere beside them on one row; where they outgrow it
+  the last names drop, and only then do they wrap onto another row, never
+  scrolling. The phone bar drops its prompt field while Details is open. Gallery
+  selection uses the shared contextual selection bar under the search and
+  filters, which stay in place; its quick selects take every match, not only
+  loaded pages, and it confirms deletion. A finished action ends
   the selection, keeping selected only the items it failed for; opening a menu does not.
 - Details sections show their content in full rather than scrolling it in a
   box. Only a long caption folds, with Expand at the end of its last line; its
@@ -313,7 +316,10 @@ the primary component reference and verify APIs against the installed version.
   lists each project's unseen results by how well they fit its brief, misses
   folded last and kept. Its cards and the deck's bar offer only large Pass,
   Super Like (keep and star) and Like, or a comparison's A and B larger than
-  Neither and Both; the viewer's bar offers every choice. Familiar ideas vary
+  Neither and Both; the viewer's bar offers every choice, Variations and More
+  Like This under Recreate ▾. A comparison's viewer steps between its sides as
+  any viewer does, naming the shown side in the top bar, with Side by Side in
+  its bar on desktop. Familiar ideas vary
   one thing of a starred or liked image on its profile, LoRAs and settings; a
   project's brief steers them rather than replacing them.
   Calibration uses only the account's own Studio generations and leaves the

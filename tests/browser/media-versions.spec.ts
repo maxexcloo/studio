@@ -7,7 +7,7 @@ for (const kind of ["image", "video"] as const) {
     page,
   }) => {
     const state = await fixtures(page);
-    // Native sharing replaces Download on phones; this checks the downloaded version.
+    // Downloads check the version, without native sharing beside them on phones.
     await page.addInitScript(() =>
       Object.defineProperty(navigator, "canShare", { configurable: true, value: undefined }),
     );
@@ -60,53 +60,51 @@ for (const kind of ["image", "video"] as const) {
       kind === "image"
         ? viewer.getByRole("img", { name: prompt, exact: true })
         : viewer.locator("video");
+    // Share › Download, or a video's Download › Video where it offers other formats.
     const expectDownload = async (href: string, extension?: string) => {
-      const download = viewer.getByRole("link", { name: "Download", exact: true });
+      const share = viewer.getByRole("button", { name: "Share", exact: true });
+      await share.click();
+      let download = page.getByRole("menuitem", { name: "Download", exact: true });
+      if (!(await download.getAttribute("href"))) {
+        await download.click();
+        download = page.getByRole("menuitem", { name: "Video", exact: true });
+      }
       await expect(download).toHaveAttribute("href", href);
       if (extension) await expect(download).toHaveAttribute("download", `source.${extension}`);
+      await share.click();
+      await expect(page.getByRole("menu")).toHaveCount(0);
     };
     await expect(media).toHaveAttribute("src", originalUrl);
     await expectDownload(originalUrl, originalExtension);
-    // With an upscale, Upscale's first option switches between it and the original.
-    const version = page
-      .getByRole("dialog", { name: "Generation", exact: true })
-      .getByRole("button", { name: "Upscale", exact: true });
-    const showUpscale = async () => {
-      await version.click();
-      await expect(page.getByRole("menuitem").first()).toHaveText("Show Upscale");
-      await page.getByRole("menuitem", { name: "Show Upscale", exact: true }).click();
-    };
-    await expect(version).toHaveAttribute("aria-pressed", "false");
-    await showUpscale();
-    await expect(version).toHaveAttribute("aria-pressed", "true");
+    // With an upscale, Edit › Upscale's first option switches between it and the original.
+    const showUpscale = page.getByRole("menuitem", { name: "Show Upscale", exact: true });
+    await viewerAction(page, "Edit", "Upscale");
+    await expect(showUpscale).toHaveAttribute("aria-checked", "false");
+    await showUpscale.click();
     await expect.poll(() => toggles.length).toBe(1);
     expect(toggles[0]).toEqual({ galleryItemId: item.id, active: true });
     await expect(media).toHaveAttribute("src", upscaleUrl);
     await expectDownload(upscaleUrl, upscaleExtension);
     // Its options regenerate it and compare an image's upscale with its original.
-    await viewerAction(page, "Upscale");
+    await viewerAction(page, "Edit", "Upscale");
     await expect(page.getByRole("menuitem", { name: "Upscale Again", exact: true })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Show Upscale", exact: true })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
+    await expect(showUpscale).toHaveAttribute("aria-checked", "true");
     const compare = page.getByRole("menuitem", { name: "Compare Upscale", exact: true });
     if (kind === "image") await expect(compare).toBeVisible();
     else await expect(compare).toHaveCount(0);
     await page.keyboard.press("Escape");
     // The viewer opens again from the URL.
     await page.reload();
-    await expect(version).toHaveAttribute("aria-pressed", "true");
     await expect(media).toHaveAttribute("src", upscaleUrl);
     await expectDownload(upscaleUrl);
-    await showUpscale();
-    await expect(version).toHaveAttribute("aria-pressed", "false");
+    await viewerAction(page, "Edit", "Upscale");
+    await expect(showUpscale).toHaveAttribute("aria-checked", "true");
+    await showUpscale.click();
     await expect.poll(() => toggles.length).toBe(2);
     expect(toggles[1]).toEqual({ galleryItemId: item.id, active: false });
     await expect(media).toHaveAttribute("src", originalUrl);
     await expectDownload(originalUrl, originalExtension);
     await page.reload();
-    await expect(version).toHaveAttribute("aria-pressed", "false");
     await expect(media).toHaveAttribute("src", originalUrl);
   });
 }

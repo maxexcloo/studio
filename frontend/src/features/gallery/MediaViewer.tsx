@@ -6,7 +6,6 @@ import {
   Group,
   Modal,
   ScrollArea,
-  SegmentedControl,
   Stack,
   Text,
   Tooltip,
@@ -116,7 +115,7 @@ function playVideo(media: HTMLVideoElement, refused: () => void) {
 
 // One key runs a viewer action, as its bar would (Settings › Studio lists them).
 const viewerShortcuts: Record<string, string> = {
-  e: "edit",
+  e: "edit-image",
   p: "prompt-composer",
   r: "new-seed",
   u: "upscale",
@@ -266,9 +265,9 @@ export function MediaViewer({
   onReturnFocus?: (item: MediaItem) => void;
   /** The opening surface's own actions, in place of the item's prompt field and actions. */
   actions?: ViewerActions;
-  /** Names each item: the items become a segmented choice in place of the position badge. */
+  /** Names each item: the shown one's name takes the position badge's place. */
   itemLabel?: (item: MediaItem) => string;
-  /** Offers the items side by side on desktop, as a last option in that choice. */
+  /** Offers the items side by side on desktop, as the first action in the bar. */
   sideBySide?: boolean;
 }) {
   const phone = usePhone();
@@ -513,16 +512,15 @@ export function MediaViewer({
             event.ctrlKey ||
             event.metaKey ||
             event.shiftKey ||
-            // The shown item's choice is a radio group, whose arrows move between items as ours do.
             (event.target as Element).closest(
-              'input:not([type="radio"]),textarea,select,video,[contenteditable="true"],[role="slider"],[role="menu"],[role="listbox"]',
+              'input,textarea,select,video,[contenteditable="true"],[role="slider"],[role="menu"],[role="listbox"]',
             )
           )
             return;
-          // A surface's own actions take F for their Star and leave Delete alone.
-          const shortcut = (actions ? { ...viewerShortcuts, f: "star" } : viewerShortcuts)[
-            event.key.toLowerCase()
-          ];
+          // A surface's own actions take E for their Edit and F for their Star, and leave Delete alone.
+          const shortcut = (
+            actions ? { ...viewerShortcuts, e: "edit", f: "star" } : viewerShortcuts
+          )[event.key.toLowerCase()];
           const found =
             shortcut && findAction(actions?.groups ?? shortcutActions.current, shortcut);
           if (found) {
@@ -585,42 +583,7 @@ export function MediaViewer({
               onClick={(event) => event.stopPropagation()}
             >
               {canNavigate && itemLabel ? (
-                <SegmentedControl
-                  size="sm"
-                  radius="xl"
-                  fullWidth
-                  style={glass}
-                  classNames={{ root: classes.choices, label: classes.choice }}
-                  aria-label="Shown Image"
-                  value={together ? "together" : item.id}
-                  onChange={(value) => {
-                    setTogether(value === "together");
-                    const next = viewable.find((candidate) => candidate.id === value);
-                    if (next && next.id !== item.id) {
-                      setCompare(false);
-                      navigate!(next);
-                    }
-                  }}
-                  data={[
-                    ...viewable.map((candidate) => ({
-                      value: candidate.id,
-                      label: itemLabel(candidate),
-                    })),
-                    ...(sideBySide && !phone
-                      ? [
-                          {
-                            value: "together",
-                            label: (
-                              <Group gap={6} wrap="nowrap">
-                                <icons.compareSideBySide size={16} />
-                                Side by Side
-                              </Group>
-                            ),
-                          },
-                        ]
-                      : []),
-                  ]}
-                />
+                <Badge {...setBadge}>{itemLabel(item)}</Badge>
               ) : item.resultSet ? (
                 comparisonPath && comparisonPath !== pathname ? (
                   <Badge
@@ -642,7 +605,6 @@ export function MediaViewer({
               <Group gap={6} wrap="nowrap">
                 <Tooltip label={phone ? "Details" : details ? "Hide Details" : "Show Details"}>
                   <ActionIcon
-                    // Focus starts here rather than in the shown item's choice before it.
                     data-autofocus
                     variant="default"
                     aria-label="Generation Details"
@@ -802,7 +764,25 @@ export function MediaViewer({
                     className={classes.actions}
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <ViewerActionGroups {...actions} />
+                    <ViewerActionGroups
+                      groups={
+                        sideBySide && canNavigate && !phone
+                          ? [
+                              [
+                                {
+                                  id: "side-by-side",
+                                  label: "Side by Side",
+                                  icon: icons.compareSideBySide,
+                                  pressed: together,
+                                  onClick: () => setTogether((value) => !value),
+                                },
+                              ],
+                              ...actions.groups,
+                            ]
+                          : actions.groups
+                      }
+                      labelled={[...actions.labelled, "side-by-side"]}
+                    />
                   </ActionBarSurface>
                 ) : (
                   <MediaViewerActions

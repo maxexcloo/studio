@@ -52,37 +52,46 @@
     color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
-/* Every action across the row at a smaller size, spread evenly. */
-.actions[data-compact] {
+/* Phone bars spread every action across the row, each name under its icon. */
+.actions[data-stacked] {
   width: 100%;
   justify-content: space-between;
   gap: 0;
 }
 
-.actions[data-compact] .action {
-  --ai-size: 30px;
-  --button-height: 30px;
+.actions[data-stacked] .divider {
+  margin-inline: 0;
 }
 
-/* Tight enough for every action across a 375 px phone, or a fitted bar whose names have all gone. */
-.actions[data-compact] .options,
+.stacked {
+  height: auto;
+  padding: 4px 6px;
+}
+
+.stackedLabel {
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 500;
+}
+
+.stackedLabel > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* A fitted bar whose names have all gone draws each ▾ closer. */
 .actions[data-tight] .options {
   padding-inline: 2px 1px;
 }
 
-.actions[data-compact] .chevron,
 .actions[data-tight] .chevron {
   margin-inline-start: 0;
 }
 
-.actions[data-compact] .chevron svg,
 .actions[data-tight] .chevron svg {
   width: 10px;
   height: 10px;
-}
-
-.actions[data-compact] .divider {
-  margin-inline: 0;
 }
 
 /* An icon with options: its ▾ close beside it, over Mantine's Button padding whatever the CSS order. */
