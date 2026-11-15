@@ -253,9 +253,9 @@ test("Tile Captions in Settings › Preferences pin phone tile captions", async 
     createdAt: stamp,
   });
   await page.goto("/images");
-  const caption = page.getByText("A quiet harbour", { exact: true });
+  const caption = page.getByText("Quiet Harbour", { exact: true });
   await expect(
-    page.getByRole("button", { name: "Open image: A quiet harbour", exact: true }),
+    page.getByRole("button", { name: "Open image: Quiet Harbour", exact: true }),
   ).toBeVisible();
   await expect(caption).toHaveCount(0);
   await page.goto("/settings#preferences");

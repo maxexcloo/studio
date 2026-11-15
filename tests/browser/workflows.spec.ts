@@ -36,7 +36,7 @@ test("Images and Videos tabs keep an expanding bottom composer", async ({ page }
   await expect(page).toHaveURL("/images");
   await expect.poll(() => state.jobs.length).toBe(1);
   await expect(
-    page.getByRole("button", { name: "Open image: An amber bird", exact: true }),
+    page.getByRole("button", { name: "Open image: Amber Bird", exact: true }),
   ).toBeVisible();
   await expandComposer(page);
   await page.getByRole("combobox", { name: "Profile", exact: true }).click();

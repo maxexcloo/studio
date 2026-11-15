@@ -1,6 +1,8 @@
 import { type Locator, type Page, expect, test } from "@playwright/test";
 
+import { mediaTitle } from "../../frontend/src/features/gallery/mediaLabels";
 import type { Profile } from "../../frontend/src/types";
+import { formatDateTime } from "../../frontend/src/ui/dates";
 import {
   closeLoras,
   fixtures,
@@ -17,7 +19,13 @@ async function seed(
   routes?: (page: Page, state: Awaited<ReturnType<typeof fixtures>>) => Promise<unknown>,
 ) {
   const state = await fixtures(page);
-  const settings = { profileId: "image:test", seed: 1234567, steps: 28, count: 2 };
+  const settings = {
+    profileId: "image:test",
+    profileName: "Image Quality",
+    seed: 1234567,
+    steps: 28,
+    count: 2,
+  };
   const item = {
     id: "hub",
     jobId: "job-hub",
@@ -48,7 +56,7 @@ async function seed(
   // Registered after the shared fixtures, these take precedence over them.
   await routes?.(page, state);
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+  await page.getByRole("button", { name: `Open image: ${mediaTitle(item)}`, exact: true }).click();
   return { state, viewer: page.getByRole("dialog", { name: "Generation", exact: true }) };
 }
 
@@ -98,7 +106,7 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
   // The bar stays in reach while phone details are open, without its prompt field.
   else {
     await expect(viewer).toBeHidden();
-    await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+    await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
     await expect(page.getByRole("button", { name: "Close Details", exact: true })).toBeVisible();
     await expect(field).toBeHidden();
@@ -125,7 +133,7 @@ test("A video's prompt field runs its edited prompt again as a video", async ({ 
     createdAt: stamp,
   });
   await page.goto("/video");
-  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "A rolling wave",
@@ -364,12 +372,12 @@ test("A regenerated result shows beside its source until All Versions collapses 
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({ parentJobId: "job-hub", parentItemId: "hub" });
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
-  const tiles = page.getByRole("button", { name: /^Open image: An amber bird/ });
+  const tiles = page.getByRole("button", { name: /^Open image: Amber Bird/ });
   await expect(tiles).toHaveCount(2);
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("switch", { name: "All Versions", exact: true }).click();
   await expect(tiles).toHaveCount(1);
-  await expect(tiles).toHaveAccessibleName("Open image: An amber bird, Version 1 of 2");
+  await expect(tiles).toHaveAccessibleName("Open image: Amber Bird, Version 1 of 2");
   // Closing on the other version returns to the tile holding it.
   await page.keyboard.press("Escape");
   await tiles.click();
@@ -423,7 +431,7 @@ test("A set's strip holds the shown result's versions in its place, as one strip
   await expect(versions).toHaveCount(0);
   expect(
     await strip.getByRole("listitem").evaluateAll((all) => all.map((entry) => entry.ariaLabel)),
-  ).toEqual(["Show A grey heron (1 of 2)", "Show Version 2", "Show Version 1"]);
+  ).toEqual(["Show Grey Heron (1 of 2)", "Show Version 2", "Show Version 1"]);
   await expect(strip.getByRole("listitem").last()).toHaveAttribute("aria-current", "true");
   // A version outside the set shows its versions alone.
   await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
@@ -686,7 +694,9 @@ test("An Animate run stays with the image it started on while the viewer moves b
     await route.fallback();
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: `Open image: ${bird}`, exact: true }).click();
+  await page
+    .getByRole("button", { name: `Open image: ${mediaTitle({ prompt: bird })}`, exact: true })
+    .click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const animate = viewer.getByRole("button", { name: "Animate", exact: true });
   // Desktop uses the arrows, Chromium phones swipe and WebKit phones take the arrow keys.
@@ -876,7 +886,7 @@ test("A queue item streams its prompt's thinking; the result keeps it collapsed 
   let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
   if (testInfo.project.use.isMobile) {
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-    details = page.getByRole("dialog", { name: "An amber bird", exact: true });
+    details = page.getByRole("dialog", { name: "Amber Bird", exact: true });
   }
   await expect(details.getByText("Written by local/text", { exact: true })).toBeVisible();
   const toggle = details.getByRole("button", { name: "Thinking", exact: true });
@@ -996,7 +1006,7 @@ test("A video's Animate template continues it from its last frame, and Edit make
     createdAt: stamp,
   });
   await page.goto("/video");
-  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(
@@ -1137,7 +1147,7 @@ test("An opened video plays, muted when the browser refuses sound", async ({ pag
     createdAt: stamp,
   });
   await page.goto("/video");
-  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).played)).toEqual({ muted: true });
   // Its controls stay hidden until a pointer moves over it.
   const video = page.getByRole("dialog", { name: "Generation", exact: true }).locator("video");
@@ -1167,7 +1177,7 @@ test("An opened video the browser won't play shows its still and its controls", 
     createdAt: stamp,
   });
   await page.goto("/video");
-  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const video = page.getByRole("dialog", { name: "Generation", exact: true }).locator("video");
   await expect(video).toHaveAttribute("poster", image);
   await expect(video).toHaveAttribute("controls");
@@ -1195,12 +1205,12 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
     createdAt: stamp,
   });
   await page.goto("/video");
-  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).hover();
+  await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).hover();
   await expect
     .poll(() => page.evaluate(() => (window as any).played))
     .toContain("/comfy/video-preview?filename=clip.mp4");
   // Opened, it plays the copy iOS Safari plays, and also downloads as a GIF.
-  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   await expect(
     page.getByRole("dialog", { name: "Generation", exact: true }).locator("video"),
   ).toHaveAttribute(
@@ -1241,6 +1251,9 @@ test("Details fold only a long caption, keep its tags in sight and copy the prom
   );
   const caption = Array.from({ length: 12 }, (_, line) => `Caption line ${line + 1}`).join("\n");
   const { viewer } = await seed(page, {
+    title: "my favourite bird",
+    number: 866,
+    settings: { profileId: "image:test", profileName: "Retired Image · ComfyUI · Quality" },
     negative,
     caption: {
       text: caption,
@@ -1253,8 +1266,13 @@ test("Details fold only a long caption, keep its tags in sight and copy the prom
   let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
   if (testInfo.project.use.isMobile) {
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-    details = page.getByRole("dialog", { name: "An amber bird", exact: true });
+    details = page.getByRole("dialog", { name: "my favourite bird", exact: true });
   }
+  await expect(details.getByText("my favourite bird", { exact: true })).toBeVisible();
+  await expect(details.getByText(`${formatDateTime(stamp)} · #866`, { exact: true })).toBeVisible();
+  await expect(
+    details.getByText("Retired Image · Quality · Image · 1024 × 1024", { exact: true }),
+  ).toBeVisible();
   // A long caption folds with Expand on its last line and folds again on Collapse; its tags stay
   // in sight.
   const tags = details.getByLabel("Caption Tags", { exact: true });
@@ -1290,7 +1308,7 @@ test("Desktop details stay where the viewer left them", async ({ page }, testInf
   await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
   await expect(details).toBeHidden();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
-  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   await expect(
     viewer.getByRole("button", { name: "Generation Details", exact: true }),
   ).toHaveAttribute("aria-expanded", "false");
@@ -1330,7 +1348,7 @@ test("Phone swipes reveal details and close the viewer", async ({ page }, testIn
   await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await expect.poll(async () => Math.round((await picture.boundingBox())!.x - start.x)).toBe(0);
   await swipe(-120);
-  const sheet = page.getByRole("dialog", { name: "An amber bird", exact: true });
+  const sheet = page.getByRole("dialog", { name: "Amber Bird", exact: true });
   await expect(sheet.getByText("1234567", { exact: true })).toBeVisible();
   await sheet.getByRole("button", { name: "Close Details", exact: true }).click();
   await expect(sheet).toBeHidden();
@@ -1431,7 +1449,7 @@ test("A tap on the picture hides and shows the chrome; swipes still move and Esc
       resultSet: { id: "tap-set", title: "Tap Set", index },
     });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: A quiet harbour", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Quiet Harbour", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const picture = viewer.getByRole("img", { name: "A quiet harbour", exact: true });
   await expect(picture).toBeVisible();
@@ -1554,7 +1572,7 @@ test("Work still generating and videos take the same swipes as a picture", async
     },
   );
   await page.goto("/video");
-  await page.getByRole("button", { name: "Open video: A live study", exact: true }).click();
+  await page.getByRole("button", { name: "Open video: Live Study", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const status = viewer.getByRole("status", { name: "Generation Status", exact: true });
   await expect(status).toBeVisible();
@@ -1760,7 +1778,7 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
     },
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Legacy Study", exact: true }).click();
   await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
@@ -1894,7 +1912,7 @@ test("Face Check marks a result that shows someone else than its character, and 
   let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
   if (testInfo.project.use.isMobile) {
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-    details = page.getByRole("dialog", { name: "An amber bird", exact: true });
+    details = page.getByRole("dialog", { name: "Amber Bird", exact: true });
   }
   await expect(
     details.getByText("Looks like someone else, not Mara (face similarity 0.31).", { exact: true }),
