@@ -2,7 +2,7 @@ const word = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ""
 
 /**
  * What a proposed prompt changed in the one it replaces, in a few words ("midday → golden hour ·
- * + a slight smile"), or "" where the two share too little to compare, as an edit instruction.
+ * + a slight smile"), or "" where they share less than half their words, as an edit instruction or a whole rewrite.
  */
 export function changeSummary(before: string, after: string, limit = 80) {
   const a = before.split(/\s+/).filter(Boolean);
@@ -18,7 +18,7 @@ export function changeSummary(before: string, after: string, limit = 80) {
         keyA[i] === keyB[j]
           ? common[(i + 1) * width + j + 1] + 1
           : Math.max(common[(i + 1) * width + j], common[i * width + j + 1]);
-  if (common[0] * 2 < Math.min(a.length, b.length)) return "";
+  if (common[0] * 2 < Math.max(a.length, b.length)) return "";
   const hunks: { removed: string[]; added: string[] }[] = [];
   let hunk: (typeof hunks)[number] | null = null;
   for (let i = 0, j = 0; i < a.length || j < b.length;) {
