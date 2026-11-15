@@ -19,11 +19,10 @@ import { workflowRisks } from "./workflow-risk.js";
 let preferencesCache = null;
 let preferencesSaveTimer = null;
 
-/** Likes and last use of profiles that still exist, so a removed profile's clear themselves. */
-function ofExistingProfiles({ liked, lastUsed }) {
+/** Last use of profiles that still exist, so a removed profile's clears itself. */
+function ofExistingProfiles({ lastUsed }) {
   const ids = new Set(allCustomWorkflowRecords({ dedupe: false }).map((item) => item.profileId));
   return {
-    liked: liked.filter((id) => ids.has(id)),
     lastUsed: Object.fromEntries(Object.entries(lastUsed).filter(([id]) => ids.has(id))),
   };
 }
@@ -32,14 +31,12 @@ export function loadWorkflowPreferences() {
   if (preferencesCache) return preferencesCache;
   try {
     const raw = readRuntimeDocument(dataDir, "workflow-preferences");
-    // Likes are stored as `favorites`, which predates Like.
     preferencesCache = ofExistingProfiles({
-      liked: Array.isArray(raw.favorites) ? raw.favorites : [],
       lastUsed: raw.lastUsed && typeof raw.lastUsed === "object" ? raw.lastUsed : {},
     });
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
-    preferencesCache = { liked: [], lastUsed: {} };
+    preferencesCache = { lastUsed: {} };
   }
   return preferencesCache;
 }
@@ -60,10 +57,7 @@ export function saveWorkflowPreferences(preferences, { immediate = false } = {})
     preferencesSaveTimer = null;
   }
   preferencesCache = ofExistingProfiles(preferences);
-  writeRuntimeDocument(dataDir, "workflow-preferences", {
-    favorites: preferencesCache.liked,
-    lastUsed: preferencesCache.lastUsed,
-  });
+  writeRuntimeDocument(dataDir, "workflow-preferences", preferencesCache);
 }
 
 /** Saves a change still in its debounce; Studio's exit calls it while the database is open. */
@@ -71,7 +65,7 @@ export function flushWorkflowPreferences() {
   if (preferencesSaveTimer) saveWorkflowPreferences(preferencesCache, { immediate: true });
 }
 
-/** Moves likes and last use to the id `canonical` gives each (merged profiles), saved at once. */
+/** Moves last use to the id `canonical` gives each (merged profiles), saved at once. */
 export function repointWorkflowPreferences(canonical) {
   saveWorkflowPreferences(repointedPreferences(loadWorkflowPreferences(), canonical), {
     immediate: true,
@@ -81,7 +75,6 @@ export function repointWorkflowPreferences(canonical) {
 function updateWorkflowPreferencePatch(patch = {}) {
   const current = loadWorkflowPreferences();
   const next = {
-    liked: Array.isArray(patch.liked) ? patch.liked : current.liked,
     lastUsed: { ...current.lastUsed, ...patch.lastUsed },
   };
   saveWorkflowPreferences(next);
@@ -199,7 +192,6 @@ function missingFileParts(workflow, info) {
 
 function automaticTags(item, prefs) {
   const tags = [];
-  if (prefs.liked.includes(item.id)) tags.push("Liked");
   if (prefs.lastUsed[item.id]) tags.push("Recent");
   tags.push(item.source === "builtin" ? "Built-in" : "Custom");
   tags.push(item.kind === "video" ? "Video" : "Image");
@@ -240,7 +232,6 @@ export function workflowSummaries({
       aspectPolicy: profile.aspectPolicy || custom?.aspectPolicy || "manual",
       defaults: profile.defaults || {},
       path: custom?.path || "",
-      liked: preferences.liked.includes(id),
       lastUsedAt: preferences.lastUsed[id] || "",
       // Built-in families know exactly which files they still lack.
       validation: {
@@ -288,7 +279,6 @@ export function workflowSummaries({
       aspectPolicy: workflow.aspectPolicy || "manual",
       defaults: workflow.defaults || {},
       path: workflow.path || "",
-      liked: preferences.liked.includes(workflow.profileId),
       lastUsedAt: preferences.lastUsed[workflow.profileId] || "",
       validation,
     };
@@ -298,8 +288,6 @@ export function workflowSummaries({
   return summaries
     .filter((item) => item.source !== "builtin" || !online || item.validation.ok)
     .sort((a, b) => {
-      const liked = Number(b.liked) - Number(a.liked);
-      if (liked) return liked;
       const recent = Date.parse(b.lastUsedAt || "0") - Date.parse(a.lastUsedAt || "0");
       if (recent) return recent;
       return a.name.localeCompare(b.name);
