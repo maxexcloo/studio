@@ -14,7 +14,7 @@
 .scrubber {
   --scrubber-thumb: 44px;
   position: fixed;
-  z-index: 2;
+  z-index: 6;
   right: 2px;
   top: calc(var(--app-shell-header-height) + var(--mantine-spacing-md));
   bottom: calc(6rem + env(safe-area-inset-bottom));

@@ -418,7 +418,8 @@ test("Header appearance preferences persist across reloads", async ({ page }) =>
   await page.goto("/");
   await openTheme(page);
   const popup = await page.locator('.mantine-Popover-dropdown[role="dialog"]').boundingBox();
-  expect(popup!.y).toBeGreaterThanOrEqual(68);
+  const trigger = await page.getByRole("button", { name: "Appearance", exact: true }).boundingBox();
+  expect(popup!.y).toBeGreaterThanOrEqual(trigger!.y + trigger!.height);
   await page.getByRole("button", { name: "Use Blue Colour", exact: true }).click();
   await page
     .getByRole("radiogroup", { name: "Background", exact: true })

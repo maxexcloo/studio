@@ -74,6 +74,10 @@ window.addEventListener(
   "pointerdown",
   (event) => {
     const target = event.target as Element;
+    if (target.closest(".mantine-Notification-root")) {
+      closing = false;
+      return;
+    }
     // Sees open dialogs before a press closes one, so its fade-out is not taken for a fade-in.
     const top = openLayers().at(-1);
     const phone = document.documentElement.hasAttribute("data-phone");

@@ -488,7 +488,7 @@ export function MediaViewer({
             event.key === "Escape" &&
             !event.nativeEvent.isComposing &&
             !deleting &&
-            !layerAbove(event.currentTarget, event) &&
+            !layerAbove(stage.current, event) &&
             event.currentTarget.contains(target) &&
             !target.closest('input:not([type="radio"]),textarea,select,[aria-haspopup]')
           ) {
@@ -500,7 +500,7 @@ export function MediaViewer({
           // Portalled layers (menus, popovers, the details sheet) bubble here through React.
           if (
             deleting ||
-            layerAbove(event.currentTarget, event) ||
+            layerAbove(stage.current, event) ||
             event.defaultPrevented ||
             !event.currentTarget.contains(event.target as Node)
           )
