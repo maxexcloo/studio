@@ -1,4 +1,4 @@
-import { loraCompatibility } from "../../shared/profiles.ts";
+import { loraCompatibility, loraRoles, loraTypes } from "../../shared/profiles.ts";
 import { strengthRange } from "./policy.js";
 
 /** Name-refined models of the same kind share their parent family's adapter layout. */
@@ -89,10 +89,8 @@ function loraDescriptionMetadata(entry) {
 
 function loraRoleMetadata(entry) {
   return {
-    ...(["slider", "style", "character", "concept"].includes(entry.type)
-      ? { type: entry.type }
-      : {}),
-    ...(["effect", "acceleration", "supporting"].includes(entry.role) ? { role: entry.role } : {}),
+    ...(loraTypes.includes(entry.type) ? { type: entry.type } : {}),
+    ...(loraRoles.includes(entry.role) ? { role: entry.role } : {}),
     ...(entry.hidden === true ? { hidden: true } : {}),
     ...(typeof entry.note === "string" ? { note: entry.note.trim().slice(0, 500) } : {}),
   };

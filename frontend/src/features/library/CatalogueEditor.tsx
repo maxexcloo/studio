@@ -17,6 +17,7 @@ import {
 import { useForm } from "@mantine/form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { loraRoles, loraTypes } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
@@ -157,7 +158,7 @@ function CatalogueForm({
           placeholder={lora ? "Unclassified" : "Inherit Source Classification"}
           data={
             lora
-              ? ["slider", "style", "character", "concept"].map((value) => ({
+              ? loraTypes.map((value) => ({
                   value,
                   label: value[0].toUpperCase() + value.slice(1),
                 }))
@@ -174,7 +175,7 @@ function CatalogueForm({
             <Select
               label="Runtime Role"
               clearable
-              data={["effect", "acceleration", "supporting"].map((value) => ({
+              data={loraRoles.map((value) => ({
                 value,
                 label: value[0].toUpperCase() + value.slice(1),
               }))}

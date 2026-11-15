@@ -17,6 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { loraRoles, loraTypes } from "../../shared/profiles.ts";
 import { logger } from "../crash-log.js";
 import { currentDataDir } from "../data-dir.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
@@ -185,7 +186,7 @@ function cleanCataloguePatch(patch, { provenance = false } = {}) {
     }
     switch (key) {
       case "type":
-        if (!["slider", "style", "character", "concept"].includes(value))
+        if (!loraTypes.includes(value))
           throw new Error("type must be slider, style, character or concept.");
         clean.type = value;
         break;
@@ -212,7 +213,7 @@ function cleanCataloguePatch(patch, { provenance = false } = {}) {
         clean.removed = true;
         break;
       case "role":
-        if (!["effect", "acceleration", "supporting"].includes(value))
+        if (!loraRoles.includes(value))
           throw new Error("role must be effect, acceleration or supporting.");
         clean.role = value;
         break;
