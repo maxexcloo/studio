@@ -8,6 +8,7 @@ import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
+import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
@@ -46,7 +47,6 @@ interface GuideBindings {
   profiles: Record<string, { pack?: string }>;
 }
 const kindLabels: Record<string, string> = { image: "Image", video: "Video" };
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
 

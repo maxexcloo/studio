@@ -8,6 +8,7 @@ import { menuWidth } from "../../theme";
 import type { GenerationInput, Profile } from "../../types";
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
+import { plural } from "../../ui/plural";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "../generation/chip";
 import { useGeneration } from "../generation/GenerationProvider";
@@ -35,7 +36,6 @@ const noModels: string[] = [];
 const strengthOptions = [0, 0.4, 0.6, 0.8, 1, 1.2];
 const defaultStrengths = [0, 0.6, 0.8, 1];
 const seedCounts = ["2", "3", "4", "6"];
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 const toggled = <T,>(list: T[], value: T) =>
   list.includes(value) ? list.filter((each) => each !== value) : [...list, value];

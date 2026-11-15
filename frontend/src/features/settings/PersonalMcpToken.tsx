@@ -1,11 +1,10 @@
 import { Alert, Badge, Button, Group, Stack, Text, TextInput } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { api, post } from "../../api";
-import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { CopyButton } from "../../ui/CopyButton";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
@@ -33,7 +32,6 @@ export function PersonalMcpToken() {
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<"rotate" | "revoke" | null>(null);
   const [error, setError] = useState("");
-  const { copied, copy } = useCopy();
   const status = useQuery({ ...ownAccountQuery, select: (data) => data.mcp });
   const viewable = visible && Boolean(status.data?.viewable);
   // The token stays in this mounted view, never in a query or mutation cache, and leaves with it.
@@ -73,17 +71,6 @@ export function PersonalMcpToken() {
     }
   };
   const endpoint = status.data?.endpoint || "";
-  const copyButton = (text: string, name: string, label: string) => (
-    <Button
-      size="compact-sm"
-      variant="default"
-      leftSection={copied === name ? <Check size={16} /> : <icons.copy size={16} />}
-      disabled={!text}
-      onClick={() => copy(text, name)}
-    >
-      {copied === name ? "Copied" : label}
-    </Button>
-  );
   return (
     <>
       <SettingGroup title="MCP Access">
@@ -97,7 +84,7 @@ export function PersonalMcpToken() {
             </Text>
           }
         >
-          {copyButton(endpoint, "url", "Copy URL")}
+          <CopyButton size="compact-sm" text={endpoint} label="Copy URL" />
         </SettingRow>
         <SettingRow
           label="MCP Token"
@@ -142,12 +129,12 @@ export function PersonalMcpToken() {
                 >
                   {shown ? "Hide" : "Show"}
                 </Button>
-                {copyButton(token, "token", "Copy Token")}
-                {copyButton(
-                  endpoint && token && `${endpoint.replace(/\/+$/, "")}/${token}`,
-                  "tokenUrl",
-                  "Copy URL with Token",
-                )}
+                <CopyButton size="compact-sm" text={token} label="Copy Token" />
+                <CopyButton
+                  size="compact-sm"
+                  text={endpoint && token && `${endpoint.replace(/\/+$/, "")}/${token}`}
+                  label="Copy URL with Token"
+                />
               </Group>
             </Stack>
           ) : (
