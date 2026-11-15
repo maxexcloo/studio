@@ -745,11 +745,12 @@ export class McpMedia {
     try {
       const queued = [];
       const queueSet = crypto.randomUUID();
+      const batches = prompts.map(() => crypto.randomUUID());
       let images = 0;
       for (const [position, prompt] of prompts.entries())
         for (let done = 0; done < runs; done += batch) {
           const size = Math.min(batch, runs - done);
-          const id = crypto.randomUUID();
+          const id = done ? crypto.randomUUID() : batches[position];
           // A prompt written in the queue is not known yet; its outputs carry it.
           const ran = writing ? undefined : prompt;
           const resultSet = result_set && {
@@ -768,6 +769,7 @@ export class McpMedia {
                 ...body,
                 clientJobId: id,
                 queueSet,
+                ...(runs > batch ? { queueBatch: batches[position] } : {}),
                 ...(record.parentItemId ? { parentItemId: record.parentItemId } : {}),
                 ...(resultSet ? { resultSet } : {}),
                 prompt: ran ?? "",

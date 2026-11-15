@@ -25,6 +25,8 @@ export const queuePriority = { manual: 0, mcp: 1, finishing: 2, dream: 3 } as co
 export interface QueueOrigin {
   priority?: number;
   queueSet?: string;
+  /** The first job of one prompt's Count, when its outputs need separate provider runs. */
+  queueBatch?: string;
   /** The owner's exact source result, checked by the admitting caller. */
   parentItemId?: string;
   dream?: DreamOrigin;
@@ -206,6 +208,7 @@ export class Store {
             operation,
             priority: origin.priority ?? queuePriority.manual,
             queueSet: origin.queueSet,
+            ...(origin.queueBatch ? { queueBatch: origin.queueBatch } : {}),
             ...(origin.dream ? { dream: origin.dream } : {}),
             ...(origin.faceRedo ? { faceRedo: origin.faceRedo } : {}),
             // A prompt the assistant writes is the item's first stage (queue.ts); it then queues.
@@ -668,6 +671,7 @@ export function publicJob({
   priority,
   dream: _dream,
   faceRedo: _faceRedo,
+  queueBatch: _queueBatch,
   input: { clientJobId: _clientJobId, ...input },
   ...job
 }: OwnedJob): QueueJob {
