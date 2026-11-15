@@ -31,7 +31,7 @@ import type { MediaItem } from "../../types";
 import { ActionBarSurface, type ActionGroups, findAction, usualAction } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { closeWhenTop, closingPopup } from "../../ui/popupClicks";
+import { closeWhenTop, closingPopup, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
@@ -488,6 +488,7 @@ export function MediaViewer({
             event.key === "Escape" &&
             !event.nativeEvent.isComposing &&
             !deleting &&
+            !layerAbove(event.currentTarget, event) &&
             event.currentTarget.contains(target) &&
             !target.closest('input:not([type="radio"]),textarea,select,[aria-haspopup]')
           ) {
@@ -499,6 +500,7 @@ export function MediaViewer({
           // Portalled layers (menus, popovers, the details sheet) bubble here through React.
           if (
             deleting ||
+            layerAbove(event.currentTarget, event) ||
             event.defaultPrevented ||
             !event.currentTarget.contains(event.target as Node)
           )
