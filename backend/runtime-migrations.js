@@ -1,3 +1,4 @@
+import { characterGenerated } from "./character-generated.js";
 import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
@@ -31,6 +32,12 @@ const steps = [
     name: "galleryRatings",
     run: galleryRatings,
     changes: (plan) => plan.likes + plan.unstarred + plan.dislikes + plan.signals,
+    online: true,
+  },
+  {
+    name: "characterGenerated",
+    run: characterGenerated,
+    changes: (plan) => plan.characters,
     online: true,
   },
 ];

@@ -394,9 +394,8 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   // Tapping an image chooses it once Undo has passed.
   await page.getByRole("button", { name: "Choose B", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  const chosen = page.getByRole("alert").filter({ hasText: "Chose B" });
-  await chosen.getByRole("button", { name: "Close", exact: true }).click();
-  await expect.poll(() => dream.requests.length).toBe(5);
+  await expect(page.getByText("Chose B", { exact: true })).toBeVisible();
+  await expect.poll(() => dream.requests.length, { timeout: 10_000 }).toBe(5);
   expect(dream.requests.map((request) => request.body)).toEqual([
     { liked: ["g1"] },
     { ids: ["g2"], rating: "disliked" },
@@ -457,11 +456,8 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await expect(third).toContainText("Guidance 3");
   // A tapped image is chosen until Undo puts the comparison back.
   await third.getByRole("button", { name: "Choose A · Guidance 3", exact: true }).click();
-  await page
-    .getByRole("alert")
-    .filter({ hasText: "Chose A · Guidance 3" })
-    .getByRole("button", { name: "Undo", exact: true })
-    .click();
+  await expect(page.getByText("Chose A · Guidance 3", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(third).toContainText("Guidance 3");
   await page.getByRole("button", { name: "Both", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();

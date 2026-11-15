@@ -12,7 +12,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import express from "express";
 import sharp from "sharp";
 
-import { characterShots, composePrompt, withCharacter } from "../../shared/characters.ts";
+import { composePrompt, withCharacter } from "../../shared/characters.ts";
 import { pausedReason } from "../../shared/queue.ts";
 import { startDemoWorker } from "../fixtures/demo-worker.js";
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
@@ -392,10 +392,6 @@ async function fixture(
   app.get("/api/characters", (_req, res) => res.json({ characters }));
   app.get("/api/outfits", (_req, res) => res.json({ outfits }));
   app.get("/api/scenes", (_req, res) => res.json({ scenes }));
-  app.post("/api/characters/:id/generated", (req, res) => {
-    characters.find((card) => card.id === req.params.id).generated = req.body;
-    res.json({ ok: true });
-  });
   app.post("/api/characters/:id/sheet", (req, res) => {
     characters.find((card) => card.id === req.params.id).sheet = { status: "making" };
     res.json({ ok: true, jobId: "sheet-job", profile: "Qwen-Image 2.1" });
@@ -1078,7 +1074,7 @@ test("media and administrator credentials discover only their own friendly tools
     // then from 10,200 for Search, from 10,900 for Gallery, Queue, Dream and Taste, and from 14,500
     // for the rule to read live state from Models and its LoRA paging, and to 15,200 for Search's
     // gallery filters, to 15,500 for generate's set title and per-prompt titles, to 15,600 for
-    // generate's character, to 15,700 for its character_views, to 16,000 for its shots (Studio
+    // generate's character, to 15,700 for its character_views (since removed), to 16,000 for its shots (Studio
     // writes a character's shots so the wording never drifts), to 16,100 for reference_strengths
     // and to 17,200 for Cards (describe and rate a card's images), then lowered to 17,100 once Cards'
     // description was tightened, then raised to 17,150 for generate's 18+ floor, to 18,050 for
@@ -1795,24 +1791,6 @@ test("models lists the account's characters, and generate applies one by name: i
     any_model: true,
   });
   assert.equal(f.submitted.at(-1).resultSet.title, "Ranger Days");
-  // Generate References: Studio writes one prompt per view, on one seed. On an img2img model the
-  // views come from the description alone, so the card's pose doesn't carry into every view.
-  const views = async () => {
-    const before = f.submitted.length;
-    const reply = await call(client, "generate", { character: "Mara", character_views: true });
-    assert.notEqual(reply.isError, true, reply.content?.[0]?.text);
-    return { reply, queued: f.submitted.slice(before) };
-  };
-  const alone = await views();
-  assert.deepEqual(
-    alone.queued.map((job) => job.prompt),
-    characterShots("red-haired ranger, green cloak", false),
-  );
-  assert.equal(new Set(alone.queued.map((job) => job.seed)).size, 1);
-  assert.ok(alone.queued.every((job) => !job.referenceAssets.length));
-  assert.match(alone.reply.content[0].text, /from Mara's description alone/);
-  assert.equal(f.characters[0].generated.jobIds.length, 4);
-  assert.match(alone.reply.content[0].text, /once they finish, the user picks which to keep/);
   // Make Sheet queues in Studio, which writes its prompt; the reply links its one result.
   const before = f.submitted.length;
   const sheet = await call(client, "generate", { character: "Mara", character_sheet: true });
@@ -1826,8 +1804,8 @@ test("models lists the account's characters, and generate applies one by name: i
     character_sheet: true,
     prompts: ["A tree"],
   });
-  // Models that edit with references take the card's image for the views and new scenes, a family
-  // that keeps characters before any other.
+  // Models that edit with references take the card's image for new scenes, a family that keeps
+  // characters before any other.
   const editor = (id, extra) => ({
     ...structuredClone(imageProfile),
     id,
@@ -1840,16 +1818,6 @@ test("models lists the account's characters, and generate applies one by name: i
     editor("editor"),
     editor("keeper", { keepsCharacters: true }),
   ]);
-  const edited = await views();
-  assert.deepEqual(
-    edited.queued.map((job) => job.prompt),
-    characterShots("red-haired ranger, green cloak", true),
-  );
-  assert.ok(
-    edited.queued.every(
-      (job) => job.profileId === "keeper" && job.referenceAssets[0]?.assetId === assetId,
-    ),
-  );
   // Without a named model a scene goes to it with only the card's first image: a second view of
   // one person is drawn as a second person.
   const scene = f.submitted.length;

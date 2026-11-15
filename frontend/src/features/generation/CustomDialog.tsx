@@ -15,15 +15,21 @@ export function CustomDialog({
   onClose,
   title,
   action,
+  label = "Change",
+  placeholder = "What should change, like “make it night”",
   onSend,
   suggestions,
+  zIndex,
 }: {
   opened: boolean;
   onClose: () => void;
   title: string;
   action: string;
+  label?: string;
+  placeholder?: string;
   onSend: (request: string) => void;
   suggestions?: (pick: (request: string) => void) => ReactNode;
+  zIndex?: number;
 }) {
   const phone = usePhone();
   const [request, setRequest] = useState("");
@@ -32,7 +38,14 @@ export function CustomDialog({
     onSend(text);
   };
   return (
-    <Modal opened={opened} onClose={onClose} title={title} size="sm" fullScreen={phone}>
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title={title}
+      size="sm"
+      fullScreen={phone}
+      zIndex={zIndex}
+    >
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -43,8 +56,8 @@ export function CustomDialog({
       >
         <Stack>
           <TextBox
-            label="Change"
-            placeholder="What should change, like “make it night”"
+            label={label}
+            placeholder={placeholder}
             autosize
             minRows={3}
             // The dialog is already full screen on phones.

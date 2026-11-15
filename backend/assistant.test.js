@@ -660,6 +660,28 @@ test("character describes a card's image as one short phrase of lasting details"
   assert.equal(seen.calls[0].body.reasoning_effort, "none");
 });
 
+test("cardIdeas offers distinct names from a card's images, unlike those already shown", async () => {
+  const seen = fakeGateway(() =>
+    json('{"options":["Mara","\\"Mara\\"","Wren.","",' + '"Ash","Ivy","Rook","Sloane"]}'),
+  );
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  const image = { mime: "image/jpeg", data: "AAAA" };
+  assert.deepEqual(
+    await engine.cardIdeas({
+      kind: "characters",
+      field: "name",
+      images: [image, image],
+      request: "short names",
+      avoid: ["Juno"],
+    }),
+    { options: ["Mara", "Wren", "Ash", "Ivy", "Rook"], model: "cloud/auto" },
+  );
+  const [system, user] = seen.calls[0].body.messages;
+  assert.match(system.content, /5 distinct names.*never a real person's name/s);
+  assert.match(user.content[0].text, /short names.*Juno/s);
+  assert.equal(user.content.filter((part) => part.type === "image_url").length, 2);
+});
+
 test("rateCardImages scores each image as the card kind's reference, in order", async () => {
   const seen = fakeGateway(() =>
     json('{"ratings":[{"rating":5,"note":"Sharp face"},{"rating":9,"note":"Clear"}]}'),

@@ -12,7 +12,7 @@ process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-char
 const { sheetPanels, sheetProfile, sheetReferences } = await import("./character-sheets.js");
 
 /** A sheet drawn to prompt-sheet.js's layout: boxes of colour on a light grey background. */
-async function drawnSheet({ gear = true, touching = false } = {}) {
+async function drawnSheet({ touching = false } = {}) {
   const box = (left, top, width, height) => ({
     input: { create: { width, height, channels: 3, background: "#7a4b2e" } },
     left,
@@ -21,12 +21,11 @@ async function drawnSheet({ gear = true, touching = false } = {}) {
   const boxes = [
     // The face column: four close-ups.
     ...[0, 1, 2, 3].map((index) => box(60, 40 + index * 310, 260, touching ? 310 : 260)),
-    // The turnaround: front, side and back.
-    box(520, 60, 300, (gear ? 760 : 1160) - 60),
-    box(1000, 70, 220, (gear ? 760 : 1160) - 70),
-    box(1400, 60, 300, (gear ? 760 : 1160) - 60),
+    // The turnaround at full height: front, side and back.
+    box(520, 60, 300, 1100),
+    box(1000, 70, 220, 1090),
+    box(1400, 60, 300, 1100),
   ];
-  if (gear) boxes.push(box(500, 920, 200, 260), box(800, 960, 300, 180), box(1300, 940, 160, 220));
   return sharp({
     create: { width: 1920, height: 1280, channels: 3, background: "#e6e6e6" },
   })
@@ -41,19 +40,17 @@ const within = (panel, left, top, right, bottom) =>
   panel.left + panel.width >= right &&
   panel.top + panel.height >= bottom;
 
-test("a sheet is cut into its face, three views and gear by the background between them", async () => {
+test("a sheet is cut into its face and three views by the background between them", async () => {
   const panels = await sheetPanels(await drawnSheet());
   const byRole = Object.fromEntries(panels.map((panel) => [panel.role, panel]));
-  assert.deepEqual(Object.keys(byRole).sort(), ["back", "face", "front", "gear", "side"]);
+  assert.deepEqual(Object.keys(byRole).sort(), ["back", "face", "front", "side"]);
   // Each holds its drawing, and no neighbour's.
   assert.ok(within(byRole.face, 60, 40, 320, 300));
   assert.ok(byRole.face.top + byRole.face.height < 350);
-  assert.ok(within(byRole.front, 520, 60, 820, 760));
+  assert.ok(within(byRole.front, 520, 60, 820, 1160));
   assert.ok(byRole.front.left + byRole.front.width < 1000);
-  assert.ok(within(byRole.side, 1000, 70, 1220, 760));
-  assert.ok(within(byRole.back, 1400, 60, 1700, 760));
-  assert.ok(byRole.back.top + byRole.back.height < 920);
-  assert.ok(within(byRole.gear, 500, 920, 1460, 1180));
+  assert.ok(within(byRole.side, 1000, 70, 1220, 1160));
+  assert.ok(within(byRole.back, 1400, 60, 1700, 1160));
 });
 
 test("close-ups stacked without gaps give the top quarter of the column as the face", async () => {
@@ -62,20 +59,6 @@ test("close-ups stacked without gaps give the top quarter of the column as the f
   );
   assert.ok(within(face, 60, 40, 320, 340));
   assert.ok(face.top + face.height <= 360);
-});
-
-test("without gear the turnaround takes the full height", async () => {
-  const panels = await sheetPanels(await drawnSheet({ gear: false }));
-  assert.deepEqual(panels.map((panel) => panel.role).sort(), ["back", "face", "front", "side"]);
-  assert.ok(
-    within(
-      panels.find((panel) => panel.role === "front"),
-      520,
-      60,
-      820,
-      1160,
-    ),
-  );
 });
 
 test("a sheet draws on a ready Qwen-Image 2.1 that takes an image, Quality before Turbo", () => {

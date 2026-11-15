@@ -34,18 +34,16 @@ export interface Card {
   updatedAt: string;
 }
 export interface Character extends Card {
-  /** Generate References' queued jobs, until the card is next saved with the ones to keep. */
-  generated?: { jobIds: string[]; at: string };
   /** Make Sheet's job, then its panels once backend/character-sheets.js has split them. */
   sheet?: CharacterSheet;
 }
 
 /**
  * Make Sheet: a character design sheet, the card's first image redrawn as a neutral face, front,
- * side and back views and any gear (backend/character-sheets.js). Each panel is kept as an image of
+ * side and back views, empty-handed (backend/character-sheets.js). Each panel is kept as an image of
  * the card by its role, and `sheet` is the whole sheet.
  */
-export const sheetRoles = ["face", "front", "side", "back", "gear", "sheet"] as const;
+export const sheetRoles = ["face", "front", "side", "back", "sheet"] as const;
 export type SheetRole = (typeof sheetRoles)[number];
 export interface CharacterSheet {
   jobId: string;
@@ -186,25 +184,6 @@ export function characterLead(description: string, fromImage = true) {
   if (!fromImage) return looks && `${looks}.`;
   return `The person from the reference image${looks ? `, ${looks},` : ""} with the same face, hair and build.`;
 }
-
-/**
- * Generate References: one shot per view, for a consistent set (a character turnaround) the card
- * can keep up to its limit. They share a seed. With the card's first image as a reference, each
- * view follows its lead; without one, the views come from the description alone.
- */
-export const characterViews = [
-  "Head-and-shoulders portrait from the front, looking at the camera",
-  "Full-body front view, standing straight, arms relaxed",
-  "Full-body side view in profile, facing left",
-  "Full-body back view, facing away",
-] as const;
-const backdrop = "plain light grey background, even soft lighting, one person in a single view.";
-export const characterShots = (description: string, fromImage: boolean) =>
-  characterViews.map((view) =>
-    fromImage
-      ? `${characterLead(description)} ${view}, ${backdrop}`
-      : [view, description.trim(), backdrop].filter(Boolean).join(", "),
-  );
 
 /** The prompt led by a card's identity (characterLead), unless it already holds it. */
 export function withCharacter(prompt: string, description: string, fromImage = true) {
