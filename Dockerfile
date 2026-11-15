@@ -27,6 +27,7 @@ COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/LICENSE /app/NOTICE ./
 COPY --from=build /app/backend ./backend
 COPY --from=build /app/shared ./shared
+COPY --from=build /app/worker/sources.json ./worker/sources.json
 
 # Slim omits OpenSSL's default CA path; point apt at the trusted build image's bundle.
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
