@@ -22,7 +22,7 @@ import {
 import { compareVariants } from "../../shared/compare.ts";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import { resolutions } from "../../shared/resolution.ts";
-import { promptWords, replyTitle } from "../../shared/titles.ts";
+import { promptWords } from "../../shared/titles.ts";
 import { upscaleQualities } from "../../shared/upscale.ts";
 import { accessFeatures } from "../account-policy.js";
 import { minorAgeRefusal } from "../minor-age.js";
@@ -915,8 +915,12 @@ export function registerGenerateTools({
         .max(compareVariants.max)
         .optional()
         .describe("The first LoRA's."),
-      title: setTitle.optional(),
-      titles: z.array(setTitle).max(maxSplitJobs).optional().describe("One per prompt."),
+      title: setTitle.optional().describe("2-5 words, Title Case."),
+      titles: z
+        .array(setTitle)
+        .max(maxSplitJobs)
+        .optional()
+        .describe("One per prompt; Title Case."),
       context: chatContext.optional(),
       preview: z.boolean().optional(),
       count: jobCount
@@ -1549,7 +1553,7 @@ export function registerGenerateTools({
     const resultSet = (axis || jobs > 1 || title || args.titles || context) && {
       id: crypto.randomUUID(),
       // A character's set is named for it unless the chat named the set.
-      title: title || card?.name || replyTitle(request) || promptWords(args.prompts[0]),
+      title: title || card?.name || promptWords(args.prompts[0]),
       source: actor.client || "MCP",
       ...(card ? { character: { id: card.id, name: card.name } } : {}),
       ...(context ? { context } : {}),
