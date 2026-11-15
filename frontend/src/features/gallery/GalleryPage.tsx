@@ -158,12 +158,16 @@ export function GalleryPage() {
     retry: false,
     queryFn: async ({ signal }) => {
       const held = client.getQueryData<InfiniteData<GalleryResultsPage, string>>(listingKey);
-      const known = new Set(held?.pages.flatMap((page) => page.items.map((item) => item.id)));
+      const known = new Set(held?.pages.flatMap((page) => page.items.map(mediaIdentity)));
       const first = await galleryPage(listing, "", 60, signal);
       // If more than a page arrived while away, bridge to the held results sequentially so no
       // matches disappear between the fresh first page and the old continuation cursor.
       let edge = first;
-      while (known.size && edge.hasMore && !edge.items.some((item) => known.has(item.id))) {
+      while (
+        known.size &&
+        edge.hasMore &&
+        !edge.items.some((item) => known.has(mediaIdentity(item)))
+      ) {
         edge = await galleryPage(listing, edge.nextCursor, 60, signal);
         first.items.push(...edge.items);
       }
@@ -193,10 +197,25 @@ export function GalleryPage() {
     },
   });
   const { refetch: readFirst } = refresh;
+  const pendingFirst = useRef<typeof listingKey | null>(null);
   const refreshFirst = useCallback(() => {
-    if (!client.isFetching({ queryKey: listingKey, exact: true }))
-      void readFirst({ cancelRefetch: false });
+    if (client.isFetching({ queryKey: listingKey, exact: true })) {
+      pendingFirst.current = listingKey;
+      return;
+    }
+    pendingFirst.current = null;
+    void readFirst({ cancelRefetch: false });
   }, [client, listingKey, readFirst]);
+  useEffect(
+    () => () => {
+      pendingFirst.current = null;
+    },
+    [listingKey],
+  );
+  // A final job can finish during pagination: once it settles there may be no active poll left.
+  useEffect(() => {
+    if (!gallery.isFetching && pendingFirst.current === listingKey) refreshFirst();
+  }, [gallery.isFetching, gallery.dataUpdatedAt, gallery.errorUpdatedAt, listingKey, refreshFirst]);
   // Active work's tiles are the newest, on the first page: only it polls, for live previews.
   // Starting or finishing work uses the same first-page read, never a full pagination refetch.
   useEffect(() => {
