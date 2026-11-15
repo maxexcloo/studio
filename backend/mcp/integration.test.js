@@ -6437,11 +6437,17 @@ test("request and prompts together run the prompts and keep the request as conte
   );
   const missing = await call(client, "generate", { kind: "image" });
   assert.match(texts(missing), /^Write the finished prompts yourself/);
-  // An empty call (a host that cancelled its arguments) is told what to send.
-  assert.match(
-    texts(await call(client, "generate", {})),
-    /as prompts, an array of strings.*\(this call had no arguments\)/,
+  // An empty call (a host that cancelled its arguments, or a model copying the chat's shortened
+  // history) is told what to send.
+  const copied = texts(
+    await call(client, "generate", {
+      _note: "Completed call; input shortened to save context.",
+      _originalChars: 8052,
+      _inputPrefix: '{"kind":"image"',
+    }),
   );
+  assert.match(copied, /as prompts, an array of strings.*\(this call had no arguments;/);
+  assert.match(copied, /shortened copy, not arguments to send/);
 });
 
 test("one Generate call fans out over several models with the same prompts and returns at once", async (t) => {

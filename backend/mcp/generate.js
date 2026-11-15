@@ -1073,7 +1073,11 @@ export function registerGenerateTools({
     if (parts) args.prompts = shotPrompts(true);
     if (!args.prompts)
       throw new Error(
-        `Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts, an array of strings, with the user's words as request${Object.keys(input).length ? "" : " (this call had no arguments)"}. Then call generate again.`,
+        `Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts, an array of strings, with the user's words as request${
+          Object.keys(input).length
+            ? ""
+            : ' (this call had no arguments; an earlier call shown as "input shortened to save context" is the chat\'s shortened copy, not arguments to send, and a call cut short needs fewer or shorter prompts)'
+        }. Then call generate again.`,
       );
     if (project) assertAvoided(project, args.prompts);
     if ([args.profile_id, profile_ids, each_profile].filter(Boolean).length > 1)
