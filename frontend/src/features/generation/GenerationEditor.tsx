@@ -181,7 +181,7 @@ export function GenerationEditor({
   assistantScope: string;
   /** The Presets chip (`PresetPicker`). */
   presets?: ReactNode;
-  /** The gallery composer's Compare ▾, beside the Image | Video switch. */
+  /** The gallery composer's Compare ▾, in the generation controls. */
   compare?: ReactNode;
   /** Which compared variant is being edited (`VariantStrip`), over the prompt. */
   variants?: ReactNode;
@@ -298,6 +298,7 @@ export function GenerationEditor({
       hasReferences={!!details.length}
       mask={mask}
       presets={presets}
+      compare={input.kind === "image" ? compare : undefined}
       ideas={offerIdeas && ideas.chip}
       settings={settings}
     />
@@ -345,34 +346,31 @@ export function GenerationEditor({
         <div className={classes.footer}>
           {fill && inputs}
           <Group justify="space-between" gap="xs">
-            <Group gap="xs" wrap="nowrap">
-              <SegmentedControl
-                aria-label="Generation Output"
-                radius="xl"
-                style={{ flexShrink: 0 }}
-                value={input.kind}
-                onChange={(value) => {
-                  const kind = value as MediaKind;
-                  onKindChange(kind, defaultProfile(models.data, kind));
-                }}
-                // Phones show the mode tabs' icons so the actions fit one row.
-                data={[
-                  { value: "image", label: "Image", icon: ImageIcon },
-                  { value: "video", label: "Video", icon: Video },
-                ].map(({ value, label, icon: Icon }) => ({
-                  value,
-                  label: phone ? (
-                    <Center>
-                      <Icon size={18} aria-hidden />
-                      <VisuallyHidden>{label}</VisuallyHidden>
-                    </Center>
-                  ) : (
-                    label
-                  ),
-                }))}
-              />
-              {input.kind === "image" && compare}
-            </Group>
+            <SegmentedControl
+              aria-label="Generation Output"
+              radius="xl"
+              style={{ flexShrink: 0 }}
+              value={input.kind}
+              onChange={(value) => {
+                const kind = value as MediaKind;
+                onKindChange(kind, defaultProfile(models.data, kind));
+              }}
+              // Phones show the mode tabs' icons so the actions fit one row.
+              data={[
+                { value: "image", label: "Image", icon: ImageIcon },
+                { value: "video", label: "Video", icon: Video },
+              ].map(({ value, label, icon: Icon }) => ({
+                value,
+                label: phone ? (
+                  <Center>
+                    <Icon size={18} aria-hidden />
+                    <VisuallyHidden>{label}</VisuallyHidden>
+                  </Center>
+                ) : (
+                  label
+                ),
+              }))}
+            />
             <Group gap="xs" wrap="nowrap" flex={phone ? "1 0 auto" : undefined} justify="flex-end">
               {phone ? (
                 <ActionIcon

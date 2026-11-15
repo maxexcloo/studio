@@ -14,7 +14,10 @@ import {
 } from "./fixtures";
 
 const compareMenu = async (page: Page, item: string) => {
-  await page.getByRole("button", { name: "Compare", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Generation Inputs", exact: true })
+    .getByRole("button", { name: "Compare", exact: true })
+    .click();
   await page.getByRole("menuitem", { name: item, exact: true }).click();
 };
 const variants = (page: Page) => page.getByRole("radiogroup", { name: "Variant", exact: true });
