@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { type ChildProcess, fork } from "node:child_process";
 import { once } from "node:events";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 import type { QueueJob } from "../../shared/queue.ts";
+import { recordedObjectInfo } from "../fixtures/fake-comfy.js";
 import { clusterDns, fakeKubernetes, serviceUrl } from "../fixtures/fake-kubernetes.ts";
 import { closeRuntimeDatabase, writeRuntimeDocument } from "../persistence/runtime.ts";
 const { startFakeComfy } = await import(new URL("../fixtures/fake-comfy.js", import.meta.url).href);
@@ -93,9 +94,7 @@ test(
     );
     const profileFile = path.join(dataDir, "workflows", "cold.json");
     writeFileSync(profileFile, JSON.stringify(raw));
-    const info = JSON.parse(
-      readFileSync(new URL("../fixtures/object_info-comfyui-0.45.0.json", import.meta.url), "utf8"),
-    );
+    const info = recordedObjectInfo();
     info.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
     const png = await sharp({ create: { width: 64, height: 64, channels: 3, background: "white" } })
       .png()

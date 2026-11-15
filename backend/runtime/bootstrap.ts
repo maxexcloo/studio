@@ -23,10 +23,10 @@ export async function loadRuntime(
     fetchImpl = fetch,
     request,
   }: {
-    dataDir?: string;
+    dataDir: string;
     fetchImpl?: typeof fetch;
     request?: KubernetesRequest;
-  } = {},
+  },
 ) {
   if (!environment.STUDIO_KUBERNETES_NAMESPACES) return undefined;
   const send =
@@ -37,15 +37,12 @@ export async function loadRuntime(
   const { pools, workloads } = await discoverWorkloads(environment, send);
   if (!workloads.length) return undefined;
   const engine = new KubernetesEngine(send);
-  const document = <T>(name: string) =>
-    dataDir
-      ? {
-          store: {
-            read: () => readRuntimeDocument(dataDir, name) as T | undefined,
-            write: (value: T) => writeRuntimeDocument(dataDir, name, value),
-          },
-        }
-      : {};
+  const document = <T>(name: string) => ({
+    store: {
+      read: () => readRuntimeDocument(dataDir, name) as T | undefined,
+      write: (value: T) => writeRuntimeDocument(dataDir, name, value),
+    },
+  });
   const controller = new RuntimeController({
     engine,
     workloads,
