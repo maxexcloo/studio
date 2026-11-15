@@ -4,6 +4,7 @@ import { ChevronDown, ImagePlus } from "lucide-react";
 import { useState } from "react";
 
 import { startImageSlot } from "../../../../shared/characters";
+import { slotCapacity } from "../../../../shared/profiles";
 import { failure } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { canReadClipboard, readClipboardImages } from "../../ui/clipboard";
@@ -15,13 +16,7 @@ import { PromptCardChoices } from "../characters/PromptCardChoices";
 import { chipProps, iconChipProps } from "./chip";
 import { GalleryChoices, galleryTabs } from "./GalleryChoices";
 import { draftForProfile, useGeneration } from "./GenerationProvider";
-import {
-  controlRange,
-  referenceCapacity,
-  referenceDetails,
-  referenceGroup,
-  referenceGroups,
-} from "./payload";
+import { controlRange, referenceDetails, referenceGroup, referenceGroups } from "./payload";
 import { ChipContent, ChipPopup, PickerHeader } from "./Picker";
 import {
   type ReferenceTarget,
@@ -142,7 +137,7 @@ export function ReferencePicker({
   const settle = () => browse({ target: null });
   // A profile taking one reference closes the picker once it is picked, saving the dismissing click.
   const groups = referenceGroups(profile);
-  const single = groups.length === 1 && referenceCapacity(groups[0]) === 1;
+  const single = groups.length === 1 && slotCapacity(groups[0]) === 1;
   function uploadFiles(files: File[], into: ReferenceTarget | null = chosen) {
     void placement.uploadFiles(files, into);
     settle();

@@ -1,4 +1,10 @@
-import { profileBackendLabels, profileNameParts, runBackend } from "../../../../shared/profiles";
+import {
+  profileBackendLabels,
+  profileNameParts,
+  runBackend,
+  slotCapacity,
+  slotGroups,
+} from "../../../../shared/profiles";
 import { withResolution } from "../../../../shared/resolution";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 
@@ -81,29 +87,14 @@ const referenceAsset = (asset: ReferenceAsset) => ({
   ...(asset.strength !== undefined ? { strength: asset.strength } : {}),
 });
 
-export function referenceGroups(profile?: SlotLayout): ReferenceSlot[][] {
-  const groups: ReferenceSlot[][] = [];
-  for (const slot of profile?.mediaInputs?.length
-    ? profile.mediaInputs
-    : [{ id: "image", label: "Image", max: 1 }]) {
-    const group = slot.follows
-      ? groups.find(
-          (items) => items[0].role === slot.role && items.some((item) => item.id === slot.follows),
-        )
-      : undefined;
-    if (group) group.push(slot);
-    else groups.push([slot]);
-  }
-  return groups;
-}
+export const referenceGroups = (profile?: SlotLayout): ReferenceSlot[][] =>
+  slotGroups(
+    profile?.mediaInputs?.length ? profile.mediaInputs : [{ id: "image", label: "Image", max: 1 }],
+  );
 
 export function referenceGroup(profile?: SlotLayout, slot?: string) {
   const groups = referenceGroups(profile);
   return groups.find((group) => group.some((input) => input.id === slot)) || groups[0];
-}
-
-export function referenceCapacity(group: ReferenceSlot[]) {
-  return group.reduce((total, input) => total + (input.max || 1), 0);
 }
 
 export function referenceGroupAssets(references: ReferenceAsset[], group: ReferenceSlot[]) {
@@ -122,7 +113,7 @@ export function addReference(
   );
   if (duplicate) return references;
   // An independent single-image role replaces; a linked stack fills its next free declared slot.
-  if (referenceCapacity(group) === 1) {
+  if (slotCapacity(group) === 1) {
     const replaced = references.findIndex((reference) => reference.slot === group[0].id);
     return replaced < 0
       ? [...references, { ...asset, slot: group[0].id }]
