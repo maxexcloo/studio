@@ -30,11 +30,33 @@ test("the migrations route answers administrators with every step's plan, and lo
     return { code: res.code, body: res.body };
   };
 
+  const workflows = path.join(dataDir, "workflows");
+  fs.mkdirSync(workflows);
+  const file = path.join(workflows, "image-krea2.json");
+  const node = (model) => ({ 1: { class_type: "RadianceImageGenerate", inputs: { model } } });
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      graph: node("krea-2-turbo-fp8.rad"),
+      studio: { id: "image-krea2", defaults: { model: "krea-2-turbo-fp8.rad" } },
+    }),
+  );
+  fs.writeFileSync(
+    path.join(workflows, "image-other.json"),
+    JSON.stringify({ graph: node("x.rad") }),
+  );
+  const plan = {
+    applied: false,
+    profiles: [{ name: "image-krea2.json", changes: ["krea-2-turbo-fp8.rad → krea-2-turbo-iq8r"] }],
+    unknown: ["image-other.json: x.rad"],
+  };
+
   assert.deepEqual(await post({ apply: true }, "user"), { code: 403, body: refusal.payload });
-  const steps = (applied) => ({
+  const steps = (applied, radiance = plan) => ({
     dreamAnimationStars: { applied, stars: 0, owners: {} },
     mcpOwnership: { applied, document: false, rows: {}, conflicts: [] },
     galleryRatings: { applied, likes: 0, unstarred: 0, dislikes: 0, signals: 0 },
+    radianceModels: { ...radiance, applied },
   });
   assert.deepEqual(await post({}), {
     code: 200,
@@ -44,8 +66,15 @@ test("the migrations route answers administrators with every step's plan, and lo
     code: 200,
     body: { ok: true, apply: true, steps: steps(true) },
   });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), {
+    graph: node("krea-2-turbo-iq8r"),
+    studio: { id: "image-krea2", defaults: { model: "krea-2-turbo-iq8r" } },
+  });
+  const again = await post({ apply: true });
+  assert.deepEqual(again.body.steps.radianceModels.profiles, [], "a second run finds nothing");
   assert.deepEqual(lines, [
-    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do",
-    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do",
+    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; radianceModels: 1 planned",
+    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; radianceModels: 1 applied",
+    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; radianceModels: 0 nothing to do",
   ]);
 });
