@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Group,
+  Menu,
   ScrollArea,
   SegmentedControl,
   Stack,
@@ -10,13 +11,15 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Fingerprint } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Check, ChevronDown, Fingerprint } from "lucide-react";
+import { useEffect } from "react";
+import { useNavigate, useParams } from "react-router";
 
 import { post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
 import { TasteProfile } from "../taste/TasteProfile";
 import { DiscardedDreams } from "./DiscardedDreams";
@@ -71,25 +74,7 @@ function Empty({ dream }: { dream: Dream }) {
   );
 }
 
-/** Above the deck while Dream is off, as its comparisons alone don't show it. */
-function OffNotice() {
-  const save = useDreamSettings();
-  return (
-    <Group justify="center" gap="xs" role="status" aria-label="Dream Status">
-      <Text size="sm" c={save.error ? "red" : "dimmed"}>
-        {save.error ? `Couldn't Turn On Dream: ${save.error.message}` : "Dream is off."}
-      </Text>
-      <Button
-        size="compact-sm"
-        variant="light"
-        loading={save.isPending}
-        onClick={() => save.mutate({ enabled: true })}
-      >
-        Turn On
-      </Button>
-    </Group>
-  );
-}
+const views = ["deck", "overview", "projects", "discarded", "taste"] as const;
 
 /**
  * Dream: the deck of unseen results, comparisons and calibration, with its pause and settings;
@@ -106,35 +91,67 @@ export function DreamPage() {
       .catch(() => undefined);
   }, [client]);
   const save = useDreamSettings();
-  // Dream always opens on the deck; Taste is its own control beside Settings.
-  const [view, setView] = useState<"deck" | "overview" | "discarded" | "projects" | "taste">(
-    "deck",
-  );
+  // Dream opens on the deck at /dream; each other view has its own path, so reload and Back keep
+  // it. Taste is its own control beside Settings.
+  const param = useParams().view;
+  const view = views.find((name) => name === param) ?? "deck";
+  const navigate = useNavigate();
+  const setView = (next: (typeof views)[number]) =>
+    navigate(next === "deck" ? "/dream" : `/dream/${next}`);
   const taste = {
     variant: view === "taste" ? "light" : "subtle",
     color: view === "taste" ? undefined : "gray",
     "aria-pressed": view === "taste",
     onClick: () => setView(view === "taste" ? "deck" : "taste"),
   } as const;
+  const viewLabels = {
+    deck: "Deck",
+    overview: "Overview",
+    projects: "Projects",
+    discarded: "Discarded",
+  };
   const data = dream.data;
   return (
     <div className={classes.page}>
-      {/* Phones give the views a row of their own, so none is clipped by the actions. */}
-      <Group className={classes.toolbar} gap="sm" wrap={phone ? "wrap" : "nowrap"}>
-        <SegmentedControl
-          radius="xl"
-          fullWidth={phone}
-          w={phone ? "100%" : undefined}
-          aria-label="Dream View"
-          value={view === "taste" ? "" : view}
-          onChange={(value) => setView(value as typeof view)}
-          data={[
-            { value: "deck", label: "Deck" },
-            { value: "overview", label: "Overview" },
-            { value: "projects", label: "Projects" },
-            { value: "discarded", label: "Discarded" },
-          ]}
-        />
+      {/* Phones keep the views in a menu, so they and the actions share one row. */}
+      <Group className={classes.toolbar} gap="sm" wrap="nowrap">
+        {phone ? (
+          <Menu position="bottom-start">
+            <PopupTooltip label="Dream View">
+              <Menu.Target>
+                <Button
+                  variant="subtle"
+                  color="gray"
+                  aria-label="Dream View"
+                  rightSection={<ChevronDown size={14} />}
+                >
+                  {view === "taste" ? "Taste" : viewLabels[view]}
+                </Button>
+              </Menu.Target>
+            </PopupTooltip>
+            <Menu.Dropdown>
+              {(Object.keys(viewLabels) as (keyof typeof viewLabels)[]).map((value) => (
+                <Menu.Item
+                  key={value}
+                  role="menuitemradio"
+                  aria-checked={view === value}
+                  rightSection={view === value ? <Check size={14} /> : undefined}
+                  onClick={() => setView(value)}
+                >
+                  {viewLabels[value]}
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
+        ) : (
+          <SegmentedControl
+            radius="xl"
+            aria-label="Dream View"
+            value={view === "taste" ? "" : view}
+            onChange={(value) => setView(value as typeof view)}
+            data={Object.entries(viewLabels).map(([value, label]) => ({ value, label }))}
+          />
+        )}
         <Group gap={4} wrap="nowrap" ml="auto">
           {data?.settings.enabled && (
             <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
@@ -204,7 +221,6 @@ export function DreamPage() {
         <DreamDeck
           items={data!.settings.enabled ? data!.unseen : []}
           pairsOnly={!data!.settings.enabled}
-          notice={!data!.settings.enabled && <OffNotice />}
           empty={<Empty dream={data!} />}
         />
       )}

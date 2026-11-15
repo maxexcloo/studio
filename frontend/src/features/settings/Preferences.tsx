@@ -215,7 +215,10 @@ function WhereWorkRuns() {
           {/* The gateway's and Studio's text workloads' models, keeping the current one a choice. */}
           <Select
             aria-label="Text"
-            data={[...new Set([...models, writingModel])]}
+            data={[...new Set([...models, writingModel])].map((value) => ({
+              value,
+              label: textModelName(value),
+            }))}
             value={writingModel}
             onChange={(choice) => choice && save.mutate({ writingModel: choice })}
             allowDeselect={false}
@@ -325,3 +328,11 @@ export function Preferences() {
     </Stack>
   );
 }
+
+const brands: Record<string, string> = { deepseek: "DeepSeek", glm: "GLM", mimo: "MiMo" };
+const titled = (word: string) => brands[word] ?? word.charAt(0).toUpperCase() + word.slice(1);
+/** A gateway alias by its readable name: `cloud/glm-flash` reads GLM Flash · Cloud. */
+const textModelName = (id: string) => {
+  const [side, name = ""] = id.split("/");
+  return `${name.split("-").map(titled).join(" ")} · ${titled(side)}`;
+};

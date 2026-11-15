@@ -1,13 +1,5 @@
-import {
-  ActionIcon,
-  Badge,
-  Button,
-  type ButtonProps,
-  Group,
-  Stack,
-  Text,
-  Tooltip,
-} from "@mantine/core";
+import { ActionIcon, Badge, Button, type ButtonProps, Group, Text, Tooltip } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
@@ -16,7 +8,7 @@ import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { layerAbove } from "../../ui/popupClicks";
-import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
+import { usePhone, useTouch } from "../../ui/usePhone";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { mediaDraft } from "../gallery/useMediaAction";
@@ -26,7 +18,7 @@ import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import { type Choice, type Verdict, dreamChoices, viewerChoices } from "./choices";
 import { type DeckCard, type PairDeckCard, deckCards } from "./deck";
-import { PairContent, sideNames } from "./PairCard";
+import { PairContent, sideLabel } from "./PairCard";
 import {
   type DreamItem,
   type PairAnswer,
@@ -264,41 +256,42 @@ const cardLabel = (card: DeckCard, top: boolean) =>
 /**
  * The Dream deck: the oldest unseen result on top, the next beneath it, the batch's progress above.
  * Swipe or press ← to pass, → to like (keep), ↑ to like and queue variations; the bar offers Pass,
- * Super Like and Like. A comparison asks about two results alike but for one thing: ← or a left
- * swipe answers A, → B, ↑ Both and ↓ Neither. Tapping a card (or its View action) opens it in the
- * viewer over the deck, with all the card's choices (Edit, Animate and More Like This too) in its
- * bar; Pass, Like or an answer there returns to the deck, and the others move on in the viewer.
+ * Super Like and Like. A comparison asks about two results alike but for one thing: tapping an
+ * image chooses it, with Undo until its notification closes; ← or a left swipe answers A, → B,
+ * ↑ Both and ↓ Neither, and Neither and Both sit under the pair. Tapping a single card (or its View
+ * action), or holding or pinching any card (or a side's label), opens it in the viewer over the
+ * deck, with all the card's choices (Edit, Animate and More Like This too) in its bar; Pass, Like
+ * or an answer there returns to the deck, and the others move on in the viewer.
  * Older gallery images join in (see `deckCards`) to teach the taste profile and rate images against
  * each other; with `pairsOnly` (Dream is off) the deck only compares them;
- * judging them changes nothing in the gallery beyond an optional Super Like (Star). `notice` shows
- * above the cards; `empty` shows once the
- * deck is through, told whether calibration images are available.
+ * judging them changes nothing in the gallery beyond an optional Super Like (Star). `empty` shows
+ * once the deck is through, told whether calibration images are available.
  */
 export function DreamDeck({
   items,
   pairsOnly,
-  notice,
   empty,
 }: {
   items: DreamItem[];
   pairsOnly: boolean;
-  notice?: ReactNode;
   empty: ReactNode;
 }) {
   const phone = usePhone();
-  const sideways = useSideways();
   const touch = useTouch();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
   const [counts, setCounts] = useState({ judged: 0, dreamed: 0 });
   // The id of the top card's item open in the viewer; after a verdict it follows the next card.
   const [viewing, setViewing] = useState<string | null>(null);
-  const judge = useJudge((card) =>
+  // The side a tap chose, outlined while its card leaves.
+  const [picked, setPicked] = useState<{ key: string; side: 0 | 1 } | null>(null);
+  /** Puts a card back on the deck, after a failed verdict or an Undo. */
+  const restore = (card: DeckCard) =>
     setDecided((previous) => {
       const next = new Set(previous);
       for (const id of ids(card)) next.delete(id);
       return next;
-    }),
-  );
+    });
+  const judge = useJudge(restore);
   const unseen = items.filter((item) => !decided.has(item.id));
   const gallery = useCalibration(pairsOnly ? 2 : 1, decided);
   const cards = deckCards(unseen, gallery.items, counts.judged, { pairsOnly });
@@ -310,8 +303,8 @@ export function DreamDeck({
   const image = single?.item.type === "image";
   const dream = single?.kind === "dream";
 
-  function commit(judgement: Judgement) {
-    const card = judgement.card;
+  /** Takes the card off the deck. */
+  function decide(card: DeckCard) {
     setDecided((previous) => {
       const next = new Set(previous);
       for (const id of ids(card)) next.add(id);
@@ -321,7 +314,51 @@ export function DreamDeck({
       judged: previous.judged + 1,
       dreamed: previous.dreamed + dreamed(card),
     }));
+  }
+  function commit(judgement: Judgement) {
+    decide(judgement.card);
     judge.mutate(judgement);
+  }
+  /** A tapped side answers once its Undo notification closes, unless undone. */
+  async function pick(side: 0 | 1) {
+    if (top?.kind !== "pair" || busy.current) return;
+    busy.current = true;
+    const card = top;
+    const answer = side ? "b" : "a";
+    setPicked({ key: card.key, side });
+    try {
+      await fly.current?.(answerDirections[answer]);
+      decide(card);
+    } finally {
+      busy.current = false;
+    }
+    let undone = false;
+    const notification = notifications.show({
+      message: (
+        <Group justify="space-between" wrap="nowrap">
+          <Text size="sm">Chose {sideLabel(card, side)}</Text>
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            onClick={() => {
+              undone = true;
+              notifications.hide(notification);
+              restore(card);
+              setCounts((previous) => ({
+                judged: previous.judged - 1,
+                dreamed: previous.dreamed - dreamed(card),
+              }));
+            }}
+          >
+            Undo
+          </Button>
+        </Group>
+      ),
+      closeButtonProps: { "aria-label": "Close" },
+      onClose: () => {
+        if (!undone) judge.mutate({ card, verdict: answer });
+      },
+    });
   }
   /** Flies the top card out its way, then commits the verdict or answer. */
   async function act(choice: Verdict | PairAnswer) {
@@ -370,11 +407,13 @@ export function DreamDeck({
   // The viewer shows the top card, so a verdict there moves on to the next card in place.
   const shown = !top ? [] : top.kind === "pair" ? top.items : [top.item];
   if (viewing && !shown.length) setViewing(null);
-  const pairLabel = (item: MediaItem) => {
-    if (top?.kind !== "pair") return "";
-    const index = top.items.findIndex((side) => side.id === item.id);
-    return `${sideNames[index]}${top.labels ? ` · ${top.labels[index]}` : ""}`;
-  };
+  const pairLabel = (item: MediaItem) =>
+    top?.kind === "pair"
+      ? sideLabel(
+          top,
+          top.items.findIndex((side) => side.id === item.id),
+        )
+      : "";
   const viewer = viewing && top && (
     <MediaViewer
       item={shown.find((item) => item.id === viewing) || shown[0]}
@@ -416,12 +455,12 @@ export function DreamDeck({
       </Button>
     </Tooltip>
   );
-  const view = (item: MediaItem, label = "View") => (
-    <Tooltip label={label}>
+  const view = (item: MediaItem) => (
+    <Tooltip label="View">
       <ActionIcon
         className={classes.view}
         variant="default"
-        aria-label={label}
+        aria-label="View"
         onClick={() => setViewing(item.id)}
       >
         <icons.preview size={16} />
@@ -431,7 +470,6 @@ export function DreamDeck({
   const batch = counts.dreamed + unseen.length;
   return (
     <>
-      {notice}
       <BatchStrip done={counts.dreamed} total={batch} />
       <div className={classes.stage}>
         {[next, top].map(
@@ -457,7 +495,12 @@ export function DreamDeck({
                 onTap={(target) => {
                   if (card.kind !== "pair") return setViewing(card.item.id);
                   const side = target.closest<HTMLElement>("[data-side]")?.dataset.side;
-                  if (side !== undefined) setViewing(card.items[Number(side)].id);
+                  if (side !== undefined) void pick(Number(side) as 0 | 1);
+                }}
+                onHold={(target) => {
+                  if (card.kind !== "pair") return setViewing(card.item.id);
+                  const side = target.closest<HTMLElement>("[data-side]")?.dataset.side;
+                  setViewing(card.items[Number(side ?? 0)].id);
                 }}
                 onSwipe={(direction) => {
                   const choice = card.kind === "pair" ? answers[direction] : intent(direction);
@@ -467,9 +510,10 @@ export function DreamDeck({
                 {card.kind === "pair" ? (
                   <PairContent
                     card={card}
-                    view={(index) =>
-                      card === top && view(card.items[index], `View ${sideNames[index]}`)
-                    }
+                    top={card === top}
+                    picked={picked?.key === card.key ? picked.side : undefined}
+                    choose={(side) => void pick(side)}
+                    view={(side) => setViewing(card.items[side].id)}
                   />
                 ) : (
                   <>
@@ -497,8 +541,7 @@ export function DreamDeck({
             ),
         )}
       </div>
-      {/* A comparison's sides stand out from Neither and Both, filling the width on phones held
-          upright; held sideways, one row leaves the card more height. */}
+      {/* A comparison's images are its A and B, so only Neither and Both stand under it. */}
       {top.kind !== "pair" ? (
         <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap">
           {/* Phones share the row by label length, so Super Like is never cut short. */}
@@ -506,22 +549,9 @@ export function DreamDeck({
             button(option, phone ? { px: "xs", flex: "1 1 auto" } : { size: "lg", miw: "9rem" }),
           )}
         </Group>
-      ) : phone && !sideways ? (
-        <Stack className={classes.actions} gap="xs">
-          <Group grow gap="xs">
-            {button(choice("a"))}
-            {button(choice("b"))}
-          </Group>
-          <Group justify="center" gap="xs">
-            {button(choice("neither"), { size: "sm" })}
-            {button(choice("both"), { size: "sm" })}
-          </Group>
-        </Stack>
       ) : (
         <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap">
           {button(choice("neither"), { size: "sm" })}
-          {button(choice("a"))}
-          {button(choice("b"))}
           {button(choice("both"), { size: "sm" })}
         </Group>
       )}

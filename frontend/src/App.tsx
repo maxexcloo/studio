@@ -63,7 +63,7 @@ function Workspace() {
   };
   const panel = overlay || lastPanel;
   const mode = (overlay ? background : location).pathname;
-  if (mode === "/dream" && !dream) return <Navigate to="/images" replace />;
+  if (mode.startsWith("/dream") && !dream) return <Navigate to="/images" replace />;
   return (
     <AppShell header={{ height: 68 }} padding={{ base: "sm", md: "lg" }}>
       <AppShell.Header>
@@ -79,6 +79,7 @@ function Workspace() {
           <Routes location={overlay ? background : location}>
             <Route path="/images" element={<GalleryPage />} />
             <Route path="/video" element={<GalleryPage />} />
+            <Route path="/videos" element={<Navigate to="/video" replace />} />
             <Route
               path="/compare/:id"
               element={
@@ -88,7 +89,7 @@ function Workspace() {
               }
             />
             <Route
-              path="/dream"
+              path="/dream/:view?"
               element={
                 <Suspense fallback={<LoadingState fill label="Loading Dream" />}>
                   <DreamPage />
