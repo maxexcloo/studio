@@ -29,15 +29,10 @@ const withRatings = (library, names) =>
     : library;
 
 function readState(ownerId = "") {
-  try {
-    const value = readRuntimeDocument(dataDir, stacksDocument(ownerId));
-    if (value?.stacks && typeof value.stacks === "object")
-      return { stacks: value.stacks, library: withRatings(value.library, readRatings) || null };
-    return { stacks: value && typeof value === "object" ? value : {}, library: null };
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    return { stacks: {}, library: null };
-  }
+  const value = readRuntimeDocument(dataDir, stacksDocument(ownerId));
+  if (value?.stacks && typeof value.stacks === "object")
+    return { stacks: value.stacks, library: withRatings(value.library, readRatings) || null };
+  return { stacks: value && typeof value === "object" ? value : {}, library: null };
 }
 
 function writeState(state, ownerId = "") {

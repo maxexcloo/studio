@@ -115,12 +115,12 @@ export function createProjects({
 }) {
   const name = (ownerId: string) => `projects:${ownerId}`;
   function read(ownerId: string): ProjectsRecord {
-    try {
-      return readRuntimeDocument(dataDir, name(ownerId)) as ProjectsRecord;
-    } catch (error) {
-      if ((error as { code?: string }).code === "ENOENT") return { projects: [], chats: {} };
-      throw error;
-    }
+    return (
+      (readRuntimeDocument(dataDir, name(ownerId)) as ProjectsRecord | undefined) ?? {
+        projects: [],
+        chats: {},
+      }
+    );
   }
   const write = (ownerId: string, record: ProjectsRecord) =>
     writeRuntimeDocument(dataDir, name(ownerId), record);

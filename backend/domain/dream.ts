@@ -752,24 +752,20 @@ export function createDream(options: {
   const pick = <T>(items: T[]) => items[random(items.length)];
   const name = (ownerId: string) => `dream:${ownerId}`;
   function read(ownerId: string): DreamRecord {
-    try {
-      const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as Partial<DreamRecord>;
-      return {
-        recent: [],
-        ...saved,
-        // Only known settings, so a retired key leaves the record on its next save.
-        settings: Object.fromEntries(
-          Object.entries(defaultDreamSettings).map(([key, value]) => [
-            key,
-            saved.settings?.[key as keyof DreamSettings] ?? value,
-          ]),
-        ) as unknown as DreamSettings,
-      };
-    } catch (error) {
-      if ((error as { code?: string }).code === "ENOENT")
-        return { settings: { ...defaultDreamSettings }, recent: [] };
-      throw error;
-    }
+    const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as
+      | Partial<DreamRecord>
+      | undefined;
+    return {
+      recent: [],
+      ...saved,
+      // Only known settings, so a retired key leaves the record on its next save.
+      settings: Object.fromEntries(
+        Object.entries(defaultDreamSettings).map(([key, value]) => [
+          key,
+          saved?.settings?.[key as keyof DreamSettings] ?? value,
+        ]),
+      ) as unknown as DreamSettings,
+    };
   }
   const write = (ownerId: string, record: DreamRecord) =>
     writeRuntimeDocument(options.dataDir, name(ownerId), record);

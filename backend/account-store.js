@@ -63,28 +63,23 @@ const wasDeleted = (store, { email = "", issuer = "", subject = "" }) =>
 
 function readStore() {
   if (cache) return cache;
-  try {
-    const saved = readRuntimeDocument(dataDir, "accounts");
-    cache = {
-      ...emptyStore(),
-      ...saved,
-      // An account is named by its email; a display name older stores kept is dropped on the next save.
-      accounts: Array.isArray(saved?.accounts)
-        ? saved.accounts.map(({ displayName: _displayName, ...account }) => account)
-        : [],
-      profiles:
-        saved?.profiles && typeof saved.profiles === "object" && !Array.isArray(saved.profiles)
-          ? saved.profiles
-          : {},
-      sessions: Array.isArray(saved?.sessions) ? saved.sessions : [],
-      gatewayLinks: Array.isArray(saved?.gatewayLinks) ? saved.gatewayLinks : [],
-      gatewayPending: Array.isArray(saved?.gatewayPending) ? saved.gatewayPending : [],
-      deletedIdentities: Array.isArray(saved?.deletedIdentities) ? saved.deletedIdentities : [],
-    };
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    cache = emptyStore();
-  }
+  const saved = readRuntimeDocument(dataDir, "accounts");
+  cache = {
+    ...emptyStore(),
+    ...saved,
+    // An account is named by its email; a display name older stores kept is dropped on the next save.
+    accounts: Array.isArray(saved?.accounts)
+      ? saved.accounts.map(({ displayName: _displayName, ...account }) => account)
+      : [],
+    profiles:
+      saved?.profiles && typeof saved.profiles === "object" && !Array.isArray(saved.profiles)
+        ? saved.profiles
+        : {},
+    sessions: Array.isArray(saved?.sessions) ? saved.sessions : [],
+    gatewayLinks: Array.isArray(saved?.gatewayLinks) ? saved.gatewayLinks : [],
+    gatewayPending: Array.isArray(saved?.gatewayPending) ? saved.gatewayPending : [],
+    deletedIdentities: Array.isArray(saved?.deletedIdentities) ? saved.deletedIdentities : [],
+  };
   return cache;
 }
 

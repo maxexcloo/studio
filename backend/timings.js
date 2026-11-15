@@ -12,16 +12,11 @@ let timings = null;
 
 function load() {
   if (timings) return timings;
-  try {
-    const raw = readRuntimeDocument(dataDir, "timings");
-    timings = {
-      runs: Array.isArray(raw?.runs) ? raw.runs : [],
-      upscales: Array.isArray(raw?.upscales) ? raw.upscales : [],
-    };
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    timings = { runs: [], upscales: [] };
-  }
+  const raw = readRuntimeDocument(dataDir, "timings");
+  timings = {
+    runs: Array.isArray(raw?.runs) ? raw.runs : [],
+    upscales: Array.isArray(raw?.upscales) ? raw.upscales : [],
+  };
   return timings;
 }
 
