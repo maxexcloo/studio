@@ -5,9 +5,9 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { loraName } from "../../shared/profiles.ts";
+import { loraCompatibility, loraName } from "../../shared/profiles.ts";
 import { enrichLocalLoraInfo, optionalLoraPolicyIssue } from "./catalogue.js";
-import { compatibleLoras, loraCompatibility, strengthRange } from "./policy.js";
+import { compatibleLoras, strengthRange } from "./policy.js";
 
 const profile = {
   id: "custom:fl",

@@ -11,7 +11,7 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, triggersFromMetadata } =
   await import("./info.js");
 
-const { loraCompatibility } = await import("./policy.js");
+const { loraCompatibility } = await import("../../shared/profiles.ts");
 
 const t = (shape) => ({ dtype: "F16", shape, data_offsets: [0, 0] });
 

@@ -4,7 +4,7 @@ import path from "node:path";
 
 import sharp from "sharp";
 
-import { isCloudProfile, loraName, runBackend } from "../../shared/profiles.ts";
+import { isCloudProfile, loraCompatibility, loraName, runBackend } from "../../shared/profiles.ts";
 import { withResolution } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { accessFeatures } from "../account-policy.js";
@@ -12,7 +12,7 @@ import { accountPreferences } from "../account-preferences.js";
 import { animateProfile, frameSize } from "../animate-profile.js";
 import { step } from "../event-loop.js";
 import { topCaptionTags } from "../gallery/filters.js";
-import { compatibleLoras, loraCompatibility } from "../lora/policy.js";
+import { compatibleLoras } from "../lora/policy.js";
 import { recommendedNegative } from "../lora/prompts.js";
 import { mcpLinkKey, mcpOwnership } from "../persistence/mcp-ownership.ts";
 import { runtimeDatabase, savedDocument, writeRuntimeDocument } from "../persistence/runtime.ts";

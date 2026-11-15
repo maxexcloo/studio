@@ -1,4 +1,5 @@
-import { loraCompatibility, strengthRange } from "./policy.js";
+import { loraCompatibility } from "../../shared/profiles.ts";
+import { strengthRange } from "./policy.js";
 
 /** Name-refined models of the same kind share their parent family's adapter layout. */
 export function withFamilyRefinements(ids, families) {

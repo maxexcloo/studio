@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, Suspense, lazy, useCallback, useEffect, useId, useState } from "react";
 
+import { loraName } from "../../../../shared/profiles";
 import {
   type QueueCancelAllResponse,
   type QueuePause,
@@ -46,7 +47,7 @@ import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { useTryAgain } from "../gallery/useTryAgain";
 import { useJobSwap } from "../runtime/JobSwap";
 import { useGenerationActions } from "./GenerationProvider";
-import { loraInfoQuery, loraTitle } from "./LoraPicker";
+import { loraInfoQuery } from "./LoraPicker";
 import { isProfile, profileName, shownProfileName } from "./payload";
 import { WritingStream } from "./PromptWriting";
 import { referenceLabel } from "./references";
@@ -337,9 +338,7 @@ function QueueJobDetails({
         </Text>
       )}
       <Text size="xs" c="dimmed">
-        {settingChips(input, profile, (file) => loraTitle(info.data?.loras[file], file)).join(
-          " · ",
-        )}
+        {settingChips(input, profile, (file) => loraName(file, info.data?.loras[file])).join(" · ")}
       </Text>
       {references.length > 0 && (
         <Group gap={6}>
