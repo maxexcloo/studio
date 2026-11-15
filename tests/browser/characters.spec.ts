@@ -227,8 +227,15 @@ test("Use as Character starts a card from a gallery image in Library › Charact
     asked.push(body);
     const options =
       body.field === "name"
-        ? ["Mara", "Wren"]
-        : ["red-haired ranger, green cloak", "freckled redhead, slim build"];
+        ? ["Wren", "Mara", "Ivy", "Ash", "Rook", "Sloane"]
+        : [
+            "red-haired ranger, green cloak",
+            "freckled redhead, slim build",
+            "young ranger",
+            "green-eyed ranger",
+            "scarred ranger",
+            "tall ranger",
+          ];
     return route.fulfill({ json: { ok: true, options } });
   });
   const rated: unknown[] = [];
@@ -250,6 +257,16 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   // Name and Description each offer ideas written from the images; a pick has Undo.
   const name = editor.getByRole("textbox", { name: "Name", exact: true });
   await editor.getByRole("button", { name: "Suggest Name", exact: true }).click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Ash",
+    "Ivy",
+    "Mara",
+    "Rook",
+    "Sloane",
+    "Wren",
+    "Refresh…",
+    "Custom…",
+  ]);
   await page.getByRole("menuitem", { name: "Wren", exact: true }).click();
   await expect(name).toHaveValue("Wren");
   await editor.getByRole("button", { name: "Undo", exact: true }).click();
@@ -258,6 +275,16 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   await page.getByRole("menuitem", { name: "Mara", exact: true }).click();
   await expect(name).toHaveValue("Mara");
   await editor.getByRole("button", { name: "Suggest Description", exact: true }).click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "freckled redhead, slim build",
+    "green-eyed ranger",
+    "red-haired ranger, green cloak",
+    "scarred ranger",
+    "tall ranger",
+    "young ranger",
+    "Refresh…",
+    "Custom…",
+  ]);
   await page.getByRole("menuitem", { name: "red-haired ranger, green cloak", exact: true }).click();
   await expect(editor.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
     "red-haired ranger, green cloak",
