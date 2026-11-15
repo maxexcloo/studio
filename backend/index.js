@@ -1000,6 +1000,8 @@ async function smallImage(item) {
     .toBuffer();
   return { mime: "image/jpeg", data: data.toString("base64") };
 }
+// The gallery as idle work walks it (domain/idle-work.ts).
+const idleItems = (since, after) => eachGalleryItem({ since }, after && galleryKey(after));
 // Gallery captions (domain/captions.ts) let search match what an image shows.
 const runtimeLoad = (name) => () => {
   try {
@@ -1014,7 +1016,7 @@ const captioner = createCaptioner({
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
-  items: (since) => eachGalleryItem({ since }),
+  items: idleItems,
   changes: galleryChangeCount,
   // Dream's pool too, so a Dream verdict's taste signal carries what the image shows.
   visible: hasGalleryMedia,
@@ -1029,7 +1031,7 @@ const dreamReview = createReview({
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: (ownerId) => Boolean(dream.access(ownerId)),
-  items: (since) => eachGalleryItem({ since }),
+  items: idleItems,
   changes: galleryChangeCount,
   visible: hasGalleryMedia,
   projects: (ownerId) => projects.list(ownerId),
@@ -1043,7 +1045,7 @@ const imageSearch = createImageSearch({
   encoder: createSiglip({ dataDir, fetch: hfFetch }),
   vectors: createImageVectors(runtimeDatabase(dataDir), siglipVersion),
   idle: galleryIdle,
-  items: (since) => eachGalleryItem({ since }),
+  items: idleItems,
   changes: galleryChangeCount,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: galleryStill,
@@ -1061,7 +1063,7 @@ const faceCheck = createFaceCheck({
       url.startsWith("https://huggingface.co/") ? hfFetch(url, init) : fetch(url, init),
   }),
   idle: galleryIdle,
-  items: (since) => eachGalleryItem({ since }),
+  items: idleItems,
   changes: galleryChangeCount,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   characters: (ownerId) =>
@@ -1099,7 +1101,7 @@ const titler = createTitler({
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
-  items: (since) => eachGalleryItem({ since }),
+  items: idleItems,
   titled: (item) =>
     findGalleryItem({ ownerId: item.ownerId ?? "", prompt: item.prompt, titled: true })?.title,
   changes: galleryChangeCount,
@@ -1112,7 +1114,7 @@ const suggester = createPromptSuggester({
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptWriterOwner,
-  items: (since) => eachGalleryItem({ since }),
+  items: idleItems,
   changes: galleryChangeCount,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: smallImage,
@@ -1126,7 +1128,7 @@ const nextSteps = createNextStepWork({
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptWriterOwner,
-  items: (since) => eachGalleryItem({ since }),
+  items: idleItems,
   changes: galleryChangeCount,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: smallImage,
