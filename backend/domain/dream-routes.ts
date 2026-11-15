@@ -61,6 +61,10 @@ export function registerDreamRoutes(
       dream.access(owner(account)) ? run(account, input) : refused,
     );
   route("GET", "/api/dream", (account) => ({ status: 200, payload: show(owner(account)) }));
+  route("GET", "/api/dream/history", (account) => ({
+    status: 200,
+    payload: { items: dream.history(owner(account)) },
+  }));
   // The header's badge: results waiting for a verdict, a comparison counting once, and whether
   // Dream is running, so the count can change.
   route("GET", "/api/dream/count", (account) => {

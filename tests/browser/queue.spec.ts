@@ -180,6 +180,20 @@ test("a request's jobs group as one set that moves and stops together", async ({
   await stopAll.getByRole("button", { name: "Stop All", exact: true }).click();
   await expect(page.getByText(unconfirmed, { exact: true })).toBeVisible();
   await expect(stopAll).toBeVisible();
+  const banner = page.getByRole("alert").filter({ hasText: unconfirmed });
+  if (test.info().project.use.isMobile) {
+    await banner.dispatchEvent("touchstart", {
+      touches: [{ identifier: 1, clientX: 120, clientY: 100 }],
+    });
+    await banner.dispatchEvent("touchend", {
+      touches: [],
+      changedTouches: [{ identifier: 1, clientX: 125, clientY: 40 }],
+    });
+  } else {
+    await banner.getByRole("button", { name: "Dismiss Notification" }).click();
+  }
+  await expect(banner).toBeHidden();
+  await expect(stopAll).toBeVisible();
 });
 
 test("Retry and a set's Retry Failed go through the shared retry, replacing the failed originals", async ({

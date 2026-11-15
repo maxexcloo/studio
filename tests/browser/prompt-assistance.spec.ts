@@ -256,11 +256,12 @@ test("Improve Prompt lists its styles alphabetically with descriptions and Custo
   );
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A bird in snow");
-  // One level deep: the styles are listed under Improve Prompt, then the box's other tools;
-  // Copy and Clear stand beside the text instead.
+  // Copy and Clear share the flat menu with each tool's options under its name.
   const menu = await promptMenu(page, "Prompt");
   await expect(menu.getByText("Improve Prompt", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText([
+    "Copy",
+    "Clear",
     "Candid",
     "Enhance",
     /^Portrait/,
@@ -337,7 +338,7 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   await expect(prompt).toHaveValue("A castle at night");
   // A suggestion fits the draft as it was before the proposal and asks at once.
   await assist(page, "Custom…");
-  await dialog.getByRole("button", { name: "Suggestions", exact: true }).click();
+  await promptMenu(dialog, "Change");
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect.poll(() => asked.length).toBe(4);

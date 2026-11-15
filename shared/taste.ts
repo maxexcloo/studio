@@ -14,3 +14,13 @@ export interface TasteWords {
 export const tasteWordLimits = { likes: 12, styles: 8, avoid: 8, note: 400 } as const;
 export type TastePreferences = Partial<TasteWords>;
 export type TastePreferenceChanges = { [Key in keyof TasteWords]?: TasteWords[Key] | null };
+
+/** A retained Dream action, with links only to results still available to its owner. */
+export interface DreamActivity {
+  at: string;
+  action: string;
+  question?: string;
+  answer?: string;
+  item: { id?: string; title: string; media?: "image" | "video" };
+  other?: { id?: string; title: string; media?: "image" | "video" };
+}

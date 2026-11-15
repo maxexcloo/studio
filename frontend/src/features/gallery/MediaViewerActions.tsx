@@ -19,15 +19,24 @@ export interface ViewerActions {
   groups: ActionGroups;
   /** The actions named beside their icons. */
   labelled: string[];
+  /** Keep every choice named and equally wide. */
+  equal?: boolean;
 }
 
 /**
- * The bar's controls in groups on one row, phones naming them under their icons. Every one stays
- * in sight: where they outgrow the bar the last named ones show as icons alone, and only then do
- * they wrap onto another row.
+ * Ordinary item bars use icons alone on phones; equal vote bars keep their names. Controls stay
+ * in sight by dropping the last names where they outgrow the bar, then wrapping if needed.
  */
-export function ViewerActionGroups({ groups, labelled }: Omit<ViewerActions, "label">) {
-  return <ActionBarGroups groups={groups} labelled={labelled} fit stacked={usePhone()} />;
+export function ViewerActionGroups({ groups, labelled, equal }: Omit<ViewerActions, "label">) {
+  return (
+    <ActionBarGroups
+      groups={groups}
+      labelled={labelled}
+      fit={!equal}
+      stacked={usePhone()}
+      equal={equal}
+    />
+  );
 }
 
 /** The viewer's action bar: the prompt field above the shared item actions. */

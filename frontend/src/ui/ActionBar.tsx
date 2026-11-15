@@ -194,9 +194,22 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
             </Fragment>
           );
         }
-        if (action.menu)
+        if (action.menu) {
+          // A scrolling dropdown would clip further submenus, which Mantine mounts inside it.
+          const leaf = !action.menu.flat().some((option) => option.menu);
           return (
-            <Menu.Sub key={id} position="right-start">
+            <Menu.Sub
+              key={id}
+              position="right-start"
+              middlewares={
+                leaf
+                  ? {
+                      shift: { crossAxis: true, padding: 12 },
+                      size: { padding: 12 },
+                    }
+                  : undefined
+              }
+            >
               <Menu.Sub.Target>
                 <Menu.Sub.Item
                   color={color}
@@ -207,12 +220,16 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                   {itemLabel(action, describedBy)}
                 </Menu.Sub.Item>
               </Menu.Sub.Target>
-              <Menu.Sub.Dropdown w={menuWidth}>
+              <Menu.Sub.Dropdown
+                w={menuWidth}
+                style={leaf ? { overflowY: "auto", overscrollBehavior: "contain" } : undefined}
+              >
                 {note(action)}
                 <ActionMenuItems groups={action.menu} />
               </Menu.Sub.Dropdown>
             </Menu.Sub>
           );
+        }
         return (
           <Menu.Item
             key={id}
@@ -419,20 +436,24 @@ export function ActionBarGroups({
   menuPosition = "top",
   fit = false,
   stacked = false,
+  equal = false,
 }: {
   groups: ActionGroups;
   labelled?: string[];
   menuPosition?: FloatingPosition;
   fit?: boolean;
-  /** Names sit under their icons, spread across the row (phone bars). */
+  /** Spreads phone controls across the row, stacking any retained names. */
   stacked?: boolean;
+  /** Give every named choice the same share of the row. */
+  equal?: boolean;
 }) {
+  const phone = usePhone();
   const row = useRef<HTMLDivElement>(null);
   const actions = shown(groups).flat();
-  const named = actions.filter((action) => labelled.includes(action.id));
+  const named = actions.filter((action) => (!phone || equal) && labelled.includes(action.id));
   // How many labels, from the last, drop to fit the room (the bar's width, which doesn't follow
   // them); it starts again for other actions or another room.
-  const key = actions.map((action) => `${action.id}:${action.label}`).join();
+  const key = `${phone}:${actions.map((action) => `${action.id}:${action.label}`).join()}`;
   const [fitted, setFitted] = useState({ key, room: 0, dropped: 0 });
   const dropped = fitted.key === key ? fitted.dropped : 0;
   const tight = fit && dropped >= named.length;
@@ -464,6 +485,7 @@ export function ActionBarGroups({
       data-tight={tight || undefined}
       data-wrap={wrap || undefined}
       data-stacked={stacked || undefined}
+      data-equal={equal || undefined}
     >
       {shown(groups).map((group, index) => {
         const controls = group.map((action) => (
