@@ -39,7 +39,7 @@ import {
   terminalStatuses,
 } from "../../../../shared/queue";
 import { api, post } from "../../api";
-import type { Profile, QueueJob, ReferenceAsset } from "../../types";
+import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
@@ -179,16 +179,19 @@ export function useQueueAction(jobId?: string) {
 }
 export function QueueJobAction({
   job,
+  items = job.items,
   compact = false,
   onRetried,
 }: {
   job: QueueJob;
+  /** The failed tiles an accepted retry replaces. */
+  items?: MediaItem[];
   compact?: boolean;
   /** Receives the replacement job once a retry is accepted. */
   onRetried?: (jobId: string) => void;
 }) {
   const action = useQueueAction(job.id);
-  const retryJobs = useTryAgain(job.items);
+  const retryJobs = useTryAgain(items);
   const [retrying, setRetrying] = useState(false);
   if (terminalStatuses.has(job.status) && job.status !== "failed") return null;
   const retry = job.status === "failed";
