@@ -43,8 +43,16 @@ import {
   mcpSize,
 } from "./controls.js";
 import { findCard } from "./manage.js";
-import { aboutTime, assertJobCount, mcpJson, readyIn } from "./media.js";
-import { assertAvoided, briefLine, keptChoices, projectArgs, projectTargets } from "./project.js";
+import { aboutTime, assertJobCount, mcpJson, readyIn, setItems } from "./media.js";
+import {
+  accountBrief,
+  accountBriefLine,
+  assertAvoided,
+  briefLine,
+  keptChoices,
+  projectArgs,
+  projectTargets,
+} from "./project.js";
 import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
 import { output, shortPrompt } from "./results.js";
 import {
@@ -70,6 +78,7 @@ import {
   workerState,
 } from "./tiers.js";
 
+const letter = (index) => String.fromCharCode(65 + index);
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;
 /** JSON with sorted keys and undefined left out, so equal arguments give equal text. */
@@ -294,8 +303,9 @@ export function registerGenerateTools({
   /**
    * `compareVariants` single-image sets become one labelled side-by-side page (/compare/:id), or "" when the run
    * doesn't fit one (videos, several images per model, a refused set) or the comparison can't be saved.
+   * A one-thing comparison (`axis`) letters its options, which the chat's "B" then picks (variants).
    */
-  const comparisonOf = async (sets) => {
+  const comparisonOf = async (sets, { axis, project } = {}) => {
     const jobs = sets.map(({ queued }) => queued.jobs || []);
     if (
       sets.length < compareVariants.min ||
@@ -305,22 +315,34 @@ export function registerGenerateTools({
     )
       return "";
     try {
+      const labels = sets.map(({ profile, label }, index) =>
+        `${axis ? `${letter(index)} · ` : ""}${label || profile.label || profile.id}`.slice(0, 80),
+      );
       const { id = "" } = await media.request(
         "POST",
         "/api/comparisons",
         {
           jobIds: jobs.map(([job]) => job.job_id),
-          labels: sets.map(({ profile }) => (profile.label || profile.id).slice(0, 80)),
+          labels,
+          ...(axis ? { axis } : {}),
+          ...(axis && project ? { projectId: project.id } : {}),
         },
         owner,
       );
+      if (id && axis)
+        media.offer(
+          owner,
+          refs,
+          id,
+          jobs.map(([job]) => job.job_id),
+        );
       return id && `${publicUrl}/compare/${id}`;
     } catch {
       return "";
     }
   };
   /** Several models' sets as one reply: a line of result links per model with its expected wait, without waiting for any. */
-  const respondSets = async (sets, note = "", signal, compare = "") => {
+  const respondSets = async (sets, note = "", signal, compare = "", axis = "") => {
     const link = ({ ref, link: url }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${url})`;
     const now = Date.now();
     const left = (
@@ -331,8 +353,8 @@ export function registerGenerateTools({
       )
     ).ends.map((endsAt) => (endsAt === null ? 0 : Math.max(0, endsAt - now)));
     const lines = sets.map(
-      ({ profile, queued }, index) =>
-        `${profile.label || profile.id}: ${queued.error || queued.jobs.map(link).join(" · ")}${left[index] ? ` (${aboutTime(left[index])})` : ""}${queued.ignored ? ` ${queued.ignored}` : ""}`,
+      ({ profile, label, queued }, index) =>
+        `${axis ? `${letter(index)} · ` : ""}${label || profile.label || profile.id}: ${queued.error || queued.jobs.map(link).join(" · ")}${left[index] ? ` (${aboutTime(left[index])})` : ""}${queued.ignored ? ` ${queued.ignored}` : ""}`,
     );
     const first = sets.find(({ queued }) => queued.jobs?.length)?.queued.jobs[0].ref || "result 1";
     const waits = [...new Set(await Promise.all(sets.map(({ profile }) => waiting(profile))))].join(
@@ -342,14 +364,15 @@ export function registerGenerateTools({
       content: [
         {
           type: "text",
-          text: `Queued ${sets.length} sets, one per model. ${note}${waits}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. Never poll or resubmit. To change or animate one later, call reuse with its ref (such as "${first}") and its full prompt revised (status shows it).${compare ? " Share the comparison link first: it shows every model side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
+          text: `${axis ? `Queued options A–${letter(sets.length - 1)} varying ${axis} at one seed; the user picks a letter (variants pick).` : `Queued ${sets.length} sets, one per model.`} ${note}${waits}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. Never poll or resubmit. To change or animate one later, call reuse with its ref (such as "${first}") and its full prompt revised (status shows it).${compare ? " Share the comparison link first: it shows them side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
         },
       ],
       structuredContent: {
         status: "queued",
         ...(compare ? { compare } : {}),
-        sets: sets.map(({ profile, queued }, index) => ({
+        sets: sets.map(({ profile, label, queued }, index) => ({
           profile: { id: profile.id, label: profile.label || profile.id },
+          ...(label ? { label } : {}),
           ...(left[index] ? { eta_seconds: Math.round(left[index] / 1000) } : {}),
           jobs: (queued.jobs || []).map(({ job_id, ref, link: url }) => ({
             job_id,
@@ -547,6 +570,7 @@ export function registerGenerateTools({
               error: `Further submission failed; retain returned jobs before retrying. ${error.message}`,
             };
           });
+        part.jobs = part.jobs.map((job) => ({ ...job, prompt_index: at + job.prompt_index }));
         queued = queued
           ? {
               ...queued,
@@ -569,7 +593,7 @@ export function registerGenerateTools({
     server,
     "models",
     "find models",
-    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; shots: Studio writes each, outfit and scene a card's name or words; character_sheet its sheet). With profile_id (id, label or words), or profile_ids: each one's guide gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
+    "What Studio has now. Without profile_id: ready profiles by kind (Stopped or Offline marked), those needing setup, service states, the account's features and characters (generate's character adds its looks: prompts set only outfit and scene; shots: Studio writes each; character_sheet its sheet). profile_id or profile_ids (id, label or words): guide gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
     {
       kind: z.enum(["all", "image", "video"]).default("all"),
       tier: tier.optional(),
@@ -856,7 +880,7 @@ export function registerGenerateTools({
     server,
     "generate",
     "generate",
-    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request; at most ${maxSplitJobs} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Leave count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Anyone sexual or nude must be 18+ (no teens).`,
+    `Queue images or videos, at most ${maxSplitJobs} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Leave the model, count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Anyone sexual or nude must be 18+ (no teens).`,
     {
       request: z
         .string()
@@ -870,6 +894,27 @@ export function registerGenerateTools({
         .union([promptList, promptListText.pipe(promptList)])
         .optional()
         .describe("Run as written; count images each."),
+      base: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("Template; prompts are deltas put at its {} or after it."),
+      axis: z
+        .string()
+        .trim()
+        .min(1)
+        .max(40)
+        .optional()
+        .describe(
+          "Vary only this at one seed, one image each: values are prompts, profile_ids or strengths.",
+        ),
+      strengths: z
+        .array(z.number().finite())
+        .min(compareVariants.min)
+        .max(compareVariants.max)
+        .optional()
+        .describe("The first LoRA's."),
       title: setTitle.optional(),
       titles: z.array(setTitle).max(maxSplitJobs).optional().describe("One per prompt."),
       context: chatContext.optional(),
@@ -901,7 +946,7 @@ export function registerGenerateTools({
         .max(16)
         .optional()
         .describe(
-          `From search uploads, upload, upload_link or reuse mode reference, or a result's number or letter. models gives each profile's references.max.`,
+          `Ids from uploads or reuse mode reference, or a result's number or letter; models gives references.max.`,
         ),
       reference_role: z.enum(["edit", "reference"]).optional(),
       // In reference_asset_ids order, where models lists the profile's reference_strengths.
@@ -929,7 +974,7 @@ export function registerGenerateTools({
         .string()
         .optional()
         .describe(
-          "Only if asked: a preset (1:1, 16:9, 9:16, 4:3, 3:4; models lists each profile's) or landscape, portrait, square.",
+          "Only if asked: a preset such as 16:9 (models lists each profile's), or landscape, portrait, square.",
         ),
       resolution: z.enum(resolutions).optional(),
       steps: z.number().int().positive().max(10000).optional(),
@@ -956,21 +1001,25 @@ export function registerGenerateTools({
       const key = `${refs || owner}\n${stableJson(input)}`;
       const earlier = generateDedupeMs > 0 ? recentGenerates.get(key) : null;
       if (earlier) return earlier.reply;
-      const accepted = [];
+      const accepted = { entries: [], set: 0 };
       const reply = generateOnce(input, signal, accepted).catch((error) => {
-        if (!accepted.length) throw error;
+        if (!accepted.entries.length) throw error;
         // Delivery can fail after admission (an aborted ETA probe, or a later model's refusal).
         // Keep the accepted jobs as the deduplicated reply so a retry cannot queue them again.
-        const jobs = accepted.flatMap(({ queued }) => queued.jobs);
-        return {
-          content: [
-            {
-              type: "text",
-              text: `These jobs were accepted before the reply was interrupted: ${error.message} Share their links and end your turn; never resubmit.\n\n${jobs.map(({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`).join(" · ")}`,
-            },
-          ],
-          structuredContent: { status: "queued", jobs },
-        };
+        const jobs = accepted.entries.flatMap(({ queued }) => queued.jobs);
+        const number = accepted.set || recordSet(accepted.entries);
+        return withSet(
+          {
+            content: [
+              {
+                type: "text",
+                text: `${setNote(number)}These jobs were accepted before the reply was interrupted: ${error.message} Share their links and end your turn; never resubmit.\n\n${jobs.map(({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`).join(" · ")}`,
+              },
+            ],
+            structuredContent: { status: "queued", jobs },
+          },
+          number,
+        );
       });
       const entry = { at: null, reply };
       recentGenerates.set(key, entry);
@@ -1014,8 +1063,42 @@ export function registerGenerateTools({
             () => null,
           )
       : null;
+  /**
+   * Records a call's queued submissions (each `{ plan, queued }`) as the conversation's next set
+   * and answers its number, or 0 when nothing queued.
+   */
+  const recordSet = (entries) =>
+    entries.some(({ queued }) => queued.jobs?.length)
+      ? media.addSet(owner, refs, {
+          plans: entries.map(({ plan, queued }) => {
+            // A rerun draws a new seed.
+            const { prompts = [], seed: _seed, ...args } = plan;
+            return {
+              args,
+              prompts,
+              jobs: (queued.jobs || []).map((job) => ({
+                id: job.job_id,
+                prompt: job.prompt_index,
+                images: job.images || 1,
+              })),
+            };
+          }),
+        })
+      : 0;
+  const setNote = (number) =>
+    number
+      ? `Set ${number} ("set ${number} B": second image; "set ${number} 2c": item 2, image c). `
+      : "";
+  /** A reply naming its set in structuredContent too. */
+  const withSet = (reply, number) =>
+    number
+      ? { ...reply, structuredContent: { ...reply.structuredContent, set: `set ${number}` } }
+      : reply;
   const generateOnce = async (input, signal, accepted) => {
-    const project = await attachedProject(signal);
+    const [project, account] = await Promise.all([
+      attachedProject(signal),
+      accountBrief(media, owner, signal),
+    ]);
     const choices = chatChoices.read(owner, conversation);
     const remembered = keptChoices(choices, structuredClone(input));
     const constrained = project
@@ -1031,6 +1114,9 @@ export function registerGenerateTools({
       each_profile,
       title,
       context,
+      base,
+      axis,
+      strengths,
       ...args
     } = constrained.args;
     if (args.reference_asset_ids)
@@ -1113,12 +1199,40 @@ export function registerGenerateTools({
             : ' (this call had no arguments; an earlier call shown as "input shortened to save context" is the chat\'s shortened copy, not arguments to send, and a call cut short needs fewer or shorter prompts)'
         }. Then call generate again.`,
       );
+    // A set template: each prompt is a delta of the one base prompt, which the chat writes once.
+    const deltas = base ? args.prompts : null;
+    if (base) {
+      if (parts) throw new Error("Pass shots or base, not both.");
+      args.prompts = deltas.map((delta) =>
+        base.includes("{}")
+          ? base.replaceAll("{}", delta)
+          : `${base.replace(/[\s,.;]+$/, "")}, ${delta}`,
+      );
+    }
     if (project) assertAvoided(project, args.prompts);
+    if (account.avoid.length)
+      assertAvoided(
+        { name: "the user's brief", brief: { avoid: account.avoid.join("\n") } },
+        args.prompts,
+      );
     if ([args.profile_id, profile_ids, each_profile].filter(Boolean).length > 1)
       throw new Error(
         "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call generate again.",
       );
     const several = Boolean(profile_ids || each_profile);
+    if (axis) {
+      const values = [strengths, profile_ids, args.prompts.length > 1].filter(Boolean).length;
+      if (values !== 1 || each_profile || shots)
+        throw new Error(
+          `axis varies one thing: pass ${compareVariants.min}–${compareVariants.max} prompts (or deltas with base), or one prompt with profile_ids or strengths.`,
+        );
+      if ((kind || "image") !== "image") throw new Error("axis compares images; leave kind out.");
+      if (strengths && !args.loras?.length)
+        throw new Error("strengths vary the first LoRA: pass it in loras.");
+      if (args.prompts.length > compareVariants.max)
+        throw new Error(`axis compares at most ${compareVariants.max} values.`);
+      args.count = 1;
+    }
     if (several && args.loras?.length)
       throw new Error(
         "LoRAs belong to one model: pass them with profile_id, or leave loras out for several models.",
@@ -1188,11 +1302,33 @@ export function registerGenerateTools({
         } catch {
           // Gone or no longer granted: Studio picks as usual.
         }
+      // Otherwise the first ready favourite in the user's brief that fits.
+      let favourite = null;
+      if (
+        args.profile_id === undefined &&
+        !fits &&
+        !keptModel &&
+        !card &&
+        !args.loras?.length &&
+        account.brief.profiles?.length
+      ) {
+        const ready = localUnlessAsked(await media.profiles(kind || "image", owner), { request });
+        const pool = wanted ? profilesForTier(ready, wanted) : ready;
+        const found = account.brief.profiles
+          .map((id) => pool.find((profile) => profile.id === id))
+          .find((profile) => profile && (profile.mediaInputs || []).length >= references);
+        if (found)
+          favourite = {
+            profile: found,
+            note: `Ran on ${found.label || found.id}, the user's favourite. `,
+          };
+      }
       targets = [
         args.profile_id === undefined
           ? fits
             ? fromRequest
             : keptModel ||
+              favourite ||
               picked(
                 await media.choices(owner, {
                   kind,
@@ -1244,6 +1380,13 @@ export function registerGenerateTools({
     }
     if (remembered.kept.length)
       projectNote = `Kept from earlier: ${remembered.kept.join(", ")}. ${projectNote}`;
+    if (axis && targets.some(({ profile }) => !mcpControls(profile).seed))
+      throw new Error("These models cannot hold a seed for a controlled comparison.");
+    if (axis && several && targets.length < compareVariants.min)
+      throw new Error(`Compare at least ${compareVariants.min} models.`);
+    // The account's brief comes back with a chat's first generate, and again as its guide would.
+    const accountLine = accountBriefLine(account, await media.profiles("all", owner));
+    if (accountLine && review(refs, "brief")) projectNote = `${accountLine}${projectNote}`;
     chatChoices.remember(
       owner,
       conversation,
@@ -1400,7 +1543,7 @@ export function registerGenerateTools({
     // A call of several results, or one the chat titled or described, is one titled set, with the
     // character it was made with and the chat's context; the gallery titles each prompt's results
     // by titles, by a one-prompt call's title, or by its prompt where they are missing.
-    const resultSet = (jobs > 1 || title || args.titles || context) && {
+    const resultSet = (axis || jobs > 1 || title || args.titles || context) && {
       id: crypto.randomUUID(),
       // A character's set is named for it unless the chat named the set.
       title: title || card?.name || replyTitle(request) || promptWords(args.prompts[0]),
@@ -1424,25 +1567,67 @@ export function registerGenerateTools({
         ...(assistant ? { assistant } : {}),
       };
     };
-    if (several) {
-      // One set per model, queued in order so each model loads once; links come back at once.
-      // Every set shares one seed, so image N of each model is a like-for-like comparison.
+    if (several || axis) {
+      // One set per model or value, queued in order so each model loads once; links come back at
+      // once. Every set shares one seed, so image N of each is a like-for-like comparison.
       const seed = args.seed ?? crypto.randomInt(2 ** 31);
+      const [{ profile, note, plan }] = plans;
+      const runs = several
+        ? plans
+        : strengths
+          ? strengths.map((strength) => ({
+              profile,
+              note,
+              label: String(strength),
+              plan: {
+                ...plan,
+                loras: plan.loras.map((lora, index) => (index ? lora : { ...lora, strength })),
+              },
+            }))
+          : plan.prompts.map((prompt, index) => ({
+              profile,
+              note,
+              label: deltas?.[index] || plan.titles?.[index] || promptWords(prompt),
+              plan: {
+                ...plan,
+                prompts: [prompt],
+                titles: plan.titles && [plan.titles[index]],
+                ...(plan.result_set ? { result_set: { ...plan.result_set, first: index } } : {}),
+              },
+            }));
       const sets = [];
-      for (const item of plans) {
+      for (const item of runs) {
         const set = {
           profile: item.profile,
           note: item.note,
+          label: item.label,
+          plan: { ...item.plan, seed, ...(axis ? { comparison: true } : {}) },
           queued: (
-            await submit(item.profile, { ...item.plan, seed }, recordOf(item), {
-              guide: false,
-            })
+            await submit(
+              item.profile,
+              { ...item.plan, seed, ...(axis ? { comparison: true } : {}) },
+              recordOf(item),
+              {
+                guide: false,
+              },
+            )
           ).queued,
         };
         sets.push(set);
-        if (set.queued.jobs.length) accepted.push(set);
+        if (set.queued.jobs.length) accepted.entries.push(set);
       }
-      return respondSets(sets, projectNote, signal, await comparisonOf(sets));
+      const number = recordSet(sets);
+      accepted.set = number;
+      return withSet(
+        await respondSets(
+          sets,
+          `${setNote(number)}${projectNote}`,
+          signal,
+          await comparisonOf(sets, { axis, project }),
+          axis,
+        ),
+        number,
+      );
     }
     const [{ profile, note: tierNote, plan, source }] = plans;
     // A face is small in a full-body or wide shot of a person, so the final prompt turns face detail on unless the caller chose.
@@ -1459,21 +1644,144 @@ export function registerGenerateTools({
       plan.face_detail = true;
     }
     const submission = await submit(profile, plan, recordOf({ plan }));
-    if (submission.queued.jobs.length) accepted.push({ profile, queued: submission.queued });
-    return respond(
-      submission.queued,
-      profile,
-      signal,
-      submission.guide,
-      source,
-      `${projectNote}${tierNote || ""}${faceNote}`,
+    if (submission.queued.jobs.length)
+      accepted.entries.push({ profile, plan, queued: submission.queued });
+    const number = recordSet([{ plan, queued: submission.queued }]);
+    accepted.set = number;
+    return withSet(
+      await respond(
+        submission.queued,
+        profile,
+        signal,
+        submission.guide,
+        source,
+        `${setNote(number)}${projectNote}${tierNote || ""}${faceNote}`,
+      ),
+      number,
+    );
+  };
+  /**
+   * Runs a conversation's set again as a new set, with a new seed: every image, or only its failed
+   * or disliked ones, each prompt changed by `swap` (case-insensitive) and then `add`.
+   */
+  const rerunSet = async ({ number, set }, { only, add, swap = [], request, title }, signal) => {
+    const items = setItems(set);
+    const jobIds = [...new Set(items.flatMap((item) => item.jobs.map((job) => job.id)))];
+    // How many images of each item run again.
+    let again;
+    if (only === "failed") {
+      const failed = new Set();
+      for (const jobId of jobIds) {
+        const job = await media.job(owner, jobId, 0, { signal });
+        if (["failed", "cancelled", "missing"].includes(job.status)) failed.add(jobId);
+      }
+      again = (job) => (failed.has(job.id) ? job.images : 0);
+    } else if (only === "disliked") {
+      const disliked = new Map();
+      for (const jobId of jobIds) {
+        const { items: outputs = [] } = await media.request(
+          "GET",
+          `/api/gallery/jobs/${encodeURIComponent(jobId)}`,
+          undefined,
+          owner,
+          { signal },
+        );
+        disliked.set(jobId, outputs.filter((output) => output.rating === "disliked").length);
+      }
+      again = (job) => disliked.get(job.id) || 0;
+    } else again = (job) => job.images;
+    const counts = items.map((item) => item.jobs.reduce((sum, job) => sum + again(job), 0));
+    if (!counts.some(Boolean)) throw new Error(`set ${number} has no ${only} images to rerun.`);
+    const pattern = (from) => new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    const prompts = set.plans.map((plan) => plan.prompts);
+    if (swap.some(({ from }) => !from.trim())) throw new Error("Give each swap a from.");
+    for (const { from } of swap)
+      if (!prompts.flat().some((prompt) => pattern(from).test(prompt)))
+        throw new Error(`No prompt in set ${number} has "${from}".`);
+    const changed = (prompt) => {
+      let next = prompt;
+      for (const { from, to } of swap) next = next.replace(pattern(from), () => to);
+      return add ? `${next.replace(/[\s,.;]+$/, "")}, ${add}` : next;
+    };
+    const checked = prompts.flat().map(changed);
+    for (const prompt of checked) {
+      const minor = minorAgeRefusal(prompt);
+      if (minor) throw new Error(minor);
+    }
+    const [project, account] = await Promise.all([
+      attachedProject(signal),
+      accountBrief(media, owner, signal),
+    ]);
+    if (project) assertAvoided(project, checked);
+    if (account.avoid.length)
+      assertAvoided(
+        { name: "the user's brief", brief: { avoid: account.avoid.join("\n") } },
+        checked,
+      );
+    // Each plan's chosen prompts, grouped by how many images each runs, become a submission.
+    const all = await media.profiles("all", owner);
+    const seed = crypto.randomInt(2 ** 31);
+    const setId = crypto.randomUUID();
+    const runs = [];
+    for (const [index, plan] of set.plans.entries()) {
+      const listed = all.find((profile) => profile.id === plan.args.profile_id);
+      const chosen = items
+        .map((item, place) => ({ ...item, count: counts[place] }))
+        .filter((item) => item.plan === index && item.count);
+      if (!chosen.length) continue;
+      if (!listed)
+        throw new Error(
+          `${plan.args.profile_id}, which set ${number} ran on, isn't ready now. Call generate instead.`,
+        );
+      const profile = media.profileForBackend(listed, plan.args.profile_backend);
+      for (const count of [...new Set(chosen.map((item) => item.count))]) {
+        const group = chosen.filter((item) => item.count === count);
+        const { titles, result_set, ...args } = plan.args;
+        runs.push({
+          profile,
+          plan: {
+            ...args,
+            prompts: group.map((item) => changed(plan.prompts[item.prompt])),
+            count,
+            ...(titles ? { titles: group.map((item) => titles[item.prompt]) } : {}),
+            ...(plan.args.prompt_references
+              ? { prompt_references: group.map((item) => plan.args.prompt_references[item.prompt]) }
+              : {}),
+            ...(result_set || title
+              ? {
+                  result_set: {
+                    ...result_set,
+                    id: setId,
+                    title: title || result_set?.title || `Set ${number}`,
+                    source: actor.client || "MCP",
+                  },
+                }
+              : {}),
+            ...(set.plans.length > 1 ? { seed } : {}),
+          },
+        });
+      }
+    }
+    const record = { ...(request ? { request } : {}) };
+    for (const run of runs) {
+      run.queued = (await submit(run.profile, run.plan, record, { guide: false })).queued;
+      if (run.queued.error) break;
+    }
+    const sent = runs.filter((run) => run.queued);
+    const fresh = recordSet(sent);
+    const note = `${setNote(fresh)}It reruns set ${number}${only ? `'s ${only} images` : ""}${add || swap.length ? ", changed" : ""}. `;
+    return withSet(
+      sent.length === 1
+        ? await respond(sent[0].queued, sent[0].profile, signal, "", "exact", note)
+        : await respondSets(sent, note, signal),
+      fresh,
     );
   };
   tool(
     server,
     "reuse",
     "reuse result",
-    `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. mode animate makes an image a video, extend continues a video from its last frame; prompt is the motion, or pass theme; length is seconds. tier or profile_id picks the model. runs_on, only if asked, keeps animate or extend local or cloud. mode reference returns it as a reference_asset_id for generate. mode upscale enlarges it in place, only when asked (upscale_quality, balanced by default).`,
+    `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. A set ref ("set 3") reruns it, or only failed or disliked images, add or swap changing each prompt. mode animate makes an image a video, extend continues a video from its last frame; prompt is the motion, or pass theme; length is seconds. tier or profile_id picks the model. runs_on, only if asked, keeps animate or extend local or cloud. mode reference returns it as a reference_asset_id for generate. mode upscale enlarges it in place, only when asked.`,
     {
       ...output,
       job_id: z
@@ -1493,10 +1801,16 @@ export function registerGenerateTools({
       runs_on: z.enum(["local", "cloud"]).optional(),
       upscale_quality: z.enum(upscaleQualities).optional(),
       title: setTitle.optional(),
+      only: z.enum(["failed", "disliked"]).optional(),
+      add: z.string().trim().optional(),
+      swap: z.array(z.object({ from: z.string(), to: z.string() })).optional(),
     },
     async (
       {
         job_id,
+        only,
+        add,
+        swap,
         title,
         output_index: chosenIndex,
         mode,
@@ -1513,6 +1827,30 @@ export function registerGenerateTools({
       },
       signal,
     ) => {
+      const whole = media.chatSet(owner, refs, job_id);
+      if (whole && !whole.item) {
+        const others = Object.entries({
+          prompt,
+          theme,
+          length,
+          runs_on,
+          upscale_quality,
+          profile_id,
+          tier: wanted,
+          preserve_seed,
+          count: count > 1,
+          mode: mode !== "again",
+        })
+          .filter(([, value]) => value)
+          .map(([name]) => name);
+        if (others.length)
+          throw new Error(
+            `A set reruns as it ran, taking only only, add, swap, request and title; leave out ${others.join(", ")}.`,
+          );
+        return rerunSet(whole, { only, add, swap, request, title }, signal);
+      }
+      if (only || add || swap)
+        throw new Error('only, add and swap are for a set ref ("set 3"). Call reuse again.');
       const found = await resolveOutput(job_id, signal);
       const id = found.jobId;
       const output_index = chosenIndex || found.index || 0;
@@ -1763,7 +2101,7 @@ export function registerGenerateTools({
           ...(profile_id ? { profile_id } : {}),
         },
         signal,
-        [],
+        { entries: [], set: 0 },
       );
       const jobs = reply.structuredContent?.jobs || [];
       const saved = [];

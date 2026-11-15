@@ -54,6 +54,7 @@ async function fixture(t, environment = gateway) {
   app.use(express.json({ limit: "30mb" }));
   const asked = [];
   const submitted = [];
+  app.get("/api/chat-brief", (_req, res) => res.json({ brief: {} }));
   app.get("/api/models", (_req, res) =>
     res.json({ profiles: [profile], defaults: { imageModel: profile.id } }),
   );

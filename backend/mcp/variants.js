@@ -12,7 +12,7 @@ export function registerVariantsTool({ tool, server, media, owner, refs, chat, r
     server,
     "variants",
     "offer variants",
-    "Lettered options of one result varying one axis, side by side with its seed: each its full prompt with only that changed. pick records the user's letter or number for taste and the brief.",
+    "Lettered options of a result varying one axis at its seed: each its full prompt with only that changed. pick records the user's letter or number for taste.",
     {
       result: z.string().min(1).optional(),
       axis: z.string().trim().min(1).max(40).optional(),

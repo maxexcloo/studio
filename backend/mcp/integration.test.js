@@ -403,6 +403,15 @@ async function fixture(
   app.get("/api/characters", (_req, res) => res.json({ characters }));
   app.get("/api/outfits", (_req, res) => res.json({ outfits }));
   app.get("/api/scenes", (_req, res) => res.json({ scenes }));
+  // The account's chat brief (preference-routes.js): a change sets only the fields it names.
+  let chatBrief = {};
+  app.get("/api/chat-brief", (_req, res) => res.json({ brief: chatBrief }));
+  app.patch("/api/chat-brief", (req, res) => {
+    chatBrief = Object.fromEntries(
+      Object.entries({ ...chatBrief, ...req.body }).filter(([, value]) => String(value) !== ""),
+    );
+    res.json({ brief: chatBrief });
+  });
   app.post("/api/characters/:id/sheet", (req, res) => {
     characters.find((card) => card.id === req.params.id).sheet = { status: "making" };
     res.json({ ok: true, jobId: "sheet-job", profile: "Qwen-Image 2.1" });
@@ -1095,7 +1104,8 @@ test("media and administrator credentials discover only their own friendly tools
     // 19,300 for one call per step (models' profile_ids, review's also) and to 19,850 for applying
     // a person's rules in proportion with the shape of liked portraits, to 20,050 for naming a
     // person's age and ethnicity first, to 20,250 for Search's dislikes, pages and summary and for
-    // leaving LoRA strengths to vary, and to 21,750 for generate's chat context and create_characters.
+    // leaving LoRA strengths to vary, and to 21,750 for generate's chat context and create_characters;
+    // sets, axis comparisons and the user's brief were then fitted within it.
     JSON.stringify(tools).length + media.getInstructions().length < 21750,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
@@ -1486,7 +1496,7 @@ test("a full-body person turns face detail on only beside a requested upscale, a
     prompts: [person],
     upscale_quality: "high",
   });
-  assert.match(texts(chosen), /^Queued on [^.]+\. Face detail on for the full-body person\. /);
+  assert.match(texts(chosen), /Face detail on for the full-body person\. /);
   assert.match(
     (await client.listTools()).tools.find((item) => item.name === "generate").description,
     /upscale_quality only when the user asks to upscale or enlarge \(it adds face detail for full-body people\)\./,
@@ -3944,7 +3954,8 @@ test("Generate returns at once with each set's ETA", async (t) => {
   assert.ok(performance.now() - started < 1500);
   assert.equal(data(video).status, "queued");
   assert.equal(data(video).eta_seconds, 300);
-  assert.match(texts(video), /^Queued on Fixture Video, ready in about 5 min\. Share the links/);
+  assert.match(texts(video), /^Queued on Fixture Video, ready in about 5 min\. /);
+  assert.match(texts(video), /Share the links/);
   // Three 12 s images: the first job's end time, then two more runs by the set's estimate, outlast 30 s.
   const f = await fixture(t, { jobEtaMs: 12_000 });
   await f.profiles(guidedCatalogue());
@@ -5513,7 +5524,7 @@ test("without a named model, Studio's default stands and the reply says which", 
     prompts: ['A neon sign that says "OPEN"'],
   });
   assert.equal(data(reply).profile.id, imageProfile.id);
-  assert.match(texts(reply), /^Queued on Fixture Image\. Chose Fixture Image, the default\. /);
+  assert.match(texts(reply), /Chose Fixture Image, the default\. /);
   assert.equal(f.submitted.at(-1).prompt, 'A neon sign that says "OPEN"');
 });
 
@@ -6515,6 +6526,8 @@ test("a pending Generate stays deduplicated, then expires from its settled reply
     },
     server: {},
     media: {
+      request: async () => ({}),
+      addSet: () => 1,
       profiles: async () => [imageProfile],
       profileForBackend: (profile) => profile,
       queue: async () => ({
@@ -6522,6 +6535,7 @@ test("a pending Generate stays deduplicated, then expires from its settled reply
         jobs: [
           {
             job_id: `job-${++queued}`,
+            prompt_index: 0,
             ref: `#${queued}`,
             link: `https://fixture.test/${queued}`,
           },
@@ -6568,6 +6582,8 @@ test("a Generate retry retains accepted jobs when its reply is interrupted", asy
   const second = await call(client, "generate", args);
   assert.equal(f.submitted.length, 1);
   assert.deepEqual(data(second).jobs, data(first).jobs);
+  assert.equal(data(first).set, "set 1");
+  assert.equal(data(second).set, "set 1");
   assert.match(texts(second), /never resubmit/);
   assert.match(texts(second), new RegExp(data(first).jobs[0].link));
 });
@@ -6584,6 +6600,7 @@ test("a Generate retry retains earlier model sets when a later model refuses sub
   const second = await call(client, "generate", args);
   assert.equal(f.submitted.length, 1);
   assert.deepEqual(data(second).jobs, data(first).jobs);
+  assert.equal(data(first).set, "set 1");
 });
 
 test("an ordinary request never upscales, even for best quality or a profile default", async (t) => {
@@ -7037,7 +7054,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
     record("lora-ops", { library: { ratings: { "fixture-effect.safetensors": "liked" } } }),
   );
   assert.equal(data(await call(mine, "taste")).summary, "Moody light");
-  await call(mine, "taste", { action: "save", avoid: ["clowns"] });
+  await call(mine, "project", { action: "brief", avoid: "clowns" });
   assert.deepEqual(seen.at(-1).body, { avoid: ["clowns"] });
   assert.deepEqual(
     data(
@@ -7220,4 +7237,267 @@ test("Models tells a chat when a profile does best without LoRAs", async (t) => 
   const client = await f.client();
   const details = data(await call(client, "models", { profile_id: imageProfile.id }));
   assert.match(details.loras_note, /does best without LoRAs: add one only when the user names it/);
+});
+
+test("a generate call is a set its ref reruns, reviews, shows and rates, wholly or by item and letter", async (t) => {
+  const f = await fixture(t);
+  f.app.post("/api/gallery/favorite", (_req, res) => res.json({ ok: true }));
+  const client = await f.client();
+  const first = await generate(client, {
+    base: "A {} barn at noon",
+    prompts: ["red", "blue"],
+    count: 2,
+  });
+  assert.equal(first.set, "set 1");
+  assert.deepEqual(
+    f.submitted.splice(0).map((body) => [body.prompt, body.count]),
+    [
+      ["A red barn at noon", 2],
+      ["A blue barn at noon", 2],
+    ],
+  );
+  const [red, blue] = first.jobs.map((job) => f.jobs.get(job.job_id));
+  for (const job of [red, blue])
+    Object.assign(job, {
+      status: "done",
+      outputs: [0, 1].map((index) => ({ url: `/comfy/view?filename=${job.id}-${index}.png` })),
+    });
+  assert.equal(reviewed(await call(client, "review", { job_id: "set 1" })).length, 4);
+  assert.match(texts(await call(client, "result", { job_id: "set 1" })), /\*\*#1–#4\*\*/);
+  // "set 1 2b" is the second item's second image.
+  assert.equal(
+    (await call(client, "gallery", { action: "like", results: ["set 1 2b"] })).isError,
+    undefined,
+  );
+  assert.deepEqual(f.requests.at(-1).body.ids, [`/comfy/view?filename=${blue.id}-1.png`]);
+  assert.equal(
+    (await call(client, "gallery", { action: "like", results: ["set 1 D"] })).isError,
+    undefined,
+  );
+  assert.deepEqual(f.requests.at(-1).body.ids, [`/comfy/view?filename=${blue.id}-1.png`]);
+  assert.equal(
+    (await call(client, "gallery", { action: "dislike", results: ["set 1"] })).isError,
+    undefined,
+  );
+  assert.equal(f.requests.at(-1).body.ids.length, 4);
+
+  const changed = data(
+    await call(client, "reuse", {
+      job_id: "set 1",
+      swap: [{ from: "RED", to: "green" }],
+      add: "in fog",
+    }),
+  );
+  assert.equal(changed.set, "set 2");
+  assert.deepEqual(
+    f.submitted.splice(0).map((body) => [body.prompt, body.count]),
+    [
+      ["A green barn at noon, in fog", 2],
+      ["A blue barn at noon, in fog", 2],
+    ],
+  );
+  red.status = "failed";
+  await call(client, "reuse", { job_id: "set 1", only: "failed" });
+  assert.deepEqual(
+    f.submitted.splice(0).map((body) => [body.prompt, body.count]),
+    [["A red barn at noon", 2]],
+  );
+  blue.outputs[1].rating = "disliked";
+  await call(client, "reuse", { job_id: "set 1", only: "disliked" });
+  assert.deepEqual(
+    f.submitted.splice(0).map((body) => [body.prompt, body.count]),
+    [["A blue barn at noon", 1]],
+  );
+  await failure(client, "reuse", { job_id: "set 1", swap: [{ from: "purple", to: "gold" }] });
+  await failure(client, "reuse", { job_id: "set 1", prompt: "A barn" });
+  await failure(client, "reuse", { job_id: "set 9" });
+  assert.equal(f.submitted.length, 0);
+});
+
+test("set positions survive identical revisions, split image jobs and partial admission", async (t) => {
+  const f = await fixture(t);
+  await f.profiles([
+    { ...imageProfile, capabilities: { ...imageProfile.capabilities, batch: false } },
+  ]);
+  const client = await f.client();
+  const set = await generate(client, { prompts: ["A red barn", "A blue barn"], count: 3 });
+  const jobs = set.jobs.map(({ job_id }) => f.jobs.get(job_id));
+  for (const job of jobs)
+    Object.assign(job, {
+      status: "done",
+      outputs: Array.from({ length: job.settings.count }, (_, index) => ({
+        url: `/comfy/view?filename=${job.id}-${index}.png`,
+      })),
+    });
+  f.app.post("/api/gallery/favorite", (_req, res) => res.json({ ok: true }));
+  assert.equal(
+    (await call(client, "gallery", { action: "like", results: ["set 1 2c"] })).isError,
+    undefined,
+  );
+  assert.deepEqual(f.requests.at(-1).body.ids, [
+    `/comfy/view?filename=${jobs.at(-1).id}-${jobs.at(-1).settings.count - 1}.png`,
+  ]);
+  f.submitted.length = 0;
+  const revised = data(
+    await call(client, "reuse", { job_id: "set 1", swap: [{ from: "blue", to: "red" }] }),
+  );
+  assert.equal(
+    f.submitted.reduce((sum, job) => sum + job.count, 0),
+    6,
+  );
+  assert.ok(f.submitted.every((job) => job.prompt === "A red barn"));
+  for (const { job_id } of revised.jobs) {
+    const job = f.jobs.get(job_id);
+    Object.assign(job, {
+      status: "done",
+      outputs: [{ url: `/comfy/view?filename=${job.id}.png` }],
+    });
+  }
+  assert.equal(
+    (await call(client, "gallery", { action: "like", results: ["set 2 2c"] })).isError,
+    undefined,
+  );
+  assert.deepEqual(f.requests.at(-1).body.ids, [
+    `/comfy/view?filename=${revised.jobs.at(-1).job_id}.png`,
+  ]);
+  f.failAfter(f.submitted.length + 1);
+  const partial = await generate(client, { prompts: ["A green barn", "A blue barn"], count: 1 });
+  assert.equal(partial.set, "set 3");
+  const missing = await call(client, "reuse", { job_id: "set 3 2" });
+  assert.equal(missing.isError, true);
+  assert.match(texts(missing), /was not queued/);
+  const foreign = await call(await f.client("bob"), "reuse", { job_id: "set 1" });
+  assert.equal(foreign.isError, true);
+  assert.match(texts(foreign), /no set 1/);
+});
+
+test("one set review includes images beyond the submission batch boundary", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const made = await generate(client, {
+    prompts: [
+      "A fox",
+      "A gull",
+      "A barn",
+      "A lake",
+      "A coat",
+      "A boat",
+      "A forest",
+      "A hill",
+      "A beach",
+      "A horse",
+      "A flower",
+    ],
+    count: 1,
+  });
+  for (const { job_id } of made.jobs) {
+    const job = f.jobs.get(job_id);
+    Object.assign(job, {
+      status: "done",
+      outputs: [{ url: `/comfy/view?filename=${job_id}.png` }],
+    });
+  }
+  assert.equal(reviewed(await call(client, "review", { job_id: made.set })).length, 11);
+  f.app.post("/api/gallery/favorite", (_req, res) => res.json({ ok: true }));
+  assert.equal(
+    (await call(client, "gallery", { action: "like", results: ["set 1 K"] })).isError,
+    undefined,
+  );
+  assert.deepEqual(f.requests.at(-1).body.ids, [
+    `/comfy/view?filename=${made.jobs.at(-1).job_id}.png`,
+  ]);
+});
+
+test("axis varies one thing at one seed, one image each, as a lettered side-by-side comparison", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const reply = await call(client, "generate", {
+    profile_id: imageProfile.id,
+    base: "Portrait of a woman with {} hair",
+    prompts: ["red", "black", "blonde"],
+    axis: "hair colour",
+    seed: 7,
+  });
+  assert.deepEqual(
+    f.submitted.splice(0).map((body) => [body.prompt, body.seed, body.count]),
+    [
+      ["Portrait of a woman with red hair", "7", 1],
+      ["Portrait of a woman with black hair", "7", 1],
+      ["Portrait of a woman with blonde hair", "7", 1],
+    ],
+  );
+  const posted = f.requests.find((request) => request.path === "/comparisons").body;
+  assert.deepEqual(posted.labels, ["A · red", "B · black", "C · blonde"]);
+  assert.equal(posted.axis, "hair colour");
+  assert.match(texts(reply), /Compare Side by Side/);
+  assert.match(texts(reply), /options A–C varying hair colour/);
+
+  await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A cat"],
+    loras: [{ name: "fixture-effect" }],
+    axis: "strength",
+    strengths: [0.4, 0.8],
+  });
+  assert.deepEqual(
+    f.submitted.splice(0).map((body) => body.loras[0].strength),
+    [0.4, 0.8],
+  );
+  const other = { ...imageProfile, id: "fixture-image-other", label: "Other" };
+  await f.profiles([imageProfile, other]);
+  const models = await call(client, "generate", {
+    prompts: ["A cat"],
+    profile_ids: [imageProfile.id, other.id],
+    axis: "profile",
+    seed: 9,
+  });
+  assert.equal(models.isError, undefined);
+  assert.deepEqual(
+    f.submitted.splice(0).map((body) => [body.profileId, body.seed, body.count]),
+    [
+      [imageProfile.id, "9", 1],
+      [other.id, "9", 1],
+    ],
+  );
+  await failure(client, "generate", { prompts: ["A cat"], axis: "hair colour" });
+  assert.equal(f.submitted.length, 0);
+});
+
+test("the account's brief comes back with a chat's first generate, picks its favourite model and refuses what it avoids", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  let avoid = [];
+  f.app.get("/api/taste", (_req, res) => res.json({ addedAvoid: avoid }));
+  f.app.put("/api/taste", (req, res) => {
+    avoid = req.body.avoid;
+    res.json({ addedAvoid: avoid });
+  });
+  const saved = data(
+    await call(client, "project", {
+      action: "brief",
+      subjects: "a woman in her 30s",
+      profiles: [imageProfile.id],
+      avoid: "buttons",
+    }),
+  );
+  assert.equal(saved.user_brief.subjects, "a woman in her 30s");
+  assert.deepEqual(saved.avoid, ["buttons"]);
+  await failure(client, "generate", { prompts: ["A coat with buttons"] });
+  const reply = await call(client, "generate", { prompts: ["A woollen coat"] });
+  assert.match(texts(reply), /The user's brief: subjects a woman in her 30s; models /);
+  assert.match(texts(reply), /the user's favourite/);
+  assert.equal(f.submitted.at(-1).profileId, imageProfile.id);
+  assert.doesNotMatch(
+    texts(await call(client, "generate", { prompts: ["A linen coat"] })),
+    /The user's brief/,
+  );
+  assert.match(
+    texts(await call(await f.client(), "generate", { prompts: ["A cotton coat"] })),
+    /The user's brief/,
+  );
+  // "" clears a field.
+  assert.equal(
+    data(await call(client, "project", { action: "brief", subjects: "" })).user_brief.subjects,
+    undefined,
+  );
 });

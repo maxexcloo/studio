@@ -1,6 +1,7 @@
 // A chat's project (domain/projects.ts): the project tool, and how generate keeps to its brief and constraints.
 import { z } from "zod";
 
+import { briefSummary } from "../../shared/chat-brief.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { maxJobsPerCall } from "./controls.js";
 import { mcpJson } from "./media.js";
@@ -73,10 +74,10 @@ export function keptChoices(choices, input) {
 
 /** The brief as one line for generate's reply, so the chat keeps writing to it; "" without one. */
 export function briefLine({ name, brief }) {
-  const parts = ["subjects", "styles", "avoid"]
-    .filter((key) => brief[key])
-    .map((key) => `${key} ${brief[key]}`);
-  return parts.length ? `Project ${name}: ${parts.join("; ")}. Keep prompts to it. ` : "";
+  const summary = [briefSummary(brief), brief.avoid && `avoid ${brief.avoid}`]
+    .filter(Boolean)
+    .join("; ");
+  return summary ? `Project ${name}: ${summary}. Keep prompts to it. ` : "";
 }
 
 /**
@@ -116,7 +117,7 @@ export function assertAvoided({ name, brief }, prompts) {
     for (const term of terms)
       if (new RegExp(`(?<![\\p{L}\\p{N}])${escape(term)}(?![\\p{L}\\p{N}])`, "iu").test(prompt))
         throw new Error(
-          `Prompt ${index + 1} names "${term}", which ${name} avoids; models draw what a prompt names, even after "no". Leave it out and call generate again, or update the project if the user wants it.`,
+          `Prompt ${index + 1} names "${term}", which ${name} avoids; models draw what a prompt names, even after "no". Leave it out and call generate again, or change that avoid list if the user wants it.`,
         );
 }
 
@@ -149,6 +150,26 @@ export function projectTargets({ name, constraints }, targets, known, { referenc
     targets: [{ profile: pick, note: "" }],
     note: `${name} runs only on ${listed.map(label).join(", ")}, so ${label(pick)} ran instead of ${others.join(", ")}. `,
   };
+}
+
+/**
+ * The account's chat brief and Always Avoid, for generate; taste may be unavailable to the account.
+ */
+export async function accountBrief(media, owner, signal) {
+  const [brief, taste] = await Promise.all([
+    media.request("GET", "/api/chat-brief", undefined, owner, { signal }),
+    media.request("GET", "/api/taste", undefined, owner, { signal }).catch(() => null),
+  ]);
+  return { brief: brief?.brief || {}, avoid: taste?.addedAvoid || [] };
+}
+
+/** The account's brief as generate's reply gives it, profiles by label; "" when there is none. */
+export function accountBriefLine({ brief, avoid }, profiles = []) {
+  const label = (id) => profiles.find((profile) => profile.id === id)?.label || id;
+  const summary = [briefSummary(brief, label), avoid.length && `avoid ${avoid.join(", ")}`]
+    .filter(Boolean)
+    .join("; ");
+  return summary ? `The user's brief: ${summary}. Keep every prompt to it. ` : "";
 }
 
 /** Registers project: a chat attaches to one so generate keeps to its brief and constraints. */
@@ -188,27 +209,96 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
       },
     };
   };
+  /**
+   * The project tool's brief action: the user's own brief for all chats, from the fields it shares
+   * with a project's (subjects, styles, avoid as Always Avoid, profiles as favourites), with
+   * ethnicity, age, body and favourite lora_names; only what is given changes.
+   */
+  const accountBriefAction = async ({ avoid, profiles, lora_names, ...fields }, signal) => {
+    const all = await media.profiles("all", owner).catch(() => []);
+    const change = {
+      ...fields,
+      ...(profiles ? { profiles: await profileIds(profiles) } : {}),
+      ...(lora_names ? { loras: lora_names } : {}),
+    };
+    const listed = avoid
+      ?.split(/[,;\n]+/)
+      .map((term) => term.trim())
+      .filter(Boolean);
+    const [{ brief }, taste] = await Promise.all([
+      Object.keys(change).length
+        ? api("PATCH", "/api/chat-brief", change, signal)
+        : api("GET", "/api/chat-brief", undefined, signal),
+      listed ? api("PUT", "/api/taste", { avoid: listed }, signal) : null,
+    ]);
+    const label = (id) => all.find((profile) => profile.id === id)?.label || id;
+    return mcpJson({
+      user_brief: { ...brief, ...(brief.profiles ? { profiles: brief.profiles.map(label) } : {}) },
+      ...(taste ? { avoid: taste.addedAvoid } : {}),
+      ...(Object.keys(change).length || listed
+        ? { note: "Tell the user it holds for every chat; Settings › Preferences edits it." }
+        : {}),
+    });
+  };
   tool(
     server,
     "project",
     "project",
-    `The chat's project: a brief and constraints generate keeps to. action: show (default; lists projects), attach (project), create, update (only what changed) or detach. Use when the user wants something for the whole chat ("no LoRAs", "only turbo").`,
+    `The chat's project and constraints. show lists projects and the user's brief; attach (project), create, update (only changes) or detach. brief saves lasting rules for all chats ("" clears); profiles are favourites, lora_names favourites.`,
     {
-      action: z.enum(["show", "attach", "create", "update", "detach"]).optional(),
+      action: z.enum(["show", "attach", "create", "update", "detach", "brief"]).optional(),
       project: z.string().optional(),
       name: z.string().optional(),
       subjects: z.string().optional(),
+      ethnicity: z.string().optional(),
+      age: z.string().optional(),
+      body: z.string().optional(),
       styles: z.string().optional(),
+      rules: z.string().optional().describe("Banned changes and standing rules."),
       avoid: z.string().optional(),
       profiles: z.array(z.string()).optional().describe('ids, names or a tier ("turbo"); [] any'),
       loras: z.boolean().optional(),
+      lora_names: z.array(z.string()).optional(),
       aspect: z.string().optional(),
       resolution: z.string().optional(),
     },
     async (
-      { action = "show", project, name, profiles, loras, aspect, resolution, ...brief },
+      {
+        action = "show",
+        project,
+        name,
+        profiles,
+        loras,
+        aspect,
+        resolution,
+        ethnicity,
+        age,
+        body: bodyType,
+        lora_names,
+        ...brief
+      },
       signal,
     ) => {
+      if (action === "brief")
+        return accountBriefAction(
+          {
+            ...brief,
+            ...Object.fromEntries(
+              Object.entries({ ethnicity, age, body: bodyType, profiles, lora_names }).filter(
+                ([, value]) => value !== undefined,
+              ),
+            ),
+          },
+          signal,
+        );
+      Object.assign(
+        brief,
+        Object.fromEntries(
+          Object.entries({ ethnicity, age, body: bodyType, loras: lora_names }).filter(
+            ([, value]) => value !== undefined,
+          ),
+        ),
+      );
       const attach = async (projectId) =>
         (await api("POST", "/api/dream/projects/attach", { chat: need(), projectId }, signal))
           .project;
@@ -232,10 +322,14 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
       const current = (await api("POST", "/api/dream/projects/activity", { chat: need() }, signal))
         .project;
       if (action === "show") {
-        const { projects } = await api("GET", "/api/dream/projects", undefined, signal);
+        const [{ projects }, { brief: own }] = await Promise.all([
+          api("GET", "/api/dream/projects", undefined, signal),
+          api("GET", "/api/chat-brief", undefined, signal),
+        ]);
         return mcpJson({
           project: await shown(current),
           projects: projects.map(({ name }) => name),
+          ...(Object.keys(own).length ? { user_brief: own } : {}),
         });
       }
       const constraints = Object.fromEntries(
