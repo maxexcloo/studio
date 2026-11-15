@@ -10,6 +10,7 @@ import {
 
 import { post } from "../../api";
 import type { MediaItem, Rating } from "../../types";
+import { layerAbove } from "../../ui/popupClicks";
 import { queueQuery } from "../generation/Queue";
 import { galleryKey } from "./queries";
 
@@ -107,6 +108,7 @@ export function useRatings() {
 
 /** A dislike's notification: the item left the gallery, with Undo to restore it. */
 export function showDisliked(count: number, undo: () => void) {
+  const owner = document.activeElement?.closest<HTMLElement>('[role="dialog"]');
   const notification = notifications.show({
     autoClose: 8000,
     message: (
@@ -120,6 +122,7 @@ export function showDisliked(count: number, undo: () => void) {
           onClick={() => {
             notifications.hide(notification);
             undo();
+            if (owner?.isConnected && !layerAbove(owner)) owner.focus({ preventScroll: true });
           }}
         >
           Undo

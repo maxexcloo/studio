@@ -353,19 +353,22 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   }
   await closeTextEditor(page, "Prompt");
   let menu = await viewerPromptMenu(page);
-  const review = () => page.getByRole("menuitem", { name: "Review Prompt", exact: true });
+  const review = () => menu.getByRole("menuitem", { name: "Review Prompt", exact: true });
   await expect(review()).toHaveAttribute("aria-checked", "false");
   await review().click();
   await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
   await editPrompt(edited);
   await closeTextEditor(page, "Prompt");
   menu = await viewerPromptMenu(page);
   await expect(review()).toHaveAttribute("aria-checked", "true");
   await expect(menu.getByRole("menuitem", { name: "Night Version", exact: true })).toBeVisible();
-  expect(asked.filter((body) => body.surface === "viewer").at(-1)).toMatchObject({
-    prompt: edited,
-    itemId: "hub",
-  });
+  await expect
+    .poll(() => asked.filter((body) => body.surface === "viewer").at(-1))
+    .toMatchObject({
+      prompt: edited,
+      itemId: "hub",
+    });
   await menu.getByRole("menuitem", { name: "Night Version", exact: true }).click();
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     steps[2].prompt,
@@ -378,12 +381,15 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   expect(state.jobs).toHaveLength(1);
   await viewer.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(edited);
-  await viewerPromptMenu(page);
+  menu = await viewerPromptMenu(page);
   await review().click();
   await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
   await viewerAction(page, "Animate");
+  menu = page.getByRole("menu", { name: "Animate", exact: true });
   await expect(review()).toHaveAttribute("aria-checked", "false");
   await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
   menu = await viewerPromptMenu(page);
   await expect(review()).toHaveAttribute("aria-checked", "false");
   await menu.getByRole("menuitem", { name: "Night Version", exact: true }).click();
