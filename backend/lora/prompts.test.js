@@ -47,6 +47,16 @@ test("enabled LoRAs' trigger words lead the prompt in stack order, once each, un
   assert.equal(withLoraTriggers("A harbour", [], infos), "A harbour");
 });
 
+test("a slider adds only the trigger word for the end its strength points to", () => {
+  const infos = {
+    "Breasts_Slider.safetensors": { triggers: ["large breasts.", "small breasts."] },
+  };
+  const run = (strength) =>
+    withLoraTriggers("A portrait", [{ name: "Breasts_Slider.safetensors", strength }], infos);
+  assert.equal(run(0.8), "large breasts., A portrait");
+  assert.equal(run(-1), "small breasts., A portrait");
+});
+
 test("a recommended negative fills above cfg 1 with the LoRAs' own; optional and none never do", () => {
   const recommended = { negative: { effect: "recommended", default: "blurry" } };
   const infos = { a: { negative: "colour bleed" }, b: {} };
