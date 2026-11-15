@@ -69,6 +69,68 @@ test("Picking a character places its first image and leads the prompt with it, a
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toHaveCount(0);
 });
 
+test("Applying and removing a two-image character preserves pre-existing manual references", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.characters.push(mara);
+  const profile = {
+    ...profiles[0],
+    editReferences: true,
+    keepsCharacters: true,
+    mediaInputs: [{ id: "image", max: 2 }],
+  };
+  await serveProfiles(page, [profile]);
+  await page.goto("/images");
+  for (const existing of [[mara.references[1]], mara.references]) {
+    const references = existing.map((asset) => ({ ...asset, slot: "image" }));
+    await page.evaluate(
+      ({ references, profileId }) => {
+        localStorage.setItem(
+          "studio-composer-draft:local",
+          JSON.stringify({
+            image: {
+              input: {
+                kind: "image",
+                profileId,
+                prompt: "A forest path.",
+                referenceAssets: references.map((asset) => ({
+                  assetId: asset.id,
+                  slot: asset.slot,
+                })),
+              },
+              references,
+              sessionId: "",
+              operation: "image",
+            },
+          }),
+        );
+      },
+      { references, profileId: profile.id },
+    );
+    await create(page);
+    await openCharacters(page);
+    await page.getByRole("button", { name: "Use character: Mara", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Remove character: Mara", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Remove character: Mara", exact: true }).click();
+    await closeReferences(page);
+    await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+      "A forest path.",
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          JSON.parse(localStorage.getItem("studio-composer-draft:local")!).image.references.map(
+            (asset: { id: string }) => asset.id,
+          ),
+        ),
+      )
+      .toEqual(references.map((asset) => asset.id));
+  }
+});
+
 test("Picking a character on an img2img model moves the composer to a model that keeps characters", async ({
   page,
 }) => {

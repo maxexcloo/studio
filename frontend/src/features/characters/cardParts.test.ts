@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { characterLead, outfitPart, scenePart } from "../../../../shared/characters.ts";
+import { addReference } from "../generation/payload.ts";
 import {
   forgetCard,
   promptCardApplied,
@@ -38,6 +39,36 @@ test("editing a saved outfit leaves the draft intact until reapplying it replace
   const remembered = rememberCard(parts, "outfits", edited, initial, next);
   assert.equal(remembered![outfit.id].text, outfitPart(edited.description));
   assert.deepEqual(forgetCard(remembered, edited.id), characterParts);
+});
+
+test("a two-image character owns only its inserted reference, preserving a manually placed second image and a no-op first image", () => {
+  const asset = (id: string) => ({
+    id,
+    slot: "image",
+    name: id,
+    thumbnailUrl: "",
+    width: 64,
+    height: 64,
+  });
+  const first = asset("front");
+  const second = asset("side");
+  const card = { id: "chr-two", description: "red hair", references: [first, second] };
+  const profile = { mediaInputs: [{ id: "image", max: 2 }] };
+  for (const before of [[second], [first, second], [{ ...first, slot: "style" }]]) {
+    const after = addReference(before, first, profile);
+    const prompt = characterLead(card.description);
+    const parts = rememberCard(undefined, "characters", card, "", prompt, { before, after });
+    assert.deepEqual(removeCharacter(card, after, prompt, parts).references, before);
+    const remaining = removeCharacter(card, after, prompt, parts).references;
+    const reapplied = addReference(remaining, first, profile);
+    const edited = { ...card, description: "black hair" };
+    const nextPrompt = characterLead(edited.description);
+    const nextParts = rememberCard(parts, "characters", edited, prompt, nextPrompt, {
+      before: remaining,
+      after: reapplied,
+    });
+    assert.deepEqual(removeCharacter(edited, reapplied, nextPrompt, nextParts).references, before);
+  }
 });
 
 test("applying an outfit preserves manually written text matching another saved outfit", () => {
@@ -105,7 +136,10 @@ test("removing an edited character removes its old recorded text and images, pre
     references: [asset("old-reference")],
   };
   const before = characterLead(original.description);
-  const parts = rememberCard(undefined, "characters", original, "", before);
+  const parts = rememberCard(undefined, "characters", original, "", before, {
+    before: [],
+    after: original.references,
+  });
   const edited = { ...original, description: "black hair", references: [asset("new-reference")] };
   const typed = `${before} ${characterLead(edited.description)} At a bus stop.`;
   const references = [asset("old-reference"), asset("new-reference"), asset("unrelated-reference")];

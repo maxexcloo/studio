@@ -7,13 +7,12 @@ import {
   characterLead,
   identitySlot,
   withCharacter,
-  withoutPart,
 } from "../../../../shared/characters";
 import { api, post } from "../../api";
 import type { Profile, ReferenceAsset } from "../../types";
 import { queueQuery } from "../generation/Queue";
 import { nextReferenceTarget, placeReference } from "../generation/references";
-import { type CardParts, rememberCard } from "./cardParts";
+import { type CardParts, rememberCard, removeCharacter } from "./cardParts";
 
 /** A card as `/api/characters` lists it: its images that still exist, as reference assets. */
 export interface CharacterCard extends Omit<Character, "sheet" | "portrait"> {
@@ -101,7 +100,7 @@ export function characterApplied(
   if (
     !previous ||
     previous.text !== characterLead(card.description) ||
-    JSON.stringify(previous.referenceIds) !==
+    JSON.stringify(previous.cardReferenceIds) !==
       JSON.stringify(card.references.map((asset) => asset.id))
   )
     return false;
@@ -123,25 +122,24 @@ export function applyCharacter(
   profile?: Profile,
   parts?: CardParts,
 ) {
-  const previous = parts?.[card.id];
-  const remaining = previous
-    ? references.filter((asset) => !previous.referenceIds?.includes(asset.id))
-    : references;
+  const cleared = removeCharacter(card, references, prompt, parts);
+  const remaining = cleared.references;
   const first = card.references[0];
   // A profile's Identity slot takes it first.
   const identity = profile && identitySlot(profile);
   const target =
     first && nextReferenceTarget(remaining, profile, identity ? { slot: identity } : null);
-  const nextPrompt = withCharacter(
-    previous?.ownsText ? withoutPart(prompt, previous.text) : prompt,
-    card.description,
-  );
+  const nextPrompt = withCharacter(cleared.prompt, card.description);
+  const nextReferences = target
+    ? placeReference(remaining, { ...first, slot: undefined }, profile, target)
+    : remaining;
   return {
-    references: target
-      ? placeReference(remaining, { ...first, slot: undefined }, profile, target)
-      : remaining,
+    references: nextReferences,
     prompt: nextPrompt,
-    cardParts: rememberCard(parts, "characters", card, prompt, nextPrompt),
+    cardParts: rememberCard(parts, "characters", card, prompt, nextPrompt, {
+      before: remaining,
+      after: nextReferences,
+    }),
   };
 }
 

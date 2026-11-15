@@ -95,7 +95,13 @@ export interface GenerationInput extends Record<string, unknown> {
   /** Exact card contributions, so reapplying an edited card can replace what was inserted. */
   cardParts?: Record<
     string,
-    { kind: CardKind; text: string; ownsText: boolean; referenceIds?: string[] }
+    {
+      kind: CardKind;
+      text: string;
+      ownsText: boolean;
+      cardReferenceIds?: string[];
+      references?: Pick<ReferenceAsset, "id" | "slot">[];
+    }
   >;
   negative: string;
   width: number;

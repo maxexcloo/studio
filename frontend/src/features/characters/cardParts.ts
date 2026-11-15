@@ -25,6 +25,7 @@ export function rememberCard(
   card: { id: string; description: string; references?: { id: string }[] },
   before: string,
   prompt: string,
+  references?: { before: ReferenceAsset[]; after: ReferenceAsset[] },
 ): CardParts {
   const text = cardTexts(kind, card.description).find((text) => prompt.includes(text))!;
   const replaced = Object.entries(parts || {}).filter(([id, part]) =>
@@ -44,7 +45,20 @@ export function rememberCard(
       kind,
       text,
       ownsText: !unowned.includes(text),
-      ...(kind === "characters" ? { referenceIds: card.references?.map((asset) => asset.id) } : {}),
+      ...(kind === "characters"
+        ? {
+            cardReferenceIds: card.references?.map((asset) => asset.id),
+            references:
+              references?.after
+                .filter(
+                  (asset) =>
+                    !references.before.some(
+                      (before) => before.id === asset.id && before.slot === asset.slot,
+                    ),
+                )
+                .map(({ id, slot }) => ({ id, slot })) || [],
+          }
+        : {}),
     },
   };
 }
@@ -68,9 +82,11 @@ export function removeCharacter(
   prompt: string,
   parts: CardParts,
 ) {
-  const ids = new Set(parts?.[card.id]?.referenceIds);
+  const contributed = parts?.[card.id]?.references || [];
   return {
-    references: references.filter((asset) => !ids.has(asset.id)),
+    references: references.filter(
+      (asset) => !contributed.some((owned) => owned.id === asset.id && owned.slot === asset.slot),
+    ),
     ...removeCard(card.id, prompt, parts),
   };
 }
