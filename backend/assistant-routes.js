@@ -136,8 +136,11 @@ export async function assistantIntegration({ environment = process.env, engine }
 }
 
 /** The text models to choose from: the gateway's and those of Studio's text workloads. */
+/** The gateway's curated aliases (`cloud/…`, `local/…`), not every model it can reach. */
 async function textModels(engine, workloadModels) {
-  return [...new Set([...(await engine.listModels()), ...workloadModels])];
+  return [...new Set([...(await engine.listModels()), ...workloadModels])].filter((model) =>
+    /^(cloud|local)\//.test(model),
+  );
 }
 
 /**

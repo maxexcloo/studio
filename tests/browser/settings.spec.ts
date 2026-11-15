@@ -301,16 +301,16 @@ test("Where Work Runs in Settings › Preferences saves where each area runs and
   await expect.poll(() => state.preferences.preferences.images).toBe("cloud");
   // Text picks the gateway text model, unsaved the account's default.
   const writing = where.getByRole("combobox", { name: "Text", exact: true });
-  await expect(writing).toHaveValue("cloud/uncensored");
+  await expect(writing).toHaveValue("Uncensored · Cloud");
   await writing.click();
   await expect(page.getByRole("option")).toHaveText([
-    "cloud/auto",
-    "cloud/uncensored",
-    "local/auto",
+    "Auto · Cloud",
+    "Uncensored · Cloud",
+    "Auto · Local",
   ]);
-  await page.getByRole("option", { name: "local/auto", exact: true }).click();
+  await page.getByRole("option", { name: "Auto · Local", exact: true }).click();
   await expect.poll(() => state.preferences.preferences.writingModel).toBe("local/auto");
-  await expect(writing).toHaveValue("local/auto");
+  await expect(writing).toHaveValue("Auto · Local");
   await choose("Videos", "Cloud");
   await expect.poll(() => state.preferences.preferences.videos).toBe("cloud");
   await choose("Videos", "Fast");
