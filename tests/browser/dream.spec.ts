@@ -13,12 +13,12 @@ async function showView(page: Page, name: string) {
 }
 
 const current = (page: Page) => page.getByRole("group", { name: "Current Dream", exact: true });
-/** Clicks an action in full screen's Dream bar; phones keep More Like This and Variations under ⋯ More. */
-async function dreamAction(page: Page, phone: boolean, name: string) {
+/** Clicks an action in full screen's Dream bar, whose Recreate ▾ holds More Like This and Variations. */
+async function dreamAction(page: Page, name: string) {
   const actions = page.getByRole("group", { name: "Dream Actions" });
-  if (!phone || !["More Like This", "Variations"].includes(name))
+  if (!["More Like This", "Variations"].includes(name))
     return actions.getByRole("button", { name, exact: true }).click();
-  await actions.getByRole("button", { name: "More", exact: true }).click();
+  await actions.getByRole("button", { name: "Recreate", exact: true }).click();
   await page.getByRole("menuitem", { name, exact: true }).click();
 }
 const verdicts = (state: Awaited<ReturnType<typeof serveDream>>) =>
@@ -139,8 +139,8 @@ test("While You Were Away ranks each project's results, folds its misses and jud
   if (!isMobile)
     await expect(
       viewer.getByRole("group", { name: "Dream Actions" }).getByRole("button"),
-    ).toHaveText(["Animate", "Edit", "More Like This", "Variations", "Pass", "Super Like", "Like"]);
-  await dreamAction(page, isMobile, "More Like This");
+    ).toHaveText(["Animate", "Edit", "Recreate", "Pass", "Super Like", "Like"]);
+  await dreamAction(page, "More Like This");
   await expect(viewer.getByRole("img", { name: "Dream prompt loose" })).toBeVisible();
   await viewer
     .getByRole("group", { name: "Dream Actions" })
@@ -353,15 +353,12 @@ test("Dream says why it can't run", async ({ page }) => {
   );
 });
 
-test("Animate keeps a Dream image and stages it in the Videos composer", async ({
-  page,
-  isMobile,
-}) => {
+test("Animate keeps a Dream image and stages it in the Videos composer", async ({ page }) => {
   const state = await fixtures(page);
   const dream = await serveDream(page, { unseen: [dreamItem("fox")] });
   await page.goto("/dream");
   await current(page).getByRole("button", { name: "View", exact: true }).click();
-  await dreamAction(page, isMobile, "Animate");
+  await dreamAction(page, "Animate");
   await expect(page).toHaveURL(/\/video/);
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Dream prompt fox",
@@ -535,25 +532,24 @@ test("Full screen switches between a comparison's sides and judges from its bar"
     .getByRole("button", { name: "View A · 20 Steps", exact: true })
     .click();
   const viewer = page.getByRole("dialog");
-  const shown = viewer.getByRole("radiogroup", { name: "Shown Image" });
   await expect(viewer.getByRole("button", { name: "Generation Details" })).toBeFocused();
-  await expect(shown.getByRole("radio", { name: "A · 20 Steps" })).toBeChecked();
+  // The top bar names the shown side, and arrow keys switch sides as in any viewer.
+  await expect(viewer.getByText("A · 20 Steps", { exact: true })).toBeVisible();
   await expect(viewer.getByRole("img", { name: "Side 20 Steps" })).toBeVisible();
-  // Arrow keys and the choice above the picture switch sides.
   await page.keyboard.press("ArrowRight");
-  await expect(shown.getByRole("radio", { name: "B · 40 Steps" })).toBeChecked();
+  await expect(viewer.getByText("B · 40 Steps", { exact: true })).toBeVisible();
   await expect(viewer.getByRole("img", { name: "Side 40 Steps" })).toBeVisible();
-  await shown.getByText("A · 20 Steps", { exact: true }).click();
+  await page.keyboard.press("ArrowLeft");
   await expect(viewer.getByRole("img", { name: "Side 20 Steps" })).toBeVisible();
+  const answers = viewer.getByRole("group", { name: "Comparison Answers" });
   if (info.project.name === "desktop") {
-    await shown.locator("label").filter({ hasText: "Side by Side" }).click();
+    await answers.getByRole("button", { name: "Side by Side", exact: true }).click();
     await expect(viewer.getByRole("button", { name: /^Show . · \d+ Steps Alone$/ })).toHaveCount(2);
     await viewer.getByRole("button", { name: "Show B · 40 Steps Alone" }).click();
-    await expect(shown.getByRole("radio", { name: "B · 40 Steps" })).toBeChecked();
+    await expect(viewer.getByRole("img", { name: "Side 40 Steps" })).toBeVisible();
   }
 
   // An answer returns to the deck.
-  const answers = viewer.getByRole("group", { name: "Comparison Answers" });
   await answers.getByRole("button", { name: "Neither", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();

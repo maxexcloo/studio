@@ -82,7 +82,7 @@ for (const failFirst of [false, true]) {
     expect(picture).not.toBeNull();
     try {
       // With an upscale, Upscale's first option shows it.
-      await viewerAction(page, "Upscale");
+      await viewerAction(page, "Edit", "Upscale");
       await page.getByRole("menuitem", { name: "Show Upscale", exact: true }).click();
       await expect(page.getByRole("menu")).toHaveCount(0);
       await expect.poll(() => requested).toBe(true);

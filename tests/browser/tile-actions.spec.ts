@@ -100,17 +100,13 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // The viewer's sections and order: Animate, Edit, Recreate, Upscale | Copy, Download | Compare,
-  // Similar | Star, Delete.
+  // Select, then the viewer's sections and order: Animate, Edit, Recreate | Share | Star, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
+    "Select",
     "Animate",
     "Edit",
     "Recreate",
-    "Upscale",
-    "Copy",
-    /^(Download|Share)$/,
-    "Compare",
-    "Similar",
+    "Share",
     "Star",
     "Delete",
   ]);
@@ -124,9 +120,9 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await expect(page.getByRole("menu")).toBeVisible();
   await expect(page.getByRole("menu").locator(":focus")).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Animate", exact: true })).toBeFocused();
+  await expect(page.getByRole("menuitem", { name: "Select", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Edit", exact: true })).toBeFocused();
+  await expect(page.getByRole("menuitem", { name: "Animate", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(more).toBeFocused();
 });
@@ -404,21 +400,22 @@ test("On a phone held sideways, the tile menu fits the screen and expands option
     return box.y + box.height;
   };
   await expect.poll(bottom).toBeLessThanOrEqual(390);
-  await page.getByRole("menuitem", { name: "Copy", exact: true }).click();
-  await expect(page.getByRole("group", { name: "Copy", exact: true })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Share", exact: true }).click();
+  await expect(page.getByRole("group", { name: "Share", exact: true })).toBeVisible();
   // Delete, last, is reachable by scrolling inside the menu.
   const remove = page.getByRole("menuitem", { name: "Delete", exact: true });
   await remove.scrollIntoViewIfNeeded();
   await expect(remove).toBeInViewport();
 });
 
-test("Similar ranks the gallery by an image from its tile menu or the viewer, as a removable filter", async ({
+test("Recreate › Similar ranks the gallery by an image from its tile menu or the viewer, as a removable filter", async ({
   page,
 }) => {
   const state = await galleryFixture(page);
   state.gallery.push({ ...state.gallery[0], id: "tile-moth", jobId: "", prompt: "A paper moth" });
   await page.reload();
   await tileMenu(page);
+  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Similar", exact: true }).click();
   // Its strictness sits above the run.
   await expect(page.getByRole("radiogroup", { name: "Strictness", exact: true })).toBeVisible();
@@ -439,13 +436,13 @@ test("Similar ranks the gallery by an image from its tile menu or the viewer, as
   await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Open image: A paper moth", exact: true }).click();
-  await viewerAction(page, "Similar");
+  await viewerAction(page, "Recreate", "Similar");
   await expect(
     page
       .getByRole("radiogroup", { name: "Strictness", exact: true })
       .getByRole("radio", { name: "Close", exact: true }),
   ).toBeChecked();
-  await page.getByRole("menuitem", { name: "Similar", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Similar", exact: true }).last().click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(chip("Close to A paper moth")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Open image:/ }).first()).toHaveAccessibleName(

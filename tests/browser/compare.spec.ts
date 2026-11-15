@@ -263,7 +263,8 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   await page
     .getByRole("button", { name: "Open image: An amber bird", exact: true })
     .click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Compare", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Compare Models", exact: true }).click();
   await expect(variants(page).getByRole("radio", { name: "B", exact: true })).toBeChecked();
   await expect(page.getByRole("button", { name: "Clear Seed 1234567", exact: true })).toBeVisible();
   await prompt(page).fill("A jade bird");
@@ -306,9 +307,9 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
     "href",
     "/compare/compare-2",
   );
-  // Compare ▾ holds its usual Compare Models, then the comparison the image belongs to.
-  await viewerAction(page, "Compare");
-  await expect(page.getByRole("menuitem")).toHaveText(["Compare Models", "Open Comparison"]);
+  // Recreate ▾ holds Compare Models, then the comparison the image belongs to.
+  await viewerAction(page, "Recreate");
+  await expect(page.getByRole("menuitem", { name: "Compare Models", exact: true })).toBeVisible();
   await page.getByRole("menuitem", { name: "Open Comparison", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\/compare-2$/);
 });
@@ -344,7 +345,7 @@ test("Compare Selected sets chosen images side by side, number keys star the win
     page.getByRole("button", { name: `Select image: ${title}`, exact: true }).click();
   await pick("A tin owl");
   await pick("A glass owl");
-  await (await selectionMenuItem(page, "Compare")).click();
+  await (await selectionMenuItem(page, "Recreate", "Compare")).click();
 
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   expect(state.comparisons[0].itemIds).toEqual(["batch-0", "batch-1"]);
