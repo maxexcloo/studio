@@ -1,6 +1,7 @@
 import {
   Alert,
   Button,
+  Checkbox,
   FocusTrap,
   Group,
   Modal,
@@ -30,6 +31,7 @@ interface CatalogueItem extends LibraryItem {
   triggers?: string[];
   tags?: string[];
   uncensored?: boolean;
+  hidden?: boolean;
   guidance?: string;
   strength?: { default?: number; min?: number; max?: number; step?: number };
 }
@@ -52,6 +54,7 @@ function CatalogueForm({
       modelType: item.modelType || "",
       type: item.type || "",
       role: item.role || "",
+      hidden: item.hidden === true,
       triggers: item.triggers || [],
       tags: item.tags || [],
       description: item.description || "",
@@ -81,6 +84,7 @@ function CatalogueForm({
         "modelType",
         "type",
         "role",
+        "hidden",
         "triggers",
         "tags",
         "description",
@@ -91,13 +95,15 @@ function CatalogueForm({
         if (!form.isDirty(key)) continue;
         const value = form.values[key];
         patch[key] =
-          key === "uncensored"
-            ? value === "unknown"
-              ? null
-              : value === "uncensored"
-            : value === ""
-              ? null
-              : value;
+          key === "hidden"
+            ? value || null
+            : key === "uncensored"
+              ? value === "unknown"
+                ? null
+                : value === "uncensored"
+              : value === ""
+                ? null
+                : value;
       }
       if (["default", "min", "max", "step"].some((key) => form.isDirty(key)))
         patch.strength = {
@@ -173,6 +179,11 @@ function CatalogueForm({
               }))}
               value={form.values.role || null}
               onChange={(value) => form.setFieldValue("role", value || "")}
+            />
+            <Checkbox
+              label="Hidden"
+              description="Left out of LoRA pickers, chats and Dream; stacks that have it still run it."
+              {...form.getInputProps("hidden", { type: "checkbox" })}
             />
             <TagsInput label="Trigger Words" {...form.getInputProps("triggers")} />
             <Text size="sm" c="dimmed">

@@ -189,6 +189,14 @@ test("Generate LoRA names resolve without folder, extension or case and take the
   assert.deepEqual(prepareLoras(subject, infos, [{ name: "ink wash", triggers: false }]), [
     { name: "styles/Ink-Wash.safetensors", strength: 1.1, triggers: false },
   ]);
+  // A LoRA the Library hides is neither offered nor run when a chat names it.
+  const hidden = {
+    "styles/Ink-Wash.safetensors": { ...infos["styles/Ink-Wash.safetensors"], hidden: true },
+  };
+  assert.throws(
+    () => prepareLoras(subject, hidden, [{ name: "ink wash" }]),
+    /is hidden in Studio's Library/,
+  );
   assert.throws(
     () => prepareLoras(subject, infos, [{ name: "oil paint" }]),
     /^Error: No LoRA named oil paint for SDXL\. Call models with lora_query to look one up\.$/,

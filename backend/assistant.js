@@ -357,7 +357,7 @@ const one = (value, limit = 600) =>
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, limit);
-const isRole = (info) => ["acceleration", "supporting"].includes(info?.role);
+const isRole = (info) => ["acceleration", "supporting"].includes(info?.role) || info?.hidden;
 
 /** A LoRA's suggested strength: the publisher's default, a "Strength 0.7" note, else 1. */
 function suggestedStrength(info) {
