@@ -6,8 +6,10 @@ import { keptTriggers } from "../lora/prompts.js";
 
 /** Images per prompt a chat gets unless the user asks for a number (videos get one); the studio UI keeps its own default. */
 export const mcpGenerationCount = 2;
-/** Images one generate call may queue: every prompt times count. */
+/** Images one batch of a generate call queues: its prompts times count. */
 export const maxJobsPerCall = 10;
+/** Images one generate call may queue, in batches of maxJobsPerCall. */
+export const maxSplitJobs = 3 * maxJobsPerCall;
 
 const fixedRange = (range) =>
   Boolean(range) && Number.isFinite(range.min) && range.min === range.max;
@@ -48,7 +50,7 @@ export function mcpControls(profile) {
     min: 1,
     max: maxJobsPerCall,
     default: profile.kind === "video" ? 1 : mcpGenerationCount,
-    note: `prompts × count is at most ${maxJobsPerCall} per call.`,
+    note: `prompts × count is at most ${maxSplitJobs} per call.`,
   };
   if (caps.seed !== false) controls.seed = { min: 0 };
   if (caps.steps !== false && !fixedRange(constraints.steps))
@@ -233,7 +235,7 @@ export function assertAdjustable(profile, request) {
   return { controls, args, ignored: notes.join(" ") };
 }
 
-const clip = (value, length) => {
+export const clip = (value, length) => {
   const textValue = String(value || "")
     .replace(/\s+/g, " ")
     .trim();
@@ -490,11 +492,62 @@ export function mcpLoras(profile, infos = {}, { query = "", names = [], ratings 
   };
 }
 
+// Words naming a model family or version in LoRA file names, which an equivalent for another family changes.
+const familyWords = new Set([
+  "chroma",
+  "dev",
+  "flux",
+  "flux1",
+  "flux2",
+  "hidream",
+  "il",
+  "illustrious",
+  "klein",
+  "krea",
+  "noct",
+  "pony",
+  "qwen",
+  "schnell",
+  "sd",
+  "sd15",
+  "sdxl",
+  "wan",
+  "xl",
+  "zimage",
+]);
+/** What a LoRA name says it does, without its family, version and filler words. */
+const loraCore = (name, extra = []) => {
+  const skip = new Set(extra.flatMap(words));
+  return words(stem(name))
+    .filter(
+      (word) =>
+        !filler.has(word) && !familyWords.has(word) && !skip.has(word) && !/^v?\d+$/.test(word),
+    )
+    .join("");
+};
+/** This profile's LoRA that does what `value` (a name for another family) does, by its name. */
+const equivalentLora = (candidates, value, profile, info) => {
+  const core = loraCore(value, [profile.family, profile.label, info?.base]);
+  if (core.length < 4) return undefined;
+  const cores = candidates.map((entry) => [
+    entry,
+    loraCore(entry.name, [profile.family, profile.label, entry.info?.base]),
+  ]);
+  return (
+    cores.find(([, other]) => other === core) ||
+    cores.find(
+      ([, other]) => other.length >= 4 && (other.startsWith(core) || core.startsWith(other)),
+    )
+  )?.[0];
+};
+
 /**
- * The generate tool's LoRA stack for a profile: each name resolved to its file, refused with the closest
- * matches when unknown or unusable, and given its recommended strength when none is supplied.
+ * The generate tool's LoRA stack for a profile: each name resolved to its file, and given its
+ * recommended strength when none is supplied. A LoRA for another family becomes this profile's
+ * equivalent by name, or is left out, each with a line in `notes`; an unknown name is refused with
+ * the closest matches.
  */
-export function prepareLoras(profile, infos = {}, loras = []) {
+export function prepareLoras(profile, infos = {}, loras = [], notes = []) {
   const candidates = loraCandidates(profile, infos);
   const short = shortNames(profile);
   const label = profile.label || profile.id;
@@ -505,16 +558,24 @@ export function prepareLoras(profile, infos = {}, loras = []) {
   const stack = [];
   for (const { name: value, strength, triggers } of loras) {
     const name = resolveLoraName(profile, value);
-    const entry = candidates.find((item) => item.name === name);
+    let entry = candidates.find((item) => item.name === name);
     if (!entry) {
       if (name && ["acceleration", "supporting"].includes(infos[name]?.role))
         throw new Error(`${value} is applied by Studio itself; leave it out of loras.`);
       if (name && infos[name]?.hidden)
         throw new Error(`${value} is hidden in Studio's Library; choose another LoRA.`);
-      if (name)
-        throw new Error(
-          `${value} is for ${infos[name]?.base || "another model family"}, not ${label}; choose a LoRA from models for this profile.`,
+      const equivalent = equivalentLora(candidates, value, profile, name && infos[name]);
+      if (equivalent) {
+        notes.push(`Used ${short(equivalent.name)} for ${value}, its ${label} equivalent.`);
+        entry = equivalent;
+      } else if (name) {
+        notes.push(
+          `Left out ${value}: it is for ${infos[name]?.base || "another model family"} and ${label} has no equivalent.`,
         );
+        continue;
+      }
+    }
+    if (!entry) {
       const near = closest(candidates, value, (item) => [stem(item.name), item.info?.title]).map(
         (item) => short(item.name),
       );
@@ -522,15 +583,39 @@ export function prepareLoras(profile, infos = {}, loras = []) {
         `No LoRA named ${value} for ${label}.${near.length ? ` Closest: ${near.join(", ")}.` : ""} Call models with lora_query to look one up.`,
       );
     }
-    if (stack.some((item) => item.name === name)) continue;
+    if (stack.some((item) => item.name === entry.name)) continue;
     stack.push({
-      name,
+      name: entry.name,
       strength: Number.isFinite(strength) ? strength : loraDefaultStrength(entry.info, 0.7),
+      // The caller's own strength, which a batch never varies (varyLoras).
+      ...(Number.isFinite(strength) ? { fixed: true } : {}),
       // A reused run keeps its Trigger Words choice; MCP callers never set it themselves.
       ...keptTriggers(triggers),
     });
   }
   return stack;
+}
+
+/**
+ * A batch's LoRA stack for its prompt at `position`. A LoRA whose strength was left to Studio steps
+ * through its centre (the strength `liked` gives it, else its default), then lower and higher within
+ * its range, and every fourth prompt leaves the last of two or more such LoRAs out.
+ */
+export function varyLoras(stack, infos = {}, position = 0, liked = {}) {
+  const free = stack.filter((lora) => !lora.fixed);
+  const dropped = free.length > 1 && position % 4 === 3 ? free.at(-1).name : null;
+  return stack
+    .filter((lora) => lora.name !== dropped)
+    .map(({ fixed, ...lora }) => {
+      if (fixed) return lora;
+      const range = strengthRange(infos[lora.name]) || {
+        min: Math.max(0, lora.strength - 0.3),
+        max: lora.strength + 0.3,
+      };
+      const centre = Math.min(range.max, Math.max(range.min, liked[lora.name] ?? lora.strength));
+      const target = [centre, (range.min + centre) / 2, (centre + range.max) / 2][position % 3];
+      return { ...lora, strength: Math.round(target * 20) / 20 };
+    });
 }
 
 const orientations = {

@@ -8,6 +8,7 @@ import {
   maxUploadMegabytes,
   mcpJson,
   mcpOutputPath,
+  readyIn,
   uploadLinkMinutes,
 } from "./media.js";
 
@@ -89,19 +90,43 @@ export function registerResultTools({
     server,
     "search",
     "search gallery",
-    "Search the user's whole gallery by words, file name or look, with refs for reuse, review and result (♥ liked); filter by liked, model or lora (part of a name) or aspect. uploads: the user's uploads, as reference_asset_ids.",
+    "Search the user's whole gallery by words, file name or look, with refs (♥ liked); filter by liked, disliked, model or lora (part of a name) or aspect; cursor pages. summary: what all matches share, for questions about all of them. uploads: the user's uploads, as reference_asset_ids.",
     {
       query: z.string().trim().max(200).default(""),
       kind: z.enum(["image", "video"]).optional(),
       liked: z.boolean().default(false),
+      disliked: z.boolean().default(false),
       model: z.string().trim().max(200).optional(),
       lora: z.string().trim().max(200).optional(),
       aspect: z.enum(["landscape", "portrait", "square"]).optional(),
       uploads: z.boolean().default(false),
+      summary: z.boolean().default(false),
       limit: z.number().int().min(1).max(24).default(8),
+      cursor: z.string().trim().max(400).optional(),
     },
-    async (args, signal) => {
-      const hits = await media.search(owner, refs, args, { signal });
+    async ({ liked, disliked, summary, ...args }, signal) => {
+      if (liked && disliked) throw new Error("Pass liked or disliked, not both.");
+      const rating = liked ? "liked" : disliked ? "disliked" : undefined;
+      if (summary) {
+        const found = await media.searchSummary(owner, { ...args, rating }, { signal });
+        const list = (entries) =>
+          entries.map(({ name, count }) => `${name} (${count})`).join(", ") || "none";
+        return {
+          content: [
+            {
+              type: "text",
+              text: `${found.count}${found.more ? "+" : ""} ${rating || "matching"} results. Profiles: ${list(found.profiles)}. LoRAs: ${list(found.loras)}. Subjects: ${list(found.subjects)}.`,
+            },
+          ],
+          structuredContent: found,
+        };
+      }
+      const { hits, total, cursor } = await media.search(
+        owner,
+        refs,
+        { ...args, rating },
+        { signal },
+      );
       if (!hits.length)
         return {
           content: [{ type: "text", text: "Nothing in the gallery matches." }],
@@ -119,7 +144,7 @@ export function registerResultTools({
             item.filename,
             String(item.createdAt || "").slice(0, 10),
             (item.caption?.text || item.suggestedPrompt) &&
-              shortPrompt(item.caption?.text || item.suggestedPrompt),
+              shortPrompt(item.caption?.text || item.suggestedPrompt, 80),
           ]
             .filter(Boolean)
             .join(" · "),
@@ -148,16 +173,16 @@ export function registerResultTools({
         job_id: item.jobId,
         output_index: item.index,
         link: media.url(owner, item.jobId, item.index),
-        liked: item.rating === "liked",
+        ...(item.rating ? { rating: item.rating } : {}),
       }));
+      // A line each: its ref, then a gist; Details and the link keep the whole prompt.
       const lines = hits.map((item, position) => {
         const { ref, link } = results[position];
         return [
           `- [${ref}](${link})${item.rating === "liked" ? " ♥" : ""}`,
-          item.title && shortPrompt(item.title),
+          shortPrompt(item.title || item.prompt || "", 80),
           item.settings?.modelName || item.model || item.settings?.profileId,
           String(item.createdAt || "").slice(0, 10),
-          item.prompt && shortPrompt(item.prompt),
         ]
           .filter(Boolean)
           .join(" · ");
@@ -174,19 +199,28 @@ export function registerResultTools({
                   images.map((item) => [item.jobId, item.index]),
                 )
           })`;
+      const counted =
+        total === undefined
+          ? `${hits.length === 1 ? "One match" : `${hits.length} matches`}`
+          : `${hits.length} of ${total} matches`;
       return {
         content: [
           {
             type: "text",
             text: [
-              `${hits.length === 1 ? "One match" : `${hits.length} matches`}, newest first. Pass a ref (and output_index for a later output) to reuse, review or result.\n\n${lines.join("\n")}${picture}`,
+              `${counted}, newest first${cursor ? `; pass cursor "${cursor}" for more` : ""}. Pass a ref (and output_index for a later output) to reuse, review or result.\n\n${lines.join("\n")}${picture}`,
               comparisonContext(comparisons),
             ]
               .filter(Boolean)
               .join("\n\n"),
           },
         ],
-        structuredContent: { results, ...(comparisons.length ? { comparisons } : {}) },
+        structuredContent: {
+          ...(total === undefined ? {} : { total }),
+          ...(cursor ? { cursor } : {}),
+          results,
+          ...(comparisons.length ? { comparisons } : {}),
+        },
       };
     },
     { readOnlyHint: true },
@@ -255,27 +289,83 @@ export function registerResultTools({
         .describe("One image each."),
     },
     async ({ job_id, output_index, compare_to, compare_to_output_index, also = [] }, signal) => {
-      const options = { scope: refs, signal, waitSeconds: reviewWaitSeconds };
-      const first = [
-        await target(job_id, output_index, signal),
-        ...(compare_to ? [await target(compare_to, compare_to_output_index, signal)] : []),
-      ];
-      if (!also.length) return media.review(owner, first, options);
       // One call for many results keeps the chat's tool steps narrow; LibreChat shrinks every
       // earlier tool call it keeps in context by the widest parallel step.
+      const groups = [
+        {
+          label: job_id,
+          targets: [
+            await target(job_id, output_index, signal),
+            ...(compare_to ? [await target(compare_to, compare_to_output_index, signal)] : []),
+          ],
+        },
+        ...(await Promise.all(
+          also.map(async (value) => {
+            try {
+              return { label: value, targets: [await target(value, 0, signal)] };
+            } catch (error) {
+              return { label: value, error: error.message };
+            }
+          }),
+        )),
+      ];
+      // Work about to finish is waited for briefly, together; the rest is listed with its wait.
+      const jobs = await media.settle(
+        owner,
+        [...new Set(groups.flatMap(({ targets = [] }) => targets.map(({ jobId }) => jobId)))],
+        reviewWaitSeconds,
+        { signal },
+      );
+      const unfinished = ({ targets = [] }) =>
+        targets.filter(({ jobId }) => !jobs.get(jobId).done).map(({ jobId }) => jobId);
+      const ready = groups.filter((group) => !group.error && !unfinished(group).length);
       const replies = await Promise.all(
-        [first, ...also].map(async (group, index) => {
+        ready.map(async (group, index) => {
+          if (groups.length === 1)
+            return media.review(owner, group.targets, { scope: refs, signal });
           try {
-            const targets = index ? [await target(group, 0, signal)] : group;
-            return await media.review(owner, targets, { ...options, brief: !index });
+            return await media.review(owner, group.targets, {
+              scope: refs,
+              signal,
+              brief: !index,
+            });
           } catch (error) {
-            return {
-              content: [{ type: "text", text: `${index ? group : job_id}: ${error.message}` }],
-            };
+            return { content: [{ type: "text", text: `${group.label}: ${error.message}` }] };
           }
         }),
       );
-      return { content: replies.flatMap((reply) => reply.content) };
+      const failed = groups
+        .filter((group) => group.error)
+        .map(({ label, error }) => ({ type: "text", text: `${label}: ${error}` }));
+      const waiting = [...new Set(groups.flatMap(unfinished))].map((jobId) => {
+        const job = jobs.get(jobId);
+        const left = Number.isFinite(job.progress?.endsAt)
+          ? Math.max(0, job.progress.endsAt - Date.now())
+          : 0;
+        const ref = media.refOf(jobId);
+        return {
+          job_id: jobId,
+          ...(ref ? { ref } : {}),
+          status: job.status || "running",
+          line: `[${ref || "Result"}](${media.pageUrl(owner, jobId)}) ${job.status || "running"}${readyIn(left, job.ahead)}`,
+          ...(left ? { eta_seconds: Math.round(left / 1000) } : {}),
+          ...(Number.isInteger(job.ahead) ? { jobs_ahead: job.ahead } : {}),
+        };
+      });
+      const pending = waiting.length
+        ? [
+            {
+              type: "text",
+              text: `Not finished yet, so not reviewed: ${waiting.map(({ line }) => line).join("; ")}. ${ready.length ? "Reply with the review of the rest and" : "Reply now with the links and"} offer to review these once done; do not poll.`,
+            },
+          ]
+        : [];
+      return {
+        content: [...replies.flatMap((reply) => reply.content), ...failed, ...pending],
+        ...(waiting.length
+          ? { structuredContent: { waiting: waiting.map(({ line: _line, ...item }) => item) } }
+          : {}),
+      };
     },
     { readOnlyHint: true },
   );
