@@ -9,15 +9,9 @@ import { LoadingState } from "../../ui/LoadingState";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
 import { PickerGrid, PickerTile } from "../generation/Picker";
-import type { CardParts } from "./cardParts";
+import { type CardParts, removeCharacter } from "./cardParts";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
-import {
-  type CharacterCard,
-  applyCharacter,
-  characterApplied,
-  charactersQuery,
-  removeCharacter,
-} from "./queries";
+import { type CharacterCard, applyCharacter, characterApplied, charactersQuery } from "./queries";
 
 const sheetStatus = { making: "Making Sheet", done: "Sheet", failed: "Sheet Failed" };
 

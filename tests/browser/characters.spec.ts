@@ -461,6 +461,36 @@ test("Make Sheet follows the card's sheet until its views show on the card", asy
   await expect(sheet.getByRole("status")).toHaveText("Making Sheet…");
 });
 
+test("Picking and removing outfits preserves handwritten text even when it matches a saved card", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const yellow = "a yellow raincoat";
+  state.outfits.push(
+    { id: "out-yellow", name: "Yellow", description: yellow, references: [] },
+    { id: "out-red", name: "Red", description: "a red raincoat", references: [] },
+  );
+  await create(page);
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  const typed = `${outfitPart(yellow)} At a bus stop.`;
+  await prompt.fill(typed);
+  const pick = async (label: string) => {
+    await page.getByRole("button", { name: "Choose References", exact: true }).click();
+    const references = page.getByRole("region", { name: "References", exact: true });
+    await references.getByText("Outfits", { exact: true }).click();
+    await references.getByRole("button", { name: label, exact: true }).click();
+    await closeReferences(page);
+  };
+  await pick("Use outfit: Red");
+  await expect(prompt).toHaveValue(`${outfitPart("a red raincoat")} ${typed}`);
+  await pick("Remove outfit: Red");
+  await expect(prompt).toHaveValue(typed);
+  await pick("Use outfit: Yellow");
+  await expect(prompt).toHaveValue(typed);
+  await pick("Remove outfit: Yellow");
+  await expect(prompt).toHaveValue(typed);
+});
+
 test("Outfits and scenes go into the prompt in order from the References sheet, and are made in the Library", async ({
   page,
 }) => {

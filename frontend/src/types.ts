@@ -93,7 +93,10 @@ export interface GenerationInput extends Record<string, unknown> {
   profileId: string;
   prompt: string;
   /** Exact card contributions, so reapplying an edited card can replace what was inserted. */
-  cardParts?: Record<string, { kind: CardKind; text: string; referenceIds?: string[] }>;
+  cardParts?: Record<
+    string,
+    { kind: CardKind; text: string; ownsText: boolean; referenceIds?: string[] }
+  >;
   negative: string;
   width: number;
   height: number;

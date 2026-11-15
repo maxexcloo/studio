@@ -7,14 +7,13 @@ import {
   characterLead,
   identitySlot,
   withCharacter,
-  withoutCharacter,
   withoutPart,
 } from "../../../../shared/characters";
 import { api, post } from "../../api";
 import type { Profile, ReferenceAsset } from "../../types";
 import { queueQuery } from "../generation/Queue";
 import { nextReferenceTarget, placeReference } from "../generation/references";
-import { type CardParts, forgetCard, rememberCard } from "./cardParts";
+import { type CardParts, rememberCard } from "./cardParts";
 
 /** A card as `/api/characters` lists it: its images that still exist, as reference assets. */
 export interface CharacterCard extends Omit<Character, "sheet" | "portrait"> {
@@ -100,10 +99,10 @@ export function characterApplied(
 ) {
   const previous = parts?.[card.id];
   if (
-    previous &&
-    (previous.text !== characterLead(card.description) ||
-      JSON.stringify(previous.referenceIds) !==
-        JSON.stringify(card.references.map((asset) => asset.id)))
+    !previous ||
+    previous.text !== characterLead(card.description) ||
+    JSON.stringify(previous.referenceIds) !==
+      JSON.stringify(card.references.map((asset) => asset.id))
   )
     return false;
   const ids = new Set(card.references.map((asset) => asset.id));
@@ -134,7 +133,7 @@ export function applyCharacter(
   const target =
     first && nextReferenceTarget(remaining, profile, identity ? { slot: identity } : null);
   const nextPrompt = withCharacter(
-    previous ? withoutPart(prompt, previous.text) : prompt,
+    previous?.ownsText ? withoutPart(prompt, previous.text) : prompt,
     card.description,
   );
   return {
@@ -142,25 +141,7 @@ export function applyCharacter(
       ? placeReference(remaining, { ...first, slot: undefined }, profile, target)
       : remaining,
     prompt: nextPrompt,
-    cardParts: rememberCard(parts, "characters", card, nextPrompt),
-  };
-}
-
-/** Removing a card takes out both its images and its lead. */
-export function removeCharacter(
-  card: CharacterCard,
-  references: ReferenceAsset[],
-  prompt: string,
-  parts?: CardParts,
-) {
-  const ids = new Set([
-    ...card.references.map((asset) => asset.id),
-    ...(parts?.[card.id]?.referenceIds || []),
-  ]);
-  return {
-    references: references.filter((asset) => !ids.has(asset.id)),
-    prompt: withoutCharacter(prompt, card.description),
-    cardParts: forgetCard(parts, card.id),
+    cardParts: rememberCard(parts, "characters", card, prompt, nextPrompt),
   };
 }
 

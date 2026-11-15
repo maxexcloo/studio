@@ -1,5 +1,4 @@
 import { notifications } from "@mantine/notifications";
-import { useQuery } from "@tanstack/react-query";
 
 import type { Profile } from "../../types";
 import {
@@ -25,8 +24,6 @@ import {
   type PromptCardKind,
   applyCharacter,
   characterApplied,
-  charactersQuery,
-  promptCardsQuery,
 } from "./queries";
 
 /**
@@ -36,9 +33,6 @@ import {
 export function useCardInComposer() {
   const { changeKind, setDraft, profiles, models } = useGeneration();
   const openComposer = useOpenComposer();
-  const characters = useQuery(charactersQuery);
-  const outfits = useQuery(promptCardsQuery("outfits"));
-  const scenes = useQuery(promptCardsQuery("scenes"));
   function stage(update: (draft: Draft, profile?: Profile) => Draft) {
     changeKind("image");
     setDraft((previous) => {
@@ -87,20 +81,14 @@ export function useCardInComposer() {
     promptCard(kind: PromptCardKind, card: PromptCard) {
       stage((draft) => {
         const prompt = String(draft.input.prompt || "");
-        if (promptCardApplied(kind, card, prompt)) return draft;
-        const lists = { characters: characters.data, outfits: outfits.data };
-        const cards = kind === "outfits" ? outfits.data : scenes.data;
-        const next = withPromptCard(kind, card, prompt, {
-          ...lists,
-          cards,
-          parts: draft.input.cardParts,
-        });
+        if (promptCardApplied(kind, card, prompt, draft.input.cardParts)) return draft;
+        const next = withPromptCard(kind, card, prompt, draft.input.cardParts);
         return {
           ...draft,
           input: {
             ...draft.input,
             prompt: next,
-            cardParts: rememberCard(draft.input.cardParts, kind, card, next),
+            cardParts: rememberCard(draft.input.cardParts, kind, card, prompt, next),
           },
         };
       });
