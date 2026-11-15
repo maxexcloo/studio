@@ -4,7 +4,6 @@
  */
 export const resolutions = ["1K", "2K", "4K"] as const;
 export type Resolution = (typeof resolutions)[number];
-export const defaultResolution: Resolution = "1K";
 const longEdges: Record<Resolution, number> = { "1K": 1024, "2K": 2048, "4K": 4096 };
 
 type Range = { min?: number; max?: number; step?: number };
@@ -13,6 +12,7 @@ interface SizedProfile {
   aspectPolicy?: string;
   constraints?: Record<string, Range | undefined>;
   native?: Partial<Record<string, string>>;
+  options?: { resolutions?: string[] };
 }
 interface SizedInput {
   kind?: unknown;
@@ -22,7 +22,6 @@ interface SizedInput {
   inpaint?: unknown;
   referenceAssets?: unknown;
   referenceRole?: unknown;
-  autoUpscale?: unknown;
 }
 
 const adjustable = (range?: Range) =>
@@ -34,6 +33,7 @@ const adjustable = (range?: Range) =>
  */
 export function resolutionApplies(input: SizedInput, profile?: SizedProfile) {
   if (!profile || (input.kind || profile.kind) !== "image" || input.inpaint) return false;
+  if (profile.options?.resolutions?.length) return false;
   if (!adjustable(profile.constraints?.width) || !adjustable(profile.constraints?.height))
     return false;
   const referenced = Array.isArray(input.referenceAssets) && input.referenceAssets.length > 0;
@@ -44,18 +44,32 @@ export function resolutionApplies(input: SizedInput, profile?: SizedProfile) {
   );
 }
 
-/**
- * How a profile reaches a tier: the tier it draws at, and the long edge Upscale then takes it to
- * where the model doesn't draw that size itself (4K draws at 2K where it can, else 1K).
- */
-export function resolutionPlan(profile: SizedProfile | undefined, resolution: Resolution) {
-  const draws = (tier: Resolution) =>
-    tier === "1K" || profile?.native?.[tier.toLowerCase()] === "yes";
-  if (draws(resolution)) return { draws: resolution };
-  return {
-    draws: draws("2K") ? ("2K" as const) : ("1K" as const),
-    upscaleTo: longEdges[resolution],
-  };
+/** Tiers the profile explicitly supports, within its dimension limits. */
+export function availableResolutions(profile?: SizedProfile, input?: SizedInput) {
+  if (!resolutionApplies(input || { kind: profile?.kind }, profile)) return [];
+  return resolutions.filter((tier) => {
+    if (tier !== "1K" && profile?.native?.[tier.toLowerCase()] !== "yes") return false;
+    if (!input)
+      return ["width", "height"].some(
+        (key) => Number(profile?.constraints?.[key]?.max) >= longEdges[tier],
+      );
+    const steps = Object.fromEntries(
+      ["width", "height"].map((key) => [key, { step: profile?.constraints?.[key]?.step }]),
+    );
+    const size = {
+      width: Number(input.width) || 1024,
+      height: Number(input.height) || Number(input.width) || 1024,
+    };
+    const intended = resolutionSize(size, tier, { constraints: steps });
+    const limited = resolutionSize(size, tier, profile);
+    return intended.width === limited.width && intended.height === limited.height;
+  });
+}
+
+/** A remembered tier follows the profile's available choices when the profile or shape changes. */
+export function selectedResolution(input: SizedInput, profile?: SizedProfile) {
+  const choices = availableResolutions(profile, input);
+  return choices.find((tier) => tier === input.resolutionTier) || choices[0];
 }
 
 /** `size`'s aspect with its long edge at the tier, each side rounded to the profile's multiple. */
@@ -80,30 +94,20 @@ export function resolutionSize(
 export const isResolution = (value: unknown): value is Resolution =>
   resolutions.includes(value as Resolution);
 
-/**
- * The run's size for its tier (1K when none is set): the width and height it draws at, and Smart
- * upscale to the tier's long edge where the model doesn't draw it. Applying it again changes nothing.
- */
+/** Apply an explicit native tier; requests without a tier retain their pixel dimensions. */
 export function withResolution<T extends SizedInput>(input: T, profile?: SizedProfile): T {
-  if (!resolutionApplies(input, profile)) return input;
-  const resolution = isResolution(input.resolutionTier) ? input.resolutionTier : defaultResolution;
+  if (!resolutionApplies(input, profile) || !isResolution(input.resolutionTier)) return input;
+  const resolution = input.resolutionTier;
   const width = Number(input.width) || 1024;
   const height = Number(input.height) || width;
-  const plan = resolutionPlan(profile, resolution);
-  const size = resolutionSize({ width, height }, plan.draws, profile);
-  const asked = (input.autoUpscale || null) as { quality?: string } | null;
+  const choices = availableResolutions(profile, { width, height });
+  if (!choices.includes(resolution))
+    throw new Error(`Choose a native resolution for this model: ${choices.join(", ")}.`);
+  const size = resolutionSize({ width, height }, resolution, profile);
   return {
     ...input,
-    resolutionTier: resolution,
     ...size,
     // 2K and larger draws decode in tiles.
-    ...(plan.draws === "1K" ? {} : { tiledDecode: true }),
-    autoUpscale: plan.upscaleTo
-      ? {
-          ...asked,
-          quality: asked?.quality || (resolution === "4K" ? "high" : "balanced"),
-          target: plan.upscaleTo,
-        }
-      : asked,
+    ...(resolution === "1K" ? {} : { tiledDecode: true }),
   };
 }
