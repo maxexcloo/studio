@@ -51,7 +51,7 @@ const turbo = (model: string) => model.includes("turbo");
  * What the two nodes take, in ComfyUI's node-list shape, so a Radiance worker's catalogue reads
  * like any worker's: their `model` lists every model the process serves.
  */
-export function radianceInfo(models: RadianceModel[]) {
+export function radianceInfo(models: RadianceModel[], loras: string[] = []) {
   const names = models.map((model) => model.id).sort();
   const node = (required: Values, optional: Values, output: string[]) => ({
     input: { required, optional },
@@ -102,6 +102,15 @@ export function radianceInfo(models: RadianceModel[]) {
         task: [videoTasks, { default: "t2va" }],
       },
       ["VIDEO", "AUDIO"],
+    ),
+    // The shared model library's last installed inventory, for Studio's stack validation.
+    LoraLoader: node(
+      {
+        lora_name: [[...loras].sort()],
+        strength_model: ["FLOAT", { default: 0.7, min: -100, max: 100, step: 0.01 }],
+      },
+      {},
+      [],
     ),
     // The save nodes beside them, which Studio handles itself.
     SaveImage: node({ images: ["IMAGE"], filename_prefix: ["STRING", {}] }, {}, []),
