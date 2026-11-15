@@ -24,6 +24,7 @@ import {
   defaultWorkerId,
   isRadianceWorker,
   listWorkers,
+  modelLibraryWorker,
   noWorkerMessage,
   workerById,
 } from "../workers.js";
@@ -144,8 +145,13 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
       throw error;
     }
     contextFailures.delete(worker.id);
+    // Radiance shares ComfyUI's LoRA folder. Its native per-model inventory endpoint would
+    // load a cold model, so catalogue reads use the model library's saved installed inventory.
+    const library = modelLibraryWorker();
+    const installed =
+      library && (contextFor(library.id).info || store.workerModels(library.id, library.url)?.info);
     const result = {
-      info: radianceInfo(models),
+      info: radianceInfo(models, optionsFor(installed, "LoraLoader", "lora_name")),
       stats: { radiance: models },
       fetchedAt: Date.now(),
     };

@@ -461,6 +461,7 @@ export function inferModels(
       backend: workflow.backend,
       // Radiance composes the stack into a rank-limited adapter.
       ...(workflow.kind === "video" && workflow.loraStack?.adapter === "radiance-tags-v1"
+
         ? {
             loraNote:
               "Radiance approximates combined LoRAs above rank 64. Use ComfyUI for exact application.",
