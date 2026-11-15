@@ -66,7 +66,7 @@ import { registerIdlePassRoutes } from "./domain/idle-work.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
 import { createProjects, stylesWithChoice } from "./domain/projects.ts";
 import { createReview } from "./domain/review.ts";
-import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
+import { registerMaintenanceRoutes, registerQueueRoutes } from "./domain/routes.ts";
 import { Store, queuePriority } from "./domain/store.ts";
 import { createPromptSuggester } from "./domain/suggested-prompts.ts";
 import {
@@ -728,7 +728,7 @@ app.post("/api/generate", async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
   res.status(result.status).json(result.payload);
 });
-registerRewriteRoutes(app, {
+registerQueueRoutes(app, {
   store,
   queue: generationQueue,
   admit: admitGeneration,
