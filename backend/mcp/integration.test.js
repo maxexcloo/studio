@@ -2571,16 +2571,15 @@ test("Generate without a wait never fetches results, and unavailable retrieval f
     false,
   );
   assert.equal(f.downloads.length, 0);
-  const waited = data(
-    await call(client, "generate", {
-      profile_id: imageProfile.id,
-      prompts: ["A tree"],
-      count: 1,
-      wait_seconds: 1,
-    }),
-  );
-  assert.equal(waited.status, "queued");
-  assert.equal(f.submitted.length, 2);
+  const waited = await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A tree"],
+    count: 1,
+    wait_seconds: 1,
+  });
+  assert.equal(waited.isError, true);
+  assert.match(texts(waited), /Unrecognized key: "wait_seconds"/);
+  assert.equal(f.submitted.length, 1);
   assert.equal(f.downloads.length, 0);
 });
 
@@ -2929,7 +2928,6 @@ test(
         profile_id: profileId,
         prompts: ["A simple demo landscape"],
         count: 1,
-        wait_seconds: 0,
       }),
     );
     assert.equal(queued.status, "queued");
@@ -2974,7 +2972,6 @@ test(
         await call(librechat, "generate", {
           profile_id: profileId,
           prompts: [prompt],
-          wait_seconds: 0,
         }),
       );
       return jobId(queued);
@@ -4220,8 +4217,6 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
       kind: "image",
       prompts: ["A heron"],
       count: 1,
-      width: 1024,
-      height: 1024,
       cfg: 4,
       sampler: "dpmpp_2m",
       seed: 7,
@@ -5515,9 +5510,17 @@ test("aspect picks the profile's own preset and resolution its long edge", async
   assert.equal(f.submitted.at(-1).tiledDecode, true);
   assert.equal(f.submitted.at(-1).autoUpscale, null);
   assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
-  // A free width and height are not arguments: the preset decides, on the profile's grid.
-  assert.deepEqual(await size({ aspect: "portrait", width: 777, height: 1001 }), [768, 1360]);
   const submitted = f.submitted.length;
+  // Free dimensions are not arguments: use the profile's aspect and resolution presets.
+  const freeSize = await call(client, "generate", {
+    prompts: ["An egg"],
+    aspect: "portrait",
+    width: 777,
+    height: 1001,
+  });
+  assert.equal(freeSize.isError, true);
+  assert.match(texts(freeSize), /Unrecognized keys: "width", "height"/);
+  assert.equal(f.submitted.length, submitted);
   const unsupported = await call(client, "generate", {
     kind: "image",
     prompts: ["An egg"],
@@ -5744,7 +5747,41 @@ test("sets of two are one Generate call: one batch per prompt, each prompt run a
   );
   // Without prompts nothing is written for the chat; it must write them itself.
   const missing = await call(client, "generate", { kind: "image", request: "six photos" });
-  assert.match(texts(missing), /^Write the finished prompts yourself/);
+  assert.match(texts(missing), /^Missing prompts\./);
+});
+
+test("Generate rejects unknown fields through the SDK and names the prompts array needed to repair a call", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const wrong = {
+    profile_id: imageProfile.id,
+    prompt: "A fox by a stream",
+    loras: [],
+    count: 2,
+    title: "Woodland Studies",
+  };
+  for (const args of [wrong, { ...wrong, prompts: ["A fox by a stream"] }]) {
+    const refused = await call(client, "generate", args);
+    assert.equal(refused.isError, true);
+    assert.match(texts(refused), /Unknown field "prompt".*Use prompts: \["\.\.\."\]/);
+    assert.match(texts(refused), /one generate call; count is images per prompt/);
+    assert.match(texts(refused), /Do not repeat this unchanged invalid call/);
+    assert.doesNotMatch(texts(refused), /A fox by a stream/);
+  }
+  for (const extra of [{ strenght: 0.7 }, { unexpected: true }]) {
+    const refused = await call(client, "generate", { prompts: ["A fox by a stream"], ...extra });
+    assert.equal(refused.isError, true);
+    assert.match(texts(refused), /Unrecognized key/);
+  }
+  assert.equal(f.submitted.length, 0);
+  const { prompt: _prompt, ...valid } = wrong;
+  const prompts = ["A fox by a stream", "An owl in a tree"];
+  const accepted = data(await call(client, "generate", { ...valid, prompts }));
+  assert.equal(accepted.jobs.length, 2);
+  assert.deepEqual(
+    f.submitted.map((body) => [body.prompt, body.count]),
+    prompts.map((prompt) => [prompt, 2]),
+  );
 });
 
 test("Reuse runs the chat's revised prompt as written and refuses a change in words alone", async (t) => {
@@ -6856,7 +6893,7 @@ test("request and prompts together run the prompts and keep the request as conte
     ],
   );
   const missing = await call(client, "generate", { kind: "image" });
-  assert.match(texts(missing), /^Write the finished prompts yourself/);
+  assert.match(texts(missing), /^Missing prompts\./);
   // An empty call (a host that cancelled its arguments, or a model copying the chat's shortened
   // history) is told what to send.
   const copied = texts(
@@ -6866,8 +6903,11 @@ test("request and prompts together run the prompts and keep the request as conte
       _inputPrefix: '{"kind":"image"',
     }),
   );
-  assert.match(copied, /as prompts, an array of strings.*\(this call had no arguments;/);
-  assert.match(copied, /shortened copy, not arguments to send/);
+  assert.match(copied, /Unrecognized keys.*_note.*_originalChars.*_inputPrefix/);
+  const empty = texts(await call(client, "generate", {}));
+  assert.match(empty, /^Missing prompts.*prompts: \["\.\.\."\].*one generate call/);
+  assert.match(empty, /shortened copy, not arguments to send/);
+  assert.match(empty, /Do not repeat this unchanged invalid call/);
 });
 
 test("one Generate call fans out over several models with the same prompts and returns at once", async (t) => {

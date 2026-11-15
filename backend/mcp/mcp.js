@@ -48,6 +48,11 @@ const conciseError = (message) => {
     .split("\n")
     .filter(Boolean)
     .map((line) => /^(.+) at (\S+)$/.exec(line)?.slice(1).reverse().join(": ") || line);
+  if (
+    match[1] === "generate" &&
+    issues.some((issue) => /^Unrecognized keys?:.*"prompt"/.test(issue))
+  )
+    return 'Unknown field "prompt". Use prompts: ["..."] (an array of finished prompts) in one generate call; count is images per prompt. Do not repeat this unchanged invalid call.';
   // An oversized set is the usual mistake; say how to split it.
   const split = issues.some((issue) => /^(?:count|prompts): Too big/.test(issue))
     ? ` count is at most ${maxJobsPerCall} per prompt, and one call queues at most ${maxSplitJobs} images (prompts × count); split a bigger set into calls made one after another.`

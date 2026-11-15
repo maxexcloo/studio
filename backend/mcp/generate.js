@@ -880,8 +880,8 @@ export function registerGenerateTools({
     server,
     "generate",
     "generate",
-    `Queue images or videos, at most ${maxSplitJobs} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Leave the model, count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Anyone sexual or nude must be 18+ (no teens).`,
-    {
+    `Queue images or videos, at most ${maxSplitJobs} images per call. Models: profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Leave the model, count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Anyone sexual or nude must be 18+ (no teens).`,
+    z.strictObject({
       request: z
         .string()
         .trim()
@@ -893,7 +893,7 @@ export function registerGenerateTools({
       prompts: z
         .union([promptList, promptListText.pipe(promptList)])
         .optional()
-        .describe("Run as written; count images each."),
+        .describe('Use prompts: ["..."], not prompt.'),
       base: z
         .string()
         .trim()
@@ -937,7 +937,6 @@ export function registerGenerateTools({
         .describe("A model id, label or words from them; models lists what is ready."),
       profile_ids: z.array(z.string().min(1)).min(1).max(maxJobsPerCall).optional(),
       each_profile: z.boolean().optional(),
-      // Unknown keys (a misspelt "strength") are dropped rather than rejected.
       loras: z
         .array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }))
         .max(8)
@@ -993,7 +992,7 @@ export function registerGenerateTools({
       scheduler: z.string().optional(),
       upscale_quality: z.enum(upscaleQualities).optional(),
       face_detail: z.boolean().optional(),
-    },
+    }),
     (input, signal) => {
       // Identical calls share pending work and its reply for two minutes after it settles.
       // A transport retry cannot queue another set; later or different requests queue anew.
@@ -1198,11 +1197,11 @@ export function registerGenerateTools({
     if (parts) args.prompts = shotPrompts(true);
     if (!args.prompts)
       throw new Error(
-        `Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts, an array of strings, with the user's words as request${
+        `Missing prompts. Write finished prompts to the model's guide and send prompts: ["..."], an array of strings, with the user's words as request in one generate call; count is images per prompt${
           Object.keys(input).length
             ? ""
             : ' (this call had no arguments; an earlier call shown as "input shortened to save context" is the chat\'s shortened copy, not arguments to send, and a call cut short needs fewer or shorter prompts)'
-        }. Then call generate again.`,
+        }. Do not repeat this unchanged invalid call.`,
       );
     // A set template: each prompt is a delta of the one base prompt, which the chat writes once.
     const deltas = base ? args.prompts : null;
