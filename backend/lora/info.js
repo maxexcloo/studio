@@ -173,7 +173,7 @@ export function loraInfo(name) {
 /**
  * Every listed LoRA's info. `worker`'s ComfyUI hands out the metadata block (no tensor
  * names) through /view_metadata, so each is read a few at a time and remembered;
- * `remote: false` (a worker that isn't answering) keeps to what is remembered.
+ * `remote: false` keeps to remembered metadata and the live catalogue definitions.
  */
 export async function loraInfos(worker, names = [], { concurrency = 6, remote: ask = true } = {}) {
   const result = {};
@@ -205,8 +205,8 @@ export async function loraInfos(worker, names = [], { concurrency = 6, remote: a
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, reader));
   // One catalogue view for the whole list, rather than a manifest check per LoRA.
   const view = loraCatalogue().loraView();
-  for (const [name, info] of Object.entries(result))
-    result[name] = catalogueLoraInfo(name, info, view);
+  for (const name of names)
+    result[name] = catalogueLoraInfo(name, result[name] || { families: [], triggers: [] }, view);
   return result;
 }
 

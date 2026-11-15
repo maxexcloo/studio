@@ -47,7 +47,12 @@ import { markWorkflowUsed } from "./workflow-catalogue.js";
 const runProfile = (profile, backend) =>
   profile?.backendOptions?.find((option) => option.id === backend)?.profile || profile;
 
-export function createGenerationSubmission({ loadComfyContext, mediaModels, comfyDownMessage }) {
+export function createGenerationSubmission({
+  loadComfyContext,
+  mediaModels,
+  comfyDownMessage,
+  prompting,
+}) {
   /**
    * Which worker runs this generation (workers.js): one that has the
    * capability its profile needs, preferring an online one with the model, and
@@ -215,7 +220,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
         )
         .map((item) => item.name);
       if (requested.length) await loraInfos(backend, requested.slice(0, 32)).catch(() => null);
-      const body = sanitizeGenerateBody(input, context.info, context.stats);
+      const body = sanitizeGenerateBody(input, context.info, context.stats, prompting);
       const enabledLoras = (body.loras || []).filter((item) => item.enabled !== false);
       if (enabledLoras.length) {
         const issue = optionalLoraIssue(
