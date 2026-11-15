@@ -143,6 +143,7 @@ interface DreamMark extends DreamOrigin {
   decidedAt?: string;
 }
 export type DreamItem = QueueMedia & {
+  number?: number;
   id?: string;
   title?: string;
   jobId?: string;
@@ -2519,7 +2520,9 @@ export function createDream(options: {
       const choice = (signal: TasteChoice): DreamActivity["item"] => {
         const item = signal.itemId && options.items(ownerId, [signal.itemId])[0];
         return {
-          ...(item && item.dream?.state !== "discarded" ? { id: signal.itemId } : {}),
+          ...(item && item.dream?.state !== "discarded"
+            ? { id: signal.itemId, number: item.number }
+            : {}),
           title: signal.title || signal.prompt || "Result",
           media: signal.media,
         };

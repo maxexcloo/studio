@@ -5,13 +5,14 @@ import { Link } from "react-router";
 import type { DreamActivity } from "../../../../shared/taste";
 import { DataTable } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
+import { viewerItemId } from "../gallery/viewerLink";
 import { historyQuery } from "./queries";
 
 function Result({ item }: { item: DreamActivity["item"] }) {
   return item.id ? (
     <Anchor
       component={Link}
-      to={`${item.media === "video" ? "/video" : "/images"}?${new URLSearchParams({ item: item.id })}`}
+      to={`${item.media === "video" ? "/video" : "/images"}?${new URLSearchParams({ item: viewerItemId({ ...item, id: item.id }) })}`}
       size="sm"
       truncate
       display="block"
