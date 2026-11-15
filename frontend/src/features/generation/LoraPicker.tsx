@@ -16,7 +16,13 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import { loraDefaultStrength, loraFamilyId, loraName } from "../../../../shared/profiles";
+import {
+  type LoraConstraints,
+  loraCompatibility,
+  loraDefaultStrength,
+  loraFamilyId,
+  loraName,
+} from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, Profile, Rating } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
@@ -57,6 +63,7 @@ export interface LoraInfo {
   triggers?: string[];
   strengthRange?: { min: number; max: number; step: number; default?: number };
   recommendedStrength?: number;
+  compatibility?: LoraConstraints;
 }
 type Lora = GenerationInput["loras"][number];
 export const loraInfoQuery = queryOptions({
@@ -82,16 +89,14 @@ const loraTabs = [
 type LoraTab = (typeof loraTabs)[number]["value"];
 /** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
 const defaultStrength = (info: LoraInfo | undefined) => loraDefaultStrength(info, 1);
-export const loraTitle = (info: LoraInfo | undefined, file: string) => loraName(file, info);
-/** Whether a LoRA lists the profile's family, however the profile spells it. */
+/** Whether a LoRA lists the family, however the profile spells it. */
 const fitsFamily = (families: string[], family: string) =>
   families.some((value) => loraFamilyId(value) === loraFamilyId(family));
-/** The profile's LoRAs that suit its family; one without a family listed may suit any. */
+/** The profile's LoRAs that submitting accepts. */
 export const compatibleLoras = (profile: Profile | undefined, metadata: Record<string, LoraInfo>) =>
-  (profile?.options?.loras || []).filter((file) => {
-    const families = metadata[file]?.families || [];
-    return !families.length || fitsFamily(families, profile!.family);
-  });
+  (profile?.options?.loras || []).filter(
+    (file) => loraCompatibility(metadata[file], profile) !== "other",
+  );
 
 const ratingOrder = (rating?: Rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);
 /** The LoRA choices' orders: by rating (the default every LoRA list shares), or by name. */
@@ -169,7 +174,7 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
         icon={icons.loras}
         items={input.loras.map((lora) => ({
           key: lora.name,
-          label: loraTitle(info.data?.loras[lora.name], lora.name),
+          label: loraName(lora.name, info.data?.loras[lora.name]),
           src: previews.data?.previews[lora.name],
           off: lora.enabled === false,
         }))}
@@ -299,7 +304,7 @@ function useLoraDraft({ value, onChange }: Omit<LoraPickerProps, "picker">) {
     onChange ? onChange({ ...input, loras }) : context.update({ loras });
   const info = useQuery(loraInfoQuery);
   const metadata = info.data?.loras || {};
-  const title = (file: string) => loraTitle(metadata[file], file);
+  const title = (file: string) => loraName(file, metadata[file]);
   return {
     input,
     profile,

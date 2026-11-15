@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { compareVariants } from "../../../../shared/compare";
-import { isCloudProfile } from "../../../../shared/profiles";
+import { isCloudProfile, loraName } from "../../../../shared/profiles";
 import { post } from "../../api";
 import type { GenerationInput, MediaItem, Profile } from "../../types";
 import { mediaDraft } from "../gallery/useMediaAction";
@@ -16,7 +16,7 @@ import {
   useGeneration,
   useGenerationActions,
 } from "../generation/GenerationProvider";
-import { compatibleLoras, loraInfoQuery, loraTitle } from "../generation/LoraPicker";
+import { compatibleLoras, loraInfoQuery } from "../generation/LoraPicker";
 import { useOpenComposer } from "../generation/openComposer";
 import {
   generationInput,
@@ -196,7 +196,7 @@ export function useDraftComparison() {
       const profile = profileOf(input);
       return profile ? profileName(profile) : input.profileId;
     },
-    lora: (name) => loraTitle(lora?.[name], name),
+    lora: (name) => loraName(name, lora?.[name]),
   });
   const seeds = runSeeds(variants);
   const keys = variants.map(({ input, references }, index) =>

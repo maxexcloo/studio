@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, X } from "lucide-react";
 import { useState } from "react";
 
-import { isCloudProfile } from "../../../../shared/profiles";
+import { isCloudProfile, loraName } from "../../../../shared/profiles";
 import { menuWidth } from "../../theme";
 import type { GenerationInput, Profile } from "../../types";
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
@@ -12,7 +12,7 @@ import { modelFamilyLabel } from "../../ui/modelFamily";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "../generation/chip";
 import { useGeneration } from "../generation/GenerationProvider";
-import { loraInfoQuery, loraTitle } from "../generation/LoraPicker";
+import { loraInfoQuery } from "../generation/LoraPicker";
 import { profileName } from "../generation/payload";
 import {
   addVariant,
@@ -50,7 +50,7 @@ export function CompareMenu() {
   const [models, setModels] = useRemembered("compare-models", noModels);
   const [strengths, setStrengths] = useRemembered("compare-strengths", defaultStrengths);
   const [seeds, setSeeds] = useRemembered("compare-seeds", "4");
-  const [loraName, setLoraName] = useState<string>();
+  const [loraFile, setLoraFile] = useState<string>();
   const { input } = draft;
   const active = draft.compare?.active ?? 0;
   const compare = (inputs: GenerationInput[]) =>
@@ -70,7 +70,7 @@ export function CompareMenu() {
   const facts = (each: Profile) =>
     `${modelFamilyLabel(each.family, each.familyName)} · ${isCloudProfile(each) ? "Cloud" : "Local GPU"}`;
   const loras = input.loras.filter((lora) => lora.enabled !== false);
-  const lora = loras.find((each) => each.name === loraName) ?? loras[0];
+  const lora = loras.find((each) => each.name === loraFile) ?? loras[0];
   const lines = promptLines(input.prompt).length;
   const variantActions: Action[] = [
     {
@@ -137,9 +137,9 @@ export function CompareMenu() {
                   value: lora.name,
                   options: loras.map((each) => ({
                     value: each.name,
-                    label: loraTitle(loraInfo?.[each.name], each.name),
+                    label: loraName(each.name, loraInfo?.[each.name]),
                   })),
-                  onChange: setLoraName,
+                  onChange: setLoraFile,
                 },
               },
             ]
