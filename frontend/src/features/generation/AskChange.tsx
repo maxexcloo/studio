@@ -147,7 +147,7 @@ export function SendButton({
 
 /**
  * Suggestions: short changes that fit the image or draft (`query`), asked for as soon as one is
- * picked, as an action whose options are the changes, then Refresh to ask for different ones
+ * picked, as an action whose options are the changes, then Refresh… to ask for different ones
  * (`fresh`) in their place. They load once `enabled` and stay cached per item or prompt. While they
  * load one Loading… row stands in for them, and with none one No Suggestions line.
  */
@@ -174,7 +174,7 @@ export function useChangeSuggestions<K extends QueryKey>({
   const loading = refresh.isPending || (steps.isFetching && !list.length);
   const again: Action = {
     id: "refresh",
-    label: "Refresh",
+    label: "Refresh…",
     icon: icons.refresh,
     // Never disabled while it works: a disabled item drops focus out of the open menu.
     disabled,
@@ -208,7 +208,7 @@ export function useChangeSuggestions<K extends QueryKey>({
 
 /**
  * An assistant menu (Animate, the viewer's Edit): its settings, the suggestions written for this
- * item with Refresh, Library's templates under their heading with Custom… last, then any other
+ * item with Refresh…, Library's templates under their heading with Custom… last, then any other
  * actions, then its own run. While what decides its options is `loading`, one row stands in for
  * them all.
  */
