@@ -13,7 +13,6 @@ import { ChevronDown, RectangleHorizontal } from "lucide-react";
 import {
   type Resolution,
   availableResolutions,
-  resolutionApplies,
   resolutionSize,
   selectedResolution,
 } from "../../../../shared/resolution";
@@ -47,10 +46,9 @@ export function SizePicker({
   const divisor = (a: number, b: number): number => (b ? divisor(b, a % b) : a);
   const common = framed ? divisor(framed.width, framed.height) : 1;
   const aspect = framed ? `${framed.width / common}:${framed.height / common}` : "";
-  // Images whose size is the composer's to pick draw at a tier; the shape comes from the preset.
   const choices = availableResolutions(profile, input);
   const tier = selectedResolution(input, profile);
-  const tiered = resolutionApplies(input, profile) && Boolean(tier);
+  const tiered = Boolean(tier);
   const at = (size: Size) => {
     const { width, height } = resolutionSize({ width: size.w, height: size.h }, tier!, profile);
     return { w: width, h: height };
@@ -70,7 +68,7 @@ export function SizePicker({
   const label = framed
     ? `Reference · ${aspect}`
     : active
-      ? `${active.label}${tiered ? ` · ${tier}` : native.length ? ` · ${nativeResolution.toUpperCase()}` : ""}`
+      ? `${active.label}${tiered ? ` · ${tier}` : native.length ? ` · ${nativeResolution.toUpperCase()}` : ` · ${shown.w} × ${shown.h}`}`
       : `${shown.w} × ${shown.h}`;
   return (
     <Popover position="top-start" width={300} trapFocus {...fittedPopup}>
@@ -104,13 +102,17 @@ export function SizePicker({
           </Stack>
         ) : (
           <Stack gap="sm">
-            {tiered && (
+            {!!choices.length && (
               <SegmentedControl
                 aria-label="Resolution"
                 fullWidth
-                value={tier}
-                onChange={(value) => onChange({ resolutionTier: value as Resolution })}
-                data={choices}
+                value={tier || "pixels"}
+                onChange={(value) =>
+                  onChange({
+                    resolutionTier: value === "pixels" ? undefined : (value as Resolution),
+                  })
+                }
+                data={[{ value: "pixels", label: "Custom" }, ...choices]}
               />
             )}
             {!!native.length && (
@@ -142,7 +144,9 @@ export function SizePicker({
                           </Text>
                         )
                       }
-                      onClick={() => onChange({ width: preset.w, height: preset.h })}
+                      onClick={() =>
+                        onChange({ width: preset.w, height: preset.h, resolutionTier: tier })
+                      }
                     >
                       {preset.label}
                     </Button>
@@ -160,7 +164,9 @@ export function SizePicker({
                     min={profile?.constraints?.[key]?.min}
                     max={profile?.constraints?.[key]?.max}
                     step={profile?.constraints?.[key]?.step}
-                    onChange={(value) => onChange({ [key]: Number(value) })}
+                    onChange={(value) =>
+                      onChange({ [key]: Number(value), resolutionTier: undefined })
+                    }
                   />
                 ))}
               </SimpleGrid>
