@@ -971,21 +971,17 @@ export async function touch(target: Locator, type: string, y = 100) {
   );
 }
 
-/** A selection action: on the bar, or an item of the phone's More when the bar has no room for it. */
-export async function selectionMenuItem(page: Page, label: string) {
-  const inline = selectionAction(page, label);
-  if ((page.viewportSize()?.width || 1440) >= 768 || (await inline.isVisible())) return inline;
-  await selectionAction(page, "More").click();
+/** An option of a selection bar's group, such as Edit's Upscale. */
+export async function selectionMenuItem(page: Page, group: string, label: string) {
+  await selectionAction(page, group).click();
   return page.getByRole("menuitem", { name: label, exact: true });
 }
 
-/** Turns on Compare Upscale in the viewer's Upscale menu. */
+/** Turns on Compare Upscale in the viewer's Edit › Upscale menu. */
 export async function compareUpscale(page: Page) {
-  await viewerAction(page, "Upscale");
-  await page.getByRole("menuitem", { name: "Compare Upscale", exact: true }).click();
+  await viewerAction(page, "Edit", "Upscale", "Compare Upscale");
 }
 
-/** Clicks a viewer action on its bar; a control with options opens its menu for the test to pick. */
 /** Chooses a text box's tool from its ⋯ menu, such as Recent Prompts from the Prompt's. */
 export async function promptTool(scope: Page | Locator, box: string, label: string) {
   await scope.getByRole("button", { name: `More ${box} Actions`, exact: true }).click();
@@ -1011,13 +1007,18 @@ export async function editorMenu(scope: Page | Locator, box: string, tool: strin
   return page.getByRole("menu");
 }
 
-/** Runs a viewer bar action, which every bar, the phone's included, shows. */
-export async function viewerAction(page: Page, label: string) {
+/**
+ * Clicks a viewer action on its bar, then any `options` in turn (Edit, Upscale); a control with
+ * options left to pick opens its menu for the test.
+ */
+export async function viewerAction(page: Page, label: string, ...options: string[]) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await viewer
     .getByRole("button", { name: label, exact: true })
     .or(viewer.getByRole("link", { name: label, exact: true }))
     .click();
+  for (const option of options)
+    await page.getByRole("menuitem", { name: option, exact: true }).click();
 }
 
 export async function section(page: Page, workspace: "Library" | "Settings", label: string) {

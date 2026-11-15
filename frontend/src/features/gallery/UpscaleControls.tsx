@@ -16,7 +16,6 @@ import { usePhone } from "../../ui/usePhone";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
 import { downloadsQuery } from "../library/queries";
-import { itemAction } from "./itemActions";
 import { useItemMutation } from "./useItemMutation";
 
 const statusQuery = (quality: UpscaleQuality) => ({
@@ -146,7 +145,7 @@ export function useUpscaleMany(items: MediaItem[]) {
 }
 /**
  * The media actions' Upscale: Show Upscale and Compare Upscale once there is one, its remembered
- * settings, then the run (MediaActions.tsx places it). Why the worker can't run it shows above them.
+ * settings, then the run (MediaActions.tsx places it under Edit). Why the worker can't run it shows above them.
  */
 export function useUpscaleAction(
   item: MediaItem,
@@ -186,12 +185,13 @@ export function useUpscaleAction(
         : `The worker is missing ${status.missingNodes.join(", ")}.`
       : undefined);
   return (
-    ready &&
-    itemAction("upscale", {
+    ready && {
+      id: "upscale",
       // Laid out like Animate: with an upscale, switching between it and the original comes
       // first; then the remembered settings, then the runs. The usual click is the first run
       // option: Show Upscale, else Upscale at the chosen settings.
       label: upscaling(item) ? "Upscaling…" : "Upscale",
+      icon: icons.upscale,
       pressed: upscaled && Boolean(item.upscaleActive),
       loading: upscaleBusy && !upscaled,
       disabled: upscaled ? version.isPending : upscaleBusy,
@@ -304,6 +304,6 @@ export function useUpscaleAction(
               },
         ],
       ],
-    })
+    }
   );
 }

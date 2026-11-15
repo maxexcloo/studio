@@ -35,11 +35,12 @@ test("Upscale's menu sets quality and Face Detail like Animate's settings and ru
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
-  await viewerAction(page, "Upscale");
+  await viewerAction(page, "Edit", "Upscale");
   // Quality is a segmented control at the top, Balanced until another is chosen.
   const quality = page.getByRole("radiogroup", { name: "Upscale Quality", exact: true });
   await expect(quality.getByRole("radio", { name: "Balanced", exact: true })).toBeChecked();
-  const run = page.getByRole("menuitem", { name: "Upscale", exact: true });
+  // The run, inside Edit › Upscale.
+  const run = page.getByRole("menuitem", { name: "Upscale", exact: true }).last();
   await run.click();
   await expect.poll(() => submitted.length).toBe(1);
   expect(submitted[0]).toEqual({
@@ -49,7 +50,7 @@ test("Upscale's menu sets quality and Face Detail like Animate's settings and ru
     faceDetail: false,
   });
   // The settings keep the menu open and are remembered for the next run.
-  await viewerAction(page, "Upscale");
+  await viewerAction(page, "Edit", "Upscale");
   await quality.getByText("High", { exact: true }).click();
   const face = page.getByRole("menuitem", { name: "Face Detail", exact: true });
   await expect(face).toHaveAttribute("aria-checked", "false");
@@ -58,7 +59,7 @@ test("Upscale's menu sets quality and Face Detail like Animate's settings and ru
   await run.click();
   await expect.poll(() => submitted.length).toBe(2);
   expect(submitted[1]).toMatchObject({ quality: "high", faceDetail: true });
-  await viewerAction(page, "Upscale");
+  await viewerAction(page, "Edit", "Upscale");
   await expect(quality.getByRole("radio", { name: "High", exact: true })).toBeChecked();
   await expect(face).toHaveAttribute("aria-checked", "true");
 });
@@ -79,7 +80,7 @@ test("Upscale lists Face Detail, disabled and off when the worker can't run it",
   );
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
-  await viewerAction(page, "Upscale");
+  await viewerAction(page, "Edit", "Upscale");
   const face = page.getByRole("menuitem", { name: "Face Detail", exact: true });
   await expect(face).toBeDisabled();
   await expect(face).toHaveAttribute("aria-checked", "false");
@@ -126,11 +127,11 @@ test("Upscale quality, 2K/4K size and face detail reach one submission while pen
     await page.goto("/images");
     await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
     // Every setting is in the menu: quality, size and Face Detail.
-    await viewerAction(page, "Upscale");
+    await viewerAction(page, "Edit", "Upscale");
     const quality = page.getByRole("radiogroup", { name: "Upscale Quality", exact: true });
     const size = page.getByRole("radiogroup", { name: "Upscale Size", exact: true });
     const face = page.getByRole("menuitem", { name: "Face Detail", exact: true });
-    const run = page.getByRole("menuitem", { name: "Upscale", exact: true });
+    const run = page.getByRole("menuitem", { name: "Upscale", exact: true }).last();
     await expect(size.getByRole("radio", { name: "Auto", exact: true })).toBeChecked();
     await quality.getByText("High", { exact: true }).click();
     await size.getByText("4K", { exact: true }).click();
@@ -143,10 +144,9 @@ test("Upscale quality, 2K/4K size and face detail reach one submission while pen
       target: 4096,
       faceDetail: true,
     });
-    // One run at a time: Upscale waits for the first.
-    const upscale = page
-      .getByRole("dialog", { name: "Generation", exact: true })
-      .getByRole("button", { name: "Upscale", exact: true });
+    // One run at a time: Edit's Upscale waits for the first.
+    await viewerAction(page, "Edit");
+    const upscale = page.getByRole("menuitem", { name: "Upscale", exact: true });
     await expect(upscale).toBeDisabled();
     release();
     await expect(upscale).toBeEnabled();
@@ -202,16 +202,17 @@ test("Offline workers and unavailable upscale models explain why submission is d
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
-  await viewerAction(page, "Upscale");
+  await viewerAction(page, "Edit", "Upscale");
   // The menu says why, above its settings, and offers to check again.
-  const menu = page.getByRole("menu");
+  const menu = page.getByRole("menu").last();
   await expect(menu).toContainText("The selected upscale worker is offline.");
-  await expect(page.getByRole("menuitem", { name: "Upscale", exact: true })).toHaveCount(0);
+  // Only Edit's Upscale, without its run.
+  await expect(page.getByRole("menuitem", { name: "Upscale", exact: true })).toHaveCount(1);
   offline = false;
   await page.getByRole("menuitem", { name: "Check Again", exact: true }).click();
   await expect(menu).toContainText("This worker has no upscale models.");
   await expect(page.getByRole("menuitem", { name: "Face Detail", exact: true })).toBeDisabled();
-  await expect(page.getByRole("menuitem", { name: "Upscale", exact: true })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "Upscale", exact: true }).last()).toBeDisabled();
   expect(submitted).toHaveLength(0);
 });
 
@@ -265,7 +266,11 @@ test("A running upscale stops from its tile and the viewer, keeping the original
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByRole("button", { name: "Stop Upscale", exact: true })).toHaveCount(0);
   // Upscale can run again, and Details says the last one was cancelled.
-  await expect(viewer.getByRole("button", { name: "Upscale", exact: true })).toBeEnabled();
+  const edit = viewer.getByRole("button", { name: "Edit", exact: true });
+  await edit.click();
+  await expect(page.getByRole("menuitem", { name: "Upscale", exact: true })).toBeEnabled();
+  await edit.click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
   if ((page.viewportSize()?.width || 1440) < 768)
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
   await expect(page.getByText("Cancelled", { exact: true })).toBeVisible();

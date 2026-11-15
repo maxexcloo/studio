@@ -7,7 +7,7 @@ import { useNavigate } from "react-router";
 import { failure, post } from "../../api";
 import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
-import { ActionBarGroups, ActionMenuItems, withMore } from "../../ui/ActionBar";
+import { ActionBarGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
@@ -16,7 +16,7 @@ import { useQueue, useQueueAction } from "../generation/Queue";
 import { showQueued } from "../settings/accountPreferences";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { mediaDownload } from "./download";
-import { itemAction, itemActionGroups } from "./itemActions";
+import { itemAction, itemActionGroups, namedItemActions } from "./itemActions";
 import { finished } from "./MediaTile";
 import { useUpscaleMany } from "./UpscaleControls";
 import type { GallerySelection } from "./useGallerySelection";
@@ -30,15 +30,11 @@ import classes from "./GallerySelectionBar.module.css";
 const shareLimit = 20;
 // Compare Selected sets out up to four images side by side, one per number key.
 const compareLimit = 4;
-// Phones show every action on the bar while they fit its room (ActionBar.tsx's `withMore`);
-// beyond it they keep what acts on several items there and the rest under More.
-const primaryIds = ["retry", "stop", "share", "download", "star", "delete"];
-const phoneRoom = 7;
 
 /**
  * The contextual selection bar under the toolbar: the count and the quick selects, then on
- * desktop the selection's actions as icons and Clear Selection; phones keep the actions and More
- * on a bottom toolbar. The same actions show as a context menu at `menu` (right-click or
+ * desktop the selection's actions and Clear Selection; phones keep the actions on a bottom
+ * toolbar. The same actions show as a context menu at `menu` (right-click or
  * Shift+F10).
  */
 export function GallerySelectionBar({
@@ -189,24 +185,17 @@ export function GallerySelectionBar({
   const pending = busy !== null;
   // Only what acts on the selection as a whole; an item's own actions stay on its tile and viewer.
   const actions = itemActionGroups([
-    // Selected uploads share Recreate › Run Suggested Prompts, one run queued for each.
-    uploads.length > 0 &&
-      itemAction("recreate", {
-        loading: recreate.isPending,
-        menu: [
-          [
-            {
-              id: "run-suggested",
-              label: "Run Suggested Prompts",
-              icon: Shuffle,
-              disabled: recreate.isPending,
-              onClick: () =>
-                recreate.mutate(uploads, {
-                  onSuccess: ({ failed }) => settle(failed.map((entry) => entry.id)),
-                }),
-            },
-          ],
-        ],
+    (failed.length > 0 || busy === "retry") &&
+      itemAction("retry", {
+        disabled: pending || !failed.length,
+        loading: busy === "retry",
+        onClick: () => void retrySelected(),
+      }),
+    (runningJobs.length > 0 || busy === "stop") &&
+      itemAction("stop", {
+        disabled: pending || !runningJobs.length,
+        loading: busy === "stop",
+        onClick: () => void stopSelected(),
       }),
     finishedImages.length > 0 &&
       themes.length > 0 &&
@@ -228,55 +217,95 @@ export function GallerySelectionBar({
           last: [],
         }),
       }),
+    // Each image upscales with Upscale's remembered settings.
     finishedImages.length > 0 &&
-      itemAction("upscale", {
+      itemAction("edit", {
         loading: upscale.isPending,
-        disabled: upscale.isPending,
-        onClick: () =>
-          upscale.mutate(undefined, {
-            onSuccess: ({ failed, error }) => {
-              if (error) failure(error);
-              settle(failed);
+        menu: [
+          [
+            {
+              id: "upscale",
+              label: "Upscale",
+              icon: icons.upscale,
+              disabled: upscale.isPending,
+              onClick: () =>
+                upscale.mutate(undefined, {
+                  onSuccess: ({ failed, error }) => {
+                    if (error) failure(error);
+                    settle(failed);
+                  },
+                }),
             },
-          }),
+          ],
+        ],
       }),
-    (failed.length > 0 || busy === "retry") &&
-      itemAction("retry", {
-        disabled: pending || !failed.length,
-        loading: busy === "retry",
-        onClick: () => void retrySelected(),
+    // Selected uploads run their suggested prompts, one run queued for each; 2–4 images compare.
+    (uploads.length > 0 || images) &&
+      itemAction("recreate", {
+        loading: recreate.isPending || compare.isPending,
+        menu: [
+          [
+            ...(uploads.length
+              ? [
+                  {
+                    id: "run-suggested",
+                    label: "Run Suggested Prompts",
+                    icon: Shuffle,
+                    disabled: recreate.isPending,
+                    onClick: () =>
+                      recreate.mutate(uploads, {
+                        onSuccess: ({ failed }) => settle(failed.map((entry) => entry.id)),
+                      }),
+                  },
+                ]
+              : []),
+            ...(images
+              ? [
+                  {
+                    id: "compare",
+                    label: "Compare",
+                    icon: icons.compare,
+                    disabled: !comparable || compare.isPending || pending,
+                    onClick: () => compare.mutate(),
+                  },
+                ]
+              : []),
+          ],
+        ],
       }),
-    (runningJobs.length > 0 || busy === "stop") &&
-      itemAction("stop", {
-        disabled: pending || !runningJobs.length,
-        loading: busy === "stop",
-        onClick: () => void stopSelected(),
-      }),
-    images &&
-      itemAction("compare", {
-        disabled: !comparable || compare.isPending || pending,
-        loading: compare.isPending,
-        onClick: () => compare.mutate(),
-      }),
-    // Phones that share natively share instead of downloading.
-    phone && typeof navigator.share === "function"
-      ? itemAction("share", {
-          label: "Share",
-          disabled: !ready.length || ready.length > shareLimit,
-          description: !ready.length
-            ? "Nothing selected has finished."
-            : ready.length > shareLimit
-              ? `Shares up to ${shareLimit} items at a time.`
-              : undefined,
-          loading: prepare.isPending,
-          onClick: () => void share(),
-        })
-      : itemAction("download", {
-          disabled: !ready.length || download.isPending,
-          description: ready.length ? undefined : "Nothing selected has finished.",
-          loading: download.isPending,
-          onClick: () => download.mutate(),
-        }),
+    itemAction("share", {
+      loading: download.isPending || prepare.isPending,
+      menu: [
+        [
+          {
+            id: "download",
+            label: "Download",
+            icon: icons.download,
+            disabled: !ready.length || download.isPending,
+            description: ready.length ? undefined : "Nothing selected has finished.",
+            onClick: () => download.mutate(),
+          },
+          // Phones that share natively also share the files.
+          ...(phone && typeof navigator.share === "function"
+            ? [
+                {
+                  id: "share-file",
+                  label: "Share",
+                  icon: icons.share,
+                  disabled: !ready.length || ready.length > shareLimit || prepare.isPending,
+                  description: !ready.length
+                    ? "Nothing selected has finished."
+                    : ready.length > shareLimit
+                      ? `Shares up to ${shareLimit} items at a time.`
+                      : undefined,
+                  keepOpen: !prepared,
+                  onClick: () => void share(),
+                },
+              ]
+            : []),
+        ],
+      ],
+    }),
     itemAction("star", {
       label: allStarred ? "Unstar" : "Star",
       pressed: allStarred,
@@ -361,11 +390,14 @@ export function GallerySelectionBar({
   ];
   const bar = phone ? (
     <ActionBarGroups
-      groups={[withMore(actions, primaryIds, phoneRoom).flat()]}
+      groups={actions}
+      labelled={namedItemActions}
+      fit
+      stacked
       menuPosition="top-end"
     />
   ) : (
-    <ActionBarGroups groups={actions} menuPosition="bottom-end" />
+    <ActionBarGroups groups={actions} labelled={namedItemActions} menuPosition="bottom-end" />
   );
   return (
     <>

@@ -531,7 +531,7 @@ test("Select Set picks a set's results to upscale together", async ({ page }) =>
   await expect(
     page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
   ).toHaveText("3 Selected");
-  await (await selectionMenuItem(page, "Upscale")).click();
+  await (await selectionMenuItem(page, "Edit", "Upscale")).click();
   await expect
     .poll(() => upscales.map((body) => body.galleryItemId).sort())
     .toEqual(["set-0", "set-1", "set-2"]);
@@ -722,7 +722,7 @@ test("Download takes a selection of any size as one archive", async ({ page }, t
   const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
   await expect(status).toHaveText("700 Selected");
   const download = page.waitForEvent("download");
-  await selectionAction(page, "Download").click();
+  await (await selectionMenuItem(page, "Share", "Download")).click();
   expect((await download).url()).toMatch(/\/api\/gallery\/export\?selection=token$/);
   expect(posted).toHaveLength(700);
   await expect(status).toHaveCount(0);
@@ -829,21 +829,25 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   const phone = test.info().project.use.isMobile;
   await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("1 Selected");
-  await expect(selectionAction(page, "Edit")).toHaveCount(0);
-  // A phone bar shows every action while they fit, Animate and Upscale included.
   await expect(selectionAction(page, "Animate")).toBeVisible();
-  await expect(selectionAction(page, "More")).toHaveCount(0);
+  await selectionAction(page, "Edit").click();
+  await expect(page.getByRole("menuitem")).toHaveText(["Upscale"]);
+  await selectionAction(page, "Edit").click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
   // The selects sit beside the count; phones name them by what they select.
   await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveText(
     phone ? "All" : "Select All",
   );
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
-  await expect(selectionAction(page, "Edit")).toHaveCount(0);
-  await expect(selectionAction(page, "More")).toHaveCount(0);
-  // Phones that share natively share instead of downloading.
+  // Phones that share natively share beside Download.
   const sharing = phone && (await page.evaluate(() => typeof navigator.share === "function"));
-  if (sharing) await expect(selectionAction(page, "Share")).toBeEnabled();
+  await selectionAction(page, "Share").click();
+  await expect(page.getByRole("menuitem")).toHaveText(
+    sharing ? ["Download", "Share"] : ["Download"],
+  );
+  await selectionAction(page, "Share").click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
   await selectionAction(page, "Star").click();
   await expect.poll(() => state.gallery.filter((item) => item.favorite).length).toBe(2);
   // Each finished action ends the selection.

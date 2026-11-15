@@ -85,7 +85,7 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
   expect(asked).toHaveLength(1);
 });
 
-test("The viewer's AI menu offers Review Prompt, then Suggestions with Refresh, then Custom…", async ({
+test("The viewer's Edit menu offers Review Prompt, then Suggestions with Refresh, then Custom…", async ({
   page,
 }) => {
   await openViewer(page);
@@ -103,7 +103,7 @@ test("The viewer's AI menu offers Review Prompt, then Suggestions with Refresh, 
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await viewerAction(page, "AI");
+  await viewerAction(page, "Edit");
   const menu = page.getByRole("menu");
   const thinking = menu.getByRole("menuitem", { name: "Thinking of Changes" });
   await expect(thinking).toBeDisabled();
@@ -113,6 +113,10 @@ test("The viewer's AI menu offers Review Prompt, then Suggestions with Refresh, 
     ...steps.map((step) => step.label),
     "Refresh Suggestions",
     "Custom…",
+    "Upscale",
+    "Edit in Composer",
+    "Use as Reference",
+    "Use as Character",
   ]);
   expect(asked).toEqual([{ surface: "viewer", jobId: "job-hub", fresh: false }]);
   await menu.getByRole("menuitem", { name: "Refresh Suggestions", exact: true }).click();
@@ -168,7 +172,7 @@ test("Custom Animation suggests what could happen from the image, filling the in
   );
 });
 
-test("AI offers Library's fixed changes above the image's suggestions", async ({ page }) => {
+test("Edit offers Library's fixed changes above the image's suggestions", async ({ page }) => {
   await openViewer(page);
   const asked: any[] = [];
   await page.route("**/api/assistant", (route) =>
@@ -195,7 +199,7 @@ test("AI offers Library's fixed changes above the image's suggestions", async ({
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
-  await viewerAction(page, "AI");
+  await viewerAction(page, "Edit");
   const menu = page.getByRole("menu");
   await expect(menu.getByText("Changes", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText([
@@ -204,6 +208,10 @@ test("AI offers Library's fixed changes above the image's suggestions", async ({
     ...steps.map((step) => step.label),
     "Refresh Suggestions",
     "Custom…",
+    "Upscale",
+    "Edit in Composer",
+    "Use as Reference",
+    "Use as Character",
   ]);
   await menu.getByRole("menuitem", { name: "Softer Shadows", exact: true }).click();
   await expect
@@ -258,7 +266,7 @@ test("No ideas or suggestions show when Studio has none", async ({ page }) => {
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await viewerAction(page, "AI");
+  await viewerAction(page, "Edit");
   const menu = page.getByRole("menu");
   await expect(menu.getByRole("menuitem", { name: "No Suggestions", exact: true })).toBeDisabled();
   await page.keyboard.press("Escape");
