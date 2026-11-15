@@ -1,3 +1,4 @@
+import type { CardKind } from "../../shared/characters";
 import type { QueueJob as SharedQueueJob } from "../../shared/queue";
 import type { Resolution } from "../../shared/resolution";
 import type { UpscaleQuality } from "../../shared/upscale";
@@ -92,6 +93,17 @@ export interface GenerationInput extends Record<string, unknown> {
   kind: MediaKind;
   profileId: string;
   prompt: string;
+  /** Exact card contributions, so reapplying an edited card can replace what was inserted. */
+  cardParts?: Record<
+    string,
+    {
+      kind: CardKind;
+      text: string;
+      ownsText: boolean;
+      cardReferenceIds?: string[];
+      references?: Pick<ReferenceAsset, "id" | "slot">[];
+    }
+  >;
   negative: string;
   width: number;
   height: number;

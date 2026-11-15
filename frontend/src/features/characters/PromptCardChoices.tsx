@@ -1,62 +1,18 @@
 import { Alert, ScrollArea, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
-import {
-  characterLead,
-  outfitPart,
-  scenePart,
-  withPart,
-  withoutPart,
-} from "../../../../shared/characters";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { PickerGrid, PickerTile } from "../generation/Picker";
-import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCardDialogs";
 import {
-  type CharacterCard,
-  type PromptCard,
-  type PromptCardKind,
-  charactersQuery,
-  promptCardsQuery,
-} from "./queries";
-
-/** The sentences a card may stand as in a prompt: a scene's differs with a character's image. */
-const partsOf = (kind: PromptCardKind, card: PromptCard) =>
-  kind === "outfits"
-    ? [outfitPart(card.description)]
-    : [scenePart(card.description, true), scenePart(card.description)];
-
-/** The sentence `card` stands as in `prompt`, if it is there. */
-export const promptCardApplied = (kind: PromptCardKind, card: PromptCard, prompt: string) =>
-  partsOf(kind, card).find((part) => prompt.includes(part));
-
-/**
- * `prompt` with `card`'s sentence after a character's lead, an outfit before a scene, in place of
- * the kind's other `cards`.
- */
-export function withPromptCard(
-  kind: PromptCardKind,
-  card: PromptCard,
-  prompt: string,
-  lists: { cards?: PromptCard[]; characters?: CharacterCard[]; outfits?: PromptCard[] },
-) {
-  const leads = (lists.characters || [])
-    .map((character) => characterLead(character.description))
-    .filter((lead) => prompt.includes(lead));
-  const cleared = (lists.cards || []).reduce(
-    (text, other) => partsOf(kind, other).reduce(withoutPart, text),
-    prompt,
-  );
-  const before =
-    kind === "outfits"
-      ? leads
-      : [...leads, ...(lists.outfits || []).map((outfit) => outfitPart(outfit.description))];
-  const part =
-    kind === "outfits"
-      ? outfitPart(card.description)
-      : scenePart(card.description, leads.length > 0);
-  return withPart(cleared, part, before);
-}
+  type CardParts,
+  promptCardApplied,
+  rememberCard,
+  removeCard,
+  withPromptCard,
+} from "./cardParts";
+import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCardDialogs";
+import { type PromptCard, type PromptCardKind, promptCardsQuery } from "./queries";
 
 /**
  * The References sheet's Outfits and Scenes tabs. Picking a card puts its sentence in the prompt
@@ -67,19 +23,19 @@ export function PromptCardChoices({
   kind,
   query,
   prompt,
+  parts,
   onChange,
   onLayer,
 }: {
   kind: PromptCardKind;
   query: string;
   prompt: string;
-  onChange: (prompt: string) => void;
+  parts?: CardParts;
+  onChange: (prompt: string, parts: CardParts) => void;
   onLayer: (open: boolean) => void;
 }) {
   const { noun } = promptCardText[kind];
   const listing = useQuery(promptCardsQuery(kind));
-  const characters = useQuery(charactersQuery);
-  const outfits = useQuery(promptCardsQuery("outfits"));
   const dialogs = usePromptCardDialogs(kind, onLayer);
   const words = query.trim().toLowerCase();
   const cards = (listing.data || []).filter(
@@ -87,17 +43,15 @@ export function PromptCardChoices({
   );
   if (listing.isPending) return <LoadingState fill label={`Loading ${noun}s`} />;
   if (listing.error) return <Alert color="red">{listing.error.message}</Alert>;
-  const applied = (card: PromptCard) => promptCardApplied(kind, card, prompt);
+  const applied = (card: PromptCard) => promptCardApplied(kind, card, prompt, parts);
   function toggle(card: PromptCard) {
     const current = applied(card);
-    if (current) return onChange(withoutPart(prompt, current));
-    onChange(
-      withPromptCard(kind, card, prompt, {
-        cards: listing.data,
-        characters: characters.data,
-        outfits: outfits.data,
-      }),
-    );
+    if (current) {
+      const next = removeCard(card.id, prompt, parts);
+      return onChange(next.prompt, next.cardParts);
+    }
+    const next = withPromptCard(kind, card, prompt, parts);
+    onChange(next, rememberCard(parts, kind, card, prompt, next));
   }
   return (
     <Stack gap="xs" flex={1} mih={0}>

@@ -6,6 +6,7 @@ import {
   create,
   expandComposer,
   fixtures,
+  image,
   loadFromLibrary,
   openLoraChoices,
   openNav,
@@ -676,4 +677,78 @@ test("Library › Presets lists what each preset holds, renames with unique name
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "A grey heron",
   );
+});
+
+test("Library preset loading confirms replacement and restores saved references without old run context", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const asset = {
+    id: "saved-reference",
+    name: "Saved Reference",
+    slot: "image",
+    url: image,
+    thumbnailUrl: image,
+    width: 1024,
+    height: 1024,
+  };
+  state.presets.push({
+    id: "reference-study",
+    title: "Reference Study",
+    input: {
+      kind: "image",
+      profileId: profiles[0].id,
+      prompt: "A copper heron",
+      referenceAssets: [{ assetId: asset.id, slot: "image" }],
+      referenceDetails: [asset],
+    },
+  });
+  await create(page);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An unsaved owl");
+  await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((key) => key.startsWith("studio-composer-draft:"))!;
+    const drafts = JSON.parse(localStorage.getItem(key)!);
+    drafts.image.operation = "refine";
+    drafts.image.parentItemId = "old-result";
+    drafts.image.parentJobId = "old-job";
+    drafts.image.references = [{ id: "old-reference", slot: "image" }];
+    drafts.image.compare = { variants: [{ input: drafts.image.input, references: [] }], active: 0 };
+    drafts.video.input.prompt = "Keep my video draft";
+    localStorage.setItem(key, JSON.stringify(drafts));
+  });
+  await page.goto("/library#presets");
+  await page.getByRole("button", { name: "Actions for Reference Study", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Load Preset", exact: true });
+  await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Actions for Reference Study", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
+  await confirm.getByRole("button", { name: "Replace", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "A copper heron",
+  );
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const entry = Object.keys(localStorage).find((key) =>
+          key.startsWith("studio-composer-draft:"),
+        );
+        const draft = entry ? JSON.parse(localStorage.getItem(entry)!).image : {};
+        return {
+          references: draft.references?.map((reference: { id: string }) => reference.id),
+          operation: draft.operation,
+          parentItemId: draft.parentItemId,
+          compare: draft.compare,
+          videoPrompt: entry ? JSON.parse(localStorage.getItem(entry)!).video.input.prompt : "",
+        };
+      }),
+    )
+    .toEqual({
+      references: [asset.id],
+      operation: "image",
+      parentItemId: undefined,
+      compare: undefined,
+      videoPrompt: "Keep my video draft",
+    });
 });

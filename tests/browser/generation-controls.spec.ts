@@ -702,6 +702,17 @@ test("A preset of some parts holds and loads only those, leaving the rest of the
   await withSettings(page, () => expect(seed).toHaveValue("7"));
 });
 
+test("A model and settings preset can be saved without a prompt", async ({ page }) => {
+  const state = await fixtures(page);
+  await create(page);
+  await openPresets(page);
+  await saveCurrent(page, "Model Settings", ["Prompt", "Negative", "Size", "LoRAs"]);
+  await expect.poll(() => state.presets.length).toBe(1);
+  expect(state.presets[0].parts).toEqual(["settings"]);
+  expect(state.presets[0].input.profileId).toBe(profiles[0].id);
+  expect(state.presets[0].input.prompt).toBeUndefined();
+});
+
 test("Generation controls preserve the draft and return keyboard focus with reduced motion", async ({
   page,
 }, testInfo) => {

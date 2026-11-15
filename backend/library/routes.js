@@ -691,21 +691,21 @@ export function registerLibraryRoutes(
     return ok({ key, entry: catalogue().undo(key, { by: by(account) }) });
   });
   // Removes an entry and its installed file, unless a profile still uses it; a LoRA leaves every
-  // account's stacks, strengths, ratings, recents and presets first.
+  // account's stacks, strengths, ratings, recents and presets after file removal succeeds.
   route("POST", "/api/library/catalogue/remove", async (account, { body }) => {
     const key = String(body?.key || "");
     const entry = catalogue().entry(key);
     if (!entry)
       return { status: 404, payload: { ok: false, error: "That entry isn't in the catalogue." } };
     const { folder, file } = splitCatalogueKey(key);
-    if (folder === "loras") forget(file);
-    const users = await references({ folder, file });
+    const users = await references({ folder, file }, { includePresets: folder !== "loras" });
     if (users.length)
       return {
         status: 409,
         payload: { ok: false, error: `Still used by ${users.join(", ")}.`, users },
       };
     const { removed } = await removeFile({ folder, file, sha256: entry.sha256 || "" });
+    if (folder === "loras") forget(file);
     catalogue().edit(key, { removed: true }, { by: by(account), origin: origin(account, "admin") });
     return ok({ key, fileRemoved: removed });
   });

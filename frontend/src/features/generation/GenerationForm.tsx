@@ -14,6 +14,7 @@ import { galleryKey } from "../gallery/queries";
 import { GenerationEditor, blockedProps, submitShortcut, useSubmitState } from "./GenerationEditor";
 import {
   defaultProfile,
+  draftForInput,
   draftForProfile,
   initialInput,
   inputForProfile,
@@ -250,17 +251,7 @@ export function GenerationForm({
           selection={draft}
           onSelectionChange={(selection) => setDraft((value) => ({ ...value, ...selection }))}
           onLoad={(loaded, selection) => {
-            setDraft((value) => ({
-              ...value,
-              presetId: selection.presetId,
-              presetTitle: selection.presetTitle,
-              sessionId: "",
-              parentJobId: undefined,
-              parentItemId: undefined,
-              operation: loaded.kind === "video" ? "animate" : "image",
-              input: { ...initialInput, ...loaded },
-              references: Array.isArray(loaded.referenceDetails) ? loaded.referenceDetails : [],
-            }));
+            setDraft(draftForInput(loaded, selection));
           }}
         />
       }

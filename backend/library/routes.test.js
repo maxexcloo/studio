@@ -99,8 +99,16 @@ test("an import from chat goes through the same pipeline, records chat as its or
     store,
     schedule: false,
     pictures: { file: () => "", save: async () => false, copy: async () => false },
-    references: async ({ file }) => (file === "in-use.safetensors" ? ["the Fast profile"] : []),
-    removeFile: async () => ({ removed: true }),
+    references: async ({ file }, { includePresets = true } = {}) =>
+      file === "in-use.safetensors"
+        ? ["the Fast profile"]
+        : file === "saved-only.safetensors" && includePresets
+          ? ["a saved preset"]
+          : [],
+    removeFile: async ({ file }) => {
+      if (file === "failed.safetensors") throw new Error("Worker unavailable");
+      return { removed: true };
+    },
     forget: (file) => forgotten.push(file),
   });
   const server = app.listen(0, "127.0.0.1");
@@ -198,7 +206,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
   assert.deepEqual(
     forgotten,
     ["watercolour-v2.safetensors"],
-    "it leaves every account's stacks first",
+    "successful removal clears account LoRA state",
   );
   await call("POST", "/api/library/catalogue/undo", { key: "loras/watercolour-v2.safetensors" });
   assert.ok(catalogue.entry("loras/watercolour-v2.safetensors"));
@@ -207,6 +215,23 @@ test("an import from chat goes through the same pipeline, records chat as its or
     key: "loras/in-use.safetensors",
   });
   assert.deepEqual([kept.ok, kept.users], [false, ["the Fast profile"]], "a used entry stays");
+  catalogue.edit("loras/failed.safetensors", { title: "Failed Removal" });
+  const failed = await call("POST", "/api/library/catalogue/remove", {
+    key: "loras/failed.safetensors",
+  });
+  assert.equal(failed.ok, false);
+  assert.deepEqual(
+    forgotten,
+    ["watercolour-v2.safetensors"],
+    "refused and failed removals preserve account presets and stacks",
+  );
+  assert.ok(catalogue.entry("loras/failed.safetensors"));
+  catalogue.edit("loras/saved-only.safetensors", { title: "Saved Only" });
+  const savedOnly = await call("POST", "/api/library/catalogue/remove", {
+    key: "loras/saved-only.safetensors",
+  });
+  assert.equal(savedOnly.ok, true, "saved presets may be cleaned up once file removal succeeds");
+  assert.deepEqual(forgotten, ["watercolour-v2.safetensors", "saved-only.safetensors"]);
 });
 
 test("dropped images arrive as data URLs, PNG, WebP or JPEG only", () => {

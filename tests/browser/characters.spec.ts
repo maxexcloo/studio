@@ -69,6 +69,68 @@ test("Picking a character places its first image and leads the prompt with it, a
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toHaveCount(0);
 });
 
+test("Applying and removing a two-image character preserves pre-existing manual references", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.characters.push(mara);
+  const profile = {
+    ...profiles[0],
+    editReferences: true,
+    keepsCharacters: true,
+    mediaInputs: [{ id: "image", max: 2 }],
+  };
+  await serveProfiles(page, [profile]);
+  await page.goto("/images");
+  for (const existing of [[mara.references[1]], mara.references]) {
+    const references = existing.map((asset) => ({ ...asset, slot: "image" }));
+    await page.evaluate(
+      ({ references, profileId }) => {
+        localStorage.setItem(
+          "studio-composer-draft:local",
+          JSON.stringify({
+            image: {
+              input: {
+                kind: "image",
+                profileId,
+                prompt: "A forest path.",
+                referenceAssets: references.map((asset) => ({
+                  assetId: asset.id,
+                  slot: asset.slot,
+                })),
+              },
+              references,
+              sessionId: "",
+              operation: "image",
+            },
+          }),
+        );
+      },
+      { references, profileId: profile.id },
+    );
+    await create(page);
+    await openCharacters(page);
+    await page.getByRole("button", { name: "Use character: Mara", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Remove character: Mara", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Remove character: Mara", exact: true }).click();
+    await closeReferences(page);
+    await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+      "A forest path.",
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          JSON.parse(localStorage.getItem("studio-composer-draft:local")!).image.references.map(
+            (asset: { id: string }) => asset.id,
+          ),
+        ),
+      )
+      .toEqual(references.map((asset) => asset.id));
+  }
+});
+
 test("Picking a character on an img2img model moves the composer to a model that keeps characters", async ({
   page,
 }) => {
@@ -459,6 +521,36 @@ test("Make Sheet follows the card's sheet until its views show on the card", asy
   ).toHaveCount(4);
   await sheet.getByRole("button", { name: "Make Sheet Again", exact: true }).click();
   await expect(sheet.getByRole("status")).toHaveText("Making Sheet…");
+});
+
+test("Picking and removing outfits preserves handwritten text even when it matches a saved card", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const yellow = "a yellow raincoat";
+  state.outfits.push(
+    { id: "out-yellow", name: "Yellow", description: yellow, references: [] },
+    { id: "out-red", name: "Red", description: "a red raincoat", references: [] },
+  );
+  await create(page);
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  const typed = `${outfitPart(yellow)} At a bus stop.`;
+  await prompt.fill(typed);
+  const pick = async (label: string) => {
+    await page.getByRole("button", { name: "Choose References", exact: true }).click();
+    const references = page.getByRole("region", { name: "References", exact: true });
+    await references.getByText("Outfits", { exact: true }).click();
+    await references.getByRole("button", { name: label, exact: true }).click();
+    await closeReferences(page);
+  };
+  await pick("Use outfit: Red");
+  await expect(prompt).toHaveValue(`${outfitPart("a red raincoat")} ${typed}`);
+  await pick("Remove outfit: Red");
+  await expect(prompt).toHaveValue(typed);
+  await pick("Use outfit: Yellow");
+  await expect(prompt).toHaveValue(typed);
+  await pick("Remove outfit: Yellow");
+  await expect(prompt).toHaveValue(typed);
 });
 
 test("Outfits and scenes go into the prompt in order from the References sheet, and are made in the Library", async ({
