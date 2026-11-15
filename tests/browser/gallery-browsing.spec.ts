@@ -337,11 +337,11 @@ test("Touch scrolling cancels hold selection and a held tile remains selected af
   test.skip(!testInfo.project.use.isMobile, "Touch gesture applies to phone projects");
   const state = await fixtures(page);
   state.gallery.push(...results(2));
-  // With captions shown, holding selects; without, it opens the tile's menu (tile-actions.spec.ts).
   state.preferences.preferences.tileCaptions = true;
   await page.goto("/images");
-  const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
-  const second = page.getByRole("button", { name: "Open image: Browse Result 1", exact: true });
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  const first = page.getByRole("button", { name: "Select image: Browse Result 0", exact: true });
+  const second = page.getByRole("button", { name: "Select image: Browse Result 1", exact: true });
   // A touch screen's hold is Studio's: no native drag lift takes it first.
   await expect(first).toHaveAttribute("draggable", "false");
   await touch(first, "touchstart");
@@ -1374,12 +1374,581 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await expect(disliked).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("combobox", { name: "Date", exact: true })).toHaveValue("Any Date");
   await expect(page.getByRole("switch", { name: "Comparisons", exact: true })).not.toBeChecked();
-  // The cleared query can already be cached; reloading verifies the saved filters and request.
+  await expect(search).toHaveValue("Browse");
+  // Filters persist across reloads; the transient search does not.
   await page.reload();
   await expect
     .poll(() => {
       const query = new URLSearchParams(state.galleryRequests.at(-1));
       return [query.get("q"), query.get("rating"), query.has("since"), query.has("comparisons")];
     })
-    .toEqual(["Browse", "disliked", false, false]);
+    .toEqual(["", "disliked", false, false]);
 });
+
+test("Incoming results preserve loaded pages, the scroll anchor and selection without a reveal step", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const original = results(120);
+  let incoming: typeof original = [];
+  const requests: string[] = [];
+  await page.route("**/api/gallery?**", (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get("cursor") || "";
+    requests.push(cursor);
+    return route.fulfill({
+      json: {
+        items: cursor ? original.slice(60) : [...incoming, ...original].slice(0, 60),
+        nextCursor: cursor ? "" : "older",
+        hasMore: !cursor,
+        totalApprox: original.length + incoming.length,
+      },
+    });
+  });
+  await page.goto("/images");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+  const firstHeight = await page
+    .locator("[data-gallery-view]")
+    .evaluate((host) => host.style.height);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(() => requests.includes("older")).toBe(true);
+  await expect
+    .poll(() => page.locator("[data-gallery-view]").evaluate((host) => host.style.height))
+    .not.toBe(firstHeight);
+  // Exercise the date scrubber too: it must stay interactive over the sticky toolbar.
+  await page.evaluate(() => window.scrollBy(0, 1));
+  const scrubber = page.getByRole("scrollbar", { name: "Gallery Dates", exact: true });
+  await expect(scrubber).toHaveAttribute("data-active", "true");
+  const track = (await scrubber.boundingBox())!;
+  const thumb = (await scrubber.locator("div").first().boundingBox())!;
+  await page.mouse.move(thumb.x + thumb.width / 2, thumb.y + thumb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(track.x + track.width / 2, track.y + track.height * 0.6, { steps: 4 });
+  await page.mouse.up();
+  const tile = page.getByRole("button", { name: "Open image: Browse Result 70", exact: true });
+  await tile.scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  const selectedTile = page.getByRole("button", {
+    name: "Select image: Browse Result 70",
+    exact: true,
+  });
+  await selectedTile.click();
+  await expect(selectedTile).toHaveAttribute("aria-pressed", "true");
+  const before = await selectedTile.boundingBox();
+  const heightBefore = await page
+    .locator("[data-gallery-view]")
+    .evaluate((host) => host.style.height);
+  const previousReads = requests.length;
+  const point = { x: before!.x + before!.width / 2, y: before!.y + before!.height / 2 };
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  incoming = results(5).map((item, index) => ({
+    ...item,
+    id: `incoming-${index}`,
+    prompt: `Incoming ${index}`,
+  }));
+  state.jobs.push({
+    id: "incoming",
+    sessionId: "s",
+    operation: "image",
+    status: "completed",
+    input: { prompt: "Incoming", profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  await expect.poll(() => requests.length).toBeGreaterThan(previousReads);
+  await expect
+    .poll(() => page.locator("[data-gallery-view]").evaluate((host) => host.style.height))
+    .not.toBe(heightBefore);
+  await expect(
+    page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
+  ).toHaveText("1 Selected");
+  await expect(selectedTile).toHaveAttribute("aria-pressed", "true");
+  await expect
+    .poll(async () => Math.abs((await selectedTile.boundingBox())!.y - before!.y))
+    .toBeLessThan(2);
+  // An arrival during a tap must keep the hit target over the gallery, not a toolbar filter.
+  await page.mouse.up();
+  await expect(page.getByRole("button", { name: "Liked", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(page.getByRole("button", { name: "Uploads", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  if (test.info().project.use.isMobile)
+    await expect(
+      page.getByRole("button", { name: "Gallery Filters", exact: true }),
+    ).toHaveAttribute("aria-expanded", "false");
+  else
+    await expect(page.getByRole("combobox", { name: "Date", exact: true })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  expect(requests.filter(Boolean)).toEqual(["older"]);
+  await expect(page.getByRole("button", { name: /^\d+ New$/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(
+    page.getByRole("button", { name: "Open image: Incoming 0", exact: true }),
+  ).toBeVisible();
+});
+
+test("Incoming results keep the viewer on its current item and return focus to that tile", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(30));
+  await page.goto("/images");
+  const tile = page.getByRole("button", { name: "Open image: Browse Result 10", exact: true });
+  await tile.click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByRole("img", { name: "Browse Result 10", exact: true })).toBeVisible();
+  const previousReads = state.galleryRequests.length;
+  state.gallery.unshift({ ...results(1)[0], id: "incoming-viewer", prompt: "Incoming In Viewer" });
+  state.jobs.push({
+    id: "incoming-viewer",
+    sessionId: "s",
+    operation: "image",
+    status: "completed",
+    input: { prompt: "Incoming", profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  await expect.poll(() => state.galleryRequests.length).toBeGreaterThan(previousReads);
+  await expect(viewer.getByRole("img", { name: "Browse Result 10", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/item=browse-10$/);
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(tile).toBeFocused();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(
+    page.getByRole("button", { name: "Open image: Incoming In Viewer", exact: true }),
+  ).toBeVisible();
+});
+
+test("Returning after more than a page of incoming results leaves no gap before held items", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const original = results(10);
+  let incoming: typeof original = [];
+  const cursors: string[] = [];
+  await page.route("**/api/gallery?**", (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get("cursor") || "";
+    cursors.push(cursor);
+    const matches = [...incoming, ...original];
+    const start = Number(cursor);
+    return route.fulfill({
+      json: {
+        items: matches.slice(start, start + 60),
+        hasMore: start + 60 < matches.length,
+        nextCursor: start + 60 < matches.length ? String(start + 60) : "",
+        totalApprox: matches.length,
+      },
+    });
+  });
+  await page.goto("/images?item=browse-0");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
+  const visibility = (hidden: boolean) =>
+    page.evaluate((hidden) => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => (hidden ? "hidden" : "visible"),
+      });
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
+      document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
+    }, hidden);
+  await visibility(true);
+  incoming = results(65).map((item, index) => ({
+    ...item,
+    id: `away-${index}`,
+    prompt: `Away ${index}`,
+  }));
+  const previousReads = cursors.length;
+  await visibility(false);
+  await expect.poll(() => cursors.length).toBe(previousReads + 2);
+  await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
+  expect(cursors.slice(previousReads)).toEqual(["", "60"]);
+  await page.keyboard.press("ArrowLeft");
+  await expect(page).toHaveURL(/item=browse-0$/);
+  await page.keyboard.press("ArrowRight");
+  await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await page
+    .locator("[data-gallery-view]")
+    .evaluate((host) =>
+      window.scrollTo(
+        0,
+        host.getBoundingClientRect().top + window.scrollY + (host.clientHeight * 64) / 75,
+      ),
+    );
+  await expect(
+    page.getByRole("button", { name: "Open image: Away 64", exact: true }),
+  ).toBeVisible();
+});
+
+test("Viewer navigation keeps decoded media visible while the next image loads and advances once", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const nextUrl = "/sample-media/delayed-next.svg";
+  state.gallery.push(
+    results(1)[0],
+    { ...results(2)[1], url: nextUrl, thumbnailUrl: nextUrl },
+    { ...results(3)[2], id: "third" },
+  );
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let requested = false;
+  await page.route("**/sample-media/delayed-next.svg", async (route) => {
+    requested = true;
+    await pending;
+    await route.fulfill({
+      contentType: "image/svg+xml",
+      body: decodeURIComponent(image.slice(image.indexOf(",") + 1)),
+    });
+  });
+  await page.goto("/images?item=browse-0");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const previous = viewer.getByRole("img", { name: "Browse Result 0", exact: true });
+  await expect(previous).toBeVisible();
+  await previous.evaluate((node: HTMLImageElement) => node.decode());
+  try {
+    await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/item=browse-1$/);
+    await expect.poll(() => requested).toBe(true);
+    await expect(previous).toBeVisible();
+    await expect(previous).toHaveAttribute("src", image);
+  } finally {
+    release();
+  }
+  await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toHaveAttribute(
+    "src",
+    nextUrl,
+  );
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/item=third$/);
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/item=third$/);
+  await page.keyboard.press("ArrowLeft");
+  await expect(page).toHaveURL(/item=browse-1$/);
+});
+
+test("A pending output becomes saved media without losing the viewer or its return focus", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    ...results(1)[0],
+    id: "working-0",
+    jobId: "working",
+    index: 0,
+    status: "pending",
+    url: "",
+  });
+  state.jobs.push({
+    id: "working",
+    sessionId: "s",
+    operation: "image",
+    status: "running",
+    input: { prompt: "Browse Result 0", profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  await page.goto("/images?item=working-0");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer).toBeVisible();
+  state.gallery[0] = {
+    ...state.gallery[0],
+    id: "saved-output",
+    number: 501,
+    status: "done",
+    url: image,
+  };
+  state.jobs[0].status = "completed";
+  await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/item=501$/);
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeFocused();
+  await expect(page.locator('[data-media-id="working-0"]')).toHaveCount(0);
+  await expect(page.locator('[data-media-id="saved-output"]')).toBeFocused();
+});
+
+for (const navigation of ["arrows", "keyboard", "swipe"] as const)
+  test(`Dislike preserves viewer neighbours, Undo and bounds with ${navigation}`, async ({
+    page,
+  }, testInfo) => {
+    const phone = testInfo.project.use.isMobile === true;
+    test.skip(navigation === "arrows" && phone, "Phones use swipes instead of arrow buttons");
+    test.skip(navigation === "swipe" && !phone, "Phone touch navigation");
+    const state = await fixtures(page);
+    state.gallery.push(...results(3));
+    await page.goto("/images?item=browse-1");
+    const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+    await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+    async function move(direction: "next" | "previous") {
+      if (navigation === "arrows")
+        await viewer
+          .getByRole("button", {
+            name: direction === "next" ? "Next Generation" : "Previous Generation",
+            exact: true,
+          })
+          .click();
+      else if (navigation === "keyboard")
+        await page.keyboard.press(direction === "next" ? "ArrowRight" : "ArrowLeft");
+      else {
+        const photo = viewer.getByRole("img");
+        const start = direction === "next" ? 220 : 60;
+        const end = direction === "next" ? 60 : 220;
+        const pointer = {
+          pointerId: 7,
+          pointerType: "touch",
+          button: 0,
+          clientY: 250,
+          isPrimary: true,
+        };
+        await photo.dispatchEvent("pointerdown", { ...pointer, clientX: start });
+        await photo.dispatchEvent("pointermove", { ...pointer, clientX: end });
+        await photo.dispatchEvent("pointerup", { ...pointer, clientX: end });
+      }
+    }
+    const refreshed = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/gallery",
+    );
+    await viewer.getByRole("button", { name: "Dislike", exact: true }).focus();
+    await page.keyboard.press("Space");
+    await expect.poll(() => state.gallery[1].rating).toBe("disliked");
+    await refreshed;
+    await expect(
+      page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+    ).toHaveCount(0);
+    await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+    await move("next");
+    await expect(page).toHaveURL(/item=browse-2$/);
+    await expect(viewer.getByRole("img", { name: "Browse Result 2", exact: true })).toBeVisible();
+    await move("previous");
+    await expect(page).toHaveURL(/item=browse-1$/);
+    await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect.poll(() => state.gallery[1].rating).toBeUndefined();
+    await expect(
+      page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+    ).toHaveCount(1);
+    await move("previous");
+    await expect(page).toHaveURL(/item=browse-0$/);
+    await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
+    await move("previous");
+    await expect(page).toHaveURL(/item=browse-0$/);
+    await move("next");
+    await expect(page).toHaveURL(/item=browse-1$/);
+    await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+    await move("next");
+    await expect(page).toHaveURL(/item=browse-2$/);
+    await expect(viewer.getByRole("img", { name: "Browse Result 2", exact: true })).toBeVisible();
+    await move("next");
+    await expect(page).toHaveURL(/item=browse-2$/);
+    await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Open image: Browse Result 2", exact: true }),
+    ).toBeFocused();
+  });
+
+test("Closing a disliked item focuses its next visible gallery neighbour", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(3));
+  await page.goto("/images?item=browse-1");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+  await viewer.getByRole("button", { name: "Dislike", exact: true }).focus();
+  await page.keyboard.press("Space");
+  await expect.poll(() => state.gallery[1].rating).toBe("disliked");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+  ).toHaveCount(0);
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 2", exact: true }),
+  ).toBeFocused();
+});
+
+test("Completing every held pending output refreshes one head page without walking history", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const held = results(60).map((item, index) => ({
+    ...item,
+    id: `working-${index}`,
+    jobId: "working",
+    index,
+    status: "pending",
+    url: "",
+  }));
+  const saved = held.map((item, index) => ({
+    ...item,
+    id: `saved-${index}`,
+    status: "done",
+    url: image,
+  }));
+  state.jobs.push({
+    id: "working",
+    sessionId: "s",
+    operation: "image",
+    status: "running",
+    input: { profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  const cursors: string[] = [];
+  await page.route("**/api/gallery?**", (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get("cursor") || "";
+    cursors.push(cursor);
+    return route.fulfill({
+      json: {
+        items: cursor ? results(60) : state.jobs[0].status === "completed" ? saved : held,
+        hasMore: !cursor,
+        nextCursor: cursor ? "" : "history",
+        totalApprox: 120,
+      },
+    });
+  });
+  await page.goto("/images?item=working-0");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open Status", exact: true })).toHaveAttribute(
+    "aria-description",
+    "Generating",
+  );
+  const previousReads = cursors.length;
+  state.jobs[0].status = "completed";
+  await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/item=saved-0$/);
+  expect(cursors.slice(previousReads)).toEqual([""]);
+});
+
+test("The final job completing during pagination defers one head refresh until the page settles", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.jobs.push({
+    id: "working",
+    sessionId: "s",
+    operation: "image",
+    status: "running",
+    input: { profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  const original = results(120);
+  const finished = { ...original[0], id: "finished-0", prompt: "Finished While Paging" };
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let paging = false;
+  const cursors: string[] = [];
+  await page.route("**/api/gallery?**", async (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get("cursor") || "";
+    cursors.push(cursor);
+    if (cursor) {
+      paging = true;
+      await held;
+    }
+    const completed = state.jobs[0].status === "completed";
+    await route.fulfill({
+      json: {
+        items: cursor
+          ? original.slice(60)
+          : completed
+            ? [finished, ...original.slice(0, 59)]
+            : original.slice(0, 60),
+        hasMore: !cursor,
+        nextCursor: cursor ? "" : "older",
+        totalApprox: completed ? 121 : 120,
+      },
+    });
+  });
+  await page.goto("/images?item=browse-59");
+  const status = page.getByRole("button", { name: "Open Status", exact: true });
+  await expect(status).toHaveAttribute("aria-description", "Generating");
+  await expect.poll(() => paging).toBe(true);
+  const previousReads = cursors.length;
+  try {
+    state.jobs[0].status = "completed";
+    await expect(status).not.toHaveAttribute("aria-description", "Generating");
+    expect(cursors.length).toBe(previousReads);
+  } finally {
+    release();
+  }
+  await expect.poll(() => cursors.slice(previousReads)).toEqual([""]);
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByRole("img", { name: "Browse Result 59", exact: true })).toBeVisible();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(
+    page.getByRole("button", { name: "Open image: Finished While Paging", exact: true }),
+  ).toBeVisible();
+  expect(cursors.filter(Boolean)).toEqual(["older"]);
+});
+
+for (const view of ["Grid", "Runs"] as const)
+  for (const captions of [false, true])
+    test(`Phone ${view} holds open item menus with captions ${captions ? "shown" : "hidden"}`, async ({
+      page,
+    }, testInfo) => {
+      test.skip(!testInfo.project.use.isMobile, "Phone touch menus");
+      const state = await fixtures(page);
+      state.preferences.preferences.tileCaptions = captions;
+      state.gallery.push(...results(2));
+      await page.goto("/images");
+      await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+      await page.getByText(view, { exact: true }).click();
+      await page.keyboard.press("Escape");
+      const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
+      const second = page.getByRole("button", { name: "Open image: Browse Result 1", exact: true });
+      await touch(first, "touchstart");
+      await touch(first, "touchmove", 140);
+      await touch(first, "touchend", 140);
+      await touch(second, "touchstart");
+      const menu = page.getByRole("menu");
+      await expect(menu).toBeVisible();
+      await touch(second, "touchend");
+      // Native contextmenu after the hold must not open a second surface.
+      expect(
+        await second.evaluate(
+          (node) =>
+            !node.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })),
+        ),
+      ).toBe(true);
+      await second.dispatchEvent("click");
+      await expect(menu).toHaveCount(1);
+      await expect(menu).toBeVisible();
+      await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
+      await expect(
+        page.getByRole("group", { name: "Gallery Selection", exact: true }),
+      ).toBeHidden();
+      await page.keyboard.press("Escape");
+      await expect(menu).toBeHidden();
+      await first.click();
+      await expect(
+        page
+          .getByRole("dialog", { name: "Generation", exact: true })
+          .getByRole("img", { name: "Browse Result 0", exact: true }),
+      ).toBeVisible();
+    });

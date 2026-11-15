@@ -245,7 +245,7 @@ export function MediaTile({
   onVersion?: (index?: number) => void;
 }) {
   const selecting = Boolean(selection?.selecting);
-  // Dragging a result into the composer is the pointer's; on touch screens a hold selects instead.
+  // Touch holds use Studio's menu or selection instead of a native drag lift.
   const touch = useTouch();
   // Its Stop takes the caption's place at the foot of the tile.
   const upscaleShown = item.status === "done" && upscaling(item) && !selecting;
