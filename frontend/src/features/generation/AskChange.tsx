@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Menu, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
   type QueryKey,
@@ -17,9 +17,8 @@ import {
   type Suggestions,
   maxSuggestions,
 } from "../../../../shared/suggestions";
-import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
+import { type Action, type ActionGroups } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
-import { PopupTooltip } from "../../ui/PopupTooltip";
 import { changeSummary } from "./changeSummary";
 import { assistantQuery } from "./PromptAssistant";
 
@@ -248,38 +247,16 @@ export const assistMenu = ({
         last,
       ];
 
-/** Suggestions as their own menu button, beside a field outside a text box's tools. */
+/** Supplies a text box's suggestions, loading once its More menu opens. */
 export function ChangeSuggestions<K extends QueryKey>({
-  disabled,
+  children,
   ...props
-}: Omit<Parameters<typeof useChangeSuggestions<K>>[0], "enabled">) {
-  const [opened, setOpened] = useState(false);
-  const { action, loading } = useChangeSuggestions({
-    ...props,
-    disabled,
-    enabled: opened,
-  });
-  return (
-    <Menu position="top-end" width={240} opened={opened} onChange={setOpened}>
-      <PopupTooltip label="Suggestions">
-        <Menu.Target>
-          <ActionIcon
-            variant="subtle"
-            color="gray"
-            aria-label="Suggestions"
-            disabled={disabled}
-            onPointerDown={keepFocus}
-          >
-            <icons.suggestions size={16} />
-          </ActionIcon>
-        </Menu.Target>
-      </PopupTooltip>
-      <Menu.Dropdown data-composer-layer aria-busy={loading || undefined}>
-        <Menu.Label>Suggestions</Menu.Label>
-        <ActionMenuItems groups={action.menu!} />
-      </Menu.Dropdown>
-    </Menu>
-  );
+}: Omit<Parameters<typeof useChangeSuggestions<K>>[0], "enabled"> & {
+  children: (action: Action) => ReactNode;
+}) {
+  const [requested, setRequested] = useState(false);
+  const { action } = useChangeSuggestions({ ...props, enabled: requested });
+  return children({ ...action, onOpen: () => setRequested(true) });
 }
 
 /**

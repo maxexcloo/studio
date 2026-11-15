@@ -14,11 +14,14 @@ import {
   ProposalLabel,
   SendButton,
   UndoButton,
+  assistMenu,
   proposalText,
   proposedClass,
+  useChangeSuggestions,
 } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
 import { assistantQuery } from "../generation/PromptAssistant";
+import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import { useItemChange } from "./useItemChange";
 import { type EditAsk, type Iteration, typedPrompt, useEditReview } from "./useMediaAction";
 
@@ -30,8 +33,8 @@ export type ViewerAsk = { request: string } | { custom: true };
 /**
  * The viewer's prompt and its assistance. The field holds the item's prompt: editing it and
  * pressing Enter or Generate runs it with the item's settings as a new version, and Improve Prompt
- * rewrites it in one of the assistant's styles. `edit` asks for the changes Edit ▾ offers (a
- * suggestion, a template, or Custom…, typed in its own box) through `useItemChange`. Under Review
+ * rewrites it in one of the assistant's styles or asks for a suggestion, template or Custom…
+ * change through `useItemChange`. Tile Edit choices use the same request path. Under Review
  * Prompt, the remembered default, a change's proposal fills the field until Run runs it or Undo
  * restores what was typed; without it, the proposal runs at once.
  */
@@ -42,7 +45,7 @@ export function useViewerPrompt(
   const original = typedPrompt(item);
   const [prompt, setPrompt] = useState(original);
   const field = useRef<HTMLTextAreaElement>(null);
-  const [review] = useEditReview();
+  const [review, setReview] = useEditReview();
   const runNow = useRef<(proposal: Change) => void>(() => {});
   const ask = useItemChange<string>(item, {
     groups,
@@ -112,22 +115,68 @@ export function useViewerPrompt(
     assistant?.available && profileId
       ? assistant.presets.filter((style) => style.id !== "custom")
       : [];
-  const improveTool: Action | null = styles.length
-    ? {
-        id: "improve",
-        label: "Improve Prompt",
-        icon: icons.assistant,
-        disabled: improve.isPending || ask.pending || !prompt.trim(),
-        menu: [
-          styles.map((style) => ({
-            id: `improve:${style.id}`,
-            label: style.label,
-            description: style.description,
-            onClick: () => improve.mutate(style.id),
-          })),
-        ],
-      }
-    : null;
+  const suggestions = useChangeSuggestions({
+    query: nextStepsQuery(item.jobId ?? ""),
+    fresh: () => askNextSteps(item.jobId!, true),
+    enabled: ask.available && item.type === "image",
+    disabled: ask.pending,
+    onPick: pick,
+  });
+  const improveTool: Action | null =
+    assistant?.available && (styles.length || ask.available)
+      ? {
+          id: "improve",
+          label: "Improve Prompt",
+          icon: icons.assistant,
+          menu: [
+            ...(ask.available
+              ? [
+                  [
+                    {
+                      id: "review",
+                      label: "Review Prompt",
+                      icon: icons.review,
+                      checked: review,
+                      keepOpen: true,
+                      onClick: () => setReview(!review),
+                    },
+                  ],
+                ]
+              : []),
+            styles.map((style) => ({
+              id: `improve:${style.id}`,
+              label: style.label,
+              description: style.description,
+              disabled: improve.isPending || ask.pending || !prompt.trim(),
+              onClick: () => improve.mutate(style.id),
+            })),
+            ...assistMenu({
+              suggestions: ask.available && item.type === "image" ? suggestions.group : [],
+              templates: ask.available
+                ? (assistant.changes ?? []).map((change) => ({
+                    id: `change:${change.id}`,
+                    label: change.label,
+                    icon: icons.suggestions,
+                    disabled: ask.pending,
+                    onClick: () => pick(change.instruction),
+                  }))
+                : [],
+              custom: ask.available
+                ? [
+                    {
+                      id: "custom",
+                      label: "Custom…",
+                      icon: icons.custom,
+                      disabled: ask.pending,
+                      onClick: () => setCustomOpen(true),
+                    },
+                  ]
+                : [],
+              last: [],
+            }),
+          ],
+        }
+      : null;
   return { item, original, prompt, setPrompt, field, ask, custom, edit, improveTool, improve };
 }
 

@@ -8,7 +8,6 @@ import {
   type ModalProps,
   Textarea,
   type TextareaProps,
-  Tooltip,
   VisuallyHidden,
   getDefaultZIndex,
   useProps,
@@ -29,10 +28,10 @@ import {
 } from "react";
 
 import { menuWidth } from "../theme";
-import { type Action, ActionBarGroups, ActionMenuItems } from "./ActionBar";
-import { useCopy } from "./clipboard";
+import { type Action, ActionMenuItems } from "./ActionBar";
+import { copyText, useCopy } from "./clipboard";
 import { icons } from "./icons";
-import { popupLayer } from "./popupClicks";
+import { layerAbove, popupLayer } from "./popupClicks";
 import { PopupTooltip } from "./PopupTooltip";
 import { useKeyboard, useKeyboardDrop } from "./useKeyboard";
 import { usePhone } from "./usePhone";
@@ -43,18 +42,7 @@ import classes from "./TextBox.module.css";
 // follows the focus (a sheet's header) moves the control from under the press.
 const keepFocus = (event: MouseEvent) => event.preventDefault();
 
-/**
- * Every multi-line text box. Beside the text stand `send` and, with `tools`, small Copy (unless
- * `copy` is off, where the page offers it) and Clear (Reset where `reset` holds the text to return
- * to) buttons, Clear turning into Undo until the text next changes, then a ⋯ menu of the box's own
- * tools (all of them inside the text's corner for a labelled box). The menu is one level deep: a
- * tool with options lists them under its name, first, rather than in a submenu. On phones the box
- * is a summary of its text: tapping it opens it full screen with those tools as buttons, since
- * menus are awkward over the keyboard, then Done, and `below` under the text; Done, Escape or
- * dismissing the keyboard returns to the page. There Copy and Clear stand beside the sends, as in
- * the composer, and `submit` adds its sends, the last one primary, so typing and sending take one
- * tap. An `inline` box edits in place on phones too, as on desktop.
- */
+/** Shared text editing, with a flat tools menu and a full-screen phone editor. */
 export function TextBox({
   value,
   onChange,
@@ -79,7 +67,7 @@ export function TextBox({
   onChange: (value: string) => void;
   /** The box's own tools, in its ⋯ menu; with them (even none) come Copy and Clear. */
   tools?: Action[];
-  /** Offers Copy beside the text; off where the page already has it (the viewer's bar). */
+  /** Omits duplicate Copy where the page offers it; the full-screen editor always offers it. */
   copy?: boolean;
   /** The send, and a proposal's Undo, which stay beside the text. */
   send?: ReactNode;
@@ -111,7 +99,8 @@ export function TextBox({
     onSubmit: () => void;
   }[];
 }) {
-  const phone = usePhone() && !inline;
+  const mobile = usePhone();
+  const phone = mobile && !inline;
   const [editing, setEditing] = useState(false);
   const content = useRef<HTMLDivElement>(null);
   const more = useRef<HTMLButtonElement>(null);
@@ -119,7 +108,7 @@ export function TextBox({
   const keyboard = useKeyboard(editing, content);
   const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
-  useKeyboardDrop(editing, () => setEditing(false));
+  useKeyboardDrop(editing, () => close());
   // Clear turns into Undo, which restores the text, until the text next changes.
   const start = reset ?? "";
   const [cleared, setCleared] = useState<string | null>(null);
@@ -142,45 +131,35 @@ export function TextBox({
   const copier = useCopy();
   const edits: Action[] = tools
     ? [
-        ...(copy
+        ...(copy || phone
           ? [
               {
                 id: "copy",
                 label: copier.copied ? "Copied" : "Copy",
                 icon: copier.copied ? Check : icons.copy,
                 disabled: !value,
-                onClick: () => copier.copy(value, title),
+                onClick: () => (mobile ? copier.copy(value, title) : void copyText(value, title)),
               },
             ]
           : []),
-        clear,
+        ...(reset === undefined || value !== start || cleared !== null ? [clear] : []),
       ]
     : [];
-  const editButtons = (size: "sm" | "lg") =>
-    edits.map((action) => (
-      <Tooltip key={action.id} label={action.label}>
-        <ActionIcon
-          onMouseDown={keepFocus}
-          variant="subtle"
-          color="gray"
-          size={size}
-          // Named for the box too, as the composer has its own Clear for the whole draft.
-          aria-label={
-            action.label === "Undo"
-              ? "Undo"
-              : `${action.id === "copy" ? "Copy" : action.label} ${title}`
-          }
-          disabled={action.disabled}
-          onClick={action.onClick}
-        >
-          {action.icon && <action.icon size={size === "sm" ? 14 : 18} />}
-        </ActionIcon>
-      </Tooltip>
-    ));
-  const actions = tools?.length ? tools : undefined;
-  // What a tool is doing spins the ⋯ (its tooltip names it); without a ⋯ in sight, as in the phone
-  // editor, it shows over the text with a spinner, standing in for the box's description meanwhile.
-  const spins = Boolean(actions) && !phone && !hideTools;
+  const editButtons = edits.map((action) => (
+    <Button
+      key={action.id}
+      onMouseDown={keepFocus}
+      variant="subtle"
+      color="gray"
+      size="compact-sm"
+      leftSection={action.icon && <action.icon size={16} />}
+      disabled={action.disabled}
+      onClick={action.onClick}
+    >
+      {action.label}
+    </Button>
+  ));
+  const spins = tools !== undefined && (!phone || editing) && !hideTools;
   const description =
     busy && !spins ? (
       <span className={classes.busy} role="status">
@@ -215,20 +194,10 @@ export function TextBox({
     ] as const)
       line.current.style[key] = style[key];
   });
-  // A tool with options lists its first group under its name (Improve Prompt's styles); its other
-  // options join the plain tools after them, as one group.
-  const listed = actions?.filter((action) => action.menu) || [];
-  const others = [
-    ...listed.flatMap((tool) =>
-      tool
-        .menu!.slice(1)
-        .flatMap((group) =>
-          group.map((option) => ({ ...option, disabled: option.disabled || tool.disabled })),
-        ),
-    ),
-    ...(actions?.filter((action) => !action.menu) || []),
-  ];
-  const menu = actions && (
+  // Keep every option under its tool's name, including its later action groups.
+  const listed = tools?.filter((action) => action.menu) || [];
+  const others = tools?.filter((action) => !action.menu) || [];
+  const menu = tools !== undefined && (
     <Menu
       position="top-end"
       width={menuWidth}
@@ -238,6 +207,7 @@ export function TextBox({
       zIndex={getDefaultZIndex("max")}
       opened={menuOpened}
       onChange={setMenuOpened}
+      onOpen={() => tools.forEach((tool) => tool.onOpen?.())}
       // An item that moves focus itself keeps it; otherwise it returns.
       returnFocus={false}
       onClose={() =>
@@ -249,31 +219,53 @@ export function TextBox({
     >
       <PopupTooltip label={busy || "More Actions"}>
         <Menu.Target>
-          <ActionIcon
-            ref={more}
-            onMouseDown={keepFocus}
-            variant="subtle"
-            color="gray"
-            aria-label={`More ${title} Actions`}
-            aria-busy={Boolean(busy) || undefined}
-            aria-description={busy}
-          >
-            {busy ? <Loader size={16} /> : <icons.more size={18} />}
-          </ActionIcon>
+          {mobile ? (
+            <Button
+              ref={more}
+              onMouseDown={keepFocus}
+              variant="subtle"
+              color="gray"
+              size="compact-sm"
+              aria-label={`More ${title} Actions`}
+              disabled={tools.length === 0 && (mobile || edits.length === 0)}
+              aria-busy={Boolean(busy) || undefined}
+              aria-description={busy}
+              leftSection={busy ? <Loader size={16} /> : <icons.more size={18} />}
+            >
+              More
+            </Button>
+          ) : (
+            <ActionIcon
+              ref={more}
+              onMouseDown={keepFocus}
+              variant="subtle"
+              color="gray"
+              aria-label={`More ${title} Actions`}
+              disabled={tools.length === 0 && (mobile || edits.length === 0)}
+              aria-busy={Boolean(busy) || undefined}
+              aria-description={busy}
+            >
+              {busy ? <Loader size={16} /> : <icons.more size={18} />}
+            </ActionIcon>
+          )}
         </Menu.Target>
       </PopupTooltip>
       <Menu.Dropdown style={{ overflowY: "auto" }}>
+        {!mobile && <ActionMenuItems groups={[edits]} />}
+        {!mobile && edits.length > 0 && (listed.length > 0 || others.length > 0) && (
+          <Menu.Divider />
+        )}
         {listed.map((tool, index) => (
           <Fragment key={tool.id}>
             {index > 0 && <Menu.Divider />}
             <Menu.Label>{tool.label}</Menu.Label>
             <ActionMenuItems
-              groups={[
-                tool.menu![0].map((option) => ({
+              groups={tool.menu!.map((group) =>
+                group.map((option) => ({
                   ...option,
                   disabled: option.disabled || tool.disabled,
                 })),
-              ]}
+              )}
             />
           </Fragment>
         ))}
@@ -283,17 +275,22 @@ export function TextBox({
     </Menu>
   );
   // A labelled box keeps its tools inside the text's corner, sharing its edge with the form's fields.
-  const inside = Boolean(!phone && !send && !hideTools && props.label && tools);
+  const inside = Boolean(!mobile && !send && !hideTools && props.label && tools);
   const boxTools = (
     <div className={classes.tools}>
-      {editButtons("sm")}
+      {mobile && editButtons}
       {menu}
     </div>
   );
-  const close = () => setEditing(false);
+  const close = () => {
+    setMenuOpened(false);
+    setEditing(false);
+    setTimeout(() => field.current?.focus({ preventScroll: true }));
+  };
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
     // A tool's menu, portalled outside the editor, closes on its own Escape first.
+    if (layerAbove(content.current, event)) return;
     if (!content.current?.contains(event.target as Node)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -304,6 +301,7 @@ export function TextBox({
       {...props}
       ref={ref}
       description={description}
+      variant={mobile && inline ? "unstyled" : props.variant}
       // While the phone editor is open, it alone is the box.
       aria-hidden={editing || undefined}
       value={value}
@@ -346,11 +344,61 @@ export function TextBox({
       })}
     />
   );
+  const editor = (field: ReactNode) => (
+    <div className={classes.editor} data-text-editor>
+      {field}
+      {overlay && <div className={classes.overlay}>{overlay}</div>}
+      {below && <div className={classes.below}>{below}</div>}
+      {/* The tools, then the send, sit just above the keyboard. */}
+      {(tools || send || submit || rightSection) && (
+        <div className={classes.toolbar} onMouseDown={keepFocus}>
+          <div className={classes.editActions} role="group" aria-label={`${title} Tools`}>
+            {editButtons}
+            {menu}
+            {!tools && !send && rightSection}
+          </div>
+          {!submit && send && <div className={classes.sends}>{send}</div>}
+        </div>
+      )}
+      {submit && (
+        <div className={classes.sends}>
+          {/* The form's named sends stand separately from its text tools. */}
+          {submit?.map((each, index) => {
+            const primary = index === submit.length - 1;
+            const Glyph = each.icon ?? ArrowUp;
+            return (
+              <Button
+                key={each.label}
+                aria-label={each.label}
+                variant={primary ? "filled" : "light"}
+                radius="xl"
+                size="sm"
+                leftSection={primary ? undefined : <Glyph size={16} />}
+                rightSection={primary ? <Glyph size={16} /> : undefined}
+                disabled={each.disabled}
+                // Sending before the keyboard drops keeps the text's blur from closing first.
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  if (!each.keepOpen) close();
+                  each.onSubmit();
+                }}
+              >
+                {each.label}
+              </Button>
+            );
+          })}
+        </div>
+      )}
+      {popups && <div className={classes.anchor}>{popups}</div>}
+    </div>
+  );
   return (
     <>
       {busy && spins && <VisuallyHidden role="status">{busy}</VisuallyHidden>}
       {/* A phone box opens its editor, which shows the tools, so only the send stands beside it. */}
-      {(!phone && tools && !inside) || send ? (
+      {mobile && inline ? (
+        editor(textarea)
+      ) : (!phone && tools && !inside) || send ? (
         <div className={classes.columned}>
           {textarea}
           {!editing && !hideTools && (
@@ -364,8 +412,8 @@ export function TextBox({
       ) : (
         textarea
       )}
-      {!editing && overlay}
-      {below}
+      {!editing && !(mobile && inline) && overlay}
+      {!editing && !(mobile && inline) && below}
       {phone && (
         <Modal.Root
           opened={editing}
@@ -402,72 +450,31 @@ export function TextBox({
             <FocusTrap.InitialFocus />
             <Modal.Header>
               <Modal.Title>{title}</Modal.Title>
-              <Button size="compact-sm" variant="subtle" onClick={close}>
-                Done
-              </Button>
+              <Modal.CloseButton aria-label={`Close ${title}`} />
             </Modal.Header>
             <Modal.Body>
-              <Textarea
-                aria-label={title}
-                description={description}
-                placeholder={props.placeholder}
-                maxLength={props.maxLength}
-                spellCheck={props.spellCheck}
-                variant="unstyled"
-                classNames={{ root: classes.field, wrapper: classes.field, input: classes.input }}
-                value={value}
-                onChange={(event) => onChange(event.currentTarget.value)}
-                // Dismissing the keyboard (iOS Done or hide) blurs the text and returns to the page;
-                // a tool's menu taking focus keeps the editor.
-                onBlur={(event) => {
-                  if (!(event.relatedTarget as Element | null)?.closest(popupLayer)) close();
-                }}
-              />
-              {overlay && <div className={classes.overlay}>{overlay}</div>}
-              {below && <div className={classes.below}>{below}</div>}
-              {/* The tools, then the send, sit just above the keyboard. */}
-              {(tools || send || submit || rightSection) && (
-                <div className={classes.toolbar} onMouseDown={keepFocus}>
-                  {actions ? (
-                    <ActionBarGroups
-                      groups={[actions]}
-                      labelled={actions.map((action) => action.id)}
-                      menuPosition="top-start"
-                    />
-                  ) : (
-                    !send && rightSection
-                  )}
-                  <div className={classes.sends}>
-                    {editButtons("lg")}
-                    {/* The form's named sends stand in for its compact ones there. */}
-                    {!submit && send}
-                    {/* Named, as the keyboard leaves room: the last send is primary, after an arrow. */}
-                    {submit?.map((each, index) => {
-                      const primary = index === submit.length - 1;
-                      const Glyph = each.icon ?? ArrowUp;
-                      return (
-                        <Button
-                          key={each.label}
-                          aria-label={each.label}
-                          variant={primary ? "filled" : "light"}
-                          radius="xl"
-                          size="sm"
-                          leftSection={primary ? undefined : <Glyph size={16} />}
-                          rightSection={primary ? <Glyph size={16} /> : undefined}
-                          disabled={each.disabled}
-                          // Sending before the keyboard drops keeps the text's blur from closing first.
-                          onPointerDown={(event) => event.preventDefault()}
-                          onClick={() => {
-                            if (!each.keepOpen) close();
-                            each.onSubmit();
-                          }}
-                        >
-                          {each.label}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </div>
+              {editor(
+                <Textarea
+                  aria-label={title}
+                  description={description}
+                  placeholder={props.placeholder}
+                  maxLength={props.maxLength}
+                  spellCheck={props.spellCheck}
+                  variant="unstyled"
+                  classNames={{ root: classes.field, wrapper: classes.field, input: classes.input }}
+                  value={value}
+                  onChange={(event) => onChange(event.currentTarget.value)}
+                  // Dismissing the keyboard (iOS Done or hide) blurs the text and returns to the page;
+                  // a tool's menu taking focus keeps the editor.
+                  onBlur={(event) => {
+                    const target = event.relatedTarget as Node | null;
+                    if (
+                      !content.current?.contains(target) &&
+                      !(target as Element | null)?.closest(popupLayer)
+                    )
+                      close();
+                  }}
+                />,
               )}
             </Modal.Body>
           </Modal.Content>
