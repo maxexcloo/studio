@@ -1,4 +1,5 @@
 import { runBackend } from "../shared/profiles.ts";
+import { activeStatuses } from "../shared/queue.ts";
 import { withResolution } from "../shared/resolution.ts";
 import { accountAccessForId } from "./account-store.js";
 import { moveTargets, onWorkerOffline, profileOnBackendKey, routeJob } from "./comfy/backends.js";
@@ -153,9 +154,7 @@ export function createGenerationQueue({
   // Reconstruct leases synchronously before the HTTP listener accepts work.
   for (const job of store
     .openJobs()
-    .filter(
-      (item) => ["starting", "running", "saving"].includes(item.status) || item.providerJobId,
-    )) {
+    .filter((item) => activeStatuses.has(item.status) || item.providerJobId)) {
     const workloads = managedWorkloads(job);
     if (workloads.length) mediaLeases.set(job.id, runtime.controller.retain(workloads));
   }

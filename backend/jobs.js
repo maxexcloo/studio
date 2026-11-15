@@ -1,3 +1,4 @@
+import { finishedItemStatuses } from "../shared/queue.ts";
 import { writeCivitaiParameters } from "./civitai/civitai.js";
 import { workerUrl } from "./comfy/backends.js";
 import { comfy, comfyOn, normalizeComfyError, noteComfyReachable } from "./comfy/comfy.js";
@@ -331,7 +332,7 @@ function watchProgress(id, run, socket, graph = {}) {
   if (!socket) return null;
   const terminal = () => {
     const job = jobs.get(id);
-    return !job || job.terminalAt || ["done", "failed", "cancelled"].includes(job.status);
+    return !job || job.terminalAt || finishedItemStatuses.has(job.status);
   };
   socket.addEventListener("message", async (event) => {
     if (terminal()) return;

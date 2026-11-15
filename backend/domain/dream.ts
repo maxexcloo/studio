@@ -13,7 +13,9 @@ import {
   type GenerationInput,
   type QueueMedia,
   awaitsWriting,
+  finishedItemStatuses,
   maxPromptCharacters,
+  pendingStatuses,
 } from "../../shared/queue.ts";
 import { replyTitle } from "../../shared/titles.ts";
 import { logger } from "../crash-log.js";
@@ -576,7 +578,7 @@ const roundTo = (value: number, step: number) => Math.round(value / step) * step
 const spicyTheme = "Spicy: sensual, explicit content where it suits the scene.";
 
 const dreamJob = (job: OwnedJob) => job.priority === queuePriority.dream;
-const waiting = (job: OwnedJob) => ["writing", "queued", "waiting"].includes(job.status);
+const waiting = (job: OwnedJob) => pendingStatuses.has(job.status);
 const kindOf = (value: { kind?: unknown; type?: unknown }): Kind =>
   value.kind === "video" || value.type === "video" ? "video" : "image";
 const normalised = (prompt: string) => prompt.toLowerCase().replace(/\s+/g, " ").trim();
@@ -2542,7 +2544,7 @@ export function createDream(options: {
           (other) =>
             other !== item &&
             other.dream?.pair?.id === item.dream?.pair?.id &&
-            !["done", "failed", "cancelled"].includes(other.status || ""),
+            !finishedItemStatuses.has(other.status || ""),
         );
       return all
         .filter((item) => item.status === "done" && !(item.dream?.pair && pending(item)))
