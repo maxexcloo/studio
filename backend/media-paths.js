@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { accountOutputSubfolder } from "./account-ownership.js";
-import { currentDataDir } from "./data-dir.js";
+import { dataDir } from "./data-dir.js";
 import { outputFolderName } from "./data-names.js";
 import { isInside } from "./paths.js";
 
@@ -13,7 +13,6 @@ import { isInside } from "./paths.js";
  * `/comfy/view?filename=…&subfolder=…&type=media`, so owner subfolders, caches
  * and parsers carry over, but such a file is only ever served from here.
  */
-export const dataDir = currentDataDir();
 
 export const mediaType = "media";
 /** A data folder's media folder: STUDIO_MEDIA_DIR, else its `media`. */

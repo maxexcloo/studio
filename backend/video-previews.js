@@ -11,7 +11,7 @@ import { pipeline } from "node:stream/promises";
 
 import { comfyFileUrl, localOutputFile } from "./comfy/comfy.js";
 import { logWarning } from "./crash-log.js";
-import { dataDir } from "./gallery/store.js";
+import { dataDir } from "./data-dir.js";
 import { mediaType } from "./media-paths.js";
 import { sendMediaBuffer } from "./media-response.js";
 import { digest } from "./values.js";

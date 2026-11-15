@@ -14,7 +14,7 @@ import path from "node:path";
 
 import { repointLoraStacks } from "../combined-profiles.js";
 import { userWorkflowsDir } from "../custom-workflows.js";
-import { dataDir } from "../gallery/store.js";
+import { dataDir } from "../data-dir.js";
 import { repointWorkflowPreferences } from "../workflow-catalogue.js";
 import { readEditableProfile } from "./editor.js";
 import { guideStore, profileStore } from "./store.js";

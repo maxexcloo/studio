@@ -6,8 +6,8 @@ import sharp from "sharp";
 import { civitaiFetch, civitaiJson, limitedBody } from "./civitai/access.js";
 import { importCivitaiImage, matchResources, versionResource } from "./civitai/import.js";
 import { downloadPresetImage, presetFromGallery, refreshImportedItem } from "./civitai/library.js";
+import { dataDir } from "./data-dir.js";
 import {
-  dataDir,
   deleteGalleryFiles,
   forgetGalleryItems,
   galleryItem,
