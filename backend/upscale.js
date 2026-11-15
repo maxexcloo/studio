@@ -208,14 +208,14 @@ function roundTo(value, step = 16) {
   return Math.max(step, Math.round(value / step) * step);
 }
 
-/** The long sides the size menu's 2K and 4K reach. */
+/** Explicit long-edge targets for Upscale. */
 export const upscaleTargets = [2048, 4096];
 
 /**
  * Works from whatever the source happens to be: the short side sets the target,
  * the pre-scale keeps the model input inside a sane VRAM budget, and the output
- * is capped so a very large source cannot queue an impossible job. A `target`
- * (the size menu's 2K/4K) is the long side to reach instead, whatever the scale.
+ * is capped so a very large source cannot queue an impossible job. An explicit `target`
+ * is the long side to reach instead, whatever the scale.
  */
 export function upscalePlan({ width, height, quality = "balanced", target = 0 }) {
   const normalized = normalizeQuality(quality);

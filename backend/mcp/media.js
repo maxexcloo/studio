@@ -5,7 +5,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 import { isCloudProfile, loraCompatibility, loraName, runBackend } from "../../shared/profiles.ts";
-import { withResolution } from "../../shared/resolution.ts";
+import { selectedResolution, withResolution } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { accessFeatures } from "../account-policy.js";
 import { accountPreferences } from "../account-preferences.js";
@@ -696,7 +696,16 @@ export class McpMedia {
       const id = placed.find((item) => item.slot === primary?.id)?.assetId;
       if (id) Object.assign(body, await this.referenceFrame(owner, profile, id));
     }
-    if (resolution) body.resolutionTier = resolution;
+    if (profile.kind === "image" && profile.options?.resolutions?.length && resolution) {
+      const native = profile.options.resolutions.find(
+        (value) => value.toUpperCase() === resolution,
+      );
+      if (!native)
+        throw new Error(
+          `Choose a native resolution for this model: ${profile.options.resolutions.join(", ")}.`,
+        );
+      body.resolution = native;
+    } else body.resolutionTier = resolution || selectedResolution(body, profile);
     Object.assign(body, withResolution(body, profile));
     // Large draws decode in tiles, matching the browser's generation path.
     if (

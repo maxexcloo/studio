@@ -12,11 +12,10 @@ import { ChevronDown, RectangleHorizontal } from "lucide-react";
 
 import {
   type Resolution,
-  defaultResolution,
+  availableResolutions,
   resolutionApplies,
-  resolutionPlan,
   resolutionSize,
-  resolutions,
+  selectedResolution,
 } from "../../../../shared/resolution";
 import type { GenerationInput, Profile } from "../../types";
 import { useTouch } from "../../ui/usePhone";
@@ -49,11 +48,11 @@ export function SizePicker({
   const common = framed ? divisor(framed.width, framed.height) : 1;
   const aspect = framed ? `${framed.width / common}:${framed.height / common}` : "";
   // Images whose size is the composer's to pick draw at a tier; the shape comes from the preset.
-  const tiered = resolutionApplies(input, profile);
-  const tier = input.resolutionTier || defaultResolution;
-  const plan = resolutionPlan(profile, tier);
+  const choices = availableResolutions(profile, input);
+  const tier = selectedResolution(input, profile);
+  const tiered = resolutionApplies(input, profile) && Boolean(tier);
   const at = (size: Size) => {
-    const { width, height } = resolutionSize({ width: size.w, height: size.h }, tier, profile);
+    const { width, height } = resolutionSize({ width: size.w, height: size.h }, tier!, profile);
     return { w: width, h: height };
   };
   // A model with its own resolutions (Grok's 1K or 2K, 480p to 1080p) takes the shape from the
@@ -106,20 +105,13 @@ export function SizePicker({
         ) : (
           <Stack gap="sm">
             {tiered && (
-              <Stack gap={4}>
-                <SegmentedControl
-                  aria-label="Resolution"
-                  fullWidth
-                  value={tier}
-                  onChange={(value) => onChange({ resolutionTier: value as Resolution })}
-                  data={[...resolutions]}
-                />
-                {plan.upscaleTo && (
-                  <Text size="xs" c="dimmed">
-                    This model draws {tier} at {plan.draws}, then Upscale enlarges it.
-                  </Text>
-                )}
-              </Stack>
+              <SegmentedControl
+                aria-label="Resolution"
+                fullWidth
+                value={tier}
+                onChange={(value) => onChange({ resolutionTier: value as Resolution })}
+                data={choices}
+              />
             )}
             {!!native.length && (
               <SegmentedControl

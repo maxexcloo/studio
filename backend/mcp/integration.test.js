@@ -3046,6 +3046,30 @@ test(
   },
 );
 
+test("MCP advertises and submits the provider's own native resolution options", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client("provider-sizing");
+  const profile = {
+    ...structuredClone(imageProfile),
+    native: { "2k": "yes", "4k": "yes" },
+    options: { ...imageProfile.options, resolutions: ["1k", "2k"] },
+    defaults: { ...imageProfile.defaults, resolution: "2k" },
+  };
+  await f.profiles([profile]);
+  const detail = data(await call(client, "models", { profile_id: profile.id }));
+  assert.deepEqual(detail.controls.resolution, { options: ["1K", "2K"], default: "2K" });
+  await generate(client, { resolution: "2K" });
+  assert.equal(f.submitted[0].resolution, "2k");
+  assert.equal(f.submitted[0].autoUpscale, null);
+  const unsupported = await call(client, "generate", {
+    kind: "image",
+    prompts: ["An egg"],
+    resolution: "4K",
+  });
+  assert.equal(unsupported.isError, true);
+  assert.equal(f.submitted.length, 1);
+});
+
 test("MCP advertises native sizing and submits tiled 2K with an explicit reference role", async (t) => {
   const f = await fixture(t);
   const client = await f.client("native-sizing");
@@ -3063,6 +3087,7 @@ test("MCP advertises native sizing and submits tiled 2K with an explicit referen
   await f.profiles([profile]);
   const detail = data(await call(client, "models", { profile_id: profile.id }));
   assert.deepEqual(detail.native, { "2k": "yes" });
+  assert.deepEqual(detail.controls.resolution.options, ["1K", "2K"]);
   const uploaded = data(
     await call(client, "upload", {
       content_base64: png.toString("base64"),
@@ -5331,9 +5356,15 @@ test("aspect picks the profile's own preset and resolution its long edge", async
   assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
   // A free width and height are not arguments: the preset decides, on the profile's grid.
   assert.deepEqual(await size({ aspect: "portrait", width: 777, height: 1001 }), [576, 1024]);
-  // Not drawn at 4K: drawn at 2K, then upscaled.
-  assert.deepEqual(await size({ resolution: "4K" }), [1536, 2048]);
-  assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: "high", target: 4096 });
+  const submitted = f.submitted.length;
+  const unsupported = await call(client, "generate", {
+    kind: "image",
+    prompts: ["An egg"],
+    resolution: "4K",
+  });
+  assert.equal(unsupported.isError, true);
+  assert.match(texts(unsupported), /native resolution.*1K, 2K/);
+  assert.equal(f.submitted.length, submitted);
   const refused = await call(client, "generate", {
     kind: "image",
     prompts: ["An egg"],

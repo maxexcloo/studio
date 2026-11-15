@@ -234,7 +234,9 @@ test(
         referenceAssets: references,
       };
       assert.equal((await request("/api/generate", { ...input, prompt: "" })).status, 400);
-      // The width only shapes the run (its resolution sets the size), so an out-of-range step count stands in.
+      const unsupportedSize = await request("/api/generate", { ...input, resolutionTier: "4K" });
+      assert.equal(unsupportedSize.status, 400);
+      assert.match((await unsupportedSize.json()).error, /native resolution/);
       assert.equal((await request("/api/generate", { ...input, steps: 1e9 })).status, 400);
       assert.equal((await request("/api/generate", { ...input, count: 1e9 })).status, 400);
       assert.equal(
@@ -293,6 +295,7 @@ test(
       const accepted = await api("/api/generate", input);
       const waiting = await waitFor(accepted.jobId, (job) => job.status === "waiting");
       assert.equal(waiting.backend, "chosen");
+      assert.deepEqual([waiting.input.width, waiting.input.height], [64, 64]);
       await stop();
       await start();
       const restored = await waitFor(

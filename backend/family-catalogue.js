@@ -72,7 +72,7 @@ const speedName = /lightning|dmd2?|hyper|turbo|lcm|pcm|\d+[-_ ]?steps?|tcd|flash
 /**
  * Whether a family draws at 2K/4K itself, per size: "yes" where its makers
  * document that size (the size menu offers it), "maybe" where reports are
- * mixed or missing (the size menu shows it disabled). Left
+ * mixed or missing (the size menu omits it). Left
  * out only where it plainly breaks: the 1 MP generation (SD 1.5/2) at 2K, and
  * models documented at ~1 MP at 4K.
  */
