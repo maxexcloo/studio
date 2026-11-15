@@ -514,11 +514,12 @@ export function registerGenerateTools({
     server,
     "models",
     "find models",
-    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; shots: Studio writes each, outfit and scene a card's name or words; character_views queues views; character_sheet its sheet). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
+    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; shots: Studio writes each, outfit and scene a card's name or words; character_views queues views; character_sheet its sheet). With profile_id (id, label or words), or profile_ids: each one's guide gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
     {
       kind: z.enum(["all", "image", "video"]).default("all"),
       tier: tier.optional(),
       profile_id: z.string().optional(),
+      profile_ids: z.array(z.string().min(1)).min(1).max(maxJobsPerCall).optional(),
       lora_query: z
         .string()
         .max(200)
@@ -539,14 +540,15 @@ export function registerGenerateTools({
       kind,
       tier: wanted,
       profile_id: named_id,
+      profile_ids,
       lora_query,
       lora_names = [],
       lora_page,
       full_guide,
     }) => {
-      const profile_id = canonicalProfileId(named_id);
-      let profiles = await media.profiles(kind, owner);
-      if (profile_id === undefined) {
+      const all = await media.profiles(kind, owner);
+      if (named_id === undefined && !profile_ids) {
+        let profiles = all;
         // Cloud (Grok) profiles list apart: generate uses one only when the user asks for Grok or the cloud.
         const cloud = profiles.filter(isCloudProfile);
         profiles = profiles.filter((profile) => !isCloudProfile(profile));
@@ -664,122 +666,141 @@ export function registerGenerateTools({
           ...(scenes.length ? { scenes: cardList(scenes) } : {}),
         });
       }
-      if (!profiles.some((profile) => profile.id === profile_id))
-        profiles = localUnlessAsked(profiles, { name: profile_id });
-      // Words that name several models ("klein", "flux") list them instead of choosing one.
-      const named = findProfile(profiles, named_id);
-      const matches = named
-        ? []
-        : searchProfiles(wanted ? profilesNearTier(profiles, wanted) : profiles, profile_id);
-      if (matches.length > 1) return mcpJson(listed(matches));
-      const { profile: listedProfile, note: tierNote } = named
-        ? named.id === profile_id
-          ? { profile: named, note: "" }
-          : withinFamily(profiles, named, wanted)
-        : namedInTier(profiles, named_id, wanted);
-      const profile = media.profileForBackend(listedProfile, listedProfile.namedBackend);
-      const infos =
-        profile.options?.loras?.length && profile.capabilities?.lora !== false
-          ? await media.loraInfos(owner)
-          : {};
-      const ratings = Object.keys(infos).length ? await media.loraRatings(owner) : {};
-      const controls = listedControls(profile);
-      // A LoRA lookup answers only that question; the profile's guide and controls come without one.
-      if (lora_query !== undefined || lora_names.length) {
-        if (!controls.loras || !profile.options?.loras?.length)
-          return mcpJson({ id: profile.id, ...(await noLoras({ profile })) });
-        if (!loraQueryWords(lora_query).length && !lora_names.length)
-          return mcpJson({
-            id: profile.id,
-            ...(await lorasPage(
-              loraIndex(profile, infos, ratings).map(({ line }) => line),
-              lora_page,
-              profile.options.loras.length,
-            )),
+      /** One profile's guide gist, defaults, controls and LoRAs, or the profiles its words name. */
+      const describe = async (value) => {
+        const profile_id = canonicalProfileId(value);
+        let profiles = all;
+        if (!profiles.some((profile) => profile.id === profile_id))
+          profiles = localUnlessAsked(profiles, { name: profile_id });
+        // Words that name several models ("klein", "flux") list them instead of choosing one.
+        const named = findProfile(profiles, value);
+        const matches = named
+          ? []
+          : searchProfiles(wanted ? profilesNearTier(profiles, wanted) : profiles, profile_id);
+        if (matches.length > 1) return listed(matches);
+        const { profile: listedProfile, note: tierNote } = named
+          ? named.id === profile_id
+            ? { profile: named, note: "" }
+            : withinFamily(profiles, named, wanted)
+          : namedInTier(profiles, value, wanted);
+        const profile = media.profileForBackend(listedProfile, listedProfile.namedBackend);
+        const infos =
+          profile.options?.loras?.length && profile.capabilities?.lora !== false
+            ? await media.loraInfos(owner)
+            : {};
+        const ratings = Object.keys(infos).length ? await media.loraRatings(owner) : {};
+        const controls = listedControls(profile);
+        // A LoRA lookup answers only that question; the profile's guide and controls come without one.
+        if (lora_query !== undefined || lora_names.length) {
+          if (!controls.loras || !profile.options?.loras?.length)
+            return { id: profile.id, ...(await noLoras({ profile })) };
+          if (!loraQueryWords(lora_query).length && !lora_names.length)
+            return {
+              id: profile.id,
+              ...(await lorasPage(
+                loraIndex(profile, infos, ratings).map(({ line }) => line),
+                lora_page,
+                profile.options.loras.length,
+              )),
+            };
+          const { loras, total, more, missing } = mcpLoras(profile, infos, {
+            query: lora_query,
+            names: lora_names,
+            ratings,
           });
-        const { loras, total, more, missing } = mcpLoras(profile, infos, {
-          query: lora_query,
-          names: lora_names,
-          ratings,
-        });
-        return mcpJson({
-          id: profile.id,
-          loras,
-          loras_total: total,
-          ...(more ? { more_matches: more } : {}),
-          ...(missing ? { missing } : {}),
-          ...(loras.length ? {} : { loras_note: await noMatch(lora_query, total) }),
-        });
-      }
-      // Only the whole guide counts as read; generate still sends it after the gist.
-      if (full_guide) review(refs, profile.id);
-      // Defaults only for adjustable controls: a fixed value is not something to choose.
-      const defaults = Object.fromEntries(
-        Object.entries({ ...profile.defaults, count: controls.count.default }).filter(
-          ([key]) => controls[key] || ["frames", "fps", "duration"].includes(key),
-        ),
-      );
-      const modes =
-        profile.imageModes &&
-        Object.fromEntries(
-          Object.entries(profile.imageModes).map(([mode, settings]) => {
-            // The same merge generate validates against when references select this mode.
-            const merged = { ...profile, ...settings };
-            return [
-              mode,
-              {
-                controls: listedControls(merged),
-                ...(settings?.prompting
-                  ? {
-                      prompting: full_guide
-                        ? settings.prompting
-                        : compactGuide(settings.prompting, maxShownGuideCharacters),
-                    }
-                  : {}),
-              },
-            ];
-          }),
+          return {
+            id: profile.id,
+            loras,
+            loras_total: total,
+            ...(more ? { more_matches: more } : {}),
+            ...(missing ? { missing } : {}),
+            ...(loras.length ? {} : { loras_note: await noMatch(lora_query, total) }),
+          };
+        }
+        // Only the whole guide counts as read; generate still sends it after the gist.
+        if (full_guide) review(refs, profile.id);
+        // Defaults only for adjustable controls: a fixed value is not something to choose.
+        const defaults = Object.fromEntries(
+          Object.entries({ ...profile.defaults, count: controls.count.default }).filter(
+            ([key]) => controls[key] || ["frames", "fps", "duration"].includes(key),
+          ),
         );
-      const { total } = mcpLoras(profile, infos, { ratings });
-      const guide = full_guide
-        ? profile.prompting
-        : compactGuide(profile.prompting, maxShownGuideCharacters);
-      const detail = {
-        ...Object.fromEntries(
-          ["id", "label", "kind", "family", "description", "mediaInputs", "aspectPolicy", "native"]
-            .filter((key) => key in profile)
-            .map((key) => [key, profile[key]]),
-        ),
-        tier: tierOf(profile),
-        references: referenceCount(profile),
-        ...(workerState[profile.availability] ? { state: workerState[profile.availability] } : {}),
-        // A combined profile: the backend it runs on (an old per-backend id names its own) and the others it has.
-        ...(profile.backend
-          ? {
-              backend: profile.namedBackend || profile.backend,
-              backends: profile.backendOptions.map((option) => option.label),
-            }
-          : {}),
-        ...(tierNote ? { note: tierNote.trim() } : {}),
-        defaults,
-        controls,
-        ...(modes
-          ? {
-              imageModes: modes,
-              imageModes_note:
-                "A mode applies when its media is supplied, such as reference with references.",
-            }
-          : {}),
-        ...(controls.loras
-          ? {
-              loras_total: total,
-              loras_note:
-                "Only when the user asks for a LoRA: find it with lora_query, then pass its name to generate.",
-            }
-          : {}),
-        ...(guide ? { prompting: guide } : {}),
+        const modes =
+          profile.imageModes &&
+          Object.fromEntries(
+            Object.entries(profile.imageModes).map(([mode, settings]) => {
+              // The same merge generate validates against when references select this mode.
+              const merged = { ...profile, ...settings };
+              return [
+                mode,
+                {
+                  controls: listedControls(merged),
+                  ...(settings?.prompting
+                    ? {
+                        prompting: full_guide
+                          ? settings.prompting
+                          : compactGuide(settings.prompting, maxShownGuideCharacters),
+                      }
+                    : {}),
+                },
+              ];
+            }),
+          );
+        const { total } = mcpLoras(profile, infos, { ratings });
+        const guide = full_guide
+          ? profile.prompting
+          : compactGuide(profile.prompting, maxShownGuideCharacters);
+        const detail = {
+          ...Object.fromEntries(
+            [
+              "id",
+              "label",
+              "kind",
+              "family",
+              "description",
+              "mediaInputs",
+              "aspectPolicy",
+              "native",
+            ]
+              .filter((key) => key in profile)
+              .map((key) => [key, profile[key]]),
+          ),
+          tier: tierOf(profile),
+          references: referenceCount(profile),
+          ...(workerState[profile.availability]
+            ? { state: workerState[profile.availability] }
+            : {}),
+          // A combined profile: the backend it runs on (an old per-backend id names its own) and the others it has.
+          ...(profile.backend
+            ? {
+                backend: profile.namedBackend || profile.backend,
+                backends: profile.backendOptions.map((option) => option.label),
+              }
+            : {}),
+          ...(tierNote ? { note: tierNote.trim() } : {}),
+          defaults,
+          controls,
+          ...(modes
+            ? {
+                imageModes: modes,
+                imageModes_note:
+                  "A mode applies when its media is supplied, such as reference with references.",
+              }
+            : {}),
+          ...(controls.loras
+            ? {
+                loras_total: total,
+                loras_note:
+                  "Only when the user asks for a LoRA: find it with lora_query, then pass its name to generate.",
+              }
+            : {}),
+          ...(guide ? { prompting: guide } : {}),
+        };
+        return detail;
       };
-      return mcpJson(detail);
+      // Several models answer in one call, so a chat comparing models takes one narrow step.
+      if (profile_ids) return mcpJson({ profiles: await Promise.all(profile_ids.map(describe)) });
+      return mcpJson(await describe(named_id));
     },
     { readOnlyHint: true },
   );
