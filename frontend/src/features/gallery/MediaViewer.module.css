@@ -53,6 +53,18 @@
   pointer-events: auto;
 }
 
+/* A pair's sides share the bar's free width equally, their labels wrapping rather than clipped. */
+.choices {
+  flex: 0 1 40rem;
+  min-width: 0;
+}
+
+.choice {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
 .stage {
   position: relative;
   display: flex;
