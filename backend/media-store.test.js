@@ -50,6 +50,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 const media = await import("./media-store.js");
 const paths = await import("./media-paths.js");
 const { runtimeDatabase } = await import("./persistence/runtime.ts");
+const { dataDir } = await import("./data-dir.js");
 const { localOutputFile } = await import("./comfy/comfy.js");
 const store = await import("./gallery/store.js");
 const { accountOutputSubfolder } = await import("./account-ownership.js");
@@ -157,7 +158,7 @@ test("ingested runs are remembered across restarts so recovery never imports the
   media.noteIngested(["job-remembered"]);
   media.noteIngested(["job-remembered"]);
   assert.deepEqual(
-    runtimeDatabase(paths.dataDir)
+    runtimeDatabase(dataDir)
       .prepare("SELECT job_id FROM studio_ingested_jobs")
       .all()
       .map((row) => row.job_id),

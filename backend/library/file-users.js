@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { userWorkflowsDir } from "../custom-workflows.js";
-import { dataDir } from "../gallery/store.js";
+import { dataDir } from "../data-dir.js";
 import { runtimeDatabase } from "../persistence/runtime.ts";
 
 /** Each saved profile definition: its name, declared family and text. */

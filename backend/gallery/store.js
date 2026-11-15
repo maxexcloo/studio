@@ -6,7 +6,7 @@ import { replyTitle } from "../../shared/titles.ts";
 import { recordBelongsToAccount } from "../account-ownership.js";
 import { localOutputFile } from "../comfy/comfy.js";
 import { logWarning } from "../crash-log.js";
-import { currentDataDir } from "../data-dir.js";
+import { dataDir } from "../data-dir.js";
 import { createResultNumbers } from "../domain/result-numbers.ts";
 import { generationRecord } from "../generation-record.js";
 import { mediaFile, mediaParams, mediaPath, mediaUrls } from "../media-paths.js";
@@ -28,8 +28,6 @@ import {
   storedResultSet,
   storedWritingRecord,
 } from "./records.js";
-
-export const dataDir = currentDataDir();
 
 /*
  * The gallery is one `studio_gallery` row per item (persistence/gallery-rows.ts), read and written
