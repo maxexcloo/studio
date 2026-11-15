@@ -274,9 +274,6 @@ test("Use as Reference moves to a model that takes references, or is disabled wh
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const reference = page.getByRole("menuitem", { name: "Use as Reference", exact: true });
   await reference.click();
-  await expect(
-    page.getByText("Image Quality takes no references, so the composer uses Image Fast."),
-  ).toBeVisible();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   // With no image model that takes one, it stays disabled.

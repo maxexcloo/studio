@@ -1,4 +1,3 @@
-import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
@@ -44,11 +43,7 @@ import { profileForBackend, profileName } from "../generation/payload";
 import { type AssistantOption, assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
-import {
-  type VideosPreference,
-  showQueued,
-  useVideosPreference,
-} from "../settings/accountPreferences";
+import { type VideosPreference, useVideosPreference } from "../settings/accountPreferences";
 import {
   askMotionIdeas,
   askNextSteps,
@@ -203,12 +198,7 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
     disabled: !(takes || fallback) || reference.isPending,
     keepOpen: true,
     onClick: () => {
-      if (fallback) {
-        selectProfile(fallback);
-        notifications.show({
-          message: `${profileName(profile)} takes no references, so the composer uses ${profileName(fallback)}.`,
-        });
-      }
+      if (fallback) selectProfile(fallback);
       reference.mutate(
         { ...item, frame: video ? viewerFrame(item) : undefined },
         {
@@ -301,10 +291,7 @@ export function useMediaActions(
   const action = useMediaAction(item, onApplied);
   const iteration = useMediaIteration(item);
   const client = useQueryClient();
-  // Outside the viewer, whose strip shows the run, nothing else may.
-  const run =
-    iterate ??
-    ((next: Iteration) => iteration.mutate(next, { onSuccess: () => showQueued(client) }));
+  const run = iterate ?? ((next: Iteration) => iteration.mutate(next));
   // Runs from the item, also the viewer's own, share its pending state.
   const running = iteration.variables?.kind;
   const stage = useStageComparison();

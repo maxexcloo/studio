@@ -1,4 +1,5 @@
 import { ActionIcon, Group, Text, Textarea, Tooltip } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -9,7 +10,6 @@ import type { MediaKind, QueueJob, ReferenceAsset } from "../../types";
 import { usePhone } from "../../ui/usePhone";
 import { CompareMenu, VariantStrip } from "../compare/ComposerCompare";
 import { useCompareRun, useDraftComparison } from "../compare/variants";
-import { showQueued } from "../settings/accountPreferences";
 import { GenerationEditor, blockedProps, submitShortcut, useSubmitState } from "./GenerationEditor";
 import {
   defaultProfile,
@@ -65,17 +65,15 @@ function useDraftSubmit({
         );
       return jobId;
     },
-    // The pending tile, or the notice where the gallery holds it back, is the confirmation: refresh
-    // the gallery now instead of waiting for its poll.
+    // The pending tile, or the header's queue where the gallery holds it back, is the
+    // confirmation: refresh the gallery now instead of waiting for its poll.
     onSuccess: (jobId) => {
       // A default that gave way to the other side from the account's preference says so.
-      showQueued(
-        client,
-        (profile &&
-          draft.defaultedProfileId === profile.id &&
-          models.data?.defaultNotes?.[profile.kind]) ||
-          undefined,
-      );
+      const note =
+        profile &&
+        draft.defaultedProfileId === profile.id &&
+        models.data?.defaultNotes?.[profile.kind];
+      if (note) notifications.show({ message: note });
       void client.invalidateQueries({ queryKey: ["gallery"] });
       void client.invalidateQueries({ queryKey: queueQuery.queryKey });
       onSubmitted?.(jobId);
