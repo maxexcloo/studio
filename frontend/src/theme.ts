@@ -334,7 +334,10 @@ export function studioTheme({
       NavLink: NavLink.extend({
         styles: { root: { borderRadius: "var(--mantine-radius-md)", ...target } },
       }),
-      Notification: Notification.extend({ styles: { root: glass } }),
+      Notification: Notification.extend({
+        defaultProps: { closeButtonProps: { "aria-label": "Dismiss Notification" } },
+        styles: { root: glass },
+      }),
       // Paper also renders Card, Dialog, ActionBar and Modal/Drawer content.
       Paper: Paper.extend({
         styles: { root: { ...glass, "--paper-border-color": "var(--studio-glass-border)" } },
