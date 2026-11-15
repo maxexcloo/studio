@@ -130,7 +130,7 @@ export function AppHeader({ mode }: { mode: string }) {
       justify="space-between"
       wrap="nowrap"
       w="100%"
-      className={classes.bar}
+      className={`${classes.bar} ${classes.header}`}
       mx="auto"
       maw={appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined}
     >
