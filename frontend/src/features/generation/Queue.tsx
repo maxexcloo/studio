@@ -173,20 +173,39 @@ export function useQueueAction(jobId?: string) {
     ),
   };
 }
-export function QueueJobAction({ job, compact = false }: { job: QueueJob; compact?: boolean }) {
+export function QueueJobAction({
+  job,
+  compact = false,
+  onRetried,
+}: {
+  job: QueueJob;
+  compact?: boolean;
+  /** Receives the replacement job once a retry is accepted. */
+  onRetried?: (jobId: string) => void;
+}) {
   const action = useQueueAction(job.id);
   const retryJobs = useTryAgain(job.items);
+  const [retrying, setRetrying] = useState(false);
   if (terminalStatuses.has(job.status) && job.status !== "failed") return null;
   const retry = job.status === "failed";
   const label = retry ? "Retry" : "Stop";
-  const onClick = () =>
-    retry ? void retryJobs([job.id]) : action.mutate({ id: job.id, action: "cancel" });
+  const pending = action.isPending || retrying;
+  const onClick = async () => {
+    if (!retry) return action.mutate({ id: job.id, action: "cancel" });
+    setRetrying(true);
+    try {
+      const replacement = (await retryJobs([job.id])).get(job.id);
+      if (replacement) onRetried?.(replacement);
+    } finally {
+      setRetrying(false);
+    }
+  };
   return compact ? (
     <RowButton
       label={label}
       icon={retry ? icons.retry : icons.stop}
-      pending={action.isPending}
-      onClick={onClick}
+      pending={pending}
+      onClick={() => void onClick()}
     />
   ) : (
     // The viewer's status, styled as a tile's Stop and Retry.
@@ -195,9 +214,9 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
       size="sm"
       radius="xl"
       leftSection={retry ? <icons.retry size={16} /> : <icons.stop size={16} />}
-      loading={action.isPending}
-      disabled={action.isPending}
-      onClick={onClick}
+      loading={pending}
+      disabled={pending}
+      onClick={() => void onClick()}
     >
       {label}
     </Button>
