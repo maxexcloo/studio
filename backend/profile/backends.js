@@ -33,9 +33,8 @@ import { dataDir } from "../data-dir.js";
 import { renameTimingKeys } from "../timings.js";
 import { repointWorkflowPreferences } from "../workflow-catalogue.js";
 import { createEditableProfile, listEditableProfiles, readEditableProfile } from "./editor.js";
-import { guideStore, hashOf, profileStore } from "./store.js";
+import { conflict, guideStore, hashOf, profileStore } from "./store.js";
 
-const conflict = (message) => Object.assign(new Error(message), { status: 409 });
 const invalid = (message) => Object.assign(new Error(message), { status: 400 });
 const pairKey = (radiance, comfyui) => `${radiance}+${comfyui}`;
 
