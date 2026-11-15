@@ -33,7 +33,9 @@ import { loraName } from "../../../../shared/profiles";
 import {
   type QueueCancelAllResponse,
   type QueuePause,
+  activeStatuses,
   pausedReason,
+  pendingStatuses,
   terminalStatuses,
 } from "../../../../shared/queue";
 import { api, post } from "../../api";
@@ -269,8 +271,7 @@ export const statusLabels: Record<QueueJob["status"], string> = {
 export const progressPercent = (progress: QueueJob["progress"]) =>
   progress?.max ? Math.max(0, Math.min(100, ((progress.value ?? 0) / progress.max) * 100)) : 0;
 /** What dragging reorders: the account's own work not yet started; Dream's waits at its own tier. */
-const movableJob = (job: QueueJob) =>
-  !job.dream && ["writing", "queued", "waiting"].includes(job.status);
+const movableJob = (job: QueueJob) => !job.dream && pendingStatuses.has(job.status);
 const loadSortable = () => import("./SortableQueue");
 const SortableQueue = lazy(loadSortable);
 /**
@@ -582,7 +583,7 @@ function QueueSetRow({
   const Kind = kindIcon(members[0], !unfinished.length && failed.length > 0);
   // The set's state as its leading unfinished job's: one running, else the first waiting.
   const lead =
-    members.find((job) => ["starting", "running", "saving"].includes(job.status)) ??
+    members.find((job) => activeStatuses.has(job.status)) ??
     members.find((job) => !terminalStatuses.has(job.status));
   const stop = async () => {
     setBusy("stop");
