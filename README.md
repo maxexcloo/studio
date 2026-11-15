@@ -106,7 +106,7 @@ Library › Imports downloads to the `models` worker. `CIVITAI_API_TOKEN` and `H
 
 ### Profiles, Guides & Catalogue
 
-Studio's data folder is the only source of live definitions: profiles in `workflows/`, prompting guides in `guides/` and catalogue changes in `library/`. Administrators edit, approve, export and revert them in Library; every edit keeps a version. The sample profiles in `backend/samples/` seed only a data folder that has never held a profile.
+Studio's data folder is the only source of live definitions: profiles in `workflows/`, prompting guides in `guides/` and catalogue changes in `library/`. Administrators edit, approve, export and revert them in Library; every edit keeps a version.
 
 A profile can run one model on Radiance or ComfyUI. Its `studio` block holds the shared fields, the backend it runs on and each backend's own block, whose fields replace the shared ones of the same name:
 
@@ -155,7 +155,7 @@ Each deployment's name is its workload id, its node selector names its pool, its
 
 With `STUDIO_BENCHMARK_IMAGE` (a [BetterBench](https://github.com/GGZ14/BetterBench) image), administrators can benchmark a running text workload from Settings › Workers: Studio runs a Job in the workload's namespace whose pods are labelled `app.kubernetes.io/name: betterbench`, so the model's network policy must admit them. `STUDIO_BENCHMARK_SECRET` names the Secret there whose `API_KEY` is the model's key. The service account also needs to create, get and delete Jobs and list pods in that namespace.
 
-Administrators choose the running workloads in **Settings › Workers**, where Automatic Control is off until turned on.
+Administrators choose the running workloads in **Settings › Workers**.
 
 ## Troubleshooting
 
