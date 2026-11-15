@@ -958,6 +958,33 @@ test("Comparisons rate gallery images against each other, and an image that wins
   assert.match(state.calls.at(-1)!.user, /Seed prompt: prompt win/);
 });
 
+test("While Dream is off, gallery comparisons still rate images and queue nothing", async (t) => {
+  const { dream, state, dreamJobs, generated } = fixture(t);
+  const createdAt = new Date(state.clock - 2 * 86_400_000).toISOString();
+  generated(
+    ...["a", "b"].map((id) => ({
+      id,
+      jobId: `job-${id}`,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      createdAt,
+    })),
+  );
+  assert.equal(dream.read("alice").settings.enabled, false);
+  assert.deepEqual(
+    dream
+      .calibration("alice", 12)
+      .map((item) => item.id)
+      .sort(),
+    ["a", "b"],
+  );
+  dream.calibrate("alice", { liked: ["a"], passed: ["b"] });
+  assert.deepEqual(dream.read("alice").ratings, { a: 1516, b: 1484 });
+  await dream.tick();
+  assert.deepEqual(dreamJobs("alice"), []);
+});
+
 test("The explore share starts at a fifth and leans toward whichever side the person keeps", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });

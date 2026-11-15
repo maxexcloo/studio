@@ -51,15 +51,20 @@ const pairEvery = 4;
 /**
  * The next `depth` cards after `judged` judged ones: a pair of gallery images every `pairEvery`
  * cards while there are two, Dream's unseen results between them, then single gallery images for
- * calibration once Dream has nothing unseen. Counting from what was judged keeps the order steady
- * as cards leave the deck.
+ * calibration once Dream has nothing unseen. With `pairsOnly` (Dream is off) every card is a pair.
+ * Counting from what was judged keeps the order steady as cards leave the deck.
  */
-export function deckCards(dream: DreamItem[], calibration: MediaItem[], judged: number, depth = 3) {
-  const unseen = dreamCards(dream);
+export function deckCards(
+  dream: DreamItem[],
+  calibration: MediaItem[],
+  judged: number,
+  { depth = 3, pairsOnly = false } = {},
+) {
+  const unseen = pairsOnly ? [] : dreamCards(dream);
   const gallery = [...calibration];
   const cards: DeckCard[] = [];
   for (let count = judged; cards.length < depth; count++) {
-    if (count % pairEvery === pairEvery - 1 && gallery.length >= 2) {
+    if ((pairsOnly || count % pairEvery === pairEvery - 1) && gallery.length >= 2) {
       const items = gallery.splice(0, 2) as [MediaItem, MediaItem];
       cards.push({
         kind: "pair",
@@ -68,7 +73,7 @@ export function deckCards(dream: DreamItem[], calibration: MediaItem[], judged: 
         question: "Which Image?",
       });
     } else if (unseen.length) cards.push(unseen.shift()!);
-    else if (gallery.length) {
+    else if (gallery.length && !pairsOnly) {
       const item = gallery.shift()!;
       cards.push({ kind: "calibration", key: item.id, item });
     } else break;

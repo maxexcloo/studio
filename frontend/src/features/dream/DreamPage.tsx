@@ -28,7 +28,7 @@ import { type Dream, dreamQuery, dreamWhen } from "./queries";
 
 import classes from "./DreamPage.module.css";
 
-/** What the deck shows once every card is judged, or before Dream is on. */
+/** The deck once every card is judged, or while Dream is off with no pair to compare. */
 function Empty({ dream }: { dream: Dream }) {
   const save = useDreamSettings();
   if (!dream.settings.enabled)
@@ -71,7 +71,7 @@ function Empty({ dream }: { dream: Dream }) {
   );
 }
 
-/** Above the deck while Dream is off, as the deck alone doesn't show it. */
+/** Above the deck while Dream is off, as its comparisons alone don't show it. */
 function OffNotice() {
   const save = useDreamSettings();
   return (
@@ -199,8 +199,8 @@ export function DreamPage() {
         )
       ) : (
         <DreamDeck
-          items={data!.unseen}
-          calibrate={data!.settings.enabled}
+          items={data!.settings.enabled ? data!.unseen : []}
+          pairsOnly={!data!.settings.enabled}
           notice={!data!.settings.enabled && <OffNotice />}
           empty={<Empty dream={data!} />}
         />
