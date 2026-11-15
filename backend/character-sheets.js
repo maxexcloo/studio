@@ -2,6 +2,7 @@ import {
   characterImage,
   characterImageIds,
   characterImages,
+  characterLead,
   keepsIdentity,
   maxCardName,
   sheetRoles,
@@ -212,6 +213,20 @@ export function sheetReferences({ references, prompt, cards, profile, madeWith =
     return profile ? withCharacterImages(viewed, references[at].slot, card, profile) : viewed;
   }
   return references;
+}
+
+/**
+ * The run's prompt with a character's lead naming its images in the plural where the run sends
+ * several of them (sheetReferences).
+ */
+export function characterPrompt({ prompt, references, cards }) {
+  for (const card of cards) {
+    const own = new Set([...card.referenceIds, ...characterImageIds(card)]);
+    const lead = characterLead(card.description);
+    if (prompt.includes(lead) && references.filter((asset) => own.has(asset.assetId)).length > 1)
+      return prompt.replace(lead, characterLead(card.description, true, 2));
+  }
+  return prompt;
 }
 
 /**

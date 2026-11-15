@@ -4,7 +4,7 @@ import { hasFullAccess, mayUseFeature, mayUseGenerationProfile } from "./account
 import { startFrameSize } from "./animate-profile.js";
 import { assistantRecord } from "./assistant-routes.js";
 import { listCards } from "./cards.js";
-import { sheetReferences } from "./character-sheets.js";
+import { characterPrompt, sheetReferences } from "./character-sheets.js";
 import { routeProfile } from "./comfy/backends.js";
 import { logEvent } from "./crash-log.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
@@ -321,10 +321,11 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     // makes the sheet.
     if (body.referenceAssets?.length && input.writing?.kind !== "sheet") {
       const ownerId = body.ownerId || "";
+      const cards = listCards("characters", ownerId);
       body.referenceAssets = sheetReferences({
         references: body.referenceAssets,
         prompt: body.prompt,
-        cards: listCards("characters", ownerId),
+        cards,
         profile: runProfile(
           (await mediaModels().catch(() => null))?.models?.profiles?.find(
             (item) => item.id === body.profileId,
@@ -334,6 +335,16 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
         madeWith: (id) =>
           galleryItem(id, ownerId)?.settings?.referenceAssets?.map((asset) => asset.assetId) || [],
       });
+      // Reuse restores what was typed; the run says "reference images" when it sends several.
+      const prompt = characterPrompt({
+        prompt: body.prompt,
+        references: body.referenceAssets,
+        cards,
+      });
+      if (prompt !== body.prompt) {
+        body.typedPrompt ??= body.prompt;
+        body.prompt = prompt;
+      }
     }
     // An older page (or a draft restored from before the reference library) can
     // send only the image's id; treat it as the reference instead of losing it.
