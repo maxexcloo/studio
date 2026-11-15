@@ -1,43 +1,47 @@
-import { Alert, Badge, Button, Group, Stack, TagsInput, Text } from "@mantine/core";
+import { Alert, Button, Group, Modal, ScrollArea, Stack, TagsInput, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { loraName } from "../../../../shared/profiles";
-import { maxAvoid, maxAvoids } from "../../../../shared/taste";
+import {
+  type TastePreferenceChanges,
+  type TastePreferences,
+  type TasteWords,
+  maxAvoid,
+  maxAvoids,
+  tasteWordLimits,
+} from "../../../../shared/taste";
 import { api, post } from "../../api";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { formatDateTime } from "../../ui/dates";
-import { SettingGroup } from "../../ui/SettingRows";
+import { icons } from "../../ui/icons";
+import { LoadingState } from "../../ui/LoadingState";
+import { closeWhenTop } from "../../ui/popupClicks";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { TextBox } from "../../ui/TextBox";
+import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
+import { isProfile, profileName } from "../generation/payload";
 
 interface Weighted {
   score: number;
 }
-export interface Taste {
-  /** The profile in plain sentences, written by Studio from what it learnt. */
+export interface Taste extends TasteWords {
   summary: string;
-  likes: string[];
-  styles: string[];
-  /** What Studio learnt they pass over. */
-  avoid: string[];
-  /** What the person asked Studio to avoid. */
   addedAvoid: string[];
-  note: string;
-  /** Scored profiles and LoRAs, best first. */
+  learnt: TasteWords;
+  preferences: TastePreferences;
   profiles: Record<"image" | "video", ({ id: string } & Weighted)[]>;
   loras: ({ name: string; strength?: number } & Weighted)[];
   updatedAt: string;
-  /** How many signals (likes, comparisons, iterations) the profile holds. */
   signals: number;
-  /** Whether the text model may write this account's profile. */
   writer: boolean;
 }
-const tasteQuery = queryOptions({
+export const tasteQuery = queryOptions({
   queryKey: ["taste"],
   queryFn: () => api<Taste>("/api/taste"),
 });
-
 const learnt = (taste: Taste) =>
   [
     taste.signals &&
@@ -46,47 +50,130 @@ const learnt = (taste: Taste) =>
   ]
     .filter(Boolean)
     .join(" · ");
-/** The few best-liked entries, those scored above nothing. */
 const top = <T extends Weighted>(entries: T[]) =>
   entries.filter((entry) => entry.score > 0).slice(0, 3);
+const wordLabels = { likes: "Likes", styles: "Styles", avoid: "Avoids", note: "Summary" } as const;
+const wordKeys = Object.keys(wordLabels) as (keyof TasteWords)[];
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-/** One labelled row of chips; nothing where there are none. */
-function Chips({ label, values }: { label: string; values: string[] }) {
-  if (!values.length) return null;
+function TasteEditor({
+  data,
+  onClose,
+  saved,
+}: {
+  data: Taste;
+  onClose: () => void;
+  saved: (next: Taste) => void;
+}) {
+  const [draft, setDraft] = useState<TasteWords>({
+    likes: data.likes,
+    styles: data.styles,
+    avoid: data.avoid,
+    note: data.note,
+  });
+  const [resets, setResets] = useState(new Set<keyof TasteWords>());
+  const [addedAvoid, setAddedAvoid] = useState(data.addedAvoid);
+  const changes: TastePreferenceChanges = Object.fromEntries(
+    wordKeys
+      .filter((key) => resets.has(key) || !same(draft[key], data[key]))
+      .map((key) => [key, same(draft[key], data.learnt[key]) ? null : draft[key]]),
+  );
+  const save = useMutation({
+    meta: { inlineError: true },
+    mutationFn: () =>
+      api<Taste>("/api/taste", {
+        method: "PUT",
+        body: JSON.stringify({
+          ...(!same(addedAvoid, data.addedAvoid) && { avoid: addedAvoid }),
+          ...(Object.keys(changes).length && { preferences: changes }),
+        }),
+      }),
+    onSuccess: (next) => {
+      saved(next);
+      onClose();
+    },
+  });
   return (
-    // The label keeps its column, so chips that wrap line up under the first.
-    <Group gap={4} wrap="nowrap" align="flex-start">
-      <Text size="xs" c="dimmed" w="4.5rem" style={{ flexShrink: 0 }}>
-        {label}
-      </Text>
-      <Group gap={4} miw={0} role="list" aria-label={label}>
-        {values.map((value) => (
-          <Badge key={value} role="listitem" maw="100%">
-            {value}
-          </Badge>
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        save.mutate();
+      }}
+    >
+      <Stack>
+        <Text size="sm" c="dimmed">
+          Your edits stay when Studio refreshes what it learnt. Remove entries with their ×, or
+          return a field to what Studio learnt.
+        </Text>
+        {wordKeys.map((key) => (
+          <Stack key={key} gap={4}>
+            {key === "note" ? (
+              <TextBox
+                label={wordLabels[key]}
+                value={draft.note}
+                onChange={(note) => setDraft({ ...draft, note })}
+                autosize
+                minRows={3}
+                maxLength={tasteWordLimits.note}
+              />
+            ) : (
+              <TagsInput
+                label={wordLabels[key]}
+                value={draft[key]}
+                onChange={(value) => setDraft({ ...draft, [key]: value })}
+                maxTags={tasteWordLimits[key]}
+                maxLength={maxAvoid}
+              />
+            )}
+            {((Object.hasOwn(data.preferences, key) && !resets.has(key)) ||
+              !same(draft[key], data.learnt[key])) && (
+              <Button
+                size="compact-sm"
+                variant="subtle"
+                w="fit-content"
+                onClick={() => {
+                  setDraft({ ...draft, [key]: data.learnt[key] });
+                  setResets(new Set([...resets, key]));
+                }}
+              >
+                Use Learnt {wordLabels[key]}
+              </Button>
+            )}
+          </Stack>
         ))}
-      </Group>
-    </Group>
+        <TagsInput
+          label="Always Avoid"
+          description="Your explicit avoids, kept separately from learnt preferences."
+          value={addedAvoid}
+          onChange={setAddedAvoid}
+          maxTags={maxAvoids}
+          maxLength={maxAvoid}
+        />
+        {save.error && <Alert color="red">{save.error.message}</Alert>}
+        <DialogFooter pending={save.isPending} onCancel={onClose}>
+          <Button
+            type="submit"
+            loading={save.isPending}
+            disabled={!Object.keys(changes).length && same(addedAvoid, data.addedAvoid)}
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </Stack>
+    </form>
   );
 }
 
-/**
- * Dream › Taste: a compact read-out of what Studio learnt this account likes (its words, best
- * models and LoRAs) and what its owner asks it to avoid. `fill` fits it to the page's height.
- */
+/** Taste words and explicit preferences, with model scores still learnt from feedback. */
 export function TasteProfile({ fill = false }: { fill?: boolean }) {
+  const phone = usePhone();
   const client = useQueryClient();
   const taste = useQuery(tasteQuery);
   const models = useQuery(modelsQuery);
   const loraInfo = useQuery(loraInfoQuery);
   const [clearing, setClearing] = useState(false);
+  const [editing, setEditing] = useState(false);
   const saved = (next: Taste) => client.setQueryData(tasteQuery.queryKey, next);
-  const avoid = useMutation({
-    meta: { inlineError: true },
-    mutationFn: (next: string[]) =>
-      api<Taste>("/api/taste", { method: "PUT", body: JSON.stringify({ avoid: next }) }),
-    onSuccess: saved,
-  });
   const refresh = useMutation({
     meta: { inlineError: true },
     mutationFn: () => post<Taste>("/api/taste/refresh"),
@@ -101,91 +188,121 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
     },
   });
   const data = taste.data;
-  const error = avoid.error || refresh.error || taste.error;
-  const profileName = (id: string) => {
-    const profile = models.data?.profiles.find((entry) => entry.id === id);
-    return profile?.displayName || profile?.label || id;
+  const error = refresh.error || taste.error;
+  const modelName = (id: string) => {
+    const profile = models.data?.profiles.find((entry) => isProfile(entry, id));
+    return profile ? profileName(profile) : "Unavailable Model";
   };
-  const known = data && (data.likes.length || data.styles.length || data.note || data.signals);
+  const description = (text: string) => (
+    <Text span size="sm" c="text" style={{ overflowWrap: "anywhere" }}>
+      {text || "None"}
+    </Text>
+  );
   return (
-    <SettingGroup title="Taste Profile" fill={fill}>
-      <Stack gap="xs" pt="xs" flex={fill ? 1 : undefined} mih={fill ? 0 : undefined}>
-        {/* The minimum reserves room while the profile loads. */}
-        <Stack gap={6} mih="4lh">
-          {data &&
-            (known ? (
+    <>
+      <SettingGroup
+        title="Taste Profile"
+        fill={fill}
+        toolbar={
+          <Button
+            size="compact-sm"
+            variant="default"
+            leftSection={<icons.edit size={16} />}
+            disabled={!data}
+            onClick={() => setEditing(true)}
+          >
+            Edit
+          </Button>
+        }
+      >
+        <ScrollArea flex={fill ? 1 : undefined} mih={0}>
+          <Stack gap="xs">
+            {taste.isPending && <LoadingState label="Loading Taste" />}
+            {data && (
               <>
-                {data.note && (
-                  <Text size="sm" lineClamp={3}>
-                    {data.note}
-                  </Text>
-                )}
-                <Chips label="Likes" values={data.likes.slice(0, 8)} />
-                <Chips label="Styles" values={data.styles.slice(0, 6)} />
-                <Chips label="Avoids" values={data.avoid.slice(0, 6)} />
-                <Chips
+                <Text size="xs" c="dimmed">
+                  {learnt(data) ||
+                    "Nothing learnt yet. Like, compare or iterate on results and Studio picks up your taste."}
+                </Text>
+                {wordKeys.map((key) => (
+                  <SettingRow
+                    key={key}
+                    label={`${wordLabels[key]}${Object.hasOwn(data.preferences, key) ? " · Your Edit" : ""}`}
+                    description={description(key === "note" ? data.note : data[key].join("; "))}
+                  />
+                ))}
+                <SettingRow
                   label="Models"
-                  values={top(
-                    [...data.profiles.image, ...data.profiles.video].sort(
-                      (a, b) => b.score - a.score,
-                    ),
-                  ).map((entry) => profileName(entry.id))}
-                />
-                <Chips
-                  label="LoRAs"
-                  values={top(data.loras).map(
-                    (lora) =>
-                      `${loraName(lora.name, loraInfo.data?.loras[lora.name])}${lora.strength === undefined ? "" : ` ${lora.strength}`}`,
+                  description={description(
+                    top(
+                      [...data.profiles.image, ...data.profiles.video].sort(
+                        (a, b) => b.score - a.score,
+                      ),
+                    )
+                      .map((entry) => modelName(entry.id))
+                      .join("; "),
                   )}
                 />
+                <SettingRow
+                  label="LoRAs"
+                  description={description(
+                    top(data.loras)
+                      .map(
+                        (lora) =>
+                          `${loraName(lora.name, loraInfo.data?.loras[lora.name])}${lora.strength === undefined ? "" : ` ${lora.strength}`}`,
+                      )
+                      .join("; "),
+                  )}
+                />
+                <SettingRow
+                  label="Always Avoid"
+                  description={description(data.addedAvoid.join("; "))}
+                />
               </>
-            ) : (
-              <Text size="sm" c="dimmed">
-                Nothing learnt yet. Like, compare or iterate on results and Studio picks up your
-                taste.
-              </Text>
-            ))}
-        </Stack>
-        <TagsInput
-          label="Always Avoid"
-          placeholder={data?.addedAvoid.length ? undefined : "Add something to avoid"}
-          disabled={!data}
-          maxTags={maxAvoids}
-          maxLength={maxAvoid}
-          value={avoid.isPending ? avoid.variables : (data?.addedAvoid ?? [])}
-          onChange={(next) => {
-            refresh.reset();
-            avoid.mutate(next);
-          }}
-        />
-        <Text size="xs" c="dimmed" mih="1lh">
-          {data && learnt(data)}
-        </Text>
-        {error && <Alert color="red">{error.message}</Alert>}
-        <Group gap="xs">
-          {data?.writer && (
-            <Button
-              variant="default"
-              loading={refresh.isPending}
-              disabled={!data.signals}
-              onClick={() => {
-                avoid.reset();
-                refresh.mutate();
-              }}
-            >
-              Refresh
-            </Button>
-          )}
-          <Button
-            variant="subtle"
-            color="red"
-            disabled={!data?.summary && !data?.signals}
-            onClick={() => setClearing(true)}
-          >
-            Clear
-          </Button>
-        </Group>
-      </Stack>
+            )}
+            {error && <Alert color="red">{error.message}</Alert>}
+            <Group gap="xs">
+              {data?.writer && (
+                <Button
+                  variant="default"
+                  leftSection={<icons.refresh size={16} />}
+                  loading={refresh.isPending}
+                  disabled={!data.signals}
+                  onClick={() => refresh.mutate()}
+                >
+                  Refresh
+                </Button>
+              )}
+              <Button
+                variant="subtle"
+                color="red"
+                disabled={
+                  !data ||
+                  (!data.summary &&
+                    !data.signals &&
+                    !data.addedAvoid.length &&
+                    !Object.keys(data.preferences).length)
+                }
+                onClick={() => setClearing(true)}
+              >
+                Clear
+              </Button>
+            </Group>
+          </Stack>
+        </ScrollArea>
+      </SettingGroup>
+      <Modal
+        id="taste-editor"
+        opened={editing}
+        onClose={closeWhenTop("taste-editor", () => setEditing(false))}
+        title="Edit Taste"
+        size="lg"
+        fullScreen={phone}
+      >
+        {editing && data && (
+          <TasteEditor data={data} onClose={() => setEditing(false)} saved={saved} />
+        )}
+      </Modal>
       <ConfirmDialog
         opened={clearing}
         title="Clear Taste Profile"
@@ -198,8 +315,9 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
           clear.reset();
         }}
       >
-        Studio forgets what it learnt and what you asked it to avoid. Your gallery and likes stay.
+        Studio forgets what it learnt and your edits, including what you asked it to avoid. Your
+        gallery and likes stay.
       </ConfirmDialog>
-    </SettingGroup>
+    </>
   );
 }

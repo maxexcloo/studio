@@ -1227,7 +1227,7 @@ export async function serveDream(
     calibration?: any[];
     /** Why Dream can't run, which makes it unavailable. */
     reason?: string;
-    /** The taste profile `/api/taste` serves; `PUT` replaces its avoids. */
+    /** The taste profile `/api/taste` serves; edits keep learnt words separate. */
     taste?: Record<string, unknown>;
     /** Dream's projects, which create, edit, Undo and Delete change. */
     projects?: any[];
@@ -1305,12 +1305,27 @@ export async function serveDream(
     signals: 0,
     writer: false,
     ...options.taste,
+    preferences: {},
+    learnt: {
+      likes: options.taste?.likes || [],
+      styles: options.taste?.styles || [],
+      avoid: options.taste?.avoid || [],
+      note: options.taste?.note || "",
+    },
   };
   await page.route(/\/api\/taste$/, (route) => {
     const request = route.request();
     if (request.method() === "PUT") {
       state.requests.push({ method: "PUT", path: "/api/taste", body: request.postDataJSON() });
-      taste.addedAvoid = request.postDataJSON().avoid;
+      const body = request.postDataJSON();
+      if (body.avoid) taste.addedAvoid = body.avoid;
+      for (const [key, value] of Object.entries(body.preferences || {})) {
+        if (value === null) delete (taste.preferences as Record<string, unknown>)[key];
+        else (taste.preferences as Record<string, unknown>)[key] = value;
+        Object.assign(taste, {
+          [key]: value === null ? (taste.learnt as Record<string, unknown>)[key] : value,
+        });
+      }
     }
     return route.fulfill({ json: taste });
   });
