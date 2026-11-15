@@ -671,15 +671,35 @@ test("cardIdeas offers distinct names from a card's images, unlike those already
       kind: "characters",
       field: "name",
       images: [image, image],
-      request: "short names",
       avoid: ["Juno"],
     }),
-    { options: ["Mara", "Wren", "Ash", "Ivy", "Rook"], model: "cloud/auto" },
+    { options: ["Mara", "Wren", "Ash", "Ivy", "Rook", "Sloane"], model: "cloud/auto" },
   );
   const [system, user] = seen.calls[0].body.messages;
-  assert.match(system.content, /5 distinct names.*never a real person's name/s);
-  assert.match(user.content[0].text, /short names.*Juno/s);
+  assert.match(system.content, /6 useful, distinct names.*never a real person's name/s);
+  assert.match(user.content[0].text, /Juno/s);
   assert.equal(user.content.filter((part) => part.type === "image_url").length, 2);
+});
+
+test("card ideas offer six descriptions, while a custom request returns one result", async () => {
+  for (const field of ["name", "description"]) {
+    for (const request of ["", "make it shorter"]) {
+      const seen = fakeGateway(() =>
+        json(
+          JSON.stringify({
+            options: ["Wind", "Wind", "Rain", "Fog", "Snow", "Cloud", "Sun", "Moon"],
+          }),
+        ),
+      );
+      const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+      const result = await engine.cardIdeas({ kind: "scenes", field, images: [], request });
+      assert.equal(result.options.length, request ? 1 : 6);
+      assert.match(
+        seen.calls[0].body.messages[0].content,
+        request ? /1 useful, distinct/ : /6 useful, distinct/,
+      );
+    }
+  }
 });
 
 test("rateCardImages scores each image as the card kind's reference, in order", async () => {

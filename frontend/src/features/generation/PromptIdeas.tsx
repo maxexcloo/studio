@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { type FocusEvent, type KeyboardEvent, type MouseEvent, useRef, useState } from "react";
 
+import { maxSuggestions } from "../../../../shared/suggestions";
 import type { MediaKind } from "../../types";
 import { useGroupFeature } from "../auth/AccountGate";
 import { promptIdeasQuery } from "../taste/suggestions";
@@ -33,7 +34,9 @@ export function usePromptIdeas({
   // A group without Prompt Assistant gets no ideas, so they are never asked for.
   const offered = useGroupFeature("promptAssistant");
   const query = useQuery({ ...promptIdeasQuery(kind), enabled: asked && offered });
-  const list = query.data?.suggestions ?? [];
+  const list = [...(query.data?.suggestions ?? [])]
+    .slice(0, maxSuggestions)
+    .sort((a, b) => a.localeCompare(b));
   return {
     focusProps: {
       onFocus: (event: FocusEvent<HTMLElement>) => {
