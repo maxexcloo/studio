@@ -16,6 +16,13 @@ export const fidelity =
 export const keepDescriptions =
   "Keep the person's own descriptions of people and things (face, body, skin, hair, clothing) word for word; change them only where the instruction asks.";
 
+/**
+ * How a requested change is written into a prompt so it lands: edited in place and in absolute
+ * words, since the image model never sees the prompt it replaces, with nothing else touched.
+ */
+export const applyChange =
+  'Make the change land clearly: rewrite the words it concerns in place, replacing whatever contradicts it rather than adding beside it, and state the new result in absolute words, since the image model never sees the earlier prompt ("a red satin dress", never "a redder dress", "much bigger" or "than before"); where the change is to the person themselves (body, face, hair, clothing, pose), name it where they are first described. Keep every other word as it was and add nothing the change doesn\'t ask for (no quality, skin or style tags).';
+
 /** How much to change: expand a short prompt, tidy a detailed one. */
 export const matchEffort =
   "Match the effort to the input: expand a short prompt the way the guide recommends, and only tidy a detailed one (order, grammar, repeated ideas), keeping its wording where it already works.";
