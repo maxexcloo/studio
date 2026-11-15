@@ -29,6 +29,9 @@ test("imported workflows take their model family's size step, so off-step sizes 
     0,
   );
   assert.deepEqual(sizedRange({ step: 8, min: 16 }, 0), { step: 8, min: 16 });
+  // A Radiance node takes multiples of 32 where the family allows 16 (FLUX.3).
+  const radiance = { family: "flux3", graph: { 1: { class_type: "RadianceImageGenerate" } } };
+  assert.equal(workflowFamilyStep(radiance), 32);
 });
 
 test("imported workflows take their model family's native sizes, so chat can ask for 2K", () => {
