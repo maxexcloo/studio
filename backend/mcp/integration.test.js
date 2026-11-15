@@ -7408,6 +7408,78 @@ test("one set review includes images beyond the submission batch boundary", asyn
   ]);
 });
 
+test("set reruns retain accepted groups when a later model refuses, and when the reply is interrupted", async (t) => {
+  const f = await fixture(t);
+  const other = { ...imageProfile, id: "fixture-image-other", label: "Other" };
+  await f.profiles([imageProfile, other]);
+  const client = await f.client();
+  const original = data(
+    await call(client, "generate", {
+      profile_ids: [imageProfile.id, other.id],
+      prompts: ["A fox"],
+      count: 1,
+    }),
+  );
+  f.failAfter(3);
+  const partial = await call(client, "reuse", { job_id: original.set });
+  assert.equal(partial.isError, undefined);
+  assert.equal(data(partial).set, "set 2");
+  assert.equal(data(partial).jobs.length, 1);
+  assert.equal(f.submitted.length, 3);
+  assert.match(texts(partial), /accepted before the reply was interrupted/);
+  assert.match(texts(partial), /never resubmit/);
+  f.failAfter(Infinity);
+  t.mock.method(McpMedia.prototype, "finishTimes", async () => {
+    throw new Error("ETA interrupted");
+  });
+  const rerun = await call(client, "reuse", { job_id: "set 2" });
+  assert.equal(rerun.isError, undefined);
+  assert.equal(data(rerun).set, "set 3");
+  assert.equal(data(rerun).jobs.length, 1);
+  assert.equal(f.submitted.length, 4);
+  assert.equal(f.submitted.at(-1).profileId, imageProfile.id);
+  assert.match(texts(rerun), /ETA interrupted/);
+});
+
+test("set reruns refuse changed project constraints before admission and preserve matching settings", async (t) => {
+  const f = await fixture(t);
+  const other = { ...imageProfile, id: "fixture-image-other", label: "Other" };
+  await f.profiles([imageProfile, other]);
+  let project = null;
+  f.app.post("/api/dream/projects/activity", (_req, res) => res.json({ project }));
+  const client = await chat(t, f, "alice", "rerun-constraints");
+  const original = await generate(client, {
+    prompts: ["A fox"],
+    aspect: "landscape",
+    loras: [{ name: "fixture-effect", strength: 0.8 }],
+  });
+  const saved = structuredClone(f.submitted[0]);
+  const constraints = { profiles: [], loras: true, aspect: "", resolution: "" };
+  project = {
+    id: "foxes",
+    name: "Foxes",
+    brief: { subjects: "", styles: "", avoid: "" },
+    constraints,
+  };
+  for (const change of [
+    { loras: false },
+    { profiles: [other.id] },
+    { aspect: "portrait" },
+    { resolution: "2K" },
+  ]) {
+    project.constraints = { ...constraints, ...change };
+    const refused = await call(client, "reuse", { job_id: original.set });
+    assert.equal(refused.isError, true);
+    assert.match(texts(refused), /conflicts with Foxes's current constraints/);
+    assert.equal(f.submitted.length, 1);
+  }
+  project.constraints = { ...constraints, profiles: [imageProfile.id], aspect: "landscape" };
+  assert.equal((await call(client, "reuse", { job_id: original.set })).isError, undefined);
+  assert.equal(f.submitted.length, 2);
+  for (const key of ["prompt", "profileId", "count", "width", "height", "loras"])
+    assert.deepEqual(f.submitted[1][key], saved[key]);
+});
+
 test("axis varies one thing at one seed, one image each, as a lettered side-by-side comparison", async (t) => {
   const f = await fixture(t);
   const client = await f.client();

@@ -1006,20 +1006,8 @@ export function registerGenerateTools({
         if (!accepted.entries.length) throw error;
         // Delivery can fail after admission (an aborted ETA probe, or a later model's refusal).
         // Keep the accepted jobs as the deduplicated reply so a retry cannot queue them again.
-        const jobs = accepted.entries.flatMap(({ queued }) => queued.jobs);
         const number = accepted.set || recordSet(accepted.entries);
-        return withSet(
-          {
-            content: [
-              {
-                type: "text",
-                text: `${setNote(number)}These jobs were accepted before the reply was interrupted: ${error.message} Share their links and end your turn; never resubmit.\n\n${jobs.map(({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`).join(" · ")}`,
-              },
-            ],
-            structuredContent: { status: "queued", jobs },
-          },
-          number,
-        );
+        return interrupted(accepted.entries, number, error);
       });
       const entry = { at: null, reply };
       recentGenerates.set(key, entry);
@@ -1094,6 +1082,21 @@ export function registerGenerateTools({
     number
       ? { ...reply, structuredContent: { ...reply.structuredContent, set: `set ${number}` } }
       : reply;
+  const interrupted = (entries, number, error) => {
+    const jobs = entries.flatMap(({ queued }) => queued.jobs);
+    return withSet(
+      {
+        content: [
+          {
+            type: "text",
+            text: `${setNote(number)}These jobs were accepted before the reply was interrupted: ${error.message} Share their links and end your turn; never resubmit.\n\n${jobs.map(({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`).join(" · ")}`,
+          },
+        ],
+        structuredContent: { status: "queued", jobs },
+      },
+      number,
+    );
+  };
   const generateOnce = async (input, signal, accepted) => {
     const [project, account] = await Promise.all([
       attachedProject(signal),
@@ -1734,6 +1737,26 @@ export function registerGenerateTools({
           `${plan.args.profile_id}, which set ${number} ran on, isn't ready now. Call generate instead.`,
         );
       const profile = media.profileForBackend(listed, plan.args.profile_backend);
+      if (project) {
+        const { args } = projectArgs(project, plan.args);
+        const required = {
+          ...args,
+          ...(project.constraints.aspect
+            ? mcpSize(profile, { aspect: project.constraints.aspect })
+            : {}),
+        };
+        const { targets } = projectTargets(project, [{ profile }], all, {
+          references: plan.args.reference_asset_ids?.length || 0,
+        });
+        if (
+          targets[0].profile.id !== profile.id ||
+          ["width", "height", "resolution"].some((key) => required[key] !== plan.args[key]) ||
+          stableJson(required.loras || []) !== stableJson(plan.args.loras || [])
+        )
+          throw new Error(
+            `set ${number} conflicts with ${project.name}'s current constraints. Call generate to follow them, or change the project before rerunning the set as it ran.`,
+          );
+      }
       for (const count of [...new Set(chosen.map((item) => item.count))]) {
         const group = chosen.filter((item) => item.count === count);
         const { titles, result_set, ...args } = plan.args;
@@ -1764,18 +1787,28 @@ export function registerGenerateTools({
     }
     const record = { ...(request ? { request } : {}) };
     for (const run of runs) {
-      run.queued = (await submit(run.profile, run.plan, record, { guide: false })).queued;
+      try {
+        run.queued = (await submit(run.profile, run.plan, record, { guide: false })).queued;
+      } catch (error) {
+        const sent = runs.filter((run) => run.queued?.jobs.length);
+        if (!sent.length) throw error;
+        return interrupted(sent, recordSet(sent), error);
+      }
       if (run.queued.error) break;
     }
     const sent = runs.filter((run) => run.queued);
     const fresh = recordSet(sent);
     const note = `${setNote(fresh)}It reruns set ${number}${only ? `'s ${only} images` : ""}${add || swap.length ? ", changed" : ""}. `;
-    return withSet(
-      sent.length === 1
-        ? await respond(sent[0].queued, sent[0].profile, signal, "", "exact", note)
-        : await respondSets(sent, note, signal),
-      fresh,
-    );
+    try {
+      return withSet(
+        sent.length === 1
+          ? await respond(sent[0].queued, sent[0].profile, signal, "", "exact", note)
+          : await respondSets(sent, note, signal),
+        fresh,
+      );
+    } catch (error) {
+      return interrupted(sent, fresh, error);
+    }
   };
   tool(
     server,
