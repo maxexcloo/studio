@@ -622,11 +622,11 @@ const itemsStarred = (ownerId, items, favorite) => {
   ]);
 };
 // Every admitted job teaches the taste profile (iterations, chat reruns included) and makes a waiting finishing upscale step aside.
-// Animating one of the account's photos, from the app or MCP, stars that photo.
+// Animating one of the account's photos, from the app or MCP but not Dream, stars that photo.
 const jobAdmitted = (job) => {
   if (job.parentJobId || job.parentItemId)
     taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
-  const photo = animatedPhoto(job);
+  const photo = job.priority === queuePriority.dream ? null : animatedPhoto(job);
   if (photo) itemsStarred(job.ownerId, setGalleryFavorites([photo.id], true), true);
   finishing.admitted(job);
   captioner.interrupt();
