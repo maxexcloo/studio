@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { logWarning } from "./crash-log.js";
+
 /**
  * Atomic byte writes and JSON recovery for Studio files.
  *
@@ -26,7 +28,7 @@ export function readJsonFile(file) {
     } catch {
       // Leave it in place; the next write replaces it either way.
     }
-    console.warn(`[Studio] ${path.basename(file)} was unreadable; it was set aside.`);
+    logWarning(`${path.basename(file)} was unreadable; it was set aside.`);
     throw error;
   }
 }

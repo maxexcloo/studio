@@ -2,6 +2,7 @@ import { isCloudProfile } from "../shared/profiles.ts";
 import { ownedQuery, recordBelongsToRequest } from "./account-ownership.js";
 import { downscaleReferences } from "./assistant-routes.js";
 import { optionsFor } from "./comfy/comfy.js";
+import { logWarning } from "./crash-log.js";
 import { families } from "./family-catalogue.js";
 import { galleryItems } from "./gallery/store.js";
 import { loraInfos } from "./lora/info.js";
@@ -20,7 +21,7 @@ export function createAssistantContext({ catalogueModels, loadComfyContext }) {
     try {
       return livePrompting();
     } catch (error) {
-      console.warn(`[Studio] The prompt assistant has no guides: ${error.message}`);
+      logWarning(`The prompt assistant has no guides: ${error.message}`);
       return () => null;
     }
   })();

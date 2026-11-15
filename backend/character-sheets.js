@@ -6,6 +6,7 @@ import {
   takesSubjects,
 } from "../shared/characters.ts";
 import { listCards, refusal, shownCard, updateCharacter } from "./cards.js";
+import { logWarning } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { isGalleryHidden } from "./gallery/store.js";
 import { publicGalleryBuffer, saveUpload } from "./references.js";
@@ -328,7 +329,7 @@ export function createCharacterSheets({ admit, profiles }) {
         try {
           await keep(ownerId, card, item);
         } catch (error) {
-          console.warn(`[Studio] Make Sheet: ${card.id}'s sheet was not split: ${error.message}`);
+          logWarning(`Make Sheet: ${card.id}'s sheet was not split: ${error.message}`);
           updateCharacter(ownerId, card.id, (current) =>
             current.sheet?.jobId === item.jobId
               ? {

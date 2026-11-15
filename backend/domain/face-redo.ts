@@ -1,4 +1,5 @@
 import type { GenerationInput } from "../../shared/queue.ts";
+import { logger } from "../crash-log.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import type { Identity } from "./face-check.ts";
 import { type OwnedJob, type QueueOrigin, queuePriority } from "./store.ts";
@@ -42,7 +43,7 @@ export function createFaceRedo(options: {
   now?: () => number;
   log?: { info(message: string): void };
 }) {
-  const { now = Date.now, log = console } = options;
+  const { now = Date.now, log = logger } = options;
   // Admission awaits validation, so an item checked twice at once queues one redo.
   const pending = new Set<string>();
   /** Queues the redo of `item`; resolves to its job ID, or undefined when there is none to queue. */

@@ -8,6 +8,7 @@ import {
   recordsForRequest,
 } from "../account-ownership.js";
 import { accountPreferences } from "../account-preferences.js";
+import { logWarning } from "../crash-log.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { similarThresholds } from "../domain/image-search.ts";
 import { queuePriority } from "../domain/store.ts";
@@ -453,7 +454,7 @@ export function registerGalleryDeleteRoute(app, { deleted = () => {} } = {}) {
     const { files, removed } = deleteRequested(req, [id], deleted);
     // Accounts never learn whether another owner's item exists.
     if (req.studioAccount && !removed.length) {
-      console.warn(`[Studio] Could not delete gallery item ${id}: not among the account's items`);
+      logWarning(`Could not delete gallery item ${id}: not among the account's items`);
       res.status(404).json({ ok: false, error: "That item was not found." });
       return;
     }

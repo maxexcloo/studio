@@ -6,6 +6,7 @@ import { assistantRecord } from "./assistant-routes.js";
 import { listCards } from "./cards.js";
 import { sheetReferences } from "./character-sheets.js";
 import { routeProfile } from "./comfy/backends.js";
+import { logEvent } from "./crash-log.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { families } from "./family-catalogue.js";
 import {
@@ -367,8 +368,8 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     // An empty painted mask falls back to a normal run, so apply normal sizing too.
     if (body.inpaint?.box) {
       const { box, image, work } = body.inpaint;
-      console.log(
-        `[Studio] Inpaint: repainting ${box.width}×${box.height} at ${box.x},${box.y} of ${image?.width}×${image?.height}, sampled at ${work.width}×${work.height}, strength ${body.inpaint.strength}`,
+      logEvent(
+        `Inpaint: repainting ${box.width}×${box.height} at ${box.x},${box.y} of ${image?.width}×${image?.height}, sampled at ${work.width}×${work.height}, strength ${body.inpaint.strength}`,
       );
     }
     // A mask was sent but nothing in it was painted, so this runs as a plain edit. Kept with the

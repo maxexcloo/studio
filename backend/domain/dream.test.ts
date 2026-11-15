@@ -633,7 +633,7 @@ test("Dream skips unavailable accounts and offline services, logging each reason
   assert.ok(dreamJobs("alice").every((job) => job.status === "cancelled"));
   assert.equal(dream.status("alice").status, "paused");
   await dream.tick();
-  assert.equal(state.logs.at(-1), "[Studio] Dream skips account alice: Paused.");
+  assert.equal(state.logs.at(-1), "Dream skips account alice: Paused.");
 });
 
 /** Serves the Dream routes; `request` answers as the user named in its last argument. */

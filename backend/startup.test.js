@@ -59,7 +59,8 @@ for (const development of [false, true]) {
       });
       await reported;
       assert.equal(ready.version, version);
-      assert.ok(output.includes(`Studio ${version}\nOpen ${ready.url}`));
+      assert.ok(output.includes(`Studio started {"version":"${version}"`));
+      assert.ok(output.includes(`Open ${ready.url}`));
       if (development) assert.equal(ready.url, "http://localhost:5173");
       else {
         const response = await fetch(`${ready.url}/api/stats`);

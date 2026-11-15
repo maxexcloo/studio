@@ -27,6 +27,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { logger } from "../crash-log.js";
 import { currentDataDir } from "../data-dir.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
 import { loadMcpPrompting } from "../mcp/prompting.js";
@@ -77,7 +78,7 @@ export function writeVersion(dir, n, record) {
 export function createProfileStore({
   dataDir = currentDataDir(),
   workflowsDir = path.join(dataDir, "workflows"),
-  log = console,
+  log = logger,
 } = {}) {
   const metaFile = path.join(workflowsDir, ".studio-meta.json");
   const aliasFile = path.join(workflowsDir, ".studio-aliases.json");
@@ -205,7 +206,7 @@ export function createProfileStore({
     }
     if (added)
       log.info?.(
-        `[profiles] Recorded ${added} profile version${added === 1 ? "" : "s"} under history/profiles.`,
+        `Recorded ${added} profile version${added === 1 ? "" : "s"} under history/profiles.`,
       );
     return { profiles, versions: added };
   }
@@ -698,7 +699,7 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
  * The guide resolver (loadMcpPrompting) over the guide store, reloaded whenever the store changes,
  * so a saved guide applies without a restart. A store that fails to load keeps the last good guides.
  */
-export function livePrompting({ dataDir = currentDataDir(), log = console } = {}) {
+export function livePrompting({ dataDir = currentDataDir(), log = logger } = {}) {
   const store = createGuideStore({ dataDir });
   let loaded = null;
   let signature = null;

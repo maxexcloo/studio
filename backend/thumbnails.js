@@ -9,6 +9,7 @@ import {
   noteComfyFetchError,
   noteComfyReachable,
 } from "./comfy/comfy.js";
+import { logEvent } from "./crash-log.js";
 import { dataDir } from "./gallery/store.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { mediaType } from "./media-paths.js";
@@ -180,8 +181,8 @@ function maybeSweep() {
   sweeping = sweepThumbnails()
     .then(({ removed, freedBytes }) => {
       if (removed)
-        console.log(
-          `[Studio] Thumbnail cache: removed ${removed} older thumbnails (${Math.round(freedBytes / 1e6)} MB).`,
+        logEvent(
+          `Thumbnail cache: removed ${removed} older thumbnails (${Math.round(freedBytes / 1e6)} MB).`,
         );
     })
     .catch(() => {})

@@ -35,6 +35,7 @@ import {
   verifyLocalAccount,
   wrongCurrentPassword,
 } from "./account-store.js";
+import { logWarning } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
@@ -458,7 +459,7 @@ export function registerMultiUserAuthRoutes(
       res.setHeader("Cache-Control", "no-store");
       res.redirect(302, url);
     } catch (error) {
-      console.warn(`[Studio] Single sign-on could not start: ${error.message}`);
+      logWarning(`Single sign-on could not start: ${error.message}`);
       res.redirect(302, "/?sign-in=unavailable");
     }
   });
@@ -482,7 +483,7 @@ export function registerMultiUserAuthRoutes(
       appendCookie(res, accountCookie(req, session.token, session.maxAge));
       res.redirect(302, "/");
     } catch (error) {
-      console.warn(`[Studio] Single sign-on failed: ${error.message}`);
+      logWarning(`Single sign-on failed: ${error.message}`);
       res.redirect(302, "/?sign-in=failed");
     }
   });

@@ -9,6 +9,7 @@ import {
   workerReachable,
 } from "../comfy/backends.js";
 import { comfy, optionsFor } from "../comfy/comfy.js";
+import { logWarning } from "../crash-log.js";
 import { customWorkflowsRevision } from "../custom-workflows.js";
 import { step } from "../event-loop.js";
 import { families } from "../family-catalogue.js";
@@ -484,7 +485,7 @@ export function withFailing(models) {
       )
       .catch((error) => {
         profileHealth.counting = false;
-        console.warn(`[Studio] Profile health couldn't be counted: ${error.message}`);
+        logWarning(`Profile health couldn't be counted: ${error.message}`);
       });
   }
   const { stats } = profileHealth;

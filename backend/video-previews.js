@@ -10,6 +10,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 import { comfyFileUrl, localOutputFile } from "./comfy/comfy.js";
+import { logWarning } from "./crash-log.js";
 import { dataDir } from "./gallery/store.js";
 import { mediaType } from "./media-paths.js";
 import { sendMediaBuffer } from "./media-response.js";
@@ -401,7 +402,7 @@ export async function editClip(source, output, edit) {
   );
   if (code !== 0 || timedOut) {
     // ffmpeg's report names server paths, so it goes to the log, not the person.
-    if (!timedOut) console.warn(`[Studio] A video edit failed: ${stderr.slice(0, 500)}`);
+    if (!timedOut) logWarning(`A video edit failed: ${stderr.slice(0, 500)}`);
     throw new Error(timedOut ? "Editing the video timed out." : "The video couldn't be edited.");
   }
   return output;

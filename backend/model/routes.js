@@ -1,6 +1,7 @@
 import { ownerIdForRequest } from "../account-ownership.js";
 import { accountPreferences } from "../account-preferences.js";
 import { animateProfile } from "../animate-profile.js";
+import { logger } from "../crash-log.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { step } from "../event-loop.js";
 import {
@@ -39,7 +40,7 @@ export function registerModelRoutes(app, { catalogue }) {
       // Workers that do not answer are part of the catalogue; only no worker at all falls back
       // here. Anything else is a bug, not an offline worker.
       if (!error?.noWorker) {
-        console.error("[Studio] Models catalogue failed:", error);
+        logger.error("Models catalogue failed", error);
         return { status: 500, payload: { ok: false, error: error.message } };
       }
       return {

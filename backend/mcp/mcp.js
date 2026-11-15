@@ -336,6 +336,7 @@ export function registerMcpRoutes(
       // Arguments the schema refused never reach the tool's own handler.
       const reason = conciseError(message);
       logWarning("MCP tool call refused", {
+        tool: /for tool (\w+):/.exec(String(message))?.[1],
         account: owner || scope,
         reason: reason.slice(0, 200),
       });
