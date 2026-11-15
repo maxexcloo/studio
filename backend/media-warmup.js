@@ -132,11 +132,24 @@ export async function warmGallery({ items = eachGalleryItem({ status: "done" }) 
   return images + videos;
 }
 
+// A pass walks the whole gallery at most hourly (older items' new upscales, files the cache swept
+// away); between, a change walks only records made since the previous pass began, an hour early
+// for runs that finished later.
+const wholeMs = 60 * 60_000;
+let wholeAt = -Infinity;
+let passAt = 0;
+
 /** Starts a pass unless one is running; a change while it runs gets its own pass after. */
 function warmGalleryNow() {
   if (warming) return warming;
   warmedRevision = galleryRevisionValue();
-  warming = warmGallery()
+  const now = Date.now();
+  const since = passAt - wholeMs;
+  passAt = now;
+  if (now - wholeAt >= wholeMs) wholeAt = now;
+  warming = warmGallery(
+    wholeAt === now ? {} : { items: eachGalleryItem({ status: "done", since }) },
+  )
     .catch((error) => logWarning(`Media warm-up stopped: ${error.message}`))
     .finally(() => {
       warming = null;
@@ -147,7 +160,7 @@ function warmGalleryNow() {
 /**
  * Warms the gallery shortly after start and again whenever it changes
  * (imports, recovered runs, finished upscales). Items already done are
- * skipped by name, so a pass after a change only builds what is new.
+ * skipped by name.
  */
 export function startMediaWarmup({ delayMs = 10_000, everyMs = 15_000 } = {}) {
   setTimeout(() => void tracked("Media warmup", warmGalleryNow), delayMs).unref?.();
