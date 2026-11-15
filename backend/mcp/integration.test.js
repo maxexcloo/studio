@@ -5199,8 +5199,18 @@ test("a vague generate runs two images on its family's fastest profile at the de
   };
   const vague = { profileId: fast.id, count: 2, loras: [], size: [1024, 1024] };
   assert.deepEqual(await run({}), vague);
-  // A Quality id the chat chose itself runs Fast unless the request asks for quality.
+  // A Quality id the chat chose itself runs Fast unless the request asks for quality, and says so.
   assert.deepEqual(await run({ profile_id: quality.id }), vague);
+  assert.match(
+    texts(
+      await call(client, "generate", {
+        prompts: ["A fox"],
+        request: "a fox",
+        profile_id: quality.id,
+      }),
+    ),
+    /Ran on Flux · Fast, the fast choice for Flux · Quality; pass tier "quality" only when the user asks for Quality/,
+  );
   assert.equal(
     (await run({ profile_id: quality.id, request: "a fox, best quality" })).profileId,
     quality.id,

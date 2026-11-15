@@ -381,7 +381,14 @@ export function registerGenerateTools({
               (item.mediaInputs || []).length >= inputs,
           )
         : [found];
-      return { profile: fastestFirst([found, ...family])[0], note: "" };
+      const fastest = fastestFirst([found, ...family])[0];
+      return {
+        profile: fastest,
+        note:
+          fastest.id === found.id
+            ? ""
+            : `Ran on ${fastest.label || fastest.id}, the fast choice for ${found.label || found.id}; pass tier "quality" only when the user asks for Quality. `,
+      };
     }
     return found.id === value
       ? { profile: found, note: "" }
