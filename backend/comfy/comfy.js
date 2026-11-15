@@ -80,15 +80,24 @@ function comfyTimeoutFor(pathname = "") {
 
 /**
  * One request to worker `worker`'s ComfyUI. `timeout` (ms) overrides the default for the path;
- * a caller's own `signal` still cancels it early. A failed answer throws with
- * `status` and the untouched `raw` text next to the friendly message.
+ * `answerWithin` (ms) gives up sooner when ComfyUI hasn't started answering, so a hung worker
+ * fails fast while a large answer over a slow link still arrives. A caller's own `signal` still
+ * cancels it early. A failed answer throws with `status` and the untouched `raw` text next to the
+ * friendly message.
  */
 export async function comfy(worker, pathname, options = {}) {
-  const { timeout, ...init } = options;
+  const { answerWithin, timeout, ...init } = options;
   const limit = AbortSignal.timeout(
     Number(timeout) > 0 ? Number(timeout) : comfyTimeoutFor(pathname),
   );
-  init.signal = init.signal ? AbortSignal.any([init.signal, limit]) : limit;
+  const answer = new AbortController();
+  const unanswered = answerWithin
+    ? setTimeout(
+        () => answer.abort(new DOMException("No answer in time", "TimeoutError")),
+        answerWithin,
+      )
+    : null;
+  init.signal = AbortSignal.any([init.signal, limit, answer.signal].filter(Boolean));
   let response;
   try {
     try {
@@ -113,6 +122,8 @@ export async function comfy(worker, pathname, options = {}) {
   } catch (error) {
     noteComfyFetchError(worker, error);
     throw error;
+  } finally {
+    clearTimeout(unanswered);
   }
   // A proxy in front of a stopped worker answers for it: for routing, that worker is offline.
   if ([502, 503, 504].includes(response.status))
