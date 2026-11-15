@@ -11,6 +11,7 @@ import { layerAbove } from "../../ui/popupClicks";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
 import { MediaViewer } from "../gallery/MediaViewer";
+import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
@@ -184,7 +185,7 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
     onError: (_error, { card }) => onFailed(card),
     onSettled: () =>
       Promise.all(
-        [dreamQuery.queryKey, ["gallery"], ["gallery-filters"]].map((queryKey) =>
+        [dreamQuery.queryKey, galleryKey, ["gallery-filters"]].map((queryKey) =>
           client.invalidateQueries({ queryKey }),
         ),
       ),

@@ -29,12 +29,13 @@ interface AccountStatus {
   /** The chat site (STUDIO_CHAT_URL) the navigation links to, if the deployment names one. */
   chatUrl?: string;
 }
+export const accountQuery = queryOptions({
+  queryKey: ["account"],
+  queryFn: () => api<AccountStatus>("/api/accounts/status"),
+  retry: false,
+});
 export function useAccount() {
-  return useQuery({
-    queryKey: ["account"],
-    queryFn: () => api<AccountStatus>("/api/accounts/status"),
-    retry: false,
-  });
+  return useQuery(accountQuery);
 }
 /** Unknown until the account status loads, so admin-only UI never flashes in. */
 export function useIsAdmin() {

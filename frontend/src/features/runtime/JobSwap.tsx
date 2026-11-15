@@ -7,6 +7,7 @@ import { type RuntimeOperation, type RuntimeSwap, waitsOnText } from "../../../.
 import { post } from "../../api";
 import type { QueueJob } from "../../types";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { queueQuery } from "../generation/Queue";
 import { servicesStatusQuery } from "./RuntimePanel";
 import { runtimeStatusQuery } from "./RuntimeWorkloads";
 
@@ -37,7 +38,11 @@ export function useJobSwap() {
     meta: { inlineError: true },
     onSuccess: () => {
       close();
-      for (const queryKey of [["queue"], runtimeStatusQuery.queryKey, servicesStatusQuery.queryKey])
+      for (const queryKey of [
+        queueQuery.queryKey,
+        runtimeStatusQuery.queryKey,
+        servicesStatusQuery.queryKey,
+      ])
         void client.invalidateQueries({ queryKey });
     },
   });

@@ -7,8 +7,10 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
+import { galleryKey } from "../gallery/queries";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
+import { queueQuery } from "../generation/Queue";
 import { accountAdminQuery } from "./AccountAdmin";
 import {
   type GalleryWorkPreference,
@@ -52,7 +54,7 @@ function DeleteFailedItems() {
         owner === "mine" ? undefined : { owner },
       ),
     onSuccess: () => {
-      for (const queryKey of [["gallery"], ["gallery-filters"], ["queue"]])
+      for (const queryKey of [galleryKey, ["gallery-filters"], queueQuery.queryKey])
         void client.invalidateQueries({ queryKey });
       setConfirming(false);
     },

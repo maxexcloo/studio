@@ -5,6 +5,7 @@ import { useState } from "react";
 import { post } from "../../api";
 import { formatDateTime } from "../../ui/dates";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { accountAdminQuery } from "./AccountAdmin";
 
 export interface GatewayAccounts {
   adminTools: boolean;
@@ -30,7 +31,7 @@ export function useGatewayChange() {
         ...(action.accountId ? { accountId: action.accountId } : {}),
       });
     },
-    onSuccess: () => client.invalidateQueries({ queryKey: ["account-admin"] }),
+    onSuccess: () => client.invalidateQueries({ queryKey: accountAdminQuery.queryKey }),
   });
 }
 

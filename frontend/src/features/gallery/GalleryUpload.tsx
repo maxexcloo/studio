@@ -13,6 +13,7 @@ import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { uploadTypes } from "../generation/references";
+import { galleryKey } from "./queries";
 
 const listedFailures = 5;
 
@@ -115,7 +116,7 @@ export function useGalleryUpload(onUploaded: () => void) {
         ),
       });
     if (!uploaded) return;
-    void client.invalidateQueries({ queryKey: ["gallery"] });
+    void client.invalidateQueries({ queryKey: galleryKey });
     onUploaded();
   }
   return { upload, uploading };

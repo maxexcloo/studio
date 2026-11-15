@@ -29,6 +29,7 @@ import {
 import { assistantQuery } from "../generation/PromptAssistant";
 import { queueJobQuery, queueQuery } from "../generation/Queue";
 import { type VideosPreference, useVideosPreference } from "../settings/accountPreferences";
+import { galleryKey } from "./queries";
 import { useItemMutation } from "./useItemMutation";
 
 type Operation = "image" | "refine" | "animate" | "extend";
@@ -353,7 +354,7 @@ export function useIterate() {
         queue ? { ...queue, jobs: [...queue.jobs, result.job!] } : queue,
       );
     void Promise.all(
-      [queueQuery.queryKey, ["gallery"]].map((queryKey) => client.invalidateQueries({ queryKey })),
+      [queueQuery.queryKey, galleryKey].map((queryKey) => client.invalidateQueries({ queryKey })),
     );
     return result.jobId;
   };

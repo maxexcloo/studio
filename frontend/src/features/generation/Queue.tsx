@@ -44,6 +44,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
+import { galleryKey } from "../gallery/queries";
 import { useTryAgain } from "../gallery/useTryAgain";
 import { useJobSwap } from "../runtime/JobSwap";
 import { useGenerationActions } from "./GenerationProvider";
@@ -141,7 +142,7 @@ export function useQueueAction(jobId?: string) {
     onSettled: () =>
       Promise.all([
         client.invalidateQueries({ queryKey: queueQuery.queryKey }),
-        client.invalidateQueries({ queryKey: ["gallery"] }),
+        client.invalidateQueries({ queryKey: galleryKey }),
       ]),
   });
   const matching = useCallback(
