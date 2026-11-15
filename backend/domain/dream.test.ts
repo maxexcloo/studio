@@ -26,7 +26,7 @@ import { createProjects } from "./projects.ts";
 import { type GenerationQueue, writtenJob } from "./queue.ts";
 import { registerRewriteRoutes } from "./routes.ts";
 import { Store, queuePriority } from "./store.ts";
-import { createTaste, tasteSignal } from "./taste.ts";
+import { createTaste, itemValues, tasteSignal } from "./taste.ts";
 
 const profiles: DreamProfile[] = [
   {
@@ -897,6 +897,40 @@ test("Dream seeds from the account's stars, its own results only one draw in fou
   assert.equal(state.items.find((item) => item.id === "liked")?.favorite, undefined);
 });
 
+test("A new star seeds every other draw until it has seeded, and results that came out alike steer the writer away", async (t) => {
+  const { dream, state, store, taste, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  // Stars from before the latest star signals are not fresh.
+  const star = (id: string, signal = true) => {
+    const input = { kind: "image", prompt: `prompt ${id}`, profileId: "flux" };
+    const session = store.createSession("alice", "Gallery").id;
+    const job = store.enqueue("alice", session, input, "image", undefined, "worker:image", id);
+    store.save({ ...job, status: "completed" });
+    const item = { id, jobId: job.id, ownerId: "alice", type: "image", status: "done" };
+    state.items.push({ ...item, favorite: true });
+    if (signal) taste.record("alice", [tasteSignal("star", job.id, itemValues(item))]);
+  };
+  const seedOfLast = () => /Seed prompt: prompt (\S+)/.exec(state.calls.at(-1)!.user)?.[1];
+  for (const id of ["old-1", "old-2", "old-3"]) star(id, false);
+  star("new");
+  state.rolls = [99];
+  await dreamOnce();
+  assert.equal(seedOfLast(), "new");
+  state.rolls = [99];
+  await dreamOnce();
+  assert.match(String(seedOfLast()), /^old-/);
+  star("newer");
+  state.rolls = [99];
+  await dreamOnce();
+  assert.equal(seedOfLast(), "newer");
+
+  // Without a seed, an idea is written fresh; the results that came out alike are named.
+  state.items = state.items.filter((item) => !item.favorite);
+  state.likeness = (a, b) => (a.dream && b.dream ? 0.95 : 0.2);
+  await dreamOnce();
+  assert.match(state.calls.at(-1)!.user, /Recent results that came out alike[^\n]*\n- dream \d/);
+});
+
 test("Dream samples only stars it can seed from, however many uploads and retired profiles' stars there are", async (t) => {
   const { dream, state, store, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
@@ -986,54 +1020,56 @@ test("While Dream is off, gallery comparisons still rate images and queue nothin
   assert.deepEqual(dreamJobs("alice"), []);
 });
 
-test("The explore share starts at a fifth and leans toward whichever side the person keeps", async (t) => {
+test("The explore share starts at a fifth and follows how often explored results are kept against the rest", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
   // At a fifth, a roll of 70 of 100 exploits.
   state.rolls = [70];
   assert.equal((await dreamOnce())?.dream?.arm, "exploit");
   let made = 0;
-  const keep = (arm: string, pair = false) => {
-    const id = `kept-${made++}`;
-    state.items.push({
-      id,
-      ownerId: "alice",
-      type: "image",
-      status: "done",
-      dream: {
-        state: "unseen",
-        prompt: "p",
-        why: "",
-        at: "",
-        arm,
-        ...(pair
-          ? {
-              pair: {
-                id: "pair",
-                side: 0 as const,
-                question: "",
-                axis: "steps",
-                label: "",
-                value: 1,
-              },
-            }
-          : {}),
-      },
-    });
-    dream.keep("alice", id);
-    return dream.read("alice").explore;
+  const decided = (count: number, arm: string, verdict: "kept" | "discarded", pair = false) => {
+    for (let index = 0; index < count; index++)
+      state.items.unshift({
+        id: `decided-${made++}`,
+        ownerId: "alice",
+        type: "image",
+        status: "done",
+        dream: {
+          state: verdict,
+          prompt: "p",
+          why: "",
+          at: "",
+          arm,
+          ...(pair
+            ? {
+                pair: {
+                  id: "pair",
+                  side: 0 as const,
+                  question: "",
+                  axis: "steps",
+                  label: "",
+                  value: 1,
+                },
+              }
+            : {}),
+        },
+      });
   };
-  assert.equal(keep("explore:prompt"), 0.22);
-  assert.equal(keep("continue:pose"), 0.2);
-  assert.equal(keep("exploit"), 0.18);
-  // A comparison's side asks something else, and leaves the share as it was.
-  assert.equal(keep("explore:steps", true), 0.18);
-  for (let index = 0; index < 30; index++) keep("explore:lora");
-  assert.equal(dream.read("alice").explore, 0.5);
+  // Explored results kept and the rest passed: at most half explore.
+  decided(10, "explore:prompt", "kept");
+  decided(10, "exploit", "discarded");
   state.rolls = [70];
   assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
-  for (let index = 0; index < 40; index++) keep("exploit");
-  assert.equal(dream.read("alice").explore, 0.05);
+  state.rolls = [40];
+  assert.equal((await dreamOnce())?.dream?.arm, "exploit");
+  // The other way round, a tenth still explores; comparisons ask something else and count for neither.
+  decided(20, "explore:lora", "discarded");
+  decided(60, "continue:pose", "kept");
+  decided(30, "explore:steps", "kept", true);
+  state.rolls = [85];
+  assert.equal((await dreamOnce())?.dream?.arm, "exploit");
+  state.rolls = [92];
+  assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
 });
 
 test("starring an unseen, finished Dream result keeps it", (t) => {

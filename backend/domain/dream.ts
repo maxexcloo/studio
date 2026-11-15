@@ -307,8 +307,6 @@ interface DreamRecord {
   projectTurns?: number;
   /** The latest view of the Dream page, and when the visit before this one ended (`since`). */
   visit?: { at: string; since?: string };
-  /** The share of fresh ideas that explore (`exploreShare`), moved by what the person keeps. */
-  explore?: number;
   /** Proposed cards waiting in Library › Characters, and when Dream last looked for more. */
   suggestions?: DreamSuggestion[];
   suggestedAt?: string;
@@ -356,10 +354,11 @@ const defaultDreamSettings: DreamSettings = {
  * thing; without one they exploit the taste profile, drawing the profile, LoRA, settings and
  * something to feature by their scores. The account's explore
  * share of them change exactly one axis instead (a new or little-used profile, an untried LoRA, or
- * new ground for the prompt), recorded as the idea's arm. The share starts at `start` and each kept
- * result moves it by `step` toward its side, within `low` and `high`.
+ * new ground for the prompt), recorded as the idea's arm. The share is `start` scaled by how often
+ * the person keeps explored results against the rest among the latest `window` they decided,
+ * within `low` and `high`.
  */
-const exploreShare = { start: 0.2, step: 0.02, low: 0.05, high: 0.5 };
+const exploreShare = { start: 0.2, low: 0.1, high: 0.5, window: 100 };
 /** A chat keeps its project this long after its latest request, then hands it to Dream. */
 const handOffMs = 3_600_000;
 /** A handed-off project continues from its latest few chat images and its newest few picks. */
@@ -419,9 +418,20 @@ const avoidDiscards = 8;
  */
 const seedSample = 9;
 const ownSeedEvery = 4;
-/** Dream uses none of its latest seeds again, and draws the sampled one least like them by image. */
+/**
+ * Dream uses none of its latest seeds again, and draws the sampled one least like them and its
+ * latest results by image. Images from the latest `freshStars` stars seed every other draw until
+ * each has seeded once, so a new star shows up soon without crowding out older ones.
+ */
 const recentSeeds = 30;
 const compareSeeds = 10;
+const freshStars = 10;
+/**
+ * Dream's latest this many image results set its diversity budget: a profile or LoRA weighs less by
+ * the share of them it took (to no less than `floor`), and results at least `alike` like another
+ * by image are named to the writer as ground to move away from.
+ */
+const diversity = { results: 20, floor: 0.2, alike: 0.9 };
 /**
  * Every comparison's answer rates its two images by Elo: each starts at `start` and the winner takes
  * up to `k` from the loser, Both and Neither drawing them together. A draw of seeds also takes up to
@@ -809,6 +819,35 @@ export function createDream(options: {
   }
   const pool = (ownerId: string, state: DreamState) =>
     options.gallery(ownerId, { dreamState: state });
+  /** Dream's latest image results, leaving out comparisons and series, which are alike by design. */
+  const dreamResults = (ownerId: string) =>
+    options
+      .gallery(ownerId, {
+        dreamState: ["unseen", "kept", "discarded"],
+        type: "image",
+        status: "done",
+      })
+      .filter((item) => !item.dream?.pair && item.dream?.arm !== "series")
+      .slice(0, diversity.results);
+  /**
+   * What a profile (`profile:<id>`) or LoRA (`lora:<name>`) weighs after its share of Dream's
+   * latest images within a day (`diversity`).
+   */
+  function spread(ownerId: string) {
+    const jobs = store
+      .jobsSince(ownerId, new Date(now() - 86_400_000).toISOString())
+      .filter((job) => dreamJob(job) && kindOf(job.input) === "image")
+      .slice(-diversity.results);
+    const used = new Map<string, number>();
+    for (const { input } of jobs)
+      for (const key of [
+        `profile:${input.profileId}`,
+        ...(Array.isArray(input.loras) ? input.loras : []).map((lora) => `lora:${lora?.name}`),
+      ])
+        used.set(key, (used.get(key) || 0) + 1);
+    return (key: string) =>
+      Math.max(diversity.floor, 1 - (used.get(key) || 0) / Math.max(jobs.length, 1));
+  }
   /** The kinds Dream may still make today, the one it is behind on first. */
   function kinds(settings: DreamSettings, counts: { images: number; videos: number }) {
     const image = settings.images && counts.images < settings.dailyImages;
@@ -850,11 +889,15 @@ export function createDream(options: {
         .filter(([attribute]) => attribute.startsWith(prefix))
         .map(([attribute, { score }]) => [attribute.slice(prefix.length), score]),
     );
-  /** A ready profile of the kind drawn by its taste score, else the default for the kind. */
+  /**
+   * A ready profile of the kind drawn by its taste score less its recent share (`spread`), else the
+   * default for the kind.
+   */
   function exploitProfile(
     kind: Kind,
     catalogue: Awaited<ReturnType<typeof options.catalogue>>,
     taste: TasteRecord,
+    weigh: (key: string) => number,
   ) {
     const profiles = catalogue.profiles.filter((profile) => kindOf(profile) === kind);
     const scores = new Map(
@@ -862,8 +905,12 @@ export function createDream(options: {
     );
     const defaultId = catalogue.defaults?.[kind === "video" ? "videoModel" : "imageModel"];
     return (
-      drawn(profiles.map((profile) => [profile, scores.get(profile.id) ?? 0])) ||
-      profiles.find((profile) => profile.id === defaultId)
+      drawn(
+        profiles.map((profile) => [
+          profile,
+          (scores.get(profile.id) ?? 0) * weigh(`profile:${profile.id}`),
+        ]),
+      ) || profiles.find((profile) => profile.id === defaultId)
     );
   }
   /**
@@ -1004,7 +1051,12 @@ export function createDream(options: {
    * they are all it starred. Only images the account made with a prompt on a ready image profile
    * are sampled, so a draw finds a seed whenever one exists.
    */
-  function favourites(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
+  function favourites(
+    ownerId: string,
+    record: DreamRecord,
+    profiles: DreamProfile[],
+    fresh: string[],
+  ) {
     const ready = profiles.filter((entry) => kindOf(entry) === "image").map((entry) => entry.id);
     const query = {
       type: "image",
@@ -1014,8 +1066,12 @@ export function createDream(options: {
     };
     const ratings = Object.entries(record.ratings || {});
     const won = shuffled(ratings.filter(([, rating]) => rating > elo.start).map(([id]) => id));
+    const sampled = generations(ownerId, { ...query, favorite: true, sample: seedSample });
     const stars = [
-      ...generations(ownerId, { ...query, favorite: true, sample: seedSample }),
+      ...sampled,
+      ...generations(ownerId, { ...query, favorite: true, ids: fresh }).filter(
+        (item) => !sampled.some((other) => other.id === item.id),
+      ),
       ...(won.length
         ? generations(ownerId, { ...query, ids: won.slice(0, elo.winners) }).filter(
             (item) => !item.favorite,
@@ -1040,24 +1096,50 @@ export function createDream(options: {
     const prompt = clean(input?.prompt, maxPromptCharacters);
     return input && profile && prompt ? { item, input, profile, prompt } : null;
   }
-  const drawSeeds = (ownerId: string, record: DreamRecord, profiles: DreamProfile[]) =>
-    favourites(ownerId, record, profiles).flatMap((item) => seedOf(ownerId, item, profiles) ?? []);
+  const drawSeeds = (
+    ownerId: string,
+    record: DreamRecord,
+    profiles: DreamProfile[],
+    fresh: string[] = [],
+  ) =>
+    favourites(ownerId, record, profiles, fresh).flatMap(
+      (item) => seedOf(ownerId, item, profiles) ?? [],
+    );
+  /** The images of the account's latest stars (`freshStars`), newest first. */
+  const starredLately = (ownerId: string) =>
+    [
+      ...new Set(
+        options.taste
+          .read(ownerId)
+          .signals.flatMap((signal) =>
+            signal.kind === "star" && signal.itemId ? [signal.itemId] : [],
+          ),
+      ),
+    ].slice(0, freshStars);
   /**
    * A seed for a continued idea or a series: of `drawSeeds`, one Dream has not used lately where it
-   * can, the one least like the latest few by image, so its seeds spread across the account's
-   * subjects, less its rating's lead (`elo`). Null without one.
+   * can, a fresh star every other draw (`freshStars`), the one least like its latest seeds and
+   * results by image, so its seeds spread across the account's subjects, less its rating's lead
+   * (`elo`). Null without one.
    */
   function seedPick(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const used = record.seeds || [];
-    const drawn = drawSeeds(ownerId, record, profiles);
+    const fresh = starredLately(ownerId);
+    const drawn = drawSeeds(ownerId, record, profiles, fresh);
     const unused = drawn.filter(({ item }) => !used.includes(String(item.id)));
-    const latest = options.items(ownerId, used.slice(0, compareSeeds));
+    const lately = unused.filter(({ item }) => fresh.includes(String(item.id)));
+    const latest = [
+      ...options.items(ownerId, used.slice(0, compareSeeds)),
+      ...dreamResults(ownerId).slice(0, compareSeeds),
+    ];
     const nearest = (item: DreamItem) =>
       Math.max(-1, ...latest.map((seen) => options.likeness(item, seen) ?? -1)) -
       ((record.ratings?.[String(item.id)] ?? elo.start) - elo.start) / elo.weight;
     let best: ReturnType<typeof seedOf> = null;
     let least = Infinity;
-    for (const seed of unused.length ? unused : drawn) {
+    const candidates =
+      lately.length && !fresh.includes(used[0]) ? lately : unused.length ? unused : drawn;
+    for (const seed of candidates) {
       const near = nearest(seed.item);
       if (near < least) [best, least] = [seed, near];
     }
@@ -1097,13 +1179,23 @@ export function createDream(options: {
     ratings[a] = Math.round(ratingA + change);
     ratings[b] = Math.round(ratingB - change);
   }
-  /** Moves the account's explore share a step toward exploring, or with `-1` away from it. */
-  function lean(ownerId: string, direction: 1 | -1) {
-    const record = read(ownerId);
-    const { start, step, low, high } = exploreShare;
-    const share = (record.explore ?? start) + direction * step;
-    record.explore = Math.round(Math.min(high, Math.max(low, share)) * 100) / 100;
-    write(ownerId, record);
+  /**
+   * The account's explore share (`exploreShare`): each side's keep rate counts from one kept of two,
+   * so a side with few verdicts stays near the start.
+   */
+  function exploring(ownerId: string) {
+    const { start, low, high, window } = exploreShare;
+    const decided = options
+      .gallery(ownerId, { dreamState: ["kept", "discarded"] })
+      .filter(
+        (item) => !item.dream?.pair && /^(exploit|explore:|continue:)/.test(item.dream?.arm || ""),
+      )
+      .slice(0, window);
+    const rate = (explored: boolean) => {
+      const side = decided.filter((item) => item.dream!.arm!.startsWith("explore:") === explored);
+      return (side.filter((item) => item.dream!.state === "kept").length + 1) / (side.length + 2);
+    };
+    return Math.min(high, Math.max(low, (start * rate(true)) / rate(false)));
   }
 
   /**
@@ -1139,10 +1231,15 @@ export function createDream(options: {
   }
   /**
    * For a share of exploited ideas, one LoRA the profile can load drawn by its taste score (a
-   * thumbs up adds one) at the strength that scored best, else its saved strength; never a
-   * thumbs-down one, and none without LoRA access.
+   * thumbs up adds one) less its recent share (`spread`), at the strength that scored best, else
+   * its saved strength; never a thumbs-down one, and none without LoRA access.
    */
-  function exploitLoras(ownerId: string, profile: DreamProfile, taste: TasteRecord) {
+  function exploitLoras(
+    ownerId: string,
+    profile: DreamProfile,
+    taste: TasteRecord,
+    weigh: (key: string) => number,
+  ) {
     const library = options.loraLibrary(ownerId);
     if (!library || !chance(shares.lora)) return [];
     const learnt = new Map(taste.loras.map((lora) => [lora.name, lora]));
@@ -1160,7 +1257,8 @@ export function createDream(options: {
     const lora = drawn(
       candidates.map((lora): [DreamLora, number] => [
         lora,
-        (learnt.get(lora.name)?.score ?? 0) + (library.ratings[lora.name] === "up" ? 1 : 0),
+        ((learnt.get(lora.name)?.score ?? 0) + (library.ratings[lora.name] === "up" ? 1 : 0)) *
+          weigh(`lora:${lora.name}`),
       ]),
     );
     return lora ? [lora] : [];
@@ -1185,6 +1283,23 @@ export function createDream(options: {
         ? { width: side(Math.sqrt(area * aspect)), height: side(Math.sqrt(area / aspect)) }
         : {}),
     };
+  }
+  /**
+   * The subjects of Dream's latest image results that came out at least `diversity.alike` like
+   * another of them by image.
+   */
+  function lookalikes(ownerId: string) {
+    const results = dreamResults(ownerId);
+    const alike = results.filter((item, index) =>
+      results.some(
+        (other, at) => at !== index && (options.likeness(item, other) ?? 0) >= diversity.alike,
+      ),
+    );
+    return [
+      ...new Set(alike.map((item) => subjectOf(item.title, item.dream?.prompt || item.prompt))),
+    ]
+      .filter(Boolean)
+      .slice(0, 6);
   }
   /** A few starred prompts from the account's whole history, sampled so each idea sees different ones. */
   function tastePrompts(ownerId: string) {
@@ -1367,6 +1482,8 @@ export function createDream(options: {
     else {
       const starred = tastePrompts(ownerId);
       const { summary } = options.taste.read(ownerId);
+      // More Like This and videos follow their source; other ideas move away from what repeats.
+      const repeats = like || source ? [] : lookalikes(ownerId);
       const passed = discarded(ownerId)
         .slice(0, avoidDiscards)
         .map((item) => subjectOf(item.title, item.prompt || item.dream?.prompt))
@@ -1416,6 +1533,12 @@ export function createDream(options: {
             ...(subjects.length ? subjects.map((subject) => `- ${subject}`) : ["(none yet)"]),
             ...(passed.length
               ? ["Discarded ideas to avoid:", ...passed.map((subject) => `- ${subject}`)]
+              : []),
+            ...(repeats.length
+              ? [
+                  "Recent results that came out alike; make this one clearly different from them in subject, setting and look:",
+                  ...repeats.map((subject) => `- ${subject}`),
+                ]
               : []),
             ...(like ? [`More like this one: ${clean(like, 1000)}`] : []),
             ...(source
@@ -1573,11 +1696,12 @@ export function createDream(options: {
         continue;
       }
       const taste = options.taste.read(ownerId);
+      const weigh = spread(ownerId);
       // More Like This keeps its result's profile where it is still ready.
       let profile =
         catalogue.profiles.find(
           (item) => kindOf(item) === "image" && steer && item.id === steer.profileId,
-        ) || exploitProfile(kind, catalogue, taste);
+        ) || exploitProfile(kind, catalogue, taste, weigh);
       if (!profile) {
         reason = `No ready local ${kind} model.`;
         continue;
@@ -1592,7 +1716,7 @@ export function createDream(options: {
         options
           .gallery(ownerId, { dreamState: ["unseen", "kept", "discarded"] })
           .filter((item) => item.dream?.arm?.startsWith(arm) && !item.dream.pair).length;
-      const share = Math.round((record.explore ?? exploreShare.start) * 100);
+      const share = Math.round(exploring(ownerId) * 100);
       const axis = !steer && !chance(100 - share) ? open[made("explore:") % open.length] : "";
       const { projects, handedOff } = turnProjects(ownerId);
       const project = projects.length
@@ -1662,7 +1786,7 @@ export function createDream(options: {
           : [];
         note = "Inspired by an import";
       } else if (axis === "prompt") note = "Exploring new ground";
-      loras ??= exploitLoras(ownerId, profile, taste);
+      loras ??= exploitLoras(ownerId, profile, taste, weigh);
       // Spicy goes to a share of ideas, so the rest stay plain.
       const spicy = spicyShare(record, access);
       const explore = axis === "prompt" && !inspiration;
@@ -2364,8 +2488,6 @@ export function createDream(options: {
       throw failure("That result is in the gallery now; delete it there instead.", 409);
     const dream: DreamMark = { ...item.dream!, state, decidedAt: stamp() };
     options.mark(ownerId, itemId, dream);
-    // A kept result leans the explore share toward its side; comparisons ask something else.
-    if (state === "kept" && !dream.pair) lean(ownerId, dream.arm?.startsWith("explore:") ? 1 : -1);
     if (teach)
       options.taste.record(ownerId, [
         tasteSignal(state === "kept" ? "keep" : "discard", item.jobId, itemValues(item)),
