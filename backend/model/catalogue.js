@@ -62,7 +62,8 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
 
   // One fetch of a worker's context at a time: callers that arrive meanwhile share it.
   const shareContextRequest = sharedRequests();
-  const catalogueReadTimeoutMs = 5000;
+  // A large node list can take several seconds to cross between sites.
+  const catalogueReadTimeoutMs = 30_000;
   // Each worker's latest failed context read, reused briefly so admission, routing and
   // eligibility do not each wait out the deadline of a hung worker in turn.
   const contextFailures = new Map();
