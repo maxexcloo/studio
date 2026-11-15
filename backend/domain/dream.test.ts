@@ -1246,6 +1246,16 @@ test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and ex
   assert.deepEqual(store.job("alice", next.id)!.input.loras, []);
 });
 
+test("Dream adds no LoRAs on a profile that does best without them", async (t) => {
+  const { dream, state, store, dreamOnce } = fixture(t, [
+    { ...profiles[0], capabilities: { defaultLoras: false } },
+  ]);
+  state.loras.alice = { ratings: { "fox.safetensors": "liked" }, strengths: {} };
+  await dream.save("alice", { enabled: true });
+  const job = (await dreamOnce())!;
+  assert.deepEqual(store.job("alice", job.id)!.input.loras, []);
+});
+
 test("an exploited idea draws its steps, guidance and aspect ratio by taste", async (t) => {
   const { dream, taste, dreamOnce } = fixture(t, [
     { ...profiles[0], capabilities: { steps: true } },

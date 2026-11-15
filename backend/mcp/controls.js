@@ -286,7 +286,7 @@ function loraCandidates(profile, infos, ratings = {}) {
   for (const name of profile.options?.loras || []) {
     const info = infos[name];
     // Infrastructure weights cannot enter the optional stack, and other architectures never fit.
-    if (["acceleration", "supporting"].includes(info?.role)) continue;
+    if (["acceleration", "supporting"].includes(info?.role) || info?.hidden) continue;
     const fit = loraCompatibility(info, profile);
     if (fit !== "other") entries.push({ name, info, fit });
   }
@@ -383,6 +383,8 @@ export function resolveLoraName(profile, value) {
   for (const pick of [
     (name) => squash(name) === key,
     (name) => squash(stem(name)) === key || squash(stem(name)) === squash(stem(value)),
+    // A name cut short, as chats write a long file name, when only one file starts with it.
+    (name) => key.length >= 8 && squash(stem(name)).startsWith(squash(stem(value))),
   ]) {
     const found = names.filter(pick);
     if (found.length === 1) return found[0];
@@ -507,6 +509,8 @@ export function prepareLoras(profile, infos = {}, loras = []) {
     if (!entry) {
       if (name && ["acceleration", "supporting"].includes(infos[name]?.role))
         throw new Error(`${value} is applied by Studio itself; leave it out of loras.`);
+      if (name && infos[name]?.hidden)
+        throw new Error(`${value} is hidden in Studio's Library; choose another LoRA.`);
       if (name)
         throw new Error(
           `${value} is for ${infos[name]?.base || "another model family"}, not ${label}; choose a LoRA from models for this profile.`,

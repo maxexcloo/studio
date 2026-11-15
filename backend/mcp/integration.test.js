@@ -1014,6 +1014,13 @@ test("media and administrator credentials discover only their own friendly tools
     /own descriptions .* word for word, changing only what they ask/,
   );
   assert.match(media.getInstructions(), /a LoRA only when the user names one or clearly wants one/);
+  // A rule such as real flaws lands as texture on the asked-for face, never a plainer or older one.
+  assert.match(
+    media.getInstructions(),
+    /real flaws means subtle texture .* never a plainer, older/,
+  );
+  // A person's age and ethnicity lead, since one named late is often lost in the image.
+  assert.match(media.getInstructions(), /age and ethnicity in the prompt's first words/);
   assert.match(
     media.getInstructions(),
     /call reuse with its ref and your revised prompt, not a new generate/,
@@ -1072,8 +1079,10 @@ test("media and administrator credentials discover only their own friendly tools
     // and to 17,200 for Cards (describe and rate a card's images), then lowered to 17,100 once Cards'
     // description was tightened, then raised to 17,150 for generate's 18+ floor, to 18,050 for
     // project, to 18,120 for its character_sheet, to 19,000 for variants and result numbers and to
-    // 19,300 for one call per step (models' profile_ids, review's also).
-    JSON.stringify(tools).length + media.getInstructions().length < 19300,
+    // 19,300 for one call per step (models' profile_ids, review's also) and to 19,850 for applying
+    // a person's rules in proportion with the shape of liked portraits, and to 20,050 for naming a
+    // person's age and ethnicity first.
+    JSON.stringify(tools).length + media.getInstructions().length < 20050,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -5167,8 +5176,18 @@ test("a vague generate runs two images on its family's fastest profile at the de
   };
   const vague = { profileId: fast.id, count: 2, loras: [], size: [1024, 1024] };
   assert.deepEqual(await run({}), vague);
-  // A Quality id the chat chose itself runs Fast unless the request asks for quality.
+  // A Quality id the chat chose itself runs Fast unless the request asks for quality, and says so.
   assert.deepEqual(await run({ profile_id: quality.id }), vague);
+  assert.match(
+    texts(
+      await call(client, "generate", {
+        prompts: ["A fox"],
+        request: "a fox",
+        profile_id: quality.id,
+      }),
+    ),
+    /Ran on Flux · Fast, the fast choice for Flux · Quality; pass tier "quality" only when the user asks for Quality/,
+  );
   assert.equal(
     (await run({ profile_id: quality.id, request: "a fox, best quality" })).profileId,
     quality.id,
@@ -6965,4 +6984,14 @@ test("admin tools chain a Library search, a one-call install and a named update 
   ])
     await failure(user, name, args);
   assert.equal(seen.length, before);
+});
+
+test("Models tells a chat when a profile does best without LoRAs", async (t) => {
+  const f = await fixture(t);
+  await f.profiles([
+    { ...imageProfile, capabilities: { ...imageProfile.capabilities, defaultLoras: false } },
+  ]);
+  const client = await f.client();
+  const details = data(await call(client, "models", { profile_id: imageProfile.id }));
+  assert.match(details.loras_note, /does best without LoRAs: add one only when the user names it/);
 });

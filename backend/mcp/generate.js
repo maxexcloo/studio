@@ -380,7 +380,14 @@ export function registerGenerateTools({
               (item.mediaInputs || []).length >= inputs,
           )
         : [found];
-      return { profile: fastestFirst([found, ...family])[0], note: "" };
+      const fastest = fastestFirst([found, ...family])[0];
+      return {
+        profile: fastest,
+        note:
+          fastest.id === found.id
+            ? ""
+            : `Ran on ${fastest.label || fastest.id}, the fast choice for ${found.label || found.id}; pass tier "quality" only when the user asks for Quality. `,
+      };
     }
     return found.id === value
       ? { profile: found, note: "" }
@@ -791,8 +798,7 @@ export function registerGenerateTools({
           ...(controls.loras
             ? {
                 loras_total: total,
-                loras_note:
-                  "Only when the user asks for a LoRA: find it with lora_query, then pass its name to generate.",
+                loras_note: `Only when the user asks for a LoRA: find it with lora_query, then pass its name to generate.${profile.capabilities?.defaultLoras === false ? " This model does best without LoRAs: add one only when the user names it." : ""}`,
               }
             : {}),
           ...(guide ? { prompting: guide } : {}),

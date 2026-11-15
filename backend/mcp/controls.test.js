@@ -177,6 +177,11 @@ test("Generate LoRA names resolve without folder, extension or case and take the
   const subject = { ...profile, options: { loras: Object.keys(infos) } };
   for (const name of ["styles/Ink-Wash.safetensors", "ink-wash", "Ink Wash", "styles/ink_wash"])
     assert.equal(resolveLoraName(subject, name), "styles/Ink-Wash.safetensors", name);
+  // A long file name cut short resolves only while one file starts with it.
+  const thighgap = "RLY-KREA2-thighgap-v1-trigger-thighgap.safetensors";
+  const cut = { ...profile, options: { loras: [thighgap, "RLY-KREA2-thick-v2.safetensors"] } };
+  assert.equal(resolveLoraName(cut, "RLY-KREA2-thighgap-v1"), thighgap);
+  assert.equal(resolveLoraName(cut, "RLY-KREA2-th"), null);
   assert.deepEqual(
     prepareLoras(subject, infos, [{ name: "ink wash" }, { name: "Ink-Wash", strength: 0.5 }]),
     [{ name: "styles/Ink-Wash.safetensors", strength: 1.1 }],
@@ -184,6 +189,14 @@ test("Generate LoRA names resolve without folder, extension or case and take the
   assert.deepEqual(prepareLoras(subject, infos, [{ name: "ink wash", triggers: false }]), [
     { name: "styles/Ink-Wash.safetensors", strength: 1.1, triggers: false },
   ]);
+  // A LoRA the Library hides is neither offered nor run when a chat names it.
+  const hidden = {
+    "styles/Ink-Wash.safetensors": { ...infos["styles/Ink-Wash.safetensors"], hidden: true },
+  };
+  assert.throws(
+    () => prepareLoras(subject, hidden, [{ name: "ink wash" }]),
+    /is hidden in Studio's Library/,
+  );
   assert.throws(
     () => prepareLoras(subject, infos, [{ name: "oil paint" }]),
     /^Error: No LoRA named oil paint for SDXL\. Call models with lora_query to look one up\.$/,

@@ -30,6 +30,8 @@ import {
   keepDescriptions,
   matchEffort,
   precedence,
+  proportionate,
+  subjectFirst,
   writerGuide,
 } from "./domain/writing-standard.ts";
 import { cleanTriggers } from "./lora/catalogue.js";
@@ -365,7 +367,7 @@ const one = (value, limit = 600) =>
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, limit);
-const isRole = (info) => ["acceleration", "supporting"].includes(info?.role);
+const isRole = (info) => ["acceleration", "supporting"].includes(info?.role) || info?.hidden;
 
 /** A LoRA's suggested strength: the publisher's default, a "Strength 0.7" note, else 1. */
 function suggestedStrength(info) {
@@ -446,6 +448,8 @@ function rewriteInstructions({
     "Keep every subject, detail, style, mood, framing and quoted text the user asked for, with quoted text kept exactly; add only what the guide recommends to realise it.",
     fidelity,
     keepDescriptions,
+    subjectFirst,
+    proportionate,
     `${matchEffort} Then apply the style below.`,
     avoidFiller(),
     'Words about speed, quality tier, model, size, aspect or count (such as "turbo", "fast", "landscape", "16:9", "2K", "two images") are settings, not scene: leave them out.',
