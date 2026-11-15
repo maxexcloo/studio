@@ -95,12 +95,11 @@ function createHistory(
    */
   function loadPromptHistory(seedItems) {
     if (cache) return cache;
-    try {
-      const saved = readRuntimeDocument(dataDir, documentName);
-      enabled = saved?.enabled !== false;
+    const saved = readRuntimeDocument(dataDir, documentName);
+    if (saved) {
+      enabled = saved.enabled !== false;
       cache = cleanEntries(saved);
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
+    } else {
       enabled = initiallyEnabled();
       let entries = [];
       const seeds = (enabled ? (seedItems ?? initialSeedItems()) : [])

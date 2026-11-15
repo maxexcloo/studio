@@ -10,7 +10,7 @@ import crypto from "node:crypto";
  */
 
 /** What a worker can be asked to do. `models` holds the model library and receives downloads. */
-export const workerCapabilities = [
+const workerCapabilities = [
   { id: "image", label: "Image", description: "Image generation, and provider-backed cloud runs." },
   { id: "video", label: "Video", description: "Local video generation." },
   { id: "upscale", label: "Upscale", description: "Upscaling finished images and videos." },

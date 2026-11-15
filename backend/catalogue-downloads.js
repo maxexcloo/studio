@@ -63,7 +63,7 @@ function hf(repo, file) {
 // keeps in fp8 and a Mac cannot load. A plain fp8 file loads at full precision
 // on a Mac and is not flagged. `sha256` is the file's Hugging Face LFS hash at its pinned
 // revision, checked after every download; the worker refuses a file without one.
-export const encoderDownloads = {
+const encoderDownloads = {
   clip_l: [
     {
       file: "clip_l.safetensors",
@@ -451,7 +451,7 @@ export const encoderDownloads = {
 };
 
 // Vision encoders that read a start image for image-to-video models (models/clip_vision).
-export const visionDownloads = {
+const visionDownloads = {
   sigclip_384: [
     {
       file: "sigclip_vision_patch14_384.safetensors",
@@ -463,11 +463,11 @@ export const visionDownloads = {
 };
 
 /** Which vision encoder a clip_vision file is, by name (they have no other use here). */
-export const visionKinds = {
+const visionKinds = {
   sigclip_384: { label: "SigLIP vision (384)", test: /sig(clip|lip).*384|384.*sig(clip|lip)/i },
 };
 
-export const vaeDownloads = {
+const vaeDownloads = {
   sd15: [
     {
       file: "vae-ft-mse-840000-ema-pruned.safetensors",
@@ -598,7 +598,7 @@ const wan22 = (file, bytes, sha256) => [
     sha256,
   },
 ];
-export const modelDownloads = {
+const modelDownloads = {
   wan22_t2v_low_fp8: wan22(
     "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
     14_293_923_632,
@@ -696,7 +696,7 @@ export const modelDownloads = {
 };
 
 // Whole checkpoints (model, text encoders and VAE in one file), for models/checkpoints.
-export const checkpointDownloads = {
+const checkpointDownloads = {
   realvisxl5_lightning: [
     {
       file: "RealVisXL_V5.0_Lightning_fp16.safetensors",
@@ -729,7 +729,7 @@ export const checkpointDownloads = {
 // The Impact Pack's face detector for Face Detail (upscale.js), in Subpack's `ultralytics_bbox`
 // folder (models/ultralytics/bbox). Ultralytics loads only pickled `.pt` weights, so the worker
 // accepts that one type in this one folder; the pinned hash is what makes it the reviewed file.
-export const detectorDownloads = {
+const detectorDownloads = {
   face_yolov8m: [
     {
       file: "face_yolov8m.pt",

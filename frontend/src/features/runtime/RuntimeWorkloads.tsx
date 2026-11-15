@@ -22,7 +22,6 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Check } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type {
@@ -34,8 +33,8 @@ import type {
   WorkloadPhase,
 } from "../../../../shared/runtime";
 import { api, post } from "../../api";
-import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { CopyButton } from "../../ui/CopyButton";
 import { DataTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
@@ -170,7 +169,6 @@ function LogText({
   controls?: ReactNode;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
-  const { copied, copy } = useCopy();
   useEffect(() => {
     viewport.current?.scrollTo({ top: viewport.current.scrollHeight });
   }, [text]);
@@ -183,15 +181,7 @@ function LogText({
       </ScrollArea.Autosize>
       <Group justify="space-between">
         {controls ?? <span />}
-        <Button
-          size="compact-sm"
-          variant="default"
-          leftSection={copied ? <Check size={16} /> : <icons.copy size={16} />}
-          disabled={!text}
-          onClick={() => copy(text, "log")}
-        >
-          {copied ? "Copied" : "Copy"}
-        </Button>
+        <CopyButton size="compact-sm" text={text} />
       </Group>
     </>
   );

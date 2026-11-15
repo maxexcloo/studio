@@ -1,5 +1,5 @@
 import { Badge, Image, Menu, Stack, Text, UnstyledButton } from "@mantine/core";
-import { ArrowLeft, ArrowRight, Plus, Replace } from "lucide-react";
+import { ArrowLeft, ArrowRight, Replace } from "lucide-react";
 import { type DragEvent, useState } from "react";
 
 import type { Profile, ReferenceAsset } from "../../types";
@@ -91,7 +91,7 @@ export function ReferenceSlots({
                     onClick={() => onChoose(cellTarget)}
                     {...dropProps(`${group.slot}:empty`, cellTarget)}
                   >
-                    <Plus size={18} aria-hidden />
+                    <icons.add size={18} aria-hidden />
                     <Badge className={classes.number} size="xs" circle variant="default">
                       {number}
                     </Badge>

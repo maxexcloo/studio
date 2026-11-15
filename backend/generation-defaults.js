@@ -1,5 +1,3 @@
-export const defaultGenerationCount = 2;
-
 /** Use the workflow's own canvas unless its family selects a starting preset. */
 export function profileImageSize(profile, kind = profile?.kind || "image") {
   const defaults = profile?.defaults || {};

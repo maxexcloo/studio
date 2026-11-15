@@ -1,10 +1,11 @@
 import { ActionIcon, Button, Group, Transition } from "@mantine/core";
 import { useFocusWithin, useHover, useMergedRef } from "@mantine/hooks";
 import { Minus, Plus } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 
 import { useMotionDuration } from "../../ui/Appearance";
+import { useFlash } from "../../ui/useFlash";
 
 import classes from "./MediaZoom.module.css";
 
@@ -26,14 +27,8 @@ export function useMediaZoom({
   const modeRef = useRef<Mode>("Fit");
   const [mode, setMode] = useState<Mode>("Fit");
   const duration = useMotionDuration();
-  const [recent, setRecent] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  function revealControls() {
-    setRecent(true);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setRecent(false), 2000);
-  }
+  const [recent, flash] = useFlash();
+  const revealControls = () => flash(true);
   function changeMode(next: Mode) {
     modeRef.current = next;
     setMode(next);
@@ -90,7 +85,6 @@ export function useMediaZoom({
     layout(modeRef.current, 0);
     return () => observer.disconnect();
   }, [disabled, width, height]);
-  useEffect(() => () => clearTimeout(timer.current), []);
   // Before paint: a key pressed as soon as the loaded image shows must not reach the stale
   // listener that still sees it as loading.
   useLayoutEffect(() => {

@@ -29,7 +29,7 @@ type Writer = TasteWriter<ReturnType<typeof userContent>>;
 // `spicy` marks steps worded explicitly, so a change of explicitWording writes them again.
 type SavedSteps = { steps: NextStep[]; at: string; spicy?: true };
 /** A finished gallery item the viewer asks about, already checked to belong to the owner. */
-export interface SuggestionItem extends IdleItem {
+interface SuggestionItem extends IdleItem {
   jobId?: string;
   prompt?: string;
   width?: number;

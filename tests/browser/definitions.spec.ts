@@ -258,7 +258,7 @@ test("Model classification saves and reads back while definition administration 
   const editor = page.getByRole("dialog", { name: "Edit Base Model", exact: true });
   await editor.getByRole("combobox", { name: "Model Type", exact: true }).click();
   await page.getByRole("option", { name: "Original", exact: true }).click();
-  await editor.getByRole("button", { name: "Save Catalogue Entry", exact: true }).click();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(writes).toEqual([{ key: item.key, patch: { modelType: "original" } }]);
   await edit();

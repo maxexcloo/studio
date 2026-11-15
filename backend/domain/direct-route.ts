@@ -3,7 +3,7 @@ import type { DomainResponse, GenerationAccount } from "./admission.ts";
 /** The signed-in account a route answers, as multi-user-auth.js finds it; none in single-user mode. */
 export type RouteAccount = GenerationAccount | null | undefined;
 /** What a route reads of its request: Express's request has these, and MCP passes them in process. */
-export interface RouteInput {
+interface RouteInput {
   params: Record<string, string>;
   query: Record<string, unknown>;
   body?: any;
@@ -11,7 +11,7 @@ export interface RouteInput {
   stop?: AbortSignal;
 }
 /** A route's answer: JSON, or a file's bytes with any headers of its own. */
-export type RouteAnswer =
+type RouteAnswer =
   | DomainResponse
   | { status: number; content: Buffer; mime: string; headers?: Record<string, string> };
 export type RouteRun = (

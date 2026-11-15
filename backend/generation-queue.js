@@ -1,4 +1,5 @@
 import { runBackend } from "../shared/profiles.ts";
+import { activeStatuses } from "../shared/queue.ts";
 import { withResolution } from "../shared/resolution.ts";
 import { accountAccessForId } from "./account-store.js";
 import { moveTargets, onWorkerOffline, routeJob } from "./comfy/backends.js";
@@ -7,11 +8,11 @@ import { cancelPrompt, isTransientComfyError } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 import { logWarning } from "./crash-log.js";
 import { getCustomWorkflow, workflowOnBackend } from "./custom-workflows.js";
-import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
+import { createCloudQueueAdapter } from "./domain/cloud-adapter.ts";
 import { createGenerationQueueAdapter } from "./domain/generation-adapter.ts";
-import { GenerationQueue, modelOf } from "./domain/queue.ts";
+import { GenerationQueue, modelOf, routeAdapters } from "./domain/queue.ts";
 import { queuePriority } from "./domain/store.ts";
-import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
+import { createUpscaleQueueAdapter } from "./domain/upscale-adapter.ts";
 import { storedWritingRecord } from "./gallery/records.js";
 import { galleryItem, galleryItems, replaceGalleryJob, updateGalleryJob } from "./gallery/store.js";
 import { jobs } from "./jobs.js";
@@ -177,9 +178,7 @@ export function createGenerationQueue({
   // Reconstruct leases synchronously before the HTTP listener accepts work.
   for (const job of store
     .openJobs()
-    .filter(
-      (item) => ["starting", "running", "saving"].includes(item.status) || item.providerJobId,
-    )) {
+    .filter((item) => activeStatuses.has(item.status) || item.providerJobId)) {
     const workloads = managedWorkloads(job);
     if (workloads.length) mediaLeases.set(job.id, runtime.controller.retain(workloads));
   }
@@ -256,9 +255,12 @@ export function createGenerationQueue({
       await queueAdapter.settled(job);
     },
   });
-  const generationAdapter = withUpscaleAdapter(
-    directCloudAdapter ? routeQueueAdapters(queueAdapter, directCloudAdapter) : queueAdapter,
-    upscaleQueueAdapter,
+  const generationAdapter = routeAdapters((job) =>
+    job.operation === "upscale"
+      ? upscaleQueueAdapter
+      : directCloudAdapter && job.resource.startsWith("provider:cliproxyapi")
+        ? directCloudAdapter
+        : queueAdapter,
   );
   const generationQueue = new GenerationQueue(
     store,

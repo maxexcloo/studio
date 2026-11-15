@@ -1,3 +1,9 @@
+/** The most LoRAs a stack runs: a loader holds up to this many (rgthree stacks and Radiance take 4). */
+export const maxLoras = 8;
+/** What a LoRA does to a picture, as the catalogue classifies it. */
+export const loraTypes = ["slider", "style", "character", "concept"] as const;
+/** How a LoRA runs: an optional effect, or part of a recipe (an acceleration adapter, a supporting file). */
+export const loraRoles = ["effect", "acceleration", "supporting"] as const;
 /** The backends one profile can run on, by name; a combined profile keeps each one's graph and settings in `studio.backends`. */
 export const profileBackendLabels: Readonly<Record<string, string>> = Object.freeze({
   comfyui: "ComfyUI",
@@ -66,6 +72,70 @@ export const loraFamilyId = (family: unknown) => {
   const id = String(family || "").replaceAll("-", "_");
   return id === "flux3_klein" ? "flux3" : id;
 };
+
+const constraintKeys = ["baseModels", "conditionings", "profileIds"] as const;
+/** A LoRA publisher's targets within its family; `unlisted: "other"` refuses the rest. */
+export type LoraConstraints = Partial<Record<(typeof constraintKeys)[number], string[]>> & {
+  unlisted?: string;
+};
+const basename = (value: unknown) =>
+  String(value || "")
+    .split(/[\\/]/)
+    .pop();
+
+/**
+ * Whether a LoRA suits a profile: "other" (trained for another family, or a variant its publisher
+ * excludes) is refused on submit; "unknown" is unverified. Explicit publisher targets refine family
+ * compatibility.
+ */
+export function loraCompatibility(
+  info:
+    | {
+        families?: string[];
+        compatibility?: LoraConstraints;
+      }
+    | null
+    | undefined,
+  profile:
+    | {
+        id?: string;
+        family?: unknown;
+        baseModel?: string;
+        model?: string;
+        defaults?: { model?: unknown };
+        recipe?: { conditioning?: string };
+      }
+    | null
+    | undefined,
+): "fits" | "other" | "unknown" {
+  const family = loraFamilyId(profile?.family);
+  if (!info?.families?.length || !family || family === "custom") return "unknown";
+  if (!info.families.some((value) => loraFamilyId(value) === family)) return "other";
+  const constraints = info.compatibility;
+  if (!constraints) return "fits";
+  const model = profile?.baseModel || profile?.defaults?.model || profile?.model;
+  const context = {
+    baseModels: String(model || "").startsWith("custom:") ? "" : basename(model),
+    conditionings: profile?.recipe?.conditioning,
+    profileIds: profile?.id,
+  };
+  let unknown = false;
+  for (const key of constraintKeys) {
+    if (!Object.hasOwn(constraints, key)) continue;
+    if (!context[key]) {
+      unknown = true;
+      continue;
+    }
+    const allowed = constraints[key] || [];
+    if (
+      !allowed.some((value) => (key === "baseModels" ? basename(value) : value) === context[key])
+    ) {
+      if (constraints.unlisted === "other") return "other";
+      unknown = true;
+    }
+  }
+  return unknown ? "unknown" : "fits";
+}
 
 /**
  * A LoRA's readable name: its catalogue title, else its file name cleaned up (no folder or

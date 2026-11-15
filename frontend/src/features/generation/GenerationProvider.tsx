@@ -13,8 +13,8 @@ import {
 
 import { api } from "../../api";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
-import { setFamilyLabels } from "../../ui/modelFamily";
 import { useRememberedKey } from "../auth/useRemembered";
+import { setFamilyLabels } from "./modelFamily";
 import { isProfile, profileForBackend, referencePatch } from "./payload";
 
 export const modelsQuery = queryOptions({
@@ -127,9 +127,7 @@ const initialDrafts: Record<MediaKind, Draft> = {
 };
 /** The gallery composer's image and video drafts as last saved for this account, over the defaults. */
 function savedDrafts(key: string): Record<MediaKind, Draft> {
-  const saved: Partial<Record<MediaKind, Draft>> = key
-    ? JSON.parse(localStorage.getItem(key) || "{}")
-    : {};
+  const saved: Partial<Record<MediaKind, Draft>> = JSON.parse(localStorage.getItem(key) || "{}");
   const restore = (kind: MediaKind) => ({
     ...initialDrafts[kind],
     ...saved[kind],
@@ -145,7 +143,7 @@ function useGenerationState() {
   const form = useForm<Draft>({ mode: "controlled", initialValues: restored.image });
   const draft = form.values;
   useEffect(() => {
-    if (storageKey) localStorage.setItem(storageKey, JSON.stringify(drafts.current));
+    localStorage.setItem(storageKey, JSON.stringify(drafts.current));
   }, [draft, storageKey]);
   const formRef = useRef(form);
   formRef.current = form;

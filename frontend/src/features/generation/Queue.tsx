@@ -29,10 +29,13 @@ import {
 } from "lucide-react";
 import { type ReactNode, Suspense, lazy, useCallback, useEffect, useId, useState } from "react";
 
+import { loraName } from "../../../../shared/profiles";
 import {
   type QueueCancelAllResponse,
   type QueuePause,
+  activeStatuses,
   pausedReason,
+  pendingStatuses,
   terminalStatuses,
 } from "../../../../shared/queue";
 import { api, post } from "../../api";
@@ -43,10 +46,11 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
+import { galleryKey } from "../gallery/queries";
 import { useTryAgain } from "../gallery/useTryAgain";
 import { useJobSwap } from "../runtime/JobSwap";
 import { useGenerationActions } from "./GenerationProvider";
-import { loraInfoQuery, loraTitle } from "./LoraPicker";
+import { loraInfoQuery } from "./LoraPicker";
 import { isProfile, profileName, shownProfileName } from "./payload";
 import { WritingStream } from "./PromptWriting";
 import { referenceLabel } from "./references";
@@ -140,7 +144,7 @@ export function useQueueAction(jobId?: string) {
     onSettled: () =>
       Promise.all([
         client.invalidateQueries({ queryKey: queueQuery.queryKey }),
-        client.invalidateQueries({ queryKey: ["gallery"] }),
+        client.invalidateQueries({ queryKey: galleryKey }),
       ]),
   });
   const matching = useCallback(
@@ -173,20 +177,39 @@ export function useQueueAction(jobId?: string) {
     ),
   };
 }
-export function QueueJobAction({ job, compact = false }: { job: QueueJob; compact?: boolean }) {
+export function QueueJobAction({
+  job,
+  compact = false,
+  onRetried,
+}: {
+  job: QueueJob;
+  compact?: boolean;
+  /** Receives the replacement job once a retry is accepted. */
+  onRetried?: (jobId: string) => void;
+}) {
   const action = useQueueAction(job.id);
   const retryJobs = useTryAgain(job.items);
+  const [retrying, setRetrying] = useState(false);
   if (terminalStatuses.has(job.status) && job.status !== "failed") return null;
   const retry = job.status === "failed";
   const label = retry ? "Retry" : "Stop";
-  const onClick = () =>
-    retry ? void retryJobs([job.id]) : action.mutate({ id: job.id, action: "cancel" });
+  const pending = action.isPending || retrying;
+  const onClick = async () => {
+    if (!retry) return action.mutate({ id: job.id, action: "cancel" });
+    setRetrying(true);
+    try {
+      const replacement = (await retryJobs([job.id])).get(job.id);
+      if (replacement) onRetried?.(replacement);
+    } finally {
+      setRetrying(false);
+    }
+  };
   return compact ? (
     <RowButton
       label={label}
       icon={retry ? icons.retry : icons.stop}
-      pending={action.isPending}
-      onClick={onClick}
+      pending={pending}
+      onClick={() => void onClick()}
     />
   ) : (
     // The viewer's status, styled as a tile's Stop and Retry.
@@ -195,9 +218,9 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
       size="sm"
       radius="xl"
       leftSection={retry ? <icons.retry size={16} /> : <icons.stop size={16} />}
-      loading={action.isPending}
-      disabled={action.isPending}
-      onClick={onClick}
+      loading={pending}
+      disabled={pending}
+      onClick={() => void onClick()}
     >
       {label}
     </Button>
@@ -248,8 +271,7 @@ export const statusLabels: Record<QueueJob["status"], string> = {
 export const progressPercent = (progress: QueueJob["progress"]) =>
   progress?.max ? Math.max(0, Math.min(100, ((progress.value ?? 0) / progress.max) * 100)) : 0;
 /** What dragging reorders: the account's own work not yet started; Dream's waits at its own tier. */
-const movableJob = (job: QueueJob) =>
-  !job.dream && ["writing", "queued", "waiting"].includes(job.status);
+const movableJob = (job: QueueJob) => !job.dream && pendingStatuses.has(job.status);
 const loadSortable = () => import("./SortableQueue");
 const SortableQueue = lazy(loadSortable);
 /**
@@ -318,9 +340,7 @@ function QueueJobDetails({
         </Text>
       )}
       <Text size="xs" c="dimmed">
-        {settingChips(input, profile, (file) => loraTitle(info.data?.loras[file], file)).join(
-          " · ",
-        )}
+        {settingChips(input, profile, (file) => loraName(file, info.data?.loras[file])).join(" · ")}
       </Text>
       {references.length > 0 && (
         <Group gap={6}>
@@ -563,7 +583,7 @@ function QueueSetRow({
   const Kind = kindIcon(members[0], !unfinished.length && failed.length > 0);
   // The set's state as its leading unfinished job's: one running, else the first waiting.
   const lead =
-    members.find((job) => ["starting", "running", "saving"].includes(job.status)) ??
+    members.find((job) => activeStatuses.has(job.status)) ??
     members.find((job) => !terminalStatuses.has(job.status));
   const stop = async () => {
     setBusy("stop");

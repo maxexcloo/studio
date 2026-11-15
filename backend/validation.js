@@ -1,3 +1,4 @@
+import { maxLoras } from "../shared/profiles.ts";
 import { isResolution } from "../shared/resolution.ts";
 import { missingNodes, nodeRange, optionsFor } from "./comfy/comfy.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
@@ -60,7 +61,7 @@ function ensureOption(info, node, key, value, label) {
   }
 }
 
-function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", maxLoras = 8) {
+function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", limit = maxLoras) {
   if (!profile?.capabilities?.lora) return [];
   const installed = optionsFor(info, "LoraLoader", "lora_name");
   if (!installed.length) return [];
@@ -73,7 +74,7 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
   const raw = Array.isArray(input.loras) ? input.loras : [];
   const sanitized = [];
   // Disabled entries don't take a slot: apply the workflow's limit to enabled LoRAs only.
-  for (const item of raw.filter((entry) => entry && entry.enabled !== false).slice(0, maxLoras)) {
+  for (const item of raw.filter((entry) => entry && entry.enabled !== false).slice(0, limit)) {
     const name = String(item.name || "").trim();
     if (!name) continue;
     if (!installed.includes(name)) throw new Error(`LoRA “${name}” isn't available in ComfyUI.`);
@@ -257,7 +258,7 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     : "";
   if (profile.capabilities.resolution && !resolutions.includes(resolution))
     throw new Error("Choose a supported resolution for this model.");
-  const loras = sanitizeLoras(input, info, profile, kind, customWorkflow?.loraStack?.max || 8);
+  const loras = sanitizeLoras(input, info, profile, kind, customWorkflow?.loraStack?.max);
   return {
     ...input,
     kind,

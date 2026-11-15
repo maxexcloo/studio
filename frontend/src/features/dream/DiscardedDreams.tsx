@@ -20,6 +20,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { mediaSource } from "../gallery/mediaSource";
 import { MediaViewer } from "../gallery/MediaViewer";
+import { galleryKey } from "../gallery/queries";
 import { type DreamItem, discardedQuery, dreamItemPath, dreamQuery } from "./queries";
 
 import classes from "./DreamPage.module.css";
@@ -56,7 +57,7 @@ export function DiscardedDreams() {
     mutationFn: (item: DreamItem) => post(dreamItemPath(item, "keep")),
     onSettled: () =>
       Promise.all(
-        [dreamQuery.queryKey, ["gallery"], ["gallery-filters"]].map((queryKey) =>
+        [dreamQuery.queryKey, galleryKey, ["gallery-filters"]].map((queryKey) =>
           client.invalidateQueries({ queryKey }),
         ),
       ),

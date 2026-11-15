@@ -14,6 +14,7 @@ import { dataDir } from "./gallery/store.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { mediaType } from "./media-paths.js";
 import { loadSharp } from "./sharp-loader.js";
+import { digest } from "./values.js";
 
 // Small on-demand cache of downscaled previews for the gallery grid, so a LAN client
 // only has to pull a full-resolution image when it actually opens the viewer.
@@ -292,7 +293,7 @@ async function build(filename, subfolder, type, size, worker) {
     // ComfyUI is down and the file is not on this computer: an earlier thumbnail still beats nothing.
     if (source === undefined) return cachedThumbnail(key);
     if (!source) return null;
-    const sourceHash = crypto.createHash("sha256").update(source).digest("hex");
+    const sourceHash = digest(source);
     const file = cachePath(key, sourceHash);
     if (fs.existsSync(file)) return { file, etag: `"${sourceHash}"` };
     return writeThumbnail(key, sourceHash, source, size);
@@ -380,52 +381,4 @@ export function viewParams(url = "") {
         worker: params.get("worker") || "",
       }
     : null;
-}
-
-/**
- * Deletes every cached thumbnail of one output. Hiding an image must leave
- * nothing of it in the open, and a thumbnail is a small copy of it.
- * Returns how many files went.
- */
-function forgetThumbnail(filename, subfolder = "", type = "output") {
-  if (!filename) return 0;
-  // Every rendition: the viewer's display copy is as much a copy as the thumbnail.
-  const names = Object.keys(RENDITIONS).flatMap((size) => [
-    ...(indexed().get(cacheKey(filename, subfolder, type, size)) || []),
-  ]);
-  let removed = 0;
-  for (const name of names) {
-    try {
-      fs.rmSync(path.join(thumbnailDir, name), { force: true });
-      indexRemove(name);
-      removed += 1;
-    } catch {
-      // Held open for a moment (Windows); the caller can try again.
-    }
-  }
-  return removed;
-}
-
-/**
- * Forgets the thumbnails of a gallery item: its original, its thumbnail URL
- * and its upscale. A thumbnail still being made for it is waited for first,
- * so it cannot land on disk just after.
- */
-export async function forgetItemThumbnails(item) {
-  let removed = 0;
-  for (const url of [
-    item?.url,
-    item?.thumbnailUrl,
-    item?.upscale?.url,
-    item?.upscale?.thumbnailUrl,
-  ]) {
-    const params = viewParams(url);
-    if (!params) continue;
-    for (const size of Object.keys(RENDITIONS))
-      await pending
-        .get(`${size}:${params.type}:${params.subfolder}:${params.filename}`)
-        ?.catch(() => null);
-    removed += forgetThumbnail(params.filename, params.subfolder, params.type);
-  }
-  return removed;
 }

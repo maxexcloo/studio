@@ -54,7 +54,7 @@ interface Router {
 
 const letter = (index: number) => String.fromCharCode(65 + index);
 /** The result set a compare run's variant `index` belongs to, named by its label. */
-export const comparisonSet = (id: string, index: number, label: string) => ({
+const comparisonSet = (id: string, index: number, label: string) => ({
   id,
   title: "Comparison",
   index,

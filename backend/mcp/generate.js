@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   cardImageNote,
   cardImageSlots,
+  cardKinds,
   characterImages,
   characterProfiles,
   characterTraits,
@@ -22,6 +23,7 @@ import { compareVariants } from "../../shared/compare.ts";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import { resolutions } from "../../shared/resolution.ts";
 import { promptWords, replyTitle } from "../../shared/titles.ts";
+import { upscaleQualities } from "../../shared/upscale.ts";
 import { accessFeatures } from "../account-policy.js";
 import { minorAgeRefusal } from "../minor-age.js";
 import { savedDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
@@ -654,9 +656,7 @@ export function registerGenerateTools({
                 cardKind
               ] ?? [])
             : [];
-        const [characters, outfits, scenes] = await Promise.all(
-          ["characters", "outfits", "scenes"].map(cards),
-        );
+        const [characters, outfits, scenes] = await Promise.all(Object.keys(cardKinds).map(cards));
         // Each card's gist: generate reads the whole description by name.
         const cardList = (items) =>
           items.map(({ id, name, description }) => ({
@@ -944,7 +944,7 @@ export function registerGenerateTools({
       denoise: z.number().finite().optional(),
       sampler: z.string().optional(),
       scheduler: z.string().optional(),
-      upscale_quality: z.enum(["fast", "balanced", "high"]).optional(),
+      upscale_quality: z.enum(upscaleQualities).optional(),
       face_detail: z.boolean().optional(),
     },
     (input, signal) => {
@@ -1491,7 +1491,7 @@ export function registerGenerateTools({
       theme: theme.optional(),
       length: z.number().optional(),
       runs_on: z.enum(["local", "cloud"]).optional(),
-      upscale_quality: z.enum(["fast", "balanced", "high"]).optional(),
+      upscale_quality: z.enum(upscaleQualities).optional(),
       title: setTitle.optional(),
     },
     async (

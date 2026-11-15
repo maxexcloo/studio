@@ -2,7 +2,12 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { guidingRoles, profileBackendLabels, sharedProfileFields } from "../shared/profiles.ts";
+import {
+  guidingRoles,
+  maxLoras,
+  profileBackendLabels,
+  sharedProfileFields,
+} from "../shared/profiles.ts";
 import { currentDataDir } from "./data-dir.js";
 import { writeJsonFile } from "./json-store.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
@@ -50,7 +55,10 @@ function loraStackConfig(meta = {}) {
     node: String(stack.node),
     max: Math.max(
       1,
-      Math.min(8, Number(stack.max) || (stack.adapter === "rgthree-power-v1" ? 8 : 4)),
+      Math.min(
+        maxLoras,
+        Number(stack.max) || (stack.adapter === "rgthree-power-v1" ? maxLoras : 4),
+      ),
     ),
   };
 }

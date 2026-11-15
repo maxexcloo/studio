@@ -9,7 +9,8 @@ import { useRef } from "react";
 import { guidingRoles, slotCapacity } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
-import { type GalleryFilterValues, appendGalleryFilters } from "../gallery/GalleryFilters";
+import type { GalleryFilterValues } from "../gallery/GalleryFilters";
+import { galleryKey, galleryQuery } from "../gallery/queries";
 import { useGeneration } from "./GenerationProvider";
 import {
   type SlotLayout,
@@ -190,7 +191,7 @@ export function useReferencePlacement(list: ReferenceList) {
     },
     // An upload is a gallery image or video, listed under the Uploads filter.
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["gallery"] });
+      await client.invalidateQueries({ queryKey: galleryKey });
     },
   });
   // A video gives one frame: `frame` milliseconds in, or its last.
@@ -262,15 +263,9 @@ export function useGalleryReference() {
  */
 export function useGalleryImages(search: string, filters: GalleryFilterValues, enabled: boolean) {
   const listing = useInfiniteQuery({
-    queryKey: ["gallery", search, "image", filters],
+    ...galleryQuery({ search, kind: "image", filters }),
     enabled,
     placeholderData: keepPreviousData,
-    initialPageParam: "",
-    queryFn: ({ pageParam }) =>
-      api<{ items: MediaItem[]; hasMore: boolean; nextCursor: string }>(
-        `/api/gallery?${appendGalleryFilters(new URLSearchParams({ limit: "60", cursor: pageParam, type: "image", q: search }), filters)}`,
-      ),
-    getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
   });
   const items = (listing.data?.pages.flatMap((page) => page.items) || []).filter(
     (item) => item.type === "image" && item.status === "done",

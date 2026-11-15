@@ -43,7 +43,7 @@ function downloadMedia(target: MediaTransfer) {
   link.click();
   link.remove();
 }
-async function prepareMediaShare(target: MediaTransfer, signal?: AbortSignal) {
+export async function prepareMediaShare(target: MediaTransfer, signal?: AbortSignal) {
   const blob = await mediaBlob(target, signal);
   return new File([blob], target.download, { type: blob.type });
 }

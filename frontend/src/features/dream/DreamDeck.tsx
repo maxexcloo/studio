@@ -2,6 +2,7 @@ import { ActionIcon, Badge, Button, type ButtonProps, Group, Text, Tooltip } fro
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
+import { loraName } from "../../../../shared/profiles";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
@@ -10,9 +11,10 @@ import { layerAbove } from "../../ui/popupClicks";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
 import { MediaViewer } from "../gallery/MediaViewer";
+import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { LoraRatings, loraInfoQuery, loraTitle } from "../generation/LoraPicker";
+import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import { type Choice, type Verdict, dreamChoices, viewerChoices } from "./choices";
@@ -183,7 +185,7 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
     onError: (_error, { card }) => onFailed(card),
     onSettled: () =>
       Promise.all(
-        [dreamQuery.queryKey, ["gallery"], ["gallery-filters"]].map((queryKey) =>
+        [dreamQuery.queryKey, galleryKey, ["gallery-filters"]].map((queryKey) =>
           client.invalidateQueries({ queryKey }),
         ),
       ),
@@ -213,7 +215,7 @@ function Caption({ item }: { item: DreamItem }) {
         {item.prompt || item.dream?.prompt}
       </Text>
       {loras.map((file) => {
-        const title = loraTitle(info.data?.loras[file], file);
+        const title = loraName(file, info.data?.loras[file]);
         return (
           <Group key={file} gap="xs" wrap="nowrap" justify="space-between">
             <Text size="xs" truncate>

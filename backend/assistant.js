@@ -1,5 +1,5 @@
 import { cardKinds, maxCardDescription, maxCardName } from "../shared/characters.ts";
-import { loraName } from "../shared/profiles.ts";
+import { loraCompatibility, loraName } from "../shared/profiles.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { replyTitle } from "../shared/titles.ts";
 /**
@@ -35,7 +35,7 @@ import {
   writerGuide,
 } from "./domain/writing-standard.ts";
 import { cleanTriggers } from "./lora/catalogue.js";
-import { loraCompatibility, strengthRange } from "./lora/policy.js";
+import { strengthRange } from "./lora/policy.js";
 import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
 import { minorAgeRefusal } from "./minor-age.js";
 import { promptStyleStore } from "./prompt-styles.js";
@@ -58,7 +58,7 @@ const cardInstructions = {
   scenes: `Describe the setting in the image so an image model can place someone else in it: the place and its notable details, the light and the time of day. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "rainy city street at night, neon signs, wet asphalt reflections". Leave out any people, their clothing and poses, and the photographic style.`,
 };
 // How many names or descriptions a card field's magic menu offers at once.
-export const cardIdeaCount = 5;
+const cardIdeaCount = 5;
 // A card's name and description ideas from its images (the card editors' ▾ beside each field).
 const cardIdeaInstructions = {
   name: (kind) =>
@@ -144,7 +144,7 @@ export function gatewaySettings(environment = process.env) {
 }
 
 /** Both text consumers accept a gateway root, /v1 base or full completion endpoint. */
-export function gatewayAddress(value, setting) {
+function gatewayAddress(value, setting) {
   let url;
   try {
     url = new URL(value);

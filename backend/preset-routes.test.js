@@ -32,7 +32,7 @@ writeRuntimeDocument(dir, "presets", [
 ]);
 const { registerPresetRoutes } = await import("./preset-routes.js");
 const { downloadPresetImage } = await import("./civitai/library.js");
-const { readPngInfo } = await import("./png-text.js");
+const { readImageMetadata } = await import("./image-metadata.js");
 const bytes = Buffer.from("model");
 const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
 let online = true;
@@ -126,7 +126,10 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   assert.equal(media.status, 200);
   const full = Buffer.from(await media.arrayBuffer());
   assert.equal((await sharp(full).metadata()).height, 192);
-  assert.match(JSON.stringify(readPngInfo(store.importedImageFile(item)).text), /a landscape/);
+  assert.match(
+    JSON.stringify(readImageMetadata(fs.readFileSync(store.importedImageFile(item))).text),
+    /a landscape/,
+  );
   const clean = Buffer.from(await (await fetch(base + item.url + "?clean=1")).arrayBuffer());
   assert.ok(clean.length < full.length);
   const asset = references.referenceAssetForAccount(undefined, item.id);
@@ -157,7 +160,8 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   const current = galleryRows().find((item) => item.id === "civitai:42");
   assert.ok(Date.parse(current.createdAt) > Date.parse("2025-01-01T00:00:00Z"));
   assert.equal(
-    JSON.parse(readPngInfo(store.importedImageFile(current)).text.civitai).prompt,
+    JSON.parse(readImageMetadata(fs.readFileSync(store.importedImageFile(current))).text.civitai)
+      .prompt,
     sourcePrompt,
   );
   assert.equal(current.civitai.sourceMetadata.prompt, sourcePrompt);

@@ -108,17 +108,6 @@ test(
     fs.utimesSync(source, now, now);
     const changed = await previews.getFileVideoPreview(source, identity);
     assert.notEqual(changed, one);
-    // Both previews and the still go: nothing of a deleted video stays in the cache.
-    assert.equal(
-      await previews.forgetItemVideoPreviews({
-        type: "video",
-        url: "/comfy/view?filename=original.mp4&type=output",
-      }),
-      3,
-    );
-    assert.equal(fs.existsSync(poster), false);
-    assert.equal(fs.existsSync(one), false);
-    assert.equal(fs.existsSync(changed), false);
   },
 );
 

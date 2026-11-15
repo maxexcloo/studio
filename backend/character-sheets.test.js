@@ -6,10 +6,10 @@ import test from "node:test";
 
 import sharp from "sharp";
 
-import { sheetView } from "../shared/characters.ts";
+import { characterLead, sheetView } from "../shared/characters.ts";
 
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-character-sheets-"));
-const { createCharacterSheets, sheetPanels, sheetProfile, sheetReferences } =
+const { characterPrompt, createCharacterSheets, sheetPanels, sheetProfile, sheetReferences } =
   await import("./character-sheets.js");
 const { createCard, listCards } = await import("./cards.js");
 
@@ -228,4 +228,18 @@ test("a new character's finished portrait becomes its first image, then its shee
   assert.equal(kept.portrait, undefined);
   assert.equal(kept.sheet.jobId, "sheet-job");
   assert.deepEqual(admitted, [["portrait-1", account]]);
+});
+
+test("a character's lead names its reference images in the plural when the run sends several", () => {
+  const card = { referenceIds: ["own", "two"], description: "red hair" };
+  const prompt = `${characterLead(card.description)} At a café table.`;
+  const run = (references) => characterPrompt({ prompt, references, cards: [card] });
+  assert.equal(run([{ assetId: "own", slot: "reference" }]), prompt);
+  assert.equal(
+    run([
+      { assetId: "own", slot: "reference" },
+      { assetId: "two", slot: "reference-2" },
+    ]),
+    "The person from the reference images, red hair, with the same face, hair and build. At a café table.",
+  );
 });

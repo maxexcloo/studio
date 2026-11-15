@@ -1,3 +1,4 @@
+import { appearanceChoices } from "../shared/appearance.ts";
 import { currentDataDir } from "./data-dir.js";
 import {
   deleteRuntimeDocument,
@@ -15,10 +16,10 @@ import {
  * gives way to the other, saying so; a model the person picks always wins (model/catalogue.js,
  * animate-profile.js). `writingModel` is the text model prompt writing asks for (assistant.js
  * `writerModel`). `galleryWork` is which unfinished work the gallery shows: none (unsaved), work
- * in progress, or queued work too (gallery/routes.js). Keys Studio no longer knows are dropped as
- * the document is read.
+ * in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
+ * settings (shared/appearance.ts). Keys Studio no longer knows are dropped as the document is read.
  */
-export const preferenceDefaults = Object.freeze({
+const preferenceDefaults = Object.freeze({
   cloudModels: true,
   loras: true,
   spicyPrompts: false,
@@ -34,7 +35,8 @@ const preferenceChoices = Object.freeze({
 const known = (key) =>
   Object.hasOwn(preferenceDefaults, key) ||
   Object.hasOwn(preferenceChoices, key) ||
-  key === "writingModel";
+  key === "writingModel" ||
+  key === "appearance";
 const dataDir = currentDataDir();
 const cache = new Map();
 const documentName = (ownerId) => `preferences:${ownerId}`;
@@ -42,12 +44,7 @@ const documentName = (ownerId) => `preferences:${ownerId}`;
 /** The values the account has saved, without defaults. */
 function saved(ownerId = "") {
   if (!cache.has(ownerId)) {
-    let value = {};
-    try {
-      value = readRuntimeDocument(dataDir, documentName(ownerId));
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
+    const value = readRuntimeDocument(dataDir, documentName(ownerId)) ?? {};
     cache.set(ownerId, Object.fromEntries(Object.entries(value).filter(([key]) => known(key))));
   }
   return cache.get(ownerId);
@@ -65,6 +62,16 @@ export function saveAccountPreferences(ownerId, patch) {
     const choices = preferenceChoices[key];
     if (choices) {
       if (!choices.includes(value)) throw new Error(`Set ${key} to ${choices.join(", ")}.`);
+      continue;
+    }
+    if (key === "appearance") {
+      const settings = Object.entries(value && typeof value === "object" ? value : { value });
+      for (const [setting, choice] of settings)
+        if (
+          !Object.hasOwn(appearanceChoices, setting) ||
+          !appearanceChoices[setting].includes(choice)
+        )
+          throw new Error(`Set appearance ${setting} to one of its choices.`);
       continue;
     }
     if (key === "writingModel") {

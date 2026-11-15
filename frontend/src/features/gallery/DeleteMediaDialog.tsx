@@ -4,6 +4,8 @@ import { useState } from "react";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { queueQuery } from "../generation/Queue";
+import { galleryKey } from "./queries";
 
 type Pages = InfiniteData<{ items: MediaItem[] }>;
 
@@ -29,7 +31,7 @@ export function DeleteMediaDialog({
     onSuccess: ({ removed }, selected) => {
       const gone = new Set(removed);
       // The gallery drops them at once; the refresh below brings counts and neighbours up to date.
-      cache.setQueriesData<Pages>({ queryKey: ["gallery"] }, (data) =>
+      cache.setQueriesData<Pages>({ queryKey: galleryKey }, (data) =>
         data
           ? {
               ...data,
@@ -50,8 +52,8 @@ export function DeleteMediaDialog({
       onDeleted([], selected);
     },
     onSettled: () => {
-      for (const key of ["gallery", "gallery-filters", "queue"])
-        void cache.invalidateQueries({ queryKey: [key] });
+      for (const queryKey of [galleryKey, ["gallery-filters"], queueQuery.queryKey])
+        void cache.invalidateQueries({ queryKey });
     },
   });
   return (

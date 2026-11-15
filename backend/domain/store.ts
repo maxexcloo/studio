@@ -7,7 +7,12 @@ import type {
   QueueJob,
   StudioSession,
 } from "../../shared/queue.ts";
-import { awaitsWriting, terminalStatuses } from "../../shared/queue.ts";
+import {
+  activeStatuses,
+  awaitsWriting,
+  pendingStatuses,
+  terminalStatuses,
+} from "../../shared/queue.ts";
 import type { DreamOrigin } from "./dream.ts";
 
 /** Queue tiers on one resource, lower first; finishing upscales and then Dream run below MCP. */
@@ -61,10 +66,8 @@ interface UserPreset {
 const now = () => new Date().toISOString();
 /** The pause key that holds every account's queue. */
 export const everyone = "*";
-/** Not yet handed to a provider: the work a pause holds and a move reorders. */
-export const pendingStatuses: ReadonlySet<string> = new Set(["writing", "queued", "waiting"]);
 /** Not yet done: pending, or handed to a provider. */
-const openStatuses = [...pendingStatuses, "starting", "running", "saving"];
+const openStatuses = [...pendingStatuses, ...activeStatuses];
 /** How many of an account's finished jobs its queue lists, newest first; older ones are read one at a time (`job`). */
 export const listedFinishedJobs = 200;
 const placeholders = (values: Iterable<unknown>) => [...values].map(() => "?").join(", ");

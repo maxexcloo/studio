@@ -13,7 +13,9 @@ import {
   type GenerationInput,
   type QueueMedia,
   awaitsWriting,
+  finishedItemStatuses,
   maxPromptCharacters,
+  pendingStatuses,
 } from "../../shared/queue.ts";
 import { replyTitle } from "../../shared/titles.ts";
 import { logger } from "../crash-log.js";
@@ -67,7 +69,7 @@ export interface DreamOrigin {
  * A recurring character, outfit or scene Dream proposes from the results the person liked, shown in
  * Library › Characters until it is accepted (which makes the card) or dismissed.
  */
-export interface DreamSuggestion {
+interface DreamSuggestion {
   id: string;
   kind: CardKind;
   name: string;
@@ -96,7 +98,7 @@ interface DreamSeries {
  * One side of a Dream comparison: two results alike but for one thing (with the same seed), shown
  * together and answered with A, B, Both or Neither to the question about what varies.
  */
-export interface DreamPair {
+interface DreamPair {
   id: string;
   side: 0 | 1;
   question: string;
@@ -175,7 +177,7 @@ export interface DreamLoraLibrary {
   ratings: Record<string, "liked" | "disliked">;
   strengths: Record<string, Record<string, number>>;
 }
-export interface DreamLora {
+interface DreamLora {
   name: string;
   strength: number;
   enabled: true;
@@ -576,7 +578,7 @@ const roundTo = (value: number, step: number) => Math.round(value / step) * step
 const spicyTheme = "Spicy: sensual, explicit content where it suits the scene.";
 
 const dreamJob = (job: OwnedJob) => job.priority === queuePriority.dream;
-const waiting = (job: OwnedJob) => ["writing", "queued", "waiting"].includes(job.status);
+const waiting = (job: OwnedJob) => pendingStatuses.has(job.status);
 const kindOf = (value: { kind?: unknown; type?: unknown }): Kind =>
   value.kind === "video" || value.type === "video" ? "video" : "image";
 const normalised = (prompt: string) => prompt.toLowerCase().replace(/\s+/g, " ").trim();
@@ -593,7 +595,7 @@ const suggestionKinds: Record<string, CardKind> = {
   scene: "scenes",
 };
 /** How a card is remembered among those taken or turned down: `<kind>:<name>`, lowercased. */
-export const cardKey = (kind: CardKind, name: string) => `${kind}:${normalised(name)}`;
+const cardKey = (kind: CardKind, name: string) => `${kind}:${normalised(name)}`;
 /**
  * The usable suggestions in the text model's reply: a known kind, a name and description within a
  * card's limits, stating no age under 18, recurring in at least two of the `liked` results it
@@ -752,24 +754,20 @@ export function createDream(options: {
   const pick = <T>(items: T[]) => items[random(items.length)];
   const name = (ownerId: string) => `dream:${ownerId}`;
   function read(ownerId: string): DreamRecord {
-    try {
-      const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as Partial<DreamRecord>;
-      return {
-        recent: [],
-        ...saved,
-        // Only known settings, so a retired key leaves the record on its next save.
-        settings: Object.fromEntries(
-          Object.entries(defaultDreamSettings).map(([key, value]) => [
-            key,
-            saved.settings?.[key as keyof DreamSettings] ?? value,
-          ]),
-        ) as unknown as DreamSettings,
-      };
-    } catch (error) {
-      if ((error as { code?: string }).code === "ENOENT")
-        return { settings: { ...defaultDreamSettings }, recent: [] };
-      throw error;
-    }
+    const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as
+      | Partial<DreamRecord>
+      | undefined;
+    return {
+      recent: [],
+      ...saved,
+      // Only known settings, so a retired key leaves the record on its next save.
+      settings: Object.fromEntries(
+        Object.entries(defaultDreamSettings).map(([key, value]) => [
+          key,
+          saved?.settings?.[key as keyof DreamSettings] ?? value,
+        ]),
+      ) as unknown as DreamSettings,
+    };
   }
   const write = (ownerId: string, record: DreamRecord) =>
     writeRuntimeDocument(options.dataDir, name(ownerId), record);
@@ -2546,7 +2544,7 @@ export function createDream(options: {
           (other) =>
             other !== item &&
             other.dream?.pair?.id === item.dream?.pair?.id &&
-            !["done", "failed", "cancelled"].includes(other.status || ""),
+            !finishedItemStatuses.has(other.status || ""),
         );
       return all
         .filter((item) => item.status === "done" && !(item.dream?.pair && pending(item)))

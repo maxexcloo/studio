@@ -281,7 +281,7 @@ test("a Hugging Face file link imports that file; a repository lists its model f
     resolveHuggingFace("https://huggingface.co/org/repo", {
       request: async () => hfResponse(null, 401),
     }),
-    /gated or private/,
+    /needs a token|needs access/,
   );
   await assert.rejects(
     resolveHuggingFace("https://huggingface.co/org/repo/blob/main/missing.safetensors", {

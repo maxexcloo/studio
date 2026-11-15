@@ -51,10 +51,13 @@ import {
   motionIdeasQuery,
   nextStepsQuery,
 } from "../taste/suggestions";
+import { AnimateDialog } from "./AnimateDialog";
 import { videoExport } from "./download";
 import { itemAction, itemActionGroups } from "./itemActions";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
+import { galleryKey } from "./queries";
+import { ReportIssueDialog } from "./ReportIssueDialog";
 import { useUpscaleAction } from "./UpscaleControls";
 import { useItemMutation } from "./useItemMutation";
 import {
@@ -72,7 +75,7 @@ import {
 import { useMediaRating } from "./useMediaRating";
 import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
-import { type VideoEdit, useVideoEdit } from "./videoEdits";
+import { TrimVideoDialog, type VideoEdit, useVideoEdit } from "./videoEdits";
 import type { ViewerAsk } from "./ViewerPrompt";
 
 /**
@@ -151,7 +154,7 @@ function useSaveFrame(item: MediaItem): Action {
       post("/api/gallery/frame", { galleryItemId: item.id, frame: viewerFrame(item) ?? "last" }),
     onSuccess: () => {
       flash(item.id);
-      void cache.invalidateQueries({ queryKey: ["gallery"] });
+      void cache.invalidateQueries({ queryKey: galleryKey });
     },
   });
   return {
@@ -344,9 +347,7 @@ export function useMediaActions(
     mutationFn: () => post("/api/result-sets/more", { itemId: item.id }),
     onSuccess: () =>
       void Promise.all(
-        [queueQuery.queryKey, ["gallery"]].map((queryKey) =>
-          client.invalidateQueries({ queryKey }),
-        ),
+        [queueQuery.queryKey, galleryKey].map((queryKey) => client.invalidateQueries({ queryKey })),
       ),
   });
   const moreLikeSet: Action[] =
@@ -718,6 +719,39 @@ export function useMediaActions(
     actions.filter((entry): entry is Action => !!entry).map(withoutLoneOption),
     layout,
   );
+}
+
+/**
+ * Animate's, Trim's and Report's dialogs for an item's actions: spread the handlers into its
+ * options and render `dialogs` where they outlive a closing menu.
+ */
+export function useMediaDialogs(item: MediaItem, iterate?: (iteration: Iteration) => void) {
+  const [animating, setAnimating] = useState<AnimateRequest | null>(null);
+  const [trimming, setTrimming] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  return {
+    handlers: {
+      onAnimate: setAnimating,
+      onReport: () => setReporting(true),
+      onTrim: () => setTrimming(true),
+    },
+    dialogs: (
+      <>
+        {animating && (
+          <AnimateDialog
+            item={item}
+            iterate={iterate}
+            {...animating}
+            onClose={() => setAnimating(null)}
+          />
+        )}
+        {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
+        {reporting && (
+          <ReportIssueDialog item={item} iterate={iterate} onClose={() => setReporting(false)} />
+        )}
+      </>
+    ),
+  };
 }
 
 /**

@@ -297,7 +297,7 @@ export function ProposalLabel({
     (proposal.action !== "upscale" && changeSummary(before, proposal.prompt)) || proposal.label;
   return (
     <Text component="span" size="xs" truncate display="block">
-      <Badge component="span" variant="light" size="xs" mr={6} aria-label="Proposed Action">
+      <Badge component="span" size="xs" mr={6} aria-label="Proposed Action">
         {labels?.[proposal.action] ?? actionLabels[proposal.action]}
       </Badge>
       {changed}

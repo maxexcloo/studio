@@ -1,6 +1,6 @@
 // Gallery records built from a run: its pending tiles, recorded settings and what ComfyUI's history
 // says it made. Pure functions, so code that only builds records never loads the gallery (store.js).
-import { maxCardDescription, maxCardName } from "../../shared/characters.ts";
+import { cardKinds, maxCardDescription, maxCardName } from "../../shared/characters.ts";
 import { keptTriggers } from "../lora/prompts.js";
 import { videoPattern } from "../media-paths.js";
 import { defaultWorkerId, isRadianceWorker, workerById } from "../workers.js";
@@ -40,35 +40,6 @@ export function outputsFrom(worker, history) {
     }
   }
   return urls;
-}
-
-/**
- * What a ComfyUI API graph made: its prompts, size, model and LoRAs, as far as
- * the common nodes tell. The graph comes from ComfyUI's history or from the
- * "prompt" text chunk ComfyUI writes into every PNG it saves.
- */
-export function describeComfyGraph(graph = {}) {
-  const textNodes = Object.values(graph || {}).filter(
-    (node) => node?.class_type === "CLIPTextEncode",
-  );
-  const prompt = textNodes[0]?.inputs?.text || "";
-  const negative = textNodes[1]?.inputs?.text || "";
-  const latentNode = Object.values(graph || {}).find(
-    (node) =>
-      /Latent/i.test(node?.class_type || "") && (node?.inputs?.width || node?.inputs?.height),
-  );
-  const latent = latentNode?.inputs || {};
-  const modelLoader = Object.values(graph || {}).find(
-    (node) => node?.inputs?.unet_name || node?.inputs?.ckpt_name,
-  );
-  const model = modelLoader?.inputs?.unet_name || modelLoader?.inputs?.ckpt_name || "";
-  return {
-    prompt: typeof prompt === "string" ? prompt : "",
-    negative: typeof negative === "string" ? negative : "",
-    width: Number(latent.width || 0),
-    height: Number(latent.height || 0),
-    model: typeof model === "string" ? model : "",
-  };
 }
 
 /** A stored `assistant` record (assistant-routes.js assistantRecord), kept to its known fields, or null. */
@@ -128,7 +99,7 @@ export function storedResultSet(value) {
 function storedContext(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const context = {};
-  for (const kind of ["character", "outfit", "scene"]) {
+  for (const { name: kind } of Object.values(cardKinds)) {
     const name = shortText(value[kind]?.name, maxCardName);
     const description = shortText(value[kind]?.description, maxCardDescription);
     if (name) context[kind] = { name, ...(description ? { description } : {}) };

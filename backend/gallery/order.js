@@ -12,14 +12,14 @@ function galleryBucket(item) {
 }
 
 /** Date.parse's time of `createdAt`, null when unreadable. */
-export function galleryTime(item) {
+function galleryTime(item) {
   const time = Date.parse(item?.createdAt || "");
   return Number.isFinite(time) ? time : null;
 }
 
 const text = (value) => (value === undefined || value === null ? null : String(value));
 
-export function galleryOrderKey(item) {
+function galleryOrderKey(item) {
   return {
     bucket: galleryBucket(item),
     time: galleryTime(item),

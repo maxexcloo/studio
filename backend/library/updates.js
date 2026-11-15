@@ -17,15 +17,14 @@
  */
 import path from "node:path";
 
-import { limitedBody } from "../civitai/access.js";
 import { civitaiFileSpec, civitaiModelFiles } from "../civitai/import.js";
 import { logger } from "../crash-log.js";
 import { currentDataDir } from "../data-dir.js";
-import { hfAccessNote } from "../hf-access.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { civitaiAvailability } from "./availability.js";
 import { splitCatalogueKey } from "./catalogue.js";
 import { shareFamily } from "./offers.js";
+import { civitaiLinks } from "./sources.js";
 
 export const dailyMs = 24 * 60 * 60 * 1000;
 const checkLimit = 300;
@@ -84,7 +83,7 @@ export function civitaiUpdate(entry, model, { familiesOf = () => [], now = Date.
       file: file.name,
       bytes: Number(file.sizeKB || 0) * 1024,
       baseModel: String(version.baseModel || ""),
-      url: `https://civitai.com/models/${model.id}?modelVersionId=${version.id}`,
+      url: civitaiLinks(model.id, version.id).civitaiCom,
       trainedWords: (Array.isArray(version.trainedWords) ? version.trainedWords : [])
         .map(String)
         .slice(0, 30),
@@ -240,17 +239,8 @@ export function createUpdateChecker({
   let checking = null;
   const load = () => {
     if (state) return state;
-    try {
-      const saved = readRuntimeDocument(dataDir, "library-updates");
-      state =
-        saved && typeof saved === "object"
-          ? { checkedAt: "", byEntry: {}, applied: {}, ...saved }
-          : null;
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-      state = null;
-    }
-    state ||= { checkedAt: "", byEntry: {}, applied: {} };
+    const saved = readRuntimeDocument(dataDir, "library-updates");
+    state = { checkedAt: "", byEntry: {}, applied: {}, ...(typeof saved === "object" && saved) };
     return state;
   };
   const save = () => writeRuntimeDocument(dataDir, "library-updates", load());
@@ -540,22 +530,4 @@ export function createUpdateChecker({
       return load();
     },
   };
-}
-
-/** A Hugging Face repository's main revision with its files, through the saved token. */
-export async function hfRepositoryMetadata(repo, { request }) {
-  const [owner, name] = String(repo).split("/");
-  const response = await request(
-    `https://huggingface.co/api/models/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/revision/main?blobs=true`,
-    { signal: AbortSignal.timeout(30000) },
-  );
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error(
-      [401, 403].includes(response.status)
-        ? hfAccessNote(repo)
-        : `Hugging Face answered HTTP ${response.status}.`,
-    );
-  }
-  return JSON.parse((await limitedBody(response, 8 * 1024 * 1024)).toString());
 }

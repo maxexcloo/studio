@@ -21,14 +21,7 @@ const maxChats = 500;
  */
 export function createChatChoices({ dataDir, now = Date.now }) {
   const key = (owner, chat) => `${owner || ""}\n${chat}`;
-  const all = () => {
-    try {
-      return readRuntimeDocument(dataDir, "mcp-chat-choices");
-    } catch (error) {
-      if (error.code === "ENOENT") return {};
-      throw error;
-    }
-  };
+  const all = () => readRuntimeDocument(dataDir, "mcp-chat-choices") ?? {};
   return {
     read: (owner, chat) => (chat ? all()[key(owner, chat)] || {} : {}),
     /** Remembers what a generate call chose; `profileId` is the one model it resolved to, if named. */

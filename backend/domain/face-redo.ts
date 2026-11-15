@@ -8,10 +8,10 @@ import { type OwnedJob, type QueueOrigin, queuePriority } from "./store.ts";
  * Only results this recent are redone, so the first check of an older gallery (Face Check turned
  * on, or a pass over results from before the redo) never floods the queue.
  */
-export const faceRedoWindowMs = 24 * 60 * 60 * 1000;
+const faceRedoWindowMs = 24 * 60 * 60 * 1000;
 
 /** A drifted gallery result, as Face Check read it. */
-export interface DriftedItem {
+interface DriftedItem {
   id: string;
   jobId?: string;
   ownerId?: string;

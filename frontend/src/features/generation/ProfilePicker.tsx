@@ -5,11 +5,11 @@ import { useEffect } from "react";
 
 import { isCloudProfile } from "../../../../shared/profiles";
 import type { GenerationInput, Models, Profile } from "../../types";
-import { modelFamilyLabel } from "../../ui/modelFamily";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { ChipOption, ChipSelect } from "./ChipSelect";
 import { inputForProfile, modelsQuery, useGeneration } from "./GenerationProvider";
+import { modelFamilyLabel } from "./modelFamily";
 import { backendLabel, isProfile, profileName } from "./payload";
 
 /**

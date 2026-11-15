@@ -23,7 +23,7 @@ import { readEditableProfile, saveEditableProfile } from "./editor.js";
 const invalid = (message) => Object.assign(new Error(message), { status: 400 });
 
 /** Why a profile can't take a converted Radiance backend, or "" when it can. */
-export function conversionRefusal(raw) {
+function conversionRefusal(raw) {
   const studio = raw?.studio || {};
   if (studio.kind !== "image" || studio.family !== "krea2")
     return "Only Krea 2 image profiles convert to Radiance.";

@@ -17,12 +17,14 @@ import {
 import { useForm } from "@mantine/form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { loraRoles, loraTypes } from "../../../../shared/profiles";
 import { api, post } from "../../api";
-import { modelFamilyLabel } from "../../ui/modelFamily";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
+import { modelFamilyLabel } from "../generation/modelFamily";
 import { type LibraryItem, libraryItemCategory } from "./LibraryCatalogueTable";
 import { catalogueQuery } from "./queries";
 interface CatalogueItem extends LibraryItem {
@@ -156,7 +158,7 @@ function CatalogueForm({
           placeholder={lora ? "Unclassified" : "Inherit Source Classification"}
           data={
             lora
-              ? ["slider", "style", "character", "concept"].map((value) => ({
+              ? loraTypes.map((value) => ({
                   value,
                   label: value[0].toUpperCase() + value.slice(1),
                 }))
@@ -173,7 +175,7 @@ function CatalogueForm({
             <Select
               label="Runtime Role"
               clearable
-              data={["effect", "acceleration", "supporting"].map((value) => ({
+              data={loraRoles.map((value) => ({
                 value,
                 label: value[0].toUpperCase() + value.slice(1),
               }))}
@@ -232,28 +234,26 @@ function CatalogueForm({
         ))}
         {save.error && <Alert color="red">{save.error.message}</Alert>}
         {undo.error && <Alert color="red">{undo.error.message}</Alert>}
-        <Group justify="space-between">
+        <Group>
           <Button
-            variant="default"
+            variant="subtle"
+            size="compact-sm"
             disabled={form.isDirty() || save.isPending}
             loading={undo.isPending}
             onClick={() => undo.mutate()}
           >
-            Undo Last Catalogue Change
+            Undo Last Change
           </Button>
-          <Group gap="xs">
-            <Button variant="default" disabled={save.isPending} onClick={close}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={!form.isDirty() || undo.isPending}
-              loading={save.isPending}
-            >
-              Save Catalogue Entry
-            </Button>
-          </Group>
         </Group>
+        <DialogFooter onCancel={close} pending={save.isPending}>
+          <Button
+            type="submit"
+            disabled={!form.isDirty() || undo.isPending}
+            loading={save.isPending}
+          >
+            Save
+          </Button>
+        </DialogFooter>
       </Stack>
     </form>
   );

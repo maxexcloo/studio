@@ -352,16 +352,3 @@ export function createCloudQueueAdapter({
     },
   };
 }
-
-export function routeQueueAdapters(local: QueueAdapter, cloud: QueueAdapter): QueueAdapter {
-  const adapter = (job: OwnedJob) =>
-    job.resource.startsWith("provider:cliproxyapi") ? cloud : local;
-  return {
-    submit: (job) => adapter(job).submit(job),
-    observe: (job) => adapter(job).observe(job),
-    cancel: (job) => adapter(job).cancel(job),
-    saveOutputs: (job) => adapter(job).saveOutputs(job),
-    eligible: (job) => adapter(job).eligible?.(job) || Promise.resolve(undefined),
-    settled: (job) => adapter(job).settled?.(job) || Promise.resolve(),
-  };
-}

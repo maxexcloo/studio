@@ -1,41 +1,4 @@
-import { loraFamilyId as familyId } from "../../shared/profiles.ts";
-
-const constraintKeys = ["baseModels", "conditionings", "profileIds"];
-const basename = (value) =>
-  String(value || "")
-    .split(/[\\/]/)
-    .pop();
-
-/** Explicit publisher targets refine family compatibility; unverified variants stay unknown. */
-export function loraCompatibility(info, profile) {
-  const family = familyId(profile?.family);
-  if (!info?.families?.length || !family || family === "custom") return "unknown";
-  if (!info.families.some((value) => familyId(value) === family)) return "other";
-  const constraints = info.compatibility;
-  if (!constraints) return "fits";
-  const model = profile?.baseModel || profile?.defaults?.model || profile?.model;
-  const context = {
-    baseModels: String(model || "").startsWith("custom:") ? "" : basename(model),
-    conditionings: profile?.recipe?.conditioning,
-    profileIds: profile?.id,
-  };
-  let unknown = false;
-  for (const key of constraintKeys) {
-    if (!Object.hasOwn(constraints, key)) continue;
-    if (!context[key]) {
-      unknown = true;
-      continue;
-    }
-    const allowed = constraints[key] || [];
-    if (
-      !allowed.some((value) => (key === "baseModels" ? basename(value) : value) === context[key])
-    ) {
-      if (constraints.unlisted === "other") return "other";
-      unknown = true;
-    }
-  }
-  return unknown ? "unknown" : "fits";
-}
+import { loraCompatibility } from "../../shared/profiles.ts";
 
 /**
  * A LoRA stack without the entries that cannot run on this profile ('other': trained for another

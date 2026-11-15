@@ -4,7 +4,7 @@ import type { DatabaseSync } from "node:sqlite";
  * A short result link: one output (`index`) or a job's watch page (`page`), a conversation's All
  * Results (`all`, `scope`) or a run's contact sheet (`sheet`, [jobId, index] pairs).
  */
-export interface McpLink {
+interface McpLink {
   audience: string;
   owner: string;
   jobId?: string;

@@ -14,6 +14,7 @@ import { logWarning } from "./crash-log.js";
 import { dataDir } from "./gallery/store.js";
 import { mediaType } from "./media-paths.js";
 import { sendMediaBuffer } from "./media-response.js";
+import { digest } from "./values.js";
 
 const require = createRequire(import.meta.url);
 let encoder = process.env.STUDIO_FFMPEG_PATH;
@@ -153,7 +154,7 @@ function coalesce(key, work, options) {
 }
 
 function identityKey(identity) {
-  return crypto.createHash("sha256").update(`${version}:${identity}`).digest("hex");
+  return digest(`${version}:${identity}`);
 }
 /** What a video's cached copies are filed under: its file, and the worker holding a ComfyUI one. */
 function sourceIdentity(filename, subfolder, type, worker = "") {
@@ -164,7 +165,7 @@ export async function getFileVideoPreview(file, identity = file) {
   const stat = await fs.promises.stat(file);
   if (stat.size > maxSourceBytes) throw new Error("This video is too large for a grid preview.");
   const key = identityKey(identity);
-  const revision = crypto.createHash("sha256").update(`${stat.size}:${stat.mtimeMs}`).digest("hex");
+  const revision = digest(`${stat.size}:${stat.mtimeMs}`);
   const output = path.join(dir, `${key}-${revision}.mp4`);
   if (fs.existsSync(output)) return output;
   return coalesce(key, async () => {
@@ -514,7 +515,7 @@ async function extractPoster(input) {
 export async function getFileVideoPoster(file, identity = file) {
   const stat = await fs.promises.stat(file);
   const key = identityKey(identity);
-  const revision = crypto.createHash("sha256").update(`${stat.size}:${stat.mtimeMs}`).digest("hex");
+  const revision = digest(`${stat.size}:${stat.mtimeMs}`);
   const output = path.join(dir, `${key}-${revision}.jpg`);
   if (fs.existsSync(output)) return output;
   return coalesce(
@@ -615,7 +616,7 @@ export async function getComfyVideoPreview(filename, subfolder, type, worker = "
  * Whether iOS Safari plays a video as it is: H.264 at 8-bit 4:2:0 in MP4 or QuickTime, within the
  * 4096 × 2304 an iPhone decodes, with AAC, MP3 or no sound. Read from ffmpeg's report of the file.
  */
-export function playsOnIos(report) {
+function playsOnIos(report) {
   const container = report.match(/Input #0, ([^\n]*?), from/)?.[1] || "";
   const video = report.match(/Stream #[^\n]*?Video: ([^\n]*)/)?.[1] || "";
   const audio = report.match(/Stream #[^\n]*?Audio: (\w+)/)?.[1];
@@ -667,7 +668,7 @@ export async function getComfyVideoPlayback(filename, subfolder, type) {
   const local = localOutputFile(filename, subfolder, type);
   if (!local) return null;
   const stat = await fs.promises.stat(local);
-  const revision = crypto.createHash("sha256").update(`${stat.size}:${stat.mtimeMs}`).digest("hex");
+  const revision = digest(`${stat.size}:${stat.mtimeMs}`);
   const key = identityKey(sourceIdentity(filename, subfolder, type));
   const output = path.join(dir, `${key}-play-${revision}.mp4`);
   const known = playbackPlans.get(output);
@@ -747,37 +748,6 @@ export async function getComfyVideoPlayback(filename, subfolder, type) {
     { poster: true },
   );
   return { file, original: false };
-}
-
-/** Hiding/deleting the original also removes its cached plaintext preview, after any encoder finishes. */
-export async function forgetItemVideoPreviews(item) {
-  if (item?.type !== "video" || !item.url) return 0;
-  let identity;
-  try {
-    const url = new URL(item.url, "http://studio.local");
-    if (url.pathname === "/comfy/view")
-      identity = sourceIdentity(
-        url.searchParams.get("filename") || "",
-        url.searchParams.get("subfolder") || "",
-        url.searchParams.get("type") || "output",
-        url.searchParams.get("worker") || "",
-      );
-  } catch {
-    return 0;
-  }
-  if (!identity) return 0;
-  const key = identityKey(identity);
-  await pending.get(key)?.catch(() => {});
-  await pending.get(`poster:${key}`)?.catch(() => {});
-  await pending.get(`play:${key}`)?.catch(() => {});
-  remoteVersions.delete(key);
-  let removed = 0;
-  for (const name of await fs.promises.readdir(dir).catch(() => [])) {
-    if (!name.startsWith(`${key}-`)) continue;
-    await fs.promises.rm(path.join(dir, name), { force: true });
-    removed++;
-  }
-  return removed;
 }
 
 /** Serves the bytes to ffmpeg over a seekable loopback URL, so MP4s with trailing metadata work and no plaintext file is written. */

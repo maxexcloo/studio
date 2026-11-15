@@ -4,15 +4,11 @@ import { useState } from "react";
 import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
-import { AnimateDialog } from "./AnimateDialog";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { MediaActionMenu } from "./MediaActions";
+import { MediaActionMenu, useMediaDialogs } from "./MediaActions";
 import { mediaTitle } from "./mediaLabels";
 import { useMediaTransfer } from "./mediaShare";
-import { ReportIssueDialog } from "./ReportIssueDialog";
-import type { AnimateRequest } from "./useMediaAction";
 import { useMediaRating } from "./useMediaRating";
-import { TrimVideoDialog } from "./videoEdits";
 
 import classes from "./MediaTileActions.module.css";
 
@@ -32,9 +28,7 @@ export function MediaTileActions({
   hideMore?: boolean;
 }) {
   const [deleting, setDeleting] = useState(false);
-  const [animating, setAnimating] = useState<AnimateRequest | null>(null);
-  const [trimming, setTrimming] = useState(false);
-  const [reporting, setReporting] = useState(false);
+  const { handlers, dialogs } = useMediaDialogs(item);
   const rating = useMediaRating(item);
   const liked = item.rating === "liked";
   const transfer = useMediaTransfer(item, opened);
@@ -95,10 +89,8 @@ export function MediaTileActions({
                 transfer={transfer}
                 onSelect={onSelect}
                 onApplied={() => onOpenedChange(false)}
-                onAnimate={setAnimating}
                 onDelete={() => setDeleting(true)}
-                onReport={() => setReporting(true)}
-                onTrim={() => setTrimming(true)}
+                {...handlers}
               />
             )}
           </Menu.Dropdown>
@@ -110,9 +102,7 @@ export function MediaTileActions({
         close={() => setDeleting(false)}
         onDeleted={() => {}}
       />
-      {animating && <AnimateDialog item={item} {...animating} onClose={() => setAnimating(null)} />}
-      {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
-      {reporting && <ReportIssueDialog item={item} onClose={() => setReporting(false)} />}
+      {dialogs}
     </>
   );
 }
