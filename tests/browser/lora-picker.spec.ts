@@ -38,15 +38,15 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
   const controls = page.getByRole("dialog", { name: "LoRAs", exact: true });
   // Choices apply at once; the popup closes like any other.
   await expect(page.getByRole("button", { name: "Use LoRAs", exact: true })).toHaveCount(0);
-  const up = page.getByRole("button", { name: "Thumbs Up Soft Style", exact: true });
+  const up = page.getByRole("button", { name: "Like Soft Style", exact: true });
   await up.click();
   await expect(up).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Thumbs Down Detail Slider", exact: true }).click();
+  await page.getByRole("button", { name: "Dislike Detail Slider", exact: true }).click();
   await expect
     .poll(() => state.loraLibrary.ratings)
-    .toEqual({ "soft-style.safetensors": "up", "detail.safetensors": "down" });
+    .toEqual({ "soft-style.safetensors": "liked", "detail.safetensors": "disliked" });
   const choices = page.getByRole("list", { name: "LoRA Choices", exact: true });
-  // Thumbs up lead and thumbs down trail, whatever the alphabet says.
+  // Liked lead and disliked trail, whatever the alphabet says.
   await expect
     .poll(() =>
       choices
@@ -64,7 +64,7 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
     )
     .toEqual(["Detail Slider", "Soft Style"]);
-  await pickerTab(page, "LoRAs", "Starred");
+  await pickerTab(page, "LoRAs", "Liked");
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
   await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toHaveCount(0);
   await pickerTab(page, "LoRAs", "All");
@@ -239,7 +239,7 @@ test("LoRAs without a family show under All Families", async ({ page }) => {
   const row = choices.getByRole("button", { name: "Detail Slider", exact: true });
   await row.click();
   await expect(row).toHaveAttribute("aria-pressed", "true");
-  await choices.getByRole("button", { name: "Thumbs Up Detail Slider", exact: true }).click();
+  await choices.getByRole("button", { name: "Like Detail Slider", exact: true }).click();
   await expect(row).toHaveAttribute("aria-pressed", "true");
   // Without a published default, a new LoRA starts at 1 kept within its range.
   await showLoraStack(page);

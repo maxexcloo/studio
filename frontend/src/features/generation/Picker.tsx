@@ -123,7 +123,7 @@ export function ChipPopup({
   /** A popover on phones too, instead of a full-screen sheet. */
   floating?: boolean;
   /**
-   * Actions under the content: `start` (such as Pin Current Prompt), with Clear and Save in the
+   * Actions under the content: `start` (such as Like Current Prompt), with Clear and Save in the
    * heading, or after `start` in the phone sheet's footer. `apply` adds Apply to the phone sheet,
    * which closes it; choices apply as they are made.
    */

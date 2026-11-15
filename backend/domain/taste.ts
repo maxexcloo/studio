@@ -403,11 +403,11 @@ function summaryOf(taste: StoredTaste, { profiles, loras }: TasteReadOut) {
     taste.styles.length && `Styles: ${taste.styles.join(", ")}.`,
     avoid.length && `Avoids ${avoid.join(", ")}.`,
     liked(models).length &&
-      `Favourite models: ${liked(models)
+      `Liked models: ${liked(models)
         .map((entry) => entry.id)
         .join(", ")}.`,
     liked(loras).length &&
-      `Favourite LoRAs: ${liked(loras)
+      `Liked LoRAs: ${liked(loras)
         .map((lora) => `${lora.name}${lora.strength === undefined ? "" : ` @${lora.strength}`}`)
         .join(", ")}.`,
     taste.note,

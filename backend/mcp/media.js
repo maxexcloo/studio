@@ -490,7 +490,7 @@ export class McpMedia {
       return null;
     }
   }
-  /** The account's thumbs up and down per LoRA file, which order every LoRA list. */
+  /** The account's likes and dislikes per LoRA file, which order every LoRA list. */
   async loraRatings(owner = "") {
     try {
       const { library } = await this.request("GET", "/api/loras/library", undefined, owner);
