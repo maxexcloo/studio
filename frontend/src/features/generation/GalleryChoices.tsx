@@ -17,6 +17,7 @@ import {
 import { useImagePreview } from "../gallery/ImagePreview";
 import { useWindowSpan } from "../gallery/MediaGrid";
 import { MorePages } from "../gallery/MorePages";
+import { galleryKey } from "../gallery/queries";
 import { PickerGrid, PickerHeader, PickerTile } from "./Picker";
 import { galleryReferenceType, useGalleryImages } from "./references";
 import type { ReferenceBrowser } from "./useReferenceBrowser";
@@ -92,7 +93,7 @@ export function GalleryChoices({
     mutationFn: (id: string) => api(`/api/gallery/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: async (_result, id) => {
       onDeleted(id);
-      await client.invalidateQueries({ queryKey: ["gallery"] });
+      await client.invalidateQueries({ queryKey: galleryKey });
       setDeleteId(null);
     },
   });

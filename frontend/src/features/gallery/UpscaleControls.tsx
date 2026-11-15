@@ -15,8 +15,10 @@ import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
+import { queueQuery } from "../generation/Queue";
 import { downloadsQuery } from "../library/queries";
 import { itemAction } from "./itemActions";
+import { galleryKey } from "./queries";
 import { useItemMutation } from "./useItemMutation";
 
 const statusQuery = (quality: UpscaleQuality) => ({
@@ -36,7 +38,7 @@ export function useStopUpscale(item: MediaItem) {
     mutationFn: (jobId: string) => post(`/api/queue/${encodeURIComponent(jobId)}/cancel`),
     onSuccess: () =>
       void Promise.all(
-        ["queue", "gallery"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
+        [galleryKey, queueQuery.queryKey].map((queryKey) => cache.invalidateQueries({ queryKey })),
       ),
   });
   const jobId = upscaling(item) ? item.upscale?.jobId : undefined;
@@ -64,7 +66,7 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
       } satisfies UpscaleRequest),
     onSuccess: () =>
       void Promise.all(
-        ["gallery", "queue"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
+        [galleryKey, queueQuery.queryKey].map((queryKey) => cache.invalidateQueries({ queryKey })),
       ),
   });
   const detector = status.data?.faceDetail;
@@ -131,7 +133,7 @@ export function useUpscaleMany(items: MediaItem[]) {
     },
     onSettled: () =>
       void Promise.all(
-        ["gallery", "queue"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
+        [galleryKey, queueQuery.queryKey].map((queryKey) => cache.invalidateQueries({ queryKey })),
       ),
   });
   return { ...mutation, settings: upscaleSettings(quick, true) };
@@ -228,7 +230,7 @@ export function useUpscaleAction(
       post<{ upscaleActive: boolean }>("/api/upscale/toggle", { galleryItemId: item.id, active }),
     onSuccess: (result) => {
       onVersionChange?.(item.id, result.upscaleActive);
-      void cache.invalidateQueries({ queryKey: ["gallery"] });
+      void cache.invalidateQueries({ queryKey: galleryKey });
     },
   });
   const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);

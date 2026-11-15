@@ -10,6 +10,7 @@ import type { MediaKind, QueueJob, ReferenceAsset } from "../../types";
 import { usePhone } from "../../ui/usePhone";
 import { CompareMenu, VariantStrip } from "../compare/ComposerCompare";
 import { useCompareRun, useDraftComparison } from "../compare/variants";
+import { galleryKey } from "../gallery/queries";
 import { GenerationEditor, blockedProps, submitShortcut, useSubmitState } from "./GenerationEditor";
 import {
   defaultProfile,
@@ -74,7 +75,7 @@ function useDraftSubmit({
         draft.defaultedProfileId === profile.id &&
         models.data?.defaultNotes?.[profile.kind];
       if (note) notifications.show({ message: note });
-      void client.invalidateQueries({ queryKey: ["gallery"] });
+      void client.invalidateQueries({ queryKey: galleryKey });
       void client.invalidateQueries({ queryKey: queueQuery.queryKey });
       onSubmitted?.(jobId);
     },

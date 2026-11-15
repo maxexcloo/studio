@@ -56,6 +56,7 @@ import { videoExport } from "./download";
 import { itemAction, itemActionGroups } from "./itemActions";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
+import { galleryKey } from "./queries";
 import { ReportIssueDialog } from "./ReportIssueDialog";
 import { useUpscaleAction } from "./UpscaleControls";
 import { useItemMutation } from "./useItemMutation";
@@ -153,7 +154,7 @@ function useSaveFrame(item: MediaItem): Action {
       post("/api/gallery/frame", { galleryItemId: item.id, frame: viewerFrame(item) ?? "last" }),
     onSuccess: () => {
       flash(item.id);
-      void cache.invalidateQueries({ queryKey: ["gallery"] });
+      void cache.invalidateQueries({ queryKey: galleryKey });
     },
   });
   return {
@@ -346,9 +347,7 @@ export function useMediaActions(
     mutationFn: () => post("/api/result-sets/more", { itemId: item.id }),
     onSuccess: () =>
       void Promise.all(
-        [queueQuery.queryKey, ["gallery"]].map((queryKey) =>
-          client.invalidateQueries({ queryKey }),
-        ),
+        [queueQuery.queryKey, galleryKey].map((queryKey) => client.invalidateQueries({ queryKey })),
       ),
   });
   const moreLikeSet: Action[] =
