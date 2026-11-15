@@ -15,8 +15,19 @@ export const keptTriggers = (triggers) =>
       : {};
 
 /**
- * The prompt with the trigger words switched on for each enabled LoRA (all of them unless
- * `triggers` is `false` or lists the chosen ones) at the start, in stack order, once each, skipping
+ * A LoRA's trigger words to apply by default. A slider's two words name its two ends, so only the
+ * end its strength points to: the first for a positive strength, the second for a negative one.
+ */
+function defaultTriggers(item, info) {
+  const triggers = cleanTriggers(info?.triggers);
+  if (triggers.length !== 2 || !/slider/i.test(`${item.name} ${info?.title || ""}`))
+    return triggers;
+  return [Number(item.strength) < 0 ? triggers[1] : triggers[0]];
+}
+
+/**
+ * The prompt with the trigger words switched on for each enabled LoRA (all of them, or a slider's
+ * one end, unless `triggers` is `false` or lists the chosen ones) at the start, in stack order, once each, skipping
  * any the prompt already says. Studio applies it once for every generation path, when it prepares
  * the run (generation-routes.js).
  */
@@ -27,13 +38,13 @@ export function withLoraTriggers(prompt, stack = [], infos = {}) {
   for (const item of stack) {
     if (item?.enabled === false || item?.triggers === false) continue;
     const chosen = Array.isArray(item?.triggers) ? item.triggers.map(String) : null;
-    for (const trigger of cleanTriggers(infos[item.name]?.triggers))
-      if (
-        (!chosen || chosen.some((word) => same(word, trigger))) &&
-        !has(text, trigger) &&
-        !lead.some((word) => same(word, trigger))
-      )
-        lead.push(trigger);
+    const triggers = chosen
+      ? cleanTriggers(infos[item.name]?.triggers).filter((trigger) =>
+          chosen.some((word) => same(word, trigger)),
+        )
+      : defaultTriggers(item, infos[item.name]);
+    for (const trigger of triggers)
+      if (!has(text, trigger) && !lead.some((word) => same(word, trigger))) lead.push(trigger);
   }
   return lead.length ? `${lead.join(", ")}, ${text}` : text;
 }
