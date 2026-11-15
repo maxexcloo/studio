@@ -3,7 +3,7 @@ import { isObject } from "./values.js";
 
 /**
  * Per-profile preferences that follow a merged or combined profile id to the id it became
- * (profile/store.js `canonical`): workflow preferences (likes and last use) and every
+ * (profile/store.js `canonical`): workflow preferences (last use) and every
  * account's LoRA stacks (the active stack and strengths). Combine
  * Backends and Merge Duplicate Profiles move them when they run.
  */
@@ -11,7 +11,6 @@ import { isObject } from "./values.js";
 /** Preferences on the kept ids: the latest use wins. */
 export function repointedPreferences(preferences, canonical) {
   return {
-    liked: [...new Set(preferences.liked.map(canonical))],
     lastUsed: Object.entries(preferences.lastUsed).reduce((next, [id, when]) => {
       const kept = canonical(id);
       if (!next[kept] || String(when) > String(next[kept])) next[kept] = when;
