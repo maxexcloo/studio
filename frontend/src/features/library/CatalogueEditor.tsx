@@ -18,6 +18,7 @@ import { useForm } from "@mantine/form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api, post } from "../../api";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
@@ -232,28 +233,26 @@ function CatalogueForm({
         ))}
         {save.error && <Alert color="red">{save.error.message}</Alert>}
         {undo.error && <Alert color="red">{undo.error.message}</Alert>}
-        <Group justify="space-between">
+        <Group>
           <Button
-            variant="default"
+            variant="subtle"
+            size="compact-sm"
             disabled={form.isDirty() || save.isPending}
             loading={undo.isPending}
             onClick={() => undo.mutate()}
           >
-            Undo Last Catalogue Change
+            Undo Last Change
           </Button>
-          <Group gap="xs">
-            <Button variant="default" disabled={save.isPending} onClick={close}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={!form.isDirty() || undo.isPending}
-              loading={save.isPending}
-            >
-              Save Catalogue Entry
-            </Button>
-          </Group>
         </Group>
+        <DialogFooter onCancel={close} pending={save.isPending}>
+          <Button
+            type="submit"
+            disabled={!form.isDirty() || undo.isPending}
+            loading={save.isPending}
+          >
+            Save
+          </Button>
+        </DialogFooter>
       </Stack>
     </form>
   );
