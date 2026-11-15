@@ -1,7 +1,8 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import type { Appearance } from "../../../../shared/appearance";
 import { api } from "../../api";
-import { accountQuery } from "../auth/AccountGate";
+import { accountQuery, useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
 import { modelsQuery } from "../generation/GenerationProvider";
 
@@ -26,6 +27,8 @@ export interface Preferences {
   writingModel?: string;
   /** Unsaved, Fast where the account has local video, otherwise Cloud. */
   videos?: VideosPreference;
+  /** The header's Appearance settings; unsaved, the browser's. */
+  appearance?: Partial<Appearance>;
 }
 interface PreferencesStatus {
   preferences: Preferences;
@@ -91,4 +94,16 @@ export function useVideosPreference() {
     useQuery(preferencesQuery).data?.preferences.videos,
     (videos: VideosPreference) => save.mutate({ videos }),
   ] as const;
+}
+
+/** The account's Appearance and its saver, once someone is signed in (single-user mode always is). */
+export function useAppearancePreference() {
+  const account = useAccount().data;
+  const signedIn = !!account && (account.mode !== "multi-user" || !!account.signedIn);
+  const preferences = useQuery({ ...preferencesQuery, enabled: signedIn });
+  const save = useSavePreferences();
+  return {
+    saved: preferences.data?.preferences.appearance,
+    save: preferences.data ? (appearance: Appearance) => save.mutate({ appearance }) : undefined,
+  };
 }
