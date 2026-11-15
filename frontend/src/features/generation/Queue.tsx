@@ -183,7 +183,6 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
     <RowButton
       label={label}
       icon={retry ? icons.retry : icons.stop}
-      stop={!retry}
       pending={action.isPending}
       onClick={onClick}
     />
@@ -202,39 +201,33 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
     </Button>
   );
 }
-/**
- * A queue row's or set's action, named in words beside its icon so Stop never reads as a checkbox;
- * `name` is a fuller accessible name that starts with the label.
- */
+/** A queue row's or set's action as a subtle icon; `name` is a fuller accessible name. */
 function RowButton({
   label,
   name,
   icon: Icon,
-  stop = false,
   pending,
   onClick,
 }: {
   label: string;
   name?: string;
   icon: LucideIcon;
-  stop?: boolean;
   pending: boolean;
   onClick: () => void;
 }) {
   return (
-    <Button
-      size="compact-sm"
-      variant="light"
-      color={stop ? "red" : "gray"}
-      miw="max-content"
-      leftSection={<Icon size={14} aria-hidden />}
-      aria-label={name}
-      loading={pending}
-      disabled={pending}
-      onClick={onClick}
-    >
-      {label}
-    </Button>
+    <Tooltip label={label}>
+      <ActionIcon
+        variant="subtle"
+        color="gray"
+        aria-label={name ?? label}
+        loading={pending}
+        disabled={pending}
+        onClick={onClick}
+      >
+        <Icon size={16} />
+      </ActionIcon>
+    </Tooltip>
   );
 }
 /** Title Case job states for the queue, tiles and the viewer. */
@@ -362,21 +355,45 @@ function shortStatus(job: QueueJob) {
     .join(" · ");
 }
 
-/** The leading drag handle, apart from the row's Stop at the other end. */
-function DragHandle({ drag }: { drag?: QueueRowDrag }) {
+/**
+ * A row's leading slot, the same width on every row: its drag handle where it can move, else its
+ * kind icon.
+ */
+function RowLead({
+  sortable,
+  drag,
+  icon: Kind,
+  alert,
+}: {
+  sortable: boolean;
+  drag?: QueueRowDrag;
+  icon: LucideIcon;
+  alert: boolean;
+}) {
   return (
-    <Tooltip label="Drag to Reorder">
-      <ActionIcon
-        ref={drag?.handleRef}
-        disabled={!drag}
-        aria-label="Drag to Reorder"
-        variant="subtle"
-        color="gray"
-        style={{ cursor: drag?.isDragging ? "grabbing" : "grab", touchAction: "none" }}
-      >
-        <GripVertical size={16} />
-      </ActionIcon>
-    </Tooltip>
+    <span className={classes.lead}>
+      {sortable ? (
+        <Tooltip label="Drag to Reorder">
+          <ActionIcon
+            ref={drag?.handleRef}
+            size="sm"
+            disabled={!drag}
+            aria-label="Drag to Reorder"
+            variant="subtle"
+            color="gray"
+            style={{ cursor: drag?.isDragging ? "grabbing" : "grab", touchAction: "none" }}
+          >
+            <GripVertical size={16} />
+          </ActionIcon>
+        </Tooltip>
+      ) : (
+        <Kind
+          size={18}
+          aria-hidden
+          color={alert ? "var(--mantine-color-red-6)" : "var(--mantine-color-dimmed)"}
+        />
+      )}
+    </span>
   );
 }
 
@@ -414,7 +431,7 @@ function QueueRow({
   return (
     <div ref={drag?.elementRef} className={classes.row}>
       <Group wrap="nowrap" gap="sm" py="xs">
-        {sortable && <DragHandle drag={drag} />}
+        <RowLead sortable={sortable} drag={drag} icon={Kind} alert={failed} />
         {/* Opens the inputs below; only the handle drags, so a tap here never moves the row. */}
         <UnstyledButton
           className={classes.toggle}
@@ -422,27 +439,21 @@ function QueueRow({
           aria-controls={detailsId}
           onClick={() => setOpened((open) => !open)}
         >
-          <Group wrap="nowrap" gap="sm">
-            <Kind
-              size={18}
-              aria-hidden
-              color={failed ? "var(--mantine-color-red-6)" : "var(--mantine-color-dimmed)"}
-              style={{ flexShrink: 0 }}
-            />
-            <Stack gap={2} flex={1} miw={0}>
-              <Text size="sm" lineClamp={1}>
-                {String(job.input?.prompt || "Generation")}
-              </Text>
-              <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={phone ? 1 : 2}>
-                {status}
-              </Text>
+          <Stack gap={2}>
+            <Text size="sm" lineClamp={2}>
+              {String(job.input?.prompt || "Generation")}
+            </Text>
+            <Group gap={6} wrap="nowrap">
               {job.dream && (
                 <Badge size="xs" color="gray" miw="max-content">
                   Dream
                 </Badge>
               )}
-            </Stack>
-          </Group>
+              <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={phone ? 1 : 2}>
+                {status}
+              </Text>
+            </Group>
+          </Stack>
         </UnstyledButton>
         {onSwap && (
           <Button variant="default" size="compact-sm" miw="max-content" onClick={onSwap}>
@@ -574,7 +585,7 @@ function QueueSetRow({
   return (
     <div ref={drag?.elementRef} className={classes.row}>
       <Group wrap="nowrap" gap="sm" py="xs">
-        {sortable && <DragHandle drag={drag} />}
+        <RowLead sortable={sortable} drag={drag} icon={Kind} alert={Kind === CircleAlert} />
         <UnstyledButton
           className={classes.toggle}
           aria-expanded={opened}
@@ -582,16 +593,8 @@ function QueueSetRow({
           onClick={() => setOpened((open) => !open)}
         >
           <Group wrap="nowrap" gap="sm">
-            <Kind
-              size={18}
-              aria-hidden
-              color={
-                Kind === CircleAlert ? "var(--mantine-color-red-6)" : "var(--mantine-color-dimmed)"
-              }
-              style={{ flexShrink: 0 }}
-            />
             <Stack gap={2} flex={1} miw={0}>
-              <Text size="sm" lineClamp={1}>
+              <Text size="sm" lineClamp={2}>
                 {title}
               </Text>
               <Text size="xs" c="dimmed" lineClamp={1}>
@@ -617,7 +620,6 @@ function QueueSetRow({
             label="Stop"
             name="Stop Set"
             icon={icons.stop}
-            stop
             pending={busy === "stop"}
             onClick={() => void stop()}
           />
@@ -723,13 +725,17 @@ export function QueueActions() {
         )}
       {/* Named in words, apart from the icons, so it never reads as a checkbox. */}
       {stopping > 0 && (
-        <RowButton
-          label="Stop All"
-          icon={icons.stop}
-          stop
-          pending={stoppingAll}
+        <Button
+          size="compact-sm"
+          variant="subtle"
+          color="gray"
+          leftSection={<icons.stop size={14} aria-hidden />}
+          loading={stoppingAll}
+          disabled={stoppingAll}
           onClick={() => setConfirming("cancel-all")}
-        />
+        >
+          Stop All
+        </Button>
       )}
       <ConfirmDialog
         opened={confirming !== undefined}

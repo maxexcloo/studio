@@ -4,7 +4,7 @@
   /* The list scrolls vertically; sideways drags are the drawer's own, to swipe it closed. */
   touch-action: pan-y;
 }
-/* The list scrolls while the service summary stays at the safe bottom edge. */
+/* The service summary follows the list directly; a long list scrolls above it. */
 .body {
   display: flex;
   flex: 1;
@@ -15,24 +15,20 @@
 }
 .list {
   display: flex;
-  flex: 1;
+  flex: 0 1 auto;
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
   touch-action: pan-y;
 }
 /* The desktop dropdown sizes the list to its rows, bounded above the service summary, with even
-   gaps around the divider; an empty or short queue keeps a steady minimum height, with Empty Queue centred. */
+   gaps around the divider. */
 .dropdown {
   display: flex;
   flex-direction: column;
   gap: var(--mantine-spacing-xs);
 }
 .dropdown .list {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  min-height: 12rem;
   max-height: min(60dvh, 32rem);
 }
 /* An administrator's summary opens Settings › Workers. */
