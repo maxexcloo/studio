@@ -1427,7 +1427,6 @@ export async function serveDream(
     state.unseen = state.unseen.filter((entry) => entry !== item);
     state.discarded = state.discarded.filter((entry) => entry !== item);
     item.dream = { ...item.dream, state: verdict === "discard" ? "discarded" : "kept" };
-    if (verdict === "like") item.rating = "liked";
     if (verdict === "discard") state.discarded.unshift(item);
     return route.fulfill({
       status: verdict === "variations" ? 202 : 200,

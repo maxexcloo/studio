@@ -71,8 +71,9 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
     "POST /api/dream/two/discard",
     "POST /api/dream/three/variations",
     "POST /api/dream/four/discard",
-    "POST /api/dream/five/like",
+    "POST /api/gallery/favorite",
   ]);
+  expect(dream.requests.at(-1)?.body).toEqual({ ids: ["five"], rating: "liked" });
 });
 
 test("While You Were Away ranks each project's results, folds its misses and judges them", async ({
@@ -150,7 +151,7 @@ test("While You Were Away ranks each project's results, folds its misses and jud
   expect(verdicts(dream)).toEqual([
     "POST /api/dream/wave/keep",
     "POST /api/dream/indoors/discard",
-    "POST /api/dream/street/like",
+    "POST /api/gallery/favorite",
     "POST /api/dream/shore/more",
     "POST /api/dream/loose/discard",
   ]);

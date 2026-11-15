@@ -1129,11 +1129,9 @@ test("Dream keeps discards disliked and hidden, never deleting them unasked, and
   dream.discard("alice", "new");
   assert.equal(state.items.find((entry) => entry.id === "new")?.rating, "disliked");
   assert.equal(taste.read("alice").signals[0].kind, "discard");
-  // Keeping a discard takes its dislike back; Like keeps a result and likes it.
+  // Keeping a discard takes its dislike back.
   dream.keep("alice", "new");
   assert.equal(state.items.find((entry) => entry.id === "new")?.rating, undefined);
-  dream.like("alice", "new");
-  assert.equal(state.items.find((entry) => entry.id === "new")?.rating, "liked");
   dream.discard("alice", "old");
   const request = await serve(t, fx);
   assert.deepEqual((await request("/discarded", {}, "DELETE")).body, { deleted: 1 });

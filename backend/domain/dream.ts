@@ -2471,25 +2471,13 @@ export function createDream(options: {
   }
   /**
    * Keeps or discards a result: a discard is disliked, kept and hidden, and keeping it again takes
-   * the dislike back. `liked` keeps it liked. `teach` is false where the caller teaches the taste
-   * profile.
+   * the dislike back. `teach` is false where the caller teaches the taste profile.
    */
-  function decide(
-    ownerId: string,
-    itemId: string,
-    state: "kept" | "discarded",
-    { teach = true, liked = false } = {},
-  ) {
+  function decide(ownerId: string, itemId: string, state: "kept" | "discarded", teach = true) {
     const item = find(ownerId, itemId);
     if (item.status !== "done") throw failure("That Dream result is not finished yet.", 409);
     const rating =
-      state === "discarded"
-        ? "disliked"
-        : liked
-          ? "liked"
-          : item.rating === "disliked"
-            ? undefined
-            : item.rating;
+      state === "discarded" ? "disliked" : item.rating === "disliked" ? undefined : item.rating;
     if (item.dream!.state === state && item.rating === rating) return item;
     if (item.dream!.state === "kept" && state === "discarded")
       throw failure("That result is in the gallery now; dislike it there instead.", 409);
@@ -2498,11 +2486,7 @@ export function createDream(options: {
     options.mark(ownerId, itemId, dream, rating);
     if (teach)
       options.taste.record(ownerId, [
-        tasteSignal(
-          state === "discarded" ? "discard" : liked ? "like" : "keep",
-          item.jobId,
-          itemValues(item),
-        ),
+        tasteSignal(state === "kept" ? "keep" : "discard", item.jobId, itemValues(item)),
       ]);
     return { ...item, dream, rating };
   }
@@ -2576,9 +2560,7 @@ export function createDream(options: {
       const [a, b] = sides;
       const kept: DreamItem[] = { a: [a], b: [b], both: [a, b], neither: [] }[answer];
       const items = sides.map((item) =>
-        decide(ownerId, String(item.id), kept.includes(item) ? "kept" : "discarded", {
-          teach: false,
-        }),
+        decide(ownerId, String(item.id), kept.includes(item) ? "kept" : "discarded", false),
       );
       const side = (item: DreamItem) => ({
         jobId: item.jobId,
@@ -2702,8 +2684,6 @@ export function createDream(options: {
       write(ownerId, record);
     },
     keep: (ownerId: string, itemId: string) => decide(ownerId, itemId, "kept"),
-    /** Like: keeps a result and likes it. */
-    like: (ownerId: string, itemId: string) => decide(ownerId, itemId, "kept", { liked: true }),
     discard: (ownerId: string, itemId: string) => decide(ownerId, itemId, "discarded"),
     /**
      * Hears ratings given wherever they happen (the gallery teaches the taste profile): a liked

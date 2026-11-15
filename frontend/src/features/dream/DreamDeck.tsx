@@ -170,7 +170,9 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
         await post(dreamItemPath(item, "variations"));
         return client.invalidateQueries({ queryKey: queueQuery.queryKey });
       }
-      if (verdict === "like") return post(dreamItemPath(item, "like"));
+      // Liking an unseen result keeps it (backend/domain/dream.ts).
+      if (verdict === "like")
+        return post("/api/gallery/favorite", { ids: [item.id], rating: "liked" });
       await post(dreamItemPath(item, "keep"));
       // As the viewer's Animate in Composer and Edit, staged in the composer for review.
       if (verdict === "animate" || verdict === "refine") {
