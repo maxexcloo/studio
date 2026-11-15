@@ -52,6 +52,7 @@ import {
   profileFromRequest,
   profilesForTier,
   profilesNearTier,
+  requestedTier,
   searchProfiles,
   serviceState,
   speedWordList,
@@ -331,8 +332,12 @@ export function registerGenerateTools({
     profile,
     note: `${pool.length < 2 ? "" : `Chose ${profile.label || profile.id}, the default. `}${note || ""}`,
   });
-  /** A named profile, moved to the wanted tier within its family (an exact id stays), with a note when the tier fell back. */
-  const namedInTier = (profiles, value, wanted) => {
+  /**
+   * A named profile, moved to the wanted tier within its family (an exact id stays), with a note when
+   * the tier fell back. Without a wanted tier, a generate `request` with no speed word moves even an
+   * exact id to its family's fastest profile that takes as many references: Quality only when asked.
+   */
+  const namedInTier = (profiles, value, wanted, request) => {
     // A cloud (Grok) profile only by its exact id or when the name asks for the cloud.
     const found = profileNamed(
       profiles.some((profile) => profile.id === value)
@@ -340,6 +345,18 @@ export function registerGenerateTools({
         : localUnlessAsked(profiles, { name: value }),
       value,
     );
+    if (request !== undefined && !wanted && !requestedTier(request)) {
+      const inputs = (found.mediaInputs || []).length;
+      const family = found.family
+        ? profiles.filter(
+            (item) =>
+              item.family === found.family &&
+              item.kind === found.kind &&
+              (item.mediaInputs || []).length >= inputs,
+          )
+        : [found];
+      return { profile: fastestFirst([found, ...family])[0], note: "" };
+    }
     return found.id === value
       ? { profile: found, note: "" }
       : withinFamily(profiles, found, wanted);
@@ -673,7 +690,7 @@ export function registerGenerateTools({
       review(refs, profile.id);
       // Defaults only for adjustable controls: a fixed value is not something to choose.
       const defaults = Object.fromEntries(
-        Object.entries({ ...profile.defaults, count: mcpGenerationCount }).filter(
+        Object.entries({ ...profile.defaults, count: controls.count.default }).filter(
           ([key]) => controls[key] || ["frames", "fps", "duration"].includes(key),
         ),
       );
@@ -698,23 +715,13 @@ export function registerGenerateTools({
             ];
           }),
         );
-      const { loras, total } = mcpLoras(profile, infos, { ratings });
+      const { total } = mcpLoras(profile, infos, { ratings });
       const guide = full_guide
         ? profile.prompting
         : compactGuide(profile.prompting, maxShownGuideCharacters);
       const detail = {
         ...Object.fromEntries(
-          [
-            "id",
-            "label",
-            "kind",
-            "family",
-            "description",
-            "mediaInputs",
-            "aspectPolicy",
-            "aspectPresets",
-            "native",
-          ]
+          ["id", "label", "kind", "family", "description", "mediaInputs", "aspectPolicy", "native"]
             .filter((key) => key in profile)
             .map((key) => [key, profile[key]]),
         ),
@@ -740,9 +747,9 @@ export function registerGenerateTools({
           : {}),
         ...(controls.loras
           ? {
-              loras: loras.slice(0, maxListedLoras),
               loras_total: total,
-              loras_note: `Each reads name — hint [trigger word]${total > maxListedLoras ? `; the first ${maxListedLoras} shown, lora_query "all" with lora_page or other words finds others` : ""}. Pass names to generate; strength defaults to the recommended value. Studio adds missing trigger words to every prompt.`,
+              loras_note:
+                "Only when the user asks for a LoRA: find it with lora_query, then pass its name to generate.",
             }
           : {}),
         ...(guide ? { prompting: guide } : {}),
@@ -755,7 +762,7 @@ export function registerGenerateTools({
     server,
     "generate",
     "generate",
-    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Anyone sexual or nude must be 18+ (no teens).`,
+    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Leave count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Anyone sexual or nude must be 18+ (no teens).`,
     {
       request: z
         .string()
@@ -772,7 +779,11 @@ export function registerGenerateTools({
       title: setTitle.optional(),
       titles: z.array(setTitle).max(maxJobsPerCall).optional().describe("One per prompt."),
       preview: z.boolean().optional(),
-      count: jobCount.optional().describe("Images per prompt; default 1."),
+      count: jobCount
+        .optional()
+        .describe(
+          `Per prompt, only if the user gives a number; default ${mcpGenerationCount} for one image prompt, else 1.`,
+        ),
       kind: z.enum(["image", "video"]).optional(),
       tier: tier.optional(),
       profile_id: z
@@ -787,7 +798,7 @@ export function registerGenerateTools({
         .array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }))
         .max(8)
         .optional()
-        .describe("Each profile's limit is its controls.loras.max in models; [] for none."),
+        .describe("Only LoRAs the user asks for."),
       reference_asset_ids: z
         .array(z.string().min(1))
         .max(16)
@@ -822,10 +833,10 @@ export function registerGenerateTools({
       aspect: z
         .string()
         .optional()
-        .describe("landscape, portrait, square or a ratio like 16:9; prefer to width/height."),
+        .describe(
+          "Only if asked: a preset (1:1, 16:9, 9:16, 4:3, 3:4; models lists each profile's) or landscape, portrait, square.",
+        ),
       resolution: z.enum(resolutions).optional(),
-      width: z.number().int().positive().max(16384).optional(),
-      height: z.number().int().positive().max(16384).optional(),
       steps: z.number().int().positive().max(10000).optional(),
       seed: z
         .number()
@@ -1047,9 +1058,8 @@ export function registerGenerateTools({
       args.count * args.prompts.length > maxJobsPerCall
     )
       args.count = 1;
-    const count = args.count ?? 1;
     // Checked before any prompt is written, so an oversized call costs nothing and says how to split.
-    assertJobCount(args.prompts?.length || 1, count);
+    assertJobCount(args.prompts?.length || 1, args.count ?? 1);
     const named = args.reference_asset_ids || [];
     // A character needs a model that takes references; its images then fill what room each has.
     const references = named.length + (card?.referenceIds.length ? 1 : 0);
@@ -1060,7 +1070,7 @@ export function registerGenerateTools({
     let targets;
     if (profile_ids) {
       const profiles = await media.profiles(kind || "all", owner);
-      targets = profile_ids.map((value) => namedInTier(profiles, value, wanted));
+      targets = profile_ids.map((value) => namedInTier(profiles, value, wanted, request));
     } else if (each_profile) {
       const local = localUnlessAsked(await media.profiles(kind || "image", owner), { request });
       targets = (wanted ? profilesForTier(local, wanted) : local)
@@ -1110,7 +1120,12 @@ export function registerGenerateTools({
                   cloud,
                 }),
               )
-          : namedInTier(await media.profiles(kind || "all", owner), args.profile_id, wanted),
+          : namedInTier(
+              await media.profiles(kind || "all", owner),
+              args.profile_id,
+              wanted,
+              request,
+            ),
       ];
     }
     // A character keeps its identity only on a model that edits with references (an img2img start
@@ -1176,6 +1191,11 @@ export function registerGenerateTools({
       throw new Error(
         `${unable.map(({ profile }) => profile.label || profile.id).join(", ")} can't hold ${card.name}'s face: it takes no reference to edit with, so each image would show someone else. Leave the model out (Studio picks ${keeper ? keeper.label || keeper.id : "one that edits with references"}), or pass any_model: true only if the user insists on it.`,
       );
+    // Several prompts or models are already the images asked for; one image gets a pick of a few.
+    const count = (args.count ??=
+      args.prompts.length === 1 && targets.length === 1 && targets[0].profile.kind === "image"
+        ? mcpGenerationCount
+        : 1);
     const jobs = targets.length * (args.prompts?.length || 1) * count;
     if (jobs > maxJobsPerCall)
       throw new Error(
@@ -1190,11 +1210,7 @@ export function registerGenerateTools({
         ? previewed.plans
         : await Promise.all(
             targets.map(async ({ profile, note }) => {
-              // An exact width and height win over an aspect sent beside them.
-              const exact = args.width !== undefined && args.height !== undefined;
-              const sized = exact ? null : mcpSize(profile, { aspect });
-              if (sized && (args.width !== undefined || args.height !== undefined))
-                throw new Error("Pass aspect, or both width and height.");
+              const sized = mcpSize(profile, aspect ? { aspect } : {});
               // A character sends its first image (characterImages), only to a model that keeps its
               // face: into its Identity slot, the named references filling the others in order, or
               // after them on a model that edits with references. As an img2img start image its

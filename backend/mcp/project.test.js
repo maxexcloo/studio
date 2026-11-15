@@ -83,8 +83,7 @@ test("a conversation keeps its own LoRAs off, tier and count where a call leaves
 test("a project's constraints replace a call's LoRAs and size, saying what changed", () => {
   const { args, note } = projectArgs(project({ loras: false, aspect: "16:9", resolution: "2K" }), {
     loras: [{ name: "glow" }],
-    width: 512,
-    height: 512,
+    aspect: "1:1",
     resolution: "1K",
   });
   assert.deepEqual(args, { loras: [], aspect: "16:9", resolution: "2K" });

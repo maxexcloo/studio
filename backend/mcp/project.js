@@ -98,14 +98,8 @@ export function projectArgs({ name, constraints }, args) {
     next.loras = [];
   }
   if (constraints.aspect) {
-    if (
-      args.width !== undefined ||
-      args.height !== undefined ||
-      (args.aspect && args.aspect !== constraints.aspect)
-    )
+    if (args.aspect && args.aspect !== constraints.aspect)
       notes.push(`${name} is ${constraints.aspect}, so it ran ${constraints.aspect}.`);
-    delete next.width;
-    delete next.height;
     next.aspect = constraints.aspect;
   }
   if (constraints.resolution) {

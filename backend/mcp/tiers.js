@@ -131,6 +131,9 @@ const speedWords = {
 };
 /** Words that ask for a speed rather than name a model. */
 export const speedWordList = new Set(Object.keys(speedWords));
+/** The tier a request's first speed word asks for ("best" is quality), or "". */
+export const requestedTier = (request) =>
+  speedWords[nameWords(request).find((word) => speedWords[word])] || "";
 const profileNames = (profile) =>
   [profile.id, profile.label, profile.displayName, profile.family].filter(Boolean);
 /**
