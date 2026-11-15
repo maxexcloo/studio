@@ -5,7 +5,7 @@ import { icons } from "../../ui/icons";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
-// Groups run from the most used; Your Cards and Prompting list A–Z, Models & LoRAs lead with their
+// Groups run from the most used; Cards and Prompting list A–Z, Models & LoRAs lead with their
 // names and Add Models follows an import to its downloads. The Library opens on Models.
 export const librarySections = {
   characters: {
@@ -13,19 +13,19 @@ export const librarySections = {
     description:
       "Your character cards: an image and lasting looks that picking one leads a prompt with.",
     icon: icons.character,
-    group: "Your Cards",
+    group: "Cards",
   },
   outfits: {
     label: "Outfits",
     description: "Outfits to dress a character in, the same across a series of shots.",
     icon: icons.outfit,
-    group: "Your Cards",
+    group: "Cards",
   },
   scenes: {
     label: "Scenes",
     description: "Places, light and time of day to reuse across a series of shots.",
     icon: icons.scene,
-    group: "Your Cards",
+    group: "Cards",
   },
   models: {
     label: "Models",
