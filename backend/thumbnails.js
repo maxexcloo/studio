@@ -14,6 +14,7 @@ import { dataDir } from "./gallery/store.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { mediaType } from "./media-paths.js";
 import { loadSharp } from "./sharp-loader.js";
+import { digest } from "./values.js";
 
 // Small on-demand cache of downscaled previews for the gallery grid, so a LAN client
 // only has to pull a full-resolution image when it actually opens the viewer.
@@ -292,7 +293,7 @@ async function build(filename, subfolder, type, size, worker) {
     // ComfyUI is down and the file is not on this computer: an earlier thumbnail still beats nothing.
     if (source === undefined) return cachedThumbnail(key);
     if (!source) return null;
-    const sourceHash = crypto.createHash("sha256").update(source).digest("hex");
+    const sourceHash = digest(source);
     const file = cachePath(key, sourceHash);
     if (fs.existsSync(file)) return { file, etag: `"${sourceHash}"` };
     return writeThumbnail(key, sourceHash, source, size);

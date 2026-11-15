@@ -9,6 +9,7 @@ import { outputFolderName } from "./data-names.js";
 import { families } from "./family-catalogue.js";
 import { classifyModel } from "./model/families.js";
 import { nodePacks } from "./node-packs.js";
+import { digest } from "./values.js";
 
 // SeedVR2 restores detail rather than interpolating it, so the pipeline mirrors
 // the reference workflow: soften the source with a lanczos pre-scale, then let
@@ -568,7 +569,7 @@ export async function uploadUpscaleVideoSource(worker, item) {
   if (![".mp4", ".webm", ".mov", ".mkv", ".m4v"].includes(extension))
     throw new Error("Only MP4, WebM, MOV, MKV and M4V videos can be upscaled.");
   const buffer = fs.readFileSync(file);
-  const filename = `studio-upscale-${crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 32)}${extension}`;
+  const filename = `studio-upscale-${digest(buffer).slice(0, 32)}${extension}`;
   const form = new FormData();
   form.append("image", new Blob([buffer]), filename);
   form.append("type", "input");

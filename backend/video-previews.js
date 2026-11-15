@@ -14,6 +14,7 @@ import { logWarning } from "./crash-log.js";
 import { dataDir } from "./gallery/store.js";
 import { mediaType } from "./media-paths.js";
 import { sendMediaBuffer } from "./media-response.js";
+import { digest } from "./values.js";
 
 const require = createRequire(import.meta.url);
 let encoder = process.env.STUDIO_FFMPEG_PATH;
@@ -153,7 +154,7 @@ function coalesce(key, work, options) {
 }
 
 function identityKey(identity) {
-  return crypto.createHash("sha256").update(`${version}:${identity}`).digest("hex");
+  return digest(`${version}:${identity}`);
 }
 /** What a video's cached copies are filed under: its file, and the worker holding a ComfyUI one. */
 function sourceIdentity(filename, subfolder, type, worker = "") {
@@ -164,7 +165,7 @@ export async function getFileVideoPreview(file, identity = file) {
   const stat = await fs.promises.stat(file);
   if (stat.size > maxSourceBytes) throw new Error("This video is too large for a grid preview.");
   const key = identityKey(identity);
-  const revision = crypto.createHash("sha256").update(`${stat.size}:${stat.mtimeMs}`).digest("hex");
+  const revision = digest(`${stat.size}:${stat.mtimeMs}`);
   const output = path.join(dir, `${key}-${revision}.mp4`);
   if (fs.existsSync(output)) return output;
   return coalesce(key, async () => {
@@ -514,7 +515,7 @@ async function extractPoster(input) {
 export async function getFileVideoPoster(file, identity = file) {
   const stat = await fs.promises.stat(file);
   const key = identityKey(identity);
-  const revision = crypto.createHash("sha256").update(`${stat.size}:${stat.mtimeMs}`).digest("hex");
+  const revision = digest(`${stat.size}:${stat.mtimeMs}`);
   const output = path.join(dir, `${key}-${revision}.jpg`);
   if (fs.existsSync(output)) return output;
   return coalesce(
@@ -667,7 +668,7 @@ export async function getComfyVideoPlayback(filename, subfolder, type) {
   const local = localOutputFile(filename, subfolder, type);
   if (!local) return null;
   const stat = await fs.promises.stat(local);
-  const revision = crypto.createHash("sha256").update(`${stat.size}:${stat.mtimeMs}`).digest("hex");
+  const revision = digest(`${stat.size}:${stat.mtimeMs}`);
   const key = identityKey(sourceIdentity(filename, subfolder, type));
   const output = path.join(dir, `${key}-play-${revision}.mp4`);
   const known = playbackPlans.get(output);
