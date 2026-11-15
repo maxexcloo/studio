@@ -107,6 +107,55 @@ test("gallery pages and exact job reads return only the signed-in account's reco
   );
 });
 
+test("viewer numbers resolve only the caller's output and survive its pending media ID", async () => {
+  const ownerId = "viewer-account";
+  const account = { userId: ownerId, role: "user", authenticated: true, features: {} };
+  const request = { studioAccount: account, query: {} };
+  const job = queue.enqueue(
+    ownerId,
+    queue.createSession(ownerId).id,
+    { kind: "image", count: 2, prompt: "Viewer Result" },
+    "image",
+  );
+  const pending = { ...item(ownerId, job.id), id: `${job.id}-1`, index: 1, status: "pending" };
+  setGallery([pending]);
+  const number = galleryStore.resultNumbers.numbered([pending])[0].number;
+  const read = (number, studioAccount = account) =>
+    call(routes["/api/gallery/results/:number"], {
+      ...request,
+      studioAccount,
+      params: { number: String(number) },
+    });
+  assert.equal((await read(number)).item.id, pending.id);
+  // Work not yet saved in the gallery resolves from the same owned queue output.
+  setGallery([]);
+  assert.equal((await read(number)).item.id, pending.id);
+  // Finishing replaces the pending media ID without replacing its URL number.
+  const finished = {
+    ...pending,
+    id: "/comfy/view?filename=finished.png&subfolder=private",
+    status: "done",
+  };
+  setGallery([finished]);
+  assert.equal((await read(number)).item.id, finished.id);
+  assert.equal((await read(number)).item.number, number);
+  assert.equal((await read(number, { ...account, userId: "stranger" })).item, undefined);
+  const video = { ...finished, type: "video", rating: "disliked" };
+  setGallery([video]);
+  assert.equal((await read(number)).item.type, "video");
+  assert.equal((await read(number)).item.rating, "disliked");
+  assert.equal((await read(number, null)).item, undefined);
+  assert.equal((await read("invalid")).item, undefined);
+  assert.equal((await read(999999999)).item, undefined);
+  assert.deepEqual(
+    await call(routes["/api/results/:number"], { ...request, params: { number: String(number) } }),
+    { jobId: job.id, index: 1 },
+  );
+  queue.save({ ...queue.job(ownerId, job.id), status: "completed" });
+  setGallery([]);
+  assert.equal((await read(number)).item, undefined);
+});
+
 test("unfinished work shows as the account chooses: none, in progress, or queued work first", async () => {
   const done = item("account-a", "job-done");
   const session = queue.createSession("account-a");

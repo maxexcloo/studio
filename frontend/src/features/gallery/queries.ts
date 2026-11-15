@@ -1,8 +1,10 @@
-import { infiniteQueryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 import { api } from "../../api";
 import type { MediaItem, MediaKind } from "../../types";
 import { type GalleryFilterValues, appendGalleryFilters } from "./GalleryFilters";
+import { galleryItemQuery } from "./MediaDetails";
+import { isResultNumber } from "./viewerLink";
 
 /** Every gallery listing's key starts with this, so invalidating it refreshes them all. */
 export const galleryKey = ["gallery"] as const;
@@ -56,3 +58,13 @@ export const galleryQuery = (
     queryFn: ({ pageParam }) => galleryPage(listing, pageParam, limit(pageParam)),
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
   });
+
+/** Resolves an account's result number without changing the media-ID API used by Details. */
+export const viewerItemQuery = (id: string) =>
+  isResultNumber(id)
+    ? queryOptions({
+        queryKey: [...galleryKey, "result", id],
+        queryFn: () => api<{ item: MediaItem }>(`/api/gallery/results/${id}`),
+        retry: false,
+      })
+    : galleryItemQuery(id);

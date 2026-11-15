@@ -851,7 +851,8 @@ const dream = createDream({
   guide: assistant.guide,
   gallery: (ownerId, query) => galleryItems({ ownerId, ...query }).map(withCanonicalProfile),
   count: (ownerId, query) => countGalleryItems({ ownerId, ...query }),
-  items: (ownerId, ids) => galleryItems({ ownerId, ids }).map(withCanonicalProfile),
+  items: (ownerId, ids) =>
+    resultNumbers.numbered(galleryItems({ ownerId, ids })).map(withCanonicalProfile),
   visible: filterVisibleGallery,
   likeness: (a, b) => imageSearch.likeness(a, b),
   // Only the owner's own record: updateGalleryJob alone matches any account's item.
