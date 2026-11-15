@@ -50,11 +50,9 @@ test("Reference browsing keeps its scroll, query and filters in the gallery edit
   await (await referenceSearch(page)).fill("Copper");
   await references.getByRole("button", { name: "Filter Gallery", exact: true }).click();
   const filters = page.getByRole("dialog", { name: "Filters", exact: true });
-  const aspect = filters.getByRole("combobox", { name: "Aspect", exact: true });
-  await aspect.click();
-  await page.getByRole("option", { name: "Square", exact: true }).click();
-  await aspect.press("Escape");
-  await aspect.press("Escape");
+  const square = filters.getByRole("button", { name: "Square", exact: true });
+  await square.click();
+  await square.press("Escape");
   await expect(filters).toBeHidden();
   await finishReferences(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
@@ -62,8 +60,8 @@ test("Reference browsing keeps its scroll, query and filters in the gallery edit
     references.getByRole("textbox", { name: "Search Gallery", exact: true }),
   ).toHaveValue("Copper");
   await references.getByRole("button", { name: "Filter Gallery", exact: true }).click();
-  await expect(filters.getByText("Square", { exact: true }).first()).toBeVisible();
-  await aspect.press("Escape");
+  await expect(square).toHaveAttribute("aria-pressed", "true");
+  await square.press("Escape");
   await expect(filters).toBeHidden();
   await page
     .getByRole("button", { name: "Use reference: Copper bird reference", exact: true })

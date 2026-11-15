@@ -151,7 +151,7 @@ test("Compare ▾ builds several variants at once from prompt lines and seeds", 
 
   // Seeds start over from the variant being edited, each run with its own seed.
   const setup = await axis(page, "Seeds");
-  await setup.getByRole("spinbutton", { name: "Seeds", exact: true }).fill("3");
+  await setup.getByRole("textbox", { name: "Seeds", exact: true }).fill("3");
   await start(page);
   await expect(variants(page).getByRole("radio")).toHaveCount(3);
   await page.getByRole("button", { name: "Compare 3", exact: true }).click();
