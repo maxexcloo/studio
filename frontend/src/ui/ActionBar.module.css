@@ -63,9 +63,10 @@
   margin-inline: 0;
 }
 
-.stacked {
+/* Narrow sides leave room for touch screens' wider minimum targets. */
+.actions[data-stacked] .stacked {
   height: auto;
-  padding: 4px 6px;
+  padding: 4px 3px;
 }
 
 .stackedLabel {
