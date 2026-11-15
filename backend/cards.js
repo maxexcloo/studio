@@ -1,9 +1,18 @@
 import crypto from "node:crypto";
 
-import { cardKinds, maxCardDescription, maxCardName, maxCards } from "../shared/characters.ts";
+import {
+  cardKinds,
+  characterTraits,
+  maxCardDescription,
+  maxCardName,
+  maxCards,
+  maxCharacterAge,
+  maxCharacterTrait,
+  minCharacterAge,
+} from "../shared/characters.ts";
 import { mayUseFeature } from "./account-policy.js";
 import { directRoute } from "./domain/direct-route.ts";
-import { dataDir, galleryJobItems, isGalleryHidden } from "./gallery/store.js";
+import { dataDir, galleryJobItems } from "./gallery/store.js";
 import { minorAgeRefusal } from "./minor-age.js";
 import { ownerDocumentName, savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { referenceAssetMetadataForAccount, referenceExistsForAccount } from "./references.js";
@@ -34,21 +43,6 @@ export function updateCharacter(ownerId, id, change) {
   return character;
 }
 
-/** Generate References' results so far, the account's own visible gallery items. */
-function generatedResults(ownerId, generated) {
-  return generated.jobIds.flatMap((jobId) =>
-    galleryJobItems(jobId)
-      .filter((item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item))
-      .map((item) => ({
-        galleryItemId: item.id,
-        jobId,
-        status: item.status,
-        thumbnailUrl: item.thumbnailUrl || item.url || "",
-        prompt: item.prompt || "",
-      })),
-  );
-}
-
 const assetOf = (account, id) => {
   try {
     return referenceAssetMetadataForAccount(account, id);
@@ -57,16 +51,20 @@ const assetOf = (account, id) => {
   }
 };
 
+/** Whether any of the account's results of `jobId` failed or was cancelled. */
+const jobFailed = (account, jobId) =>
+  galleryJobItems(jobId).some(
+    (item) =>
+      (item.ownerId || "") === (account?.userId || "") &&
+      ["failed", "cancelled"].includes(item.status),
+  );
+
 /**
  * A character's sheet as the account sees it: its panels that still exist, as reference assets
  * with their role, and how far Make Sheet has come (`making` until its panels are kept).
  */
 function shownSheet(account, sheet) {
-  const failed = galleryJobItems(sheet.jobId).some(
-    (item) =>
-      (item.ownerId || "") === (account?.userId || "") &&
-      ["failed", "cancelled"].includes(item.status),
-  );
+  const failed = jobFailed(account, sheet.jobId);
   return {
     jobId: sheet.jobId,
     at: sheet.at,
@@ -81,7 +79,7 @@ function shownSheet(account, sheet) {
 
 /**
  * A card as the account sees it: its images that still exist, as reference assets, a character's
- * generated references waiting to be picked and its sheet.
+ * portrait while it is made and its sheet.
  */
 export function shownCard(account, character) {
   const references = character.referenceIds.flatMap((id) => {
@@ -92,11 +90,11 @@ export function shownCard(account, character) {
     ...character,
     references,
     missing: character.referenceIds.length - references.length,
-    ...(character.generated
+    ...(character.portrait
       ? {
-          generated: {
-            ...character.generated,
-            results: generatedResults(account?.userId || "", character.generated),
+          portrait: {
+            jobId: character.portrait.jobId,
+            status: jobFailed(account, character.portrait.jobId) ? "failed" : "making",
           },
         }
       : {}),
@@ -108,11 +106,33 @@ class CardError extends Error {
   status = 400;
 }
 
-/** The fields a request may set on a `kind` card, checked; images must be references the account owns. */
-function cleanCard(kind, account, body) {
+/** A character's age and story (shared/characters.ts characterTraits), checked; empty ones are left out. */
+function cleanTraits(body) {
+  const traits = {};
+  for (const key of characterTraits) {
+    const value = String(body?.[key] || "").trim();
+    if (value.length > maxCharacterTrait)
+      throw new CardError(`Keep the ${key} within ${maxCharacterTrait} characters.`);
+    if (value) traits[key] = value;
+  }
+  if (body?.age !== undefined && body.age !== null && body.age !== "") {
+    const age = Number(body.age);
+    if (!Number.isInteger(age) || age < minCharacterAge || age > maxCharacterAge)
+      throw new CardError(`Give an age from ${minCharacterAge} to ${maxCharacterAge}.`);
+    traits.age = age;
+  }
+  return traits;
+}
+
+/**
+ * The fields a request may set on a `kind` card, checked; images must be references the account
+ * owns. A character waiting on its portrait (`pending`) may have none yet.
+ */
+function cleanCard(kind, account, body, pending = false) {
   const { name: noun, images } = cardKinds[kind];
   const name = String(body?.name || "").trim();
   const description = String(body?.description || "").trim();
+  const traits = kind === "characters" ? cleanTraits(body) : {};
   const ids = Array.isArray(body?.referenceIds) ? [...new Set(body.referenceIds.map(String))] : [];
   if (!name) throw new CardError(`Name the ${noun}.`);
   if (name.length > maxCardName)
@@ -120,9 +140,9 @@ function cleanCard(kind, account, body) {
   if (description.length > maxCardDescription)
     throw new CardError(`Keep the description within ${maxCardDescription} characters.`);
   if (!images.min && !description) throw new CardError(`Describe the ${noun}.`);
-  const refusal = minorAgeRefusal(`${name}\n${description}`);
+  const refusal = minorAgeRefusal([name, description, ...Object.values(traits)].join("\n"));
   if (refusal) throw new CardError(refusal);
-  if (ids.length < images.min || ids.length > images.max)
+  if ((ids.length < images.min && !(pending && !ids.length)) || ids.length > images.max)
     throw new CardError(
       images.min
         ? `Choose ${images.min} to ${images.max} images.`
@@ -130,18 +150,25 @@ function cleanCard(kind, account, body) {
     );
   if (!ids.every((id) => referenceExistsForAccount(account, id)))
     throw new CardError("One of those images is gone.");
-  return { name, description, referenceIds: ids };
+  return { name, description, ...traits, referenceIds: ids };
 }
 
-/** Saves a new `kind` card for the account from `fields` and returns it; a CardError answers 400. */
+/**
+ * Saves a new `kind` card for the account from `fields` and returns it; a CardError answers 400. A
+ * new character may wait on a portrait job of the account's (`portrait: { jobId, sheet }`), which
+ * becomes its first image (character-sheets.js).
+ */
 export function createCard(account, kind, fields) {
   const ownerId = account?.userId || "";
   const cards = listCards(kind, ownerId);
   if (cards.length >= maxCards) throw new CardError(`An account can keep ${maxCards} ${kind}.`);
+  const jobId = kind === "characters" ? String(fields?.portrait?.jobId || "") : "";
+  if (jobId && !/^[\w-]{1,100}$/.test(jobId)) throw new CardError("That portrait job is unknown.");
   const now = new Date().toISOString();
   const card = {
     id: `${cardKinds[kind].prefix}-${crypto.randomUUID()}`,
-    ...cleanCard(kind, account, fields),
+    ...cleanCard(kind, account, fields, Boolean(jobId)),
+    ...(jobId ? { portrait: { jobId, ...(fields.portrait.sheet ? { sheet: true } : {}) } } : {}),
     createdAt: now,
     updatedAt: now,
   };
@@ -196,11 +223,13 @@ export function registerCardRoutes(app) {
       const cards = listCards(kind, ownerId);
       const index = cards.findIndex((card) => card.id === params.id);
       if (index < 0) return missing;
-      // Saving a character is where generated references are picked, so it ends their wait.
-      const { generated: _picked, ...kept } = cards[index];
+      // A character's story is replaced by what is sent, and images end a portrait's wait.
+      const { age: _age, ...kept } = cards[index];
+      for (const key of characterTraits) delete kept[key];
+      if (body?.referenceIds?.length) delete kept.portrait;
       const card = {
         ...kept,
-        ...cleanCard(kind, account, body),
+        ...cleanCard(kind, account, body, Boolean(kept.portrait)),
         updatedAt: new Date().toISOString(),
       };
       save(kind, ownerId, cards.with(index, card));
@@ -215,21 +244,4 @@ export function registerCardRoutes(app) {
       return { status: 200, payload: { ok: true } };
     });
   }
-
-  // Generate References queued these jobs (the app's and MCP's generate); the character lists
-  // their results until it is next saved.
-  route("POST", "/api/characters/:id/generated", (account, ownerId, { params, body }) => {
-    const characters = listCards("characters", ownerId);
-    const index = characters.findIndex((character) => character.id === params.id);
-    if (index < 0) return { status: 404, payload: { ok: false, error: "No such character." } };
-    const jobIds = Array.isArray(body?.jobIds) ? body.jobIds.map(String) : [];
-    if (!jobIds.length || jobIds.length > 8 || !jobIds.every((id) => /^[\w-]{1,100}$/.test(id)))
-      throw new CardError("Pass the 1 to 8 jobs Generate References queued.");
-    const character = {
-      ...characters[index],
-      generated: { jobIds, at: new Date().toISOString() },
-    };
-    save("characters", ownerId, characters.with(index, character));
-    return { status: 200, payload: { ok: true, character: shownCard(account, character) } };
-  });
 }

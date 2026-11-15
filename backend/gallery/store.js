@@ -532,7 +532,7 @@ export function* galleryRuns(since, size = 200) {
 
 /* ---------------------------------------------------------------- Search */
 
-/** What a gallery search looks through: the title (domain/titles.ts), its MCP result set's title, its own title there and its character, the prompts (an upload's suggested one too), an import's source title, the caption (domain/captions.ts), the model and LoRAs, and the file's name. */
+/** What a gallery search looks through: the title (domain/titles.ts), its MCP result set's title, its own title there, its character and the names its chat gave it, the prompts (an upload's suggested one too), an import's source title, the caption (domain/captions.ts), the model and LoRAs, and the file's name. */
 function gallerySearchText(item) {
   if (!item || typeof item !== "object") return "";
   const settings = item.settings || {};
@@ -542,6 +542,10 @@ function gallerySearchText(item) {
     item.resultSet?.title,
     item.resultSet?.variation,
     item.resultSet?.character?.name,
+    item.resultSet?.context?.character?.name,
+    item.resultSet?.context?.outfit?.name,
+    item.resultSet?.context?.scene?.name,
+    item.resultSet?.context?.series,
     item.prompt,
     item.suggestedPrompt,
     item.source?.title,

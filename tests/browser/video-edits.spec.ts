@@ -52,5 +52,4 @@ test("A video's Edit menu reverses or trims it into a new version", async ({
   await expect.poll(() => edits.length).toBe(2);
   expect(edits[1]).toMatchObject({ galleryItemId: "clip", kind: "trim", start: 200 });
   await expect(dialog).toBeHidden();
-  await expect(page.getByText("Saved as a new version.", { exact: true })).toBeVisible();
 });

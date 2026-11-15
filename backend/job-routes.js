@@ -9,6 +9,20 @@ import { queueSchedule } from "./queue-eta.js";
  * from the queue's records. MCP reads and cancels a job through the first two.
  */
 export function registerJobRoutes(app, { store, queue }) {
+  /** Open jobs on its resource that run before a waiting job: started ones, then the queue's order by priority. */
+  function aheadOf(job) {
+    const open = store.openJobs().filter((other) => other.resource === job.resource);
+    const at = open.findIndex((other) => other.id === job.id);
+    const priority = job.priority ?? 0;
+    return open.filter(
+      (other, index) =>
+        other.id !== job.id &&
+        (["running", "saving"].includes(other.status) ||
+          (other.reason !== pausedReason &&
+            ((other.priority ?? 0) < priority ||
+              ((other.priority ?? 0) === priority && index < at)))),
+    ).length;
+  }
   function generationJobResponse(account, id) {
     const queued = store.job(account?.userId || "", id);
     if (!queued) return { status: "missing" };
@@ -17,6 +31,12 @@ export function registerJobRoutes(app, { store, queue }) {
       ["starting", "queued", "waiting"].includes(queued.status) &&
       !Number.isFinite(queued.progress?.endsAt)
         ? queueSchedule(queue).endsAt.get(queued.id)
+        : undefined;
+    // How many jobs run first, so a chat can say so where no end is known.
+    const ahead =
+      ["starting", "queued", "waiting"].includes(queued.status) &&
+      !Number.isFinite(waitingEnd ?? queued.progress?.endsAt)
+        ? aheadOf(queued)
         : undefined;
     // MCP clients read these words; they predate the queue's own.
     const status =
@@ -34,6 +54,7 @@ export function registerJobRoutes(app, { store, queue }) {
       error: queued.status === "failed" ? queued.reason : undefined,
       // A paused queue's hold is the one waiting reason a chat hears.
       ...(queued.reason === pausedReason ? { reason: pausedReason } : {}),
+      ...(ahead === undefined ? {} : { ahead }),
       // The prompt's thinking stays in Studio; a chat hears only the status.
       progress:
         queued.status === "writing"

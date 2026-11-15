@@ -163,7 +163,7 @@ export interface DreamProfile {
   model?: string;
   workflow?: string;
   defaults?: GenerationInput;
-  capabilities?: { startImage?: boolean; steps?: boolean };
+  capabilities?: { startImage?: boolean; steps?: boolean; defaultLoras?: boolean };
   mediaInputs?: { id: string; required?: boolean; role?: string }[];
   /** Whether it edits with its references, keeping a character's identity in new scenes. */
   editReferences?: boolean;
@@ -1195,9 +1195,10 @@ export function createDream(options: {
   /**
    * The LoRAs the profile can load (its list already follows the account's LoRA and Uncensored
    * Models access) that suit its model family. A LoRA for another family is left out rather than
-   * failing the run.
+   * failing the run. None on a profile that does best without LoRAs.
    */
   const fit = (profile: DreamProfile, loras: DreamLora[]) => {
+    if (profile.capabilities?.defaultLoras === false) return [];
     const available = new Set(profile.options?.loras || []);
     return options.fitLoras(
       profile,

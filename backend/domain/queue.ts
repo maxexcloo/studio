@@ -46,6 +46,8 @@ export interface QueueAdapter {
   settled?(job: OwnedJob): Promise<void>;
   /** Other resources that could run this queued job now, best first (an idle worker takes it). */
   alternatives?(job: OwnedJob): string[];
+  /** How many jobs a resource runs at once; one unless it says more (a worker's `slots`). */
+  slots?(resource: string): number;
 }
 
 /** What the writing stage streams into the item's progress while the prompt is written. */
@@ -117,8 +119,8 @@ export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
 export const modelOf = (input: GenerationInput) => String(input.profileId || input.model || "");
 
 /**
- * A resource's load: whether work runs there (`current`, its job's id), how many jobs wait for it
- * and the model it last ran.
+ * A resource's load: whether its slots are all taken (`current`, the last started job's id), how
+ * many jobs wait for it and the model it last ran.
  */
 export interface ResourceLoad {
   busy: boolean;
@@ -140,6 +142,8 @@ const reuseBypassLimit = 3;
 const localVideo = (job: OwnedJob) =>
   job.resource.startsWith("worker:") && job.input.kind === "video";
 const videoWaitReason = "Waiting for another video to finish.";
+/** How long a worker's run may show no progress before it is given up: a video's steps take longer. */
+const stallMinutes = (job: OwnedJob) => (job.input.kind === "video" ? 30 : 10);
 
 /** Only this database's recorded IDs reach the provider adapter. Restart never resubmits accepted work. */
 export class GenerationQueue {
@@ -162,6 +166,10 @@ export class GenerationQueue {
   private loaded = new Map<string, OwnedJob>();
   /** Jobs whose prompt is being written, to abort on cancel or stop. */
   private writing = new Map<string, AbortController>();
+  /** Each running job's last progress and when it changed, to find a stalled run. */
+  private progressSeen = new Map<string, { key: string; at: number }>();
+  /** The clock stalls are measured by (tests move it). */
+  now = () => Date.now();
   private stopped = false;
   private readonly tickFailed = logFailure("The queue");
   readonly store: Store;
@@ -195,13 +203,21 @@ export class GenerationQueue {
       return loads.get(resource)!;
     };
     for (const resource of this.loaded.keys()) at(resource);
+    const running = new Map<string, number>();
     for (const job of this.store.openJobs()) {
       // A started job a restart recovered isn't accepted in this process yet, but still runs.
-      if (this.acceptedIds.has(job.id) || started(job))
-        Object.assign(at(job.resource), { busy: true, current: job.id });
-      else at(job.resource).queued += 1;
+      if (this.acceptedIds.has(job.id) || started(job)) {
+        running.set(job.resource, (running.get(job.resource) ?? 0) + 1);
+        if (running.get(job.resource)! >= this.slots(job.resource))
+          Object.assign(at(job.resource), { busy: true, current: job.id });
+        else at(job.resource);
+      } else at(job.resource).queued += 1;
     }
     return loads;
+  }
+
+  private slots(resource: string) {
+    return this.adapter.slots?.(resource) ?? 1;
   }
 
   /** Forgets what a resource has loaded: its worker stopped, restarted or went offline. */
@@ -374,7 +390,10 @@ export class GenerationQueue {
               await this.adapter.settled?.(completed);
             } else {
               this.store.save(job);
-              if (terminalStatuses.has(job.status)) await this.adapter.settled?.(job);
+              if (terminalStatuses.has(job.status)) {
+                this.progressSeen.delete(job.id);
+                await this.adapter.settled?.(job);
+              } else if (this.stalled(job)) await this.giveUpStalled(job);
             }
           } catch (error) {
             const latest = this.store.job(job.ownerId, job.id)!;
@@ -389,11 +408,13 @@ export class GenerationQueue {
     );
     // Read again: jobs were added, observed or cancelled while the observations were awaited.
     const all = this.store.schedulable(reuseBypassLimit);
-    const occupied = new Set(
-      all
-        .filter((job) => !terminalStatuses.has(job.status) && this.acceptedIds.has(job.id))
-        .map((job) => job.resource),
-    );
+    const running = new Map<string, number>();
+    for (const job of all)
+      if (!terminalStatuses.has(job.status) && this.acceptedIds.has(job.id))
+        running.set(job.resource, (running.get(job.resource) ?? 0) + 1);
+    const free = (resource: string) => this.slots(resource) - (running.get(resource) ?? 0);
+    // Resources whose every slot runs a job; the rest take work.
+    const occupied = new Set([...running.keys()].filter((resource) => free(resource) <= 0));
     const isStarted = (job: OwnedJob) => this.acceptedIds.has(job.id) || started(job);
     // A started MCP set finishes before other work of its tier and below, so its jobs stay
     // contiguous; manual work still goes first.
@@ -452,6 +473,7 @@ export class GenerationQueue {
       [...groups].map(async ([resource, candidates]) => {
         // Resource groups run independently. A slow cloud request or offline worker cannot hold the scheduler.
         this.scheduling.add(resource);
+        let room = free(resource);
         try {
           for (let job of candidates) {
             let reason: string | undefined;
@@ -510,6 +532,8 @@ export class GenerationQueue {
             } finally {
               this.submitting.delete(job.id);
             }
+            // A resource with another free slot starts its next candidate in this pass.
+            if (--room > 0) continue;
             for (const pending of candidates) {
               const latest = this.store.job(pending.ownerId, pending.id)!;
               if (["queued", "waiting"].includes(latest.status) && !this.acceptedIds.has(latest.id))
@@ -526,6 +550,71 @@ export class GenerationQueue {
         }
       }),
     );
+  }
+
+  /**
+   * Whether a worker's running generation has shown no new progress for its stallMinutes, while
+   * the worker still lists it (a hung run keeps its worker from all other work).
+   */
+  private stalled(job: OwnedJob) {
+    if (!job.resource.startsWith("worker:") || job.operation === "upscale") return false;
+    if (job.status !== "running" || job.cancelRequested) return false;
+    const { value, max, node, phase } = (job.progress ?? {}) as Record<string, unknown>;
+    const key = JSON.stringify([value, max, node, phase]);
+    const seen = this.progressSeen.get(job.id);
+    if (seen?.key !== key) {
+      this.progressSeen.set(job.id, { key, at: this.now() });
+      return false;
+    }
+    return this.now() - seen.at >= stallMinutes(job) * 60_000;
+  }
+
+  /**
+   * Interrupts a stalled run on its worker and fails it with why, then queues it once more on
+   * another worker, a free one first; its tier, set and Dream origin go with it.
+   */
+  private async giveUpStalled(job: OwnedJob) {
+    const minutes = stallMinutes(job);
+    logWarning("Run stalled", { job: job.id, worker: job.resource, minutes });
+    this.progressSeen.delete(job.id);
+    await Promise.resolve(this.adapter.cancel(job)).catch(() => undefined);
+    const failed = this.store.save({
+      ...this.store.job(job.ownerId, job.id)!,
+      status: "failed",
+      progress: undefined,
+      reason: `Stopped: no progress for ${minutes} min.`,
+    });
+    await this.adapter.settled?.(failed);
+    if (job.stallRetry) return;
+    const busy = new Set(
+      this.store
+        .openJobs()
+        .filter((other) => this.acceptedIds.has(other.id))
+        .map((other) => other.resource),
+    );
+    const others = (this.adapter.alternatives?.(job) ?? []).filter(
+      (resource) => resource !== job.resource,
+    );
+    const target = others.find((resource) => !busy.has(resource)) ?? others[0];
+    if (!target) return;
+    const retry = this.store.enqueue(
+      job.ownerId,
+      job.sessionId,
+      job.input,
+      job.operation,
+      job.parentJobId,
+      target,
+      undefined,
+      {
+        priority: job.priority,
+        queueSet: job.queueSet,
+        parentItemId: job.parentItemId,
+        ...(job.dream ? { dream: job.dream } : {}),
+        ...(job.faceRedo ? { faceRedo: job.faceRedo } : {}),
+      },
+    );
+    this.store.save({ ...retry, stallRetry: true });
+    logEvent(`Queued stalled job ${job.id} again as ${retry.id} on ${target}`);
   }
 
   /** Whether another local video job has started and not yet finished and saved. */

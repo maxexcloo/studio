@@ -574,8 +574,6 @@ test("The chip composer offers supported sizes and settings, follows the output 
     referenceAssets: [],
   });
   expect(state.jobs[0].input.parentJobId).toBeUndefined();
-  // The gallery holds back unfinished work by default, so queuing says so instead of a tile.
-  await expect(page.getByRole("alert").filter({ hasText: "Queued." })).toBeVisible();
   await expandComposer(page);
   await page
     .getByRole("radiogroup", { name: "Generation Output", exact: true })
@@ -1058,9 +1056,7 @@ test("A model with its own resolutions offers them with its aspects in the size 
   await expect(page.getByRole("button", { name: "Aspect", exact: true })).toHaveText("16:9 · 2K");
 });
 
-test("A default that gave way to the other side says so in the one Queued notice", async ({
-  page,
-}) => {
+test("A default that gave way to the other side says so on queuing", async ({ page }) => {
   const state = await fixtures(page);
   const note = "No local image model is running, so this runs in the cloud.";
   await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
@@ -1072,5 +1068,5 @@ test("A default that gave way to the other side says so in the one Queued notice
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A quiet harbour");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
-  await expect(page.getByRole("alert").filter({ hasText: `${note} Queued.` })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: note })).toBeVisible();
 });

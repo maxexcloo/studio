@@ -71,7 +71,7 @@ export const librarySections = {
   promptStyles: {
     label: "Prompt Styles",
     description:
-      "The assistant's fixed options: Improve Prompt's styles, Animate's themes and AI edits. Every saved version is kept.",
+      "The assistant's fixed options: Improve Prompt's styles and Animate's and Edit's templates. Every saved version is kept.",
     icon: icons.assistant,
     admin: true,
     group: "Prompting",

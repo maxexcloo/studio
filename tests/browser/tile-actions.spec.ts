@@ -126,16 +126,18 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // Select, then the viewer's sections and order: Animate, Edit, Recreate | Share | Like, Dislike,
-  // Delete.
+  // Select, then Like, Dislike, Report, Share | Animate, Edit, Recreate, Upscale | Similar, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Select",
+    "Like",
+    "Dislike",
+    "Report",
+    "Share",
     "Animate",
     "Edit",
     "Recreate",
-    "Share",
-    "Like",
-    "Dislike",
+    "Upscale",
+    "Similar",
     "Delete",
   ]);
   await page.keyboard.press("Escape");
@@ -150,7 +152,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("menuitem", { name: "Select", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Animate", exact: true })).toBeFocused();
+  await expect(page.getByRole("menuitem", { name: "Like", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(more).toBeFocused();
 });
@@ -261,7 +263,7 @@ test("Use as Reference counts every backend of a combined profile", async ({ pag
   await expect(page.getByRole("img", { name: /^Reference 1/ })).toBeVisible();
 });
 
-test("Use as Reference moves to a model that takes references, or says none does", async ({
+test("Use as Reference moves to a model that takes references, or is disabled where none does", async ({
   page,
 }) => {
   const state = await galleryFixture(page);
@@ -271,20 +273,15 @@ test("Use as Reference moves to a model that takes references, or says none does
   await tileMenu(page);
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const reference = page.getByRole("menuitem", { name: "Use as Reference", exact: true });
-  await expect(reference).toHaveAccessibleDescription("Switches to Image Fast");
   await reference.click();
-  await expect(
-    page.getByText("Image Quality takes no references, so the composer uses Image Fast."),
-  ).toBeVisible();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
-  // With no image model that takes one, it stays disabled and says why.
+  // With no image model that takes one, it stays disabled.
   await serveProfiles(page, [none, profiles[1], { ...profiles[2], mediaInputs: [] }]);
   await page.goto("/images");
   await tileMenu(page);
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await expect(reference).toBeDisabled();
-  await expect(reference).toHaveAccessibleDescription(/takes no references/);
 });
 
 test("A reference placed by hand applies the profile's reference-mode settings", async ({
@@ -436,18 +433,14 @@ test("On a phone held sideways, the tile menu fits the screen and expands option
   await expect(remove).toBeInViewport();
 });
 
-test("Recreate › Similar ranks the gallery by an image from its tile menu or the viewer, as a removable filter", async ({
+test("Similar ranks the gallery by an image from its tile menu or the viewer, as a removable filter", async ({
   page,
 }) => {
   const state = await galleryFixture(page);
   state.gallery.push({ ...state.gallery[0], id: "tile-moth", jobId: "", prompt: "A paper moth" });
   await page.reload();
   await tileMenu(page);
-  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Similar", exact: true }).click();
-  // Its strictness sits above the run.
-  await expect(page.getByRole("radiogroup", { name: "Strictness", exact: true })).toBeVisible();
-  await page.getByRole("menuitem", { name: "Similar", exact: true }).last().click();
   const chip = (label: string) =>
     page.getByRole("button", { name: `Remove ${label} Filter`, exact: true });
   await expect(chip("Similar to A copper bird")).toBeVisible();
@@ -464,13 +457,8 @@ test("Recreate › Similar ranks the gallery by an image from its tile menu or t
   await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Open image: A paper moth", exact: true }).click();
-  await viewerAction(page, "Recreate", "Similar");
-  await expect(
-    page
-      .getByRole("radiogroup", { name: "Strictness", exact: true })
-      .getByRole("radio", { name: "Close", exact: true }),
-  ).toBeChecked();
-  await page.getByRole("menuitem", { name: "Similar", exact: true }).last().click();
+  // The chip's choice holds for the next Similar.
+  await viewerAction(page, "Similar");
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(chip("Close to A paper moth")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Open image:/ }).first()).toHaveAccessibleName(

@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { useRef } from "react";
 
-import { guidingRoles } from "../../../../shared/profiles";
+import { guidingRoles, slotCapacity } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
 import { type GalleryFilterValues, appendGalleryFilters } from "../gallery/GalleryFilters";
@@ -15,7 +15,6 @@ import {
   type SlotLayout,
   addReference,
   profileForBackend,
-  referenceCapacity,
   referenceDetails,
   referenceGroup,
   referenceGroupAssets,
@@ -59,7 +58,7 @@ export function referenceCells(references: ReferenceAsset[], profile?: SlotLayou
   let number = 0;
   return referenceGroups(profile).map((group) => {
     const assets = referenceGroupAssets(references, group);
-    const capacity = referenceCapacity(group);
+    const capacity = slotCapacity(group);
     return {
       slot: group[0].id,
       // Unlabelled slots read by their ID, such as Start or Image.
@@ -87,16 +86,14 @@ export function nextReferenceTarget(
 ): ReferenceTarget | null {
   const groups = referenceGroups(profile);
   const room = (group: (typeof groups)[number]) =>
-    referenceGroupAssets(references, group).length < referenceCapacity(group);
+    referenceGroupAssets(references, group).length < slotCapacity(group);
   if (chosen?.replace && references.some((asset) => referenceKey(asset) === chosen.replace))
     return chosen;
   const group = groups.find((items) => items[0].id === chosen?.slot);
-  if (group && (room(group) || referenceCapacity(group) === 1)) return { slot: group[0].id };
+  if (group && (room(group) || slotCapacity(group) === 1)) return { slot: group[0].id };
   const open = groups.find(room);
   if (open) return { slot: open[0].id };
-  return groups.length === 1 && referenceCapacity(groups[0]) === 1
-    ? { slot: groups[0][0].id }
-    : null;
+  return groups.length === 1 && slotCapacity(groups[0]) === 1 ? { slot: groups[0][0].id } : null;
 }
 
 export function placeReference(

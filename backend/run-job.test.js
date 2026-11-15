@@ -82,6 +82,7 @@ test("a run goes from queued through progress to a finished gallery image", asyn
     index: 2,
     variation: "Fox Wizard",
     character: { id: "chr-mara", name: "Mara" },
+    context: { character: { name: "Mara", description: "Red-haired ranger" }, series: "Ranger" },
   };
   const body = sdxlRequest({ resultSet: { ...resultSet, extra: "dropped" } });
   queue(id, body);

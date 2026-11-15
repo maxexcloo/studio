@@ -12,7 +12,7 @@ import {
   UnstyledButton,
   VisuallyHidden,
 } from "@mantine/core";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import {
   type PointerEvent,
@@ -35,7 +35,6 @@ import { closeWhenTop, closingPopup } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
-import { showQueued } from "../settings/accountPreferences";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaDetails } from "./MediaDetails";
 import { MediaJobStatus } from "./MediaJobStatus";
@@ -385,7 +384,6 @@ export function MediaViewer({
       : item.resultSet && setPosition(item, members),
   } as const;
   const iteration = useMediaIteration(item);
-  const client = useQueryClient();
   // An accepted retry removes the failed item; the viewer follows its replacement once listed.
   const [replacement, setReplacement] = useState("");
   const [arrival, setArrival] = useState<{ id: string; from: "next" | "previous" }>();
@@ -403,7 +401,6 @@ export function MediaViewer({
     void iteration.mutateAsync(next).then(
       (job) => {
         setQueued((runs) => [...runs, { job, from: item.id }]);
-        if (closing) showQueued(client);
       },
       () => {},
     );

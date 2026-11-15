@@ -9,10 +9,12 @@ import sharp from "sharp";
 import { sheetView } from "../shared/characters.ts";
 
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-character-sheets-"));
-const { sheetPanels, sheetProfile, sheetReferences } = await import("./character-sheets.js");
+const { createCharacterSheets, sheetPanels, sheetProfile, sheetReferences } =
+  await import("./character-sheets.js");
+const { createCard, listCards } = await import("./cards.js");
 
 /** A sheet drawn to prompt-sheet.js's layout: boxes of colour on a light grey background. */
-async function drawnSheet({ gear = true, touching = false } = {}) {
+async function drawnSheet({ touching = false } = {}) {
   const box = (left, top, width, height) => ({
     input: { create: { width, height, channels: 3, background: "#7a4b2e" } },
     left,
@@ -21,12 +23,11 @@ async function drawnSheet({ gear = true, touching = false } = {}) {
   const boxes = [
     // The face column: four close-ups.
     ...[0, 1, 2, 3].map((index) => box(60, 40 + index * 310, 260, touching ? 310 : 260)),
-    // The turnaround: front, side and back.
-    box(520, 60, 300, (gear ? 760 : 1160) - 60),
-    box(1000, 70, 220, (gear ? 760 : 1160) - 70),
-    box(1400, 60, 300, (gear ? 760 : 1160) - 60),
+    // The turnaround at full height: front, side and back.
+    box(520, 60, 300, 1100),
+    box(1000, 70, 220, 1090),
+    box(1400, 60, 300, 1100),
   ];
-  if (gear) boxes.push(box(500, 920, 200, 260), box(800, 960, 300, 180), box(1300, 940, 160, 220));
   return sharp({
     create: { width: 1920, height: 1280, channels: 3, background: "#e6e6e6" },
   })
@@ -41,19 +42,17 @@ const within = (panel, left, top, right, bottom) =>
   panel.left + panel.width >= right &&
   panel.top + panel.height >= bottom;
 
-test("a sheet is cut into its face, three views and gear by the background between them", async () => {
+test("a sheet is cut into its face and three views by the background between them", async () => {
   const panels = await sheetPanels(await drawnSheet());
   const byRole = Object.fromEntries(panels.map((panel) => [panel.role, panel]));
-  assert.deepEqual(Object.keys(byRole).sort(), ["back", "face", "front", "gear", "side"]);
+  assert.deepEqual(Object.keys(byRole).sort(), ["back", "face", "front", "side"]);
   // Each holds its drawing, and no neighbour's.
   assert.ok(within(byRole.face, 60, 40, 320, 300));
   assert.ok(byRole.face.top + byRole.face.height < 350);
-  assert.ok(within(byRole.front, 520, 60, 820, 760));
+  assert.ok(within(byRole.front, 520, 60, 820, 1160));
   assert.ok(byRole.front.left + byRole.front.width < 1000);
-  assert.ok(within(byRole.side, 1000, 70, 1220, 760));
-  assert.ok(within(byRole.back, 1400, 60, 1700, 760));
-  assert.ok(byRole.back.top + byRole.back.height < 920);
-  assert.ok(within(byRole.gear, 500, 920, 1460, 1180));
+  assert.ok(within(byRole.side, 1000, 70, 1220, 1160));
+  assert.ok(within(byRole.back, 1400, 60, 1700, 1160));
 });
 
 test("close-ups stacked without gaps give the top quarter of the column as the face", async () => {
@@ -62,20 +61,6 @@ test("close-ups stacked without gaps give the top quarter of the column as the f
   );
   assert.ok(within(face, 60, 40, 320, 340));
   assert.ok(face.top + face.height <= 360);
-});
-
-test("without gear the turnaround takes the full height", async () => {
-  const panels = await sheetPanels(await drawnSheet({ gear: false }));
-  assert.deepEqual(panels.map((panel) => panel.role).sort(), ["back", "face", "front", "side"]);
-  assert.ok(
-    within(
-      panels.find((panel) => panel.role === "front"),
-      520,
-      60,
-      820,
-      1160,
-    ),
-  );
 });
 
 test("a sheet draws on a ready Qwen-Image 2.1 that takes an image, Quality before Turbo", () => {
@@ -152,4 +137,95 @@ test("a run takes the sheet's view its prompt names, and a subject video takes t
     mediaInputs: [{ id: "reference", role: "start" }],
   };
   assert.equal(run("She dances", { profile: frames })[0].assetId, "own");
+});
+
+test("a character's other images follow its view in its reference stack's free places", () => {
+  const card = {
+    id: "chr-1",
+    referenceIds: ["own", "two", "three", "four"],
+    sheet: { jobId: "job", panels: [{ role: "back", referenceId: "back" }] },
+  };
+  const stack = (count) => ({
+    kind: "image",
+    editReferences: true,
+    mediaInputs: Array.from({ length: count }, (_, index) => ({
+      id: index ? `reference-${index + 1}` : "reference",
+      role: "reference",
+      ...(index ? { follows: index > 1 ? `reference-${index}` : "reference" } : {}),
+    })),
+  });
+  const run = (references, profile, prompt = "Back view in the rain") =>
+    sheetReferences({ references, prompt, cards: [card], profile }).map(
+      ({ assetId, slot }) => `${assetId}@${slot}`,
+    );
+  const own = [{ assetId: "own", slot: "reference" }];
+  assert.deepEqual(run(own, stack(10)), [
+    "back@reference",
+    "two@reference-2",
+    "three@reference-3",
+    "four@reference-4",
+  ]);
+  // Up to the stack's capacity, after a named reference.
+  assert.deepEqual(
+    run(
+      [
+        { assetId: "dress", slot: "reference" },
+        { ...own[0], slot: "reference-2" },
+      ],
+      stack(3),
+    ),
+    ["dress@reference", "back@reference-2", "two@reference-3"],
+  );
+  // A slot taking several counts each place; an Identity slot of one stays alone.
+  assert.deepEqual(run(own, { editReferences: true, mediaInputs: [{ id: "reference", max: 3 }] }), [
+    "back@reference",
+    "two@reference",
+    "three@reference",
+  ]);
+  assert.deepEqual(
+    run([{ assetId: "own", slot: "face" }], {
+      mediaInputs: [{ id: "face", role: "identity" }, { id: "reference" }],
+    }),
+    ["back@face"],
+  );
+  // An img2img profile keeps its start image alone.
+  assert.deepEqual(
+    run(own, {
+      family: "sdxl",
+      mediaInputs: [{ id: "reference" }, { id: "reference-2", follows: "reference" }],
+    }),
+    ["back@reference"],
+  );
+});
+
+test("a new character's finished portrait becomes its first image, then its sheet queues as its owner", async () => {
+  const account = { userId: "artist" };
+  const card = createCard(account, "characters", {
+    name: "Mara",
+    description: "red-haired ranger",
+    age: 31,
+    job: "Scout",
+    portrait: { jobId: "portrait-job", sheet: true },
+  });
+  assert.deepEqual([card.referenceIds, card.age, card.job], [[], 31, "Scout"]);
+  const admitted = [];
+  const sheets = createCharacterSheets({
+    admit: async (input, as) => {
+      admitted.push([input.referenceAssets[0].assetId, as]);
+      return { status: 200, payload: { jobId: "sheet-job" } };
+    },
+    profiles: async () => [
+      { id: "qwen", kind: "image", family: "qwen_image_21", mediaInputs: [{ id: "image" }] },
+    ],
+    account: (ownerId) => ({ userId: ownerId }),
+  });
+  // Someone else's result of the same job id never becomes the card's.
+  const result = { jobId: "portrait-job", type: "image", status: "done" };
+  await sheets.completed([{ ...result, id: "theirs", ownerId: "other" }]);
+  await sheets.completed([{ ...result, id: "portrait-1", ownerId: "artist" }]);
+  const [kept] = listCards("characters", "artist");
+  assert.deepEqual(kept.referenceIds, ["portrait-1"]);
+  assert.equal(kept.portrait, undefined);
+  assert.equal(kept.sheet.jobId, "sheet-job");
+  assert.deepEqual(admitted, [["portrait-1", account]]);
 });

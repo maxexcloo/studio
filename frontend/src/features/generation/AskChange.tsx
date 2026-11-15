@@ -15,7 +15,6 @@ import {
   type ChangeAction,
   type NextStep,
   type Suggestions,
-  maxNextSteps,
 } from "../../../../shared/suggestions";
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
@@ -148,9 +147,9 @@ export function SendButton({
 
 /**
  * Suggestions: short changes that fit the image or draft (`query`), asked for as soon as one is
- * picked, as an action whose options are the changes, then Refresh Suggestions to ask for
- * different ones (`fresh`) in their place. They load once `enabled` and stay cached per item or
- * prompt. While they load, or with none, a dimmed line stands in for them.
+ * picked, as an action whose options are the changes, then Refresh to ask for different ones
+ * (`fresh`) in their place. They load once `enabled` and stay cached per item or prompt. While they
+ * load one Loading… row stands in for them, and with none one No Suggestions line.
  */
 export function useChangeSuggestions<K extends QueryKey>({
   query,
@@ -175,7 +174,7 @@ export function useChangeSuggestions<K extends QueryKey>({
   const loading = refresh.isPending || (steps.isFetching && !list.length);
   const again: Action = {
     id: "refresh",
-    label: "Refresh Suggestions",
+    label: "Refresh",
     icon: icons.refresh,
     // Never disabled while it works: a disabled item drops focus out of the open menu.
     disabled,
@@ -183,7 +182,7 @@ export function useChangeSuggestions<K extends QueryKey>({
     onClick: () => refresh.mutate(),
   };
   const options: Action[] = loading
-    ? [{ id: "thinking", label: "Thinking of Changes", disabled: true }]
+    ? [{ id: "thinking", label: "Loading…", disabled: true }]
     : list.length
       ? list.map((step) => ({
           id: `step:${step.label}`,
@@ -198,51 +197,51 @@ export function useChangeSuggestions<K extends QueryKey>({
     disabled,
     menu: [options, [again]],
   };
-  // The same under a heading, as one group of an assistant menu (assistMenu), keeping room for
-  // the most it can hold so what follows stays put as they arrive.
+  // The same under a heading, as one group of an assistant menu (assistMenu).
   const group: Action[] = [
     { id: "suggestions-heading", label: "Suggestions", heading: true },
     ...options.map((option) => ({ ...option, icon: icons.suggestions })),
-    ...Array.from({ length: maxNextSteps - options.length }, (_, index) => ({
-      id: `suggestions-reserved-${index}`,
-      label: "",
-      reserved: true,
-    })),
     again,
   ];
   return { action, group, loading };
 }
 
 /**
- * An assistant menu (AI, Animate): its settings, then its fixed options under their heading, then
- * the suggestions written for this item with Refresh, then any other actions, then Custom… and any
- * run of its own. While what decides its options is `loading`, one row stands in for them all, so
- * nothing shown moves under a finger when they arrive.
+ * An assistant menu (Animate, the viewer's Edit): its settings, the suggestions written for this
+ * item with Refresh, Library's templates under their heading with Custom… last, then any other
+ * actions, then its own run. While what decides its options is `loading`, one row stands in for
+ * them all.
  */
 export const assistMenu = ({
   loading,
   settings = [],
-  fixed,
   suggestions = [],
+  templates,
+  custom = [],
   others = [],
   last,
 }: {
   loading?: boolean;
   settings?: Action[];
-  fixed: { label: string; options: Action[] };
   suggestions?: Action[];
-  others?: Action[];
+  templates: Action[];
+  custom?: Action[];
+  others?: ActionGroups;
   last: Action[];
 }): ActionGroups =>
   loading
     ? [[{ id: "loading", label: "Loading…", disabled: true }]]
     : [
         settings,
-        fixed.options.length
-          ? [{ id: `${fixed.label}-heading`, label: fixed.label, heading: true }, ...fixed.options]
-          : [],
         suggestions,
-        others,
+        templates.length || custom.length
+          ? [
+              { id: "templates-heading", label: "Templates", heading: true },
+              ...[...templates].sort((a, b) => String(a.label).localeCompare(String(b.label))),
+              ...custom,
+            ]
+          : [],
+        ...others,
         last,
       ];
 

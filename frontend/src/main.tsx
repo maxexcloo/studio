@@ -26,6 +26,9 @@ const client = new QueryClient({
   }),
   defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchOnWindowFocus: true } },
 });
+// The gallery places its own scroll when the viewer closes through Back; iOS Safari's restoration
+// of the opening position would land afterwards and override it.
+history.scrollRestoration = "manual";
 // The first frame waits briefly for Geist, so text doesn't reflow when the fallback font swaps out.
 const fontReady = Promise.race([
   document.fonts.load('1em "Geist Variable"'),

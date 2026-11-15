@@ -1,19 +1,15 @@
 import { ActionIcon, Menu, getDefaultZIndex } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
 import { useState } from "react";
 
 import { menuWidth } from "../../theme";
 import { ActionMenuItems } from "../../ui/ActionBar";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
-import { useGeneration } from "../generation/GenerationProvider";
-import { profileName } from "../generation/payload";
 import { CharacterEditor, type CharacterStart } from "./CharacterEditor";
-import { useGenerateReferences } from "./generateReferences";
 import { type CharacterCard, useDeleteCharacter, useMakeSheet } from "./queries";
 
 /**
- * New, Edit and Delete Character, Generate References and Make Sheet for a list of cards: `edit`
+ * New, Edit and Delete Character and Make Sheet for a list of cards: `edit`
  * and `remove` open their dialog, which `dialogs` renders. `onLayer` hears when one opens or closes
  * over a sheet. A sheet in the making shows on its card.
  */
@@ -22,20 +18,6 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
   const [deleting, setDeleting] = useState<CharacterCard | null>(null);
   const deletion = useDeleteCharacter();
   const making = useMakeSheet();
-  const { profile } = useGeneration();
-  const generation = useGenerateReferences(profile?.kind === "image" ? profile.id : undefined);
-  const generate = (card: CharacterCard) =>
-    generation.mutate(card, {
-      onSuccess: ({ profile, jobIds, withImage }) =>
-        notifications.show({
-          title: `Generating ${jobIds.length} References for ${card.name}`,
-          message: `With ${profileName(profile)}${
-            card.references.length && !withImage
-              ? ", from the description alone: no ready model edits with references"
-              : ""
-          }. Once they finish, pick the ones to keep in Edit Character.`,
-        }),
-    });
   const closeEditor = () => {
     setEditing(undefined);
     onLayer(false);
@@ -49,7 +31,6 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
       setEditing({ card, start });
       onLayer(true);
     },
-    generate,
     sheet: (card: CharacterCard) => making.mutate(card),
     remove: (card: CharacterCard) => {
       deletion.reset();
@@ -63,8 +44,6 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
           character={editing?.card}
           start={editing?.start}
           onClose={closeEditor}
-          onGenerate={generate}
-          generating={generation.isPending}
         />
         <ConfirmDialog
           opened={deleting !== null}
@@ -83,11 +62,10 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
   };
 }
 
-/** A card's ⋯ menu: Edit Character, Generate References, Make Sheet, then Delete Character. */
+/** A card's ⋯ menu: Use in Composer, Edit Character, Make Sheet, then Delete Character. */
 export function CharacterMenu({
   card,
   onEdit,
-  onGenerate,
   onSheet,
   onDelete,
   onUse,
@@ -95,7 +73,6 @@ export function CharacterMenu({
 }: {
   card: CharacterCard;
   onEdit: () => void;
-  onGenerate: () => void;
   onSheet: () => void;
   onDelete: () => void;
   /** Library's Use in Composer; the References sheet picks a card by its tile instead. */
@@ -127,15 +104,9 @@ export function CharacterMenu({
                 : []),
               { id: "edit", label: "Edit Character", icon: icons.edit, onClick: onEdit },
               {
-                id: "generate",
-                label: "Generate References",
-                icon: icons.variations,
-                onClick: onGenerate,
-              },
-              {
                 id: "sheet",
                 label: "Make Sheet",
-                description: "Front, side and back views, expressions and gear",
+                description: "Face, front, side and back views",
                 icon: icons.sheet,
                 disabled: !card.references.length || card.sheet?.status === "making",
                 onClick: onSheet,

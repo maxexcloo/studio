@@ -92,6 +92,7 @@ function loraRoleMetadata(entry) {
       ? { type: entry.type }
       : {}),
     ...(["effect", "acceleration", "supporting"].includes(entry.role) ? { role: entry.role } : {}),
+    ...(entry.hidden === true ? { hidden: true } : {}),
     ...(typeof entry.note === "string" ? { note: entry.note.trim().slice(0, 500) } : {}),
   };
 }

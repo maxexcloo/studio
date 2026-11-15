@@ -2,6 +2,7 @@ import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query
 
 import {
   type Character,
+  type CharacterTrait,
   type SheetRole,
   characterLead,
   identitySlot,
@@ -14,21 +15,11 @@ import { queueQuery } from "../generation/Queue";
 import { nextReferenceTarget, placeReference } from "../generation/references";
 
 /** A card as `/api/characters` lists it: its images that still exist, as reference assets. */
-export interface CharacterCard extends Omit<Character, "generated" | "sheet"> {
+export interface CharacterCard extends Omit<Character, "sheet" | "portrait"> {
   references: ReferenceAsset[];
   missing: number;
-  /** Generate References' results, waiting to be picked in the editor. */
-  generated?: {
-    jobIds: string[];
-    at: string;
-    results: {
-      galleryItemId: string;
-      jobId: string;
-      status: string;
-      thumbnailUrl: string;
-      prompt: string;
-    }[];
-  };
+  /** The portrait a chat queued for a new card, until it becomes its first image. */
+  portrait?: { jobId: string; status: "making" | "failed" };
   /** Make Sheet's sheet: its views by role once made (backend/cards.js shownSheet). */
   sheet?: {
     jobId: string;
@@ -38,21 +29,20 @@ export interface CharacterCard extends Omit<Character, "generated" | "sheet"> {
     panels: (ReferenceAsset & { role: SheetRole })[];
   };
 }
-export interface CharacterFields {
+export interface CharacterFields extends Partial<Record<CharacterTrait, string>> {
   name: string;
   description: string;
+  age?: number;
   referenceIds: string[];
 }
 
 export const charactersQuery = queryOptions({
   queryKey: ["characters"],
   queryFn: async () => (await api<{ characters: CharacterCard[] }>("/api/characters")).characters,
-  // Follows generated references and sheets until each has finished.
+  // Follows portraits and sheets until each has finished.
   refetchInterval: (query) =>
     query.state.data?.some(
-      (card) =>
-        card.sheet?.status === "making" ||
-        card.generated?.results.some((result) => !["done", "failed"].includes(result.status)),
+      (card) => card.sheet?.status === "making" || card.portrait?.status === "making",
     )
       ? 5000
       : false,

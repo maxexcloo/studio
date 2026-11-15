@@ -13,14 +13,13 @@ import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { assistMenu } from "../generation/AskChange";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import { showQueued } from "../settings/accountPreferences";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { mediaDownload } from "./download";
 import { itemAction, itemActionGroups, namedItemActions } from "./itemActions";
 import { finished } from "./MediaTile";
 import { useUpscaleMany } from "./UpscaleControls";
 import type { GallerySelection } from "./useGallerySelection";
-import { useAnimateThemes, useIterate } from "./useMediaAction";
+import { useAnimateTemplates, useIterate } from "./useMediaAction";
 import { showDisliked, useRatings } from "./useMediaRating";
 import { useRecreateMany } from "./useRecreateMany";
 import type { useTryAgain } from "./useTryAgain";
@@ -93,7 +92,7 @@ export function GallerySelectionBar({
   const finishedImages = ready.filter((item) => item.type === "image" && !item.uploaded);
   const upscale = useUpscaleMany(finishedImages);
   const iterate = useIterate();
-  const themes = useAnimateThemes();
+  const templates = useAnimateTemplates();
   const client = useQueryClient();
   const animate = useMutation({
     mutationFn: async (theme: string) => {
@@ -105,7 +104,6 @@ export function GallerySelectionBar({
           error ??= reason;
         });
       if (error) failure(error);
-      if (failed.length < finishedImages.length) showQueued(client);
       settle(failed);
     },
   });
@@ -187,7 +185,7 @@ export function GallerySelectionBar({
   }
   const pending = busy !== null;
   // Only what acts on the selection as a whole; an item's own actions stay on its tile and viewer.
-  const actions = itemActionGroups([
+  const selectionActions = [
     (failed.length > 0 || busy === "retry") &&
       itemAction("retry", {
         disabled: pending || !failed.length,
@@ -201,33 +199,31 @@ export function GallerySelectionBar({
         onClick: () => void stopSelected(),
       }),
     finishedImages.length > 0 &&
-      themes.length > 0 &&
+      templates.length > 0 &&
       itemAction("animate", {
         loading: animate.isPending,
         menu: assistMenu({
-          fixed: {
-            label: "Themes",
-            options: themes
-              .filter((theme) => theme.id !== "custom")
-              .map((theme) => ({
-                id: `animate-${theme.id}`,
-                label: theme.label,
-                icon: icons.animate,
-                disabled: animate.isPending,
-                onClick: () => animate.mutate(theme.id),
-              })),
-          },
+          templates: templates
+            .filter((template) => template.id !== "custom")
+            .map((template) => ({
+              id: `animate-${template.id}`,
+              label: template.label,
+              icon: icons.animate,
+              disabled: animate.isPending,
+              onClick: () => animate.mutate(template.id),
+            })),
           last: [],
         }),
       }),
     // Each image upscales with Upscale's remembered settings.
     finishedImages.length > 0 &&
-      itemAction("edit", {
+      itemAction("upscale", {
         loading: upscale.isPending,
         menu: [
+          upscale.settings,
           [
             {
-              id: "upscale",
+              id: "upscale-run",
               label: "Upscale",
               icon: icons.upscale,
               disabled: upscale.isPending,
@@ -248,6 +244,17 @@ export function GallerySelectionBar({
         loading: recreate.isPending || compare.isPending,
         menu: [
           [
+            ...(images
+              ? [
+                  {
+                    id: "compare",
+                    label: "Compare",
+                    icon: icons.compare,
+                    disabled: !comparable || compare.isPending || pending,
+                    onClick: () => compare.mutate(),
+                  },
+                ]
+              : []),
             ...(uploads.length
               ? [
                   {
@@ -259,17 +266,6 @@ export function GallerySelectionBar({
                       recreate.mutate(uploads, {
                         onSuccess: ({ failed }) => settle(failed.map((entry) => entry.id)),
                       }),
-                  },
-                ]
-              : []),
-            ...(images
-              ? [
-                  {
-                    id: "compare",
-                    label: "Compare",
-                    icon: icons.compare,
-                    disabled: !comparable || compare.isPending || pending,
-                    onClick: () => compare.mutate(),
                   },
                 ]
               : []),
@@ -285,7 +281,6 @@ export function GallerySelectionBar({
             label: "Download",
             icon: icons.download,
             disabled: !ready.length || download.isPending,
-            description: ready.length ? undefined : "Nothing selected has finished.",
             onClick: () => download.mutate(),
           },
           // Phones that share natively also share the files.
@@ -296,11 +291,6 @@ export function GallerySelectionBar({
                   label: "Share",
                   icon: icons.share,
                   disabled: !ready.length || ready.length > shareLimit || prepare.isPending,
-                  description: !ready.length
-                    ? "Nothing selected has finished."
-                    : ready.length > shareLimit
-                      ? `Shares up to ${shareLimit} items at a time.`
-                      : undefined,
                   keepOpen: !prepared,
                   onClick: () => void share(),
                 },
@@ -352,7 +342,9 @@ export function GallerySelectionBar({
       description: deletable.length ? undefined : "Stop work in progress before deleting it.",
       onClick: () => setConfirm(true),
     }),
-  ]);
+  ];
+  const actions = itemActionGroups(selectionActions);
+  const menuActions = itemActionGroups(selectionActions, "menu");
   useEffect(() => {
     if (confirm || pending) return;
     const keys = (event: KeyboardEvent) => {
@@ -503,7 +495,7 @@ export function GallerySelectionBar({
         </Menu.Target>
         <Menu.Dropdown aria-label="Selection Actions">
           <Menu.Label>{selected.length} Selected</Menu.Label>
-          <ActionMenuItems groups={actions} />
+          <ActionMenuItems groups={menuActions} />
         </Menu.Dropdown>
       </Menu>
       <DeleteMediaDialog

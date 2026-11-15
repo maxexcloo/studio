@@ -1,4 +1,4 @@
-import { cardKinds, maxCardDescription } from "../shared/characters.ts";
+import { cardKinds, maxCardDescription, maxCardName } from "../shared/characters.ts";
 import { loraName } from "../shared/profiles.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { replyTitle } from "../shared/titles.ts";
@@ -30,6 +30,8 @@ import {
   keepDescriptions,
   matchEffort,
   precedence,
+  proportionate,
+  subjectFirst,
   writerGuide,
 } from "./domain/writing-standard.ts";
 import { cleanTriggers } from "./lora/catalogue.js";
@@ -48,12 +50,21 @@ const titleInstructions =
   "Title what the text below describes: the prompt that made an image or video. Reply with only a concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
 // A character card's description (Make Character), which leads a prompt with the card's images.
 // Clothing stays out: a card's character changes outfits, and a described one fights the prompt's.
-const characterInstructions = `Describe the main person or creature in the image so an image model can draw them again in other outfits and scenes: their lasting look (apparent age, build, hair, eyes, skin, distinguishing marks such as scars or tattoos). Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "red-haired woman in her thirties, freckles, slim build, scar over left eye". Leave out clothing, the setting, pose, expression, lighting and style, and never guess a name or identity. Reply with only the phrase.`;
+const characterInstructions = `Describe the main person or creature in the image so an image model can draw them again in other outfits and scenes: their lasting look (apparent age, build, hair, eyes, skin, distinguishing marks such as scars or tattoos). Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "red-haired woman in her thirties, freckles, slim build, scar over left eye". Leave out clothing, the setting, pose, expression, lighting and style, and never guess a name or identity.`;
 // The same for outfit and scene cards (shared/characters.ts cardKinds): only what the card adds.
 const cardInstructions = {
   characters: characterInstructions,
-  outfits: `Describe the clothing the main person in the image wears so an image model can dress someone else in it: each garment, its colour, material and fit, accessories, and the footwear or bare feet. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "yellow raincoat, dark slim jeans, black rubber boots". Leave out the person's body, face and hair, the pose, the setting and the style. Reply with only the phrase.`,
-  scenes: `Describe the setting in the image so an image model can place someone else in it: the place and its notable details, the light and the time of day. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "rainy city street at night, neon signs, wet asphalt reflections". Leave out any people, their clothing and poses, and the photographic style. Reply with only the phrase.`,
+  outfits: `Describe the clothing the main person in the image wears so an image model can dress someone else in it: each garment, its colour, material and fit, accessories, and the footwear or bare feet. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "yellow raincoat, dark slim jeans, black rubber boots". Leave out the person's body, face and hair, the pose, the setting and the style.`,
+  scenes: `Describe the setting in the image so an image model can place someone else in it: the place and its notable details, the light and the time of day. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "rainy city street at night, neon signs, wet asphalt reflections". Leave out any people, their clothing and poses, and the photographic style.`,
+};
+// How many names or descriptions a card field's magic menu offers at once.
+export const cardIdeaCount = 5;
+// A card's name and description ideas from its images (the card editors' ▾ beside each field).
+const cardIdeaInstructions = {
+  name: (kind) =>
+    `Suggest ${cardIdeaCount} distinct names for the ${cardKinds[kind].name} in the images, short and memorable, each fitting how it looks: ${kind === "characters" ? "a given name or nickname, never a real person's name or identity" : "two to four words naming it"}, under ${maxCardName} characters, in Title Case.`,
+  description: (kind) =>
+    `${cardInstructions[kind]} Write ${cardIdeaCount} different phrases, each stressing different details or worded differently.`,
 };
 // What makes an image a good reference for each card kind, for rating a card's images.
 const cardRatings = {
@@ -72,6 +83,7 @@ export const reasoningEfforts = {
   animate: null,
   caption: "none",
   character: "none",
+  "card-ideas": "none",
   describe: "none",
   dream: "none",
   guide: "none",
@@ -355,7 +367,7 @@ const one = (value, limit = 600) =>
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, limit);
-const isRole = (info) => ["acceleration", "supporting"].includes(info?.role);
+const isRole = (info) => ["acceleration", "supporting"].includes(info?.role) || info?.hidden;
 
 /** A LoRA's suggested strength: the publisher's default, a "Strength 0.7" note, else 1. */
 function suggestedStrength(info) {
@@ -436,6 +448,8 @@ function rewriteInstructions({
     "Keep every subject, detail, style, mood, framing and quoted text the user asked for, with quoted text kept exactly; add only what the guide recommends to realise it.",
     fidelity,
     keepDescriptions,
+    subjectFirst,
+    proportionate,
     `${matchEffort} Then apply the style below.`,
     avoidFiller(),
     'Words about speed, quality tier, model, size, aspect or count (such as "turbo", "fast", "landscape", "16:9", "2K", "two images") are settings, not scene: leave them out.',
@@ -1131,7 +1145,10 @@ export function createAssistant(
       call: "character",
       model,
       messages: [
-        { role: "system", content: `${cardInstructions[kind]} ${contentRule(explicit)}` },
+        {
+          role: "system",
+          content: `${cardInstructions[kind]} Reply with only the phrase. ${contentRule(explicit)}`,
+        },
         {
           role: "user",
           content: userContent(`Describe this ${cardKinds[kind].name}.`, [image], true),
@@ -1143,6 +1160,52 @@ export function createAssistant(
     const description = one(reply.text, maxCardDescription).replace(/^["'“]+|["'”.\s]+$/g, "");
     if (!description) throw new AssistantError("unusable reply");
     return { description, model };
+  }
+
+  /**
+   * Names or descriptions (`field`) for a card from its images, `cardIdeaCount` of them, steered by
+   * the person's `request` and unlike those already shown (`avoid`); the caller checks the model
+   * reads images.
+   */
+  async function cardIdeas({ kind, field, images, request = "", avoid = [], explicit, signal }) {
+    const model = await modelFor("card-ideas", explicit);
+    const limit = field === "name" ? maxCardName : maxCardDescription;
+    const reply = await chat({
+      call: "card-ideas",
+      model,
+      messages: [
+        {
+          role: "system",
+          content: `${cardIdeaInstructions[field](kind)} Reply with only JSON: {"options":["…"]}. ${contentRule(explicit)}`,
+        },
+        {
+          role: "user",
+          content: userContent(
+            [
+              `Suggest ${field === "name" ? "names" : "descriptions"} for this ${cardKinds[kind].name}.`,
+              request && `What the person wants: ${one(request, 300)}`,
+              avoid.length &&
+                `Offer different ones from: ${avoid.map((idea) => one(idea, limit)).join(" | ")}`,
+            ]
+              .filter(Boolean)
+              .join("\n"),
+            images,
+            true,
+          ),
+        },
+      ],
+      temperature: 0.8,
+      signal,
+    });
+    const options = [
+      ...new Set(
+        (Array.isArray(replyJson(reply.text)?.options) ? replyJson(reply.text).options : [])
+          .map((idea) => one(idea, limit).replace(/^["'“]+|["'”.\s]+$/g, ""))
+          .filter(Boolean),
+      ),
+    ].slice(0, cardIdeaCount);
+    if (!options.length) throw new AssistantError("unusable reply");
+    return { options, model };
   }
 
   /**
@@ -1301,6 +1364,7 @@ export function createAssistant(
     caption,
     review,
     character,
+    cardIdeas,
     rateCardImages,
     title,
     draftGuide,

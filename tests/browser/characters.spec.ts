@@ -1,13 +1,12 @@
 import { type Page, expect, test } from "@playwright/test";
 
-import { characterShots, outfitPart, scenePart, withCharacter } from "../../shared/characters";
+import { outfitPart, scenePart, withCharacter } from "../../shared/characters";
 import {
   closeReferences,
   create,
   fixtures,
   image,
   profiles,
-  promptTool,
   serveProfiles,
   signIn,
   stamp,
@@ -201,7 +200,7 @@ test("New Character saves a name, description and gallery images from the Refere
   ).toBeVisible();
 });
 
-test("Use as Character starts a card from a gallery image in Library › Characters, described by the assistant", async ({
+test("Use as Character starts a card from a gallery image in Library › Characters, named and described by the assistant", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -222,10 +221,15 @@ test("Use as Character starts a card from a gallery image in Library › Charact
       json: { available: true, vision: true, presets: [], themes: [], changes: [] },
     }),
   );
-  const described: unknown[] = [];
-  await page.route("**/api/assistant/cards/describe", (route) => {
-    described.push(route.request().postDataJSON());
-    return route.fulfill({ json: { ok: true, description: "red-haired ranger, green cloak" } });
+  const asked: { field: string; assetIds: string[] }[] = [];
+  await page.route("**/api/assistant/cards/ideas", (route) => {
+    const body = route.request().postDataJSON();
+    asked.push(body);
+    const options =
+      body.field === "name"
+        ? ["Mara", "Wren"]
+        : ["red-haired ranger, green cloak", "freckled redhead, slim build"];
+    return route.fulfill({ json: { ok: true, options } });
   });
   const rated: unknown[] = [];
   await page.route("**/api/assistant/cards/rate", (route) => {
@@ -243,21 +247,26 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   await expect(
     editor.getByRole("button", { name: "Reference 1 · Images", exact: true }),
   ).toBeVisible();
-  await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Mara");
-  // Describe Image is a tool of the Description box: in its ⋯, or the phone editor's bar.
-  if (test.info().project.use.isMobile) {
-    await editor.getByRole("textbox", { name: "Description", exact: true }).click();
-    const sheet = page.getByRole("dialog", { name: "Description", exact: true });
-    await sheet.getByRole("button", { name: "Describe Image", exact: true }).click();
-    await expect(sheet.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
-      "red-haired ranger, green cloak",
-    );
-    await sheet.getByRole("button", { name: "Done", exact: true }).click();
-  } else await promptTool(editor, "Description", "Describe Image");
+  // Name and Description each offer ideas written from the images; a pick has Undo.
+  const name = editor.getByRole("textbox", { name: "Name", exact: true });
+  await editor.getByRole("button", { name: "Suggest Name", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Wren", exact: true }).click();
+  await expect(name).toHaveValue("Wren");
+  await editor.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(name).toHaveValue("");
+  await editor.getByRole("button", { name: "Suggest Name", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Mara", exact: true }).click();
+  await expect(name).toHaveValue("Mara");
+  await editor.getByRole("button", { name: "Suggest Description", exact: true }).click();
+  await page.getByRole("menuitem", { name: "red-haired ranger, green cloak", exact: true }).click();
   await expect(editor.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
     "red-haired ranger, green cloak",
   );
-  expect(described).toEqual([{ kind: "characters", assetId: "asset-ranger" }]);
+  // Each field asks once; its ideas stay for the images.
+  expect(asked).toEqual([
+    { kind: "characters", field: "name", assetIds: ["asset-ranger"] },
+    { kind: "characters", field: "description", assetIds: ["asset-ranger"] },
+  ]);
   // Rate Images scores each image as the card's reference.
   await editor.getByRole("button", { name: "Rate Images", exact: true }).click();
   const ratings = editor.getByLabel("Image Ratings");
@@ -280,6 +289,61 @@ test("Use as Character starts a card from a gallery image in Library › Charact
     .click();
   await expect(page.getByText("No Characters", { exact: true })).toBeVisible();
   expect(state.characters).toEqual([]);
+});
+
+test("A result's chat character offers Create Character in Details, starting the card with its name, description and image", async ({
+  page,
+}, testInfo) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "ivo",
+    jobId: "ivo-job",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "A tall smith at the forge",
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+    resultSet: {
+      id: "set-ivo",
+      title: "Forge Tales",
+      index: 0,
+      context: {
+        character: { name: "Ivo", description: "tall smith, shaved head" },
+        series: "Forge Tales",
+      },
+    },
+  });
+  await page.goto("/images");
+  await page
+    .getByRole("button", { name: "Open image: A tall smith at the forge", exact: true })
+    .click();
+  if (testInfo.project.use.isMobile)
+    await page.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Ivo", exact: true })).toHaveAttribute(
+    "href",
+    "/images?q=Ivo",
+  );
+  await page.getByRole("button", { name: "Create Character", exact: true }).click();
+  await expect(page).toHaveURL(/\/library#characters$/);
+  const editor = page.getByRole("dialog", { name: "New Character", exact: true });
+  await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Ivo");
+  await expect(editor.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
+    "tall smith, shaved head",
+  );
+  await editor.getByRole("textbox", { name: "Age", exact: true }).fill("40");
+  await editor.getByRole("textbox", { name: "Job", exact: true }).fill("Smith");
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(editor).toBeHidden();
+  expect(state.characters[0]).toMatchObject({ name: "Ivo", age: 40, job: "Smith" });
+  await expect(
+    page.getByRole("list", { name: "Characters", exact: true }).getByRole("listitem", {
+      name: "Ivo",
+      exact: true,
+    }),
+  ).toContainText("Age 40 · Smith");
 });
 
 test("A member sees only their cards and Presets in the Library, and a group without Characters only Presets", async ({
@@ -308,41 +372,6 @@ test("A member sees only their cards and Presets in the Library, and a group wit
   ).toHaveCount(0);
 });
 
-test("Generate References queues one view per shot on a shared seed with the card's image, then the editor picks which to keep", async ({
-  page,
-}) => {
-  const state = await fixtures(page);
-  state.characters.push(structuredClone(mara));
-  // The card's image goes only to a model that edits with references, never as an img2img start.
-  await serveProfiles(page, [{ ...profiles[0], editReferences: true }, ...profiles.slice(1)]);
-  await page.goto("/library#characters");
-  await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Generate References", exact: true }).click();
-  await expect.poll(() => state.jobs.length).toBe(4);
-  expect(state.jobs.map((job) => job.input.prompt)).toEqual(characterShots(mara.description, true));
-  expect(new Set(state.jobs.map((job) => job.input.seed)).size).toBe(1);
-  expect(state.jobs.every((job) => job.input.referenceAssets[0].assetId === "asset-front")).toBe(
-    true,
-  );
-  await expect.poll(() => state.characters[0].generated?.jobIds.length).toBe(4);
-  // Tiles follow the queued jobs, the first view first.
-  const picked = `${state.characters[0].generated.jobIds[0]}:0`;
-  await page.getByRole("button", { name: "Pick References", exact: true }).click();
-  const editor = page.getByRole("dialog", { name: "Edit Character", exact: true });
-  const generated = editor.getByRole("list", { name: "Generated References", exact: true });
-  await generated.getByRole("button", { name: "Add generated reference 1", exact: true }).click();
-  await expect(
-    editor.getByRole("button", { name: "Reference 3 · Images", exact: true }),
-  ).toBeVisible();
-  await editor.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(editor).toBeHidden();
-  expect(state.characters[0].referenceIds).toEqual([
-    "asset-front",
-    "asset-side",
-    `asset-${picked}`,
-  ]);
-});
-
 test("Make Sheet follows the card's sheet until its views show on the card", async ({ page }) => {
   const state = await fixtures(page);
   state.characters.push(structuredClone(mara));
@@ -361,7 +390,7 @@ test("Make Sheet follows the card's sheet until its views show on the card", asy
   state.characters[0].sheet = {
     ...state.characters[0].sheet,
     status: "done",
-    panels: ["face", "front", "side", "back", "gear", "sheet"].map((role) => ({
+    panels: ["face", "front", "side", "back", "sheet"].map((role) => ({
       ...mara.references[0],
       id: `asset-${role}`,
       role,
@@ -370,14 +399,14 @@ test("Make Sheet follows the card's sheet until its views show on the card", asy
   await page.reload();
   await expect(card).toContainText("2 images · Sheet");
   const views = card.getByRole("group", { name: "Mara's Sheet", exact: true });
-  for (const role of ["Face", "Front", "Side", "Back", "Gear"])
+  for (const role of ["Face", "Front", "Side", "Back"])
     await expect(views.getByRole("img", { name: `Mara ${role}`, exact: true })).toBeVisible();
   // A view opens full size over the page, and Escape closes only it.
   await views.getByRole("button", { name: "Preview Mara Front", exact: true }).click();
-  const preview = page.getByRole("dialog", { name: "Mara Front · 2 of 5", exact: true });
+  const preview = page.getByRole("dialog", { name: "Mara Front · 2 of 4", exact: true });
   await expect(preview).toBeVisible();
   await preview.getByRole("button", { name: "Next Image", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Mara Side · 3 of 5", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Mara Side · 3 of 4", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: /^Mara Side/ })).toBeHidden();
   // Only the Library stays.
@@ -389,7 +418,7 @@ test("Make Sheet follows the card's sheet until its views show on the card", asy
   const sheet = editor.getByRole("region", { name: "Sheet", exact: true });
   await expect(
     sheet.getByRole("group", { name: "Mara's Sheet", exact: true }).getByRole("img"),
-  ).toHaveCount(5);
+  ).toHaveCount(4);
   await sheet.getByRole("button", { name: "Make Sheet Again", exact: true }).click();
   await expect(sheet.getByRole("status")).toHaveText("Making Sheet…");
 });

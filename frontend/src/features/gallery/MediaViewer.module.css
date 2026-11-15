@@ -164,7 +164,7 @@
   width: min(100%, var(--studio-composer-width));
 }
 
-/* The strip is sized to its versions. */
+/* The strip is sized to its thumbnails. */
 .strip {
   width: auto;
   max-width: min(100%, var(--studio-composer-width));
@@ -210,6 +210,12 @@
   outline-offset: -1px;
   opacity: 0.7;
   transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
+}
+
+/* A set result's versions stand smaller in its place, apart from the set's other results. */
+.variation[data-version] {
+  width: 40px;
+  height: 40px;
 }
 
 .variation[data-entering] {
@@ -323,7 +329,7 @@
 }
 
 /* A touch tap on the media fades the chrome out and back. Hidden chrome stays in the accessibility
-   tree, and focus reaching it brings it back; loading actions stay in sight, strips do not. With
+   tree, and focus reaching it brings it back; loading actions stay in sight, the strip does not. With
    nothing left in sight the media glides to the middle of the screen (MediaViewer.tsx measures the
    distance), keeping its fitted size. */
 .topBar,
