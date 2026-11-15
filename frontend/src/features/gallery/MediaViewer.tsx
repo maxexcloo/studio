@@ -588,7 +588,9 @@ export function MediaViewer({
                 <SegmentedControl
                   size="sm"
                   radius="xl"
+                  fullWidth
                   style={glass}
+                  classNames={{ root: classes.choices, label: classes.choice }}
                   aria-label="Shown Image"
                   value={together ? "together" : item.id}
                   onChange={(value) => {
