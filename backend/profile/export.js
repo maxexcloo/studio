@@ -17,10 +17,9 @@ import path from "node:path";
 
 import { zipBuffer } from "../gallery/export.js";
 import { writeBytesFile } from "../json-store.js";
-import { hashOf } from "./store.js";
+import { hashOf, validId } from "./store.js";
 
 const exportsKept = 20;
-const validId = (id) => /^[a-z0-9][a-z0-9._-]{0,79}$/.test(id) && !id.includes("..");
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const sorted = (value) =>
   Object.fromEntries(Object.entries(value || {}).sort(([a], [b]) => a.localeCompare(b)));
