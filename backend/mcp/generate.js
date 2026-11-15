@@ -799,8 +799,7 @@ export function registerGenerateTools({
           ...(controls.loras
             ? {
                 loras_total: total,
-                loras_note:
-                  "Only when the user asks for a LoRA: find it with lora_query, then pass its name to generate.",
+                loras_note: `Only when the user asks for a LoRA: find it with lora_query, then pass its name to generate.${profile.capabilities?.defaultLoras === false ? " This model does best without LoRAs: add one only when the user names it." : ""}`,
               }
             : {}),
           ...(guide ? { prompting: guide } : {}),

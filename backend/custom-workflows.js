@@ -364,6 +364,8 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
       startImage: mediaInputs.length > 0 || Boolean(controls.startImage),
       startImageRequired: mediaInputs.some((item) => item.required || item.min > 0),
       imageToImage: meta.capabilities?.imageToImage === true || mediaInputs.length > 0,
+      // A profile that does best without LoRAs: chats and Dream add none unless asked.
+      ...(meta.capabilities?.defaultLoras === false ? { defaultLoras: false } : {}),
       denoise: Boolean(controls.denoise),
       textEncoder: Boolean(controls.textEncoder),
       vae: Boolean(controls.vae),
