@@ -35,6 +35,7 @@ import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {
   capabilityForProfile,
   defaultWorkerId,
+  isRadianceWorker,
   listWorkers,
   noWorkerMessage,
   workerById,
@@ -330,9 +331,13 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
           galleryItem(id, ownerId)?.settings?.referenceAssets?.map((asset) => asset.assetId) || [],
       });
     }
+    // Radiance takes its references with the request (radiance-jobs.js), so nothing is staged for it.
+    const staging = !isRadianceWorker(workerById(backend));
     // An older page (or a draft restored from before the reference library) can
     // send only the image's id; treat it as the reference instead of losing it.
-    if (!body.referenceAssets?.length && body.startImageId && !body.startImage) {
+    if (!body.referenceAssets?.length && body.startImageId && !body.startImage && !staging)
+      body.referenceAssets = [{ slot: "reference", assetId: body.startImageId }];
+    if (!body.referenceAssets?.length && body.startImageId && !body.startImage && staging) {
       // Not a library id (an old start-image upload): keep the legacy path for it.
       body.referenceAssets = await stageReferenceAssetsForAccount(
         backend,
@@ -341,7 +346,11 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
         { unique: Boolean(body.ownerId), generation: body },
       ).catch(() => []);
     }
-    if (body.referenceAssets?.length && !body.referenceAssets.every((item) => item.comfyName)) {
+    if (
+      staging &&
+      body.referenceAssets?.length &&
+      !body.referenceAssets.every((item) => item.comfyName)
+    ) {
       try {
         body.referenceAssets = await stageReferenceAssetsForAccount(
           backend,

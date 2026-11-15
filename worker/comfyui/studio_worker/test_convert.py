@@ -64,19 +64,19 @@ def native(file, dtype="F8_E4M3"):
     )
 
 
-class RecipeTests(unittest.TestCase):
-    def test_recipe_follows_the_weights(self):
+class CheckTests(unittest.TestCase):
+    def test_only_plain_weights_convert(self):
         with tempfile.TemporaryDirectory() as directory:
             file = Path(directory) / "model.safetensors"
             native(file)
-            self.assertEqual(convert.recipe(file), "krea-2-fp8-unscaled.recipe")
+            convert.check(file)
             native(file, "BF16")
-            self.assertEqual(convert.recipe(file), "krea-2-fp8.recipe")
+            convert.check(file)
             safetensors(
                 file, {"blocks.0.attn.wq.weight_scale": {"dtype": "F32", "shape": [1]}}
             )
             with self.assertRaisesRegex(ValueError, "scaled or quantised"):
-                convert.recipe(file)
+                convert.check(file)
 
     def test_mapping_renames_tensors_and_keeps_their_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -132,7 +132,7 @@ class ConversionTests(unittest.TestCase):
     def start(self, sha256=None):
         data = self.fixture.read_bytes()
         return convert.start(
-            "fine-tune-fp8",
+            "fine-tune-iq8r",
             "https://civitai.com/api/download/models/1?fileId=2",
             len(data),
             sha256 or hashlib.sha256(data).hexdigest(),
@@ -152,7 +152,11 @@ class ConversionTests(unittest.TestCase):
         conversion = self.finish()
         self.assertEqual(conversion["status"], "done", conversion)
         self.assertEqual(conversion["note"], {"profile": "image-fine-tune"})
-        self.assertEqual((self.models / "fine-tune-fp8.rad").read_bytes(), b"rad")
+        self.assertEqual((self.models / "fine-tune-iq8r.rad").read_bytes(), b"rad")
+        self.assertEqual(
+            (self.models / "fine-tunes.yaml").read_text(),
+            "  fine-tune-iq8r:\n    model: /models/radiance/fine-tune-iq8r.rad\n    tp: 1\n",
+        )
         calls = [json.loads(line) for line in self.log.read_text().splitlines()]
         self.assertEqual(len(calls), len(convert.BASE_FILES) + 1)
         self.assertTrue(
@@ -165,12 +169,12 @@ class ConversionTests(unittest.TestCase):
         work = self.models / ".convert"
         self.assertEqual(
             sorted(path.name for path in work.iterdir()),
-            ["fine-tune-fp8.log", "krea-2-turbo", "sources"],
+            ["fine-tune-iq8r.log", "krea-2-turbo", "sources"],
         )
         self.assertEqual(list((work / "sources").iterdir()), [])
         with self.assertRaisesRegex(ValueError, "already exists"):
             self.start()
-        convert.clear("fine-tune-fp8")
+        convert.clear("fine-tune-iq8r")
         self.assertIsNone(convert.status()["conversion"])
 
     def test_a_mismatched_download_fails_and_is_removed(self):
@@ -179,7 +183,7 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(conversion["status"], "failed")
         self.assertIn("checksum", conversion["error"])
         self.assertEqual(list((self.models / ".convert/sources").iterdir()), [])
-        self.assertFalse((self.models / "fine-tune-fp8.rad").exists())
+        self.assertFalse((self.models / "fine-tune-iq8r.rad").exists())
 
     def test_cancel_stops_the_download_and_keeps_its_partial(self):
         with patch.dict(os.environ, {"CURL_SLEEP": "1"}):

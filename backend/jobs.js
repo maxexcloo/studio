@@ -17,6 +17,7 @@ import {
 } from "./media-store.js";
 import { warmNewOutputs } from "./media-warmup.js";
 import { nextProgress } from "./progress-phase.js";
+import { runRadianceJob } from "./radiance-jobs.js";
 import { missedUpscaleState, pairRunOutputs, runUpscaleState } from "./run-upscale.js";
 import {
   generationEstimate,
@@ -26,7 +27,7 @@ import {
   upscaleEstimate,
 } from "./timings.js";
 import { upscaleLeftMs, upscaleWork } from "./upscale-timing.js";
-import { defaultWorkerId } from "./workers.js";
+import { defaultWorkerId, isRadianceWorker, workerById } from "./workers.js";
 import { markWorkflowUsed } from "./workflow-catalogue.js";
 
 export const jobs = new Map();
@@ -502,6 +503,7 @@ function showReconnecting(id, run, on) {
  */
 async function runJob(id, body, { prepare = null } = {}) {
   const worker = body.comfyBackend;
+  if (isRadianceWorker(workerById(worker))) return runRadianceJob(id, body, workerById(worker));
   jobBodies.set(id, body);
   const timing = { timer: null, estimate: generationEstimate(body), warm: false };
   runTimings.set(id, timing);

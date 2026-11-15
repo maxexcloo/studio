@@ -10,6 +10,7 @@ import {
 import { families } from "../family-catalogue.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
 import { canonicalProfileId } from "../profile/store.js";
+import { radianceImageNode } from "../providers/radiance.ts";
 import { classifyModel } from "./families.js";
 
 function modelBasename(name = "") {
@@ -261,7 +262,8 @@ export function inferModels(
     "VAEDecode",
     "SaveImage",
   ]);
-  if (!configuredOnly && missingCoreImageNodes.length) {
+  // A Radiance worker runs only Radiance nodes (providers/radiance.ts).
+  if (!configuredOnly && missingCoreImageNodes.length && !info?.[radianceImageNode]) {
     return emptyModelResult({
       reason: `ComfyUI is missing required image nodes: ${missingCoreImageNodes.join(", ")}`,
     });
@@ -457,10 +459,8 @@ export function inferModels(
       aspectPolicy: workflow.aspectPolicy,
       maxLoras: workflow.loraStack?.max,
       backend: workflow.backend,
-      // Radiance video takes a request's LoRAs through one rank-64 slot (ai's video runtime), so the picker says so.
-      ...(workflow.kind === "video" && workflow.loraStack?.adapter === "radiance-tags-v1"
-        ? { loraNote: "Up to rank 64 in total" }
-        : {}),
+      // Radiance truncates a LoRA above rank 64, so the picker says so.
+      ...(workflow.loraStack?.adapter === "radiance-tags-v1" ? { loraNote: "Up to rank 64" } : {}),
     });
     const reason = configuredOnly ? "" : unready(workflow);
     if (reason)

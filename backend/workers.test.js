@@ -76,6 +76,13 @@ test("without STUDIO_WORKERS, the image and video workloads give one worker per 
       label: "Video · 2 GPUs",
       gpus: 2,
     }),
+    workload("radiance", "image", "http://radiance:8000", {
+      label: "Radiance",
+      worker: "radiance",
+      backend: "radiance",
+      capabilities: ["image", "video"],
+      gpus: 2,
+    }),
     workload("text-qwen", "text", "http://qwen:8000", { model: "local/auto" }),
   ];
   const list = deploymentWorkers({}, workloads);
@@ -85,12 +92,21 @@ test("without STUDIO_WORKERS, the image and video workloads give one worker per 
       name: "Primary",
       url: "http://comfyui:8188",
       capabilities: ["image", "video", "upscale", "models"],
+      backend: "comfyui",
     },
     {
       id: "comfyui-video",
       name: "Video",
       url: "http://comfyui-video:8188",
       capabilities: ["video"],
+      backend: "comfyui",
+    },
+    {
+      id: "radiance",
+      name: "Radiance",
+      url: "http://radiance:8000",
+      capabilities: ["image", "video"],
+      backend: "radiance",
     },
   ]);
   const listed = [{ id: "local", url: "http://local:8188", capabilities: ["image"] }];
