@@ -9,12 +9,11 @@ import {
   validAccountKey,
 } from "./account-policy.js";
 import { accountPreferences, forgetAccountPreferences } from "./account-preferences.js";
-import { currentDataDir } from "./data-dir.js";
+import { dataDir } from "./data-dir.js";
 import { scryptAsync } from "./kdf.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { digest } from "./values.js";
 
-const dataDir = currentDataDir();
 const sessionLifetimeMs = 30 * 24 * 60 * 60 * 1000;
 const maxSessions = 500;
 const kdf = "scrypt-n32768-r8-p1";
