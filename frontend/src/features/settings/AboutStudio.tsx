@@ -2,6 +2,7 @@ import { Anchor, Group, Kbd, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { Fragment } from "react";
 
+import { homepage as repository } from "../../../../package.json";
 import { api } from "../../api";
 import { CopyButton } from "../../ui/CopyButton";
 import { icons } from "../../ui/icons";
@@ -9,7 +10,6 @@ import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { StudioLogo } from "../../ui/StudioLogo";
 import { usePhone } from "../../ui/usePhone";
 
-const repository = "https://github.com/maxexcloo/studio";
 // Studio's lineage first, then what it runs on.
 const credits = [
   {

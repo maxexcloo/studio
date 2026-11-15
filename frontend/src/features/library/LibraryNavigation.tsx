@@ -1,5 +1,6 @@
 import { ArchiveX, BookOpen, Boxes, FileCog, HardDriveDownload, Import } from "lucide-react";
 
+import { cardKinds } from "../../../../shared/characters";
 import { icons } from "../../ui/icons";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
@@ -98,7 +99,7 @@ export function useLibraryNavigation() {
   return {
     admin,
     options: visibleSections(librarySections, admin, (key) =>
-      ["characters", "outfits", "scenes"].includes(key) ? characters : key === "presets" || admin,
+      Object.hasOwn(cardKinds, key) ? characters : key === "presets" || admin,
     ),
   };
 }
