@@ -86,13 +86,15 @@ export function BenchmarkResults() {
     );
   return (
     <SettingGroup title="Benchmarks">
+      <Text size="sm" c="dimmed">
+        Recent benchmarks, newest first, and who asked.
+      </Text>
       <DataTable
         label="Benchmarks"
         rows={status.runs}
         rowKey={(run) => run.id}
         rowName={(run) => run.label}
         empty="No Benchmarks"
-        compact
         rowActions={(run) =>
           run.status === "running" && (
             <Menu.Item
@@ -106,6 +108,15 @@ export function BenchmarkResults() {
         }
         columns={[
           {
+            key: "time",
+            header: "Time",
+            cell: (run) => (
+              <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                {shortDateTime.format(new Date(run.startedAt))}
+              </Text>
+            ),
+          },
+          {
             key: "model",
             header: "Model",
             main: true,
@@ -115,13 +126,14 @@ export function BenchmarkResults() {
                 <Text size="sm" fw={500}>
                   {run.label}
                 </Text>
-                <Text
-                  size="xs"
-                  c={run.error ? "red" : "dimmed"}
-                  style={{ overflowWrap: "anywhere" }}
-                >
-                  {run.error ?? `${run.model} · ${shortDateTime.format(new Date(run.startedAt))}`}
+                <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
+                  {run.model} · Requested by {run.requestedBy}
                 </Text>
+                {run.error && (
+                  <Text size="xs" c="red">
+                    {run.error}
+                  </Text>
+                )}
               </Stack>
             ),
           },
