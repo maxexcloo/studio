@@ -202,7 +202,7 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });
 
-test("Report Issue… fixes the image as a new version and dislikes the original with the issue", async ({
+test("Report fixes the image as a new version and dislikes the original with the issue", async ({
   page,
 }) => {
   const asked: any[] = [];
@@ -225,8 +225,7 @@ test("Report Issue… fixes the image as a new version and dislikes the original
       });
     }),
   );
-  await viewerAction(page, "Recreate");
-  await page.getByRole("menuitem", { name: "Report Issue…", exact: true }).click();
+  await viewerAction(page, "Report");
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   const fix = report.getByRole("button", { name: "Fix & Recreate", exact: true });
   await expect(fix).toBeDisabled();
@@ -460,7 +459,7 @@ test("The strip shows iterations of iterations as a tree, newest first and the o
   await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
 
-test("Recreate › Similar › More Like This Set asks for new variations of a result's set", async ({
+test("Recreate › More Like This Set asks for new variations of a result's set", async ({
   page,
 }) => {
   const asked: unknown[] = [];
@@ -470,17 +469,13 @@ test("Recreate › Similar › More Like This Set asks for new variations of a r
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "Recreate", "Similar");
-  await page.getByRole("menuitem", { name: "More Like This Set", exact: true }).click();
+  await viewerAction(page, "Recreate", "More Like This Set");
   await expect.poll(() => asked).toEqual([{ itemId: "hub" }]);
 });
 
 test("More Like This Set is offered only for a result in a set", async ({ page }) => {
   await seed(page);
-  // Similar's menu still holds its strictness and its run.
-  await viewerAction(page, "Recreate", "Similar");
-  await expect(page.getByRole("radiogroup", { name: "Strictness", exact: true })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Similar", exact: true })).toHaveCount(2);
+  await viewerAction(page, "Recreate");
   await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
     0,
@@ -942,7 +937,7 @@ test("With local video stopped, an Animate theme queues on Grok", async ({ page 
   });
 });
 
-test("A video's Extend theme continues it from its last frame, and its frame can be a reference or an image", async ({
+test("A video's Animate template continues it from its last frame, and Edit makes its frame a reference or an image", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -962,7 +957,7 @@ test("A video's Extend theme continues it from its last frame, and its frame can
   await page.goto("/video");
   await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await viewer.getByRole("button", { name: "Extend", exact: true }).click();
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(
     page.getByRole("menuitem", { name: "Extend in Composer", exact: true }),
   ).toBeVisible();
@@ -977,7 +972,7 @@ test("A video's Extend theme continues it from its last frame, and its frame can
     },
   });
   // The frame showing is saved as an image, or becomes a reference in the composer.
-  await viewer.getByRole("button", { name: "Extend", exact: true }).click();
+  await viewer.getByRole("button", { name: "Edit", exact: true }).click();
   await page.getByRole("menuitem", { name: "Save Frame as Image", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Saved to Uploads", exact: true })).toBeVisible();
   expect(state.referenceRequests.at(-1)).toEqual({ save: true, galleryItemId: "clip", frame: 0 });
@@ -1586,11 +1581,19 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   const phone = viewport.width < 768;
   if (phone) {
     // Phones fit every action on the bar's one row; names drop from the last where they outgrow
-    // it, Like, Dislike and Delete having none.
+    // it, only the four menus having any.
     const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
-    const row = ["Animate", "Edit", "Recreate", "Share", "Like", "Dislike", "Delete"].map((name) =>
-      bar.getByRole("button", { name, exact: true }),
-    );
+    const row = [
+      "Animate",
+      "Edit",
+      "Recreate",
+      "Upscale",
+      "Like",
+      "Dislike",
+      "Share",
+      "Similar",
+      "Delete",
+    ].map((name) => bar.getByRole("button", { name, exact: true }));
     const tops = await Promise.all(
       row.map(async (control) => {
         const box = (await control.boundingBox())!;

@@ -9,9 +9,13 @@ import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionTo
 import { CardThumbnails } from "./CardImages";
 import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCardDialogs";
 import { type PromptCardKind, promptCardsQuery } from "./queries";
+import { useCardFrom } from "./useCardFrom";
 import { useCardInComposer } from "./useCardInComposer";
 
-/** Library › Outfits and Library › Scenes: every card of the kind, to search, edit and delete. */
+/**
+ * Library › Outfits and Library › Scenes: every card of the kind, to search, edit and delete. Use as
+ * Outfit and Use as Scene open here, starting a new card from their image (useCardFrom).
+ */
 export function LibraryPromptCards({
   kind,
   heading,
@@ -23,6 +27,7 @@ export function LibraryPromptCards({
   const label = `${noun}s`;
   const listing = useQuery(promptCardsQuery(kind));
   const dialogs = usePromptCardDialogs(kind);
+  const start = useCardFrom((asset) => dialogs.edit(undefined, [asset]));
   const use = useCardInComposer();
   const [query, setQuery] = useState("");
   const words = query.trim().toLowerCase();
@@ -41,6 +46,7 @@ export function LibraryPromptCards({
           }
         />
       </SectionHeader>
+      {start.error && <Alert color="red">{start.error.message}</Alert>}
       {listing.isPending ? (
         <LoadingState fill label={`Loading ${label}`} />
       ) : listing.error ? (

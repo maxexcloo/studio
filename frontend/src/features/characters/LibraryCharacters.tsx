@@ -1,10 +1,7 @@
 import { Alert, Button, Group, Paper, Progress, SimpleGrid, Stack, Text } from "@mantine/core";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useQuery } from "@tanstack/react-query";
+import { type ReactNode, useState } from "react";
 
-import { post } from "../../api";
-import type { ReferenceAsset } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -15,35 +12,20 @@ import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import { sheetViews } from "./CharacterEditor";
 import { type CharacterCard, charactersQuery } from "./queries";
+import { useCardFrom } from "./useCardFrom";
 import { useCardInComposer } from "./useCardInComposer";
 
 /**
  * Library › Characters: every card the account keeps, to search, edit and delete, after the cards
- * Dream suggests (CardSuggestions). Use as Character
- * opens here with `characterFrom` (a gallery image's ID) in the route state, starting a new card
- * from that image.
+ * Dream suggests (CardSuggestions). Use as Character opens here, starting a new card from its
+ * image (useCardFrom).
  */
 export function LibraryCharacters({ heading }: { heading: ReactNode }) {
   const characters = useQuery(charactersQuery);
   const dialogs = useCharacterDialogs();
   const use = useCardInComposer();
   const [query, setQuery] = useState("");
-  const location = useLocation();
-  const navigate = useNavigate();
-  const from = (location.state as { characterFrom?: string } | null)?.characterFrom;
-  const start = useMutation({
-    mutationFn: (galleryItemId: string) =>
-      post<{ asset: ReferenceAsset }>("/api/reference-assets/from-gallery", { galleryItemId }),
-    onSuccess: ({ asset }) => dialogs.edit(undefined, { references: [asset] }),
-  });
-  const started = useRef("");
-  useEffect(() => {
-    if (!from || started.current === from) return;
-    started.current = from;
-    start.mutate(from);
-    // The image is taken; a reload or Back opens the section without starting another card.
-    navigate(location, { replace: true, state: { ...location.state, characterFrom: undefined } });
-  }, [from]);
+  const start = useCardFrom((asset) => dialogs.edit(undefined, { references: [asset] }));
   const words = query.trim().toLowerCase();
   const cards = (characters.data || []).filter(
     (card) => !words || `${card.name} ${card.description}`.toLowerCase().includes(words),
