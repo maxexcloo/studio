@@ -15,11 +15,7 @@ import { localRefusal, requireLocal } from "./route-access.js";
 export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
   // The form's file becomes the `upload` the shared route takes; MCP passes its own.
   app.post("/api/reference-assets/upload", async (req, res, next) => {
-    try {
-      req.body = { upload: await readMultipartUpload(req) };
-    } catch (error) {
-      return res.status(400).json({ ok: false, error: error.message });
-    }
+    req.body = { upload: await readMultipartUpload(req) };
     next();
   });
   directRoute(app, "POST", "/api/reference-assets/upload", async (account, { body }) => {
