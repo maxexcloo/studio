@@ -139,17 +139,13 @@ export async function mediaDraft(
   const firstSlot = profileForBackend(profile, undefined, true)?.mediaInputs?.[0]?.id || "image";
   const recordedReferences = source?.input.referenceAssets ?? item.settings?.referenceAssets;
   const recordedDetails = Array.isArray(saved.referenceDetails) ? saved.referenceDetails : [];
-  let restored = Array.isArray(recordedReferences)
+  const restored = Array.isArray(recordedReferences)
     ? recordedReferences.map((reference) => ({ ...reference }))
     : recordedDetails.map((asset: ReferenceAsset) => ({
         assetId: asset.id,
         slot: asset.slot || firstSlot,
         strength: asset.strength,
       }));
-  // A job submitted with only `startImageId` (an MCP or API alias) recorded its one reference there.
-  const startImageId = String(saved.startImageId || "");
-  if (operation === "image" && !restored.length && startImageId)
-    restored = [{ assetId: startImageId, slot: firstSlot }];
   const references: ReferenceAsset[] =
     operation !== "image"
       ? []

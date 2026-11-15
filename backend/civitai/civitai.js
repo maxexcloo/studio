@@ -97,9 +97,7 @@ export function parametersText(body = {}, { width = 0, height = 0, hashes = {} }
   if (modelFile && hashes[modelFile]) settings.push(["Model hash", hashes[modelFile]]);
   if (modelFile && !String(modelFile).startsWith("custom:"))
     settings.push(["Model", stem(modelFile)]);
-  const hasReference = Boolean(
-    body.startImageId || body.startImage || body.referenceAssets?.length,
-  );
+  const hasReference = Boolean(body.referenceAssets?.length);
   if (hasReference && Number(body.denoise) > 0 && Number(body.denoise) < 1)
     settings.push(["Denoising strength", Number(body.denoise)]);
   const loraHashes = loras

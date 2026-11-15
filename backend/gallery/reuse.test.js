@@ -389,7 +389,7 @@ test("Radiance reference settings omit unsupported denoise", async () => {
   const reference = {
     kind: "image",
     modelName: "qwen-image.rad",
-    startImageId: "reference",
+    referenceAssets: [{ assetId: "reference" }],
     denoise: 0.7,
   };
   assert.equal(generationSettings(reference).denoise, undefined);
