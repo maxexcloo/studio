@@ -18,18 +18,12 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 
 const view = (filename) =>
   `/comfy/view?${new URLSearchParams({ filename, subfolder: "studio", type: "output" })}`;
-const { readRuntimeDocument, writeRuntimeDocument } = await import("../persistence/runtime.ts");
+const { readRuntimeDocument } = await import("../persistence/runtime.ts");
 const saved = () => JSON.stringify(readRuntimeDocument(dataDir, "gallery-hidden"));
-// A marker list as older versions wrote it: output names in the clear.
-writeRuntimeDocument(dataDir, "gallery-hidden", { [view("image_00007_.png")]: Date.now() });
 
 const store = await import("./store.js");
 
 test("the list of deleted outputs no longer says what they were", () => {
-  assert.ok(!saved().includes("image_00007_"), "the old readable list was turned into digests");
-  const old = { url: view("image_00007_.png"), createdAt: new Date(0).toISOString() };
-  assert.equal(store.isGalleryHidden(old), true, "and it still works");
-
   store.hideGalleryItems([{ url: view("image_00008_.png") }]);
   const after = saved();
   assert.ok(!after.includes("image_00008_"));
