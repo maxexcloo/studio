@@ -64,11 +64,11 @@ export function CardIdeas({
   const loading = again.isPending || (ideas.isFetching && !options.length);
   const noun = nouns[field];
   const groups = assistMenu({
-    fixed: { label: "", options: [] },
+    templates: [],
     suggestions: [
       { id: "heading", label: "Suggestions", heading: true },
       ...(loading
-        ? [{ id: "thinking", label: `Writing ${noun}s`, disabled: true }]
+        ? [{ id: "loading", label: "Loading…", disabled: true }]
         : options.length
           ? options.map((idea): Action => ({
               id: `idea:${idea}`,
