@@ -11,14 +11,14 @@ export interface FinishingItem {
   type?: string;
   status?: string;
   prompt?: string;
-  favorite?: boolean;
+  rating?: string;
   upscale?: { status?: string; url?: string };
 }
 /** Whether smart upscale can run now, and with face detail. */
 type FinishingReadiness = { reason: string } | { reason?: undefined; faceDetail: boolean };
 interface FinishingRecord {
   settings: FinishingSettings;
-  /** Starred item IDs waiting to be finished, oldest first. */
+  /** Liked item IDs waiting to be finished, oldest first. */
   waiting: string[];
 }
 interface Request {
@@ -46,7 +46,7 @@ const waiting = (job: OwnedJob) => ["queued", "waiting"].includes(job.status);
 const finishingJob = (job: OwnedJob) => job.priority === queuePriority.finishing;
 
 /**
- * Finish Starred Images: an image an account stars is queued for smart upscale while Studio is idle,
+ * Finish Liked Images: an image an account likes is queued for smart upscale while Studio is idle,
  * by the captioner's rule (no live job, Dream's included, and no text work). One runs at a time,
  * at the tier above Dream's, on the upscale worker only; a waiting one is cancelled and requeued the
  * moment higher-tier work arrives, and a started one finishes. Settings and the waiting list live per
@@ -87,13 +87,13 @@ export function createFinishing(options: {
   }
   const write = (ownerId: string, record: FinishingRecord) =>
     writeRuntimeDocument(options.dataDir, name(ownerId), record);
-  /** A finished, starred, owned image with no upscale, made or on its way. */
+  /** A finished, liked, owned image with no upscale, made or on its way. */
   const finishable = (item?: FinishingItem) =>
     Boolean(
       item &&
       item.type === "image" &&
       item.status === "done" &&
-      item.favorite &&
+      item.rating === "liked" &&
       !item.upscale?.url &&
       !["queued", "running"].includes(item.upscale?.status || ""),
     );
@@ -103,13 +103,13 @@ export function createFinishing(options: {
 
   let noted = "";
   function note(reason: string) {
-    if (reason && reason !== noted) log.info(`Finish Starred Images waits: ${reason}`);
+    if (reason && reason !== noted) log.info(`Finish Liked Images waits: ${reason}`);
     noted = reason;
   }
   let ticking = false;
   let next = 0;
   let timer: ReturnType<typeof setInterval> | undefined;
-  const tickFailed = logFailure("Finish Starred Images");
+  const tickFailed = logFailure("Finish Liked Images");
   async function tick() {
     if (ticking || !options.idle()) return;
     ticking = true;
@@ -144,7 +144,7 @@ export function createFinishing(options: {
         });
         if (result.status >= 400)
           log.info(
-            `Finish Starred Images skips ${itemId}: ${String(result.payload.error || result.status)}`,
+            `Finish Liked Images skips ${itemId}: ${String(result.payload.error || result.status)}`,
           );
         next = index + 1;
         return;
@@ -173,7 +173,7 @@ export function createFinishing(options: {
     tick,
     start() {
       timer ||= setInterval(
-        () => void tracked("Finish Starred Images", tick).catch(tickFailed),
+        () => void tracked("Finish Liked Images", tick).catch(tickFailed),
         tickMs,
       );
       timer.unref();
@@ -183,7 +183,7 @@ export function createFinishing(options: {
       timer = undefined;
     },
     allowed: (ownerId: string) => options.allowed(ownerId),
-    /** How many starred images wait to be finished. */
+    /** How many liked images wait to be finished. */
     waiting: (ownerId: string) => pending(ownerId).length,
     /** Hears every admitted job: higher-tier work makes a waiting finishing upscale step aside at once. */
     admitted(job: OwnedJob) {
@@ -198,11 +198,11 @@ export function createFinishing(options: {
       if (!record.settings.enabled) await stopWaiting(ownerId, false);
       return record.settings;
     },
-    /** Starring adds finishable images to the waiting list; unstarring takes them off it. */
-    starred(ownerId: string, itemIds: string[], favorite: boolean) {
+    /** Liking adds finishable images to the waiting list; unliking takes them off it. */
+    liked(ownerId: string, itemIds: string[], liked: boolean) {
       const record = read(ownerId);
-      if (!record.settings.enabled || !options.allowed(ownerId)) return;
-      const ids = favorite
+      if (!itemIds.length || !record.settings.enabled || !options.allowed(ownerId)) return;
+      const ids = liked
         ? [
             ...record.waiting,
             ...itemIds.filter(
@@ -211,13 +211,13 @@ export function createFinishing(options: {
           ]
         : record.waiting.filter((id) => !itemIds.includes(id));
       write(ownerId, { ...record, waiting: [...new Set(ids)] });
-      if (favorite && timer) void tick().catch(tickFailed);
+      if (liked && timer) void tick().catch(tickFailed);
     },
   };
 }
 export type Finishing = ReturnType<typeof createFinishing>;
 
-/** The caller's own Finish Starred Images settings and how many images wait. */
+/** The caller's own Finish Liked Images settings and how many images wait. */
 export function registerFinishingRoutes(app: Router, { finishing }: { finishing: Finishing }) {
   const owner = (req: Request) => req.studioAccount?.userId || "";
   const allowed = (req: Request, res: Response) => {

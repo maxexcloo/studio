@@ -202,6 +202,56 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });
 
+test("Report Issue… fixes the image as a new version and dislikes the original with the issue", async ({
+  page,
+}) => {
+  const asked: any[] = [];
+  const { state } = await seed(page, {}, (page) =>
+    page.route("**/api/suggestions", (route) => {
+      const body = route.request().postDataJSON();
+      if (body.surface !== "change") return route.fallback();
+      asked.push(body);
+      return route.fulfill({
+        json: {
+          suggestions: [
+            {
+              action: "edit",
+              label: "Fix Hands",
+              request: body.request,
+              prompt: "An amber bird with natural claws",
+            },
+          ],
+        },
+      });
+    }),
+  );
+  await viewerAction(page, "Recreate");
+  await page.getByRole("menuitem", { name: "Report Issue…", exact: true }).click();
+  const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
+  const fix = report.getByRole("button", { name: "Fix & Recreate", exact: true });
+  await expect(fix).toBeDisabled();
+  await report.getByText("Hands", { exact: true }).click();
+  await expect(report.getByRole("checkbox", { name: "Hands", exact: true })).toBeChecked();
+  await report.getByRole("textbox", { name: "Details", exact: true }).fill("six toes");
+  await fix.click();
+  await expect(report).toBeHidden();
+  expect(asked).toEqual([
+    {
+      surface: "change",
+      jobId: "job-hub",
+      request: "Fix what is wrong, keeping everything else: Hands: six toes",
+      actions: ["edit", "recreate"],
+    },
+  ]);
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1]).toMatchObject({
+    operation: "refine",
+    parentItemId: "hub",
+    input: { prompt: "An amber bird with natural claws" },
+  });
+  await expect.poll(() => state.gallery.find((item) => item.id === "hub")?.rating).toBe("disliked");
+});
+
 test("Edit offers the image's next steps as changes, and picking one asks at once", async ({
   page,
 }) => {
@@ -1535,9 +1585,10 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   expect(bounds?.height).toBe(viewport.height);
   const phone = viewport.width < 768;
   if (phone) {
-    // Phones fit every action on the bar's one row, each named but Star and Delete.
+    // Phones fit every action on the bar's one row; names drop from the last where they outgrow
+    // it, Like, Dislike and Delete having none.
     const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
-    const row = ["Animate", "Edit", "Recreate", "Share", "Star", "Delete"].map((name) =>
+    const row = ["Animate", "Edit", "Recreate", "Share", "Like", "Dislike", "Delete"].map((name) =>
       bar.getByRole("button", { name, exact: true }),
     );
     const tops = await Promise.all(
@@ -1547,7 +1598,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       }),
     );
     expect(new Set(tops.map(Math.round)).size).toBe(1);
-    for (const name of ["Animate", "Edit", "Recreate", "Share"])
+    for (const name of ["Animate", "Edit"])
       await expect(bar.getByRole("button", { name, exact: true })).toHaveText(name);
   }
   await viewerAction(page, "Share");

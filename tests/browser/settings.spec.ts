@@ -343,7 +343,7 @@ test("Spicy Prompts shows in Settings › Preferences only with Uncensored Model
   await expect.poll(() => state.preferences.preferences.spicyPrompts).toBe(true);
 });
 
-test("Finish Starred Images in Settings › Preferences saves its switch, quality and face detail", async ({
+test("Finish Liked Images in Settings › Preferences saves its switch, quality and face detail", async ({
   page,
 }) => {
   await fixtures(page);
@@ -362,7 +362,7 @@ test("Finish Starred Images in Settings › Preferences saves its switch, qualit
     return route.fulfill({ json: status });
   });
   await page.goto("/settings#preferences");
-  const toggle = page.getByRole("switch", { name: "Finish Starred Images", exact: true });
+  const toggle = page.getByRole("switch", { name: "Finish Liked Images", exact: true });
   await expect(toggle).not.toBeChecked();
   await expect(page.getByRole("combobox", { name: "Finishing Quality", exact: true })).toHaveCount(
     0,
@@ -370,7 +370,7 @@ test("Finish Starred Images in Settings › Preferences saves its switch, qualit
   await toggle.click({ force: true });
   await expect(toggle).toBeChecked();
   await expect(
-    page.getByText("Upscale images you star while the GPU is idle. 3 waiting.", { exact: true }),
+    page.getByText("Upscale images you like while the GPU is idle. 3 waiting.", { exact: true }),
   ).toBeVisible();
   await page.getByRole("combobox", { name: "Finishing Quality", exact: true }).click();
   await page.getByRole("option", { name: "High", exact: true }).click();

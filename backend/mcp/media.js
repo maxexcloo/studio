@@ -876,18 +876,18 @@ export class McpMedia {
   }
   /**
    * The account's finished gallery outputs as its gallery search finds them (GET /api/gallery: the
-   * words, Image Search's "looks like", kind and starred), newest first. Each hit's job joins this
+   * words, Image Search's "looks like", kind and liked), newest first. Each hit's job joins this
    * scope's refs, so Reuse, Review and Result take it; a job another MCP owner holds is left out.
    */
   async search(
     owner,
     scope,
-    { query, kind, starred, model, lora, aspect, uploads, limit },
+    { query, kind, liked, model, lora, aspect, uploads, limit },
     { signal } = {},
   ) {
     const params = new URLSearchParams({ q: query, includeFailed: "0", limit: "200" });
     if (kind) params.set("type", kind);
-    if (starred) params.set("favorites", "1");
+    if (liked) params.set("rating", "liked");
     for (const [key, value] of Object.entries({ model, lora, aspect }))
       if (value) params.set(key, value);
     if (uploads) params.set("uploads", "1");
@@ -1972,7 +1972,7 @@ export class McpMedia {
     const jobs = await this.scopeJobs(owner, scope, { signal });
     if (!jobs.length)
       throw new Error(
-        "There are no results in this conversation yet. For the user's earlier or starred work, call search (starred: true for starred).",
+        "There are no results in this conversation yet. For the user's earlier or liked work, call search (liked: true for liked).",
       );
     const comparisons = await this.comparisons(
       owner,

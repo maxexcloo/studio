@@ -14,7 +14,7 @@ test.after(() => {
   for (const folder of [outputDir, dataDir]) fs.rmSync(folder, { recursive: true, force: true });
 });
 
-test("search looks through prompts, set titles, models and LoRAs; favourites filter by star", () => {
+test("search looks through prompts, set titles, models and LoRAs; ratings filter in SQL", () => {
   const done = (id, extra) => ({
     id,
     url: id,
@@ -75,12 +75,16 @@ test("search looks through prompts, set titles, models and LoRAs; favourites fil
   });
   assert.deepEqual([...page.items, ...next.items].map((item) => item.id).sort(), ["s2", "s3"]);
 
-  store.setGalleryFavorites(["s2"], true);
-  assert.deepEqual(ids(store.galleryFilter({ favorites: true })), ["s2", "s3"]);
-  store.setGalleryFavorites(["s2"], false);
-  assert.deepEqual(
-    ids(store.galleryFilter({ favorites: true })),
-    ["s3"],
-    "an unstarred image leaves the favourites",
-  );
+  const rated = (rating) =>
+    store
+      .pageGallery({ query: { rating } })
+      .items.map((item) => item.id)
+      .sort();
+  store.setGalleryRatings(["s2"], "liked");
+  store.setGalleryRatings(["s1"], "disliked");
+  assert.deepEqual(rated("liked"), ["s2"]);
+  assert.deepEqual(rated("disliked"), ["s1"]);
+  assert.deepEqual(ids(null), ["s2", "s3"], "a disliked image leaves the gallery");
+  store.setGalleryRatings(["s1", "s2"], null);
+  assert.deepEqual([rated("liked"), ids(null)], [[], ["s1", "s2", "s3"]]);
 });

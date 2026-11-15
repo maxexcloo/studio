@@ -29,10 +29,10 @@ export const galleryColumns: [string, string][] = [
   ["status", field("status")],
   ["upscale_status", field("upscale.status")],
   ["uploaded", `CASE WHEN ${field("uploaded")} THEN 1 ELSE 0 END`],
-  ["favorite", `CASE WHEN ${field("favorite")} THEN 1 ELSE 0 END`],
+  ["rating", field("rating")],
   [
-    "dream_pool",
-    `CASE WHEN json_type(value, '$.dream') = 'object' AND ${field("dream.state")} IS NOT 'kept' THEN 1 ELSE 0 END`,
+    "unlisted",
+    `CASE WHEN ${field("rating")} IS 'disliked' OR (json_type(value, '$.dream') = 'object' AND ${field("dream.state")} IS NOT 'kept') THEN 1 ELSE 0 END`,
   ],
   ["set_id", field("resultSet.id")],
   ["created_ms", `CAST(round(unixepoch(${field("createdAt")}, 'subsec') * 1000) AS INTEGER)`],
@@ -44,7 +44,7 @@ export const galleryColumns: [string, string][] = [
 
 // The gallery's order, then the columns pages filter on, so a page's count reads only the index.
 const galleryOrder =
-  "uploaded, dream_pool, bucket, created_ms DESC, job_id DESC, item_index, item_id DESC, status, type, favorite";
+  "uploaded, unlisted, bucket, created_ms DESC, job_id DESC, item_index, item_id DESC, status, type, rating";
 
 /** The indexes over `galleryColumns`: gallery order with and without an owner, jobs, ids, sets,
  * states, Dream states, an owner's prompts (a repeated prompt's title), times (recent work) and
@@ -62,19 +62,60 @@ export const galleryIndexes: [string, string][] = [
   ["studio_gallery_created", "created_ms"],
   [
     "studio_gallery_runs",
-    "created_ms, key, dream_pool, status, favorite, json_extract(value, '$.settings.profileId'), json_extract(value, '$.timing.runMs')",
+    "created_ms, key, unlisted, status, rating, json_extract(value, '$.settings.profileId'), json_extract(value, '$.timing.runMs')",
   ],
 ];
 
-/** The gallery table with its columns, for a database that has none yet. */
-export const createGalleryTable = `CREATE TABLE studio_gallery (key TEXT PRIMARY KEY, value TEXT NOT NULL, ${galleryColumns
-  .map(([name, expression]) => `${name} GENERATED ALWAYS AS (${expression}) VIRTUAL`)
-  .join(", ")})`;
-
-/** The gallery's indexes, made where missing as the database opens. */
-export const createGalleryIndexes = galleryIndexes
-  .map(([name, keys]) => `CREATE INDEX IF NOT EXISTS ${name} ON studio_gallery (${keys})`)
-  .join(";\n");
+/**
+ * Creates the gallery table where missing and brings its derived columns and indexes in line with
+ * `galleryColumns` and `galleryIndexes`. They hold only what each row's JSON gives, so adding,
+ * replacing or dropping them changes no data.
+ */
+export function syncGallerySchema(db: DatabaseSync) {
+  db.exec("CREATE TABLE IF NOT EXISTS studio_gallery (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+  const columns = new Set(
+    (db.prepare("PRAGMA table_xinfo(studio_gallery)").all() as { name: string; hidden: number }[])
+      .filter((column) => column.hidden >= 2)
+      .map((column) => column.name),
+  );
+  const indexes = new Map(
+    (
+      db
+        .prepare(
+          "SELECT name, sql FROM sqlite_schema WHERE type = 'index' AND tbl_name = 'studio_gallery' AND sql IS NOT NULL",
+        )
+        .all() as { name: string; sql: string }[]
+    ).map((index) => [index.name, index.sql]),
+  );
+  const wanted = new Map(
+    galleryIndexes.map(([name, keys]) => [
+      name,
+      `CREATE INDEX ${name} ON studio_gallery (${keys})`,
+    ]),
+  );
+  const staleIndexes = [...indexes].filter(([name, sql]) => wanted.get(name) !== sql);
+  const staleColumns = [...columns].filter(
+    (name) => !galleryColumns.some(([want]) => want === name),
+  );
+  const newColumns = galleryColumns.filter(([name]) => !columns.has(name));
+  const newIndexes = [...wanted].filter(([name, sql]) => indexes.get(name) !== sql);
+  if (!staleIndexes.length && !staleColumns.length && !newColumns.length && !newIndexes.length)
+    return;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const [name] of staleIndexes) db.exec(`DROP INDEX ${name}`);
+    for (const name of staleColumns) db.exec(`ALTER TABLE studio_gallery DROP COLUMN ${name}`);
+    for (const [name, expression] of newColumns)
+      db.exec(
+        `ALTER TABLE studio_gallery ADD COLUMN ${name} GENERATED ALWAYS AS (${expression}) VIRTUAL`,
+      );
+    for (const [, sql] of newIndexes) db.exec(sql);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
 
 export function readGalleryRows(db: DatabaseSync): unknown[] {
   return (db.prepare("SELECT value FROM studio_gallery").all() as { value: string }[]).map((row) =>

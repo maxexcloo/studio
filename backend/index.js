@@ -118,7 +118,7 @@ import {
   putGalleryItems,
   recordsFromComfyHistory,
   resultNumbers,
-  setGalleryFavorites,
+  setGalleryRatings,
   updateGalleryJob,
   visibleGallery,
 } from "./gallery/store.js";
@@ -540,7 +540,7 @@ const assistantEngine = registerAssistantRoutes(app, {
   profiles: assistant.profiles,
   guide: assistant.guide,
   loras: assistant.loras,
-  starred: assistant.starred,
+  liked: assistant.liked,
 });
 
 const readComparisons = () => {
@@ -566,7 +566,7 @@ registerGalleryReadRoutes(app, {
 
 registerLoraRoutes(app, { comfyDownMessage, latestComfyContext });
 
-// Taste profiles (domain/taste.ts) learn from stars, compare votes and iterations on a result.
+// Taste profiles (domain/taste.ts) learn from likes and dislikes, compare votes and iterations on a result.
 // A gone or disabled account's prompts never reach the text model.
 const tasteWriter = (ownerId) =>
   ownerId && !accountAccessForId(ownerId)?.authenticated ? null : assistantEngine;
@@ -590,38 +590,48 @@ const taste = {
       ),
     ),
 };
-/** Hears which of an account's items were starred or unstarred, by hand or by animating a photo. */
-const itemsStarred = (ownerId, items, favorite) => {
-  if (favorite)
-    dream.starred(
-      ownerId,
-      items.map((item) => item.id),
-    );
-  finishing.starred(
+/**
+ * Hears which of an account's items were rated, by hand or by animating a photo: each with its
+ * new `rating` and the one it had (`was`). A dislike with an `issue` came from Report Issue.
+ */
+const itemsRated = (ownerId, items, issue = "") => {
+  dream.rated(ownerId, items);
+  const liked = items.filter((item) => item.rating === "liked");
+  finishing.liked(
     ownerId,
-    items.map((item) => item.id),
-    favorite,
+    liked.map((item) => item.id),
+    true,
   );
+  finishing.liked(
+    ownerId,
+    items.filter((item) => item.was === "liked").map((item) => item.id),
+    false,
+  );
+  const undone = { liked: "unlike", disliked: "undislike" };
+  const done = { liked: "like", disliked: issue ? "report" : "dislike" };
   taste.record(ownerId, [
-    ...items.map((item) => tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item))),
-    ...(favorite
-      ? setPreferenceSignals(
-          items,
-          [...new Set(items.map((item) => item.resultSet?.id).filter(Boolean))].flatMap((setId) =>
-            galleryItems({ setId }),
-          ),
-          itemValues,
-        )
-      : []),
+    ...items.flatMap((item) =>
+      [undone[item.was], done[item.rating]].filter(Boolean).map((kind) => ({
+        ...tasteSignal(kind, item.jobId, itemValues(item)),
+        ...(kind === "report" && { issue }),
+      })),
+    ),
+    ...setPreferenceSignals(
+      liked,
+      [...new Set(liked.map((item) => item.resultSet?.id).filter(Boolean))].flatMap((setId) =>
+        galleryItems({ setId }),
+      ),
+      itemValues,
+    ),
   ]);
 };
 // Every admitted job teaches the taste profile (iterations, chat reruns included) and makes a waiting finishing upscale step aside.
-// Animating one of the account's photos, from the app or MCP but not Dream, stars that photo.
+// Animating one of the account's photos, from the app or MCP but not Dream, likes that photo.
 const jobAdmitted = (job) => {
   if (job.parentJobId || job.parentItemId)
     taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
   const photo = job.priority === queuePriority.dream ? null : animatedPhoto(job);
-  if (photo) itemsStarred(job.ownerId, setGalleryFavorites([photo.id], true), true);
+  if (photo) itemsRated(job.ownerId, setGalleryRatings([photo.id], "liked"));
   finishing.admitted(job);
   captioner.interrupt();
   dreamReview.interrupt();
@@ -631,7 +641,7 @@ const jobAdmitted = (job) => {
   nextSteps.interrupt();
 };
 registerGalleryHistoryRoutes(app, {
-  starred: (req, items, favorite) => itemsStarred(ownerIdForRequest(req), items, favorite),
+  rated: (req, items, issue) => itemsRated(ownerIdForRequest(req), items, issue),
 });
 
 registerPreferenceRoutes(app);
@@ -862,9 +872,9 @@ const dream = createDream({
   visible: filterVisibleGallery,
   likeness: (a, b) => imageSearch.likeness(a, b),
   // Only the owner's own record: updateGalleryJob alone matches any account's item.
-  mark: (ownerId, itemId, mark) => {
+  mark: (ownerId, itemId, mark, rating) => {
     if (!galleryItem(itemId, ownerId)) throw new Error("That Dream result is unavailable.");
-    updateGalleryJob(itemId, { dream: mark });
+    updateGalleryJob(itemId, { dream: mark, rating });
   },
   remove: (ownerId, itemIds) => deleteOwnedGalleryItems(ownerId, itemIds),
   loraLibrary: (ownerId) => {
@@ -958,7 +968,7 @@ registerDreamRoutes(app, {
 const studioIdle = () => !textBusy() && !store.hasOpenOwnWork();
 // Gallery work (captions, image search, titles, suggested prompts, next steps) may run while busy.
 const galleryIdle = () => flagEnabled("STUDIO_GALLERY_WHILE_BUSY") || studioIdle();
-// Finish Starred Images (domain/finishing.ts): idle-time smart upscales of what an account stars.
+// Finish Liked Images (domain/finishing.ts): idle-time smart upscales of what an account likes.
 const finishing = createFinishing({
   dataDir,
   store,

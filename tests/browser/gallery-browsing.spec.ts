@@ -89,12 +89,15 @@ test("The viewer loads the next page as it nears the last loaded result and coun
   await expect(viewer.getByText("61 / 61", { exact: true })).toBeVisible();
 });
 
-test("Select All takes every match across pages, and the search and Starred stay while selecting", async ({
+test("Select All takes every match across pages, and the search and Liked stay while selecting", async ({
   page,
 }) => {
   await fixtures(page);
-  // Every other result is starred; the gallery pages them 60 at a time unless asked for more.
-  const items = results(130).map((item, index) => ({ ...item, favorite: index % 2 === 0 }));
+  // Every other result is liked; the gallery pages them 60 at a time unless asked for more.
+  const items = results(130).map((item, index) => ({
+    ...item,
+    rating: index % 2 === 0 ? "liked" : undefined,
+  }));
   const requests: URLSearchParams[] = [];
   await page.route("**/api/gallery?**", async (route) => {
     const query = new URL(route.request().url()).searchParams;
@@ -102,7 +105,7 @@ test("Select All takes every match across pages, and the search and Starred stay
     const matches = items.filter(
       (item) =>
         item.prompt.includes(query.get("q") || "") &&
-        (query.get("favorites") !== "1" || item.favorite),
+        (query.get("rating") !== "liked" || item.rating === "liked"),
     );
     const start = Number(query.get("cursor") || 0);
     const end = start + Number(query.get("limit"));
@@ -116,9 +119,9 @@ test("Select All takes every match across pages, and the search and Starred stay
     });
   });
   await page.goto("/images");
-  const starred = page.getByRole("button", { name: "Starred", exact: true });
-  await starred.click();
-  await expect(starred).toHaveAttribute("aria-pressed", "true");
+  const liked = page.getByRole("button", { name: "Liked", exact: true });
+  await liked.click();
+  await expect(liked).toHaveAttribute("aria-pressed", "true");
   await (await toolbarSearch(page)).fill("Browse");
   await expect.poll(() => requests.at(-1)?.get("q")).toBe("Browse");
   const select = page.getByRole("button", { name: "Select Items", exact: true });
@@ -133,7 +136,7 @@ test("Select All takes every match across pages, and the search and Starred stay
   await expect(status).toHaveText("65 Selected");
   // The rest loaded in one larger page, within the same search and filter.
   const rest = requests.find((query) => query.get("limit") === "500");
-  expect([rest?.get("q"), rest?.get("favorites")]).toEqual(["Browse", "1"]);
+  expect([rest?.get("q"), rest?.get("rating")]).toEqual(["Browse", "liked"]);
   // With everything selected, Select None takes Select All's place.
   await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Select None", exact: true }).click();
@@ -141,15 +144,16 @@ test("Select All takes every match across pages, and the search and Starred stay
   await expect(page.getByRole("button", { name: "Select None", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   await expect(status).toHaveText("65 Selected");
-  const unstar = page.waitForRequest("**/api/gallery/favorite");
-  await selectionAction(page, "Unstar").click();
-  expect((await unstar).postDataJSON().ids).toHaveLength(65);
+  const unlike = page.waitForRequest("**/api/gallery/favorite");
+  await selectionAction(page, "Unlike").click();
+  expect((await unlike).postDataJSON()).toMatchObject({ rating: null });
+  expect((await unlike).postDataJSON().ids).toHaveLength(65);
   // A finished action ends the selection.
   await expect(select).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(
     "Browse",
   );
-  expect([requests.at(-1)?.get("q"), requests.at(-1)?.get("favorites")]).toEqual(["Browse", "1"]);
+  expect([requests.at(-1)?.get("q"), requests.at(-1)?.get("rating")]).toEqual(["Browse", "liked"]);
   // Pressing Select again ends selection too.
   await select.click();
   await select.click();
@@ -212,7 +216,7 @@ test("Closing a navigated viewer reveals and focuses its current virtualised gal
   await expect(current).toBeInViewport();
 });
 
-test("Single-item viewer keyboard actions star and request deletion through the existing confirmation", async ({
+test("Single-item viewer keyboard actions like and request deletion through the existing confirmation", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -222,7 +226,7 @@ test("Single-item viewer keyboard actions star and request deletion through the 
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer).toBeVisible();
   await page.keyboard.press("f");
-  await expect.poll(() => state.gallery[0].favorite).toBe(true);
+  await expect.poll(() => state.gallery[0].rating).toBe("liked");
   await page.keyboard.press("Delete");
   const confirm = page.getByRole("dialog", { name: "Delete Item", exact: true });
   await expect(confirm).toBeVisible();
@@ -310,9 +314,9 @@ test("Touch scrolling cancels hold selection and a held tile remains selected af
   await expect(selection.getByRole("status")).toHaveText("2 Selected");
   await other.click();
   await expect(selection.getByRole("status")).toHaveText("1 Selected");
-  await selectionAction(page, "Star").click();
-  await expect.poll(() => state.gallery[1].favorite).toBe(true);
-  expect(state.gallery[0].favorite).not.toBe(true);
+  await selectionAction(page, "Like").click();
+  await expect.poll(() => state.gallery[1].rating).toBe("liked");
+  expect(state.gallery[0].rating).toBeUndefined();
   await expect(selection).toHaveCount(0);
   await page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
@@ -693,8 +697,8 @@ test("Tiles select as in a file manager: Ctrl toggles, Shift selects a range, Es
   await tile(4).click();
   await expect(status).toHaveText("3 Selected");
   // An open tooltip doesn't take the Escape.
-  await selectionAction(page, "Star").hover();
-  await expect(page.getByRole("tooltip", { name: "Star" })).toBeVisible();
+  await selectionAction(page, "Like").hover();
+  await expect(page.getByRole("tooltip", { name: "Like" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(status).toHaveCount(0);
   await tile(2).focus();
@@ -772,8 +776,8 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   const phone = test.info().project.use.isMobile;
   await expect(await toolbarSearch(page)).toHaveValue(phone ? "" : "birds");
   await search.press("Escape");
-  // Starred and Uploads are toolbar toggles, one at a time.
-  await showOnly(page, "Starred");
+  // Liked and Uploads are toolbar toggles, one at a time.
+  await showOnly(page, "Liked");
   await showOnly(page, "Uploads");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   // The view (Grid or Runs) leads the popup.
@@ -848,8 +852,8 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   );
   await selectionAction(page, "Share").click();
   await expect(page.getByRole("menu")).toHaveCount(0);
-  await selectionAction(page, "Star").click();
-  await expect.poll(() => state.gallery.filter((item) => item.favorite).length).toBe(2);
+  await selectionAction(page, "Like").click();
+  await expect.poll(() => state.gallery.filter((item) => item.rating === "liked").length).toBe(2);
   // Each finished action ends the selection.
   await expect(page.getByRole("status")).toHaveCount(0);
   await page.getByRole("button", { name: "Select Items", exact: true }).click();

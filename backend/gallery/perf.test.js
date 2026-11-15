@@ -240,7 +240,7 @@ test("profile health reads recent finished and failed runs from the runs index, 
   setGallery([
     run("a"),
     run("b", { status: "failed", createdAt: at(2) }),
-    run("c", { favorite: true, createdAt: at(3) }),
+    run("c", { rating: "liked", createdAt: at(3) }),
     run("pending", { status: "pending" }),
     run("old", { createdAt: at(40) }),
     run("dream", { dream: { state: "unseen" } }),
@@ -248,11 +248,11 @@ test("profile health reads recent finished and failed runs from the runs index, 
   const pages = [...galleryRuns(Date.now() - 30 * 86_400_000, 2)];
   assert.equal(pages.length, 2);
   assert.deepEqual(
-    pages.flat().map((item) => [item.settings.profileId, item.status, item.favorite]),
+    pages.flat().map((item) => [item.settings.profileId, item.status, item.rating]),
     [
-      ["profile-c", "done", true],
-      ["profile-b", "failed", false],
-      ["profile-a", "done", false],
+      ["profile-c", "done", "liked"],
+      ["profile-b", "failed", null],
+      ["profile-a", "done", null],
     ],
   );
 });

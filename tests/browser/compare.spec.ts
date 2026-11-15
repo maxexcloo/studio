@@ -79,15 +79,15 @@ test("The composer compares variants that each change one thing, as one labelled
   ]);
   await expect(page.getByRole("heading", { name: "Compare", exact: true })).toBeVisible();
 
-  // Starring keeps the winner without touching the composer; Use This takes one there.
+  // Picking the winner likes it without touching the composer; Use This takes one there.
   await page
-    .getByRole("button", { name: "Star Image Fast · Prompt A as Winner", exact: true })
+    .getByRole("button", { name: "Pick Image Fast · Prompt A as Winner", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Clear Winner Image Fast · Prompt A", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   expect(run.vote).toBe(run.jobIds[1]);
-  expect(state.gallery.find((item) => item.jobId === run.jobIds[1]).favorite).toBe(true);
+  expect(state.gallery.find((item) => item.jobId === run.jobIds[1]).rating).toBe("liked");
   await page.getByRole("button", { name: "Use Image Fast · Prompt C", exact: true }).click();
   await expect(page).toHaveURL(/\/images\?compose=1/);
   await expect(prompt(page)).toHaveValue("A silver fox");
@@ -314,7 +314,7 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   await expect(page).toHaveURL(/\/compare\/compare-2$/);
 });
 
-test("Compare Selected sets chosen images side by side, number keys star the winner and the gallery finds it", async ({
+test("Compare Selected sets chosen images side by side, number keys pick the winner and the gallery finds it", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -363,7 +363,7 @@ test("Compare Selected sets chosen images side by side, number keys star the win
   expect(state.comparisons[0].winnerItemId).toBe("batch-0");
   await page.keyboard.press("1");
   await expect(
-    page.getByRole("button", { name: "Star Variant A as Winner", exact: true }),
+    page.getByRole("button", { name: "Pick Variant A as Winner", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
   expect(state.comparisons[0].winnerItemId).toBeNull();
 
@@ -435,7 +435,7 @@ test("Variants of a result show their numbers, the axis they vary and Undo for t
   await expect(page.getByRole("heading", { name: "Which Lighting?", exact: true })).toBeVisible();
 
   // Picking one adds it to the chat's project brief, which Undo restores.
-  await page.getByRole("button", { name: "Star B · Golden Dusk as Winner", exact: true }).click();
+  await page.getByRole("button", { name: "Pick B · Golden Dusk as Winner", exact: true }).click();
   await expect(page.getByText("Added to Foxes's brief", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect.poll(() => undone).toEqual(["POST"]);

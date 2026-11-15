@@ -32,7 +32,7 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await page.goto("/images");
   await page.getByRole("link", { name: "Dream", exact: true }).click();
   await expect(page).toHaveURL(/\/dream$/);
-  await expect(current(page)).toContainText("Because you star one.");
+  await expect(current(page)).toContainText("Because you like one.");
   await expect(current(page)).toContainText("Dream prompt one");
 
   const batch = page.getByRole("progressbar", { name: "Dream Batch", exact: true });
@@ -59,11 +59,11 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await page.mouse.up();
   await expect(current(page)).toContainText("Dream prompt five");
 
-  // Super Like keeps and stars it, from the deck's bar or the viewer's.
+  // Like keeps and likes it, from the deck's bar or the viewer's.
   await current(page).getByRole("button", { name: "View", exact: true }).click();
   await page
     .getByRole("group", { name: "Dream Actions" })
-    .getByRole("button", { name: "Super Like", exact: true })
+    .getByRole("button", { name: "Like", exact: true })
     .click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   expect(verdicts(dream)).toEqual([
@@ -73,7 +73,7 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
     "POST /api/dream/four/discard",
     "POST /api/gallery/favorite",
   ]);
-  expect(dream.requests.at(-1)?.body).toEqual({ ids: ["five"], favorite: true });
+  expect(dream.requests.at(-1)?.body).toEqual({ ids: ["five"], rating: "liked" });
 });
 
 test("While You Were Away ranks each project's results, folds its misses and judges them", async ({
@@ -122,13 +122,13 @@ test("While You Were Away ranks each project's results, folds its misses and jud
   await misses.click();
   await expect(beach.getByText("Indoors; the brief asks for the sea.")).toBeVisible();
 
-  // Pass, Super Like and Like judge in place.
-  await beach.getByRole("button", { name: "Like Dream prompt wave", exact: true }).click();
+  // Dislike, Like and Keep judge in place.
+  await beach.getByRole("button", { name: "Keep Dream prompt wave", exact: true }).click();
   await expect(beach.getByRole("button", { name: "View Dream prompt wave" })).toHaveCount(0);
-  await beach.getByRole("button", { name: "Pass Dream prompt indoors", exact: true }).click();
+  await beach.getByRole("button", { name: "Dislike Dream prompt indoors", exact: true }).click();
   await page
     .getByRole("region", { name: "City" })
-    .getByRole("button", { name: "Super Like Dream prompt street", exact: true })
+    .getByRole("button", { name: "Like Dream prompt street", exact: true })
     .click();
 
   // Full screen has every choice and moves on to the next result after a verdict.
@@ -139,12 +139,12 @@ test("While You Were Away ranks each project's results, folds its misses and jud
   if (!isMobile)
     await expect(
       viewer.getByRole("group", { name: "Dream Actions" }).getByRole("button"),
-    ).toHaveText(["Animate", "Edit", "Recreate", "Pass", "Super Like", "Like"]);
+    ).toHaveText(["Animate", "Edit", "Recreate", "Dislike", "Like", "Keep"]);
   await dreamAction(page, "More Like This");
   await expect(viewer.getByRole("img", { name: "Dream prompt loose" })).toBeVisible();
   await viewer
     .getByRole("group", { name: "Dream Actions" })
-    .getByRole("button", { name: "Pass", exact: true })
+    .getByRole("button", { name: "Dislike", exact: true })
     .click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
@@ -174,8 +174,8 @@ test("While You Were Away shows a series as one set, in its order", async ({ pag
   await expect(views.last()).toHaveAccessibleName("View Dream prompt second");
   await expect(page.getByRole("button", { name: "View Dream prompt loose" })).toBeVisible();
   await expect(set.getByRole("button", { name: "View Dream prompt loose" })).toHaveCount(0);
-  // Liking one judges only that result.
-  await set.getByRole("button", { name: "Like Dream prompt first", exact: true }).click();
+  // Keeping one judges only that result.
+  await set.getByRole("button", { name: "Keep Dream prompt first", exact: true }).click();
   await expect(views).toHaveCount(1);
 });
 
@@ -183,7 +183,7 @@ test("Library › Characters offers Dream's suggested cards: Accept makes the ca
   page,
 }) => {
   const state = await fixtures(page);
-  const liked = (id: string) => ({ ...dreamItem(id), dream: undefined, favorite: true });
+  const liked = (id: string) => ({ ...dreamItem(id), dream: undefined, rating: "liked" });
   const dream = await serveDream(page, {
     characters: state.characters,
     suggestions: [
@@ -377,16 +377,17 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   await page.goto("/dream");
   const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
   await expect(card).toContainText("From Your Gallery");
-  // Super Like's label shows in full, phones included.
+  // Dislike's label shows in full, phones included.
   expect(
     await page
-      .getByRole("button", { name: "Super Like", exact: true })
+      .getByRole("button", { name: "Dislike", exact: true })
       .locator(".mantine-Button-label")
       .evaluate((label) => label.scrollWidth <= label.clientWidth),
   ).toBe(true);
   await page.keyboard.press("ArrowRight");
   await expect(card).toContainText("Dream prompt g2");
-  await page.getByRole("button", { name: "Pass", exact: true }).click();
+  // Dislike rates the gallery image too, hiding it.
+  await page.getByRole("button", { name: "Dislike", exact: true }).click();
   await expect(card).toContainText("Dream prompt g3");
   await page.keyboard.press("ArrowRight");
   // Every fourth card is a pair.
@@ -395,9 +396,10 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   const chosen = page.getByRole("alert").filter({ hasText: "Chose B" });
   await chosen.getByRole("button", { name: "Close", exact: true }).click();
-  await expect.poll(() => dream.requests.length).toBe(4);
+  await expect.poll(() => dream.requests.length).toBe(5);
   expect(dream.requests.map((request) => request.body)).toEqual([
     { liked: ["g1"] },
+    { ids: ["g2"], rating: "disliked" },
     { passed: ["g2"] },
     { liked: ["g3"] },
     { liked: ["g5"], passed: ["g4"] },

@@ -39,8 +39,8 @@ export function Thumbnail({ item }: { item: DreamItem }) {
 }
 
 /**
- * Discarded Dream results, newest discard first; Keep moves one into the gallery after all, on its
- * card or in the viewer. Studio deletes discards after 30 days, and Delete All deletes them now.
+ * Disliked Dream results, newest first; Keep moves one into the gallery after all, on its card or
+ * in the viewer. They stay, hidden, until Delete All deletes them.
  */
 export function DiscardedDreams() {
   const client = useQueryClient();
@@ -76,7 +76,7 @@ export function DiscardedDreams() {
     <ScrollArea flex={1} mih={0}>
       <Group justify="space-between" gap="sm" pb="sm">
         <Text size="sm" c="dimmed">
-          Discards are deleted after 30 days.
+          Disliked results stay hidden until you delete them.
         </Text>
         <Button variant="subtle" color="red" size="sm" onClick={() => setConfirming(true)}>
           Delete All

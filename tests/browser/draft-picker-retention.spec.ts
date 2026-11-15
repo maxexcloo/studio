@@ -8,7 +8,7 @@ function referenceItem() {
     jobId: "reference-source",
     type: "image",
     status: "done",
-    favorite: true,
+    rating: "liked",
     url: image,
     thumbnailUrl: image,
     prompt: "Copper bird reference",
@@ -48,13 +48,13 @@ test("Reference browsing keeps its scroll, query and filters in the gallery edit
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await expect.poll(() => listing.evaluate((element) => element.scrollTop)).toBe(120);
   await (await referenceSearch(page)).fill("Copper");
-  await pickerTab(page, "References", "Starred");
+  await pickerTab(page, "References", "Liked");
   await finishReferences(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await expect(references.getByRole("radio", { name: "Starred", exact: true })).toBeChecked();
-  await expect(
-    references.getByRole("textbox", { name: "Search Starred", exact: true }),
-  ).toHaveValue("Copper");
+  await expect(references.getByRole("radio", { name: "Liked", exact: true })).toBeChecked();
+  await expect(references.getByRole("textbox", { name: "Search Liked", exact: true })).toHaveValue(
+    "Copper",
+  );
   await page
     .getByRole("button", { name: "Use reference: Copper bird reference", exact: true })
     .click();

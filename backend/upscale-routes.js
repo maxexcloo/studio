@@ -16,7 +16,7 @@ import { noWorkerMessage, workerById } from "./workers.js";
 
 /**
  * Smart upscale: its status, queuing an upscale of a gallery item and switching the view between
- * the upscale and the original. Answers `queueUpscale` and `upscaleReady` for Finish Starred
+ * the upscale and the original. Answers `queueUpscale` and `upscaleReady` for Finish Liked
  * Images (domain/finishing.ts), which `finishing` is told of each queued job.
  */
 export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue, store }) {
@@ -88,7 +88,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
 
   /**
    * Queues a smart upscale of one of the account's gallery items on a worker with Upscale, answering
-   * `{ status, payload }` as the route sends it. `origin` sets the queue tier (Finish Starred Images).
+   * `{ status, payload }` as the route sends it. `origin` sets the queue tier (Finish Liked Images).
    */
   async function queueUpscale(account, request, origin) {
     const worker = routeJob("upscale");

@@ -43,7 +43,7 @@ export interface UpscaleResponse {
   revision: number;
 }
 
-/** One account's Finish Starred Images settings (`/api/finishing`). It is off until turned on. */
+/** One account's Finish Liked Images settings (`/api/finishing`). It is off until turned on. */
 export interface FinishingSettings {
   enabled: boolean;
   quality: UpscaleQuality;
@@ -53,6 +53,6 @@ export interface FinishingSettings {
 
 export interface FinishingStatus {
   settings: FinishingSettings;
-  /** Starred images waiting to be finished. */
+  /** Liked images waiting to be finished. */
   waiting: number;
 }

@@ -116,7 +116,7 @@ function archiveEntries(req = null, ids = null) {
     ? eachGalleryItem({
         ...query,
         status: "done",
-        dreamPool: false,
+        unlisted: false,
         ...(ids && { named: [...ids] }),
       })
     : [];

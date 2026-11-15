@@ -150,7 +150,8 @@ export interface MediaItem {
   /** A prompt that would recreate an item made without one (an upload); Recreate uses it. */
   suggestedPrompt?: string;
   createdAt?: string;
-  favorite?: boolean;
+  /** Liked, or disliked and so hidden from the gallery but its Disliked view. */
+  rating?: Rating;
   /** An uploaded image or video (references.js), listed under the gallery's Uploads filter. */
   uploaded?: boolean;
   /** Where an imported upload came from: its Reddit post's link and title. */
@@ -234,3 +235,5 @@ export interface Models {
     capabilities: string[];
   }[];
 }
+
+export type Rating = "liked" | "disliked";

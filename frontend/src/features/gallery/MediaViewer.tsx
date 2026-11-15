@@ -46,7 +46,7 @@ import { MediaViewerDock, type QueuedRun, useRunFamily } from "./MediaViewerDock
 import { setMembers, setPosition } from "./resultSets";
 import { type SwipeDirection, swipeDirection } from "./swipe";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
-import { useMediaFavorite } from "./useMediaFavorite";
+import { useMediaRating } from "./useMediaRating";
 
 import classes from "./MediaViewer.module.css";
 const MediaComparison = lazy(() =>
@@ -275,7 +275,7 @@ export function MediaViewer({
   const [version, setVersion] = useState<{ id: string; active: boolean } | null>(null);
   const displayed = version?.id === item.id ? { ...item, upscaleActive: version.active } : item;
   const source = mediaSource(displayed);
-  const favorite = useMediaFavorite(displayed);
+  const rating = useMediaRating(displayed);
   // Work still running is viewable while it is the current item, so it navigates like a result.
   const viewable = items.filter((candidate) => candidate.url || candidate.id === item.id);
   const currentIndex = viewable.findIndex((candidate) => candidate.id === item.id);
@@ -517,9 +517,9 @@ export function MediaViewer({
             )
           )
             return;
-          // A surface's own actions take E for their Edit and F for their Star, and leave Delete alone.
+          // A surface's own actions take E for their Edit and F for their Like, and leave Delete alone.
           const shortcut = (
-            actions ? { ...viewerShortcuts, e: "edit", f: "star" } : viewerShortcuts
+            actions ? { ...viewerShortcuts, e: "edit", f: "like" } : viewerShortcuts
           )[event.key.toLowerCase()];
           const found =
             shortcut && findAction(actions?.groups ?? shortcutActions.current, shortcut);
@@ -542,7 +542,7 @@ export function MediaViewer({
             item.url
           ) {
             event.preventDefault();
-            if (!favorite.isPending && !event.repeat) favorite.mutate();
+            if (!rating.isPending && !event.repeat) rating.like();
           } else if (!actions && event.key === "Delete") {
             event.preventDefault();
             setDeleting(true);

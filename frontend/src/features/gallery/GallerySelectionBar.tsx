@@ -21,7 +21,7 @@ import { finished } from "./MediaTile";
 import { useUpscaleMany } from "./UpscaleControls";
 import type { GallerySelection } from "./useGallerySelection";
 import { useAnimateThemes, useIterate } from "./useMediaAction";
-import { useFavorites } from "./useMediaFavorite";
+import { showDisliked, useRatings } from "./useMediaRating";
 import { useRecreateMany } from "./useRecreateMany";
 import type { useTryAgain } from "./useTryAgain";
 
@@ -72,7 +72,10 @@ export function GallerySelectionBar({
     (job) => job.status === "failed" && failedIds.has(job.id),
   );
   const runningJobs = [...new Set(running.map((item) => item.jobId).filter(Boolean))] as string[];
-  const allStarred = ready.length > 0 && ready.every((item) => item.favorite);
+  const allRated = (rating: string) =>
+    ready.length > 0 && ready.every((item) => item.rating === rating);
+  const allLiked = allRated("liked");
+  const allDisliked = allRated("disliked");
   // The selection is posted, being too long for a URL, and downloads from the link it returns.
   const download = useMutation({
     mutationFn: () =>
@@ -83,7 +86,7 @@ export function GallerySelectionBar({
       settle();
     },
   });
-  const favorites = useFavorites();
+  const ratings = useRatings();
   const uploads = ready.filter((item) => item.uploaded);
   const recreate = useRecreateMany();
   // A set or run is animated or upscaled as a whole (Runs' Select Set).
@@ -306,16 +309,43 @@ export function GallerySelectionBar({
         ],
       ],
     }),
-    itemAction("star", {
-      label: allStarred ? "Unstar" : "Star",
-      pressed: allStarred,
+    itemAction("like", {
+      label: allLiked ? "Unlike" : "Like",
+      pressed: allLiked,
       disabled: !ready.length || pending,
       description: ready.length ? undefined : "Nothing selected has finished.",
       onClick: () =>
-        favorites.mutate(
-          { ids: ready.map((item) => item.id), favorite: !allStarred },
+        ratings.mutate(
+          { ids: ready.map((item) => item.id), rating: allLiked ? null : "liked" },
           { onSuccess: () => settle() },
         ),
+    }),
+    // In the Disliked view, Dislike restores the selection.
+    itemAction("dislike", {
+      label: allDisliked ? "Restore" : "Dislike",
+      pressed: allDisliked,
+      disabled: !ready.length || pending,
+      description: ready.length ? undefined : "Nothing selected has finished.",
+      onClick: () => {
+        const ids = ready.map((item) => item.id);
+        const was = new Map(ready.map((item) => [item.id, item.rating ?? null]));
+        ratings.mutate(
+          { ids, rating: allDisliked ? null : "disliked" },
+          {
+            onSuccess: () => {
+              settle();
+              // Undo gives each item back the rating it had.
+              if (!allDisliked)
+                showDisliked(ids.length, () =>
+                  (["liked", null] as const).forEach((rating) => {
+                    const back = ids.filter((id) => was.get(id) === rating);
+                    if (back.length) ratings.mutate({ ids: back, rating });
+                  }),
+                );
+            },
+          },
+        );
+      },
     }),
     itemAction("delete", {
       disabled: !deletable.length || pending,

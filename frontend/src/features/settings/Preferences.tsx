@@ -18,7 +18,7 @@ import {
   useSavePreferences,
   useTileCaptions,
 } from "./accountPreferences";
-import { FinishStarredImages } from "./FinishStarredImages";
+import { FinishLikedImages } from "./FinishLikedImages";
 
 /**
  * Delete Failed Items: everyone deletes their own; administrators of a multi-user Studio may choose
@@ -274,7 +274,7 @@ export function Preferences() {
     <Stack gap="lg">
       {/* Settings run A–Z, then Export. */}
       <SettingGroup title="Gallery">
-        <FinishStarredImages />
+        <FinishLikedImages />
         <SettingRow
           label="Tile Captions"
           description="Show each tile's title and details on phones. Desktop shows them on hover."

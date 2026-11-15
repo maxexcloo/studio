@@ -25,7 +25,7 @@ import { useGalleryColumns } from "./useGalleryLayout";
 import classes from "./GalleryFilters.module.css";
 
 /**
- * The gallery's one toolbar row: search, Filter ▾, Starred and Uploads, the active filters as removable chips, the result
+ * The gallery's one toolbar row: search, Filter ▾, Liked and Uploads, the active filters as removable chips, the result
  * count, the zoom slider (desktop; phones pinch) and `actions` (Upload ▾, Select). Phones show the chips in a row below
  * and open the search from its icon into the full row. Search narrows within the filters; filter changes keep the query.
  */
@@ -63,9 +63,13 @@ export function GalleryToolbar({
     if (query && phone) setSearching(true);
   }, [query, phone]);
   const chips = useActiveFilters({ kind, value, onChange }, extraChips);
-  // Clearing the filters leaves the Starred or Uploads toggle as it is.
+  // Clearing the filters, Disliked among them, leaves the Liked or Uploads toggle as it is.
   const clear = () => {
-    onChange({ ...emptyGalleryFilters, starred: value.starred, uploads: value.uploads });
+    onChange({
+      ...emptyGalleryFilters,
+      rating: value.rating === "liked" ? "liked" : "",
+      uploads: value.uploads,
+    });
     for (const chip of extraChips) chip.remove();
   };
   const toolbar = useRef<HTMLDivElement>(null);
@@ -183,18 +187,20 @@ export function GalleryToolbar({
           toggles={toggles}
         />
       </ChipPopup>
-      {/* Starred and Uploads show one at a time. */}
+      {/* Liked, Disliked (in Filters) and Uploads show one at a time. */}
       <FilterToggle
-        label="Starred"
-        icon={icons.star}
-        on={value.starred}
-        onToggle={() => onChange({ ...value, starred: !value.starred, uploads: false })}
+        label="Liked"
+        icon={icons.like}
+        on={value.rating === "liked"}
+        onToggle={() =>
+          onChange({ ...value, rating: value.rating === "liked" ? "" : "liked", uploads: false })
+        }
       />
       <FilterToggle
         label="Uploads"
         icon={icons.uploads}
         on={value.uploads}
-        onToggle={() => onChange({ ...value, uploads: !value.uploads, starred: false })}
+        onToggle={() => onChange({ ...value, uploads: !value.uploads, rating: "" })}
       />
       {/* Phones have no room here for the chips: a spacer keeps the actions at the end. */}
       {phone ? <div className={classes.chips} /> : filterChips}

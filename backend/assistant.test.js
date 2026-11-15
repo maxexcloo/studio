@@ -555,7 +555,7 @@ test("LoRA matching pre-filters by family, role and words, then ranks with the m
     profile,
     prompt: "neon cabin",
     loras: library,
-    starred: ["neon.safetensors"],
+    liked: ["neon.safetensors"],
   });
   assert.equal(fallback.source, "prefilter");
   assert.deepEqual(
@@ -564,7 +564,7 @@ test("LoRA matching pre-filters by family, role and words, then ranks with the m
       ["neon.safetensors", 1],
       ["cabin-style.safetensors", 0.8],
     ],
-    "a starred LoRA ranks first",
+    "a liked LoRA ranks first",
   );
 });
 
