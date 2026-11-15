@@ -371,7 +371,8 @@ test("Compare Selected sets chosen images side by side, number keys pick the win
 
   // The Comparisons filter keeps only compared results.
   await page.getByRole("link", { name: "Back to Images", exact: true }).click();
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("switch", { name: "Comparisons", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Open image: A felt owl", exact: true }),

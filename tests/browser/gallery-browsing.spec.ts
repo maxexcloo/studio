@@ -447,7 +447,8 @@ test("Runs fan a stacked run out in place and open it to flip through", async ({
   );
   await page.goto("/images");
   // The view is a Filter choice; the popup closes like any other.
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByText("Runs", { exact: true }).click();
   await page.keyboard.press("Escape");
   const stack = page.getByRole("button", { name: "Run: Bird study 0, 3 Images", exact: true });
@@ -468,7 +469,8 @@ test("Runs fan a stacked run out in place and open it to flip through", async ({
   await expect(run).toBeHidden();
   await expect(stack).toHaveAttribute("aria-expanded", "false");
   await page.reload();
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await expect(page.getByRole("radio", { name: "Runs" })).toBeChecked();
 });
 
@@ -505,7 +507,8 @@ test("An MCP result set is one titled run whose viewer names each result's place
     page.getByRole("button", { name: "Open image: Set prompt 1", exact: true }),
   ).toBeVisible();
   // Runs stacks the set under its title, newest first.
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByText("Runs", { exact: true }).click();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Run: Variety Test, 3 Images", exact: true }).click();
@@ -557,7 +560,8 @@ test("Select Set picks a set's results to upscale together", async ({ page }) =>
     return route.fulfill({ json: { ok: true } });
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByText("Runs", { exact: true }).click();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Run: Variety Test, 3 Images", exact: true }).click();
@@ -810,7 +814,8 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   // Liked and Uploads are toolbar toggles, one at a time.
   await showOnly(page, "Liked");
   await showOnly(page, "Uploads");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   // The view (Grid or Runs) leads the popup.
   await expect(page.getByRole("radiogroup", { name: "Gallery View", exact: true })).toBeVisible();
   await expect(page.getByRole("switch", { name: "All Versions", exact: true })).toBeChecked();
@@ -938,7 +943,8 @@ test("Model filters list each clean name once and find it by any part", async ({
     }),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   const models = page.getByRole("combobox", { name: "Models", exact: true });
   await models.click();
   // Files and ids read as the composer's names, without folder, backend or quantisation.
@@ -967,7 +973,8 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
   const state = await fixtures(page);
   await page.goto("/");
   const filter = page.getByRole("button", { name: "Gallery Filters", exact: true });
-  await filter.click();
+  const phone = test.info().project.use.isMobile;
+  if (phone) await filter.click();
   const pick = async (facet: string, option: string) => {
     await page.getByRole("combobox", { name: facet, exact: true }).click();
     await page.getByRole("option", { name: option, exact: true }).click();
@@ -976,11 +983,19 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
   await pick("Models", "Studio Image");
   await pick("Models", "Motion Quality");
   await pick("LoRAs", "Detail Slider");
-  await page.getByRole("button", { name: "Up to 1K", exact: true }).click();
-  await page.getByRole("button", { name: "Square", exact: true }).click();
-  await page.getByText("Week", { exact: true }).click();
+  if (phone) {
+    await page.getByRole("button", { name: "Up to 1K", exact: true }).click();
+    await page.getByRole("button", { name: "Square", exact: true }).click();
+    await page.getByText("Week", { exact: true }).click();
+  } else {
+    await expect(filter).toHaveCount(0);
+    await pick("Size", "Up to 1K");
+    await pick("Aspect Ratio", "Square");
+    await page.getByRole("combobox", { name: "Date", exact: true }).click();
+    await page.getByRole("option", { name: "Past Week", exact: true }).click();
+  }
   await page.keyboard.press("Escape");
-  await expect(filter).toHaveAttribute("aria-expanded", "false");
+  if (phone) await expect(filter).toHaveAttribute("aria-expanded", "false");
   // The active filters show in the toolbar row as removable chips.
   const chips = page.getByRole("group", { name: "Active Filters", exact: true });
   const removable = chips.getByRole("button", { name: /^Remove / });
@@ -1011,7 +1026,6 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
       q: "bird",
     });
   // Closing the phone's search clears it; desktop keeps its box and query.
-  const phone = test.info().project.use.isMobile;
   const expected = phone ? "" : "bird";
   await search.press("Escape");
   await page.getByRole("button", { name: "Clear All", exact: true }).click();
@@ -1066,7 +1080,8 @@ test("On a phone held sideways, Gallery Filters fits the screen and scrolls", as
   await fixtures(page);
   await page.setViewportSize({ width: 844, height: 390 });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   const filters = page.locator("[data-chip-popup]");
   await expect(filters).toBeVisible();
   const bottom = async () => {
@@ -1148,7 +1163,8 @@ test("The Tags facet lists the most used caption tags with counts and filters by
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   // A list, most used first, each with its count.
   await page.getByRole("combobox", { name: "Tags", exact: true }).click();
   const options = page.getByRole("listbox").getByRole("option");
@@ -1273,4 +1289,41 @@ test("The open item is in the URL: Back closes the viewer and a link opens it", 
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/images$/);
+});
+
+test("Desktop gallery controls stay available while scrolling and rating changes preserve search", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.use.isMobile === true, "Desktop toolbar only");
+  const state = await fixtures(page);
+  state.gallery.push(...results(90));
+  await page.goto("/images");
+  await expect(page.getByRole("button", { name: "Gallery Filters", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("switch", { name: "Disliked", exact: true })).toHaveCount(0);
+  const disliked = page.getByRole("button", { name: "Disliked", exact: true });
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() => window.scrollBy(0, 800));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await expect(disliked).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("combobox", { name: "Models", exact: true })).toBeInViewport({
+    ratio: 1,
+  });
+  const search = await toolbarSearch(page);
+  await search.fill("Browse");
+  await page.getByRole("button", { name: "Liked", exact: true }).click();
+  await disliked.click();
+  await expect(disliked).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Liked", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect
+    .poll(() => {
+      const query = new URLSearchParams(state.galleryRequests.at(-1));
+      return [query.get("q"), query.get("rating")];
+    })
+    .toEqual(["Browse", "disliked"]);
+  await expect(search).toHaveValue("Browse");
 });

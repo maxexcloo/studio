@@ -24,11 +24,6 @@ import { useGalleryColumns } from "./useGalleryLayout";
 
 import classes from "./GalleryFilters.module.css";
 
-/**
- * The gallery's one toolbar row: search, Filter ▾, Liked and Uploads, the active filters as removable chips, the result
- * count, the zoom slider (desktop; phones pinch) and `actions` (Upload ▾, Select). Phones show the chips in a row below
- * and open the search from its icon into the full row. Search narrows within the filters; filter changes keep the query.
- */
 export function GalleryToolbar({
   kind,
   query,
@@ -48,7 +43,7 @@ export function GalleryToolbar({
   onChange: (value: GalleryFilterValues) => void;
   /** View choices that narrow what shows, such as collapsed versions, as removable chips. */
   extraChips: FilterChip[];
-  /** The view's own choices: Grid or Runs at the top of the Filter popup, then its on/off filters. */
+  /** Grid or Runs, followed by the view's on/off filters. */
   view: ReactNode;
   toggles: ReactNode;
   count?: number;
@@ -135,7 +130,13 @@ export function GalleryToolbar({
     );
   const filterChips = <FilterChips chips={chips} onClear={clear} />;
   const row = (
-    <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
+    <Group
+      ref={toolbar}
+      gap="xs"
+      mih={44}
+      wrap={phone ? "nowrap" : "wrap"}
+      className={classes.mode}
+    >
       {phone ? (
         <Tooltip label="Search Gallery">
           <Button
@@ -152,42 +153,43 @@ export function GalleryToolbar({
       ) : (
         search
       )}
-      <ChipPopup
-        title="Filters"
-        opened={filtering}
-        onOpenedChange={setFiltering}
-        width={340}
-        position="bottom-start"
-        headerEnd={
-          <>
-            {phone && results && (
-              <Text size="sm" c="dimmed">
-                {results}
-              </Text>
-            )}
-            <Button size="compact-sm" variant="subtle" disabled={!chips.length} onClick={clear}>
-              Clear
-            </Button>
-          </>
-        }
-        target={
-          <FilterButton
-            label="Gallery Filters"
-            count={chips.length}
-            opened={filtering}
-            onClick={() => setFiltering(!filtering)}
+      {phone && (
+        <ChipPopup
+          title="Filters"
+          opened={filtering}
+          onOpenedChange={setFiltering}
+          width={340}
+          position="bottom-start"
+          headerEnd={
+            <>
+              {results && (
+                <Text size="sm" c="dimmed">
+                  {results}
+                </Text>
+              )}
+              <Button size="compact-sm" variant="subtle" disabled={!chips.length} onClick={clear}>
+                Clear
+              </Button>
+            </>
+          }
+          target={
+            <FilterButton
+              label="Gallery Filters"
+              count={chips.length}
+              opened={filtering}
+              onClick={() => setFiltering(!filtering)}
+            />
+          }
+        >
+          <GalleryFilterPanel
+            kind={kind}
+            value={value}
+            onChange={onChange}
+            view={view}
+            toggles={toggles}
           />
-        }
-      >
-        <GalleryFilterPanel
-          kind={kind}
-          value={value}
-          onChange={onChange}
-          view={view}
-          toggles={toggles}
-        />
-      </ChipPopup>
-      {/* Liked, Disliked (in Filters) and Uploads show one at a time. */}
+        </ChipPopup>
+      )}
       <FilterToggle
         label="Liked"
         icon={icons.like}
@@ -196,14 +198,28 @@ export function GalleryToolbar({
           onChange({ ...value, rating: value.rating === "liked" ? "" : "liked", uploads: false })
         }
       />
+      {!phone && (
+        <FilterToggle
+          label="Disliked"
+          icon={icons.dislike}
+          on={value.rating === "disliked"}
+          onToggle={() =>
+            onChange({
+              ...value,
+              rating: value.rating === "disliked" ? "" : "disliked",
+              uploads: false,
+            })
+          }
+        />
+      )}
       <FilterToggle
         label="Uploads"
         icon={icons.uploads}
         on={value.uploads}
         onToggle={() => onChange({ ...value, uploads: !value.uploads, rating: "" })}
       />
-      {/* Phones have no room here for the chips: a spacer keeps the actions at the end. */}
-      {phone ? <div className={classes.chips} /> : filterChips}
+      {/* Keep the actions at the end of the row. */}
+      <div className={classes.chips} />
       {results && !phone && (
         <Text size="sm" c="dimmed" className={classes.count}>
           {results}
@@ -216,7 +232,17 @@ export function GalleryToolbar({
   return (
     <>
       {row}
-      {phone && chips.length > 0 && filterChips}
+      {!phone && (
+        <GalleryFilterPanel
+          inline
+          kind={kind}
+          value={value}
+          onChange={onChange}
+          view={view}
+          toggles={toggles}
+        />
+      )}
+      {chips.length > 0 && filterChips}
     </>
   );
 }

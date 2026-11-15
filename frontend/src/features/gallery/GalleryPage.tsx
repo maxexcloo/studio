@@ -396,120 +396,123 @@ export function GalleryPage() {
     >
       <VisuallyHidden component="h1">{kind === "video" ? "Videos" : "Images"}</VisuallyHidden>
       {/* The search and filters stay in place while selecting; the selection bar follows them. */}
-      <GalleryToolbar
-        query={query}
-        onQueryChange={setQuery}
-        kind={kind}
-        value={filters}
-        onChange={setFilters}
-        count={gallery.data?.pages.at(-1)?.totalApprox}
-        extraChips={[
-          ...(similar
-            ? [
-                {
-                  key: "similar",
-                  label: `${similarChipLabels[strictness]} ${similarSource ? mediaTitle(similarSource) : "Image"}`,
-                  remove: removeSimilar,
-                  choice: {
-                    label: "Strictness",
-                    value: strictness,
-                    options: similarStrictnessOptions,
-                    onChange: (value: string) => setStrictness(value as SimilarStrictness),
+      <div className={classes.toolbar}>
+        <GalleryToolbar
+          query={query}
+          onQueryChange={setQuery}
+          kind={kind}
+          value={filters}
+          onChange={setFilters}
+          count={gallery.data?.pages.at(-1)?.totalApprox}
+          extraChips={[
+            ...(similar
+              ? [
+                  {
+                    key: "similar",
+                    label: `${similarChipLabels[strictness]} ${similarSource ? mediaTitle(similarSource) : "Image"}`,
+                    remove: removeSimilar,
+                    choice: {
+                      label: "Strictness",
+                      value: strictness,
+                      options: similarStrictnessOptions,
+                      onChange: (value: string) => setStrictness(value as SimilarStrictness),
+                    },
                   },
-                },
-              ]
-            : []),
-          ...(setId
-            ? [
+                ]
+              : []),
+            ...(setId
+              ? [
+                  {
+                    key: "set",
+                    label: `Set: ${loaded[0]?.resultSet?.title || "Results"}`,
+                    remove: () =>
+                      setParams(
+                        (next) => {
+                          next.delete("set");
+                          return next;
+                        },
+                        { replace: true },
+                      ),
+                  },
+                ]
+              : []),
+            ...(grouped
+              ? [{ key: "versions", label: "Grouped Versions", remove: () => setAllVersions(true) }]
+              : []),
+          ]}
+          view={
+            <SegmentedControl
+              aria-label="Gallery View"
+              fullWidth
+              size="xs"
+              value={view}
+              onChange={(value) => setView(value as "grid" | "runs")}
+              data={[
                 {
-                  key: "set",
-                  label: `Set: ${loaded[0]?.resultSet?.title || "Results"}`,
-                  remove: () =>
-                    setParams(
-                      (next) => {
-                        next.delete("set");
-                        return next;
-                      },
-                      { replace: true },
-                    ),
+                  value: "grid",
+                  label: <ViewLabel icon={<LayoutGrid size={14} />} text="Grid" />,
                 },
-              ]
-            : []),
-          ...(grouped
-            ? [{ key: "versions", label: "Grouped Versions", remove: () => setAllVersions(true) }]
-            : []),
-        ]}
-        view={
-          <SegmentedControl
-            aria-label="Gallery View"
-            fullWidth
-            size="xs"
-            value={view}
-            onChange={(value) => setView(value as "grid" | "runs")}
-            data={[
-              {
-                value: "grid",
-                label: <ViewLabel icon={<LayoutGrid size={14} />} text="Grid" />,
-              },
-              { value: "runs", label: <ViewLabel icon={<Rows3 size={14} />} text="Runs" /> },
-            ]}
-          />
-        }
-        toggles={
-          <>
-            {view === "grid" && (
-              <Switch
-                label="All Versions"
-                labelPosition="left"
-                checked={allVersions}
-                onChange={(event) => setAllVersions(event.currentTarget.checked)}
-              />
-            )}
-            {/* Disliked items show nowhere else. */}
-            <Switch
-              label="Disliked"
-              labelPosition="left"
-              checked={filters.rating === "disliked"}
-              onChange={(event) =>
-                setFilters({
-                  ...filters,
-                  rating: event.currentTarget.checked ? "disliked" : "",
-                  uploads: false,
-                })
-              }
+                { value: "runs", label: <ViewLabel icon={<Rows3 size={14} />} text="Runs" /> },
+              ]}
             />
-            {kind === "image" && (
-              <Switch
-                label="Comparisons"
-                labelPosition="left"
-                checked={filters.comparisons}
-                onChange={(event) =>
-                  setFilters({ ...filters, comparisons: event.currentTarget.checked })
-                }
-              />
-            )}
-          </>
-        }
-        actions={
-          <>
-            <GalleryUpload upload={upload} />
-            {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
-            <Tooltip label="Select Items" disabled={!phone}>
-              <Button
-                {...(phone ? iconChipProps : chipProps)}
-                ref={selectionButton}
-                aria-label="Select Items"
-                aria-pressed={selection.selecting}
-                leftSection={phone ? undefined : <SquareCheck size={15} />}
-                disabled={!items.length && !selection.selecting}
-                onClick={selection.selecting ? doneSelecting : selection.start}
-              >
-                {phone ? <SquareCheck size={16} /> : "Select"}
-              </Button>
-            </Tooltip>
-          </>
-        }
-      />
+          }
+          toggles={
+            <>
+              {view === "grid" && (
+                <Switch
+                  label="All Versions"
+                  labelPosition="left"
+                  checked={allVersions}
+                  onChange={(event) => setAllVersions(event.currentTarget.checked)}
+                />
+              )}
+              {phone && (
+                <Switch
+                  label="Disliked"
+                  labelPosition="left"
+                  checked={filters.rating === "disliked"}
+                  onChange={(event) =>
+                    setFilters({
+                      ...filters,
+                      rating: event.currentTarget.checked ? "disliked" : "",
+                      uploads: false,
+                    })
+                  }
+                />
+              )}
+              {kind === "image" && (
+                <Switch
+                  label="Comparisons"
+                  labelPosition="left"
+                  checked={filters.comparisons}
+                  onChange={(event) =>
+                    setFilters({ ...filters, comparisons: event.currentTarget.checked })
+                  }
+                />
+              )}
+            </>
+          }
+          actions={
+            <>
+              <GalleryUpload upload={upload} />
+              {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
+              <Tooltip label="Select Items" disabled={!phone}>
+                <Button
+                  {...(phone ? iconChipProps : chipProps)}
+                  ref={selectionButton}
+                  aria-label="Select Items"
+                  aria-pressed={selection.selecting}
+                  leftSection={phone ? undefined : <SquareCheck size={15} />}
+                  disabled={!items.length && !selection.selecting}
+                  onClick={selection.selecting ? doneSelecting : selection.start}
+                >
+                  {phone ? <SquareCheck size={16} /> : "Select"}
+                </Button>
+              </Tooltip>
+            </>
+          }
+        />
+      </div>
       {selection.selecting && (
         <GallerySelectionBar
           selection={{ ...selection, end: doneSelecting }}

@@ -366,7 +366,8 @@ test("A regenerated result shows beside its source until All Versions collapses 
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   const tiles = page.getByRole("button", { name: /^Open image: An amber bird/ });
   await expect(tiles).toHaveCount(2);
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  if (test.info().project.use.isMobile)
+    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("switch", { name: "All Versions", exact: true }).click();
   await expect(tiles).toHaveCount(1);
   await expect(tiles).toHaveAccessibleName("Open image: An amber bird, Version 1 of 2");
