@@ -1018,6 +1018,11 @@ test("media and administrator credentials discover only their own friendly tools
     /own descriptions .* word for word, changing only what they ask/,
   );
   assert.match(media.getInstructions(), /a LoRA only when the user names one or clearly wants one/);
+  // A rule such as real flaws lands as texture on the asked-for face, never a plainer or older one.
+  assert.match(
+    media.getInstructions(),
+    /real flaws means subtle texture .* never a plainer, older/,
+  );
   assert.match(
     media.getInstructions(),
     /call reuse with its ref and your revised prompt, not a new generate/,
@@ -1076,8 +1081,9 @@ test("media and administrator credentials discover only their own friendly tools
     // and to 17,200 for Cards (describe and rate a card's images), then lowered to 17,100 once Cards'
     // description was tightened, then raised to 17,150 for generate's 18+ floor, to 18,050 for
     // project, to 18,120 for its character_sheet, to 19,000 for variants and result numbers and to
-    // 19,300 for one call per step (models' profile_ids, review's also).
-    JSON.stringify(tools).length + media.getInstructions().length < 19300,
+    // 19,300 for one call per step (models' profile_ids, review's also) and to 19,850 for applying
+    // a person's rules in proportion with the shape of liked portraits.
+    JSON.stringify(tools).length + media.getInstructions().length < 19850,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });

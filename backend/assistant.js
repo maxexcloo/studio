@@ -30,6 +30,7 @@ import {
   keepDescriptions,
   matchEffort,
   precedence,
+  proportionate,
   writerGuide,
 } from "./domain/writing-standard.ts";
 import { cleanTriggers } from "./lora/catalogue.js";
@@ -436,6 +437,7 @@ function rewriteInstructions({
     "Keep every subject, detail, style, mood, framing and quoted text the user asked for, with quoted text kept exactly; add only what the guide recommends to realise it.",
     fidelity,
     keepDescriptions,
+    proportionate,
     `${matchEffort} Then apply the style below.`,
     avoidFiller(),
     'Words about speed, quality tier, model, size, aspect or count (such as "turbo", "fast", "landscape", "16:9", "2K", "two images") are settings, not scene: leave them out.',

@@ -229,6 +229,7 @@ test("a rewrite streams visible text, returns the cleaned prompt, and logs no pr
   assert.doesNotMatch(body.messages[0].content, /x\.invalid/, "no guide sources");
   // A restyle keeps the person's own descriptions, so a character doesn't drift between prompts.
   assert.match(body.messages[0].content, /own descriptions of people and things .* word for word/);
+  assert.match(body.messages[0].content, /real flaws means subtle texture/);
   assert.equal(body.messages[1].content, "secret cabin");
   assert.match(lines[0], /^Prompt assistant rewrite with cloud\/auto in \d+ ms$/);
   assert.doesNotMatch(lines.join("\n"), /secret/);
