@@ -31,6 +31,7 @@ import {
   matchEffort,
   precedence,
   proportionate,
+  subjectFirst,
   writerGuide,
 } from "./domain/writing-standard.ts";
 import { cleanTriggers } from "./lora/catalogue.js";
@@ -437,6 +438,7 @@ function rewriteInstructions({
     "Keep every subject, detail, style, mood, framing and quoted text the user asked for, with quoted text kept exactly; add only what the guide recommends to realise it.",
     fidelity,
     keepDescriptions,
+    subjectFirst,
     proportionate,
     `${matchEffort} Then apply the style below.`,
     avoidFiller(),
