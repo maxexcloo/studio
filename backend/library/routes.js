@@ -36,7 +36,7 @@ import { logWarning } from "../crash-log.js";
 import { currentDataDir } from "../data-dir.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { familyFromName } from "../family-catalogue.js";
-import { hfFetch } from "../hf-access.js";
+import { hfFetch, hfRevision } from "../hf-access.js";
 import { fileStem } from "../image-metadata.js";
 import { writeBytesFileAsync } from "../json-store.js";
 import { forgetLora } from "../lora/stacks.js";
@@ -50,7 +50,7 @@ import { createImportEngine, importStore, publicImport } from "./imports.js";
 import { libraryPlacement, lookupLibrary } from "./lookup.js";
 import { detectLink, resolveCivitaiModel, resolveHuggingFace } from "./sources.js";
 import { findSubstitute } from "./substitutes.js";
-import { createUpdateChecker, dailyMs, hfRepositoryMetadata } from "./updates.js";
+import { createUpdateChecker, dailyMs } from "./updates.js";
 
 const pictureEdge = 1280;
 const maxImageBytes = 24 * 1024 * 1024;
@@ -500,7 +500,7 @@ export function registerLibraryRoutes(
     },
     installed: installedKeys,
     json,
-    hfMetadata: (repo) => hfRepositoryMetadata(repo, { request: hfRequest }),
+    hfMetadata: (repo) => hfRevision(repo, "main", { request: hfRequest }),
     familiesOf,
     startDownload,
     downloads,

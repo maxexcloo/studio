@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { a1111Samplers, a1111Schedules } from "../image-metadata.js";
 import { civitaiAvailability } from "../library/availability.js";
+import { civitaiLinks } from "../library/sources.js";
 import { minorAgeRefusal } from "../minor-age.js";
 import { refreshWorkerModels, workerModelFile } from "../worker-models.js";
 import { modelLibraryWorker } from "../workers.js";
@@ -278,7 +279,7 @@ export function civitaiFileSpec(version, file, { now = Date.now() } = {}) {
     // Construct the endpoint from IDs rather than trusting a URL from metadata.
     url: `https://civitai.com/api/download/models/${version.id}?type=${encodeURIComponent(file.type)}&format=${/\.gguf$/i.test(file.name) ? "GGUF" : "SafeTensor"}${file.metadata?.fp ? `&fp=${encodeURIComponent(file.metadata.fp)}` : ""}${file.metadata?.size ? `&size=${encodeURIComponent(file.metadata.size)}` : ""}`,
     baseModel: String(version.baseModel || "").slice(0, 100),
-    sourceUrl: `https://civitai.com/models/${version.modelId}?modelVersionId=${version.id}`,
+    sourceUrl: civitaiLinks(version.modelId, version.id).civitaiCom,
     trainedWords: (Array.isArray(version.trainedWords) ? version.trainedWords : [])
       .map(String)
       .slice(0, 30),
@@ -307,7 +308,7 @@ export function versionResource(version, weight = 1, { now = Date.now() } = {}) 
     version: String(version.name || "").slice(0, 200),
     type: String(version.model?.type || "Unknown"),
     baseModel: String(version.baseModel || ""),
-    sourceUrl: `https://civitai.com/models/${version.modelId}?modelVersionId=${version.id}`,
+    sourceUrl: civitaiLinks(version.modelId, version.id).civitaiCom,
     file: file?.name || "",
     folder,
     sha256,

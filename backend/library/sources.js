@@ -7,7 +7,7 @@ import path from "node:path";
 
 import { civitaiJson, isCivitaiHost, limitedBody } from "../civitai/access.js";
 import { civitaiLink, versionResource } from "../civitai/import.js";
-import { hfFetch } from "../hf-access.js";
+import { hfFetch, hfRevision } from "../hf-access.js";
 import { civitaiAvailability } from "./availability.js";
 import { catalogueKinds } from "./catalogue.js";
 import { civitaiOffers, hfOffers } from "./offers.js";
@@ -316,21 +316,7 @@ export function parseHfLink(value) {
 export async function resolveHuggingFace(value, { request = hfFetch, gguf = false } = {}) {
   const link = parseHfLink(value);
   const { owner, repo } = link;
-  const response = await request(
-    `https://huggingface.co/api/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/revision/${encodeURIComponent(link.revision)}?blobs=true`,
-    { signal: AbortSignal.timeout(30000) },
-  );
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error(
-      response.status === 401 || response.status === 403
-        ? "This repository is gated or private. Accept its terms on Hugging Face and add a token to the deployment."
-        : response.status === 404
-          ? "That Hugging Face repository or revision doesn't exist."
-          : `Hugging Face metadata is unavailable (HTTP ${response.status}).`,
-    );
-  }
-  const metadata = JSON.parse((await limitedBody(response, 8 * 1024 * 1024)).toString());
+  const metadata = await hfRevision(`${owner}/${repo}`, link.revision, { request });
   if (!/^[a-f0-9]{40}$/i.test(metadata.sha || ""))
     throw new Error("Hugging Face didn't return an exact revision.");
   const tags = Array.isArray(metadata.tags) ? metadata.tags.map(String) : [];
