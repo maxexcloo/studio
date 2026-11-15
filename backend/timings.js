@@ -1,5 +1,5 @@
 import { logWarning } from "./crash-log.js";
-import { dataDir } from "./gallery/store.js";
+import { dataDir } from "./data-dir.js";
 import { addRun, estimateRun, isWarm, timingKey } from "./generation-timing.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { addUpscale, estimateUpscale } from "./upscale-timing.js";

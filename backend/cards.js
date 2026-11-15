@@ -11,8 +11,9 @@ import {
   minCharacterAge,
 } from "../shared/characters.ts";
 import { mayUseFeature } from "./account-policy.js";
+import { dataDir } from "./data-dir.js";
 import { directRoute } from "./domain/direct-route.ts";
-import { dataDir, galleryJobItems } from "./gallery/store.js";
+import { galleryJobItems } from "./gallery/store.js";
 import { minorAgeRefusal } from "./minor-age.js";
 import { ownerDocumentName, savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { referenceAssetMetadataForAccount, referenceExistsForAccount } from "./references.js";

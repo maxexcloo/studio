@@ -12,7 +12,7 @@ import {
   workflowMissingFiles,
   workflowOptionIssues,
 } from "./custom-workflows.js";
-import { dataDir } from "./gallery/store.js";
+import { dataDir } from "./data-dir.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { workflowRisks } from "./workflow-risk.js";
 

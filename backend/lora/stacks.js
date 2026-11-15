@@ -1,5 +1,5 @@
 import { maxLoras } from "../../shared/profiles.ts";
-import { dataDir } from "../gallery/store.js";
+import { dataDir } from "../data-dir.js";
 import {
   ownerDocumentName,
   ownerDocuments,

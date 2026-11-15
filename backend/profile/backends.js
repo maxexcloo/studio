@@ -29,7 +29,7 @@ import {
   sharedProfileFields,
   userWorkflowsDir,
 } from "../custom-workflows.js";
-import { dataDir } from "../gallery/store.js";
+import { dataDir } from "../data-dir.js";
 import { renameTimingKeys } from "../timings.js";
 import { repointWorkflowPreferences } from "../workflow-catalogue.js";
 import { createEditableProfile, listEditableProfiles, readEditableProfile } from "./editor.js";
