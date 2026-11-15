@@ -14,6 +14,10 @@ test("a proposal's summary names the words it replaced, added and removed", () =
   );
   assert.equal(changeSummary(before, before), "");
   // An edit instruction shares too little with the prompt to compare.
-  assert.equal(changeSummary(before, "Make her dress red, keep everything else"), "");
-  assert.ok(changeSummary("a b c d e f", `a b c d e f ${"word ".repeat(40)}`, 30).endsWith("…"));
+  assert.equal(
+    changeSummary(before, "Change her hair so it is straight, keeping the becak ride as it is"),
+    "",
+  );
+  const long = "one two three four five six seven eight nine ten";
+  assert.ok(changeSummary(long, `${long} with a much longer added phrase`, 20).endsWith("…"));
 });

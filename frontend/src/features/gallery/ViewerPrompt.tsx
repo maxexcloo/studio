@@ -247,7 +247,7 @@ export function ViewerPrompt({
         minRows={1}
         maxRows={4}
         className={change ? `${classes.prompt} ${proposedClass}` : classes.prompt}
-        description={change && <ProposalLabel proposal={change} before={ask.typed} />}
+        description={change && <ProposalLabel proposal={change} before={original} />}
         value={prompt}
         readOnly={change?.action === "upscale"}
         onChange={setPrompt}
