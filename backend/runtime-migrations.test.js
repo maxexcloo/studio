@@ -36,6 +36,7 @@ test("the migrations route answers administrators with every step's plan, and lo
     mcpOwnership: { applied, document: false, rows: {}, conflicts: [] },
     galleryRatings: { applied, likes: 0, unstarred: 0, dislikes: 0, signals: 0 },
     characterGenerated: { applied, characters: 0, cards: [] },
+    legacyShapes: { applied, arms: 0, notes: 0 },
   });
   assert.deepEqual(await post({}), {
     code: 200,
@@ -46,7 +47,7 @@ test("the migrations route answers administrators with every step's plan, and lo
     body: { ok: true, apply: true, steps: steps(true) },
   });
   assert.deepEqual(lines, [
-    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do",
-    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do",
+    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do",
+    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do",
   ]);
 });

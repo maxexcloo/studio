@@ -4,6 +4,7 @@ import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
 import { dreamOwnership } from "./dream-ownership.js";
 import { galleryRatings } from "./gallery-ratings.js";
+import { legacyShapes } from "./legacy-shapes.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
 
 /**
@@ -38,6 +39,12 @@ const steps = [
     name: "characterGenerated",
     run: characterGenerated,
     changes: (plan) => plan.characters,
+    online: true,
+  },
+  {
+    name: "legacyShapes",
+    run: legacyShapes,
+    changes: (plan) => plan.arms + plan.notes,
     online: true,
   },
 ];
