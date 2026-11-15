@@ -16,6 +16,7 @@ export interface Profile {
   recipe?: { modelLabel?: string; label?: string; conditioning?: string };
   workerIds?: string[];
   maxLoras?: number;
+  loraNote?: string;
   provider?: string;
   ready?: boolean;
   uncensored?: boolean;

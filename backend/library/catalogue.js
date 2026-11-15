@@ -116,13 +116,12 @@ function rawFromEdit(edit = {}) {
   if (
     isObject(edit.strength) &&
     Number.isFinite(edit.strength.min) &&
-    Number.isFinite(edit.strength.max) &&
-    Number.isFinite(edit.strength.step)
+    Number.isFinite(edit.strength.max)
   )
     raw.strengthRange = {
       min: edit.strength.min,
       max: edit.strength.max,
-      step: edit.strength.step,
+      ...(edit.strength.step !== undefined ? { step: edit.strength.step } : {}),
       ...(Number.isFinite(edit.strength.default) ? { default: edit.strength.default } : {}),
     };
   const link = edit.links?.civitaiCom || edit.links?.civitaiRed || edit.links?.hf;

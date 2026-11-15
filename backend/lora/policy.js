@@ -21,7 +21,7 @@ export function compatibleLoras(loras, infos, profile) {
   return { loras: kept, dropped: droppedNames.length, droppedNames };
 }
 
-/** Only explicit full publisher bounds replace existing controls. */
+/** Published bounds use the usual control increment unless the publisher gives one. */
 export function strengthRange(info) {
   const range = info?.strengthRange;
   if (
@@ -31,12 +31,12 @@ export function strengthRange(info) {
     range.min >= range.max
   )
     return null;
-  if (!Number.isFinite(range.step) || range.step <= 0 || range.step > range.max - range.min)
-    return null;
+  const step = range.step ?? Math.min(0.05, range.max - range.min);
+  if (!Number.isFinite(step) || step <= 0 || step > range.max - range.min) return null;
   return {
     min: range.min,
     max: range.max,
-    step: range.step,
+    step,
     ...(Number.isFinite(range.default) && range.default >= range.min && range.default <= range.max
       ? { default: range.default }
       : {}),

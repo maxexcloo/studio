@@ -73,6 +73,11 @@ test("exact profile and model allowlists are combined, with missing context mark
 test("only valid explicit publisher strength bounds replace fallback controls", () => {
   const info = { strengthRange: { min: -3, max: 10, step: 0.05 } };
   assert.deepEqual(strengthRange(info), info.strengthRange);
+  assert.deepEqual(strengthRange({ strengthRange: { min: -3, max: 10 } }), {
+    min: -3,
+    max: 10,
+    step: 0.05,
+  });
   assert.equal(strengthRange({ strengthRange: { min: -3, max: 10, step: 0 } }), null);
   assert.equal(strengthRange({}), null);
   assert.equal(optionalLoraPolicyIssue({ name: "slider", strength: 10 }, info, profile), "");
