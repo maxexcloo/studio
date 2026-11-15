@@ -1,0 +1,132 @@
+import { Button, Group, Menu } from "@mantine/core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+
+import type { CardKind } from "../../../../shared/characters";
+import { post } from "../../api";
+import type { ReferenceAsset } from "../../types";
+import { type Action, ActionMenuItems } from "../../ui/ActionBar";
+import { icons } from "../../ui/icons";
+import { PopupTooltip } from "../../ui/PopupTooltip";
+import { UndoButton, assistMenu } from "../generation/AskChange";
+import { CustomDialog } from "../generation/CustomDialog";
+
+type Field = "name" | "description";
+const nouns = { name: "Name", description: "Description" } as const;
+
+/**
+ * A card field's ✨ ▾: names or descriptions the prompt assistant writes from the card's images,
+ * asked for when it opens, then Refresh Suggestions for others and Custom… to say what to write.
+ * Picking one fills the field, with Undo beside it until the field next changes.
+ */
+export function CardIdeas({
+  kind,
+  field,
+  images,
+  value,
+  onChange,
+}: {
+  kind: CardKind;
+  field: Field;
+  images: ReferenceAsset[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const client = useQueryClient();
+  const [opened, setOpened] = useState(false);
+  const [custom, setCustom] = useState(false);
+  const [picked, setPicked] = useState<{ before: string; after: string } | null>(null);
+  const assetIds = images.map((asset) => asset.id);
+  const ask = (body: { request?: string; avoid?: string[] }) =>
+    post<{ options: string[] }>("/api/assistant/cards/ideas", { kind, field, assetIds, ...body });
+  const queryKey = ["card-ideas", kind, field, ...assetIds];
+  const ideas = useQuery({
+    queryKey,
+    queryFn: () => ask({}),
+    enabled: opened,
+    staleTime: Infinity,
+  });
+  const pick = (idea: string) => {
+    setPicked({ before: picked && value === picked.after ? picked.before : value, after: idea });
+    onChange(idea);
+  };
+  const again = useMutation({
+    mutationFn: (request?: string) => ask({ request, avoid: ideas.data?.options }),
+    onSuccess: (answer, request) => {
+      client.setQueryData(queryKey, answer);
+      if (request) pick(answer.options[0]);
+    },
+  });
+  const options = ideas.data?.options ?? [];
+  const loading = again.isPending || (ideas.isFetching && !options.length);
+  const noun = nouns[field];
+  const groups = assistMenu({
+    fixed: { label: "", options: [] },
+    suggestions: [
+      { id: "heading", label: "Suggestions", heading: true },
+      ...(loading
+        ? [{ id: "thinking", label: `Writing ${noun}s`, disabled: true }]
+        : options.length
+          ? options.map((idea): Action => ({
+              id: `idea:${idea}`,
+              label: idea,
+              icon: icons.suggestions,
+              onClick: () => pick(idea),
+            }))
+          : [{ id: "none", label: "No Suggestions", disabled: true }]),
+      {
+        id: "refresh",
+        label: "Refresh Suggestions",
+        icon: icons.refresh,
+        keepOpen: true,
+        onClick: () => again.mutate(undefined),
+      },
+    ],
+    last: [{ id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) }],
+  });
+  return (
+    <Group gap={2} wrap="nowrap" pr={4}>
+      {picked && value === picked.after && (
+        <UndoButton
+          onClick={() => {
+            onChange(picked.before);
+            setPicked(null);
+          }}
+        />
+      )}
+      <Menu position="bottom-end" width={320} opened={opened} onChange={setOpened}>
+        <PopupTooltip label={`Suggest ${noun}`}>
+          <Menu.Target>
+            <Button
+              variant="subtle"
+              color="gray"
+              size="compact-sm"
+              radius="xl"
+              px={6}
+              aria-label={`Suggest ${noun}`}
+              loading={again.isPending && !opened}
+              rightSection={<ChevronDown size={12} />}
+            >
+              <icons.assistant size={16} />
+            </Button>
+          </Menu.Target>
+        </PopupTooltip>
+        <Menu.Dropdown aria-busy={loading || undefined}>
+          <ActionMenuItems groups={groups} />
+        </Menu.Dropdown>
+      </Menu>
+      <CustomDialog
+        opened={custom}
+        onClose={() => setCustom(false)}
+        title={`Custom ${noun}`}
+        action="Ask"
+        label="Request"
+        placeholder={
+          field === "name" ? "What kind of name, like “short and Japanese”" : "What to stress"
+        }
+        onSend={(request) => again.mutate(request)}
+      />
+    </Group>
+  );
+}

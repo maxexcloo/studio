@@ -51,12 +51,12 @@ const ordinaryRoutes = [
   // Character, outfit and scene cards are the requester's own, behind the Characters feature (cards.js).
   ["GET", /^\/api\/(characters|outfits|scenes)$/],
   ["POST", /^\/api\/(characters|outfits|scenes)$/],
-  ["POST", /^\/api\/characters\/[\w-]+\/(generated|sheet)$/],
+  ["POST", /^\/api\/characters\/[\w-]+\/sheet$/],
   ["PUT", /^\/api\/(characters|outfits|scenes)\/[\w-]+$/],
   ["DELETE", /^\/api\/(characters|outfits|scenes)\/[\w-]+$/],
   // The prompt assistant works only with the requester's profiles, LoRAs and references.
   ["GET", /^\/api\/assistant$/],
-  ["POST", /^\/api\/assistant\/(animate|cards\/(describe|rate)|loras|negative|rewrite)$/],
+  ["POST", /^\/api\/assistant\/(animate|cards\/(describe|ideas|rate)|loras|negative|rewrite)$/],
   // Comparisons, the taste profile, suggestions and Dream use only the requester's own records.
   [
     "GET",

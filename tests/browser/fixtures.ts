@@ -666,23 +666,6 @@ export async function fixtures(page: Page) {
       });
       const id = decodeURIComponent(path.split("/")[3] || "");
       const index = list.findIndex((item) => item.id === id);
-      // Generate References' jobs, listed with their gallery results.
-      if (path.endsWith("/generated")) {
-        characters[index].generated = {
-          jobIds: body.jobIds,
-          at: stamp,
-          results: gallery
-            .filter((item) => body.jobIds.includes(item.jobId))
-            .map((item) => ({
-              galleryItemId: item.id,
-              jobId: item.jobId,
-              status: item.status,
-              thumbnailUrl: item.thumbnailUrl,
-              prompt: item.prompt,
-            })),
-        };
-        return respond({ ok: true, character: characters[index] });
-      }
       // Make Sheet's job, which the card follows until a test gives it panels.
       if (path.endsWith("/sheet")) {
         characters[index].sheet = { jobId: "sheet-job", at: stamp, status: "making", panels: [] };

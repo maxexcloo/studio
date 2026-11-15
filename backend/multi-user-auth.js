@@ -67,10 +67,10 @@ const mcpBearerRoutes = [
   ["GET", /^\/api\/accounts\/status$/],
   ["GET", /^\/api\/models$/],
   ["GET", /^\/api\/loras\/info$/],
-  // generate's character, shots' outfit and scene cards and models' card lists; character_views
-  // records its jobs on the character, and character_sheet makes its sheet.
+  // generate's character, shots' outfit and scene cards and models' card lists; character_sheet
+  // makes its sheet.
   ["GET", /^\/api\/(?:characters|outfits|scenes)$/],
-  ["POST", /^\/api\/characters\/[\w-]+\/(?:generated|sheet)$/],
+  ["POST", /^\/api\/characters\/[\w-]+\/sheet$/],
   // The cards tool's create, update, describe and rate.
   ["POST", /^\/api\/(?:characters|outfits|scenes)$/],
   ["PUT", /^\/api\/(?:characters|outfits|scenes)\/[\w-]+$/],

@@ -20,7 +20,6 @@ import { type ReactNode, useId, useRef, useState } from "react";
 import { type CardKind, maxCardDescription, maxCardName } from "../../../../shared/characters";
 import { post } from "../../api";
 import type { ReferenceAsset } from "../../types";
-import type { Action } from "../../ui/ActionBar";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
@@ -40,6 +39,7 @@ import {
 } from "../generation/references";
 import { ReferenceSlots, referenceCellType } from "../generation/ReferenceSlots";
 import { useReferenceBrowser } from "../generation/useReferenceBrowser";
+import { CardIdeas } from "./CardIdeas";
 
 /**
  * A card's editor: a dialog, full screen on phones, whose body scrolls. Above the desktop
@@ -101,8 +101,8 @@ export function CardForm({ onSubmit, children }: { onSubmit: () => void; childre
 }
 
 /**
- * Every card's fields, one column sharing its edges: Name, Description (with Describe Image) and
- * Images, so Character, Outfit and Scene stay alike.
+ * Every card's fields, one column sharing its edges: Name and Description, each with ideas written
+ * from the images (CardIdeas), and Images, so Character, Outfit and Scene stay alike.
  */
 export function CardFields({
   kind,
@@ -131,7 +131,11 @@ export function CardFields({
   images: ReferenceAsset[];
   onImages: (images: ReferenceAsset[]) => void;
 }) {
-  const describe = useDescribeImage(kind, images[0], onDescription);
+  const assistant = useCardAssistant();
+  const ideas = (field: "name" | "description", value: string, onChange: (value: string) => void) =>
+    assistant && images.length > 0 ? (
+      <CardIdeas kind={kind} field={field} images={images} value={value} onChange={onChange} />
+    ) : undefined;
   return (
     <>
       <TextInput
@@ -141,6 +145,9 @@ export function CardFields({
         data-autofocus
         value={name}
         onChange={(event) => onName(event.currentTarget.value)}
+        rightSection={ideas("name", name, onName)}
+        rightSectionWidth="auto"
+        rightSectionPointerEvents="all"
       />
       <TextBox
         label="Description"
@@ -151,7 +158,7 @@ export function CardFields({
         maxLength={maxCardDescription}
         value={description}
         onChange={onDescription}
-        {...describe}
+        send={ideas("description", description, onDescription)}
       />
       <CardImages kind={kind} max={max} note={note} value={images} onChange={onImages} />
     </>
@@ -196,38 +203,10 @@ export function CardThumbnails({
   );
 }
 
-/** Whether the account's text model can read a card's images, for Describe Image and Rate Images. */
+/** Whether the account's text model can read a card's images, for its ideas and Rate Images. */
 function useCardAssistant() {
   const assistant = useQuery(assistantQuery);
   return Boolean(assistant.data?.available && assistant.data.vision);
-}
-
-/**
- * Describe Image: writes the card's description from its first image, for any kind of card, as a
- * tool of the Description box (`tools`, with `busy` while it writes).
- */
-function useDescribeImage(
-  kind: CardKind,
-  image: ReferenceAsset | undefined,
-  onDescribed: (description: string) => void,
-) {
-  const available = useCardAssistant();
-  const describe = useMutation({
-    mutationFn: (asset: ReferenceAsset) =>
-      post<{ description: string }>("/api/assistant/cards/describe", { kind, assetId: asset.id }),
-    onSuccess: ({ description }) => onDescribed(description),
-  });
-  const tool: Action = {
-    id: "describe",
-    label: "Describe Image",
-    icon: icons.assistant,
-    disabled: describe.isPending,
-    onClick: () => image && describe.mutate(image),
-  };
-  return {
-    tools: available && image ? [tool] : undefined,
-    busy: describe.isPending ? "Describing Image…" : undefined,
-  };
 }
 
 type Rating = { rating: number; note: string };

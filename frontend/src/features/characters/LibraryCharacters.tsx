@@ -1,4 +1,4 @@
-import { Alert, Button, Group, Paper, Progress, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Alert, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
@@ -11,7 +11,7 @@ import { CardSuggestions } from "./CardSuggestions";
 import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import { sheetViews } from "./CharacterEditor";
-import { type CharacterCard, charactersQuery } from "./queries";
+import { charactersQuery } from "./queries";
 import { useCardFrom } from "./useCardFrom";
 import { useCardInComposer } from "./useCardInComposer";
 
@@ -69,7 +69,6 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                     <CharacterMenu
                       card={card}
                       onEdit={() => dialogs.edit(card)}
-                      onGenerate={() => dialogs.generate(card)}
                       onSheet={() => dialogs.sheet(card)}
                       onDelete={() => dialogs.remove(card)}
                       onUse={() => use.character(card)}
@@ -97,9 +96,6 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                 {sheetViews(card).length > 0 && (
                   <CardThumbnails label={`${card.name}'s Sheet`} images={sheetViews(card)} views />
                 )}
-                {card.generated && (
-                  <GeneratedFooter generated={card.generated} onPick={() => dialogs.edit(card)} />
-                )}
               </Stack>
             </Paper>
           ))}
@@ -107,44 +103,5 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
       )}
       {dialogs.dialogs}
     </>
-  );
-}
-
-/**
- * Generate References on a card: a progress line while they run, then how many wait to be picked,
- * with Pick References wrapping under it where the card is too narrow for both.
- */
-function GeneratedFooter({
-  generated,
-  onPick,
-}: {
-  generated: NonNullable<CharacterCard["generated"]>;
-  onPick: () => void;
-}) {
-  const done = generated.results.filter((result) => result.status === "done").length;
-  const ended = generated.results.filter((result) =>
-    ["done", "failed"].includes(result.status),
-  ).length;
-  const total = generated.jobIds.length;
-  const running = ended < total;
-  return (
-    <Group gap="xs" justify="space-between">
-      <Group gap="xs" wrap="nowrap" flex="1 1 8rem">
-        <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
-          {running ? `References ${done}/${total}` : `${done} References to Pick`}
-        </Text>
-        {running && (
-          <Progress
-            flex={1}
-            size="sm"
-            value={total ? (done / total) * 100 : 0}
-            aria-label="Generating References"
-          />
-        )}
-      </Group>
-      <Button variant="default" size="compact-sm" style={{ flexShrink: 0 }} onClick={onPick}>
-        Pick References
-      </Button>
-    </Group>
   );
 }

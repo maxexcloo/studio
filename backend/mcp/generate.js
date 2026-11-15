@@ -8,7 +8,6 @@ import {
   cardImageSlots,
   characterImages,
   characterProfiles,
-  characterShots,
   composePrompt,
   identitySlot,
   keepsCharacterFaces,
@@ -516,7 +515,7 @@ export function registerGenerateTools({
     server,
     "models",
     "find models",
-    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; shots: Studio writes each, outfit and scene a card's name or words; character_views queues views; character_sheet its sheet). With profile_id (id, label or words), or profile_ids: each one's guide gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
+    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; shots: Studio writes each, outfit and scene a card's name or words; character_sheet its sheet). With profile_id (id, label or words), or profile_ids: each one's guide gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
     {
       kind: z.enum(["all", "image", "video"]).default("all"),
       tier: tier.optional(),
@@ -859,8 +858,6 @@ export function registerGenerateTools({
       reference_strengths: z.array(z.number().finite().nullable()).max(16).optional(),
       // A character's name or id (models lists them).
       character: z.string().min(1).optional(),
-      // Generate References: Studio writes one prompt per view of the character (shared/characters.ts).
-      character_views: z.boolean().optional(),
       // Make Sheet: the character's design sheet, whose views generate then sends (character-sheets.js).
       character_sheet: z.boolean().optional(),
       // The user insists on a model that can't hold the character's face (the refusal says so).
@@ -939,14 +936,14 @@ export function registerGenerateTools({
     },
   );
   /** The account's character by id or name, with the images it still has, owned for this call. */
-  const characterFor = async (value, signal, views = false) => {
+  const characterFor = async (value, signal) => {
     const { characters = [] } = await media.request("GET", "/api/characters", undefined, owner, {
       signal,
     });
     const card = findCard(characters, value);
     if (!card) throw new Error(`No character "${value}". Call models to list them.`);
     const referenceIds = card.references.map((asset) => asset.id);
-    if (!referenceIds.length && !views)
+    if (!referenceIds.length)
       throw new Error(`${card.name} has no images left. Ask the user to add some in Studio.`);
     media.adopt(owner, refs, { assets: referenceIds });
     return { ...card, referenceIds };
@@ -990,20 +987,14 @@ export function registerGenerateTools({
           return (await media.resultReference(owner, found.jobId, found.index || 0)).asset.id;
         }),
       );
-    const views = args.character_views === true;
     const sheet = args.character_sheet === true;
-    delete args.character_views;
     delete args.character_sheet;
-    if ((views || sheet) && !args.character)
-      throw new Error(
-        `${sheet ? "character_sheet" : "character_views"} needs character: the name or id of the card.`,
-      );
-    const card = args.character ? await characterFor(args.character, signal, views) : null;
+    if (sheet && !args.character)
+      throw new Error("character_sheet needs character: the name or id of the card.");
+    const card = args.character ? await characterFor(args.character, signal) : null;
     if (sheet) {
-      if (views || args.prompts || args.shots)
-        throw new Error(
-          "character_sheet queues the sheet alone: leave out prompts, shots and character_views.",
-        );
+      if (args.prompts || args.shots)
+        throw new Error("character_sheet queues the sheet alone: leave out prompts and shots.");
       const made = await media.request(
         "POST",
         `/api/characters/${encodeURIComponent(card.id)}/sheet`,
@@ -1017,7 +1008,7 @@ export function registerGenerateTools({
         content: [
           {
             type: "text",
-            text: `Queued ${card.name}'s character sheet on ${made.profile}: Studio writes its prompt, then keeps its face, front, side and back views and gear on the card, and generate sends the view a prompt names. Share the link and end your turn.\n\n[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`,
+            text: `Queued ${card.name}'s character sheet on ${made.profile}: Studio writes its prompt, then keeps its face, front, side and back views on the card, and generate sends the view a prompt names. Share the link and end your turn.\n\n[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`,
           },
         ],
         structuredContent: { status: "queued", jobs: [{ job_id: made.jobId, ref, link }] },
@@ -1026,22 +1017,13 @@ export function registerGenerateTools({
     const anyModel = args.any_model === true;
     delete args.character;
     delete args.any_model;
-    // The views share one seed and, where the profile edits with references, the card's first
-    // image, which each plan's prompts then follow (characterShots).
-    if (views)
-      Object.assign(args, {
-        prompts: characterShots(card.description, false),
-        count: 1,
-        seed: args.seed ?? crypto.randomInt(2 ** 31),
-        same_seed: true,
-      });
     // Shots: Studio writes each prompt from its parts, an outfit or scene card's own description
     // where one is named, so the assistant never rewords the character, outfit or place.
     const shots = args.shots;
     delete args.shots;
     // Outfit and scene card images as references: off until a live proof run shows they help.
     const cardImages = process.env.STUDIO_CARD_IMAGES === "1";
-    if (shots && (args.prompts || views)) throw new Error("Pass shots or prompts, not both.");
+    if (shots && args.prompts) throw new Error("Pass shots or prompts, not both.");
     const lists = {};
     const cardNamed = async (kind, value) => {
       if (!value?.trim()) return undefined;
@@ -1087,8 +1069,6 @@ export function registerGenerateTools({
         "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call generate again.",
       );
     const several = Boolean(profile_ids || each_profile);
-    if (several && views)
-      throw new Error("character_views queues on one model: pass profile_id or leave it out.");
     if (several && args.loras?.length)
       throw new Error(
         "LoRAs belong to one model: pass them with profile_id, or leave loras out for several models.",
@@ -1101,7 +1081,7 @@ export function registerGenerateTools({
       const minor = minorAgeRefusal(prompt);
       if (minor) throw new Error(minor);
     }
-    const listProblem = views ? "" : promptListProblem(args.prompts);
+    const listProblem = promptListProblem(args.prompts);
     if (listProblem) throw new Error(listProblem);
     // "count: 4" beside four prompts means one image each, not sixteen.
     if (
@@ -1226,7 +1206,7 @@ export function registerGenerateTools({
     }));
     // The model a warning names when the chosen one can't hold a character's (or reference's) face.
     const keeper =
-      (card?.referenceIds.length || named.length) && !views
+      card?.referenceIds.length || named.length
         ? characterProfiles(localUnlessAsked(await media.profiles("image", owner), { request }))[0]
         : undefined;
     targets = targets.filter(
@@ -1236,7 +1216,7 @@ export function registerGenerateTools({
     // Identity lock: a character runs only where its image is edited with, never as text alone or
     // an img2img start image, unless the user insists on the model.
     const unable =
-      card?.referenceIds.length && !views && !anyModel
+      card?.referenceIds.length && !anyModel
         ? targets.filter(({ profile }) => !keepsIdentity(profile))
         : [];
     if (unable.length)
@@ -1290,18 +1270,16 @@ export function registerGenerateTools({
                   ? { prompts: shotPrompts(room > 0) }
                   : card
                     ? {
-                        prompts: views
-                          ? characterShots(card.description, room > 0)
-                          : args.prompts.map((prompt) =>
-                              withCharacter(prompt, card.description, room > 0),
-                            ),
+                        prompts: args.prompts.map((prompt) =>
+                          withCharacter(prompt, card.description, room > 0),
+                        ),
                       }
                     : {}),
                 profile_id: profile.id,
                 ...(profile.namedBackend ? { profile_backend: profile.namedBackend } : {}),
               };
               const start =
-                card?.referenceIds.length && !views && !room
+                card?.referenceIds.length && !room
                   ? `${profile.label || profile.id} can't take ${card.name}'s image as a reference, so only the description carries the character and the face will change from image to image. Tell the user; ${keeper ? `${keeper.label || keeper.id}` : "a model that edits with references"} keeps the same face in new outfits and scenes. `
                   : "";
               // A reference on an img2img model is its start image, and the reply says what follows.
@@ -1345,13 +1323,9 @@ export function registerGenerateTools({
                   .map((label) => `${cardImageNote(label, slots.length)} `)
                   .join("");
               }
-              const alone =
-                views && card.referenceIds.length && !room
-                  ? `The views come from ${card.name}'s description alone: this model doesn't edit with references. `
-                  : "";
               return {
                 profile,
-                note: `${note || ""}${start}${img2img}${alone}${cards}`,
+                note: `${note || ""}${start}${img2img}${cards}`,
                 plan,
                 source: "exact",
               };
@@ -1429,24 +1403,13 @@ export function registerGenerateTools({
     }
     const submission = await submit(profile, plan, recordOf({ plan }));
     if (submission.queued.jobs.length) accepted.push({ profile, queued: submission.queued });
-    let viewsNote = "";
-    if (views) {
-      await media.request(
-        "POST",
-        `/api/characters/${encodeURIComponent(card.id)}/generated`,
-        { jobIds: submission.queued.jobs.map((job) => job.job_id) },
-        owner,
-        { signal },
-      );
-      viewsNote = `Studio wrote one prompt per view for ${card.name}; once they finish, the user picks which to keep on the card in Studio. `;
-    }
     return respond(
       submission.queued,
       profile,
       signal,
       submission.guide,
       source,
-      `${projectNote}${tierNote || ""}${faceNote}${viewsNote}`,
+      `${projectNote}${tierNote || ""}${faceNote}`,
     );
   };
   tool(

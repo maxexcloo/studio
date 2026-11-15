@@ -15,6 +15,8 @@ export function CustomDialog({
   onClose,
   title,
   action,
+  label = "Change",
+  placeholder = "What should change, like “make it night”",
   onSend,
   suggestions,
 }: {
@@ -22,6 +24,8 @@ export function CustomDialog({
   onClose: () => void;
   title: string;
   action: string;
+  label?: string;
+  placeholder?: string;
   onSend: (request: string) => void;
   suggestions?: (pick: (request: string) => void) => ReactNode;
 }) {
@@ -43,8 +47,8 @@ export function CustomDialog({
       >
         <Stack>
           <TextBox
-            label="Change"
-            placeholder="What should change, like “make it night”"
+            label={label}
+            placeholder={placeholder}
             autosize
             minRows={3}
             // The dialog is already full screen on phones.
