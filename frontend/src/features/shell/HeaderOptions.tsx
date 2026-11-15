@@ -1,40 +1,24 @@
-import { ActionIcon, Menu, Popover } from "@mantine/core";
-import { Library, Palette } from "lucide-react";
-import { forwardRef, useState } from "react";
+import { ActionIcon, Menu } from "@mantine/core";
+import { Library } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
-import { AppearanceControls } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { AccountMenuContent } from "../auth/AccountMenu";
 
-// The outer popover and inner menu each retain a ref to the same DOM anchor.
-const OptionsTarget = forwardRef<
-  HTMLButtonElement,
-  { appearanceOpened: boolean; onStyle: () => void }
->(function OptionsTarget({ appearanceOpened, onStyle }, ref) {
-  const [opened, setOpened] = useState(false);
+export function HeaderOptions() {
   const location = useLocation();
   return (
-    <Menu opened={opened} onChange={setOpened} position="bottom-end" shadow="md">
-      <PopupTooltip label="More Options" disabled={appearanceOpened}>
+    <Menu position="bottom-end" shadow="md">
+      <PopupTooltip label="More Options">
         <Menu.Target>
-          <ActionIcon ref={ref} aria-label="More Options" variant="subtle" color="gray">
+          <ActionIcon aria-label="More Options" variant="subtle" color="gray">
             <icons.more size={20} />
           </ActionIcon>
         </Menu.Target>
       </PopupTooltip>
       <Menu.Dropdown>
         <AccountMenuContent>
-          <Menu.Item
-            leftSection={<Palette size={16} />}
-            onClick={() => {
-              setOpened(false);
-              onStyle();
-            }}
-          >
-            Appearance
-          </Menu.Item>
           <Menu.Item
             component={Link}
             to="/library"
@@ -54,26 +38,5 @@ const OptionsTarget = forwardRef<
         </AccountMenuContent>
       </Menu.Dropdown>
     </Menu>
-  );
-});
-export function HeaderOptions() {
-  const [style, setStyle] = useState(false);
-  return (
-    <Popover
-      opened={style}
-      onChange={setStyle}
-      width={290}
-      position="bottom-end"
-      offset={18}
-      trapFocus
-      shadow="md"
-    >
-      <Popover.Target>
-        <OptionsTarget appearanceOpened={style} onStyle={() => setStyle(true)} />
-      </Popover.Target>
-      <Popover.Dropdown data-composer-layer>
-        <AppearanceControls />
-      </Popover.Dropdown>
-    </Popover>
   );
 }

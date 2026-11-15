@@ -166,6 +166,9 @@ test("The centred creative modes leave Status and More Options usable at each la
       )
       .toBeLessThan(1);
     await page.getByRole("button", { name: "Open Status", exact: true }).click({ trial: true });
+    await openTheme(page);
+    await expect(page.getByRole("radiogroup", { name: "Animations", exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
     await more.click();
     await page.getByRole("menuitem", { name: "Library", exact: true }).click();
     await expect(page.getByRole("dialog", { name: /^Library/ })).toBeVisible();
