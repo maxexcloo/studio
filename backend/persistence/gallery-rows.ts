@@ -47,7 +47,8 @@ const galleryOrder =
   "uploaded, dream_pool, bucket, created_ms DESC, job_id DESC, item_index, item_id DESC, status, type, favorite";
 
 /** The indexes over `galleryColumns`: gallery order with and without an owner, jobs, ids, sets,
- * states, Dream states, an owner's prompts (a repeated prompt's title) and times (recent work). */
+ * states, Dream states, an owner's prompts (a repeated prompt's title), times (recent work) and
+ * runs (profile health, read from the index alone). */
 export const galleryIndexes: [string, string][] = [
   ["studio_gallery_order", galleryOrder],
   ["studio_gallery_owner_order", `owner_id, ${galleryOrder}`],
@@ -59,6 +60,10 @@ export const galleryIndexes: [string, string][] = [
   ["studio_gallery_dream", `${dreamState}, owner_id`],
   ["studio_gallery_prompt", "owner_id, json_extract(value, '$.prompt')"],
   ["studio_gallery_created", "created_ms"],
+  [
+    "studio_gallery_runs",
+    "created_ms, key, dream_pool, status, favorite, json_extract(value, '$.settings.profileId'), json_extract(value, '$.timing.runMs')",
+  ],
 ];
 
 /** The gallery table with its columns, for a database that has none yet. */

@@ -17,6 +17,7 @@ const {
   forgetGalleryItems,
   galleryItems,
   galleryRevisionValue,
+  galleryRuns,
   pageGallery,
   updateGalleryJob,
 } = await import("./store.js");
@@ -222,4 +223,36 @@ test("a search's list is kept across pages and enrichment, and rebuilt when item
   updateGalleryJob(first.items[0].id, { status: "failed" });
   assert.equal(page().totalApprox, first.totalApprox, "failed items still list");
   assert.equal(tested, 4000, "a status change rebuilds it");
+});
+
+test("profile health reads recent finished and failed runs from the runs index, a page at a time", () => {
+  const at = (days) => new Date(Date.now() - days * 86_400_000).toISOString();
+  const run = (id, fields) => ({
+    id,
+    jobId: id,
+    type: "image",
+    status: "done",
+    createdAt: at(1),
+    settings: { profileId: `profile-${id}` },
+    timing: { runMs: 1000 },
+    ...fields,
+  });
+  setGallery([
+    run("a"),
+    run("b", { status: "failed", createdAt: at(2) }),
+    run("c", { favorite: true, createdAt: at(3) }),
+    run("pending", { status: "pending" }),
+    run("old", { createdAt: at(40) }),
+    run("dream", { dream: { state: "unseen" } }),
+  ]);
+  const pages = [...galleryRuns(Date.now() - 30 * 86_400_000, 2)];
+  assert.equal(pages.length, 2);
+  assert.deepEqual(
+    pages.flat().map((item) => [item.settings.profileId, item.status, item.favorite]),
+    [
+      ["profile-c", "done", true],
+      ["profile-b", "failed", false],
+      ["profile-a", "done", false],
+    ],
+  );
 });
