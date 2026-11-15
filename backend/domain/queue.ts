@@ -4,12 +4,13 @@ import {
   type QueueMedia,
   type QueueStatus,
   pausedReason,
+  pendingStatuses,
   terminalStatuses,
 } from "../../shared/queue.ts";
 import { logEvent, logWarning } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 import { logFailure } from "./log-failure.ts";
-import { type OwnedJob, Store, everyone, pendingStatuses, queuePriority } from "./store.ts";
+import { type OwnedJob, Store, everyone, queuePriority } from "./store.ts";
 
 export interface JobObservation {
   status: QueueStatus;

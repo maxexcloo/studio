@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CircleAlert } from "lucide-react";
 import { type CSSProperties, type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 
-import { terminalStatuses } from "../../../../shared/queue";
+import { finishedItemStatuses, terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
@@ -26,7 +26,7 @@ import classes from "./MediaTile.module.css";
 
 /** Saved, failed or cancelled; anything else is still generating. */
 export const finished = (item: { status?: unknown }) =>
-  ["done", "failed", "cancelled"].includes(String(item.status));
+  finishedItemStatuses.has(String(item.status));
 
 function useQueueJob(jobId: string | undefined, enabled: boolean) {
   return useQuery({
