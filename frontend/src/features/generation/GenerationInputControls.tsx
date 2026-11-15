@@ -146,7 +146,7 @@ export function ChipRail({ label, children }: { label: string; children: ReactNo
  * The chip rail shared by the gallery composer and timeline cards, in one order on
  * every breakpoint: what runs (Profile, and its Backend when it has several), what it starts from
  * (References, then their role and mask as one group), what shapes it (LoRAs), what comes out
- * (Aspect, Count, a video's Length, a set Seed), then Settings, Presets and Compare.
+ * (Aspect, Count, a video's Length, a set Seed), then Settings, Compare and Presets.
  */
 export function GenerationInputControls({
   input,
@@ -236,8 +236,8 @@ export function GenerationInputControls({
         </Button>
       )}
       <GenerationSettings input={input} profile={profile} onChange={onChange} {...settings} />
-      {presets}
       {compare}
+      {presets}
     </ChipRail>
   );
 }
