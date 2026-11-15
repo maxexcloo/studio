@@ -53,6 +53,7 @@ export interface LoraInfo {
   type?: string;
   description?: string;
   role?: string;
+  hidden?: boolean;
   triggers?: string[];
   strengthRange?: { min: number; max: number; step: number; default?: number };
   recommendedStrength?: number;
@@ -320,7 +321,8 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   const previews = useQuery(loraPreviewsQuery);
   const typeOf = (file: string) => metadata[file]?.type || "";
   const familiesOf = (file: string) => metadata[file]?.families || [];
-  const available = profile?.options?.loras || [];
+  // A LoRA the Library hides isn't offered; a stack that has one keeps it.
+  const available = (profile?.options?.loras || []).filter((file) => !metadata[file]?.hidden);
   const ratings = library.data?.library.ratings || {};
   // A tab remembered from before shows All.
   const tab = loraTabs.some((item) => item.value === picker.tab) ? picker.tab : "all";

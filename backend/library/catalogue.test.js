@@ -299,6 +299,16 @@ test("the LoRA view keeps the older shapes, with Studio's edits applied", (t) =>
   assert.equal(catalogue["seed-only.safetensors"].title, "Seed Only");
 });
 
+test("a hidden LoRA stays in the catalogue, marked hidden until shown again", (t) => {
+  const store = fixture(t).store();
+  store.migrate();
+  assert.throws(() => store.edit("loras/style.safetensors", { hidden: false }), /hidden is true/);
+  store.edit("loras/style.safetensors", { hidden: true }, { by: "admin-1" });
+  assert.equal(store.loraView().catalogue["style.safetensors"].hidden, true);
+  store.edit("loras/style.safetensors", { hidden: null }, { by: "admin-1" });
+  assert.equal(store.loraView().catalogue["style.safetensors"].hidden, undefined);
+});
+
 test("partial LoRA strength recommendations survive saved definitions and edits without inventing control bounds", (t) => {
   const f = fixture(t);
   const catalogueFile = path.join(f.dir, "library/catalogue.json");
