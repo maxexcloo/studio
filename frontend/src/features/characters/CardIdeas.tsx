@@ -1,4 +1,4 @@
-import { Button, Group, Menu } from "@mantine/core";
+import { Button, Group, Menu, getDefaultZIndex } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
@@ -13,6 +13,8 @@ import { UndoButton, assistMenu } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
 
 type Field = "name" | "description";
+// Above the card's dialog, which sits over the desktop References popover (CardDialog).
+const zIndex = getDefaultZIndex("overlay") + 1;
 const nouns = { name: "Name", description: "Description" } as const;
 
 /**
@@ -95,7 +97,7 @@ export function CardIdeas({
           }}
         />
       )}
-      <Menu position="bottom-end" width={320} opened={opened} onChange={setOpened}>
+      <Menu position="bottom-end" width={320} zIndex={zIndex} opened={opened} onChange={setOpened}>
         <PopupTooltip label={`Suggest ${noun}`}>
           <Menu.Target>
             <Button
@@ -120,6 +122,7 @@ export function CardIdeas({
         opened={custom}
         onClose={() => setCustom(false)}
         title={`Custom ${noun}`}
+        zIndex={zIndex}
         action="Ask"
         label="Request"
         placeholder={

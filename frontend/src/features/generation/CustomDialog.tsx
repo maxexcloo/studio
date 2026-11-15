@@ -19,6 +19,7 @@ export function CustomDialog({
   placeholder = "What should change, like “make it night”",
   onSend,
   suggestions,
+  zIndex,
 }: {
   opened: boolean;
   onClose: () => void;
@@ -28,6 +29,7 @@ export function CustomDialog({
   placeholder?: string;
   onSend: (request: string) => void;
   suggestions?: (pick: (request: string) => void) => ReactNode;
+  zIndex?: number;
 }) {
   const phone = usePhone();
   const [request, setRequest] = useState("");
@@ -36,7 +38,14 @@ export function CustomDialog({
     onSend(text);
   };
   return (
-    <Modal opened={opened} onClose={onClose} title={title} size="sm" fullScreen={phone}>
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title={title}
+      size="sm"
+      fullScreen={phone}
+      zIndex={zIndex}
+    >
       <form
         onSubmit={(event) => {
           event.preventDefault();
