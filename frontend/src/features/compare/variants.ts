@@ -4,6 +4,7 @@ import { compareVariants } from "../../../../shared/compare";
 import { isCloudProfile, loraName } from "../../../../shared/profiles";
 import { post } from "../../api";
 import type { GenerationInput, MediaItem, Profile } from "../../types";
+import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { submitBlockedReason } from "../generation/GenerationEditor";
 import {
@@ -249,7 +250,7 @@ export function useCompareRun(onQueued: (comparisonId: string) => void) {
       }),
     onSuccess: (comparison) => {
       client.setQueryData(["comparison", comparison.id], comparison);
-      for (const queryKey of [queueQuery.queryKey, ["gallery"], ["comparisons"]])
+      for (const queryKey of [queueQuery.queryKey, galleryKey, ["comparisons"]])
         void client.invalidateQueries({ queryKey });
       onQueued(comparison.id);
     },

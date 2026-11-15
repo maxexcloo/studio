@@ -1,6 +1,8 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../api";
+import { accountQuery } from "../auth/AccountGate";
+import { galleryKey } from "../gallery/queries";
 import { modelsQuery } from "../generation/GenerationProvider";
 
 /** Where the account prefers videos to run: Cloud, or the local Fast or Quality tier. */
@@ -55,13 +57,13 @@ export function useSavePreferences() {
       client.setQueryData(preferencesQuery.queryKey, status);
       // Model choices change what the account may use everywhere.
       if ("cloudModels" in patch || "loras" in patch || "uncensoredModels" in patch)
-        for (const queryKey of [["account"], modelsQuery.queryKey])
+        for (const queryKey of [accountQuery.queryKey, modelsQuery.queryKey])
           void client.invalidateQueries({ queryKey });
       // Explicit wording (Spicy Prompts with Uncensored Models) changes what suggestions say.
       if ("spicyPrompts" in patch || "uncensoredModels" in patch)
         void client.invalidateQueries({ queryKey: ["suggestions"] });
       // The gallery shows the unfinished work the account chose.
-      if ("galleryWork" in patch) void client.invalidateQueries({ queryKey: ["gallery"] });
+      if ("galleryWork" in patch) void client.invalidateQueries({ queryKey: galleryKey });
       // Default models follow where the account prefers each area to run.
       if ("images" in patch || "videos" in patch)
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });

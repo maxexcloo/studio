@@ -8,6 +8,7 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { usePhone } from "../../ui/usePhone";
 import { queueQuery } from "../generation/Queue";
 import { playbackUrl } from "./mediaSource";
+import { galleryKey } from "./queries";
 import { useItemMutation } from "./useItemMutation";
 
 /** A video edit backend/gallery/video-edits.js saves as a new version of the clip. */
@@ -23,7 +24,7 @@ export function useVideoEdit(item: MediaItem, { inlineError = false } = {}) {
     mutationFn: (edit: VideoEdit) =>
       post<{ id: string }>("/api/gallery/video-edit", { galleryItemId: item.id, ...edit }),
     onSuccess: () => {
-      void cache.invalidateQueries({ queryKey: ["gallery"] });
+      void cache.invalidateQueries({ queryKey: galleryKey });
       void cache.invalidateQueries({ queryKey: queueQuery.queryKey });
     },
   });

@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { useQueueAction } from "../generation/Queue";
+import { galleryKey } from "./queries";
 
 /**
  * Retries failed jobs once each through the shared queue command. An accepted retry's new job
@@ -32,7 +33,7 @@ export function useTryAgain(items: MediaItem[]) {
         ...[...accepted.keys()].map((id) => retry({ id, action: "clear" })),
         replaced.length && post("/api/gallery/delete", { ids: replaced }),
       ]);
-      if (accepted.size) await client.invalidateQueries({ queryKey: ["gallery"] });
+      if (accepted.size) await client.invalidateQueries({ queryKey: galleryKey });
       return accepted;
     },
     [retry, client, items],
