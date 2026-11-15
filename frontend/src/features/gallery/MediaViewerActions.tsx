@@ -5,6 +5,7 @@ import type { MediaItem } from "../../types";
 import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "../../ui/ActionBar";
 import { usePhone } from "../../ui/usePhone";
 import { AnimateDialog } from "./AnimateDialog";
+import { namedItemActions } from "./itemActions";
 import { useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import type { AnimateRequest, Iteration } from "./useMediaAction";
@@ -12,20 +13,6 @@ import { TrimVideoDialog } from "./videoEdits";
 import { ViewerPrompt, useViewerPrompt } from "./ViewerPrompt";
 
 import classes from "./MediaViewer.module.css";
-
-// Desktop names Animate, Edit, Recreate, AI, Upscale, Copy, Download, Compare and Similar beside their icons.
-// Phones show every action as a compact icon on one row.
-const labelled = [
-  "animate",
-  "edit",
-  "recreate",
-  "ai",
-  "upscale",
-  "copy",
-  "download",
-  "compare",
-  "similar",
-];
 
 /** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */
 export interface ViewerActions {
@@ -37,11 +24,12 @@ export interface ViewerActions {
 }
 
 /**
- * The bar's controls in groups on one row. Every one stays in sight: where they outgrow the bar
- * the last named ones show as icons alone, and only then do they wrap onto another row.
+ * The bar's controls in groups on one row, phones naming them under their icons. Every one stays
+ * in sight: where they outgrow the bar the last named ones show as icons alone, and only then do
+ * they wrap onto another row.
  */
 export function ViewerActionGroups({ groups, labelled }: Omit<ViewerActions, "label">) {
-  return <ActionBarGroups groups={groups} labelled={labelled} fit />;
+  return <ActionBarGroups groups={groups} labelled={labelled} fit stacked={usePhone()} />;
 }
 
 /** The viewer's action bar: the prompt field above the shared item actions. */
@@ -76,7 +64,6 @@ export function MediaViewerActions({
   /** Hides the prompt field, keeping what was typed (the phone details sheet). */
   promptHidden?: boolean;
 }) {
-  const phone = usePhone();
   const transfer = useMediaTransfer(item, true);
   const [animating, setAnimating] = useState<AnimateRequest | null>(null);
   const [trimming, setTrimming] = useState(false);
@@ -93,14 +80,20 @@ export function MediaViewerActions({
     onVersionChange,
   });
   const prompt = useViewerPrompt(item, { groups: itemGroups, iterate });
-  // AI follows Recreate: the prompt's assistance, beside the item's own iterations.
-  const groups = prompt.ai
-    ? itemGroups.map((group) => {
-        const recreate = group.findIndex((action) => action.id === "recreate");
-        return recreate < 0
-          ? group
-          : [...group.slice(0, recreate + 1), prompt.ai!, ...group.slice(recreate + 1)];
-      })
+  // Edit opens with the prompt's assistance, before the item's own edits.
+  const ai = prompt.ai;
+  const groups = ai
+    ? itemGroups.map((group) =>
+        group.map((action) =>
+          action.id === "edit"
+            ? {
+                ...action,
+                loading: action.loading || ai.loading,
+                menu: [...ai.menu!, ...action.menu!],
+              }
+            : action,
+        ),
+      )
     : itemGroups;
   if (shortcuts) shortcuts.current = itemGroups;
   return (
@@ -116,11 +109,7 @@ export function MediaViewerActions({
           <ViewerPrompt state={prompt} iterate={iterate} pending={pending} />
         </Box>
       )}
-      {phone ? (
-        <ActionBarGroups groups={groups} compact />
-      ) : (
-        <ViewerActionGroups groups={groups} labelled={labelled} />
-      )}
+      <ViewerActionGroups groups={groups} labelled={namedItemActions} />
       {animating && (
         <AnimateDialog
           item={item}

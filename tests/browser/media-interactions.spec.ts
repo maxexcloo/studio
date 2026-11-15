@@ -63,7 +63,7 @@ test("Prompt paste attaches an owned reference before submission", async ({ page
   }
 });
 
-test("Phones that share natively share the image where desktop downloads it", async ({
+test("Share downloads the image, and phones that share natively also share it", async ({
   page,
 }, testInfo) => {
   const state = await fixtures(page);
@@ -91,15 +91,12 @@ test("Phones that share natively share the image where desktop downloads it", as
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Transfer Study", exact: true }).click();
-  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  const download = viewer.getByRole("link", { name: "Download", exact: true });
-  if (!testInfo.project.use.isMobile) {
-    await expect(download).toHaveAttribute("href", "/api/fixture-media.png");
-    await expect(viewer.getByRole("button", { name: /^Share/ })).toHaveCount(0);
-    return;
-  }
-  await expect(download).toHaveCount(0);
   await viewerAction(page, "Share");
+  const download = page.getByRole("menuitem", { name: "Download", exact: true });
+  await expect(download).toHaveAttribute("href", "/api/fixture-media.png");
+  const share = page.getByRole("menuitem", { name: "Share", exact: true });
+  if (!testInfo.project.use.isMobile) return await expect(share).toHaveCount(0);
+  await share.click();
   await expect
     .poll(() => page.evaluate(() => (window as any).sharedMedia?.[0]?.type))
     .toBe("image/png");

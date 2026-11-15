@@ -20,13 +20,13 @@ export function MediaTileActions({
   item,
   opened,
   onOpenedChange,
-  omit,
+  onSelect,
   hideMore,
 }: {
   item: MediaItem;
   opened: boolean;
   onOpenedChange: (value: boolean) => void;
-  omit?: string[];
+  onSelect?: () => void;
   /** Hides More for a tile whose menu opens by holding; the hidden button still anchors it. */
   hideMore?: boolean;
 }) {
@@ -90,7 +90,7 @@ export function MediaTileActions({
               <MediaActionMenu
                 item={item}
                 transfer={transfer}
-                omit={omit}
+                onSelect={onSelect}
                 onApplied={() => onOpenedChange(false)}
                 onAnimate={setAnimating}
                 onDelete={() => setDeleting(true)}

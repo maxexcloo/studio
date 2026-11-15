@@ -18,6 +18,7 @@ import {
   Scissors,
   Shuffle,
   Snail,
+  SquareCheck,
   TextQuote,
   Waves,
   Wind,
@@ -254,8 +255,6 @@ function useCharacterAction(item: MediaItem, onApplied: () => void): Action | nu
 
 interface MediaActionOptions {
   transfer: MediaTransferActions;
-  /** Action and option IDs a surface leaves out. */
-  omit?: string[];
   compare?: boolean;
   /** Queues a new run; the viewer's joins its strip. Defaults to queueing it directly. */
   iterate?: (iteration: Iteration) => void;
@@ -277,7 +276,6 @@ export function useMediaActions(
   item: MediaItem,
   {
     transfer,
-    omit = [],
     compare,
     iterate,
     onApplied = () => {},
@@ -513,14 +511,14 @@ export function useMediaActions(
         }),
       }),
     // Edit changes the item itself or reuses it elsewhere; a video's edits each save a new version
-    // and the original stays.
+    // and the original stays. The viewer adds its prompt's assistance first (MediaViewerActions).
     ready &&
       itemAction("edit", {
         loading: videoEdit.isPending,
         menu: image
           ? [
-              [...(character ? [character] : []), ...(reference ? [reference] : [])],
               [
+                ...(upscale ? [upscale] : []),
                 {
                   id: "edit-image",
                   label: "Edit in Composer",
@@ -528,10 +526,13 @@ export function useMediaActions(
                   disabled: action.isPending,
                   onClick: () => action.mutate("refine"),
                 },
+                ...(reference ? [reference] : []),
+                ...(character ? [character] : []),
               ],
             ]
           : [
               [
+                ...(upscale ? [upscale] : []),
                 { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
                 editAction("reverse", "Reverse", Rewind, "reverse"),
                 editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
@@ -543,11 +544,11 @@ export function useMediaActions(
               ],
             ],
       }),
-    // Recreate runs the item again from here, then opens it in the composer. An upload has only its
-    // suggested prompt; unfinished work opens its prompt.
+    // Recreate runs the item again from here, compares or finds what is like it, then opens it in
+    // the composer. An upload has only its suggested prompt; unfinished work opens its prompt.
     itemAction("recreate", {
       disabled: !ready && action.isPending,
-      loading: running === "regenerate" || running === "repeat",
+      loading: running === "regenerate" || running === "repeat" || variants.isPending,
       onClick: ready ? undefined : () => action.mutate("image"),
       menu: ready
         ? [
@@ -567,124 +568,141 @@ export function useMediaActions(
                     onClick: () => run({ kind: "repeat" }),
                   },
                 ],
+            [
+              // Compare Models stages this image's prompt across models in the composer; Open
+              // Comparison shows the side-by-side view it belongs to.
+              ...(image
+                ? [
+                    {
+                      id: "compare-models",
+                      label: "Compare Models",
+                      icon: icons.compare,
+                      disabled: variants.isPending,
+                      onClick: () => variants.mutate(),
+                    },
+                  ]
+                : []),
+              ...(image && comparison
+                ? [
+                    {
+                      id: "open-comparison",
+                      label: "Open Comparison",
+                      icon: icons.compareSideBySide,
+                      onClick: () => {
+                        onApplied();
+                        navigate(`/compare/${comparison}`);
+                      },
+                    },
+                  ]
+                : []),
+              // How alike the gallery's results must be, then the gallery ranked by likeness to
+              // this image (GalleryPage reads `similar`) and new variations of its MCP result set;
+              // a video in a set has only the latter.
+              ...(image
+                ? [
+                    {
+                      id: "similar",
+                      label: "Similar",
+                      icon: icons.similar,
+                      menu: [
+                        [
+                          {
+                            id: "similar-strictness",
+                            label: "Strictness",
+                            icon: icons.similar,
+                            choice: {
+                              value: strictness,
+                              options: similarStrictnessOptions,
+                              onChange: (value: string) =>
+                                setStrictness(value as SimilarStrictness),
+                            },
+                          },
+                        ],
+                        [
+                          {
+                            id: "similar-gallery",
+                            label: "Similar",
+                            icon: icons.similar,
+                            onClick: () => {
+                              onApplied();
+                              navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
+                            },
+                          },
+                          ...(moreLikeSet ? [{ id: "more-like-set", ...moreLikeSet }] : []),
+                        ],
+                      ],
+                    },
+                  ]
+                : moreLikeSet
+                  ? [{ id: "more-like-set", ...moreLikeSet }]
+                  : []),
+            ],
             [recreateAction],
           ]
         : undefined,
     }),
-    // Compare Models stages this image's prompt across models in the composer; Open Comparison
-    // shows the side-by-side view it belongs to.
-    image &&
-      itemAction("compare", {
-        menu: [
-          [
-            {
-              id: "compare-models",
-              label: "Compare Models",
-              icon: icons.compare,
-              disabled: variants.isPending,
-              onClick: () => variants.mutate(),
-            },
-            ...(comparison
-              ? [
-                  {
-                    id: "open-comparison",
-                    label: "Open Comparison",
-                    icon: icons.compareSideBySide,
-                    onClick: () => {
-                      onApplied();
-                      navigate(`/compare/${comparison}`);
-                    },
-                  },
-                ]
-              : []),
-          ],
-        ],
-      }),
-    // How alike the gallery's results must be, then the gallery ranked by likeness to this image
-    // (GalleryPage reads `similar`) and new variations of its MCP result set; a video in a set
-    // has only the latter.
-    image
-      ? itemAction("similar", {
-          menu: [
-            [
-              {
-                id: "similar-strictness",
-                label: "Strictness",
-                icon: icons.similar,
-                choice: {
-                  value: strictness,
-                  options: similarStrictnessOptions,
-                  onChange: (value: string) => setStrictness(value as SimilarStrictness),
-                },
-              },
-            ],
-            [
-              {
-                id: "similar-gallery",
-                label: "Similar",
-                icon: icons.similar,
-                onClick: () => {
-                  onApplied();
-                  navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
-                },
-              },
-              ...(moreLikeSet ? [{ id: "more-like-set", ...moreLikeSet }] : []),
-            ],
-          ],
-        })
-      : moreLikeSet && itemAction("similar", moreLikeSet),
-    upscale,
-    // Its options sort alphabetically.
-    itemAction("copy", {
+    itemAction("share", {
       menu: [
         [
           {
-            id: "copy-details",
-            label: "Details",
-            icon: ListChecks,
-            onClick: () => void copyText(settingsText(), "Details"),
-          },
-          {
             id: "copy-prompt",
-            label: "Prompt",
+            label: "Copy Prompt",
             icon: TextQuote,
             onClick: () => void copyText(item.prompt || "", "Prompt"),
           },
+          {
+            id: "copy-details",
+            label: "Copy Details",
+            icon: ListChecks,
+            onClick: () => void copyText(settingsText(), "Details"),
+          },
         ],
+        ready
+          ? [
+              {
+                id: "download",
+                label: "Download",
+                icon: icons.download,
+                link: gif && loop ? undefined : transfer.download,
+                menu:
+                  gif && loop
+                    ? [
+                        [
+                          {
+                            id: "download-video",
+                            label: "Video",
+                            icon: icons.download,
+                            link: transfer.download,
+                          },
+                          { id: "download-gif", label: "GIF", icon: Film, link: gif },
+                          {
+                            id: "download-loop",
+                            label: "Back & Forth",
+                            icon: ArrowLeftRight,
+                            link: loop,
+                          },
+                        ],
+                      ]
+                    : undefined,
+              },
+              // Phones that share natively also share it as a file.
+              ...(transfer.canShare
+                ? [
+                    {
+                      id: "share-file",
+                      label: "Share",
+                      icon: icons.share,
+                      disabled: transfer.sharing,
+                      loading: transfer.sharing,
+                      keepOpen: !transfer.shareReady,
+                      onClick: () => void transfer.share(),
+                    },
+                  ]
+                : []),
+            ]
+          : [],
       ],
     }),
-    // Phones that share natively share instead of downloading.
-    ready &&
-      (transfer.canShare
-        ? itemAction("share", {
-            disabled: transfer.sharing,
-            loading: transfer.sharing,
-            keepOpen: !transfer.shareReady,
-            onClick: () => void transfer.share(),
-          })
-        : itemAction("download", {
-            link: transfer.download,
-            menu:
-              gif && loop
-                ? [
-                    [
-                      {
-                        id: "download-video",
-                        label: "Video",
-                        icon: icons.download,
-                        link: transfer.download,
-                      },
-                      { id: "download-gif", label: "GIF", icon: Film, link: gif },
-                      {
-                        id: "download-loop",
-                        label: "Back & Forth",
-                        icon: ArrowLeftRight,
-                        link: loop,
-                      },
-                    ],
-                  ]
-                : undefined,
-          })),
     itemAction("delete", { onClick: onDelete }),
     ready &&
       itemAction("star", {
@@ -694,23 +712,28 @@ export function useMediaActions(
         onClick: () => favorite.mutate(),
       }),
   ];
-  const kept = (action: Action): Action =>
-    action.menu
-      ? {
-          ...action,
-          menu: action.menu.map((group) =>
-            group.filter((option) => !omit.includes(option.id)).map(kept),
-          ),
-        }
-      : action;
   return itemActionGroups(
-    actions
-      .filter((entry): entry is Action => !!entry && !omit.includes(entry.id))
-      .map((entry) => withoutLoneOption(kept(entry))),
+    actions.filter((entry): entry is Action => !!entry).map(withoutLoneOption),
   );
 }
 
-/** The shared actions as menu items, mounted while a menu is open. */
-export function MediaActionMenu({ item, ...options }: MediaActionOptions & { item: MediaItem }) {
-  return <ActionMenuItems groups={useMediaActions(item, options)} />;
+/**
+ * The shared actions as menu items, mounted while a menu is open; a gallery tile's menu starts with
+ * Select, which starts selecting with its item selected.
+ */
+export function MediaActionMenu({
+  item,
+  onSelect,
+  ...options
+}: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
+  const groups = useMediaActions(item, options);
+  return (
+    <ActionMenuItems
+      groups={
+        onSelect
+          ? [[{ id: "select", label: "Select", icon: SquareCheck, onClick: onSelect }], ...groups]
+          : groups
+      }
+    />
+  );
 }

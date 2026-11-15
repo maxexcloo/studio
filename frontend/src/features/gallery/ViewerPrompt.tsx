@@ -28,10 +28,10 @@ import { type Iteration, typedPrompt } from "./useMediaAction";
 import classes from "./MediaViewer.module.css";
 
 /**
- * The viewer's prompt and its assistance, shared by the prompt field and the bar's AI menu. The
+ * The viewer's prompt and its assistance, shared by the prompt field and the bar's Edit menu. The
  * field holds the item's prompt: editing it and pressing Enter or Generate runs it with the item's
- * settings as a new version, and Improve Prompt rewrites it in one of the assistant's styles. AI
- * (`ai`) offers Review Prompt, the image's next steps, Custom…, which asks for a change in plain
+ * settings as a new version, and Improve Prompt rewrites it in one of the assistant's styles. `ai`,
+ * which opens Edit ▾, offers Review Prompt, the image's next steps, Custom…, which asks for a change in plain
  * words typed in its own box (`useItemChange`), and Refresh Suggestions. Under Review Prompt, the
  * remembered default, a change's proposal fills the field until Run runs it or Undo restores what
  * was typed; without it, the proposal runs at once.
@@ -148,7 +148,7 @@ export function useViewerPrompt(
           }),
         }
       : null;
-  // Improve Prompt's styles, but Custom, whose place AI's Custom… takes.
+  // Improve Prompt's styles, but Custom, whose place Edit's Custom… takes.
   const styles =
     assistant?.available && profileId
       ? assistant.presets.filter((style) => style.id !== "custom")
