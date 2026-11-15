@@ -67,7 +67,7 @@ export function registerRewriteRoutes(
     /**
      * The owner's gallery records of a job. A job's own results are what its adapter reported (a
      * cloud provider's bare files, or a snapshot taken on completion), so the queue shows the
-     * gallery's records instead: each with its prompt, settings, title and star.
+     * gallery's records instead: each with its prompt, settings, title and rating.
      */
     media?: (ownerId: string, jobId: string) => QueueMedia[];
     /** Whether the owner has this gallery item, which a run may then be made from. */

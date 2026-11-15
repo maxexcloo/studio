@@ -371,18 +371,12 @@ function suggestedStrength(info) {
 /**
  * The deterministic half of LoRA matching: LoRAs that may run on the profile (never 'other', never
  * an acceleration or supporting file), scored by the request's words found in each one's title,
- * triggers and tags (description words count half), plus a small boost for LoRAs in starred results.
+ * triggers and tags (description words count half), plus a small boost for LoRAs in liked results.
  * Returns at most `limit` candidates with a score above zero, best first.
  */
-export function preFilterLoras({
-  profile,
-  prompt,
-  loras = [],
-  starred = [],
-  limit = maxCandidates,
-}) {
+export function preFilterLoras({ profile, prompt, loras = [], liked = [], limit = maxCandidates }) {
   const asked = new Set(meaningful(prompt));
-  const boosted = new Set(starred);
+  const boosted = new Set(liked);
   const scored = [];
   for (const { name, info = {} } of loras) {
     if (!name || isRole(info) || loraCompatibility(info, profile) === "other") continue;
@@ -456,7 +450,7 @@ function rewriteInstructions({
       : "",
     negative ? "Describe what should be present; the negative prompt is written separately." : "",
     examples.length
-      ? `Prompts this person starred on this model, for their taste (never copy their subjects): ${examples.map((example) => JSON.stringify(one(example, 400))).join(" ")}`
+      ? `Prompts this person liked on this model, for their taste (never copy their subjects): ${examples.map((example) => JSON.stringify(one(example, 400))).join(" ")}`
       : "",
     `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
     `Style: ${override || preset.instruction}`,
@@ -916,11 +910,11 @@ export function createAssistant(
     profile = {},
     prompt,
     loras = [],
-    starred = [],
+    liked = [],
     limit = 4,
     signal,
   } = {}) {
-    const candidates = preFilterLoras({ profile, prompt, loras, starred });
+    const candidates = preFilterLoras({ profile, prompt, loras, liked });
     if (!candidates.length) return { loras: [], source: "prefilter" };
     const started = now();
     const model = await modelFor("loras");

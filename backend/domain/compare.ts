@@ -7,7 +7,7 @@ import { type RouteAccount, directRoute } from "./direct-route.ts";
 import type { QueueOrigin, Store } from "./store.ts";
 
 /**
- * A compare set: `compareVariants` image jobs shown side by side. `vote` is the starred winner and,
+ * A compare set: `compareVariants` image jobs shown side by side. `vote` is the chosen winner and,
  * with the variants' recorded inputs, the taste signal the taste profile learns from. A compare run
  * is also a result set of the same ID (`comparisonSet`), so the gallery keeps its results together.
  */

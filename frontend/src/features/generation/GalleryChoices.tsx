@@ -23,10 +23,10 @@ import type { ReferenceBrowser } from "./useReferenceBrowser";
 
 type Tab = ReferenceBrowser["state"]["tab"];
 
-/** The gallery's images, all, starred or uploaded. */
+/** The gallery's images, all, liked or uploaded. */
 export const galleryTabs: { value: Tab; label: string }[] = [
   { value: "gallery", label: "Gallery" },
-  { value: "starred", label: "Starred" },
+  { value: "liked", label: "Liked" },
   { value: "uploads", label: "Uploads" },
 ];
 
@@ -79,10 +79,10 @@ export function GalleryChoices({
     onChange: (filters) => browse({ filters }),
   });
   const [search] = useDebouncedValue(query, 250);
-  // Starred and Uploads are the gallery's own filters, set by the tab.
+  // Liked and Uploads are the gallery's own filters, set by the tab.
   const { listing, items } = useGalleryImages(
     search,
-    { ...filters, starred: tab === "starred", uploads },
+    { ...filters, rating: tab === "liked" ? "liked" : "", uploads },
     enabled,
   );
   const [deleteId, setDeleteId] = useState<string | null>(null);

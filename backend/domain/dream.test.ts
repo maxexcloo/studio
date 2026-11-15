@@ -107,8 +107,8 @@ function fixture(t: TestContext, catalogue = profiles) {
           item.ownerId === ownerId &&
           (query.dreamState === undefined ||
             [query.dreamState].flat().includes(item.dream?.state)) &&
-          (!query.liked || item.favorite || item.dream?.state === "kept") &&
-          (!query.favorite || item.favorite) &&
+          (!query.liked || item.rating === "liked" || item.dream?.state === "kept") &&
+          (!query.rating || item.rating === query.rating) &&
           (!query.type || item.type === query.type) &&
           (!query.status || item.status === query.status) &&
           (!query.conversationIds || query.conversationIds.includes(item.chat?.conversationId)) &&
@@ -118,7 +118,7 @@ function fixture(t: TestContext, catalogue = profiles) {
           (query.uploaded === undefined || Boolean(item.uploaded) === query.uploaded) &&
           (query.before === undefined || Date.parse(item.createdAt || "") <= query.before),
       )
-      .slice(0, query.sample);
+      .slice(0, query.sample ?? query.limit);
   const dream = createDream({
     dataDir,
     store,
@@ -148,7 +148,7 @@ function fixture(t: TestContext, catalogue = profiles) {
         return {
           text: JSON.stringify({
             prompt: `dream ${state.prompts}`,
-            why: "You star foxes.",
+            why: "You like foxes.",
             title: `Fox Dream ${state.prompts}`,
           }),
         };
@@ -162,11 +162,15 @@ function fixture(t: TestContext, catalogue = profiles) {
     },
     items: (ownerId, ids) =>
       state.items.filter((item) => item.ownerId === ownerId && ids.includes(String(item.id))),
-    visible: (items) => items.filter((item) => !item.dream || item.dream.state === "kept"),
+    visible: (items) =>
+      items.filter(
+        (item) => item.rating !== "disliked" && (!item.dream || item.dream.state === "kept"),
+      ),
     likeness: (a, b) => state.likeness(a, b),
-    mark: (ownerId, itemId, mark) => {
+    mark: (ownerId, itemId, mark, rating) => {
       const item = state.items.find((entry) => entry.ownerId === ownerId && entry.id === itemId)!;
       item.dream = mark;
+      item.rating = rating;
     },
     remove: (ownerId, itemIds) => {
       state.items = state.items.filter(
@@ -235,15 +239,11 @@ function fixture(t: TestContext, catalogue = profiles) {
     store.save({ ...store.job(ownerId, jobId)!, status: "completed" });
     for (const item of state.items) if (item.jobId === jobId) item.status = "done";
   };
-  /** Gallery reads not narrowed to Dream results, liked or starred items, chats or ids: walks of the gallery. */
+  /** Gallery reads not narrowed to Dream results, liked or rated items, chats or ids: walks of the gallery. */
   const walks = () =>
     state.reads.filter(
       (query) =>
-        !query.dreamState &&
-        !query.liked &&
-        !query.favorite &&
-        !query.conversationIds &&
-        !query.ids,
+        !query.dreamState && !query.liked && !query.rating && !query.conversationIds && !query.ids,
     );
   const dreamJobs = (ownerId?: string) =>
     store.jobs(ownerId).filter((job) => job.priority === queuePriority.dream);
@@ -344,7 +344,7 @@ test("Dream is off until turned on, queues one hidden job per account only while
   assert.equal((job.input.writing as { title?: string }).title, "Fox Dream 1");
   assert.deepEqual(job.dream && { prompt: job.dream.prompt, why: job.dream.why }, {
     prompt: "dream 1",
-    why: "You star foxes.",
+    why: "You like foxes.",
   });
   // Its session is Dream's own.
   assert.equal(store.session("alice", job.sessionId)?.title, "Dream");
@@ -467,7 +467,7 @@ test("A finished Dream job starts the next at once, without waiting for the next
   assert.equal(live("alice").length, 1);
 });
 
-test("Dream stops at today's cap per kind, however much waits unseen, and animates kept or starred images", async (t) => {
+test("Dream stops at today's cap per kind, however much waits unseen, and animates kept or liked images", async (t) => {
   const { dream, state, dreamOnce, live } = fixture(t);
   await dream.save("alice", { enabled: true, dailyImages: 3 });
   assert.ok(await dreamOnce());
@@ -485,7 +485,7 @@ test("Dream stops at today's cap per kind, however much waits unseen, and animat
   state.clock += 86_400_000;
   assert.equal(dream.status("alice").status, "waiting");
 
-  // With Images off, videos still animate a kept or starred image with the default video profile.
+  // With Images off, videos still animate a kept or liked image with the default video profile.
   await dream.save("alice", { images: false, videos: true, dailyVideos: 1 });
   const video = await dreamOnce();
   assert.equal(video?.input.kind, "video");
@@ -501,26 +501,26 @@ test("Dream stops at today's cap per kind, however much waits unseen, and animat
 
 test("Dream draws a ready profile by its taste, explores one axis at a time and keeps Spicy to accounts with Uncensored Models", async (t) => {
   const { dream, state, taste, dreamOnce, generated } = fixture(t);
-  const starred = (id: string, profileId: string) => {
+  const liked = (id: string, profileId: string) => {
     generated({
       id,
       ownerId: "alice",
       type: "image",
       status: "done",
-      favorite: true,
-      prompt: `starred ${id}`,
+      rating: "liked",
+      prompt: `liked ${id}`,
       settings: { profileId },
     });
-    taste.record("alice", [tasteSignal("star", id, { profileId, tags: ["fox"] })]);
+    taste.record("alice", [tasteSignal("like", id, { profileId, tags: ["fox"] })]);
   };
-  starred("a", "qwen");
-  starred("b", "qwen");
+  liked("a", "qwen");
+  liked("b", "qwen");
   taste.record("alice", [tasteSignal("discard", "c", { profileId: "flux" })]);
   await dream.save("alice", { enabled: true, spicy: true });
   const job = await dreamOnce();
   assert.equal(job?.input.profileId, "qwen");
   assert.equal(job?.dream?.arm, "exploit");
-  assert.match(state.calls[0].user, /- starred [ab]/);
+  assert.match(state.calls[0].user, /- liked [ab]/);
   // An exploited idea features something they like.
   assert.match(state.calls[0].system, /feature this, which they like: fox\./);
   // No uncensored grant: Spicy never applies, whatever the setting says.
@@ -544,7 +544,7 @@ test("Dream draws a ready profile by its taste, explores one axis at a time and 
   const explored = await dreamOnce();
   assert.equal(explored?.input.profileId, "flux");
   assert.equal(explored?.dream?.arm, "explore:profile");
-  assert.equal(explored?.dream?.why, "Trying FLUX for the first time · You star foxes.");
+  assert.equal(explored?.dream?.why, "Trying FLUX for the first time · You like foxes.");
   // The next explores the prompt: half from a Library import, on its profile with its LoRAs, for
   // Uncensored Models only, since imports carry no content rating.
   state.access.alice!.uncensored = true;
@@ -572,7 +572,7 @@ test("Dream draws a ready profile by its taste, explores one axis at a time and 
   ]);
   assert.match(state.calls.at(-1)!.user, /Inspiration prompt: a lighthouse in a storm/);
   assert.match(state.calls.at(-1)!.system, /Start from the inspiration prompt/);
-  assert.equal(inspired?.dream?.why, "Inspired by an import · You star foxes.");
+  assert.equal(inspired?.dream?.why, "Inspired by an import · You like foxes.");
   // Without an import, an explored prompt goes beyond their taste on the profile it drew.
   state.access.alice!.uncensored = false;
   state.loras = {};
@@ -784,7 +784,7 @@ test("Dream's ideas take the account's projects in turn and While You Were Away 
   assert.equal((await request("")).body.since, (await request("/visit", {})).body.since);
 });
 
-test("Dream varies a starred image, and a quiet chat's project once the chat hands it over, one axis at a time", async (t) => {
+test("Dream varies a liked image, and a quiet chat's project once the chat hands it over, one axis at a time", async (t) => {
   const { dream, state, store, projects, dreamOnce, walks } = fixture(t);
   await dream.save("alice", { enabled: true });
   const beach = projects.create("alice", { name: "Beach", brief: { avoid: "crowds" } });
@@ -818,16 +818,16 @@ test("Dream varies a starred image, and a quiet chat's project once the chat han
       ...extra,
     });
   };
-  chatImage("seed", "a fox on a beach at dawn", { favorite: true });
+  chatImage("seed", "a fox on a beach at dawn", { rating: "liked" });
 
   // The chat asked for something within the hour: it keeps its project, and Dream varies the
-  // starred image on its profile, with its settings, the LoRAs that still fit and its references.
+  // liked image on its profile, with its settings, the LoRAs that still fit and its references.
   // A roll of 99 starts no series.
   state.rolls = [99];
   const held = await dreamOnce();
   assert.equal(held?.dream?.projectId, undefined);
   assert.equal(held?.dream?.arm, "continue:scene");
-  assert.match(String(held?.dream?.why), /^Varying a starred image: new scene · /);
+  assert.match(String(held?.dream?.why), /^Varying a liked image: new scene · /);
   assert.deepEqual(
     [held?.input.profileId, held?.input.steps, held?.input.width, held?.input.height],
     ["flux", 20, 832, 1216],
@@ -858,7 +858,7 @@ test("Dream varies a starred image, and a quiet chat's project once the chat han
   assert.deepEqual(walks(), [], "Dream never walks the whole gallery");
 });
 
-test("Dream seeds from the account's stars, its own results only one draw in four, and spreads its seeds", async (t) => {
+test("Dream seeds from the account's likes, its own results only one draw in four, and spreads its seeds", async (t) => {
   const { dream, state, store, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
   const image = (id: string, extra: Partial<DreamItem>) => {
@@ -876,65 +876,65 @@ test("Dream seeds from the account's stars, its own results only one draw in fou
     });
   };
   const kept = { state: "kept" as const, prompt: "", why: "", at: "" };
-  image("old", { favorite: true, createdAt: "2026-01-01T00:00:00Z" });
-  image("super", { favorite: true, dream: kept });
+  image("old", { rating: "liked", createdAt: "2026-01-01T00:00:00Z" });
+  image("super", { rating: "liked", dream: kept });
   image("liked", { dream: kept });
   // A roll of 99 starts no series; a draw of 1 of 4 leaves Dream's own results out.
   state.rolls = [99];
   state.draws[4] = [1];
   const first = await dreamOnce();
-  assert.match(String(first?.dream?.why), /^Varying a starred image: /);
+  assert.match(String(first?.dream?.why), /^Varying a liked image: /);
   assert.match(state.calls.at(-1)!.user, /Seed prompt: prompt old/);
   assert.deepEqual(dream.read("alice").seeds, ["old"]);
   // A draw of 0 lets them in: the latest seed waits its turn, and of the rest the one least like it
-  // by image seeds. A Like is no star.
+  // by image seeds. A Like is no like.
   state.likeness = (a, b) => (a.id === "super" && b.id === "old" ? 0.95 : 0.5);
   state.rolls = [99];
   const second = await dreamOnce();
-  assert.match(String(second?.dream?.why), /^Varying a liked result: /);
+  assert.match(String(second?.dream?.why), /^Varying a kept result: /);
   assert.match(state.calls.at(-1)!.user, /Seed prompt: prompt liked/);
   assert.deepEqual(dream.read("alice").seeds, ["liked", "old"]);
-  assert.equal(state.items.find((item) => item.id === "liked")?.favorite, undefined);
+  assert.equal(state.items.find((item) => item.id === "liked")?.rating, undefined);
 });
 
-test("A new star seeds every other draw until it has seeded, and results that came out alike steer the writer away", async (t) => {
+test("A new like seeds every other draw until it has seeded, and results that came out alike steer the writer away", async (t) => {
   const { dream, state, store, taste, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
-  // Stars from before the latest star signals are not fresh.
-  const star = (id: string, signal = true) => {
+  // Likes from before the latest like signals are not fresh.
+  const like = (id: string, signal = true) => {
     const input = { kind: "image", prompt: `prompt ${id}`, profileId: "flux" };
     const session = store.createSession("alice", "Gallery").id;
     const job = store.enqueue("alice", session, input, "image", undefined, "worker:image", id);
     store.save({ ...job, status: "completed" });
     const item = { id, jobId: job.id, ownerId: "alice", type: "image", status: "done" };
-    state.items.push({ ...item, favorite: true });
-    if (signal) taste.record("alice", [tasteSignal("star", job.id, itemValues(item))]);
+    state.items.push({ ...item, rating: "liked" });
+    if (signal) taste.record("alice", [tasteSignal("like", job.id, itemValues(item))]);
   };
   const seedOfLast = () => /Seed prompt: prompt (\S+)/.exec(state.calls.at(-1)!.user)?.[1];
-  for (const id of ["old-1", "old-2", "old-3"]) star(id, false);
-  star("new");
+  for (const id of ["old-1", "old-2", "old-3"]) like(id, false);
+  like("new");
   state.rolls = [99];
   await dreamOnce();
   assert.equal(seedOfLast(), "new");
   state.rolls = [99];
   await dreamOnce();
   assert.match(String(seedOfLast()), /^old-/);
-  star("newer");
+  like("newer");
   state.rolls = [99];
   await dreamOnce();
   assert.equal(seedOfLast(), "newer");
 
   // Without a seed, an idea is written fresh; the results that came out alike are named.
-  state.items = state.items.filter((item) => !item.favorite);
+  state.items = state.items.filter((item) => item.rating !== "liked");
   state.likeness = (a, b) => (a.dream && b.dream ? 0.95 : 0.2);
   await dreamOnce();
   assert.match(state.calls.at(-1)!.user, /Recent results that came out alike[^\n]*\n- dream \d/);
 });
 
-test("Dream samples only stars it can seed from, however many uploads and retired profiles' stars there are", async (t) => {
+test("Dream samples only likes it can seed from, however many uploads and retired profiles' likes there are", async (t) => {
   const { dream, state, store, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
-  const star = (id: string, profileId: string, extra: Partial<DreamItem> = {}) => {
+  const like = (id: string, profileId: string, extra: Partial<DreamItem> = {}) => {
     const input = { kind: "image", prompt: `prompt ${id}`, profileId };
     const session = store.createSession("alice", "Gallery").id;
     const job = store.enqueue("alice", session, input, "image", undefined, "worker:image", id);
@@ -945,18 +945,18 @@ test("Dream samples only stars it can seed from, however many uploads and retire
       ownerId: "alice",
       type: "image",
       status: "done",
-      favorite: true,
+      rating: "liked",
       ...extra,
     });
   };
   for (let index = 0; index < 10; index++) {
-    star(`retired-${index}`, "retired");
-    star(`upload-${index}`, "flux", { uploaded: true });
+    like(`retired-${index}`, "retired");
+    like(`upload-${index}`, "flux", { uploaded: true });
   }
-  star("usable", "flux");
+  like("usable", "flux");
   state.rolls = [99];
   const job = await dreamOnce();
-  assert.match(String(job?.dream?.why), /^Varying a starred image: /);
+  assert.match(String(job?.dream?.why), /^Varying a liked image: /);
   assert.match(state.calls.at(-1)!.user, /Seed prompt: prompt usable/);
 });
 
@@ -986,7 +986,7 @@ test("Comparisons rate gallery images against each other, and an image that wins
   dream.calibrate("alice", { liked: ["lose", "same"], passed: [] });
   dream.calibrate("alice", { passed: ["same"], liked: [] });
   assert.deepEqual(dream.read("alice").ratings, { win: 1516, lose: 1485, same: 1499 });
-  // Nothing is starred: the image that won seeds.
+  // Nothing is liked: the image that won seeds.
   state.rolls = [99];
   const job = await dreamOnce();
   assert.match(String(job?.dream?.why), /^Varying a comparison winner: /);
@@ -1072,39 +1072,46 @@ test("The explore share starts at a fifth and follows how often explored results
   assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
 });
 
-test("starring an unseen, finished Dream result keeps it", (t) => {
-  const { dream, state, taste } = fixture(t);
+test("liking an unseen Dream result keeps it, disliking discards it and Restore keeps a discard", (t) => {
+  const { dream, state } = fixture(t);
   const mark = { prompt: "p", why: "", at: new Date(state.clock).toISOString() };
-  for (const [id, status] of [
-    ["done", "done"],
-    ["pending", "pending"],
-  ])
-    state.items.push({
-      id,
-      jobId: `job-${id}`,
-      ownerId: "alice",
-      type: "image",
-      status,
-      dream: { ...mark, state: "unseen" },
-    });
-  dream.starred("alice", ["done", "pending"]);
-  dream.starred("bob", ["done"]);
-  assert.deepEqual(
-    state.items.map((item) => item.dream?.state),
-    ["kept", "unseen"],
+  const item = (id: string, dreamState: "unseen" | "discarded", rating?: string) => ({
+    id,
+    jobId: `job-${id}`,
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    rating,
+    dream: { ...mark, state: dreamState },
+  });
+  state.items.push(
+    item("liked", "unseen", "liked"),
+    item("disliked", "unseen", "disliked"),
+    item("restored", "discarded"),
   );
+  dream.rated("alice", state.items);
   assert.deepEqual(
-    taste.read("alice").signals.map((signal) => [signal.kind, signal.jobId]),
-    [["keep", "job-done"]],
+    state.items.map((entry) => [entry.id, entry.dream?.state, entry.rating]),
+    [
+      ["liked", "kept", "liked"],
+      ["disliked", "discarded", "disliked"],
+      ["restored", "kept", undefined],
+    ],
   );
 });
 
-test("Dream deletes discards after 30 days, and Delete All deletes an account's others", async (t) => {
+test("Dream keeps discards disliked and hidden, never deleting them unasked, and Delete All deletes them", async (t) => {
   const fx = fixture(t);
-  const { dream, state } = fx;
+  const { dream, state, taste } = fx;
   const daysAgo = (days: number) => new Date(state.clock - days * 86_400_000).toISOString();
-  const item = (id: string, ownerId: string, days: number, mark: "discarded" | "kept") => ({
+  const item = (
+    id: string,
+    ownerId: string,
+    days: number,
+    mark: "unseen" | "discarded" | "kept",
+  ) => ({
     id,
+    jobId: `job-${id}`,
     ownerId,
     type: "image",
     status: "done",
@@ -1112,22 +1119,23 @@ test("Dream deletes discards after 30 days, and Delete All deletes an account's 
   });
   state.items.push(
     item("old", "alice", 31, "discarded"),
-    item("recent", "alice", 2, "discarded"),
-    item("older", "alice", 1, "discarded"),
+    item("new", "alice", 0, "unseen"),
     item("kept", "alice", 90, "kept"),
     item("bob-old", "bob", 40, "discarded"),
-    item("bob-recent", "bob", 1, "discarded"),
   );
   await dream.tick();
   const ids = () => state.items.map((entry) => entry.id);
-  assert.deepEqual(ids(), ["recent", "older", "kept", "bob-recent"]);
-  assert.deepEqual(
-    dream.discarded("alice").map((entry) => entry.id),
-    ["older", "recent"],
-  );
+  assert.deepEqual(ids(), ["old", "new", "kept", "bob-old"]);
+  dream.discard("alice", "new");
+  assert.equal(state.items.find((entry) => entry.id === "new")?.rating, "disliked");
+  assert.equal(taste.read("alice").signals[0].kind, "discard");
+  // Keeping a discard takes its dislike back.
+  dream.keep("alice", "new");
+  assert.equal(state.items.find((entry) => entry.id === "new")?.rating, undefined);
+  dream.discard("alice", "old");
   const request = await serve(t, fx);
-  assert.deepEqual((await request("/discarded", {}, "DELETE")).body, { deleted: 2 });
-  assert.deepEqual(ids(), ["kept", "bob-recent"]);
+  assert.deepEqual((await request("/discarded", {}, "DELETE")).body, { deleted: 1 });
+  assert.deepEqual(ids(), ["new", "kept", "bob-old"]);
 });
 
 test("Calibration offers the account's older Studio generations, unjudged first, and only teaches the taste profile", async (t) => {
@@ -1239,7 +1247,7 @@ test("an exploited idea draws its steps, guidance and aspect ratio by taste", as
     { ...profiles[0], capabilities: { steps: true } },
   ]);
   taste.record("alice", [
-    tasteSignal("star", "a", { profileId: "flux", steps: 28, cfg: 3.4, width: 832, height: 1216 }),
+    tasteSignal("like", "a", { profileId: "flux", steps: 28, cfg: 3.4, width: 832, height: 1216 }),
     tasteSignal("discard", "b", { profileId: "flux", steps: 12, cfg: 7, width: 1216, height: 832 }),
   ]);
   await dream.save("alice", { enabled: true });
@@ -1269,13 +1277,13 @@ test("Dream compares steps only on a profile with a steps control, and what tast
       ownerId: "alice",
       type: "image",
       status: "done",
-      favorite: true,
+      rating: "liked",
       prompt: "a fox in snow",
       settings: { profileId: "flux" },
     });
     for (let index = 0; index < judged; index++)
       taste.record("alice", [
-        tasteSignal("star", `judged-${index}`, { profileId: "flux", steps: index % 2 ? 10 : 20 }),
+        tasteSignal("like", `judged-${index}`, { profileId: "flux", steps: index % 2 ? 10 : 20 }),
       ]);
     await dream.save("alice", { enabled: true, dailyImages: 10 });
     for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
@@ -1308,7 +1316,7 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
     ownerId: "alice",
     type: "image",
     status: "done",
-    favorite: true,
+    rating: "liked",
     prompt: "a fox in snow",
     settings: { profileId: "flux" },
   });
@@ -1489,7 +1497,7 @@ test("Dream suggests recurring cards from liked results once a day; Accept makes
     type: "image",
     status: "done",
     prompt,
-    favorite: true,
+    rating: "liked",
     jobId: `job-${id}`,
   });
   generated(...["1", "2", "3", "4", "5"].map((id) => liked(id, `Mara on a rooftop ${id}`)));
@@ -1547,7 +1555,7 @@ test("Dream suggests recurring cards from liked results once a day; Accept makes
   assert.deepEqual(dream.suggestions("alice"), []);
 });
 
-test("A series follows a starred image's character through one night on its profile and LoRAs, then ends", async (t) => {
+test("A series follows a liked image's character through one night on its profile and LoRAs, then ends", async (t) => {
   const { dream, state, store, dreamOnce } = fixture(t);
   const input = {
     kind: "image",
@@ -1569,7 +1577,7 @@ test("A series follows a starred image's character through one night on its prof
     type: "image",
     status: "done",
     title: "Mara",
-    favorite: true,
+    rating: "liked",
   });
   await dream.save("alice", { enabled: true });
   const jobs = [];
@@ -1611,9 +1619,9 @@ test("A series follows a starred image's character through one night on its prof
   state.rolls = [99];
   const after = await dreamOnce();
   assert.equal(after?.input.resultSet, undefined);
-  // A series whose image is no longer starred ends.
+  // A series whose image is no longer liked ends.
   await dreamOnce();
-  state.items.find((item) => item.id === "mara")!.favorite = false;
+  state.items.find((item) => item.id === "mara")!.rating = undefined;
   const next = await dreamOnce();
   assert.equal(next?.input.resultSet, undefined);
   assert.equal(dream.read("alice").series, undefined);
@@ -1625,12 +1633,12 @@ test("Dream videos animate the best-reviewed still and extend kept videos, each 
     (job!.input.referenceAssets as { assetId: string; slot: string }[])[0];
   await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
   generated({
-    id: "starred",
+    id: "liked",
     ownerId: "alice",
     type: "image",
     status: "done",
-    prompt: "a starred still",
-    favorite: true,
+    prompt: "a liked still",
+    rating: "liked",
   });
   const dreamed = (id: string, score: number, miss = "") =>
     state.items.push({
@@ -1654,12 +1662,12 @@ test("Dream videos animate the best-reviewed still and extend kept videos, each 
   assert.equal(first?.dream?.projectId, "beach");
   assert.match(state.calls.at(-1)!.user, /first frame was made from: still best/);
   assert.equal(frameOf(await dreamOnce()).assetId, "asset-good");
-  assert.equal(frameOf(await dreamOnce()).assetId, "asset-starred");
+  assert.equal(frameOf(await dreamOnce()).assetId, "asset-liked");
   // Each still is animated once; a miss never is.
   assert.equal(await dreamOnce(), undefined);
   assert.match(
     dream.status("alice").reason!,
-    /^Dream videos animate a kept, starred or well-reviewed image/,
+    /^Dream videos animate a kept, liked or well-reviewed image/,
   );
 
   // A kept video is extended from its last frame on its own model, never an extension again.
@@ -1669,7 +1677,7 @@ test("Dream videos animate the best-reviewed still and extend kept videos, each 
     type: "video",
     status: "done",
     prompt: "a clip",
-    favorite: true,
+    rating: "liked",
     settings: { profileId: "wan" },
   });
   const extension = await dreamOnce();
@@ -1727,5 +1735,5 @@ test("A Dream video skips a source that left the gallery and animates the next",
   });
   finish("alice", live("alice")[0].id);
   assert.equal(await dreamOnce(), undefined);
-  assert.match(dream.status("alice").reason!, /^Dream videos animate a kept, starred/);
+  assert.match(dream.status("alice").reason!, /^Dream videos animate a kept, liked/);
 });

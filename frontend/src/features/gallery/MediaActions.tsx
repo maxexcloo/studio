@@ -70,7 +70,7 @@ import {
   useMediaAction,
   useMediaIteration,
 } from "./useMediaAction";
-import { useMediaFavorite } from "./useMediaFavorite";
+import { useMediaRating } from "./useMediaRating";
 import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
 import { type VideoEdit, useVideoEdit } from "./videoEdits";
@@ -263,6 +263,8 @@ interface MediaActionOptions {
   /** Opens Animate's dialog: Custom Animation, or any theme or suggested motion under Review Prompt. */
   onAnimate: (choice: AnimateRequest) => void;
   onDelete: () => void;
+  /** Opens Report Issue…. */
+  onReport: () => void;
   onRetried?: (jobId: string) => void;
   onTrim: () => void;
   onVersionChange?: (id: string, active: boolean) => void;
@@ -282,6 +284,7 @@ export function useMediaActions(
     onCompare,
     onAnimate,
     onDelete,
+    onReport,
     onRetried,
     onTrim,
     onVersionChange,
@@ -335,7 +338,7 @@ export function useMediaActions(
       videoEdit.mutate({ kind }, { onSuccess: () => flashEdited(`${item.id}:${kind}`) }),
   });
   const navigate = useNavigate();
-  const favorite = useMediaFavorite(item);
+  const rating = useMediaRating(item);
   const ready = item.status === "done" && Boolean(item.url);
   const gif = ready ? videoExport(item, "gif") : null;
   const loop = ready ? videoExport(item, "loop") : null;
@@ -567,6 +570,16 @@ export function useMediaActions(
                     icon: Repeat,
                     onClick: () => run({ kind: "repeat" }),
                   },
+                  ...(item.jobId && assistant.data?.available
+                    ? [
+                        {
+                          id: "report",
+                          label: "Report Issue…",
+                          icon: icons.report,
+                          onClick: onReport,
+                        },
+                      ]
+                    : []),
                 ],
             [
               // Compare Models stages this image's prompt across models in the composer; Open
@@ -705,11 +718,19 @@ export function useMediaActions(
     }),
     itemAction("delete", { onClick: onDelete }),
     ready &&
-      itemAction("star", {
-        label: item.favorite ? "Unstar" : "Star",
-        pressed: Boolean(item.favorite),
-        disabled: favorite.isPending,
-        onClick: () => favorite.mutate(),
+      itemAction("like", {
+        label: item.rating === "liked" ? "Unlike" : "Like",
+        pressed: item.rating === "liked",
+        disabled: rating.isPending,
+        onClick: rating.like,
+      }),
+    // In the Disliked view, a disliked item's Dislike restores it.
+    ready &&
+      itemAction("dislike", {
+        label: item.rating === "disliked" ? "Restore" : "Dislike",
+        pressed: item.rating === "disliked",
+        disabled: rating.isPending,
+        onClick: rating.dislike,
       }),
   ];
   return itemActionGroups(

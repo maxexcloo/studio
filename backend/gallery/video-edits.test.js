@@ -79,7 +79,7 @@ function seed() {
       type: "video",
       status: "done",
       prompt: "A wave",
-      favorite: true,
+      rating: "liked",
       createdAt: "2026-11-01T00:00:00.000Z",
     },
   ]);
@@ -108,7 +108,7 @@ test(
     const trimmed = await edited(url, { kind: "trim", start: 500, end: 1500 });
     const version = galleryRows().find((item) => item.id === trimmed.id);
     assert.deepEqual(
-      [version.ownerId, version.prompt, version.favorite],
+      [version.ownerId, version.prompt, version.rating],
       ["alice", "A wave", undefined],
     );
     const { parentJobId, parentItemId } = store.job("alice", version.jobId);

@@ -76,7 +76,7 @@ function SettingsForm({ dream }: { dream: Dream }) {
         {dream.spicyAvailable && toggle("spicy", "Spicy", "Allow explicit themes.")}
         {toggle("images", "Images", "Make new images.")}
         {number("dailyImages", "Images per Day", 500, "The most images Dream makes a day.")}
-        {toggle("videos", "Videos", "Animate kept or starred images too.")}
+        {toggle("videos", "Videos", "Animate kept or liked images too.")}
         {number("dailyVideos", "Videos per Day", 100, "The most videos Dream makes a day.")}
       </div>
       {save.error && (

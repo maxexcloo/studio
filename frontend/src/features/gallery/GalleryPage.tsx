@@ -485,6 +485,19 @@ export function GalleryPage() {
                 onChange={(event) => setAllVersions(event.currentTarget.checked)}
               />
             )}
+            {/* Disliked items show nowhere else. */}
+            <Switch
+              label="Disliked"
+              labelPosition="left"
+              checked={filters.rating === "disliked"}
+              onChange={(event) =>
+                setFilters({
+                  ...filters,
+                  rating: event.currentTarget.checked ? "disliked" : "",
+                  uploads: false,
+                })
+              }
+            />
             {kind === "image" && (
               <Switch
                 label="Comparisons"

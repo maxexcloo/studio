@@ -15,9 +15,9 @@ export interface Comparison {
   prompt?: string;
   /** Present when every variant used the same negative prompt, even an empty one. */
   negative?: string;
-  /** The starred winner's job ID. */
+  /** The winner's job ID. */
   vote: string | null;
-  /** The exact starred image, even when variants share a batch. */
+  /** The exact winning image, even when variants share a batch. */
   winnerItemId: string | null;
   variants: { jobId: string; label: string; item: MediaItem | null }[];
   /** What the variants of one result vary ("lighting"); a pick goes to its project's brief. */

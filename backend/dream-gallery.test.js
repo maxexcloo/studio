@@ -52,23 +52,32 @@ test("Dream results stay out of the gallery, its delta and MCP job reads until k
   assert.deepEqual(galleryJobResponse(queue, alice, "job-unseen").payload.items, []);
 
   // A change to an unkept result keeps it out of the gallery.
-  updateGalleryJob("unseen", { favorite: true });
+  updateGalleryJob("unseen", { rating: "liked" });
   assert.deepEqual(shown(), ["mine"]);
   // Keeping it makes it an ordinary gallery item everywhere.
   updateGalleryJob("unseen", { dream: { ...mark, state: "kept" } });
   assert.deepEqual(shown().sort(), ["mine", "unseen"]);
   assert.equal(galleryJobResponse(queue, alice, "job-unseen").payload.items.length, 1);
+  // A dislike hides an item from the gallery, kept for the Disliked view.
+  updateGalleryJob("mine", { rating: "disliked" });
+  assert.deepEqual(shown(), ["unseen"]);
+  assert.deepEqual(
+    filterVisibleGallery(galleryItems({ rating: "disliked" }), { disliked: true }).map(
+      (entry) => entry.id,
+    ),
+    ["mine"],
+  );
 });
 
 test("Dream reads its results, an owner's liked items and a chat's items by query", () => {
   setGallery([
     item("plain"),
-    { ...item("starred"), favorite: true },
+    { ...item("liked"), rating: "liked" },
     item("kept", "kept"),
     item("unseen", "unseen"),
     item("gone", "discarded"),
     { ...item("asked"), chat: { conversationId: "chat-1" } },
-    { ...item("bobs"), ownerId: "bob", favorite: true },
+    { ...item("bobs"), ownerId: "bob", rating: "liked" },
     { ...item("bobs-kept", "kept"), ownerId: "bob" },
   ]);
   const ids = (query) =>
@@ -77,14 +86,14 @@ test("Dream reads its results, an owner's liked items and a chat's items by quer
       .sort();
   assert.deepEqual(ids({ dreamState: "unseen" }), ["unseen"]);
   assert.deepEqual(ids({ dreamState: ["kept", "discarded"] }), ["gone", "kept"]);
-  assert.deepEqual(ids({ liked: true }), ["kept", "starred"]);
+  assert.deepEqual(ids({ liked: true }), ["kept", "liked"]);
   assert.deepEqual(ids({ conversationIds: ["chat-1"] }), ["asked"]);
   // Calibration's random pick of older records.
   assert.deepEqual(
     ids({
       before: Date.now() + 1000,
-      notIds: ["plain", "starred"],
-      jobIds: ["job-plain", "job-starred", "job-asked"],
+      notIds: ["plain", "liked"],
+      jobIds: ["job-plain", "job-liked", "job-asked"],
     }),
     ["asked"],
   );

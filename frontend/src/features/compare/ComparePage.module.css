@@ -10,7 +10,7 @@
   box-shadow: 0 0 0 2px var(--mantine-primary-color-filled);
 }
 
-.star {
+.winner {
   position: absolute;
   top: var(--mantine-spacing-xs);
   right: var(--mantine-spacing-xs);

@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { readGalleryRows, writeGalleryRows } from "./gallery-rows.ts";
-import { closeRuntimeDatabase, runtimeDatabase } from "./runtime.ts";
+import { closeRuntimeDatabase, databaseFile, openDatabase, runtimeDatabase } from "./runtime.ts";
 
 test("Studio writes each gallery change to its row at once, never a preview", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-rows-"));
@@ -31,18 +31,51 @@ test("Studio writes each gallery change to its row at once, never a preview", (t
     });
   run(`
     import assert from 'node:assert/strict';
-    import {forgetGalleryItems,galleryItem,galleryItems,putGalleryItems,setGalleryFavorites} from './backend/gallery/store.js';
+    import {forgetGalleryItems,galleryItem,galleryItems,putGalleryItems,setGalleryRatings} from './backend/gallery/store.js';
     assert.deepEqual(galleryItems().map(item=>item.id),['kept','removed']);
-    setGalleryFavorites(['kept'],true);
+    setGalleryRatings(['kept'],'liked');
     forgetGalleryItems([galleryItem('removed')]);
     putGalleryItems([{id:'added',type:'image',status:'done',createdAt:'2026-01-02T00:00:00Z',preview:'data:'}]);
   `);
   const rows = readGalleryRows(runtimeDatabase(dataDir)) as {
     id: string;
-    favorite?: boolean;
+    rating?: string;
     preview?: string;
   }[];
   assert.deepEqual(rows.map((row) => row.id).sort(), ["added", "kept"]);
-  assert.equal(rows.find((row) => row.id === "kept")?.favorite, true);
+  assert.equal(rows.find((row) => row.id === "kept")?.rating, "liked");
   assert.equal(rows.find((row) => row.id === "added")?.preview, undefined);
+});
+
+test("Opening a gallery replaces derived columns and indexes the code no longer defines", (t) => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-schema-"));
+  t.after(() => {
+    closeRuntimeDatabase(dataDir);
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  });
+  const old = openDatabase(databaseFile(dataDir));
+  old.exec(`CREATE TABLE studio_gallery (key TEXT PRIMARY KEY, value TEXT NOT NULL,
+    favorite GENERATED ALWAYS AS (json_extract(value, '$.favorite')) VIRTUAL);
+    CREATE INDEX studio_gallery_order ON studio_gallery (favorite)`);
+  old.close();
+  const db = runtimeDatabase(dataDir);
+  writeGalleryRows(db, [{ id: "a", rating: "disliked" } as { id: string }]);
+  const columns = (
+    db.prepare("PRAGMA table_xinfo(studio_gallery)").all() as { name: string }[]
+  ).map((column) => column.name);
+  assert.ok(!columns.includes("favorite") && columns.includes("rating"));
+  assert.equal(
+    (db.prepare("SELECT unlisted FROM studio_gallery").get() as { unlisted: number }).unlisted,
+    1,
+  );
+  assert.doesNotMatch(
+    String(
+      (
+        db.prepare("SELECT sql FROM sqlite_schema WHERE name = 'studio_gallery_order'").get() as {
+          sql: string;
+        }
+      ).sql,
+    ),
+    /favorite/,
+  );
 });

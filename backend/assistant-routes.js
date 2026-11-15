@@ -146,8 +146,8 @@ async function textModels(engine, workloadModels) {
 /**
  * `workloadModels()`: the models of Studio's text workloads, running or not, which prompt writing
  * may pick too. `profiles(req)`: the generation profiles this account may use (account-scoped).
- * `guide(profile)`: its detailed prompting guide. `loras(req)`: [{ name, info }] the account may stack. `starred(req,
- * profile)`: { examples, loras } from starred results on the same family. `frame(req, assetId)`: a
+ * `guide(profile)`: its detailed prompting guide. `loras(req)`: [{ name, info }] the account may stack. `liked(req,
+ * profile)`: { examples, loras } from liked results on the same family. `frame(req, assetId)`: a
  * reference image the account may use, as the text model reads it; `caption(req, assetId)` what it
  * shows in words.
  */
@@ -162,7 +162,7 @@ export function registerAssistantRoutes(
     profiles = async () => [],
     guide = () => null,
     loras = async () => [],
-    starred = async () => ({ examples: [], loras: [] }),
+    liked = async () => ({ examples: [], loras: [] }),
     frame = async () => null,
     caption = () => "",
   } = {},
@@ -294,8 +294,8 @@ export function registerAssistantRoutes(
   const rewrite = async (account, body, context, { signal, begin, onDelta } = {}) => {
     const references = await downscaleReferences(body?.references);
     const { stack } = await stackFrom(account, body?.loras);
-    // Learning from stars: the account's starred prompts on this family, computed per request.
-    const examples = (await starred({ studioAccount: account }, context.profile)).examples || [];
+    // Learning from likes: the account's liked prompts on this family, computed per request.
+    const examples = (await liked({ studioAccount: account }, context.profile)).examples || [];
     begin?.();
     return engine.rewrite({
       profile: context.profile,
@@ -417,7 +417,7 @@ export function registerAssistantRoutes(
   writer("/api/assistant/loras", async (account, body, context, signal) => {
     if (!allowed(account, "loras"))
       return { status: 403, payload: { ok: false, error: "LoRAs are off for this account." } };
-    const favourite = await starred({ studioAccount: account }, context.profile);
+    const likes = await liked({ studioAccount: account }, context.profile);
     return {
       status: 200,
       payload: {
@@ -427,7 +427,7 @@ export function registerAssistantRoutes(
           profile: context.profile,
           prompt: body?.prompt,
           loras: await loras({ studioAccount: account }),
-          starred: favourite.loras || [],
+          liked: likes.loras || [],
         })),
       },
     };
