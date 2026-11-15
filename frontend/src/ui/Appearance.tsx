@@ -14,8 +14,16 @@ import {
 } from "@mantine/core";
 import { useLocalStorage, useMediaQuery, useReducedMotion } from "@mantine/hooks";
 import { Check, Palette } from "lucide-react";
-import { type ReactNode, createContext, useContext, useLayoutEffect, useMemo } from "react";
+import {
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+} from "react";
 
+import { type Appearance, appearanceChoices } from "../../../shared/appearance";
 import {
   type Background,
   type MotionSpeed,
@@ -28,48 +36,50 @@ import {
 import { PopupTooltip } from "./PopupTooltip";
 import { usePhone, useSideways, useTouch } from "./usePhone";
 
-const colours = [
-  "studio",
-  "blue",
-  "cyan",
-  "grape",
-  "green",
-  "orange",
-  "pink",
-  "red",
-  "teal",
-  "violet",
-] as const;
-interface Appearance {
-  colour: (typeof colours)[number];
-  background: Background;
-  motion: MotionSpeed;
-  rounding: Rounding;
-  layout: "fixed" | "full";
-}
 const defaults: Appearance = {
-  colour: "studio",
-  rounding: "soft",
-  layout: "full",
   background: "default",
+  colour: "studio",
+  colourScheme: "auto",
+  layout: "full",
   motion: "standard",
+  rounding: "soft",
 };
 const Context = createContext<{
   appearance: Appearance;
-  setAppearance: (next: Appearance | ((previous: Appearance) => Appearance)) => void;
+  setAppearance: (update: (previous: Appearance) => Appearance) => void;
 }>(null!);
 const colourSchemeManager = localStorageColorSchemeManager({ key: "studio-colour-scheme" });
 // Glass needs backdrop blur; without it, translucent surfaces would show the page through text.
 const blurs =
   CSS.supports("backdrop-filter", "blur(1px)") ||
   CSS.supports("-webkit-backdrop-filter", "blur(1px)");
-export function AppearanceProvider({ children }: { children: ReactNode }) {
-  const [appearance, setAppearance] = useLocalStorage<Appearance>({
+/**
+ * Appearance follows the account (`saved`, its `appearance` preference, and `save`). The browser
+ * keeps a copy for the moments before the account is known, such as sign-in.
+ */
+export function AppearanceProvider({
+  saved,
+  save,
+  children,
+}: {
+  saved?: Partial<Appearance>;
+  save?: (appearance: Appearance) => void;
+  children: ReactNode;
+}) {
+  const [device, setDevice] = useLocalStorage<Partial<Appearance>>({
     key: "studio-appearance",
     defaultValue: defaults,
     getInitialValueInEffect: false,
   });
-  const resolved = { ...defaults, ...appearance };
+  const resolved = { ...defaults, ...device, ...saved };
+  useEffect(() => {
+    if (saved) setDevice(saved);
+  }, [saved, setDevice]);
+  const setAppearance = (update: (previous: Appearance) => Appearance) => {
+    const next = update(resolved);
+    setDevice(next);
+    save?.(next);
+  };
   const reduced = useReducedMotion();
   const duration = reduced ? 0 : motionSpeeds[resolved.motion];
   const opaque = useMediaQuery("(prefers-reduced-transparency: reduce)", false, {
@@ -105,10 +115,19 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
         defaultColorScheme="auto"
         colorSchemeManager={colourSchemeManager}
       >
+        <ColourScheme value={resolved.colourScheme} />
         {children}
       </MantineProvider>
     </Context.Provider>
   );
+}
+/** Mantine keeps the colour scheme itself; this keeps it on the appearance's. */
+function ColourScheme({ value }: { value: Appearance["colourScheme"] }) {
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
+  useEffect(() => {
+    if (colorScheme !== value) setColorScheme(value);
+  }, [colorScheme, value, setColorScheme]);
+  return null;
 }
 export const useAppearance = () => useContext(Context);
 export function useMotionDuration() {
@@ -117,7 +136,6 @@ export function useMotionDuration() {
 export function AppearanceControls() {
   const { appearance, setAppearance } = useAppearance();
   const palette = useMantineTheme();
-  const { colorScheme, setColorScheme } = useMantineColorScheme();
   return (
     <ScrollArea.Autosize mah="calc(100dvh - 105px)">
       <Stack gap="sm">
@@ -171,7 +189,7 @@ export function AppearanceControls() {
               rowGap: "var(--mantine-spacing-xs)",
             }}
           >
-            {colours.map((colour) => (
+            {appearanceChoices.colour.map((colour) => (
               <Tooltip
                 key={colour}
                 label={colour === "studio" ? "Amber" : colour[0].toUpperCase() + colour.slice(1)}
@@ -198,8 +216,13 @@ export function AppearanceControls() {
           <SegmentedControl
             aria-label="Colour Scheme"
             fullWidth
-            value={colorScheme}
-            onChange={(value) => setColorScheme(value as "auto" | "light" | "dark")}
+            value={appearance.colourScheme}
+            onChange={(colourScheme) =>
+              setAppearance((previous) => ({
+                ...previous,
+                colourScheme: colourScheme as Appearance["colourScheme"],
+              }))
+            }
             data={[
               { value: "auto", label: "System" },
               { value: "light", label: "Light" },
