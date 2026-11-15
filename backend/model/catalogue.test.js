@@ -22,8 +22,13 @@ test.after(() => {
 });
 
 const { loraCatalogue } = await import("../lora/info.js");
-const { createModelCatalogue, loraAllowed, modelsForAccount, withPreferredDefaults } =
-  await import("./catalogue.js");
+const {
+  createModelCatalogue,
+  dreamCatalogue,
+  loraAllowed,
+  modelsForAccount,
+  withPreferredDefaults,
+} = await import("./catalogue.js");
 
 test("the Library lists a worker's last known files without waiting on it", async () => {
   const info = { LoraLoader: { input: { required: { lora_name: [["kept.safetensors"]] } } } };
@@ -78,6 +83,24 @@ test("uncensored LoRAs need Uncensored Models, in discovery and at admission", (
   assert.deepEqual(shown({ ...member(true), role: "administrator" }).loras, names);
   assert.deepEqual(shown({ ...member(false), role: "administrator" }).loras, limited.loras);
   assert.equal(loraAllowed(undefined)("explicit.safetensors"), true);
+});
+
+test("Dream runs the ready local profiles the composer offers, unless their worker was stopped", () => {
+  const { profiles, defaults } = dreamCatalogue({
+    defaults: { imageModel: "grok-image", videoModel: "wan" },
+    profiles: [
+      { id: "grok-image", kind: "image" },
+      // A worker that answered too slowly leaves its profiles Offline; they still run.
+      { id: "flux", kind: "image", availability: "offline" },
+      { id: "krea", kind: "image", ready: false },
+      { id: "wan", kind: "video", availability: "parked" },
+    ],
+  });
+  assert.deepEqual(
+    profiles.map((profile) => profile.id),
+    ["flux"],
+  );
+  assert.deepEqual(defaults, { imageModel: "flux", videoModel: undefined });
 });
 
 test("default profiles sit on the preferred side while it can run, otherwise the other with a note", () => {

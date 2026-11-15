@@ -146,7 +146,7 @@ import { isMediaUrl, mediaFile, mediaParams } from "./media-paths.js";
 import { ingestRecords, noteIngested, removeComfyFiles } from "./media-store.js";
 import { startMediaWarmup } from "./media-warmup.js";
 import { minorAge } from "./minor-age.js";
-import { createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
+import { createModelCatalogue, dreamCatalogue, modelsForAccount } from "./model/catalogue.js";
 import { registerModelDownloadRoutes } from "./model/download-routes.js";
 import { buildProfile, offlineModelResult } from "./model/models.js";
 import { registerModelRoutes } from "./model/routes.js";
@@ -847,18 +847,8 @@ const dream = createDream({
     if (ownerId && !mayUseFeature(account, "dream")) return null;
     return { account, uncensored: !account || mayUseFeature(account, "uncensoredModels") };
   },
-  catalogue: async (_ownerId, account) => {
-    const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
-    return {
-      profiles: (models.profiles || []).filter(
-        (profile) =>
-          profile.ready !== false &&
-          !["offline", "parked"].includes(profile.availability) &&
-          !isCloudProfile(profile),
-      ),
-      defaults: models.defaults,
-    };
-  },
+  catalogue: async (_ownerId, account) =>
+    dreamCatalogue(modelsForAccount((await mediaModels(false)).models, { studioAccount: account })),
   online: async (kind) => {
     const { services } = await observeServices({ allowed: [kind] });
     const reach = (state) => (["offline", "parked"].includes(state) ? state : "online");
