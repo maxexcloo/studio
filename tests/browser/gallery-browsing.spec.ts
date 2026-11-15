@@ -1372,6 +1372,10 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await page.getByRole("switch", { name: "Comparisons", exact: true }).click();
   await page.getByRole("button", { name: "Clear All", exact: true }).click();
   await expect(disliked).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("combobox", { name: "Date", exact: true })).toHaveValue("Any Date");
+  await expect(page.getByRole("switch", { name: "Comparisons", exact: true })).not.toBeChecked();
+  // The cleared query can already be cached; reloading verifies the saved filters and request.
+  await page.reload();
   await expect
     .poll(() => {
       const query = new URLSearchParams(state.galleryRequests.at(-1));

@@ -179,7 +179,7 @@ test("Compare ▾ builds variants across a LoRA's strengths and across models", 
   await strengths.getByRole("combobox", { name: "LoRA", exact: true }).click();
   await page.getByRole("option", { name: "Detail Slider", exact: true }).click();
   const values = strengths.getByRole("combobox", { name: "Strengths", exact: true });
-  await values.click();
+  await strengths.getByText("Strengths", { exact: true }).click();
   await page.getByRole("option", { name: "0.6", exact: true }).click();
   await page.getByRole("option", { name: "1.2", exact: true }).click();
   await values.press("Escape");
@@ -282,7 +282,7 @@ test("Compare stages compatible LoRAs from an empty stack and only the model's n
   await variants(page).getByText("B", { exact: true }).click();
   const resolutions = await axis(page, "Resolutions");
   const sizes = resolutions.getByRole("combobox", { name: "Resolutions", exact: true });
-  await sizes.click();
+  await resolutions.getByText("Resolutions", { exact: true }).click();
   await expect(page.getByRole("option")).toHaveText(["1K", "2K"]);
   await page.getByRole("option", { name: "1K", exact: true }).click();
   await page.getByRole("option", { name: "2K", exact: true }).click();
@@ -312,7 +312,7 @@ test("Compare preserves provider resolution enum values without converting them 
   await prompt(page).fill("A copper fox");
   const setup = await axis(page, "Resolutions");
   const choices = setup.getByRole("combobox", { name: "Resolutions", exact: true });
-  await choices.click();
+  await setup.getByText("Resolutions", { exact: true }).click();
   await expect(page.getByRole("option")).toHaveText(["1K", "2K"]);
   await page.getByRole("option", { name: "1K", exact: true }).click();
   await page.getByRole("option", { name: "2K", exact: true }).click();
@@ -594,5 +594,5 @@ test("Variants of a result show their numbers, the axis they vary and Undo for t
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   if (testInfo.project.use.isMobile)
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-  await expect(page.getByText(/^#13 · Image\b/)).toBeVisible();
+  await expect(page.getByText(/ · #13$/)).toBeVisible();
 });
