@@ -7,12 +7,12 @@ import {
   characterLead,
   identitySlot,
   withCharacter,
-  withoutCharacter,
 } from "../../../../shared/characters";
 import { api, post } from "../../api";
 import type { Profile, ReferenceAsset } from "../../types";
 import { queueQuery } from "../generation/Queue";
 import { nextReferenceTarget, placeReference } from "../generation/references";
+import { type CardParts, rememberCard, removeCharacter } from "./cardParts";
 
 /** A card as `/api/characters` lists it: its images that still exist, as reference assets. */
 export interface CharacterCard extends Omit<Character, "sheet" | "portrait"> {
@@ -94,7 +94,16 @@ export function characterApplied(
   card: CharacterCard,
   references: ReferenceAsset[],
   prompt: string,
+  parts?: CardParts,
 ) {
+  const previous = parts?.[card.id];
+  if (
+    !previous ||
+    previous.text !== characterLead(card.description) ||
+    JSON.stringify(previous.cardReferenceIds) !==
+      JSON.stringify(card.references.map((asset) => asset.id))
+  )
+    return false;
   const ids = new Set(card.references.map((asset) => asset.id));
   return (
     references.some((asset) => ids.has(asset.id)) &&
@@ -111,26 +120,26 @@ export function applyCharacter(
   references: ReferenceAsset[],
   prompt: string,
   profile?: Profile,
+  parts?: CardParts,
 ) {
+  const cleared = removeCharacter(card, references, prompt, parts);
+  const remaining = cleared.references;
   const first = card.references[0];
   // A profile's Identity slot takes it first.
   const identity = profile && identitySlot(profile);
   const target =
-    first && nextReferenceTarget(references, profile, identity ? { slot: identity } : null);
+    first && nextReferenceTarget(remaining, profile, identity ? { slot: identity } : null);
+  const nextPrompt = withCharacter(cleared.prompt, card.description);
+  const nextReferences = target
+    ? placeReference(remaining, { ...first, slot: undefined }, profile, target)
+    : remaining;
   return {
-    references: target
-      ? placeReference(references, { ...first, slot: undefined }, profile, target)
-      : references,
-    prompt: withCharacter(prompt, card.description),
-  };
-}
-
-/** Removing a card takes out both its images and its lead. */
-export function removeCharacter(card: CharacterCard, references: ReferenceAsset[], prompt: string) {
-  const ids = new Set(card.references.map((asset) => asset.id));
-  return {
-    references: references.filter((asset) => !ids.has(asset.id)),
-    prompt: withoutCharacter(prompt, card.description),
+    references: nextReferences,
+    prompt: nextPrompt,
+    cardParts: rememberCard(parts, "characters", card, prompt, nextPrompt, {
+      before: remaining,
+      after: nextReferences,
+    }),
   };
 }
 

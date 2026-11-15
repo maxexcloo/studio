@@ -164,7 +164,11 @@ export function GenerationEditor({
   /** The composer's: a picked character moves the draft to a model that keeps faces. */
   onCharacterProfile?: (
     profile: Profile,
-    next: { references: ReferenceAsset[]; prompt: string },
+    next: {
+      references: ReferenceAsset[];
+      prompt: string;
+      cardParts?: GenerationInput["cardParts"];
+    },
   ) => void;
   /** Receives the profile the gallery would choose for that output, if any. */
   onKindChange: (kind: MediaKind, profile?: Profile) => void;

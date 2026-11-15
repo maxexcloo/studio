@@ -1,5 +1,4 @@
 import { notifications } from "@mantine/notifications";
-import { useQuery } from "@tanstack/react-query";
 
 import type { Profile } from "../../types";
 import {
@@ -17,16 +16,14 @@ import {
   referencePatch,
 } from "../generation/payload";
 import { orderedReferences } from "../generation/references";
+import { promptCardApplied, rememberCard, withPromptCard } from "./cardParts";
 import { characterEditor, switchedText } from "./CharacterChoices";
-import { promptCardApplied, withPromptCard } from "./PromptCardChoices";
 import {
   type CharacterCard,
   type PromptCard,
   type PromptCardKind,
   applyCharacter,
   characterApplied,
-  charactersQuery,
-  promptCardsQuery,
 } from "./queries";
 
 /**
@@ -36,9 +33,6 @@ import {
 export function useCardInComposer() {
   const { changeKind, setDraft, profiles, models } = useGeneration();
   const openComposer = useOpenComposer();
-  const characters = useQuery(charactersQuery);
-  const outfits = useQuery(promptCardsQuery("outfits"));
-  const scenes = useQuery(promptCardsQuery("scenes"));
   function stage(update: (draft: Draft, profile?: Profile) => Draft) {
     changeKind("image");
     setDraft((previous) => {
@@ -58,9 +52,15 @@ export function useCardInComposer() {
           referenceDetails(draft.references, draft.input, profile),
           profile,
         );
-        if (characterApplied(card, references, prompt)) return draft;
+        if (characterApplied(card, references, prompt, draft.input.cardParts)) return draft;
         const editor = characterEditor(profile, models.data);
-        const next = applyCharacter(card, references, prompt, editor || profile);
+        const next = applyCharacter(
+          card,
+          references,
+          prompt,
+          editor || profile,
+          draft.input.cardParts,
+        );
         if (editor) {
           switched = profileName(editor);
           return draftForProfile(draft, editor, next);
@@ -71,6 +71,7 @@ export function useCardInComposer() {
           input: {
             ...draft.input,
             prompt: next.prompt,
+            cardParts: next.cardParts,
             ...referencePatch(draft.input, draft.references, next.references, profile),
           },
         };
@@ -80,14 +81,14 @@ export function useCardInComposer() {
     promptCard(kind: PromptCardKind, card: PromptCard) {
       stage((draft) => {
         const prompt = String(draft.input.prompt || "");
-        if (promptCardApplied(kind, card, prompt)) return draft;
-        const lists = { characters: characters.data, outfits: outfits.data };
-        const cards = kind === "outfits" ? outfits.data : scenes.data;
+        if (promptCardApplied(kind, card, prompt, draft.input.cardParts)) return draft;
+        const next = withPromptCard(kind, card, prompt, draft.input.cardParts);
         return {
           ...draft,
           input: {
             ...draft.input,
-            prompt: withPromptCard(kind, card, prompt, { ...lists, cards }),
+            prompt: next,
+            cardParts: rememberCard(draft.input.cardParts, kind, card, prompt, next),
           },
         };
       });
