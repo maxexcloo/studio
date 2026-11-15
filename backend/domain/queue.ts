@@ -340,6 +340,10 @@ export class GenerationQueue {
       jobs.set(saved.id, saved);
       return saved;
     };
+    const wait = (job: OwnedJob, reason: string) => {
+      if (job.status !== "waiting" || job.reason !== reason)
+        save({ ...job, status: "waiting", reason });
+    };
     for (const job of jobs.values()) {
       if (!pendingStatuses.has(job.status) || this.acceptedIds.has(job.id)) continue;
       // A prompt already being written finishes; its job then waits as Paused.
@@ -450,11 +454,7 @@ export class GenerationQueue {
       (item) => waitingNow(item) && !(ownWaiting && item.priority === queuePriority.dream),
     )) {
       if (occupied.has(job.resource)) {
-        this.store.save({
-          ...job,
-          status: "waiting",
-          reason: "Waiting for earlier work to finish and save its outputs.",
-        });
+        wait(job, "Waiting for earlier work to finish and save its outputs.");
       } else if (!this.scheduling.has(job.resource)) {
         const group = groups.get(job.resource) || [];
         group.push(job);
@@ -510,7 +510,7 @@ export class GenerationQueue {
             // meets this. Synchronous from here to "starting", so two workers' passes can't both start.
             if (!reason && localVideo(job) && this.videoRunning(job.id)) reason = videoWaitReason;
             if (reason) {
-              this.store.save({ ...job, status: "waiting", reason });
+              wait(job, reason);
               continue;
             }
             job = this.store.save({ ...job, status: "starting", reason: "" });
@@ -550,11 +550,7 @@ export class GenerationQueue {
             for (const pending of candidates) {
               const latest = this.store.job(pending.ownerId, pending.id)!;
               if (["queued", "waiting"].includes(latest.status) && !this.acceptedIds.has(latest.id))
-                this.store.save({
-                  ...latest,
-                  status: "waiting",
-                  reason: "Waiting for earlier work to finish and save its outputs.",
-                });
+                wait(latest, "Waiting for earlier work to finish and save its outputs.");
             }
             break;
           }
