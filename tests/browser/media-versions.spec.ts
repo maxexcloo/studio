@@ -78,7 +78,7 @@ for (const kind of ["image", "video"] as const) {
     await expectDownload(originalUrl, originalExtension);
     // With an upscale, Edit › Upscale's first option switches between it and the original.
     const showUpscale = page.getByRole("menuitem", { name: "Show Upscale", exact: true });
-    await viewerAction(page, "Edit", "Upscale");
+    await viewerAction(page, "Upscale");
     await expect(showUpscale).toHaveAttribute("aria-checked", "false");
     await showUpscale.click();
     await expect.poll(() => toggles.length).toBe(1);
@@ -86,7 +86,7 @@ for (const kind of ["image", "video"] as const) {
     await expect(media).toHaveAttribute("src", upscaleUrl);
     await expectDownload(upscaleUrl, upscaleExtension);
     // Its options regenerate it and compare an image's upscale with its original.
-    await viewerAction(page, "Edit", "Upscale");
+    await viewerAction(page, "Upscale");
     await expect(page.getByRole("menuitem", { name: "Upscale Again", exact: true })).toBeVisible();
     await expect(showUpscale).toHaveAttribute("aria-checked", "true");
     const compare = page.getByRole("menuitem", { name: "Compare Upscale", exact: true });
@@ -97,7 +97,7 @@ for (const kind of ["image", "video"] as const) {
     await page.reload();
     await expect(media).toHaveAttribute("src", upscaleUrl);
     await expectDownload(upscaleUrl);
-    await viewerAction(page, "Edit", "Upscale");
+    await viewerAction(page, "Upscale");
     await expect(showUpscale).toHaveAttribute("aria-checked", "true");
     await showUpscale.click();
     await expect.poll(() => toggles.length).toBe(2);

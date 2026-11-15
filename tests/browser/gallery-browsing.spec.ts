@@ -535,7 +535,7 @@ test("Select Set picks a set's results to upscale together", async ({ page }) =>
   await expect(
     page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
   ).toHaveText("3 Selected");
-  await (await selectionMenuItem(page, "Edit", "Upscale")).click();
+  await (await selectionMenuItem(page, "Upscale", "Upscale")).click();
   await expect
     .poll(() => upscales.map((body) => body.galleryItemId).sort())
     .toEqual(["set-0", "set-1", "set-2"]);
@@ -834,9 +834,13 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("1 Selected");
   await expect(selectionAction(page, "Animate")).toBeVisible();
-  await selectionAction(page, "Edit").click();
-  await expect(page.getByRole("menuitem")).toHaveText(["Upscale"]);
-  await selectionAction(page, "Edit").click();
+  await expect(selectionAction(page, "Edit")).toHaveCount(0);
+  await selectionAction(page, "Upscale").click();
+  await expect(page.getByRole("menuitem", { name: "Upscale", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("radiogroup", { name: "Upscale Quality", exact: true }),
+  ).toBeVisible();
+  await selectionAction(page, "Upscale").click();
   await expect(page.getByRole("menu")).toHaveCount(0);
   // The selects sit beside the count; phones name them by what they select.
   await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveText(
