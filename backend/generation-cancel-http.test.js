@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
-import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { recordedObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
 import { clusterDns, fakeKubernetes, serviceUrl } from "./fixtures/fake-kubernetes.ts";
 import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 import { closeRuntimeDatabase, writeRuntimeDocument } from "./persistence/runtime.ts";
@@ -24,9 +24,7 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
     settings: { automatic: true, parkIdleMinutes: 0 },
   });
   closeRuntimeDatabase(path.join(directory, "runtime"));
-  const info = JSON.parse(
-    fs.readFileSync(new URL("./fixtures/object_info-comfyui-0.45.0.json", import.meta.url), "utf8"),
-  );
+  const info = recordedObjectInfo();
   info.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
   const png = await sharp({ create: { width: 64, height: 64, channels: 3, background: "white" } })
     .png()

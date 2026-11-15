@@ -9,6 +9,13 @@ import { closeRuntimeDatabase } from "../persistence/runtime.ts";
 import { loadRuntime } from "./bootstrap.ts";
 import type { KubernetesRequest } from "./kubernetes.ts";
 
+/** The data folder for runs whose records the test doesn't read. */
+const scratch = mkdtempSync(join(tmpdir(), "studio-runtime-"));
+test.after(() => {
+  closeRuntimeDatabase(scratch);
+  rmSync(scratch, { recursive: true, force: true });
+});
+
 const environment = (extra = {}) => ({
   STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 2, gaming: 1 }),
   STUDIO_KUBERNETES_NAMESPACES: "comfyui, text",
@@ -103,7 +110,7 @@ function cluster(change: (items: Record<string, any>) => void = () => {}) {
 }
 
 test("workloads come from the labelled deployments, their claims and the Service selecting them", async () => {
-  const runtime = await loadRuntime(environment(), { request: cluster() });
+  const runtime = await loadRuntime(environment(), { dataDir: scratch, request: cluster() });
   assert.deepEqual(runtime!.controller.pools, { gpu: 2, gaming: 1 });
   assert.deepEqual(runtime!.controller.workloads, [
     {
@@ -145,14 +152,17 @@ test("workloads come from the labelled deployments, their claims and the Service
 });
 
 test("without namespaces there is no runtime; what can't be derived stops Studio by name", async () => {
-  assert.equal(await loadRuntime({}), undefined);
+  assert.equal(await loadRuntime({}, { dataDir: scratch }), undefined);
   await assert.rejects(
-    loadRuntime({ STUDIO_KUBERNETES_NAMESPACES: "text", STUDIO_KUBERNETES_URL: "http://k" }),
+    loadRuntime(
+      { STUDIO_KUBERNETES_NAMESPACES: "text", STUDIO_KUBERNETES_URL: "http://k" },
+      { dataDir: scratch },
+    ),
     /STUDIO_KUBERNETES_GPUS is required/,
   );
   const { STUDIO_LOCAL_TEXT_MODEL: _model, ...withoutModel } = environment();
   await assert.rejects(
-    loadRuntime(withoutModel, { request: cluster() }),
+    loadRuntime(withoutModel, { dataDir: scratch, request: cluster() }),
     /STUDIO_LOCAL_TEXT_MODEL is required/,
   );
   for (const [change, message] of [
@@ -180,13 +190,16 @@ test("without namespaces there is no runtime; what can't be derived stops Studio
       /text\/text-gemma-tp2 needs one Service selecting its pods, not 2/,
     ],
   ] as const)
-    await assert.rejects(loadRuntime(environment(), { request: cluster(change) }), message);
+    await assert.rejects(
+      loadRuntime(environment(), { dataDir: scratch, request: cluster(change) }),
+      message,
+    );
 });
 
 test("in-cluster access needs the mounted service account", async () => {
   const { STUDIO_KUBERNETES_URL: _url, ...inCluster } = environment();
   await assert.rejects(
-    loadRuntime({ ...inCluster, KUBERNETES_SERVICE_HOST: "10.0.0.1" }),
+    loadRuntime({ ...inCluster, KUBERNETES_SERVICE_HOST: "10.0.0.1" }, { dataDir: scratch }),
     /needs Studio's in-cluster service account token \(automountServiceAccountToken\) or STUDIO_KUBERNETES_URL/,
   );
 });

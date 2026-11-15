@@ -12,7 +12,7 @@ import {
   workflowMissingFiles,
 } from "../custom-workflows.js";
 import { directRoute } from "../domain/direct-route.ts";
-import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { readJsonFile, writeBytesFile, writeJsonFile } from "../json-store.js";
 import { adminRefusal, fromChat } from "../route-access.js";
 import { hashOf, profileStore, validId } from "./store.js";
 
@@ -112,10 +112,7 @@ export function createEditableProfile(
   const checked = validateProfileText(id, text, { info });
   if (!checked.ok) throw Object.assign(new Error(checked.errors[0]), { status: 400, checked });
   const next = String(text).endsWith("\n") ? String(text) : `${text}\n`;
-  fs.mkdirSync(userWorkflowsDir, { recursive: true });
-  const temporary = `${fileFor(id)}.${process.pid}.tmp`;
-  fs.writeFileSync(temporary, next, { flag: "wx" });
-  fs.renameSync(temporary, fileFor(id));
+  writeBytesFile(fileFor(id), next);
   const at = new Date().toISOString();
   const edits = readEdits();
   edits[id] = { editedAt: at, by: String(by || ""), baseHash: "" };
@@ -263,9 +260,7 @@ export function saveEditableProfile(
   const at = new Date();
   // Saved as written, so the diff the editor showed is the change on disk.
   const next = String(text).endsWith("\n") ? String(text) : `${text}\n`;
-  const temporary = `${fileFor(id)}.${process.pid}.tmp`;
-  fs.writeFileSync(temporary, next);
-  fs.renameSync(temporary, fileFor(id));
+  writeBytesFile(fileFor(id), next);
   const edits = readEdits();
   edits[id] = {
     editedAt: at.toISOString(),
