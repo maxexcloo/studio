@@ -76,7 +76,11 @@ export function galleryJobResponse(store, account, id, settings = false) {
   cleanupGalleryState(store);
   const items = resultNumbers.numbered(
     filterVisibleGallery(
-      galleryJobItems(id).filter((item) => recordBelongsToAccount(item, account)),
+      galleryJobItems(id).filter(
+        (item) =>
+          recordBelongsToAccount(item, account) && (!item.dream || item.dream.state === "kept"),
+      ),
+      { disliked: true },
     ),
   );
   const fields = [
@@ -84,6 +88,7 @@ export function galleryJobResponse(store, account, id, settings = false) {
     "jobId",
     "index",
     "number",
+    "rating",
     "status",
     "type",
     "url",
