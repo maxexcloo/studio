@@ -47,6 +47,8 @@ test("adult ages, non-sexual minor-coded words and other numbers pass", () => {
     "18 year old East Asian girl, 18–22",
     "women aged 18–22 on a city tour",
     "a 21yo Korean woman in Tokyo",
+    "a nude twenty-one-year-old Thai woman, a twenty one year old friend",
+    "a slim young woman in lingerie",
     "Image 2 of the set, page 12, stage 3, 35mm film, f/1.8",
     "A woman doing yoga at 5 yoga mats",
     "teenagers skateboarding in a park at dusk",

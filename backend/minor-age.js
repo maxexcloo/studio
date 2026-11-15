@@ -23,12 +23,14 @@ const under18 = [
   "seventeen",
 ];
 const age = `(?:1[0-7]|[1-9]|${under18.join("|")})`;
+// Not the end of a larger number ("twenty-one-year-old", "21-year-old").
+const ageStart = "(?<![\\w-])(?<!(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[\\s-]?)";
 const teenAge = `(?:1[0-7]|${under18.slice(9).join("|")})`;
 const patterns = [
   // "16-year-old", "16 year old", "sixteen years old", "16-17-year-old", "16yo", "16 y/o"
-  new RegExp(`\\b${age}(?:\\s*[-–—]\\s*\\d{1,2})?[\\s-]*(?:years?|yrs?)[\\s-]*old\\b`, "i"),
-  new RegExp(`\\b${age}(?:\\s*[-–—]\\s*\\d{1,2})?\\s*(?:yo|y/o|y\\.o\\.?)(?![\\w/])`, "i"),
-  new RegExp(`\\b${age}[\\s-]*years?[\\s-]*of[\\s-]*age\\b`, "i"),
+  new RegExp(`${ageStart}${age}(?:\\s*[-–—]\\s*\\d{1,2})?[\\s-]*(?:years?|yrs?)[\\s-]*old\\b`, "i"),
+  new RegExp(`${ageStart}${age}(?:\\s*[-–—]\\s*\\d{1,2})?\\s*(?:yo|y/o|y\\.o\\.?)(?![\\w/])`, "i"),
+  new RegExp(`${ageStart}${age}[\\s-]*years?[\\s-]*of[\\s-]*age\\b`, "i"),
   // "aged 16", "age: 16", "ages 16–22"
   new RegExp(`\\bage[sd]?\\s*:?\\s*${age}\\b(?!\\s*(?:mm|cm|%))`, "i"),
   /\b(?:underage|under-age|pre-?teens?|loli|lolicon|shota|shotacon|jailbait)\b/i,
@@ -54,7 +56,7 @@ const young = new RegExp(
     "teens?|teenagers?|teenaged?|teeny|tweens?|adolescen\\w*|pubescent|prepubescent|puberty",
     "school[\\s-]?(?:girls?|boys?|kids?|children|child|uniforms?)|(?:high|middle|elementary|primary|grade|junior high|secondary)[\\s-]?school(?:ers?)?|seifuku",
     "child|children|childish|child[\\s-]?like|kids?|kiddos?|toddlers?|infants?|little (?:girls?|boys?)|young (?:girls?|boys?)",
-    "(?:petite|tiny|small|little|skinny|slim)[\\s,-]+(?:and\\s+)?(?:young|youthful)|(?:young|youthful)[\\s-]looking|looks? (?:very |so |really )?young|very young|too young",
+    "(?:petite|tiny|little)[\\s,-]+(?:and\\s+)?(?:young|youthful)|(?:young|youthful)[\\s-]looking|looks? (?:very |so |really )?young|very young|too young",
     "barely legal|just (?:turned )?(?:18|eighteen)|baby[\\s-]?faced?|lolita|nymphets?|under[\\s-]?(?:18|eighteen)|sweet sixteen",
     `(?:girls?|boys?|wom[ae]n|m[ae]n|she|he|her|him|daughter|son|sister|brother)(?:\\s*(?:,|\\(|is|'s|was|aged))+\\s*${teenAge}(?![\\w%/:]|\\s*(?:x|×|mm|cm|px|frames?|images?|photos?|shots?|steps?|panels?|seconds?)\\b)`,
     `${teenAge}[fm]`,
