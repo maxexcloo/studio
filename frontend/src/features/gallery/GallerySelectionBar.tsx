@@ -16,6 +16,7 @@ import { useQueue, useQueueAction } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { mediaDownload } from "./download";
 import { itemAction, itemActionGroups, namedItemActions } from "./itemActions";
+import { prepareMediaShare } from "./mediaShare";
 import { finished } from "./MediaTile";
 import { useUpscaleMany } from "./UpscaleControls";
 import type { GallerySelection } from "./useGallerySelection";
@@ -131,16 +132,7 @@ export function GallerySelectionBar({
   const [shareFiles, setShareFiles] = useState<{ key: string; files: File[] } | null>(null);
   const prepared = shareFiles?.key === shareKey ? shareFiles.files : null;
   const prepare = useMutation({
-    mutationFn: () =>
-      Promise.all(
-        ready.map(async (item) => {
-          const target = mediaDownload(item);
-          const response = await fetch(target.href, { credentials: "same-origin" });
-          if (!response.ok) throw new Error(`Studio could not prepare ${target.download}.`);
-          const blob = await response.blob();
-          return new File([blob], target.download, { type: blob.type });
-        }),
-      ),
+    mutationFn: () => Promise.all(ready.map((item) => prepareMediaShare(mediaDownload(item)))),
     onSuccess: (files) => setShareFiles({ key: shareKey, files }),
   });
   async function share() {
