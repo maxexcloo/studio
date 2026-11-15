@@ -25,7 +25,8 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
             title: "Detail Slider",
             families: ["test"],
             type: "slider",
-            triggers: ["inkbird", "fine detail"],
+            triggers: ["inkbird", "fine detail", "a long exact trigger, with punctuation"],
+            sourceUrl: "https://example.com/detail",
             strengthRange: { min: 0.4, max: 1.2, step: 0.05, default: 0.8 },
           },
           "soft-style.safetensors": { title: "Soft Style", families: ["test"], type: "style" },
@@ -87,6 +88,17 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
   await triggers.getByText("inkbird", { exact: true }).click();
   await expect(inkbird).not.toBeChecked();
   await expect(triggers.getByRole("checkbox", { name: "fine detail", exact: true })).toBeChecked();
+  const lastTrigger = triggers.getByRole("checkbox", {
+    name: "a long exact trigger, with punctuation",
+    exact: true,
+  });
+  await expect(lastTrigger).toBeChecked();
+  await triggers.getByText("a long exact trigger, with punctuation", { exact: true }).click();
+  await expect(lastTrigger).not.toBeChecked();
+  await expect(controls.getByRole("link", { name: "View Source", exact: true })).toHaveAttribute(
+    "href",
+    "https://example.com/detail",
+  );
   await closeLoras(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A quiet bird");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
@@ -318,6 +330,7 @@ test("The stack's preset field saves, loads and renames LoRA presets, marks edit
   const name = page.getByRole("combobox", { name: "Preset Name", exact: true });
   await expect(name).toHaveValue("");
   await expect(name).toHaveAttribute("placeholder", "Unsaved Preset");
+  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toHaveText("Save");
   // Names stay unique: a name in use offers that preset rather than saving another.
   await page.getByRole("button", { name: "Save Preset", exact: true }).click();
   await expect(name).toBeFocused();

@@ -85,6 +85,10 @@
   align-items: center;
 }
 
+.tabs {
+  flex: 0 1 auto;
+}
+
 /* One bar of tabs (`ScrollingSegments` scrolls it where it is wider than the screen), with a line
    before each later group. */
 .tab:has([data-group-start]) {
@@ -103,15 +107,15 @@
 /* Search, Filter and the actions never wrap apart. */
 .searchRow {
   display: flex;
-  flex: 1 1 16rem;
+  flex: 1 1 12rem;
   gap: var(--mantine-spacing-xs);
   align-items: center;
   min-width: 0;
 }
 
 .search {
-  flex: 1 1 8rem;
-  min-width: 8rem;
+  flex: 1 1 6rem;
+  min-width: 6rem;
 }
 
 .reveal {
