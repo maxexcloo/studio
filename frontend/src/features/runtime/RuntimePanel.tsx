@@ -17,12 +17,10 @@ import { BenchmarkResults } from "./Benchmarks";
 import { AutomaticControl, RuntimeHistory, RuntimeWorkloads } from "./RuntimeWorkloads";
 
 const services = [
-  { kind: "text", label: "Text" },
   { kind: "image", label: "Images" },
   { kind: "video", label: "Videos" },
+  { kind: "text", label: "Text" },
 ] as const;
-/** The status panel lists media first, as the queue above it does. */
-const summaryKinds = [services[1], services[2], services[0]];
 const healthColour = (state: ServiceHealth) =>
   ({ healthy: "green", offline: "red", parked: "gray", unknown: "yellow", waiting: "yellow" })[
     state
@@ -140,7 +138,7 @@ export function ServiceHealthSummary() {
         {status.error.message}
       </Text>
     );
-  const available = summaryKinds.filter(({ kind }) => status.data?.services[kind]);
+  const available = services.filter(({ kind }) => status.data?.services[kind]);
   return (
     <Stack gap={4} component="section" aria-label="Service Status">
       {status.isPending && (
