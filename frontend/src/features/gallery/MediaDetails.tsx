@@ -32,7 +32,7 @@ import { loraInfoQuery } from "../generation/LoraPicker";
 import { backendLabel, isProfile, shownProfileName } from "../generation/payload";
 import { WritingThinking } from "../generation/PromptWriting";
 import { queueQuery } from "../generation/Queue";
-import { mediaTitle } from "./mediaLabels";
+import { mediaNumber, mediaTitle } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { derivations } from "./versions";
 
@@ -54,6 +54,47 @@ const time = (value?: string) => {
   const date = value ? new Date(value) : null;
   return date && !Number.isNaN(date.getTime()) ? formatDateTime(date) : "";
 };
+const recordedModel = (item: MediaItem) => {
+  const settings = item.settings || {};
+  return shownProfileName(
+    String(
+      settings.profileName ||
+        fileStem(
+          settings.modelName ||
+            settings.model ||
+            (item.model?.startsWith("custom:") ? "" : item.model),
+        ),
+    ),
+  );
+};
+
+/** Recorded creation and model metadata, shared by the desktop panel and phone sheet. */
+export function MediaDetailsMetadata({ item }: { item: MediaItem }) {
+  const source = mediaSource(item);
+  const created = time(item.createdAt);
+  const when = [created && `${item.uploaded ? "Uploaded " : ""}${created}`, mediaNumber(item)]
+    .filter(Boolean)
+    .join(" · ");
+  const model = [
+    recordedModel(item),
+    item.type === "video" ? "Video" : "Image",
+    source.width ? `${source.width} × ${source.height}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <Stack gap={2}>
+      {when && (
+        <Text size="xs" c="dimmed">
+          {when}
+        </Text>
+      )}
+      <Text size="xs" c="dimmed">
+        {model}
+      </Text>
+    </Stack>
+  );
+}
 
 type Row = [label: string, value: string];
 /** A reference the run took: the role it ran as and, where recorded, how strongly it applied. */
@@ -123,14 +164,7 @@ function generationDetails(
     return { id, role: "Edit Source", strength: denoise > 0 ? `Denoise ${denoise}` : "" };
   });
   return {
-    profile: shownProfileName(
-      String(
-        settings.profileName ||
-          recorded?.displayName ||
-          recorded?.label ||
-          fileStem(settings.modelName || (item.model?.startsWith("custom:") ? "" : item.model)),
-      ),
-    ),
+    profile: recordedModel(item),
     loras: (Array.isArray(settings.loras) ? settings.loras : [])
       .filter((lora) => lora?.name && lora.enabled !== false)
       .map((lora) => ({
@@ -183,7 +217,6 @@ function generationDetails(
       ["FPS", video ? settings.fps : ""],
       ["File", item.outputName || item.filename],
       ["File Size", size === null ? pendingValue : formatBytes(size)],
-      ["Time", time(item.createdAt)],
     ]),
     // The stages in the order they ran, then their totals.
     timing: rows([
@@ -582,7 +615,7 @@ function Related({
 
 /**
  * Details › Caption (with its tags), From, Prompt, Negative Prompt, Set, the chat's Character,
- * Outfit, Scene and Series, Source, Derived, Model, LoRAs,
+ * Outfit, Scene and Series, Source, Derived, LoRAs,
  * References, Settings, Output and Timing for one result; From and Derived look among the `loaded`
  * items too, and `open` shows a related result in the
  * viewer.
@@ -623,11 +656,6 @@ export function MediaDetails({
         </DetailSection>
       )}
       <Related title="Derived" items={related.derived} open={open} />
-      {details.profile && (
-        <DetailSection title="Model">
-          <Text size="sm">{details.profile}</Text>
-        </DetailSection>
-      )}
       {!!details.loras.length && (
         <DetailSection title="LoRAs">
           {details.loras.map((lora) => (

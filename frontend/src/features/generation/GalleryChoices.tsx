@@ -16,6 +16,7 @@ import {
 } from "../gallery/GalleryFilters";
 import { useImagePreview } from "../gallery/ImagePreview";
 import { useWindowSpan } from "../gallery/MediaGrid";
+import { mediaTitle } from "../gallery/mediaLabels";
 import { MorePages } from "../gallery/MorePages";
 import { galleryKey } from "../gallery/queries";
 import { PickerGrid, PickerHeader, PickerTile } from "./Picker";
@@ -149,6 +150,7 @@ export function GalleryChoices({
     src: item.url,
     thumbnailUrl: item.thumbnailUrl,
     alt: name(item, index),
+    title: item.uploaded ? name(item, index) : mediaTitle(item),
   });
   const morePages = (
     <MorePages
