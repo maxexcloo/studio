@@ -146,6 +146,60 @@ test("one local video runs at a time across workers; images and cloud videos go 
   }
 });
 
+test("waiting transitions persist once, change their reason and resume when ready", async (t) => {
+  for (const occupied of [false, true])
+    await t.test(occupied ? "occupied worker" : "worker readiness", async () => {
+      const dir = mkdtempSync(path.join(os.tmpdir(), "studio-wait-"));
+      const filename = path.join(dir, "studio.sqlite");
+      const f = fixture(filename);
+      let reason: string | undefined = "Worker is starting.";
+      if (!occupied) f.adapter.eligible = async () => reason;
+      try {
+        const session = f.store.createSession("alice");
+        const active = occupied ? f.store.enqueue("alice", session.id, {}, "image") : undefined;
+        if (active) {
+          await f.queue.tick();
+          f.observations.set(active.id, { status: "running" });
+        }
+        const waiting = f.store.enqueue("alice", session.id, {}, "image");
+        const save = f.store.save.bind(f.store);
+        let writes = 0;
+        f.store.save = (job) => {
+          if (job.id === waiting.id) writes++;
+          return save(job);
+        };
+        await f.queue.tick();
+        assert.equal(writes, 1);
+        assert.equal(f.store.job("alice", waiting.id)?.status, "waiting");
+        await f.queue.tick();
+        assert.equal(writes, 1);
+        if (!occupied) {
+          reason = "Worker is loading its model.";
+          await f.queue.tick();
+          assert.equal(writes, 2);
+        }
+        const persisted = new Store(openDatabase(filename));
+        try {
+          assert.equal(persisted.job("alice", waiting.id)?.status, "waiting");
+          assert.equal(
+            persisted.job("alice", waiting.id)?.reason,
+            occupied ? "Waiting for earlier work to finish and save its outputs." : reason,
+          );
+        } finally {
+          persisted.close();
+        }
+        reason = undefined;
+        if (active) f.observations.set(active.id, { status: "completed" });
+        await f.queue.tick();
+        assert.ok(f.submitted.includes(waiting.id));
+        assert.equal(f.store.job("alice", waiting.id)?.status, "running");
+      } finally {
+        f.store.close();
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+});
+
 test("a worker with two slots runs two jobs at once, the third waiting for one to finish", async () => {
   const { store, adapter, submitted, observations } = fixture();
   const queue = new GenerationQueue(store, {
