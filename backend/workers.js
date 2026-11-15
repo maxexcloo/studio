@@ -177,6 +177,8 @@ function workloadWorkers(kubernetes) {
       );
     group.id ||= workload.worker || "";
     group.capabilities.push(...(workload.capabilities || [workload.kind]));
+    // Radiance serves one model per GPU side by side, so it runs a job on each at once.
+    if (workload.backend === "radiance") group.slots = Math.max(group.slots ?? 1, workload.gpus);
     groups.set(url, group);
   }
   const taken = new Set();
@@ -188,6 +190,7 @@ function workloadWorkers(kubernetes) {
         url,
         capabilities: group.capabilities,
         backend: group.backend,
+        slots: group.slots,
       },
       { taken, where: `Deployment ${group.first}` },
     ),
