@@ -151,8 +151,7 @@ export function TextBox({
       onMouseDown={keepFocus}
       variant="subtle"
       color="gray"
-      size="compact-sm"
-      leftSection={action.icon && <action.icon size={16} />}
+      size="compact-xs"
       disabled={action.disabled}
       onClick={action.onClick}
     >
@@ -225,12 +224,12 @@ export function TextBox({
               onMouseDown={keepFocus}
               variant="subtle"
               color="gray"
-              size="compact-sm"
+              size="compact-xs"
               aria-label={`More ${title} Actions`}
               disabled={tools.length === 0 && (mobile || edits.length === 0)}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
-              leftSection={busy ? <Loader size={16} /> : <icons.more size={18} />}
+              leftSection={busy ? <Loader size={16} /> : undefined}
             >
               More
             </Button>
@@ -258,7 +257,9 @@ export function TextBox({
         {listed.map((tool, index) => (
           <Fragment key={tool.id}>
             {index > 0 && <Menu.Divider />}
-            <Menu.Label>{tool.label}</Menu.Label>
+            {!tool.menu!.flat().some((option) => option.heading) && (
+              <Menu.Label>{tool.label}</Menu.Label>
+            )}
             <ActionMenuItems
               groups={tool.menu!.map((group) =>
                 group.map((option) => ({
@@ -349,7 +350,7 @@ export function TextBox({
       {field}
       {overlay && <div className={classes.overlay}>{overlay}</div>}
       {below && <div className={classes.below}>{below}</div>}
-      {/* The tools, then the send, sit just above the keyboard. */}
+      {/* Tools and form sends share the pinned row above the keyboard. */}
       {(tools || send || submit || rightSection) && (
         <div className={classes.toolbar} onMouseDown={keepFocus}>
           <div className={classes.editActions} role="group" aria-label={`${title} Tools`}>
@@ -358,35 +359,34 @@ export function TextBox({
             {!tools && !send && rightSection}
           </div>
           {!submit && send && <div className={classes.sends}>{send}</div>}
-        </div>
-      )}
-      {submit && (
-        <div className={classes.sends}>
-          {/* The form's named sends stand separately from its text tools. */}
-          {submit?.map((each, index) => {
-            const primary = index === submit.length - 1;
-            const Glyph = each.icon ?? ArrowUp;
-            return (
-              <Button
-                key={each.label}
-                aria-label={each.label}
-                variant={primary ? "filled" : "light"}
-                radius="xl"
-                size="sm"
-                leftSection={primary ? undefined : <Glyph size={16} />}
-                rightSection={primary ? <Glyph size={16} /> : undefined}
-                disabled={each.disabled}
-                // Sending before the keyboard drops keeps the text's blur from closing first.
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  if (!each.keepOpen) close();
-                  each.onSubmit();
-                }}
-              >
-                {each.label}
-              </Button>
-            );
-          })}
+          {submit && (
+            <div className={classes.sends}>
+              {submit?.map((each, index) => {
+                const primary = index === submit.length - 1;
+                const Glyph = each.icon ?? ArrowUp;
+                return (
+                  <Button
+                    key={each.label}
+                    aria-label={each.label}
+                    variant={primary ? "filled" : "light"}
+                    radius="xl"
+                    size="compact-xs"
+                    leftSection={primary ? undefined : <Glyph size={16} />}
+                    rightSection={primary ? <Glyph size={16} /> : undefined}
+                    disabled={each.disabled}
+                    // Sending before the keyboard drops keeps the text's blur from closing first.
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      if (!each.keepOpen) close();
+                      each.onSubmit();
+                    }}
+                  >
+                    {each.label}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
       {popups && <div className={classes.anchor}>{popups}</div>}

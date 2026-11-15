@@ -29,7 +29,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Phones reserve both sides of the centred modes for Status and More Options. */
+/* Portrait phones give the centred modes their own row below the brand and account controls. */
 :where(:root[data-phone]) .bar {
   gap: 4px !important;
 }
@@ -37,6 +37,11 @@
   padding: 2px;
 }
 
-:where(:root[data-phone]) .home {
-  display: none;
+:where(:root[data-phone]:not([data-phone="sideways"])) .header {
+  align-items: flex-start;
+  padding-top: var(--mantine-spacing-xs);
+}
+
+:where(:root[data-phone]:not([data-phone="sideways"])) .modes {
+  bottom: var(--mantine-spacing-xs);
 }
