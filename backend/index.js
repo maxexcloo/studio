@@ -1262,11 +1262,11 @@ server.listen(Number(port), host, () => {
 drainServer = async () => {
   // MCP calls waiting inline for images reply with their links instead of outliving the grace.
   mcp?.endWaits();
-  const closed = new Promise((resolve, reject) => {
+  generationQueue.stop();
+  await new Promise((resolve, reject) => {
     if (!server.listening) return resolve();
     server.close((error) => (error ? reject(error) : resolve()));
   });
-  await Promise.all([generationQueue.stop(), closed]);
   flushWorkflowPreferences();
   // The runtime database's one connection; nothing may write after this.
   store.close();

@@ -30,9 +30,9 @@ async function fixture(t, beforeAcknowledgement) {
     async cancel() {},
     async saveOutputs() {},
   });
-  await queue.stop();
+  queue.stop();
   t.after(async () => {
-    await queue.stop();
+    queue.stop();
     store.close();
     rmSync(dir, { recursive: true, force: true });
   });
