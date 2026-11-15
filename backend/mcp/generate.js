@@ -977,7 +977,7 @@ export function registerGenerateTools({
       aspect: z
         .string()
         .optional()
-        .describe("Profile preset (e.g. 16:9), landscape, portrait or square."),
+        .describe("Only if asked: Profile preset (e.g. 16:9), landscape, portrait or square."),
       resolution: z.enum(resolutions).optional().describe("Native sizes only."),
       steps: z.number().int().positive().max(10000).optional(),
       seed: z
