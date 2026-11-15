@@ -15,6 +15,7 @@ import {
   type ChangeAction,
   type NextStep,
   type Suggestions,
+  maxSuggestions,
 } from "../../../../shared/suggestions";
 import { type Action, type ActionGroups } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
@@ -169,7 +170,9 @@ export function useChangeSuggestions<K extends QueryKey>({
     mutationFn: fresh,
     onSuccess: (answer) => client.setQueryData<Suggestions<NextStep>>(query.queryKey, answer),
   });
-  const list = steps.data?.suggestions ?? [];
+  const list = [...(steps.data?.suggestions ?? [])]
+    .slice(0, maxSuggestions)
+    .sort((a, b) => a.label.localeCompare(b.label));
   const loading = refresh.isPending || (steps.isFetching && !list.length);
   const again: Action = {
     id: "refresh",

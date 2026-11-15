@@ -7,7 +7,7 @@ import {
   type NextStep,
   type Suggestions,
   changeActions,
-  maxNextSteps,
+  maxSuggestions,
 } from "../../shared/suggestions.ts";
 import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import { type ModelImage, userContent } from "./model-content.ts";
@@ -26,8 +26,9 @@ import {
 type SuggestionSurface = "composer" | "viewer" | "animate" | "change" | "draft";
 // The viewer's next steps and Animate's motion ideas may send the image along.
 type Writer = TasteWriter<ReturnType<typeof userContent>>;
+// `count` records the requested count so older saved menus refresh once, even if a reply is short.
 // `spicy` marks steps worded explicitly, so a change of explicitWording writes them again.
-type SavedSteps = { steps: NextStep[]; at: string; spicy?: true };
+type SavedSteps = { steps: NextStep[]; at: string; count?: number; spicy?: true };
 /** A finished gallery item the viewer asks about, already checked to belong to the owner. */
 interface SuggestionItem extends IdleItem {
   jobId?: string;
@@ -110,7 +111,7 @@ const draftGuides: Record<Exclude<ChangeAction, "upscale">, (kind: "image" | "vi
   recreate: (kind) => `recreate: make a fresh ${kind} from the rewritten prompt.`,
   animate: () => "animate: the prompt describes the video's motion, camera, action and sound.",
 };
-// The parts of an image the viewer's next steps change, each step a different one, so they vary.
+// Areas to vary across the viewer's next steps.
 const stepAreas = [
   "body",
   "face",
@@ -302,17 +303,17 @@ export function createSuggestions({
     const system = {
       composer: [
         `You suggest prompt ideas for a person's next ${kind} in a media studio, drawn from their taste profile and the prompts they liked.`,
-        `Write three varied, standalone ${kind} prompts of at most ${maxIdea} characters each that they would likely enjoy: not copies of the prompts they liked.`,
-        `Take each from a different angle (${angles(kind === "video" ? motionAngles : imageAngles, 3)}), with subjects and settings unlike one another.`,
+        `Write ${maxSuggestions} useful, distinct, standalone ${kind} prompts of at most ${maxIdea} characters each that they would likely enjoy: not copies of the prompts they liked.`,
+        `Take each from a different angle (${angles(kind === "video" ? motionAngles : imageAngles, maxSuggestions)}), with subjects and settings unlike one another.`,
         contentRule(spicy),
         avoidFiller(),
         data,
-        'Reply with JSON only: {"ideas": ["<prompt>", "<prompt>", "<prompt>"]}.',
+        'Reply with JSON only, with an "ideas" array of prompt strings.',
       ],
       // A draft without a request asks for changes to offer, as the viewer's next steps do.
       draft: [
         `You suggest changes to the draft prompt of ${kind === "video" ? "a video" : "an image"} a person is about to make in a media studio, drawn from the prompt and their taste profile.`,
-        `Suggest three or four distinct changes, each from a different angle (${angles(kind === "video" ? motionAngles : imageAngles, 4)}).`,
+        `Suggest ${maxSuggestions} useful, distinct changes, each from a different angle (${angles(kind === "video" ? motionAngles : imageAngles, maxSuggestions)}).`,
         fidelity,
         applyChange,
         keepDescriptions,
@@ -326,7 +327,7 @@ export function createSuggestions({
       // Animate's instruction says what happens; its writer turns the instruction into the prompt.
       animate: [
         `You suggest what could happen when an image a person made in a media studio becomes a short video, drawn from the image's prompt and settings${image ? ", what the attached image shows" : ""} and their taste profile.`,
-        `Suggest three or four distinct ideas that fit what the image shows, each from a different angle (${angles(motionAngles, 4)}).`,
+        `Suggest ${maxSuggestions} useful, distinct ideas that fit what the image shows, each from a different angle (${angles(motionAngles, maxSuggestions)}).`,
         contentRule(spicy),
         avoidFiller(),
         'Each has a label of at most four words in Title Case (such as "Slow Push In", "Hair in the Wind" or "Turns to Camera") and one short sentence saying what happens in the video.',
@@ -335,7 +336,7 @@ export function createSuggestions({
       ],
       viewer: [
         `You suggest changes to an image a person just made in a media studio, drawn from ${image ? "what the attached image shows, " : ""}its prompt and settings and their taste profile.`,
-        `Suggest four concrete changes to what this image shows, each to a different area (${stepAreas.join(", ")}; a scene without people uses only the last three), naming the specific change for this image, such as an outfit, an expression, a hairstyle, a pose or a place: never a vague style or mood tweak ("Cinematic", "Moodier", "More Detail").`,
+        `Suggest ${maxSuggestions} useful, distinct concrete changes to what this image shows, spread across different areas (${stepAreas.join(", ")}; use only areas that fit the image), naming the specific change for this image, such as an outfit, an expression, a hairstyle, a pose or a place: never a vague style or mood tweak ("Cinematic", "Moodier", "More Detail").`,
         spicy &&
           "Make one or two of them sensual or explicit for this image, such as less or sheerer clothing, nudity, a suggestive pose or an emphasised figure.",
         ...targetLines(target),
@@ -386,19 +387,11 @@ export function createSuggestions({
             .map((idea: unknown) => fit(clean(idea), maxIdea))
             .filter(Boolean),
         ),
-      ].slice(0, 3) as string[];
+      ].slice(0, maxSuggestions) as string[];
       return ideas.length ? { suggestions: ideas } : empty("The text model's reply was unusable.");
     }
     const labels = new Set<string>();
-    // The viewer's steps vary: one per area, the first the model gave.
-    const areas = new Set<unknown>();
     const steps = (Array.isArray(reply?.steps) ? reply.steps : [])
-      .filter((step: Record<string, unknown>) => {
-        if (surface !== "viewer" || !step?.area) return true;
-        if (areas.has(step.area)) return false;
-        areas.add(step.area);
-        return true;
-      })
       .map((step: Record<string, unknown>) => ({
         label: titleCase(clean(step?.label, 40)),
         request: clean(step?.request, 160),
@@ -411,7 +404,7 @@ export function createSuggestions({
         return true;
       })
       .filter(unlike(offered))
-      .slice(0, maxNextSteps) as NextStep[];
+      .slice(0, maxSuggestions) as NextStep[];
     return steps.length ? { suggestions: steps } : empty("The text model's reply was unusable.");
   }
 
@@ -475,6 +468,7 @@ export function createSuggestions({
       save(source, {
         steps: answer.suggestions as NextStep[],
         at: new Date(now()).toISOString(),
+        count: maxSuggestions,
         ...(spicy ? { spicy } : {}),
       });
     return answer;
@@ -651,7 +645,12 @@ export function createSuggestions({
       const fresh = body.fresh === true;
       const spicy = explicit(ownerId);
       const saved = surface === "viewer" ? source?.nextSteps : undefined;
-      if (saved?.steps.length && !fresh && Boolean(saved.spicy) === spicy)
+      if (
+        saved?.steps.length &&
+        saved.count === maxSuggestions &&
+        !fresh &&
+        Boolean(saved.spicy) === spicy
+      )
         return { suggestions: saved.steps.filter(unlike(fixed("change"))) };
       const { known, lines } = tasteContext(ownerId);
       const drafted = surface === "composer" || surface === "draft";

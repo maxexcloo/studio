@@ -60,7 +60,7 @@ export function useCardIdeas({
       if (request) pick(answer.options[0]);
     },
   });
-  const options = ideas.data?.options ?? [];
+  const options = [...(ideas.data?.options ?? [])].sort((a, b) => a.localeCompare(b));
   const loading = again.isPending || (ideas.isFetching && !options.length);
   const noun = nouns[field];
   const groups = assistMenu({

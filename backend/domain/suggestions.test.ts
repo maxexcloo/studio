@@ -5,7 +5,7 @@ import test, { type TestContext } from "node:test";
 
 import express from "express";
 
-import type { Change } from "../../shared/suggestions.ts";
+import { type Change, maxSuggestions } from "../../shared/suggestions.ts";
 import type { userContent } from "./model-content.ts";
 import { createNextStepWork, createSuggestions, registerSuggestionRoutes } from "./suggestions.ts";
 import type { TasteRecord, TasteWriter } from "./taste.ts";
@@ -95,6 +95,7 @@ function fixture(
   return {
     calls,
     models,
+    items,
     suggestions,
     advance: (ms: number) => (clock += ms),
   };
@@ -157,6 +158,49 @@ async function serve(t: TestContext, suggestions: ReturnType<typeof fixture>["su
   };
 }
 
+test("each suggestion picker requests six distinct ideas and caps an oversized reply", async () => {
+  assert.equal(maxSuggestions, 6);
+  for (const surface of ["composer", "viewer", "animate", "draft"]) {
+    const labels = ["Wind", "Amber", "Rain", "Fog", "Snow", "Cloud", "Sun"];
+    const { calls, suggestions } = fixture({
+      reply: () =>
+        JSON.stringify({
+          ideas: [labels[0], ...labels],
+          steps: [labels[0], ...labels].map((label) => ({ label, request: label, prompt: label })),
+        }),
+    });
+    const result = await suggestions.suggest("alice", {
+      surface,
+      kind: "image",
+      jobId: "job-a",
+      prompt: "A harbour",
+    });
+    assert.equal(result.suggestions.length, 6, surface);
+    assert.equal(
+      new Set(result.suggestions.map((idea) => (typeof idea === "string" ? idea : idea.label)))
+        .size,
+      6,
+    );
+    assert.match(calls[0][0].content, /(?:Write|Suggest) 6 useful, distinct/);
+  }
+});
+
+test("older saved suggestions refresh on access, and a new short answer stays cached", async () => {
+  const { items, calls, suggestions, advance } = fixture();
+  items["alice:job-a"].nextSteps = {
+    steps: [{ label: "Old", request: "old", prompt: "old" }],
+    at: "2026-01-01",
+  };
+  const body = { surface: "viewer", jobId: "job-a" };
+  const answer = await suggestions.suggest("alice", body);
+  assert.equal(calls.length, 1);
+  assert.equal(answer.suggestions.length, 2, "never pad a short usable answer");
+  assert.equal((items["alice:job-a"].nextSteps as { count: number }).count, 6);
+  advance(11 * 60_000);
+  assert.deepEqual(await suggestions.suggest("alice", body), answer);
+  assert.equal(calls.length, 1);
+});
+
 test("composer ideas come from the taste profile, framed as data, short and distinct", async () => {
   const { calls, suggestions } = fixture();
   const result = await suggestions.suggest("alice", { surface: "composer", kind: "image" });
@@ -183,7 +227,7 @@ test("composer ideas asked again offer different ones from those shown", async (
   );
   assert.equal(again.suggestions.length, 3);
   // Each ask takes its ideas from a few angles drawn at random, so refreshes range widely.
-  assert.match(calls[0][0].content, /Take each from a different angle \([^;)]+; [^;)]+; [^;)]+\)/);
+  assert.match(calls[0][0].content, /Take each from a different angle \([^;)]+(?:; [^;)]+){5}\)/);
 });
 
 test("Animate's ideas and a draft's changes asked again offer different ones from those shown", async () => {
@@ -243,10 +287,10 @@ test("Animate's motion ideas come from the image, each its own instruction, and 
   // The viewer's next steps are still their own.
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
   assert.equal(calls.length, 2);
-  assert.match(calls[1][0].content, /a different area/);
+  assert.match(calls[1][0].content, /spread across different areas/);
 });
 
-test("viewer next steps vary: one per area, specific, and spicy only where the account may", async () => {
+test("viewer next steps vary across relevant areas, specific, and spicy only where the account may", async () => {
   const step = (area: string, label: string) => ({ area, label, request: label, prompt: label });
   const reply = () =>
     JSON.stringify({
@@ -264,6 +308,7 @@ test("viewer next steps vary: one per area, specific, and spicy only where the a
     );
   assert.deepEqual(await labels("alice", "job-a"), [
     "Hair Up",
+    "Pink Bob",
     "Red Satin Dress",
     "Neon Rim Light",
   ]);

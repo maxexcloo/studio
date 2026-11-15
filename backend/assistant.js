@@ -1,6 +1,7 @@
 import { cardKinds, maxCardDescription, maxCardName } from "../shared/characters.ts";
 import { loraCompatibility, loraName } from "../shared/profiles.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
+import { maxSuggestions } from "../shared/suggestions.ts";
 import { replyTitle } from "../shared/titles.ts";
 /**
  * The prompt assistant engine: one OpenAI-compatible adapter behind every assistant
@@ -57,14 +58,12 @@ const cardInstructions = {
   outfits: `Describe the clothing the main person in the image wears so an image model can dress someone else in it: each garment, its colour, material and fit, accessories, and the footwear or bare feet. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "yellow raincoat, dark slim jeans, black rubber boots". Leave out the person's body, face and hair, the pose, the setting and the style.`,
   scenes: `Describe the setting in the image so an image model can place someone else in it: the place and its notable details, the light and the time of day. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "rainy city street at night, neon signs, wet asphalt reflections". Leave out any people, their clothing and poses, and the photographic style.`,
 };
-// How many names or descriptions a card field's magic menu offers at once.
-const cardIdeaCount = 5;
 // A card's name and description ideas from its images (the card editors' ▾ beside each field).
 const cardIdeaInstructions = {
-  name: (kind) =>
-    `Suggest ${cardIdeaCount} distinct names for the ${cardKinds[kind].name} in the images, short and memorable, each fitting how it looks: ${kind === "characters" ? "a given name or nickname, never a real person's name or identity" : "two to four words naming it"}, under ${maxCardName} characters, in Title Case.`,
-  description: (kind) =>
-    `${cardInstructions[kind]} Write ${cardIdeaCount} different phrases, each stressing different details or worded differently.`,
+  name: (kind, count) =>
+    `Suggest ${count} useful, distinct names for the ${cardKinds[kind].name} in the images, short and memorable, each fitting how it looks: ${kind === "characters" ? "a given name or nickname, never a real person's name or identity" : "two to four words naming it"}, under ${maxCardName} characters, in Title Case.`,
+  description: (kind, count) =>
+    `${cardInstructions[kind]} Write ${count} useful, distinct phrases, each stressing different details or worded differently.`,
 };
 // What makes an image a good reference for each card kind, for rating a card's images.
 const cardRatings = {
@@ -1163,20 +1162,20 @@ export function createAssistant(
   }
 
   /**
-   * Names or descriptions (`field`) for a card from its images, `cardIdeaCount` of them, steered by
-   * the person's `request` and unlike those already shown (`avoid`); the caller checks the model
-   * reads images.
+   * Names or descriptions (`field`) for a card from its images, or one for a custom `request`,
+   * unlike those already shown (`avoid`); the caller checks the model reads images.
    */
   async function cardIdeas({ kind, field, images, request = "", avoid = [], explicit, signal }) {
     const model = await modelFor("card-ideas", explicit);
     const limit = field === "name" ? maxCardName : maxCardDescription;
+    const count = request ? 1 : maxSuggestions;
     const reply = await chat({
       call: "card-ideas",
       model,
       messages: [
         {
           role: "system",
-          content: `${cardIdeaInstructions[field](kind)} Reply with only JSON: {"options":["…"]}. ${contentRule(explicit)}`,
+          content: `${cardIdeaInstructions[field](kind, count)} Reply with only JSON: {"options":["…"]}. ${contentRule(explicit)}`,
         },
         {
           role: "user",
@@ -1203,7 +1202,7 @@ export function createAssistant(
           .map((idea) => one(idea, limit).replace(/^["'“]+|["'”.\s]+$/g, ""))
           .filter(Boolean),
       ),
-    ].slice(0, cardIdeaCount);
+    ].slice(0, count);
     if (!options.length) throw new AssistantError("unusable reply");
     return { options, model };
   }
