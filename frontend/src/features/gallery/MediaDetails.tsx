@@ -92,6 +92,8 @@ function generationDetails(
   const shown = mediaSource(item);
   const inpaint = settings.inpaint as { strength?: number } | undefined;
   const video = item.type === "video";
+  // Radiance runs its own text encoder, VAE and sampler, so ComfyUI's recorded choices don't apply.
+  const comfyui = (value: unknown) => (settings.profileBackend === "radiance" ? "" : value);
   const staged = (Array.isArray(settings.referenceAssets) ? settings.referenceAssets : []).filter(
     (reference): reference is { slot?: string; assetId: string } => Boolean(reference?.assetId),
   );
@@ -140,15 +142,15 @@ function generationDetails(
     settings: sorted([
       // The backend a combined profile ran on.
       ["Backend", settings.profileBackend ? backendLabel(String(settings.profileBackend)) : ""],
-      ["Text Encoder", fileStem(settings.textEncoder)],
-      ["VAE", fileStem(settings.vae)],
-      ["CLIP Type", settings.clipType],
-      ["Weight Type", settings.weightDtype],
+      ["Text Encoder", comfyui(fileStem(settings.textEncoder))],
+      ["VAE", comfyui(fileStem(settings.vae))],
+      ["CLIP Type", comfyui(settings.clipType)],
+      ["Weight Type", comfyui(settings.weightDtype)],
       ["Resolution", settings.resolution || settings.resolutionTier],
       ["Steps", settings.steps],
       ["CFG", settings.cfg],
-      ["Sampler", settings.sampler],
-      ["Scheduler", settings.scheduler],
+      ["Sampler", comfyui(settings.sampler)],
+      ["Scheduler", comfyui(settings.scheduler)],
       // A picture's mode, named as the composer's Reference Role chips name it.
       [
         "Mode",
