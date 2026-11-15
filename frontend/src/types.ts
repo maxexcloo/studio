@@ -113,6 +113,14 @@ export interface GenerationInput extends Record<string, unknown> {
   /** The backend a combined profile runs on; the profile's current one when absent. */
   profileBackend?: string;
 }
+/** What an MCP chat said its results show (backend/gallery/records.js storedResultSet). */
+export interface ResultContext {
+  character?: { name: string; description?: string };
+  outfit?: { name: string; description?: string };
+  scene?: { name: string; description?: string };
+  series?: string;
+}
+
 export interface MediaItem {
   id: string;
   jobId?: string;
@@ -163,9 +171,18 @@ export interface MediaItem {
   outputName?: string;
   /**
    * The MCP result set it belongs to: one generate call's id, title and asking client (`source`),
-   * and this result's prompt position and own title (`variation`), when the chat gave one.
+   * the character card it was made with, what the chat said it shows (`context`), and this
+   * result's prompt position and own title (`variation`), when the chat gave one.
    */
-  resultSet?: { id: string; title: string; index: number; variation?: string; source?: string };
+  resultSet?: {
+    id: string;
+    title: string;
+    index: number;
+    variation?: string;
+    source?: string;
+    character?: { id: string; name: string };
+    context?: ResultContext;
+  };
   /** The result this one was made from, kept from its run (backend/version-sources.js `resultSource`). */
   parentItemId?: string;
   parentJobId?: string;

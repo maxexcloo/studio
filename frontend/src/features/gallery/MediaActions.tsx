@@ -34,6 +34,7 @@ import { copyText } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
 import { useGroupFeature } from "../auth/AccountGate";
+import { useStartCard } from "../characters/useCardFrom";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { useStageComparison } from "../compare/variants";
 import { assistMenu, useChangeSuggestions } from "../generation/AskChange";
@@ -215,25 +216,15 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
 
 /**
  * Edit › Use as Character, Use as Outfit and Use as Scene: each opens its Library section with a new
- * card started from the image, where the prompt assistant can describe it.
+ * card started from the image and what its chat called it, where the prompt assistant can describe it.
  */
 function useCardActions(item: MediaItem, onApplied: () => void): Action[] {
   const characters = useGroupFeature("characters");
-  const location = useLocation();
-  const navigate = useNavigate();
+  const startCard = useStartCard();
   if (!characters || item.type !== "image") return [];
   const start = (kind: CardKind) => () => {
     onApplied();
-    navigate(`/library#${kind}`, {
-      state: {
-        // The gallery under Library, without its viewer.
-        backgroundLocation: location.state?.backgroundLocation || {
-          ...location,
-          search: location.search.replace(/[?&]item=[^&]*/, "").replace(/^&/, "?"),
-        },
-        cardFrom: item.id,
-      },
-    });
+    startCard(kind, item);
   };
   return [
     {

@@ -291,6 +291,61 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   expect(state.characters).toEqual([]);
 });
 
+test("A result's chat character offers Create Character in Details, starting the card with its name, description and image", async ({
+  page,
+}, testInfo) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "ivo",
+    jobId: "ivo-job",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "A tall smith at the forge",
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+    resultSet: {
+      id: "set-ivo",
+      title: "Forge Tales",
+      index: 0,
+      context: {
+        character: { name: "Ivo", description: "tall smith, shaved head" },
+        series: "Forge Tales",
+      },
+    },
+  });
+  await page.goto("/images");
+  await page
+    .getByRole("button", { name: "Open image: A tall smith at the forge", exact: true })
+    .click();
+  if (testInfo.project.use.isMobile)
+    await page.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Ivo", exact: true })).toHaveAttribute(
+    "href",
+    "/images?q=Ivo",
+  );
+  await page.getByRole("button", { name: "Create Character", exact: true }).click();
+  await expect(page).toHaveURL(/\/library#characters$/);
+  const editor = page.getByRole("dialog", { name: "New Character", exact: true });
+  await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Ivo");
+  await expect(editor.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
+    "tall smith, shaved head",
+  );
+  await editor.getByRole("textbox", { name: "Age", exact: true }).fill("40");
+  await editor.getByRole("textbox", { name: "Job", exact: true }).fill("Smith");
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(editor).toBeHidden();
+  expect(state.characters[0]).toMatchObject({ name: "Ivo", age: 40, job: "Smith" });
+  await expect(
+    page.getByRole("list", { name: "Characters", exact: true }).getByRole("listitem", {
+      name: "Ivo",
+      exact: true,
+    }),
+  ).toContainText("Age 40 · Smith");
+});
+
 test("A member sees only their cards and Presets in the Library, and a group without Characters only Presets", async ({
   page,
 }) => {
