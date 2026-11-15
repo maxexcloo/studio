@@ -11,7 +11,8 @@ import {
 } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fingerprint } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useNavigate, useParams } from "react-router";
 
 import { post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
@@ -91,6 +92,8 @@ function OffNotice() {
   );
 }
 
+const views = ["deck", "overview", "projects", "discarded", "taste"] as const;
+
 /**
  * Dream: the deck of unseen results, comparisons and calibration, with its pause and settings;
  * While You Were Away as the overview per project, the projects, the discards or the taste profile.
@@ -106,10 +109,13 @@ export function DreamPage() {
       .catch(() => undefined);
   }, [client]);
   const save = useDreamSettings();
-  // Dream always opens on the deck; Taste is its own control beside Settings.
-  const [view, setView] = useState<"deck" | "overview" | "discarded" | "projects" | "taste">(
-    "deck",
-  );
+  // Dream opens on the deck at /dream; each other view has its own path, so reload and Back keep
+  // it. Taste is its own control beside Settings.
+  const param = useParams().view;
+  const view = views.find((name) => name === param) ?? "deck";
+  const navigate = useNavigate();
+  const setView = (next: (typeof views)[number]) =>
+    navigate(next === "deck" ? "/dream" : `/dream/${next}`);
   const taste = {
     variant: view === "taste" ? "light" : "subtle",
     color: view === "taste" ? undefined : "gray",
