@@ -1,5 +1,6 @@
 import { logWarning } from "../crash-log.js";
 import { directRoute } from "../domain/direct-route.ts";
+import { minorAgeRefusal } from "../minor-age.js";
 import { readMultipartUpload, saveUpload } from "../references.js";
 import { localRefusal } from "../route-access.js";
 import { promptTitle } from "./records.js";
@@ -40,6 +41,8 @@ export function importRecord(value) {
  */
 export async function importUpload(upload, record, ownerId = "") {
   const kept = importRecord(record);
+  const refusal = minorAgeRefusal(kept.prompt);
+  if (refusal) throw new Error(refusal);
   return saveUpload(
     { ...upload, ...kept, name: kept.prompt ? promptTitle(kept.prompt) : upload.name },
     ownerId,
