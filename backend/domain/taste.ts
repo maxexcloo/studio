@@ -165,6 +165,8 @@ export interface TasteWriter<Content = string> {
 }
 
 const maxSignals = 200;
+/** Comparison answers fill at most half the signals, so a run of them can't push out stars and keeps. */
+const answerKinds = new Set<TasteKind>(["preferred", "pair-both", "pair-neither"]);
 /** One action, such as a bulk star, adds at most this many signals so it can't flood the profile. */
 const maxPerCall = 20;
 /** The summariser reads each prompt cut to this length; signals keep it whole. */
@@ -742,10 +744,13 @@ export function createTaste({
       try {
         const taste = load(ownerId);
         const at = stamp();
+        let answers = 0;
         taste.signals = [
           ...signals.map((signal) => ({ at, ...signal })).reverse(),
           ...taste.signals,
-        ].slice(0, maxSignals);
+        ]
+          .filter((signal) => !answerKinds.has(signal.kind) || ++answers <= maxSignals / 2)
+          .slice(0, maxSignals);
         taste.since += signals.length;
         write(ownerId, taste);
         // Best effort in the background; the request that added the signal never waits.

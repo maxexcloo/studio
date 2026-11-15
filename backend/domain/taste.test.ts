@@ -90,6 +90,11 @@ test("signals snapshot the whole result, newest first, capped per account", (t) 
     Array.from({ length: 30 }, (_, index) => tasteSignal("star", `bulk-${index}`)),
   );
   assert.equal(taste.read("carol").signals.length, 20);
+  // A run of comparison answers fills at most half, leaving the stars before it.
+  for (let index = 0; index < 150; index++)
+    taste.record("carol", [tasteSignal("preferred", `answer-${index}`)]);
+  const kinds = taste.read("carol").signals.map((signal) => signal.kind);
+  assert.deepEqual([kinds.length, kinds.filter((kind) => kind === "star").length], [120, 20]);
   const alice = taste.read("alice");
   assert.equal(alice.signals.length, 200);
   assert.equal(alice.signals[0].jobId, "job-204");
