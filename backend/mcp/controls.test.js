@@ -203,6 +203,29 @@ test("Generate LoRA names resolve without folder, extension or case and take the
   );
 });
 
+test("A LoRA for another family becomes this profile's equivalent by name, or is left out with a note", () => {
+  const infos = {
+    "hyperCurvyBodyFor_v1.safetensors": { families: ["flux"], base: "FLUX.1" },
+    "hyperCurvyBodyForSDXL_v2.safetensors": { families: ["sdxl"], base: "SDXL" },
+    "neonGlow_flux.safetensors": { families: ["flux"], base: "FLUX.1" },
+  };
+  const subject = { ...profile, options: { loras: Object.keys(infos) } };
+  const notes = [];
+  assert.deepEqual(
+    prepareLoras(
+      subject,
+      infos,
+      [{ name: "hyperCurvyBodyFor_v1", strength: 0.6 }, { name: "neonGlow_flux" }],
+      notes,
+    ),
+    [{ name: "hyperCurvyBodyForSDXL_v2.safetensors", strength: 0.6, fixed: true }],
+  );
+  assert.deepEqual(notes, [
+    "Used hyperCurvyBodyForSDXL_v2 for hyperCurvyBodyFor_v1, its SDXL equivalent.",
+    "Left out neonGlow_flux: it is for FLUX.1 and SDXL has no equivalent.",
+  ]);
+});
+
 test("a distilled profile without CFG offers no cfg and leaves one out with a clear note", () => {
   const distilled = {
     ...profile,

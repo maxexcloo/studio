@@ -25,18 +25,20 @@ import { savedDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { canonicalProfileId } from "../profile/store.js";
 import { promptStyleStore } from "../prompt-styles.js";
 import {
+  clip,
   closest,
   listedControls,
   loraIndex,
   loraQueryWords,
   maxJobsPerCall,
+  maxSplitJobs,
   mcpControls,
   mcpGenerationCount,
   mcpLoras,
   mcpSize,
 } from "./controls.js";
 import { findCard } from "./manage.js";
-import { assertJobCount, mcpJson } from "./media.js";
+import { aboutTime, assertJobCount, mcpJson, readyIn } from "./media.js";
 import { assertAvoided, briefLine, keptChoices, projectArgs, projectTargets } from "./project.js";
 import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
 import { output, shortPrompt } from "./results.js";
@@ -65,13 +67,6 @@ import {
 
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;
-/** A set's expected wait for the reply: "about 40 s", "about 3 min". */
-const aboutTime = (ms) =>
-  ms < 55_000
-    ? `about ${Math.max(5, Math.round(ms / 5000) * 5)} s`
-    : ms < 90 * 60_000
-      ? `about ${Math.round(ms / 60_000)} min`
-      : `about ${Math.round(ms / 3_600_000)} h`;
 /** JSON with sorted keys and undefined left out, so equal arguments give equal text. */
 const stableJson = (value) =>
   JSON.stringify(value, (_key, item) =>
@@ -110,7 +105,7 @@ const theme = z
   .describe(`One of ${themeIds().join(", ")}.`);
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
 const setTitle = z.string().trim().min(1).max(80);
-const promptList = z.array(z.string().trim().min(1)).min(1).max(maxJobsPerCall);
+const promptList = z.array(z.string().trim().min(1)).min(1).max(maxSplitJobs);
 /** A JSON array sent as one string, or a single prompt. */
 const promptListText = z.string().transform((text) => {
   try {
@@ -221,12 +216,14 @@ export function registerGenerateTools({
     guide = "",
     promptSource = "exact",
     note = "",
-    promptLength = 200,
   ) => {
     const label = profile.label || profile.id;
     // Iterations that rebuild a whole generate call drift from the result; reuse keeps its settings.
     const followUp = `To change or animate one later, call reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and its full prompt revised (status shows it).`;
-    const [endsAt] = await media.finishTimes(owner, [submission], { signal });
+    const {
+      ends: [endsAt],
+      ahead,
+    } = await media.finishTimes(owner, [submission], { signal });
     const left = endsAt === null ? 0 : Math.max(0, endsAt - Date.now());
     const structured = {
       status: submission.status,
@@ -238,6 +235,7 @@ export function registerGenerateTools({
       },
       prompt_source: promptSource,
       ...(left ? { eta_seconds: Math.round(left / 1000) } : {}),
+      ...(ahead === undefined ? {} : { jobs_ahead: ahead }),
       jobs: submission.jobs.map(({ job_id, ref, link, status, images }) => ({
         job_id,
         ref,
@@ -246,12 +244,6 @@ export function registerGenerateTools({
         ...(images ? { images } : {}),
       })),
     };
-    // The prompt each result ran, shortened unless reuse is revising it; one line when every job shares it.
-    const prompted = submission.jobs.filter(({ prompt }) => prompt);
-    const distinct = new Set(prompted.map(({ prompt }) => prompt));
-    const prompts = !prompted.length
-      ? ""
-      : `\n\n${distinct.size === 1 ? `Prompt: ${shortPrompt([...distinct][0], promptLength)}` : prompted.map(({ ref, prompt }) => `${ref[0].toUpperCase()}${ref.slice(1)} prompt: ${shortPrompt(prompt, promptLength)}`).join("\n")}`;
     // The profile's guide follows its first use in a conversation, so the agent applies it to later prompts.
     const extra = guide
       ? [
@@ -272,10 +264,10 @@ export function registerGenerateTools({
     ].join(" · ");
     const message =
       submission.status === "queued"
-        ? `Queued on ${label}${left ? `, ready in ${aboutTime(left)}` : ""}. ${ignoredNote(submission)}${note}${await waiting(profile)}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. When the user later asks to see results, call result. Never poll or resubmit. ${followUp}`
+        ? `Queued on ${label}${readyIn(left, ahead)}. ${ignoredNote(submission)}${note}${await waiting(profile)}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. When the user later asks to see results, call result. Never poll or resubmit. ${followUp}`
         : `${submission.error} ${ignoredNote(submission)}${note}Share the links; never resubmit.`;
     return {
-      content: [{ type: "text", text: `${message}\n\n${pending}${prompts}` }, ...extra],
+      content: [{ type: "text", text: `${message}\n\n${pending}` }, ...extra],
       structuredContent: {
         ...structured,
         ...(submission.error ? { error: submission.error } : {}),
@@ -320,7 +312,7 @@ export function registerGenerateTools({
         sets.map(({ queued }) => queued),
         { signal },
       )
-    ).map((endsAt) => (endsAt === null ? 0 : Math.max(0, endsAt - now)));
+    ).ends.map((endsAt) => (endsAt === null ? 0 : Math.max(0, endsAt - now)));
     const lines = sets.map(
       ({ profile, queued }, index) =>
         `${profile.label || profile.id}: ${queued.error || queued.jobs.map(link).join(" · ")}${left[index] ? ` (${aboutTime(left[index])})` : ""}${queued.ignored ? ` ${queued.ignored}` : ""}`,
@@ -413,7 +405,7 @@ export function registerGenerateTools({
             ),
           }
         : {}),
-      note: "From the profile's graph, so it outranks any count its label or description gives.",
+      note: "From the profile's graph; outranks its label.",
     };
   };
   /** Profiles as the models tool lists them: "id — label" grouped by kind, marked when their worker isn't running. */
@@ -506,11 +498,49 @@ export function registerGenerateTools({
    */
   const submit = async (profile, args, record = {}, { guide = true } = {}) => {
     const fresh = guide && review(refs, profile.id);
+    // A set over maxJobsPerCall images queues in batches of that size, one after another.
+    const count = args.count ?? mcpGenerationCount;
+    const size = Math.max(1, Math.floor(maxJobsPerCall / count));
+    const prompts = args.prompts || [""];
+    let queued;
     try {
-      const queued = await media.queue(owner, args, refs, {
-        ...record,
-        ...(conversation ? { conversation } : {}),
-      });
+      for (let at = 0; at < prompts.length; at += size) {
+        const part = await media
+          .queue(
+            owner,
+            prompts.length > size
+              ? {
+                  ...args,
+                  prompts: prompts.slice(at, at + size),
+                  ...(args.titles ? { titles: args.titles.slice(at, at + size) } : {}),
+                  ...(args.result_set ? { result_set: { ...args.result_set, first: at } } : {}),
+                  ...(Number.isInteger(args.seed) && !args.same_seed
+                    ? { seed: args.seed + at * count }
+                    : {}),
+                }
+              : args,
+            refs,
+            { ...record, ...(conversation ? { conversation } : {}) },
+          )
+          .catch((error) => {
+            if (!queued) throw error;
+            return {
+              status: "partially_queued",
+              jobs: [],
+              error: `Further submission failed; retain returned jobs before retrying. ${error.message}`,
+            };
+          });
+        queued = queued
+          ? {
+              ...queued,
+              ...(part.error ? { status: part.status, error: part.error } : {}),
+              jobs: [...queued.jobs, ...part.jobs],
+            }
+          : part;
+        if (queued.error) break;
+      }
+      if (prompts.length > size)
+        queued.ignored = `${queued.ignored ? `${queued.ignored} ` : ""}Queued ${prompts.length * count} images in batches of up to ${size * count}.`;
       return { queued, guide: fresh ? compactGuide(profile.prompting) : "" };
     } catch (error) {
       // A refused submission delivered no guide, so the next attempt carries it.
@@ -612,8 +642,13 @@ export function registerGenerateTools({
         const [characters, outfits, scenes] = await Promise.all(
           ["characters", "outfits", "scenes"].map(cards),
         );
+        // Each card's gist: generate reads the whole description by name.
         const cardList = (items) =>
-          items.map(({ id, name, description }) => ({ id, name, description }));
+          items.map(({ id, name, description }) => ({
+            id,
+            name,
+            description: clip(description, 120),
+          }));
         const shown = (value) => kind === "all" || kind === value;
         const services = catalogue.backends
           ? Object.fromEntries(
@@ -664,7 +699,7 @@ export function registerGenerateTools({
                 characters: characters.map((card) => ({
                   id: card.id,
                   name: card.name,
-                  description: card.description,
+                  description: clip(card.description, 120),
                   images: card.references.length,
                   ...(card.sheet ? { sheet: card.sheet.status } : {}),
                 })),
@@ -760,16 +795,7 @@ export function registerGenerateTools({
           : compactGuide(profile.prompting, maxShownGuideCharacters);
         const detail = {
           ...Object.fromEntries(
-            [
-              "id",
-              "label",
-              "kind",
-              "family",
-              "description",
-              "mediaInputs",
-              "aspectPolicy",
-              "native",
-            ]
+            ["id", "label", "kind", "family", "description", "aspectPolicy", "native"]
               .filter((key) => key in profile)
               .map((key) => [key, profile[key]]),
           ),
@@ -815,7 +841,7 @@ export function registerGenerateTools({
     server,
     "generate",
     "generate",
-    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Leave count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Anyone sexual or nude must be 18+ (no teens).`,
+    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request; at most ${maxSplitJobs} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Leave count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Anyone sexual or nude must be 18+ (no teens).`,
     {
       request: z
         .string()
@@ -830,7 +856,7 @@ export function registerGenerateTools({
         .optional()
         .describe("Run as written; count images each."),
       title: setTitle.optional(),
-      titles: z.array(setTitle).max(maxJobsPerCall).optional().describe("One per prompt."),
+      titles: z.array(setTitle).max(maxSplitJobs).optional().describe("One per prompt."),
       preview: z.boolean().optional(),
       count: jobCount
         .optional()
@@ -851,7 +877,9 @@ export function registerGenerateTools({
         .array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }))
         .max(8)
         .optional()
-        .describe("Only LoRAs the user asks for."),
+        .describe(
+          "Only LoRAs the user asks for; strength only if they give one, so a set varies it.",
+        ),
       reference_asset_ids: z
         .array(z.string().min(1))
         .max(16)
@@ -1097,7 +1125,7 @@ export function registerGenerateTools({
     )
       args.count = 1;
     // Checked before any prompt is written, so an oversized call costs nothing and says how to split.
-    assertJobCount(args.prompts?.length || 1, args.count ?? 1);
+    assertJobCount(args.prompts?.length || 1, args.count ?? 1, maxSplitJobs);
     const named = args.reference_asset_ids || [];
     // A character needs a model that takes references; its images then fill what room each has.
     const references = named.length + (card?.referenceIds.length ? 1 : 0);
@@ -1235,9 +1263,9 @@ export function registerGenerateTools({
         ? mcpGenerationCount
         : 1);
     const jobs = targets.length * (args.prompts?.length || 1) * count;
-    if (jobs > maxJobsPerCall)
+    if (jobs > maxSplitJobs)
       throw new Error(
-        `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs}; one call queues at most ${maxJobsPerCall}. Lower count, pass fewer profile_ids, or name a tier.`,
+        `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs}; one call queues at most ${maxSplitJobs}. Lower count, pass fewer profile_ids, or name a tier.`,
       );
     // A preview's prompts run as shown when the same call follows without preview.
     const previewKey = `${refs || owner}\n${stableJson({ ...input, preview: undefined })}`;
@@ -1634,7 +1662,6 @@ export function registerGenerateTools({
         submission.guide,
         source,
         `${plan.tierNote || ""}${dropped}`,
-        Infinity,
       );
     },
   );
