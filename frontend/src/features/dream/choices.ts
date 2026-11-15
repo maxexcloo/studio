@@ -120,7 +120,7 @@ export function dreamChoices(card: DeckCard): Choice[][] {
 
 /**
  * The choices as the viewer's action groups, on one row in the item bar's order: Animate and Edit,
- * then Recreate ▾ holding Variations and More Like This, then the verdicts at the end, Dislike,
+ * then Recreate ▾ holding More Like This and Variations, then the verdicts at the end, Dislike,
  * Like and Keep, with Keep the filled one. Phones leave Like's name to its icon. A comparison
  * names all its answers, A and B large.
  */
@@ -145,7 +145,7 @@ export function viewerChoices(
     };
   const all = choices.flat();
   const pick = (...ids: string[]) => ids.flatMap((id) => all.filter((choice) => choice.id === id));
-  const dream = pick("variations", "more-like-this");
+  const dream = pick("more-like-this", "variations");
   const groups: ActionGroups = [
     [
       ...pick("animate", "edit"),

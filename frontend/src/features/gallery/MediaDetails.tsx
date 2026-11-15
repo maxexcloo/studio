@@ -2,6 +2,7 @@ import {
   ActionIcon,
   Anchor,
   Badge,
+  Button,
   Group,
   Image,
   Stack,
@@ -22,8 +23,10 @@ import { formatBytes } from "../../ui/bytes";
 import { useCopy } from "../../ui/clipboard";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
+import { useGroupFeature } from "../auth/AccountGate";
 import { identityNote } from "../characters/identity";
-import { charactersQuery } from "../characters/queries";
+import { charactersQuery, promptCardsQuery } from "../characters/queries";
+import { useStartCard } from "../characters/useCardFrom";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { backendLabel, isProfile, shownProfileName } from "../generation/payload";
@@ -395,6 +398,72 @@ function Caption({ item }: { item: MediaItem }) {
   );
 }
 
+const contextCards = [
+  { kind: "characters", key: "character", noun: "Character" },
+  { kind: "outfits", key: "outfit", noun: "Outfit" },
+  { kind: "scenes", key: "scene", noun: "Scene" },
+] as const;
+
+/**
+ * What the chat said a result shows: its character, outfit and scene, each searching the gallery
+ * for the results that share it, with Create where Library has no card of that name, and its
+ * series.
+ */
+function ChatContext({ item }: { item: MediaItem }) {
+  const context = item.resultSet?.context;
+  const cards = useGroupFeature("characters") && item.type === "image" && item.status === "done";
+  const startCard = useStartCard();
+  const lists = {
+    characters: useQuery({ ...charactersQuery, enabled: Boolean(cards && context?.character) }),
+    outfits: useQuery({
+      ...promptCardsQuery("outfits"),
+      enabled: Boolean(cards && context?.outfit),
+    }),
+    scenes: useQuery({ ...promptCardsQuery("scenes"), enabled: Boolean(cards && context?.scene) }),
+  };
+  if (!context) return null;
+  const search = (words: string) =>
+    `${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(words)}`;
+  return (
+    <>
+      {contextCards.map(({ kind, key, noun }) => {
+        const named = context[key];
+        if (!named) return null;
+        const saved = lists[kind].data;
+        const Icon = icons[key];
+        return (
+          <DetailSection key={key} title={noun}>
+            <Anchor component={Link} to={search(named.name)} size="sm">
+              {named.name}
+            </Anchor>
+            {named.description && <DetailText>{named.description}</DetailText>}
+            {cards &&
+              saved &&
+              !saved.some((card) => card.name.toLowerCase() === named.name.toLowerCase()) && (
+                <Button
+                  variant="subtle"
+                  size="compact-sm"
+                  leftSection={<Icon size={14} />}
+                  style={{ alignSelf: "flex-start" }}
+                  onClick={() => startCard(kind, item)}
+                >
+                  Create {noun}
+                </Button>
+              )}
+          </DetailSection>
+        );
+      })}
+      {context.series && (
+        <DetailSection title="Series">
+          <Anchor component={Link} to={search(context.series)} size="sm">
+            {context.series}
+          </Anchor>
+        </DetailSection>
+      )}
+    </>
+  );
+}
+
 /** One gallery item in full: gallery pages leave out its prompt's thinking, which Details reads here. */
 export const galleryItemQuery = (id: string) =>
   queryOptions({
@@ -512,7 +581,8 @@ function Related({
 }
 
 /**
- * Details › Caption (with its tags), From, Prompt, Negative Prompt, Source, Derived, Model, LoRAs,
+ * Details › Caption (with its tags), From, Prompt, Negative Prompt, Set, the chat's Character,
+ * Outfit, Scene and Series, Source, Derived, Model, LoRAs,
  * References, Settings, Output and Timing for one result; From and Derived look among the `loaded`
  * items too, and `open` shows a related result in the
  * viewer.
@@ -544,6 +614,7 @@ export function MediaDetails({
           <Text size="sm">{item.resultSet.title}</Text>
         </DetailSection>
       )}
+      <ChatContext item={item} />
       {item.source && (
         <DetailSection title="Source">
           <Anchor href={item.source.url} target="_blank" rel="noreferrer" size="sm">

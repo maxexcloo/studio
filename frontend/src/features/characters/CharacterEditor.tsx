@@ -1,44 +1,58 @@
-import { Alert, Button, Group, Input, Loader, Paper, Stack, Text } from "@mantine/core";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  Alert,
+  Button,
+  Group,
+  Input,
+  Loader,
+  NumberInput,
+  Paper,
+  Stack,
+  Text,
+  TextInput,
+} from "@mantine/core";
+import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
-import { maxCharacterImages } from "../../../../shared/characters";
-import { post } from "../../api";
-import type { MediaItem, ReferenceAsset } from "../../types";
+import {
+  type CharacterTrait,
+  maxCharacterAge,
+  maxCharacterImages,
+  maxCharacterTrait,
+  minCharacterAge,
+  sheetRoles,
+} from "../../../../shared/characters";
+import type { ReferenceAsset } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
+import { TextBox } from "../../ui/TextBox";
 import { chipProps } from "../generation/chip";
-import { PickerGrid, PickerTile } from "../generation/Picker";
-import { statusLabels } from "../generation/Queue";
 import { CardDialog, CardFields, CardForm, CardThumbnails } from "./CardImages";
 import { type CharacterCard, charactersQuery, useMakeSheet, useSaveCharacter } from "./queries";
 
-/** What a new card starts from, such as Use as Character's image. */
+/** What a new card starts from, such as Use as Character's image and what its chat called it. */
 export interface CharacterStart {
   references: ReferenceAsset[];
+  name?: string;
+  description?: string;
 }
+
+type Story = Partial<Record<CharacterTrait, string>> & { age?: number };
 
 /**
  * New Character and Edit Character: a name, a short description and 1–4 images, chosen from the
- * gallery or uploaded, in the order they fill reference slots. A saved card also generates
- * references to pick from and makes its sheet.
+ * gallery or uploaded, the first leading. A saved card also makes its sheet.
  */
 export function CharacterEditor({
   opened,
   character,
   start,
   onClose,
-  onGenerate,
-  generating = false,
 }: {
   opened: boolean;
   character?: CharacterCard;
   start?: CharacterStart;
   onClose: () => void;
-  /** Generate References for a saved card. */
-  onGenerate?: (card: CharacterCard) => void;
-  generating?: boolean;
 }) {
   return (
     <CardDialog
@@ -52,8 +66,6 @@ export function CharacterEditor({
           character={character}
           start={start}
           onClose={onClose}
-          onGenerate={onGenerate}
-          generating={generating}
         />
       )}
     </CardDialog>
@@ -64,44 +76,32 @@ function CharacterForm({
   character,
   start,
   onClose,
-  onGenerate,
-  generating,
 }: {
   character?: CharacterCard;
   start?: CharacterStart;
   onClose: () => void;
-  onGenerate?: (card: CharacterCard) => void;
-  generating?: boolean;
 }) {
-  const [name, setName] = useState(character?.name || "");
-  const [description, setDescription] = useState(character?.description || "");
+  const [name, setName] = useState(character?.name || start?.name || "");
+  const [description, setDescription] = useState(
+    character?.description || start?.description || "",
+  );
+  const [story, setStory] = useState<Story>({
+    age: character?.age,
+    job: character?.job,
+    backstory: character?.backstory,
+    likes: character?.likes,
+    dislikes: character?.dislikes,
+  });
   const [images, setImages] = useState<ReferenceAsset[]>(
     character?.references || start?.references || [],
   );
   const save = useSaveCharacter(character?.id);
-  const full = images.length >= maxCharacterImages;
-  // The card as it stands now, for Generate References' results as they finish.
+  // The card as it stands now, for its sheet as it is made.
   const characters = useQuery({ ...charactersQuery, enabled: Boolean(character) });
   const current = characters.data?.find((card) => card.id === character?.id) || character;
   const making = useMakeSheet();
   const sheet = current?.sheet;
-  // Each queued job's results, or a placeholder until its first appears in the gallery.
-  const generated = (current?.generated?.jobIds || []).flatMap((jobId) => {
-    const results = current!.generated!.results.filter((result) => result.jobId === jobId);
-    return results.length
-      ? results
-      : [{ galleryItemId: jobId, jobId, status: "queued", thumbnailUrl: "", prompt: "" }];
-  });
-  const fromGallery = useMutation({
-    mutationFn: async (item: Pick<MediaItem, "id">) =>
-      (
-        await post<{ asset: ReferenceAsset }>("/api/reference-assets/from-gallery", {
-          galleryItemId: item.id,
-        })
-      ).asset,
-    onSuccess: (asset) => setImages((previous) => [...previous, asset]),
-  });
-  const error = save.error || fromGallery.error;
+  const error = save.error;
   return (
     <CardForm
       onSubmit={() =>
@@ -109,6 +109,7 @@ function CharacterForm({
           {
             name: name.trim(),
             description: description.trim(),
+            ...story,
             referenceIds: images.map((asset) => asset.id),
           },
           { onSuccess: onClose },
@@ -128,60 +129,11 @@ function CharacterForm({
         images={images}
         onImages={setImages}
       />
-      {current && onGenerate && (
-        <EditorSection
-          label="Generated References"
-          description={
-            generated.length
-              ? "Pick the ones to keep. The rest stay in the gallery."
-              : "A portrait and front, side and back views from the description and first image."
-          }
-          empty="None Yet"
-          action={
-            <Button
-              {...chipProps}
-              leftSection={<icons.variations size={15} />}
-              loading={generating}
-              onClick={() => onGenerate(current)}
-            >
-              Generate References
-            </Button>
-          }
-        >
-          {generated.length > 0 && (
-            <PickerGrid label="Generated References">
-              {generated.map((result, index) => {
-                const selected = images.some(
-                  (asset) => asset.galleryItemId === result.galleryItemId,
-                );
-                const done = result.status === "done";
-                return (
-                  <PickerTile
-                    key={result.galleryItemId}
-                    label={`${selected ? "Remove" : "Add"} generated reference ${index + 1}`}
-                    selected={selected}
-                    disabled={!done || full || fromGallery.isPending}
-                    image={done ? result.thumbnailUrl : undefined}
-                    placeholder={done ? undefined : icons.variations}
-                    title={done ? "Ready" : resultStatus(result.status)}
-                    onToggle={() =>
-                      selected
-                        ? setImages(
-                            images.filter((asset) => asset.galleryItemId !== result.galleryItemId),
-                          )
-                        : fromGallery.mutate({ id: result.galleryItemId })
-                    }
-                  />
-                );
-              })}
-            </PickerGrid>
-          )}
-        </EditorSection>
-      )}
+      <CharacterStory story={story} onStory={setStory} />
       {current && (
         <EditorSection
           label="Sheet"
-          description="Front, side and back views, expressions and gear, sent when a prompt names a view."
+          description="Face, front, side and back views, each sent in place of the first image when a prompt names that view."
           empty="No Sheet Yet"
           action={
             <Button
@@ -227,14 +179,13 @@ function CharacterForm({
   );
 }
 
-/** A generated reference's state while it has no picture, in the queue's words. */
-const resultStatus = (status: string) =>
-  statusLabels[status as keyof typeof statusLabels] ?? "Generating";
+// The panels a card shows as its views; any other a sheet holds stays off it.
+const viewRoles: string[] = sheetRoles.filter((role) => role !== "sheet");
 
-/** A card's sheet views (Face, Front, Side, Back and Gear) to show, without the whole sheet. */
+/** A card's sheet views (Face, Front, Side and Back) to show, without the whole sheet. */
 export const sheetViews = (card: CharacterCard) =>
   (card.sheet?.panels || [])
-    .filter((panel) => panel.role !== "sheet")
+    .filter((panel) => viewRoles.includes(panel.role))
     .map((panel) => ({
       key: panel.id,
       src: panel.url || panel.thumbnailUrl,
@@ -278,5 +229,48 @@ function EditorSection({
         </Paper>
       )}
     </Input.Wrapper>
+  );
+}
+
+/** A character's age and story: shown on its card, never sent to a model. */
+function CharacterStory({ story, onStory }: { story: Story; onStory: (story: Story) => void }) {
+  const text = (key: CharacterTrait) => ({
+    maxLength: maxCharacterTrait,
+    value: story[key] || "",
+    onChange: (value: string) => onStory({ ...story, [key]: value }),
+  });
+  return (
+    <>
+      <Group grow align="flex-start">
+        <NumberInput
+          label="Age"
+          min={minCharacterAge}
+          max={maxCharacterAge}
+          allowDecimal={false}
+          value={story.age ?? ""}
+          onChange={(value) =>
+            onStory({ ...story, age: typeof value === "number" ? value : undefined })
+          }
+        />
+        <TextInput
+          label="Job"
+          {...text("job")}
+          onChange={(event) => text("job").onChange(event.currentTarget.value)}
+        />
+      </Group>
+      <TextBox label="Backstory" autosize minRows={2} {...text("backstory")} />
+      <Group grow align="flex-start">
+        <TextInput
+          label="Likes"
+          {...text("likes")}
+          onChange={(event) => text("likes").onChange(event.currentTarget.value)}
+        />
+        <TextInput
+          label="Dislikes"
+          {...text("dislikes")}
+          onChange={(event) => text("dislikes").onChange(event.currentTarget.value)}
+        />
+      </Group>
+    </>
   );
 }

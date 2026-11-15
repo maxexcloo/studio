@@ -93,6 +93,7 @@ test("without STUDIO_WORKERS, the image and video workloads give one worker per 
       url: "http://comfyui:8188",
       capabilities: ["image", "video", "upscale", "models"],
       backend: "comfyui",
+      slots: 1,
     },
     {
       id: "comfyui-video",
@@ -100,6 +101,7 @@ test("without STUDIO_WORKERS, the image and video workloads give one worker per 
       url: "http://comfyui-video:8188",
       capabilities: ["video"],
       backend: "comfyui",
+      slots: 1,
     },
     {
       id: "radiance",
@@ -107,6 +109,7 @@ test("without STUDIO_WORKERS, the image and video workloads give one worker per 
       url: "http://radiance:8000",
       capabilities: ["image", "video"],
       backend: "radiance",
+      slots: 1,
     },
   ]);
   const listed = [{ id: "local", url: "http://local:8188", capabilities: ["image"] }];

@@ -752,6 +752,11 @@ const admitGeneration = createGenerationAdmission({
 const characterSheets = createCharacterSheets({
   admit: admitGeneration,
   profiles: (account) => assistant.profiles({ studioAccount: account }),
+  account: (ownerId) => {
+    if (!multiUserEnabled) return undefined;
+    const account = ownerId ? accountAccessForId(ownerId) : null;
+    return account?.authenticated ? account : null;
+  },
 });
 characterSheets.register(app);
 app.post("/api/generate", async (req, res) => {
@@ -919,7 +924,7 @@ const dream = createDream({
       const strength = range
         ? Math.min(range.max, Math.max(range.min, lora.strength))
         : lora.strength;
-      return optionalLoraPolicyIssue({ name: lora.name, strength }, info, profile)
+      return info?.hidden || optionalLoraPolicyIssue({ name: lora.name, strength }, info, profile)
         ? []
         : [{ ...lora, strength }];
     }),

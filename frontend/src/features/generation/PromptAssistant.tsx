@@ -312,7 +312,9 @@ export function usePromptAssistant({
   // Styles in Library › Prompt Styles' order, with Custom… last: a change to the draft where there
   // is one, else the Custom style.
   const custom = change || info.presets.some((item) => item.id === "custom");
-  const styles = info.presets.filter((item) => item.id !== "custom");
+  const styles = info.presets
+    .filter((item) => item.id !== "custom")
+    .sort((a, b) => a.label.localeCompare(b.label));
   const improve: ToolAction[] = [
     // Each style is a choice that runs at once; the last one used carries a check.
     ...(styles.length > 1

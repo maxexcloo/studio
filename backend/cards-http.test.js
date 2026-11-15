@@ -122,14 +122,43 @@ test(
       });
       assert.equal(refused.status, 400);
     }
-    // Generate References' jobs wait on the card until it is next saved.
-    const generated = await call(`/api/characters/${id}/generated`, {
+    // A character keeps an adult age and its story; one waiting on its portrait may have no image.
+    const pending = await call("/api/characters", {
       method: "POST",
       cookie: cookies.artist,
-      body: { jobIds: ["job-front", "job-side"] },
+      body: {
+        ...card,
+        name: "Ivo",
+        referenceIds: [],
+        age: 40,
+        likes: "rain",
+        portrait: { jobId: "job-ivo" },
+      },
     });
-    assert.deepEqual(generated.body.character.generated.jobIds, ["job-front", "job-side"]);
-    assert.deepEqual(generated.body.character.generated.results, []);
+    assert.equal(pending.status, 201, pending.body.error);
+    assert.deepEqual(
+      [pending.body.character.age, pending.body.character.likes, pending.body.character.portrait],
+      [40, "rain", { jobId: "job-ivo", status: "making" }],
+    );
+    for (const story of [
+      { age: 16 },
+      { job: "x".repeat(501) },
+      { backstory: "a 15 year old runaway" },
+    ])
+      assert.equal(
+        (
+          await call("/api/characters", {
+            method: "POST",
+            cookie: cookies.artist,
+            body: { ...card, name: "Kit", ...story },
+          })
+        ).status,
+        400,
+      );
+    await call(`/api/characters/${pending.body.character.id}`, {
+      method: "DELETE",
+      cookie: cookies.artist,
+    });
     const updated = await call(`/api/characters/${id}`, {
       method: "PUT",
       cookie: cookies.artist,
@@ -138,8 +167,8 @@ test(
     assert.equal(updated.status, 200);
     const listed = (await call("/api/characters", { cookie: cookies.artist })).body.characters;
     assert.deepEqual(
-      listed.map((item) => [item.name, item.referenceIds, item.generated]),
-      [["Mara the Ranger", [side.id], undefined]],
+      listed.map((item) => [item.name, item.referenceIds]),
+      [["Mara the Ranger", [side.id]]],
     );
     // Outfits and scenes need a description and take at most one image, kept for picking only.
     const outfit = await call("/api/outfits", {

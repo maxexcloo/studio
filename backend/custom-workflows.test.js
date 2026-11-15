@@ -64,6 +64,14 @@ test("start image metadata is normalized into a media input", () => {
   });
   assert.equal(workflow.capabilities.imageToImage, true);
   assert.equal(workflow.capabilities.startImageRequired, true);
+  assert.equal(workflow.capabilities.defaultLoras, undefined);
+  assert.equal(
+    metadataFromJson({
+      studio: { id: "plain", capabilities: { defaultLoras: false } },
+      1: { class_type: "SaveImage", inputs: { images: ["1", 0], filename_prefix: "test" } },
+    }).capabilities.defaultLoras,
+    false,
+  );
   assert.deepEqual(workflow.mediaInputs[0].control, { node: "1", input: "image" });
 });
 

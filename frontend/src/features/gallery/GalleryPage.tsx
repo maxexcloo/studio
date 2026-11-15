@@ -174,8 +174,9 @@ export function GalleryPage() {
           client.setQueryData<InfiniteData<Page>>(galleryKey, (data) => {
             if (!data) return data;
             // The fresh first page leads; what it pushed past its end stays, as the next page
-            // carries on from the old first page's cursor. Its jobs' unfinished tiles give way to
-            // their results.
+            // carries on from the old first page's cursor. What it holds leaves the later pages
+            // (a set moves up whole when a result joins it), and its jobs' unfinished tiles give
+            // way to their results.
             const fresh = new Set(first.items.flatMap((item) => [item.id, item.jobId || item.id]));
             const [old, ...rest] = data.pages;
             const page = {
@@ -185,7 +186,12 @@ export function GalleryPage() {
                 ...old.items.filter((item) => !fresh.has(item.id) && !fresh.has(item.jobId || "")),
               ],
             };
-            return { ...data, pages: [page, ...rest] };
+            const ids = new Set(first.items.map((item) => item.id));
+            const later = rest.map((page) => ({
+              ...page,
+              items: page.items.filter((item) => !ids.has(item.id)),
+            }));
+            return { ...data, pages: [page, ...later] };
           }),
         )
         .catch(() => undefined)

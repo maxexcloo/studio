@@ -283,6 +283,9 @@ export function createGenerationQueue({
             ).map((worker) => `worker:${worker.id}`)
           : [];
       },
+      slots: (resource) =>
+        (resource.startsWith("worker:") && workerById(resource.slice("worker:".length))?.slots) ||
+        1,
       settled: async (job) => {
         if (job.status === "failed")
           logWarning("Job failed", {

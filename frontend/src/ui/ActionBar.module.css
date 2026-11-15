@@ -87,16 +87,28 @@
   height: 10px;
 }
 
-/* A fitted bar whose names have all gone draws each ▾ closer. */
-.actions[data-tight] .options {
+/* A phone bar's unnamed controls are narrow, keeping their touch height, so every action and the
+   leading names fit one row; the theme's touch minimum width is an inline style. */
+.actions[data-stacked] .action:not(.stacked) {
+  width: 28px;
+  min-width: 0 !important;
+  padding-inline: 0;
+}
+
+.actions[data-stacked] .action.options {
+  width: auto;
+}
+
+/* A fitted bar whose names have all gone, and a phone bar, draw each ▾ closer. */
+.actions:is([data-tight], [data-stacked]) .options {
   padding-inline: 2px 1px;
 }
 
-.actions[data-tight] .chevron {
+.actions:is([data-tight], [data-stacked]) .chevron {
   margin-inline-start: 0;
 }
 
-.actions[data-tight] .chevron svg {
+.actions:is([data-tight], [data-stacked]) .chevron svg {
   width: 10px;
   height: 10px;
 }
@@ -131,8 +143,4 @@
 /* A setting's switch sits at the row's end and leaves the press to the row. */
 .switch {
   pointer-events: none;
-}
-
-.reserved {
-  visibility: hidden;
 }

@@ -1,10 +1,13 @@
 import {
   characterImage,
   characterImageIds,
+  characterImages,
+  keepsIdentity,
   maxCardName,
   sheetRoles,
   takesSubjects,
 } from "../shared/characters.ts";
+import { slotCapacity, slotGroups } from "../shared/profiles.ts";
 import { listCards, refusal, shownCard, updateCharacter } from "./cards.js";
 import { logWarning } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
@@ -61,8 +64,8 @@ function runs(counts, noise, gap) {
 
 /**
  * The panels of a sheet drawn to the layout prompt-sheet.js asks for, as `{ role, left, top,
- * width, height }` in the image's pixels: the face column's top close-up (`face`), the turnaround's
- * three figures (`front`, `side`, `back`) and the gear row (`gear`) when there is one. Panels are
+ * width, height }` in the image's pixels: the face column's top close-up (`face`) and the
+ * turnaround's three figures (`front`, `side`, `back`). Panels are
  * found by the background between them; where the gaps aren't clear, by the layout's proportions.
  */
 export async function sheetPanels(buffer) {
@@ -140,12 +143,7 @@ export async function sheetPanels(buffer) {
   const face = faces.length && drawn(0, first, split, end);
   // Its margin stops short of the close-up under it.
   if (face) panels.push(["face", face, end]);
-  // The gear row sits under the turnaround, past a gap across the lower half.
-  const below = widestGap(rows(split, 0, w, h), 0, h * 0.45, h * 0.92);
-  const gear = below === null ? null : drawn(split, below, w, h);
-  const bottom = gear && gear[3] - gear[1] > h * 0.06 ? below : h;
-  if (bottom < h) panels.push(["gear", gear]);
-  let figures = runs(columns(split, 0, w, bottom), noise(bottom), w * 0.01)
+  let figures = runs(columns(split, 0, w, h), noise(h), w * 0.01)
     .filter(([start, end]) => end - start > w * 0.03)
     .map(([start, end]) => [split + start, split + end]);
   // Three figures; more means something else drawn between them, so the three widest.
@@ -164,7 +162,7 @@ export async function sheetPanels(buffer) {
     ]);
   }
   for (const [index, role] of ["front", "side", "back"].entries()) {
-    const box = drawn(figures[index][0], 0, figures[index][1], bottom);
+    const box = drawn(figures[index][0], 0, figures[index][1], h);
     if (box) panels.push([role, box]);
   }
   // Each panel with a margin of background, in the image's own pixels.
@@ -184,7 +182,7 @@ export async function sheetPanels(buffer) {
 /**
  * A run's references (`{ assetId, slot }`) with the account's characters' sheets in play: the
  * card's first image becomes the sheet's panel for the view the `prompt` names (characterImage),
- * and on a video `profile` that animates subjects (MiniMax H3's Reference profiles) any image of
+ * followed by its other images where the `profile` has room (withCharacterImages), and on a video `profile` that animates subjects (MiniMax H3's Reference profiles) any image of
  * the character becomes its whole sheet, or the sheet joins a frame made with the character in
  * the next free slot. `madeWith(assetId)` lists the asset IDs a gallery image was made with.
  */
@@ -210,18 +208,95 @@ export function sheetReferences({ references, prompt, cards, profile, madeWith =
     }
     if (at < 0 || references[at].assetId !== card.referenceIds[0]) continue;
     const view = characterImage(card, prompt);
-    return view === card.referenceIds[0] ? references : swap(at, view);
+    const viewed = view === card.referenceIds[0] ? references : swap(at, view);
+    return profile ? withCharacterImages(viewed, references[at].slot, card, profile) : viewed;
   }
   return references;
 }
 
 /**
- * Make Sheet's route and its finishing step. `profiles(account)` are the generation profiles the
- * account may use; `admit` is domain/admission.ts's. `completed(items)` hears each finished job's
- * results, keeping a sheet's panels on its character.
+ * A character's other images (2–4) after its own, in the free places of its slot's linked stack
+ * (slotGroups) on a `profile` that keeps faces from its references; never a start or end frame.
  */
-export function createCharacterSheets({ admit, profiles }) {
+function withCharacterImages(references, slot, card, profile) {
+  if (!keepsIdentity(profile)) return references;
+  const group = slotGroups(profile.mediaInputs).find((slots) =>
+    slots.some((input) => input.id === slot),
+  );
+  if (!group || slotCapacity(group) < 2 || ["start", "end"].includes(group[0].role))
+    return references;
+  const free = group.flatMap((input) =>
+    Array.from(
+      { length: (input.max || 1) - references.filter((asset) => asset.slot === input.id).length },
+      () => input.id,
+    ),
+  );
+  const others = card.referenceIds
+    .slice(characterImages)
+    .filter((id) => !references.some((asset) => asset.assetId === id))
+    .slice(0, free.length);
+  return [...references, ...others.map((assetId, index) => ({ assetId, slot: free[index] }))];
+}
+
+/**
+ * Make Sheet's route and its finishing step. `profiles(account)` are the generation profiles the
+ * account may use; `admit` is domain/admission.ts's; `account(ownerId)` is the owner's account to
+ * queue a sheet as once its portrait is made (null once it is gone). `completed(items)` hears each
+ * finished job's results, keeping a new character's portrait and a sheet's panels on the card.
+ */
+export function createCharacterSheets({ admit, profiles, account: accountFor }) {
   const splitting = new Set();
+
+  /** Queues `card`'s sheet from its first image, as admit answers, with the profile it runs on. */
+  async function queueSheet(account, card) {
+    const profile = sheetProfile(await profiles(account));
+    if (!profile)
+      return {
+        status: 409,
+        payload: { ok: false, error: "Make Sheet needs Qwen-Image 2.1, which isn't ready." },
+      };
+    const admitted = await admit(
+      {
+        ...profile.defaults,
+        autoUpscale: null,
+        kind: "image",
+        profileId: profile.id,
+        ...(profile.backend ? { profileBackend: profile.backend } : {}),
+        model: profile.model,
+        workflow: profile.workflow,
+        loras: [],
+        referenceAssets: [{ assetId: card.referenceIds[0], slot: profile.mediaInputs[0].id }],
+        ...sheetSize,
+        prompt: "",
+        seed: "",
+        count: 1,
+        writing: { kind: "sheet", name: card.name, description: card.description },
+      },
+      account,
+    );
+    if (admitted.status >= 400) return admitted;
+    const jobId = String(admitted.payload.jobId);
+    const character = updateCharacter(account?.userId || "", card.id, (current) => ({
+      ...current,
+      sheet: { jobId, at: new Date().toISOString() },
+    }));
+    return { status: 200, jobId, profile, character };
+  }
+
+  /** Keeps a new character's finished portrait as its first image, then queues its sheet if asked. */
+  async function keepPortrait(ownerId, card, item) {
+    const character = updateCharacter(ownerId, card.id, (current) =>
+      current.portrait?.jobId === item.jobId && !current.referenceIds.length
+        ? (({ portrait: _done, ...rest }) => ({ ...rest, referenceIds: [item.id] }))(current)
+        : current,
+    );
+    if (!card.portrait.sheet || character?.referenceIds[0] !== item.id) return;
+    const account = accountFor(ownerId);
+    if (account === null) return;
+    const queued = await queueSheet(account, character);
+    if (queued.status >= 400)
+      logWarning(`Make Sheet: ${card.id}'s sheet was not queued: ${queued.payload.error}`);
+  }
 
   /** Cuts a finished sheet into its panels and keeps them on its character. */
   async function keep(ownerId, card, item) {
@@ -261,65 +336,38 @@ export function createCharacterSheets({ admit, profiles }) {
             status: 404,
             payload: { ok: false, error: "No such character." },
           };
-        const profile = sheetProfile(await profiles(account));
-        if (!profile)
+        if (!card.referenceIds.length)
           return {
             status: 409,
-            payload: {
-              ok: false,
-              error: "Make Sheet needs Qwen-Image 2.1, which isn't ready.",
-            },
+            payload: { ok: false, error: `${card.name} has no image to draw a sheet from yet.` },
           };
-        const admitted = await admit(
-          {
-            ...profile.defaults,
-            autoUpscale: null,
-            kind: "image",
-            profileId: profile.id,
-            ...(profile.backend ? { profileBackend: profile.backend } : {}),
-            model: profile.model,
-            workflow: profile.workflow,
-            loras: [],
-            referenceAssets: [
-              {
-                assetId: card.referenceIds[0],
-                slot: profile.mediaInputs[0].id,
-              },
-            ],
-            ...sheetSize,
-            prompt: "",
-            seed: "",
-            count: 1,
-            writing: {
-              kind: "sheet",
-              name: card.name,
-              description: card.description,
-            },
-          },
-          account,
-        );
-        if (admitted.status >= 400) return admitted;
-        const jobId = String(admitted.payload.jobId);
-        const character = updateCharacter(ownerId, card.id, (current) => ({
-          ...current,
-          sheet: { jobId, at: new Date().toISOString() },
-        }));
+        const queued = await queueSheet(account, card);
+        if (queued.status >= 400) return queued;
         return {
           status: 200,
           payload: {
             ok: true,
-            jobId,
-            profile: profile.label || profile.id,
-            character: shownCard(account, character),
+            jobId: queued.jobId,
+            profile: queued.profile.label || queued.profile.id,
+            character: shownCard(account, queued.character),
           },
         };
       });
     },
-    /** Keeps the panels of each finished sheet among `items`, once. */
+    /** Keeps each finished portrait and the panels of each finished sheet among `items`, once. */
     async completed(items) {
       for (const item of items) {
-        if (item.type !== "image" || item.status !== "done" || isGalleryHidden(item)) continue;
         const ownerId = item.ownerId || "";
+        const waiting = listCards("characters", ownerId).find(
+          (each) => each.portrait?.jobId === item.jobId && !each.referenceIds.length,
+        );
+        if (item.type !== "image" || item.status !== "done" || isGalleryHidden(item)) continue;
+        if (waiting) {
+          await keepPortrait(ownerId, waiting, item).catch((error) =>
+            logWarning(`Character portrait: ${waiting.id}: ${error.message}`),
+          );
+          continue;
+        }
         const card = listCards("characters", ownerId).find(
           (each) => each.sheet?.jobId === item.jobId && !each.sheet.panels,
         );

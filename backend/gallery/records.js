@@ -1,5 +1,6 @@
 // Gallery records built from a run: its pending tiles, recorded settings and what ComfyUI's history
 // says it made. Pure functions, so code that only builds records never loads the gallery (store.js).
+import { maxCardDescription, maxCardName } from "../../shared/characters.ts";
 import { keptTriggers } from "../lora/prompts.js";
 import { videoPattern } from "../media-paths.js";
 import { defaultWorkerId, isRadianceWorker, workerById } from "../workers.js";
@@ -93,8 +94,9 @@ const shortText = (value, max) =>
 
 /**
  * The MCP result set a run belongs to (mcp/media.js queue): one generate call's id and title, the
- * client that asked (`source`), the character card it was made with (`character`), and this run's
- * prompt position and its own title (`variation`); null for anything else.
+ * client that asked (`source`), the character card it was made with (`character`), what the chat
+ * said it shows (`context`: a character, outfit and scene by name and description, and a series),
+ * and this run's prompt position and its own title (`variation`); null for anything else.
  */
 export function storedResultSet(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -109,6 +111,7 @@ export function storedResultSet(value) {
       : "";
   const characterName = shortText(value.character?.name, 80);
   const index = Number.isInteger(value.index) && value.index >= 0 ? Math.min(value.index, 99) : 0;
+  const context = storedContext(value.context);
   return {
     id,
     title,
@@ -118,7 +121,21 @@ export function storedResultSet(value) {
     ...(characterId && characterName
       ? { character: { id: characterId, name: characterName } }
       : {}),
+    ...(context ? { context } : {}),
   };
+}
+
+function storedContext(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const context = {};
+  for (const kind of ["character", "outfit", "scene"]) {
+    const name = shortText(value[kind]?.name, maxCardName);
+    const description = shortText(value[kind]?.description, maxCardDescription);
+    if (name) context[kind] = { name, ...(description ? { description } : {}) };
+  }
+  const series = shortText(value.series, 80);
+  if (series) context.series = series;
+  return Object.keys(context).length ? context : null;
 }
 
 /**

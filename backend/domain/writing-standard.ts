@@ -16,6 +16,17 @@ export const fidelity =
 export const keepDescriptions =
   "Keep the person's own descriptions of people and things (face, body, skin, hair, clothing) word for word; change them only where the instruction asks.";
 
+/** A person's age and ethnicity lead and stay, since a late or dropped one is often lost in the image. */
+export const subjectFirst =
+  "Name each person's age and ethnicity in the prompt's first words, show the ethnicity in their face (eye shape, nose, skin tone) and keep both through every rewrite and change.";
+
+/**
+ * A person's rules applied in proportion, so a batch keeps what they like: an attractiveness word
+ * and one small real mark score best, a face rewritten plain or older worst.
+ */
+export const proportionate =
+  "Apply each rule in proportion: real flaws means subtle texture (pores, slight asymmetry, a freckle or small mark) on the face asked for, never a plainer, older, harsher or more masculine one; keep the asked-for age, attractiveness and style, and vary a batch within the brief, never away from it.";
+
 /**
  * How a requested change is written into a prompt so it lands: edited in place and in absolute
  * words, since the image model never sees the prompt it replaces, with nothing else touched.

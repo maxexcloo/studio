@@ -105,21 +105,22 @@ test("The viewer's Edit menu offers Review Prompt, then Suggestions with Refresh
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await viewerAction(page, "Edit");
   const menu = page.getByRole("menu");
-  const thinking = menu.getByRole("menuitem", { name: "Thinking of Changes" });
+  const thinking = menu.getByRole("menuitem", { name: "Loading…", exact: true });
   await expect(thinking).toBeDisabled();
   release[0]();
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
     ...steps.map((step) => step.label),
-    "Refresh Suggestions",
+    "Refresh",
     "Custom…",
-    "Upscale",
-    "Edit in Composer",
-    "Use as Reference",
     "Use as Character",
+    "Use as Outfit",
+    "Use as Reference",
+    "Use as Scene",
+    "Edit in Composer",
   ]);
   expect(asked).toEqual([{ surface: "viewer", jobId: "job-hub", fresh: false }]);
-  await menu.getByRole("menuitem", { name: "Refresh Suggestions", exact: true }).click();
+  await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
   await expect(thinking).toBeVisible();
   release[1]();
   await expect(menu.getByRole("menuitem", { name: "Snowfall", exact: true })).toBeVisible();
@@ -201,17 +202,18 @@ test("Edit offers Library's fixed changes above the image's suggestions", async 
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   await viewerAction(page, "Edit");
   const menu = page.getByRole("menu");
-  await expect(menu.getByText("Changes", { exact: true })).toBeVisible();
+  await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
-    /^Softer Shadows/,
     ...steps.map((step) => step.label),
-    "Refresh Suggestions",
+    "Refresh",
+    "Softer Shadows",
     "Custom…",
-    "Upscale",
-    "Edit in Composer",
-    "Use as Reference",
     "Use as Character",
+    "Use as Outfit",
+    "Use as Reference",
+    "Use as Scene",
+    "Edit in Composer",
   ]);
   await menu.getByRole("menuitem", { name: "Softer Shadows", exact: true }).click();
   await expect
@@ -219,7 +221,7 @@ test("Edit offers Library's fixed changes above the image's suggestions", async 
     .toBe("soften the shadows");
 });
 
-test("Animate offers its themes, then motions written for the image, then Custom…", async ({
+test("Animate offers motions written for the image, then its templates and Custom…", async ({
   page,
 }) => {
   const state = await openViewer(page);
@@ -240,15 +242,15 @@ test("Animate offers its themes, then motions written for the image, then Custom
   expect(asked).toEqual([]);
   await viewerAction(page, "Animate");
   const menu = page.getByRole("menu");
-  await expect(menu.getByText("Themes", { exact: true })).toBeVisible();
+  await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
+    "Wings Unfold",
+    "Refresh",
     "Action",
     "Cinematic Camera",
     "Dialogue",
     "Living Photo",
-    "Wings Unfold",
-    "Refresh Suggestions",
     "Custom…",
     "Animate in Composer",
   ]);

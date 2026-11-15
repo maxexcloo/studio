@@ -236,7 +236,7 @@ test("Prompt assistance finishes before a generation is submitted", async ({ pag
   expect(state.jobs[0].input.prompt).toBe("A cinematic amber bird");
 });
 
-test("Improve Prompt lists its styles in their order with descriptions and Custom… last, which asks what to change", async ({
+test("Improve Prompt lists its styles alphabetically with descriptions and Custom… last, which asks what to change", async ({
   page,
 }) => {
   await fixtures(page);
@@ -261,9 +261,9 @@ test("Improve Prompt lists its styles in their order with descriptions and Custo
   const menu = await promptMenu(page, "Prompt");
   await expect(menu.getByText("Improve Prompt", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText([
-    /^Portrait/,
-    "Enhance",
     "Candid",
+    "Enhance",
+    /^Portrait/,
     "Custom…",
     "Write Negative",
     "Recent Prompts",

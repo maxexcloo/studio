@@ -1,12 +1,11 @@
 import { Alert, Button, Chip, Group, Modal, Stack } from "@mantine/core";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { MediaItem } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { showQueued } from "../settings/accountPreferences";
 import { askChange } from "../taste/suggestions";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { useRatings } from "./useMediaRating";
@@ -29,7 +28,6 @@ export function ReportIssueDialog({
   onClose: () => void;
 }) {
   const phone = usePhone();
-  const client = useQueryClient();
   const iteration = useMediaIteration(item);
   const ratings = useRatings();
   const [picked, setPicked] = useState<string[]>([]);
@@ -53,10 +51,7 @@ export function ReportIssueDialog({
         sameSeed: change.action === "recreate",
       };
       if (iterate) iterate(next);
-      else {
-        await iteration.mutateAsync(next);
-        showQueued(client);
-      }
+      else await iteration.mutateAsync(next);
       await ratings.mutateAsync({ ids: [item.id], rating: "disliked", issue });
     },
     onSuccess: onClose,

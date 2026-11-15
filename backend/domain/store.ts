@@ -35,6 +35,8 @@ export type OwnedJob = Omit<QueueJob, "dream"> &
     resource: string;
     cancelRequested?: boolean;
     cleared?: boolean;
+    /** Queued again after its first run stalled (queue.ts), so a second stall only fails it. */
+    stallRetry?: true;
   };
 /** One job of a request, as `Store.enqueueAll` queues it. */
 export interface QueuedCopy {

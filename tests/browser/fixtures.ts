@@ -650,6 +650,7 @@ export async function fixtures(page: Page) {
       const list = cards[cardKind];
       const noun = cardKind.slice(0, -1);
       const card = (fields: any, id: string) => ({
+        ...fields,
         id,
         name: fields.name,
         description: fields.description,
@@ -666,23 +667,6 @@ export async function fixtures(page: Page) {
       });
       const id = decodeURIComponent(path.split("/")[3] || "");
       const index = list.findIndex((item) => item.id === id);
-      // Generate References' jobs, listed with their gallery results.
-      if (path.endsWith("/generated")) {
-        characters[index].generated = {
-          jobIds: body.jobIds,
-          at: stamp,
-          results: gallery
-            .filter((item) => body.jobIds.includes(item.jobId))
-            .map((item) => ({
-              galleryItemId: item.id,
-              jobId: item.jobId,
-              status: item.status,
-              thumbnailUrl: item.thumbnailUrl,
-              prompt: item.prompt,
-            })),
-        };
-        return respond({ ok: true, character: characters[index] });
-      }
       // Make Sheet's job, which the card follows until a test gives it panels.
       if (path.endsWith("/sheet")) {
         characters[index].sheet = { jobId: "sheet-job", at: stamp, status: "making", panels: [] };
@@ -978,9 +962,9 @@ export async function selectionMenuItem(page: Page, group: string, label: string
   return page.getByRole("menuitem", { name: label, exact: true });
 }
 
-/** Turns on Compare Upscale in the viewer's Edit › Upscale menu. */
+/** Turns on Compare Upscale in the viewer's Upscale menu. */
 export async function compareUpscale(page: Page) {
-  await viewerAction(page, "Edit", "Upscale", "Compare Upscale");
+  await viewerAction(page, "Upscale", "Compare Upscale");
 }
 
 /** Chooses a text box's tool from its ⋯ menu, such as Recent Prompts from the Prompt's. */

@@ -18,9 +18,8 @@ export const cardKinds = {
 } as const;
 export type CardKind = keyof typeof cardKinds;
 /**
- * How many of a card's images go to a model: its first. A model that edits with references reads
- * each image as another subject, so three views of one person drew her twice on live, however the
- * prompt said there was one.
+ * How many of a card's images a draft places: its first. The run adds the others after it where the
+ * profile's reference stack has room (backend/character-sheets.js sheetReferences).
  */
 export const characterImages = 1;
 
@@ -33,19 +32,31 @@ export interface Card {
   createdAt: string;
   updatedAt: string;
 }
-export interface Character extends Card {
-  /** Generate References' queued jobs, until the card is next saved with the ones to keep. */
-  generated?: { jobIds: string[]; at: string };
+/**
+ * A character's own story beside its looks: shown on its card and never sent to a model, which
+ * draws only the description. Ages start at 18.
+ */
+export const characterTraits = ["job", "backstory", "likes", "dislikes"] as const;
+export type CharacterTrait = (typeof characterTraits)[number];
+export const maxCharacterTrait = 500;
+export const minCharacterAge = 18;
+export const maxCharacterAge = 120;
+/** How many characters one create_characters call makes (backend/mcp/generate.js). */
+export const maxNewCharacters = 4;
+export interface Character extends Card, Partial<Record<CharacterTrait, string>> {
+  age?: number;
+  /** The portrait an MCP chat queued for a new card, until it becomes the card's first image. */
+  portrait?: { jobId: string; sheet?: boolean };
   /** Make Sheet's job, then its panels once backend/character-sheets.js has split them. */
   sheet?: CharacterSheet;
 }
 
 /**
  * Make Sheet: a character design sheet, the card's first image redrawn as a neutral face, front,
- * side and back views and any gear (backend/character-sheets.js). Each panel is kept as an image of
+ * side and back views, empty-handed (backend/character-sheets.js). Each panel is kept as an image of
  * the card by its role, and `sheet` is the whole sheet.
  */
-export const sheetRoles = ["face", "front", "side", "back", "gear", "sheet"] as const;
+export const sheetRoles = ["face", "front", "side", "back", "sheet"] as const;
 export type SheetRole = (typeof sheetRoles)[number];
 export interface CharacterSheet {
   jobId: string;
@@ -186,25 +197,6 @@ export function characterLead(description: string, fromImage = true) {
   if (!fromImage) return looks && `${looks}.`;
   return `The person from the reference image${looks ? `, ${looks},` : ""} with the same face, hair and build.`;
 }
-
-/**
- * Generate References: one shot per view, for a consistent set (a character turnaround) the card
- * can keep up to its limit. They share a seed. With the card's first image as a reference, each
- * view follows its lead; without one, the views come from the description alone.
- */
-export const characterViews = [
-  "Head-and-shoulders portrait from the front, looking at the camera",
-  "Full-body front view, standing straight, arms relaxed",
-  "Full-body side view in profile, facing left",
-  "Full-body back view, facing away",
-] as const;
-const backdrop = "plain light grey background, even soft lighting, one person in a single view.";
-export const characterShots = (description: string, fromImage: boolean) =>
-  characterViews.map((view) =>
-    fromImage
-      ? `${characterLead(description)} ${view}, ${backdrop}`
-      : [view, description.trim(), backdrop].filter(Boolean).join(", "),
-  );
 
 /** The prompt led by a card's identity (characterLead), unless it already holds it. */
 export function withCharacter(prompt: string, description: string, fromImage = true) {

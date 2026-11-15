@@ -1,5 +1,4 @@
 import { ActionIcon, Badge, Button, type ButtonProps, Group, Text, Tooltip } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
@@ -263,7 +262,7 @@ const cardLabel = (card: DeckCard, top: boolean) =>
  * The Dream deck: the oldest unseen result on top, the next beneath it, the batch's progress above.
  * Swipe or press ← to dislike, → to keep, ↑ to keep and queue variations; the bar offers Dislike,
  * Like and Keep. A comparison asks about two results alike but for one thing: tapping an
- * image chooses it, with Undo until its notification closes; ← or a left swipe answers A, → B,
+ * image chooses it, with Undo under the deck for a moment; ← or a left swipe answers A, → B,
  * ↑ Both and ↓ Neither, and Neither and Both sit under the pair. Tapping a single card (or its View
  * action), or holding or pinching any card (or a side's label), opens it in the viewer over the
  * deck, with all the card's choices (Edit, Animate and More Like This too) in its bar; Dislike,
@@ -325,50 +324,55 @@ export function DreamDeck({
     decide(judgement.card);
     judge.mutate(judgement);
   }
-  /** A tapped side answers once its Undo notification closes, unless undone. */
+  // A tapped side, answered once its Undo has stood for a moment or the next choice is made.
+  const [chosen, setChosen] = useState<{ card: PairDeckCard; side: 0 | 1 } | null>(null);
+  const chosenRef = useRef(chosen);
+  chosenRef.current = chosen;
+  const undoTimer = useRef(0);
+  function answerChosen() {
+    window.clearTimeout(undoTimer.current);
+    const last = chosenRef.current;
+    if (!last) return;
+    chosenRef.current = null;
+    setChosen(null);
+    judge.mutate({ card: last.card, verdict: last.side ? "b" : "a" });
+  }
+  const answerRef = useRef(answerChosen);
+  answerRef.current = answerChosen;
+  useEffect(() => () => answerRef.current(), []);
+  function undoChosen() {
+    window.clearTimeout(undoTimer.current);
+    const last = chosenRef.current;
+    if (!last) return;
+    chosenRef.current = null;
+    setChosen(null);
+    restore(last.card);
+    setCounts((previous) => ({
+      judged: previous.judged - 1,
+      dreamed: previous.dreamed - dreamed(last.card),
+    }));
+  }
+  /** A tapped side answers once its Undo has gone, unless undone. */
   async function pick(side: 0 | 1) {
     if (top?.kind !== "pair" || busy.current) return;
     busy.current = true;
     const card = top;
-    const answer = side ? "b" : "a";
+    answerChosen();
     setPicked({ key: card.key, side });
     try {
-      await fly.current?.(answerDirections[answer]);
+      await fly.current?.(answerDirections[side ? "b" : "a"]);
       decide(card);
     } finally {
       busy.current = false;
     }
-    let undone = false;
-    const notification = notifications.show({
-      message: (
-        <Group justify="space-between" wrap="nowrap">
-          <Text size="sm">Chose {sideLabel(card, side)}</Text>
-          <Button
-            size="compact-sm"
-            variant="subtle"
-            onClick={() => {
-              undone = true;
-              notifications.hide(notification);
-              restore(card);
-              setCounts((previous) => ({
-                judged: previous.judged - 1,
-                dreamed: previous.dreamed - dreamed(card),
-              }));
-            }}
-          >
-            Undo
-          </Button>
-        </Group>
-      ),
-      closeButtonProps: { "aria-label": "Close" },
-      onClose: () => {
-        if (!undone) judge.mutate({ card, verdict: answer });
-      },
-    });
+    chosenRef.current = { card, side };
+    setChosen({ card, side });
+    undoTimer.current = window.setTimeout(answerChosen, 4000);
   }
   /** Flies the top card out its way, then commits the verdict or answer. */
   async function act(choice: Verdict | PairAnswer) {
     if (!top || busy.current) return;
+    answerChosen();
     busy.current = true;
     try {
       if (top.kind === "pair") {
@@ -438,7 +442,30 @@ export function DreamDeck({
       sideBySide={top.kind === "pair"}
     />
   );
-  if (!top) return gallery.loading ? <LoadingState fill label="Loading Dream" /> : empty;
+  const undoLine = chosen && (
+    <Group justify="center" gap="xs">
+      <Text size="xs" c="dimmed">
+        Chose {sideLabel(chosen.card, chosen.side)}
+      </Text>
+      <Button
+        size="compact-xs"
+        variant="subtle"
+        leftSection={<icons.undo size={12} />}
+        onClick={undoChosen}
+      >
+        Undo
+      </Button>
+    </Group>
+  );
+  if (!top)
+    return gallery.loading ? (
+      <LoadingState fill label="Loading Dream" />
+    ) : (
+      <>
+        {empty}
+        {undoLine}
+      </>
+    );
   const choices = dreamChoices(top).flat();
   const choice = (id: Choice["choice"]) => choices.find((option) => option.choice === id)!;
   const button = (
@@ -510,7 +537,9 @@ export function DreamDeck({
                 }}
                 onSwipe={(direction) => {
                   const choice = card.kind === "pair" ? answers[direction] : intent(direction);
-                  if (choice) commit({ card, verdict: choice } as Judgement);
+                  if (!choice) return;
+                  answerChosen();
+                  commit({ card, verdict: choice } as Judgement);
                 }}
               >
                 {card.kind === "pair" ? (
@@ -561,14 +590,17 @@ export function DreamDeck({
           {button(choice("both"), { size: "sm" })}
         </Group>
       )}
-      {/* Touch screens swipe and tap, so the keyboard hint shows only with a mouse. */}
-      {!phone && !touch && (
-        <Text size="xs" c="dimmed" ta="center">
-          {top.kind === "pair"
-            ? "← A · → B · ↑ Both · ↓ Neither"
-            : `← Dislike · → Keep${image && dream ? " · ↑ Keep & Variations" : ""}`}
-        </Text>
-      )}
+      {chosen
+        ? undoLine
+        : // Touch screens swipe and tap, so the keyboard hint shows only with a mouse.
+          !phone &&
+          !touch && (
+            <Text size="xs" c="dimmed" ta="center">
+              {top.kind === "pair"
+                ? "← A · → B · ↑ Both · ↓ Neither"
+                : `← Dislike · → Keep${image && dream ? " · ↑ Keep & Variations" : ""}`}
+            </Text>
+          )}
       {viewer}
     </>
   );

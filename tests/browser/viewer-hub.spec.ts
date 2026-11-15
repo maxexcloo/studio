@@ -98,8 +98,6 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
   // The bar stays in reach while phone details are open, without its prompt field.
   else {
     await expect(viewer).toBeHidden();
-    // The gallery holds back unfinished work by default, so queuing says so instead.
-    await expect(page.getByRole("alert").filter({ hasText: "Queued." })).toBeVisible();
     await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
     await expect(page.getByRole("button", { name: "Close Details", exact: true })).toBeVisible();
@@ -202,7 +200,7 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });
 
-test("Report Issue… fixes the image as a new version and dislikes the original with the issue", async ({
+test("Report fixes the image as a new version and dislikes the original with the issue", async ({
   page,
 }) => {
   const asked: any[] = [];
@@ -225,8 +223,7 @@ test("Report Issue… fixes the image as a new version and dislikes the original
       });
     }),
   );
-  await viewerAction(page, "Recreate");
-  await page.getByRole("menuitem", { name: "Report Issue…", exact: true }).click();
+  await viewerAction(page, "Report");
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   const fix = report.getByRole("button", { name: "Fix & Recreate", exact: true });
   await expect(fix).toBeDisabled();
@@ -373,6 +370,12 @@ test("A regenerated result shows beside its source until All Versions collapses 
   await page.getByRole("switch", { name: "All Versions", exact: true }).click();
   await expect(tiles).toHaveCount(1);
   await expect(tiles).toHaveAccessibleName("Open image: An amber bird, Version 1 of 2");
+  // Closing on the other version returns to the tile holding it.
+  await page.keyboard.press("Escape");
+  await tiles.click();
+  await viewer.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(tiles).toBeFocused();
 });
 
 test("The strip holds the item's versions, not the other results of its run", async ({ page }) => {
@@ -389,6 +392,43 @@ test("The strip holds the item's versions, not the other results of its run", as
   await expect(strip.getByRole("listitem").last()).toHaveAttribute("aria-current", "true");
   await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
+});
+
+test("A set's strip holds the shown result's versions in its place, as one strip", async ({
+  page,
+}) => {
+  const set = { id: "set-birds", title: "Birds" };
+  const { viewer } = await seed(page, { resultSet: { ...set, index: 0 } }, async (_page, state) => {
+    state.jobs.length = 0;
+    state.gallery.unshift(
+      {
+        ...state.gallery[0],
+        id: "heron",
+        prompt: "A grey heron",
+        createdAt: "2026-10-23T00:01:00.000Z",
+        resultSet: { ...set, index: 1 },
+      },
+      {
+        ...state.gallery[0],
+        id: "hub-night",
+        prompt: "An amber bird at night",
+        createdAt: "2026-10-23T00:02:00.000Z",
+        resultSet: undefined,
+        parentItemId: "hub",
+      },
+    );
+  });
+  const strip = viewer.getByRole("list", { name: "Set: Birds", exact: true });
+  const versions = viewer.getByRole("list", { name: "Versions", exact: true });
+  await expect(versions).toHaveCount(0);
+  expect(
+    await strip.getByRole("listitem").evaluateAll((all) => all.map((entry) => entry.ariaLabel)),
+  ).toEqual(["Show A grey heron (1 of 2)", "Show Version 2", "Show Version 1"]);
+  await expect(strip.getByRole("listitem").last()).toHaveAttribute("aria-current", "true");
+  // A version outside the set shows its versions alone.
+  await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
+  await expect(strip).toHaveCount(0);
+  await expect(versions.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
 
 test("A version keeps its strip once the runs have left the queue, and runs from it record it", async ({
@@ -460,7 +500,7 @@ test("The strip shows iterations of iterations as a tree, newest first and the o
   await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
 
-test("Recreate › Similar › More Like This Set asks for new variations of a result's set", async ({
+test("Recreate › More Like This Set asks for new variations of a result's set", async ({
   page,
 }) => {
   const asked: unknown[] = [];
@@ -470,17 +510,13 @@ test("Recreate › Similar › More Like This Set asks for new variations of a r
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "Recreate", "Similar");
-  await page.getByRole("menuitem", { name: "More Like This Set", exact: true }).click();
+  await viewerAction(page, "Recreate", "More Like This Set");
   await expect.poll(() => asked).toEqual([{ itemId: "hub" }]);
 });
 
 test("More Like This Set is offered only for a result in a set", async ({ page }) => {
   await seed(page);
-  // Similar's menu still holds its strictness and its run.
-  await viewerAction(page, "Recreate", "Similar");
-  await expect(page.getByRole("radiogroup", { name: "Strictness", exact: true })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Similar", exact: true })).toHaveCount(2);
+  await viewerAction(page, "Recreate");
   await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
     0,
@@ -942,7 +978,7 @@ test("With local video stopped, an Animate theme queues on Grok", async ({ page 
   });
 });
 
-test("A video's Extend theme continues it from its last frame, and its frame can be a reference or an image", async ({
+test("A video's Animate template continues it from its last frame, and Edit makes its frame a reference or an image", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -962,7 +998,7 @@ test("A video's Extend theme continues it from its last frame, and its frame can
   await page.goto("/video");
   await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await viewer.getByRole("button", { name: "Extend", exact: true }).click();
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(
     page.getByRole("menuitem", { name: "Extend in Composer", exact: true }),
   ).toBeVisible();
@@ -977,7 +1013,7 @@ test("A video's Extend theme continues it from its last frame, and its frame can
     },
   });
   // The frame showing is saved as an image, or becomes a reference in the composer.
-  await viewer.getByRole("button", { name: "Extend", exact: true }).click();
+  await viewer.getByRole("button", { name: "Edit", exact: true }).click();
   await page.getByRole("menuitem", { name: "Save Frame as Image", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Saved to Uploads", exact: true })).toBeVisible();
   expect(state.referenceRequests.at(-1)).toEqual({ save: true, galleryItemId: "clip", frame: 0 });
@@ -1586,11 +1622,19 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   const phone = viewport.width < 768;
   if (phone) {
     // Phones fit every action on the bar's one row; names drop from the last where they outgrow
-    // it, Like, Dislike and Delete having none.
+    // it, only the four menus having any.
     const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
-    const row = ["Animate", "Edit", "Recreate", "Share", "Like", "Dislike", "Delete"].map((name) =>
-      bar.getByRole("button", { name, exact: true }),
-    );
+    const row = [
+      "Animate",
+      "Edit",
+      "Recreate",
+      "Upscale",
+      "Like",
+      "Dislike",
+      "Share",
+      "Similar",
+      "Delete",
+    ].map((name) => bar.getByRole("button", { name, exact: true }));
     const tops = await Promise.all(
       row.map(async (control) => {
         const box = (await control.boundingBox())!;

@@ -182,6 +182,18 @@ test("composer ideas asked again offer different ones from those shown", async (
     /Already suggested \(offer different ones\): A foghorn lighthouse at blue hour; /,
   );
   assert.equal(again.suggestions.length, 3);
+  // Each ask takes its ideas from a few angles drawn at random, so refreshes range widely.
+  assert.match(calls[0][0].content, /Take each from a different angle \([^;)]+; [^;)]+; [^;)]+\)/);
+});
+
+test("Animate's ideas and a draft's changes asked again offer different ones from those shown", async () => {
+  const { calls, suggestions } = fixture();
+  await suggestions.suggest("alice", { surface: "animate", jobId: "job-a" });
+  await suggestions.suggest("alice", { surface: "animate", jobId: "job-a", fresh: true });
+  assert.match(calls[0][0].content, /each from a different angle \(/);
+  assert.match(calls[1][1].content, /Already suggested \(offer different ones\): Warmer Light/);
+  await suggestions.suggest("alice", { surface: "draft", kind: "image", prompt: "A fox" });
+  assert.doesNotMatch(calls[2][1].content, /Already suggested/);
 });
 
 test("viewer next steps use the item's prompt and settings, with Title Case labels of four words", async () => {

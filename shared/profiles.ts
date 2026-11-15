@@ -20,6 +20,27 @@ export function runBackend(
   return backends.find((option) => option.references)?.id || fallback;
 }
 
+/**
+ * A profile's reference slots as roles: a slot that `follows` another of its role joins that one's
+ * linked stack, which takes as many images as its slots' `max` (1 each) add up to.
+ */
+export function slotGroups<S extends { id: string; role?: string; follows?: string }>(slots: S[]) {
+  const groups: S[][] = [];
+  for (const slot of slots) {
+    const group = slot.follows
+      ? groups.find(
+          (items) => items[0].role === slot.role && items.some((item) => item.id === slot.follows),
+        )
+      : undefined;
+    if (group) group.push(slot);
+    else groups.push([slot]);
+  }
+  return groups;
+}
+
+export const slotCapacity = (group: { max?: number }[]) =>
+  group.reduce((total, input) => total + (input.max || 1), 0);
+
 /** What a combined profile shares across its backends; any other field in `studio.backends.<id>` replaces the shared one. */
 export const sharedProfileFields: readonly string[] = Object.freeze([
   "id",
