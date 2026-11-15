@@ -463,12 +463,25 @@ export function filterVisibleGallery(items) {
 export const visibleGallery = (query = {}, options = {}) =>
   filterVisibleGallery(galleryItems({ ...query, dreamPool: false }, options));
 
+/** The names of the LoRAs runs made from `since` (ms) used, read without parsing whole records. */
+export function galleryLoraNames(since) {
+  return new Set(
+    statement(
+      `SELECT DISTINCT json_extract(lora.value, '$.name') AS name
+       FROM studio_gallery INDEXED BY studio_gallery_created, json_each(studio_gallery.value, '$.settings.loras') AS lora
+       WHERE created_ms >= ?`,
+    )
+      .all(since)
+      .map((row) => row.name),
+  );
+}
+
 /**
  * The finished and failed runs made from `since` (ms) that the gallery shows, Dream's pool aside,
  * with only the fields profile health counts, a page of `size` at a time: each page reads
  * without parsing whole records, and the caller may give other work a turn between pages.
  */
-export function* galleryRuns(since, size = 500) {
+export function* galleryRuns(since, size = 200) {
   for (let after = 0; ;) {
     const rows = statement(
       `SELECT rowid, key, status, favorite,
