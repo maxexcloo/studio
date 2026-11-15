@@ -119,9 +119,12 @@ export function DreamPage() {
   const data = dream.data;
   return (
     <div className={classes.page}>
-      <Group className={classes.toolbar} gap="sm" wrap="nowrap">
+      {/* Phones give the views a row of their own, so none is clipped by the actions. */}
+      <Group className={classes.toolbar} gap="sm" wrap={phone ? "wrap" : "nowrap"}>
         <SegmentedControl
           radius="xl"
+          fullWidth={phone}
+          w={phone ? "100%" : undefined}
           aria-label="Dream View"
           value={view === "taste" ? "" : view}
           onChange={(value) => setView(value as typeof view)}
