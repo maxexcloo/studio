@@ -17,7 +17,7 @@ const maxChats = 500;
 
 /**
  * Each conversation's own choices, which a summarised chat forgets: LoRAs off, the model or tier
- * per kind and the count. Read and written through the runtime store on each call, so every
+ * per kind, count and set name. Read and written through the runtime store on each call, so every
  * replica sees them.
  */
 export function createChatChoices({ dataDir, now = Date.now }) {
@@ -38,6 +38,7 @@ export function createChatChoices({ dataDir, now = Date.now }) {
       if (profileId) choices[kind] = { profile_id: profileId };
       else if (input.tier) choices[kind] = { tier: input.tier };
       if (input.count) choices.count = input.count;
+      if (input.title) choices.title = input.title;
       delete saved[key(owner, chat)];
       saved[key(owner, chat)] = { ...choices, at: now() };
       const keys = Object.keys(saved);
@@ -54,6 +55,7 @@ export function createChatChoices({ dataDir, now = Date.now }) {
 export function keptChoices(choices, input) {
   const next = { ...input };
   const kept = [];
+  if (input.title === undefined && choices.title) next.title = choices.title;
   if (input.loras === undefined && choices.loras === false) {
     next.loras = [];
     kept.push("no LoRAs");

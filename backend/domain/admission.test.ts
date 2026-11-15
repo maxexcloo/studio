@@ -128,6 +128,7 @@ test("an MCP revision keeps its exact source while remaining in the chat's sessi
         prompt: "A chat request",
         clientJobId: "chat-first",
         chat: { conversationId: "chat-1" },
+        resultSet: { id: "set-first", title: "Moonlit Fox Studies" },
       } as never,
       account,
       undefined,
@@ -145,9 +146,25 @@ test("an MCP revision keeps its exact source while remaining in the chat's sessi
     );
     assert.equal(revised.status, 200);
     assert.equal(revised.payload.sessionId, first.payload.sessionId);
+    assert.equal(
+      store.session("alice", String(first.payload.sessionId))?.title,
+      "Moonlit Fox Studies",
+    );
     assert.notEqual(revised.payload.sessionId, source.payload.sessionId);
     assert.equal(store.job("alice", "chat-revision")?.parentItemId, "source-2");
     assert.equal(store.job("alice", "chat-revision")?.parentJobId, undefined);
+    const other = await admit(
+      {
+        prompt: "Another account",
+        chat: { conversationId: "chat-1" },
+        resultSet: { title: "Mountain Lake" },
+      },
+      { userId: "bob", role: "user" },
+      undefined,
+      { priority: queuePriority.mcp },
+    );
+    assert.equal(store.session("bob", String(other.payload.sessionId))?.title, "Mountain Lake");
+    assert.notEqual(other.payload.sessionId, first.payload.sessionId);
   } finally {
     store.close();
   }

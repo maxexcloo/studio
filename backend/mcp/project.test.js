@@ -80,6 +80,25 @@ test("a conversation keeps its own LoRAs off, tier and count where a call leaves
   assert.deepEqual(choices.read("alice", ""), {});
 });
 
+test("set names persist per account and conversation while explicit names take priority", (t) => {
+  const directory = dataDir(t);
+  const choices = createChatChoices({ dataDir: directory });
+  choices.remember("alice", "chat", { title: "Moonlit Fox Studies" });
+  const reloaded = createChatChoices({ dataDir: directory });
+  const input = { prompts: ["A fox by a tree"] };
+  assert.equal(
+    keptChoices(reloaded.read("alice", "chat"), input).args.title,
+    "Moonlit Fox Studies",
+  );
+  assert.equal(keptChoices(reloaded.read("alice", "other"), input).args.title, undefined);
+  assert.equal(keptChoices(reloaded.read("bob", "chat"), input).args.title, undefined);
+  assert.equal(keptChoices(reloaded.read("alice", ""), input).args.title, undefined);
+  assert.equal(
+    keptChoices(reloaded.read("alice", "chat"), { ...input, title: "my chosen name" }).args.title,
+    "my chosen name",
+  );
+});
+
 test("a project's constraints replace a call's LoRAs and size, saying what changed", () => {
   const { args, note } = projectArgs(project({ loras: false, aspect: "16:9", resolution: "2K" }), {
     loras: [{ name: "glow" }],
