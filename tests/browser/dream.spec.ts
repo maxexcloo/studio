@@ -272,6 +272,31 @@ test("Dream explains itself while off and saves its settings on the deck", async
   await expect.poll(() => dream.settings.images).toBe(false);
 });
 
+test("While Dream is off, the deck compares gallery images in pairs", async ({ page }) => {
+  await fixtures(page);
+  const gallery = ["g1", "g2", "g3", "g4", "g5"].map((id) => ({
+    ...dreamItem(id),
+    dream: undefined,
+  }));
+  const dream = await serveDream(page, {
+    enabled: false,
+    unseen: [dreamItem("fox")],
+    calibration: gallery,
+  });
+  await page.goto("/dream");
+  await expect(page.getByRole("status", { name: "Dream Status" })).toContainText("Dream is off.");
+  await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
+  await page.getByRole("button", { name: "Both", exact: true }).click();
+  // The image left over makes no card, and Dream's own results wait until it is on.
+  await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
+  expect(dream.requests.map((request) => request.body)).toEqual([
+    { liked: ["g1"], passed: ["g2"] },
+    { liked: ["g3", "g4"] },
+  ]);
+});
+
 test("The taste read-out fits the screen and adds what to avoid", async ({ page }) => {
   await fixtures(page);
   const dream = await serveDream(page, {

@@ -14,6 +14,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
+import { LoadingState } from "../../ui/LoadingState";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
@@ -107,12 +108,12 @@ function usePrefetch(card?: DeckCard) {
 }
 
 /**
- * Gallery images for calibration, drawn a round at a time while `wanted`; a new round is drawn
- * once every image so far is judged, until a round brings nothing new.
+ * Gallery images for calibration, drawn a round at a time; a new round is drawn once fewer than
+ * `least` images so far are unjudged, until a round brings nothing new.
  */
-function useCalibration(wanted: boolean, decided: Set<string>) {
+function useCalibration(least: number, decided: Set<string>) {
   const [round, setRound] = useState(0);
-  const query = useQuery({ ...calibrationQuery(round), enabled: wanted });
+  const query = useQuery(calibrationQuery(round));
   const known = useRef(new Set<string>());
   const [pool, setPool] = useState<{ items: MediaItem[]; added: number }>({ items: [], added: 0 });
   useEffect(() => {
@@ -122,11 +123,11 @@ function useCalibration(wanted: boolean, decided: Set<string>) {
     setPool((previous) => ({ items: [...previous.items, ...fresh], added: fresh.length }));
   }, [query.data]);
   const remaining = pool.items.filter((item) => !decided.has(item.id));
-  const drained = wanted && pool.added > 0 && !remaining.length;
+  const drained = pool.added > 0 && remaining.length < least;
   useEffect(() => {
     if (drained) setRound((previous) => previous + 1);
   }, [drained]);
-  return remaining;
+  return { items: remaining, loading: query.isPending };
 }
 
 export type Judgement =
@@ -267,20 +268,20 @@ const cardLabel = (card: DeckCard, top: boolean) =>
  * swipe answers A, → B, ↑ Both and ↓ Neither. Tapping a card (or its View action) opens it in the
  * viewer over the deck, with all the card's choices (Edit, Animate and More Like This too) in its
  * bar; Pass, Like or an answer there returns to the deck, and the others move on in the viewer.
- * With `calibrate`, older gallery images join in (see `deckCards`) to teach the taste profile and
- * rate images against each other;
+ * Older gallery images join in (see `deckCards`) to teach the taste profile and rate images against
+ * each other; with `pairsOnly` (Dream is off) the deck only compares them;
  * judging them changes nothing in the gallery beyond an optional Super Like (Star). `notice` shows
  * above the cards; `empty` shows once the
  * deck is through, told whether calibration images are available.
  */
 export function DreamDeck({
   items,
-  calibrate,
+  pairsOnly,
   notice,
   empty,
 }: {
   items: DreamItem[];
-  calibrate: boolean;
+  pairsOnly: boolean;
   notice?: ReactNode;
   empty: ReactNode;
 }) {
@@ -299,8 +300,8 @@ export function DreamDeck({
     }),
   );
   const unseen = items.filter((item) => !decided.has(item.id));
-  const gallery = useCalibration(calibrate, decided);
-  const cards = deckCards(unseen, calibrate ? gallery : [], counts.judged);
+  const gallery = useCalibration(pairsOnly ? 2 : 1, decided);
+  const cards = deckCards(unseen, gallery.items, counts.judged, { pairsOnly });
   const [top, next] = cards;
   usePrefetch(cards[2]);
   const fly = useRef<Fly | null>(null);
@@ -392,7 +393,7 @@ export function DreamDeck({
       sideBySide={top.kind === "pair"}
     />
   );
-  if (!top) return empty;
+  if (!top) return gallery.loading ? <LoadingState fill label="Loading Dream" /> : empty;
   const choices = dreamChoices(top).flat();
   const choice = (id: Choice["choice"]) => choices.find((option) => option.choice === id)!;
   const button = (
