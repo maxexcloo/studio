@@ -176,6 +176,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     loraLibrary: (ownerId) => state.loras[ownerId] ?? null,
     // As the LoRA policy would: klein.safetensors is for another model family.
     fitLoras: (_profile, loras) => loras.filter((lora) => lora.name !== "klein.safetensors"),
+    loraName: (name) => name.replace(/\.safetensors$/, ""),
     inspiration: () => state.inspiration,
     reference: (_account, itemId, frame) => {
       if (state.gone.has(itemId)) throw new Error("That image is no longer in the gallery.");

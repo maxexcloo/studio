@@ -18,7 +18,7 @@ import {
  * An account's LoRA library and per-workflow stacks, and what each installed LoRA was trained for.
  * Registered after the gallery's /api/loras/previews, which /api/loras/:workflowId would match.
  */
-export function registerLoraRoutes(app, { comfyDownMessage, loadComfyContext }) {
+export function registerLoraRoutes(app, { comfyDownMessage, latestComfyContext }) {
   app.delete("/api/loras", (req, res) => {
     if (!requireLocal(req, res)) return;
     clearLoraState(ownerIdForRequest(req));
@@ -69,7 +69,7 @@ export function registerLoraRoutes(app, { comfyDownMessage, loadComfyContext }) 
     if (!accountMayUseLoras({ studioAccount: account }))
       return { status: 200, payload: { ok: true, loras: {} } };
     try {
-      const { info } = await loadComfyContext(defaultWorkerId());
+      const { info } = await latestComfyContext(defaultWorkerId());
       const names = optionsFor(info, "LoraLoader", "lora_name").filter(loraAllowed(account));
       return {
         status: 200,
