@@ -8,7 +8,7 @@ import {
   profileBackendLabels,
   sharedProfileFields,
 } from "../shared/profiles.ts";
-import { dataDir } from "./gallery/store.js";
+import { dataDir } from "./data-dir.js";
 import { writeJsonFile } from "./json-store.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { chainReferenceSlots } from "./reference-chains.js";

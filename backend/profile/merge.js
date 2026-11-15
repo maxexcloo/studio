@@ -21,7 +21,7 @@ import path from "node:path";
 
 import { repointLoraStacks } from "../combined-profiles.js";
 import { graphFromJson, userWorkflowsDir } from "../custom-workflows.js";
-import { dataDir } from "../gallery/store.js";
+import { dataDir } from "../data-dir.js";
 import { isObject } from "../values.js";
 import { repointWorkflowPreferences } from "../workflow-catalogue.js";
 import { listEditableProfiles, readEditableProfile } from "./editor.js";

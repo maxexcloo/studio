@@ -1,4 +1,5 @@
-import { dataDir, galleryItems } from "./gallery/store.js";
+import { dataDir } from "./data-dir.js";
+import { galleryItems } from "./gallery/store.js";
 import {
   ownerDocumentName,
   readRuntimeDocument,

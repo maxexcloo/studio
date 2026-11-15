@@ -3,8 +3,9 @@ import path from "node:path";
 
 import { comfy } from "./comfy/comfy.js";
 import { logWarning } from "./crash-log.js";
+import { dataDir } from "./data-dir.js";
 import { writeBytesFileAsync } from "./json-store.js";
-import { dataDir, mediaPath, mediaSubfolder, mediaUrls } from "./media-paths.js";
+import { mediaPath, mediaSubfolder, mediaUrls } from "./media-paths.js";
 import { runtimeDatabase } from "./persistence/runtime.ts";
 
 /*
