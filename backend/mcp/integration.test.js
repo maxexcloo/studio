@@ -5219,6 +5219,9 @@ test("a Generate count is one batched job where the profile batches, else a job 
   assert.equal(four.jobs.length, 1);
   const ten = await generate(client, { count: 10, seed: 1 });
   assert.equal(ten.jobs.length, 2);
+  assert.equal(f.submitted[0].queueBatch, undefined);
+  assert.equal(f.submitted[1].queueBatch, f.submitted[1].clientJobId);
+  assert.equal(f.submitted[2].queueBatch, f.submitted[1].clientJobId);
   assert.deepEqual(
     f.submitted.map((body) => [body.count, body.seed]),
     [
@@ -5237,6 +5240,7 @@ test("a Generate count is one batched job where the profile batches, else a job 
   await f.profiles([{ ...imageProfile, capabilities: { variations: false } }]);
   const single = await generate(client, { count: 4 });
   assert.equal(single.jobs.length, 4);
+  assert.ok(f.submitted.slice(13).every((body) => body.queueBatch === f.submitted[13].clientJobId));
   assert.deepEqual(
     f.submitted.slice(13).map((body) => body.count),
     [1, 1, 1, 1],

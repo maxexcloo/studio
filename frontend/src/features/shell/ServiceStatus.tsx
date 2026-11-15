@@ -22,7 +22,7 @@ import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import { useIsAdmin } from "../auth/AccountGate";
-import { Queue, QueueActions, useQueue } from "../generation/Queue";
+import { Queue, QueueActions, queueEntries, useQueue } from "../generation/Queue";
 import { SwapNotice } from "../runtime/JobSwap";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
 
@@ -50,6 +50,7 @@ export function StatusAction() {
     void client.invalidateQueries({ queryKey: servicesStatusQuery.queryKey });
   }, [client, runningKey]);
   const title = "Generations";
+  const heading = queue.data ? `${title} (${queueEntries(queue.data.jobs).length})` : title;
   // A sideways touch drag pulls the drawer with the finger; far enough, and it closes.
   const swipe = useSwipeClose("left", close);
   const target = useRef<HTMLButtonElement>(null);
@@ -136,7 +137,7 @@ export function StatusAction() {
             className={classes.dropdown}
           >
             <Group justify="space-between" wrap="nowrap" mih={28}>
-              <Text fw={500}>{title}</Text>
+              <Text fw={500}>{heading}</Text>
               <QueueActions />
             </Group>
             <div className={classes.list}>
@@ -164,7 +165,7 @@ export function StatusAction() {
         <Drawer.Overlay />
         <Drawer.Content {...swipe}>
           <Drawer.Header>
-            <Drawer.Title>{title}</Drawer.Title>
+            <Drawer.Title aria-label={title}>{heading}</Drawer.Title>
             {/* The queue's actions sit beside Close, as on desktop beside the title. */}
             <Group gap="xs" wrap="nowrap">
               <QueueActions />
