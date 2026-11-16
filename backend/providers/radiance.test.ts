@@ -92,7 +92,7 @@ test("the client reads model states and keeps Radiance's own words on failure", 
 });
 
 test("one-GPU Qwen and Noct fit their actual conditioning limits without constraining FLUX3", () => {
-  for (const model of ["qwen-image-2.1-iq8r", "noctq-v4-uncensored-iq8r"]) {
+  for (const model of ["qwen-image-2.1-iq8r", "noctq-v4-iq8r"]) {
     // 1792 × 1024 shrinks to 1344 × 768.
     const wide = imageRequest({ ...image, model, width: 1792 }).body as { size: string };
     assert.equal(wide.size, "1344x768");
@@ -102,7 +102,7 @@ test("one-GPU Qwen and Noct fit their actual conditioning limits without constra
     );
   }
   const edit = imageRequest(
-    { ...image, model: "flux-3-klein-iq8r", width: 1408, height: 1408 },
+    { ...image, model: "flux-3-image-klein-iq8r", width: 1408, height: 1408 },
     Array(10).fill(new Uint8Array([1])),
   );
   assert.equal((edit.body as FormData).getAll("image[]").length, 10);
@@ -111,7 +111,7 @@ test("one-GPU Qwen and Noct fit their actual conditioning limits without constra
 test("Noct preserves the guide or explicit negative and CFG1 explicitly overrides native defaults", () => {
   const request = imageRequest({
     ...image,
-    model: "noctq-v4-uncensored-iq8r",
+    model: "noctq-v4-iq8r",
     cfg: 3,
     steps: 25,
     negative_prompt: "  exact entered negative  ",
