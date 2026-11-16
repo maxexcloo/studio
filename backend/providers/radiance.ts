@@ -117,7 +117,8 @@ export function radianceInfo(models: RadianceModel[], loras: string[] = []) {
       {},
       [],
     ),
-    // The save nodes beside them, which Studio handles itself.
+    // The reference loaders and save nodes beside them, which Studio handles itself.
+    LoadImage: node({ image: [[], { image_upload: true }] }, {}, ["IMAGE", "MASK"]),
     SaveImage: node({ images: ["IMAGE"], filename_prefix: ["STRING", {}] }, {}, []),
     SaveVideo: node({ video: ["VIDEO"], filename_prefix: ["STRING", {}] }, {}, []),
   };
