@@ -20,12 +20,12 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { maxBriefList } from "../../../../shared/chat-brief";
 import { loraName } from "../../../../shared/profiles";
 import {
   type Project,
   type ProjectContent,
   maxProjectBrief,
+  maxProjectLoras,
   maxProjectName,
   maxProjectProfiles,
   projectAspects,
@@ -117,7 +117,7 @@ function ProjectForm({ project, onClose }: { project?: Project; onClose: () => v
       <MultiSelect
         label="Favourite LoRAs"
         searchable
-        maxValues={maxBriefList}
+        maxValues={maxProjectLoras}
         data={[
           ...new Set([...Object.keys(loras.data?.loras || {}), ...(draft.brief.loras || [])]),
         ].map((name) => ({
