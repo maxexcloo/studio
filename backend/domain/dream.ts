@@ -2475,20 +2475,22 @@ export function createDream(options: {
       // A waiting Dream job whose worker went offline or was parked steps aside instead of holding
       // Dream up; Dream makes new work for that kind once the worker is back.
       const reach = new Map<string, Promise<Reach>>();
-      const stranded = await Promise.all(
-        live()
-          .filter((job) => dreamJob(job) && waiting(job))
-          .map(async (job) => {
-            const kind = kindOf(job.input);
-            const backend = job.resource.startsWith("provider:") ? "cloud" : "local";
-            const key = `${kind}:${backend}`;
-            if (!reach.has(key))
-              reach.set(
-                key,
-                options.online(kind, backend).then((online) => online.media),
-              );
-            return (await reach.get(key)) === "online" ? null : job;
-          }),
+      const stranded = await tracked("Dream: stranded jobs", () =>
+        Promise.all(
+          live()
+            .filter((job) => dreamJob(job) && waiting(job))
+            .map(async (job) => {
+              const kind = kindOf(job.input);
+              const backend = job.resource.startsWith("provider:") ? "cloud" : "local";
+              const key = `${kind}:${backend}`;
+              if (!reach.has(key))
+                reach.set(
+                  key,
+                  options.online(kind, backend).then((online) => online.media),
+                );
+              return (await reach.get(key)) === "online" ? null : job;
+            }),
+        ),
       );
       for (const job of stranded)
         if (job) await options.cancel(job.ownerId, job.id).catch(() => undefined);
@@ -2504,7 +2506,7 @@ export function createDream(options: {
           if (held(ownerId) >= options.slots()) continue;
           let state: { status: DreamStatus; reason?: string };
           try {
-            state = await consider(ownerId);
+            state = await tracked(`Dream: consider ${index}`, () => consider(ownerId));
           } catch (error) {
             state = { status: "waiting", reason: (error as Error).message };
           }
@@ -2520,7 +2522,7 @@ export function createDream(options: {
       if (!busy() && !live().some((job) => job.status === "writing"))
         for (const ownerId of owners)
           try {
-            if (await suggest(ownerId)) break;
+            if (await tracked("Dream: suggestions", () => suggest(ownerId))) break;
           } catch (error) {
             tickFailed(error);
           }
