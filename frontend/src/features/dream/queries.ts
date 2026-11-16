@@ -1,6 +1,7 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 import type { CardKind } from "../../../../shared/characters";
+import type { DreamSettings } from "../../../../shared/dream";
 import type { DigestGroup, Project, Review } from "../../../../shared/projects";
 import type { DreamActivity } from "../../../../shared/taste";
 import { api } from "../../api";
@@ -8,16 +9,7 @@ import type { MediaItem } from "../../types";
 
 export type DreamMedia = "image" | "video";
 
-/** One account's Dream settings (backend/domain/dream.ts). */
-export interface DreamSettings {
-  enabled: boolean;
-  paused: boolean;
-  dailyImages: number;
-  dailyVideos: number;
-  images: boolean;
-  videos: boolean;
-  spicy: boolean;
-}
+export type { DreamSettings } from "../../../../shared/dream";
 export type DreamStatus = "off" | "paused" | "waiting" | "generating" | "capped" | "unavailable";
 export type DreamItem = MediaItem & {
   dream?: {

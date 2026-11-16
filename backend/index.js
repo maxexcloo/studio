@@ -30,7 +30,7 @@ import {
   verifyAccountMcpToken,
 } from "./account-store.js";
 import { listenForAgentSignIn } from "./agent-sign-in.js";
-import { dreamVideoProfile } from "./animate-profile.js";
+import { animateProfile, dreamVideoProfile } from "./animate-profile.js";
 import { createAssistantContext } from "./assistant-context.js";
 import { promptAssistantOff, registerAssistantRoutes } from "./assistant-routes.js";
 import { refusal as cardRefusal, createCard, listCards, registerCardRoutes } from "./cards.js";
@@ -53,7 +53,7 @@ import { logEvent, logWarning } from "./crash-log.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { appVersion, dataDir } from "./data-dir.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
-import { flagEnabled } from "./deployment-settings.js";
+import { dreamDefaultSettings, flagEnabled } from "./deployment-settings.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
@@ -820,11 +820,12 @@ registerSuggestionRoutes(app, {
       ? promptAssistantOff
       : "",
 });
-// Dream (domain/dream.ts): idle-time results from the taste profile, off until an account turns it on.
-// It only queues work; it never places GPU workloads, and cloud profiles never take part.
+// Dream (domain/dream.ts): idle-time results from each account's taste and resolved settings.
+// It only queues work; it never places GPU workloads.
 const projects = createProjects({ dataDir });
 const dream = createDream({
   dataDir,
+  defaults: dreamDefaultSettings,
   store,
   taste,
   projects: (ownerId) => projects.list(ownerId),
@@ -838,7 +839,16 @@ const dream = createDream({
   },
   catalogue: async (_ownerId, account) =>
     dreamCatalogue(modelsForAccount((await mediaModels(false)).models, { studioAccount: account })),
-  online: async (kind) => {
+  online: async (kind, backend) => {
+    if (backend === "cloud") {
+      const profiles = (await directCloud?.profiles().catch(() => [])) || [];
+      return {
+        text: (await textOnline()) ? "online" : "offline",
+        media: profiles.some((profile) => profile.kind === kind && profile.ready !== false)
+          ? "online"
+          : "offline",
+      };
+    }
     const { services } = await observeServices({ allowed: [kind] });
     const reach = (state) => (["offline", "parked"].includes(state) ? state : "online");
     return {
@@ -922,9 +932,25 @@ const dream = createDream({
   },
   reference: (account, itemId, frame) =>
     referenceAssetForAccount(account, itemId, frame ? { frame } : undefined),
-  videoProfile: async (ownerId, account, { width, height, extend }) => {
+  videoProfile: async (ownerId, account, { width, height, extend, backend }) => {
     const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
-    return dreamVideoProfile(models.profiles || [], {
+    const profiles = dreamCatalogue(models).profiles.filter(
+      (profile) => isCloudProfile(profile) === (backend === "cloud"),
+    );
+    if (extend && !profiles.some((profile) => profile.id === canonicalProfileId(extend)))
+      throw new Error("The source video's model is not ready on the selected Dream backend.");
+    if (backend === "cloud") {
+      const pool = extend
+        ? profiles.filter((profile) => profile.id === canonicalProfileId(extend))
+        : profiles;
+      return animateProfile(pool, {
+        where: "cloud",
+        defaultId: models.defaults?.videoModel,
+        width,
+        height,
+      });
+    }
+    return dreamVideoProfile(profiles, {
       videos: accountPreferences(ownerId).videos,
       extend: extend && canonicalProfileId(extend),
       defaultId: models.defaults?.videoModel,
