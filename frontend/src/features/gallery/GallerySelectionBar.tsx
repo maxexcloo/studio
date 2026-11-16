@@ -293,7 +293,6 @@ export function GallerySelectionBar({
       ],
     }),
     itemAction("like", {
-      label: allLiked ? "Unlike" : "Like",
       pressed: allLiked,
       disabled: !ready.length || pending,
       description: ready.length ? undefined : "Nothing selected has finished.",
@@ -305,7 +304,6 @@ export function GallerySelectionBar({
     }),
     // In the Disliked view, Dislike restores the selection.
     itemAction("dislike", {
-      label: allDisliked ? "Restore" : "Dislike",
       pressed: allDisliked,
       disabled: !ready.length || pending,
       description: ready.length ? undefined : "Nothing selected has finished.",
