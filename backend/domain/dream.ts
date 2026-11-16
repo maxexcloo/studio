@@ -823,15 +823,35 @@ export function createDream(options: {
    * never reach Dream, so it shows and learns only from what the account made here.
    */
   function generations(ownerId: string, query: DreamQuery) {
-    const jobs = store.jobIds(ownerId);
+    const jobs = jobIds(ownerId);
     return options
       .visible(options.gallery(ownerId, query))
       .filter((item) => (item.ownerId || "") === ownerId && item.jobId && jobs.has(item.jobId));
   }
   const pool = (ownerId: string, state: DreamState) =>
     options.gallery(ownerId, { dreamState: state });
-  // A large pool takes long to read, so `consider` reads it at most once.
-  let considering: { ownerId: string; results?: DreamItem[] } | undefined;
+  // A large pool or job table takes long to read, so `consider` reads each at most once.
+  let considering:
+    | {
+        ownerId: string;
+        results?: DreamItem[];
+        jobIds?: Set<string>;
+        promptJobIds?: Map<string, string[]>;
+      }
+    | undefined;
+  /** The IDs of all the owner's jobs. */
+  function jobIds(ownerId: string) {
+    if (considering?.ownerId !== ownerId) return store.jobIds(ownerId);
+    return (considering.jobIds ??= store.jobIds(ownerId));
+  }
+  /** The owner's jobs with a prompt on one of `profileIds`. */
+  function promptJobIds(ownerId: string, profileIds: string[]) {
+    if (considering?.ownerId !== ownerId) return store.promptJobIds(ownerId, profileIds);
+    const key = JSON.stringify(profileIds);
+    const cache = (considering.promptJobIds ??= new Map());
+    if (!cache.has(key)) cache.set(key, store.promptJobIds(ownerId, profileIds));
+    return cache.get(key)!;
+  }
   /** All of Dream's results in gallery order, unseen, kept and discarded. */
   function allResults(ownerId: string) {
     const read = () => options.gallery(ownerId, { dreamState: ["unseen", "kept", "discarded"] });
@@ -1100,7 +1120,7 @@ export function createDream(options: {
       type: "image",
       status: "done",
       uploaded: false,
-      jobIds: store.promptJobIds(ownerId, ready),
+      jobIds: promptJobIds(ownerId, ready),
     };
     const ratings = Object.entries(record.ratings || {});
     const won = shuffled(ratings.filter(([, rating]) => rating > elo.start).map(([id]) => id));
