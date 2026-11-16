@@ -28,6 +28,7 @@ import {
   type ReactNode,
   type Ref,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -417,6 +418,8 @@ export function PickerTile({
   preview?: { label: string; open: () => void; image?: PreviewImage };
   row?: boolean;
 }) {
+  // Mantine omits target IDs withRoles=false; outside presses still need the preview's target.
+  const previewId = useId();
   const [state, setState] = useState<"loaded" | "failed">();
   const peekable = !useTouch() && Boolean(preview?.image);
   const [peek, setPeek] = useState(false);
@@ -435,6 +438,7 @@ export function PickerTile({
   }
   return (
     <Popover
+      id={previewId}
       opened={peekable && peek}
       onChange={setPeek}
       position="right"
@@ -445,6 +449,7 @@ export function PickerTile({
     >
       <Popover.Target>
         <div
+          id={previewId}
           className={classes.tile}
           role="listitem"
           data-row={row || undefined}
