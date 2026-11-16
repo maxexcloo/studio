@@ -141,13 +141,17 @@ function applyRgthreeLoraStack(graph, body, config) {
 function applyRadianceLoraStack(graph, body, config) {
   const node = graph[config.node];
   if (!node) throw new Error("The configured Radiance node is missing from this workflow.");
-  const fixed = JSON.parse(node.inputs?.loras || "[]");
-  (node.inputs ||= {}).loras = JSON.stringify([
+  const inputs = (node.inputs ||= {});
+  const fixed = JSON.parse(inputs.loras || "[]");
+  const chosen = enabledLoras(body, config.max);
+  // A run with LoRAs moves to the stack's own model, with the adapters that model needs first
+  // (a speed LoRA its default model has baked in).
+  const swapped = chosen.length && config.model;
+  if (swapped) inputs.model = config.model;
+  inputs.loras = JSON.stringify([
     ...fixed,
-    ...enabledLoras(body, config.max).map((lora) => ({
-      name: lora.name,
-      strength: Number(lora.strength ?? 0.7),
-    })),
+    ...(swapped ? config.loras || [] : []),
+    ...chosen.map((lora) => ({ name: lora.name, strength: Number(lora.strength ?? 0.7) })),
   ]);
 }
 

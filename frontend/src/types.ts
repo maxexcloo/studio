@@ -40,6 +40,8 @@ export interface Profile {
     reason?: string;
     /** How many reference images it takes. */
     references: number;
+    /** A Radiance backend with a model for runs with LoRAs, so they stay on it. */
+    loras?: boolean;
     profile?: Omit<Profile, "backendOptions">;
   }[];
   /** Why it isn't ready, such as its backend's missing nodes. */
