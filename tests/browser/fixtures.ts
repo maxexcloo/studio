@@ -3,6 +3,8 @@ import { createRequire } from "node:module";
 
 import { type Locator, type Page, expect } from "@playwright/test";
 
+import { dreamDefaults, dreamSettingKeys } from "../../shared/dream";
+
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
 const familyLabels = { flux1: "FLUX.1", sdxl: "SDXL" };
 
@@ -186,6 +188,7 @@ export async function fixtures(page: Page) {
     canChangePassword: true,
   };
 
+  const deploymentDream = dreamDefaultsFixture();
   const administration = {
     accounts: [
       {
@@ -270,6 +273,10 @@ export async function fixtures(page: Page) {
       return respond(preferences);
     }
     if (path === "/api/settings/deployment") {
+      if (method === "POST") {
+        const setting = Object.values(deploymentDream).find((entry) => entry.key === body.key);
+        if (setting) setting.value = body.value;
+      }
       const setting = (key: string) => ({
         key,
         configured: "",
@@ -284,6 +291,7 @@ export async function fixtures(page: Page) {
           profiles: [],
         },
         catalogue: [],
+        dream: deploymentDream,
         integrations: {
           civitai: { token: { set: false } },
           huggingFace: { token: { set: false } },
@@ -1247,13 +1255,8 @@ export async function serveDream(
 ) {
   const state = {
     settings: {
+      ...dreamDefaults,
       enabled: options.enabled ?? true,
-      paused: false,
-      dailyImages: 40,
-      dailyVideos: 4,
-      images: true,
-      videos: false,
-      spicy: false,
     },
     unseen: options.unseen ?? [],
     discarded: options.discarded ?? [],
@@ -1499,3 +1502,16 @@ export function videoClip() {
     return undefined;
   }
 }
+
+export const dreamDefaultsFixture = () =>
+  Object.fromEntries(
+    Object.entries(dreamDefaults).map(([name, value]) => [
+      name,
+      {
+        key: dreamSettingKeys[name as keyof typeof dreamDefaults],
+        value,
+        source: "default",
+        locked: false,
+      },
+    ]),
+  );

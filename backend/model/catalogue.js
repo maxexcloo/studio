@@ -352,15 +352,14 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
 }
 
 /**
- * The local profiles Dream may run from an account's catalogue (modelsForAccount): every ready one
+ * The profiles Dream may run from an account's catalogue (modelsForAccount): every ready one
  * the composer offers except those on a worker stopped on purpose. A worker whose node list did not
  * arrive in time still counts, as Dream asks whether each kind's worker answers before using this.
  * Each kind's default is the catalogue's where Dream may run it, else its first such profile.
  */
 export function dreamCatalogue(models) {
   const profiles = (models.profiles || []).filter(
-    (profile) =>
-      profile.ready !== false && profile.availability !== "parked" && !isCloudProfile(profile),
+    (profile) => profile.ready !== false && profile.availability !== "parked",
   );
   const defaults = {};
   for (const kind of ["image", "video"]) {

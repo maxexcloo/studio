@@ -1,11 +1,8 @@
+import { dreamDefaults, dreamSettingError } from "../../shared/dream.ts";
 import { type RouteAccount, type RouteRun, directRoute } from "./direct-route.ts";
 import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
 import { type Projects, projectPatch } from "./projects.ts";
 import { digest } from "./review.ts";
-
-// What Dream's settings route accepts: the ranges of its numbers and its on/off switches.
-const limits = { dailyImages: [0, 500], dailyVideos: [0, 100] } as const;
-const switches = ["enabled", "paused", "images", "videos", "spicy"] as const;
 
 /** The caller's own Dream: settings, the unseen pool, verdicts, discards and projects. */
 export function registerDreamRoutes(
@@ -93,27 +90,11 @@ export function registerDreamRoutes(
   }));
   route("PUT", "/api/dream/settings", async (account, { body = {} }) => {
     const patch: Partial<DreamSettings> = {};
-    for (const key of switches) {
+    for (const key of Object.keys(dreamDefaults) as (keyof DreamSettings)[]) {
       if (body[key] === undefined) continue;
-      if (typeof body[key] !== "boolean")
-        return { status: 400, payload: { ok: false, error: `Set ${key} to true or false.` } };
-      patch[key] = body[key];
-    }
-    for (const [key, [low, high]] of Object.entries(limits) as [
-      keyof typeof limits,
-      readonly [number, number],
-    ][]) {
-      if (body[key] === undefined) continue;
-      if (
-        !Number.isInteger(body[key]) ||
-        (body[key] as number) < low ||
-        (body[key] as number) > high
-      )
-        return {
-          status: 400,
-          payload: { ok: false, error: `Set ${key} to a whole number from ${low} to ${high}.` },
-        };
-      patch[key] = body[key] as number;
+      const error = dreamSettingError(key, body[key]);
+      if (error) return { status: 400, payload: { ok: false, error } };
+      Object.assign(patch, { [key]: body[key] });
     }
     if (patch.spicy && !dream.access(owner(account))?.uncensored)
       return {

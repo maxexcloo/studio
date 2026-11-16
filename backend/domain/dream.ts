@@ -8,6 +8,8 @@ import {
   maxCardName,
   maxCharacterImages,
 } from "../../shared/characters.ts";
+import { type DreamSettings, dreamDefaults } from "../../shared/dream.ts";
+import { isCloudProfile } from "../../shared/profiles.ts";
 import type { Project, Review } from "../../shared/projects.ts";
 import {
   type GenerationInput,
@@ -38,17 +40,7 @@ import {
 } from "./taste.ts";
 import { contentRule, writerGuide } from "./writing-standard.ts";
 
-/** One account's Dream settings. Dream is off until the person turns it on. */
-export interface DreamSettings {
-  enabled: boolean;
-  paused: boolean;
-  dailyImages: number;
-  dailyVideos: number;
-  images: boolean;
-  videos: boolean;
-  /** Takes effect only with Uncensored Models. */
-  spicy: boolean;
-}
+export type { DreamSettings } from "../../shared/dream.ts";
 /** What a Dream job carries from admission to its gallery items. */
 export interface DreamOrigin {
   prompt: string;
@@ -159,9 +151,10 @@ export type DreamItem = QueueMedia & {
   /** How it fits its project's brief (domain/review.ts). */
   review?: Review;
 };
-/** A ready, local generation profile the account may use (cloud profiles never reach Dream). */
+/** A ready generation profile the account may use. */
 export interface DreamProfile {
   id: string;
+  provider?: string;
   kind?: string;
   label?: string;
   model?: string;
@@ -351,15 +344,6 @@ const shares = {
 const seriesShare = 2;
 /** Percent of videos that extend one of the account's videos rather than animate a still. */
 const extendShare = 35;
-const defaultDreamSettings: DreamSettings = {
-  enabled: false,
-  paused: false,
-  dailyImages: 40,
-  dailyVideos: 4,
-  images: true,
-  videos: false,
-  spicy: false,
-};
 /**
  * Most ideas create new concepts, even when they try another profile or LoRA. A smaller share
  * continues liked work; explicit More Like This, comparisons and series keep their own rules.
@@ -678,11 +662,12 @@ export function suggestionsFrom(
  */
 export function createDream(options: {
   dataDir: string;
+  defaults?(): DreamSettings;
   store: Store;
   taste: Taste;
   owners(): string[];
   access(ownerId: string): DreamAccess | null;
-  /** The account's ready, granted, local profiles and its default model per kind. */
+  /** The account's ready, granted profiles and its default model per kind. */
   catalogue(
     ownerId: string,
     account?: GenerationAccount,
@@ -692,7 +677,7 @@ export function createDream(options: {
   /** Each attached chat's project and latest request (domain/projects.ts). */
   chats(ownerId: string): Chats;
   /** Whether the text model and the worker for a kind are reachable, or parked (stopped on purpose). */
-  online(kind: Kind): Promise<{ text: Reach; media: Reach }>;
+  online(kind: Kind, backend: "local" | "cloud"): Promise<{ text: Reach; media: Reach }>;
   /** Whether admitted local text work is running now. */
   textBusy(): boolean;
   /** How many Dream jobs an account may have at once: one per media worker, so every idle GPU dreams. */
@@ -731,15 +716,13 @@ export function createDream(options: {
     frame?: "last",
   ): { id: string; source?: string };
   /**
-   * The local video profile that animates an image or, with `extend` (the video's profile),
-   * continues a video, at the account's Fast or Quality as Animate chooses (animate-profile.js),
-   * with the size for the frame; a throw where nothing can run it. Dream never runs videos in the
-   * cloud.
+   * A ready, granted video profile on the selected backend, with its frame size. Extensions
+   * retain their exact source profile; a throw where that cannot run.
    */
   videoProfile(
     ownerId: string,
     account: GenerationAccount | undefined,
-    frame: { width: number; height: number; extend?: string },
+    frame: { width: number; height: number; extend?: string; backend: "local" | "cloud" },
   ): Promise<{
     profile: DreamProfile;
     size?: { width: number; height: number };
@@ -777,17 +760,23 @@ export function createDream(options: {
     return {
       recent: [],
       ...saved,
-      // Only known settings, so a retired key leaves the record on its next save.
       settings: Object.fromEntries(
-        Object.entries(defaultDreamSettings).map(([key, value]) => [
+        Object.entries(options.defaults?.() ?? dreamDefaults).map(([key, value]) => [
           key,
           saved?.settings?.[key as keyof DreamSettings] ?? value,
         ]),
       ) as unknown as DreamSettings,
     };
   }
-  const write = (ownerId: string, record: DreamRecord) =>
-    writeRuntimeDocument(options.dataDir, name(ownerId), record);
+  const write = (ownerId: string, record: DreamRecord, patch?: Partial<DreamSettings>) => {
+    const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as
+      | Partial<DreamRecord>
+      | undefined;
+    writeRuntimeDocument(options.dataDir, name(ownerId), {
+      ...record,
+      settings: { ...saved?.settings, ...patch },
+    });
+  };
   const stamp = () => new Date(now()).toISOString();
   // The server's local day.
   const day = (time: number) => new Date(time).toDateString();
@@ -925,7 +914,9 @@ export function createDream(options: {
           profile,
           (scores.get(profile.id) ?? 0) * weigh(`profile:${profile.id}`),
         ]),
-      ) || profiles.find((profile) => profile.id === defaultId)
+      ) ||
+      profiles.find((profile) => profile.id === defaultId) ||
+      profiles[0]
     );
   }
   /**
@@ -1713,15 +1704,19 @@ export function createDream(options: {
     let reason = "";
     let idle = "";
     for (const kind of kinds(record.settings, counts)) {
-      const online = await options.online(kind);
+      const backend = record.settings[kind === "image" ? "imageBackend" : "videoBackend"];
+      const online = await options.online(kind, backend);
       if (online.text !== "online")
         return { status: "unavailable", reason: unreachable("The text model", online.text) };
       if (online.media !== "online") {
-        reason = unreachable(`The ${kind} worker`, online.media);
+        reason = unreachable(
+          backend === "local" ? `The ${kind} worker` : `The cloud ${kind} service`,
+          online.media,
+        );
         continue;
       }
       if (kind === "video") {
-        // One local video runs at a time, so a second Dream video would hold a slot idle.
+        // One Dream video runs at a time.
         if (live().some((job) => dreamJob(job) && kindOf(job.input) === "video")) {
           idle = "Dream makes one video at a time.";
           continue;
@@ -1735,8 +1730,21 @@ export function createDream(options: {
         reason = refused;
         continue;
       }
-      const catalogue = await options.catalogue(ownerId, access.account);
+      const available = await options.catalogue(ownerId, access.account);
+      const catalogue = {
+        ...available,
+        profiles: available.profiles.filter(
+          (profile) => isCloudProfile(profile) === (backend === "cloud"),
+        ),
+      };
       const steer = kind === "image" && record.steer?.remaining ? record.steer : undefined;
+      if (
+        steer?.profileId &&
+        !catalogue.profiles.some((profile) => profile.id === steer.profileId)
+      ) {
+        reason = "The source image's model is not ready on the selected Dream backend.";
+        continue;
+      }
       if (
         kind === "image" &&
         !steer &&
@@ -1761,7 +1769,7 @@ export function createDream(options: {
           (item) => kindOf(item) === "image" && steer && item.id === steer.profileId,
         ) || exploitProfile(kind, catalogue, taste, weigh);
       if (!profile) {
-        reason = `No ready local ${kind} model.`;
+        reason = `No ready ${backend} ${kind} model available to this account.`;
         continue;
       }
       // Equipment exploration accompanies concept exploration; More Like This keeps its source.
@@ -1938,7 +1946,7 @@ export function createDream(options: {
   }
   /**
    * Queues a video that animates the account's best still or extends one of its videos
-   * (videoSources), on a local model at its Fast or Quality; answers why it couldn't, or "".
+   * (videoSources), on its selected backend; answers why it couldn't, or "".
    */
   async function video(ownerId: string, record: DreamRecord, access: DreamAccess) {
     const referenceOf = ({ item, extend }: DreamVideoSource) => {
@@ -1979,6 +1987,7 @@ export function createDream(options: {
     let choice: Awaited<ReturnType<typeof options.videoProfile>>;
     try {
       choice = await options.videoProfile(ownerId, access.account, {
+        backend: record.settings.videoBackend,
         width: Number(item.width) || 0,
         height: Number(item.height) || 0,
         ...(extend ? { extend: String(item.settings?.profileId || "") } : {}),
@@ -1987,6 +1996,10 @@ export function createDream(options: {
       return (error as Error).message;
     }
     const { profile } = choice;
+    if (extend && profile.id !== item.settings?.profileId)
+      return "The source video's model is not ready on the selected Dream backend.";
+    if (isCloudProfile(profile) !== (record.settings.videoBackend === "cloud"))
+      return "No ready video model on the selected Dream backend.";
     const slot =
       profile.mediaInputs?.find((input) => input.role === "start") || profile.mediaInputs?.[0];
     const spicy = spicyShare(record, access);
@@ -2098,7 +2111,7 @@ export function createDream(options: {
 
   /**
    * A comparison's starting point: a drawn liked or kept image (`drawSeeds`) the account generated
-   * with a ready local profile, without references, not compared before.
+   * with a ready selected profile, without references, not compared before.
    */
   function pairBase(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const used = new Set(record.compared);
@@ -2345,7 +2358,8 @@ export function createDream(options: {
       .filter((item) => clean(item.prompt, 1))
       .slice(0, suggestFrom);
     if (liked.length < suggestAfter) return false;
-    if ((await options.online("image")).text !== "online") return false;
+    if ((await options.online("image", record.settings.imageBackend)).text !== "online")
+      return false;
     // Stamped first, so a failed look waits a day too.
     record.suggestedAt = stamp();
     write(ownerId, record);
@@ -2460,18 +2474,20 @@ export function createDream(options: {
     try {
       // A waiting Dream job whose worker went offline or was parked steps aside instead of holding
       // Dream up; Dream makes new work for that kind once the worker is back.
-      const reach = new Map<Kind, Promise<Reach>>();
+      const reach = new Map<string, Promise<Reach>>();
       const stranded = await Promise.all(
         live()
           .filter((job) => dreamJob(job) && waiting(job))
           .map(async (job) => {
             const kind = kindOf(job.input);
-            if (!reach.has(kind))
+            const backend = job.resource.startsWith("provider:") ? "cloud" : "local";
+            const key = `${kind}:${backend}`;
+            if (!reach.has(key))
               reach.set(
-                kind,
-                options.online(kind).then((online) => online.media),
+                key,
+                options.online(kind, backend).then((online) => online.media),
               );
-            return (await reach.get(kind)) === "online" ? null : job;
+            return (await reach.get(key)) === "online" ? null : job;
           }),
       );
       for (const job of stranded)
@@ -2767,7 +2783,7 @@ export function createDream(options: {
       const record = read(ownerId);
       // Turning Dream on resumes it too.
       record.settings = { ...record.settings, ...(patch.enabled && { paused: false }), ...patch };
-      write(ownerId, record);
+      write(ownerId, record, { ...(patch.enabled && { paused: false }), ...patch });
       if (!record.settings.enabled || record.settings.paused) {
         states.delete(ownerId);
         await stopWaiting(ownerId);
