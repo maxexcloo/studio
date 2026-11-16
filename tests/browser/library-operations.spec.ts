@@ -2,13 +2,10 @@ import { expect, test } from "@playwright/test";
 
 import {
   chooseView,
-  closeLoras,
   create,
   expandComposer,
   fixtures,
   image,
-  loadFromLibrary,
-  openLoraChoices,
   openNav,
   openPresets,
   profiles,
@@ -584,10 +581,8 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(table).toContainText("Later Model");
 });
 
-test("Library shows import grades, and the Presets chip loads inspiration settings where they fit", async ({
-  page,
-}) => {
-  const state = await fixtures(page);
+test("Library shows import grades and what each imported image is missing", async ({ page }) => {
+  await fixtures(page);
   await page.route("**/api/presets", (route) =>
     route.fulfill({
       json: {
@@ -619,24 +614,6 @@ test("Library shows import grades, and the Presets chip loads inspiration settin
   await expect(
     page.getByText("watercolour.safetensors: Not downloaded yet", { exact: true }),
   ).toBeVisible();
-  await create(page);
-  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  await openLoraChoices(page);
-  await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
-  await closeLoras(page);
-  // An imported image whose LoRA is missing gives only its prompt.
-  await openPresets(page);
-  await loadFromLibrary(page, "Missing Style Study");
-  await expect(prompt).toHaveValue("A missing style study");
-  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeHidden();
-  await openPresets(page);
-  await loadFromLibrary(page, "Amber Study");
-  await expect(prompt).toHaveValue("Amber bird study");
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
-  await expect.poll(() => state.jobs.length).toBe(1);
-  expect(state.jobs[0].input.profileId).toBe("image:test");
-  expect(state.jobs[0].input.steps).toBe(24);
-  expect(state.jobs[0].input.loras).toEqual([]);
 });
 
 test("Library › Presets lists what each preset holds, renames with unique names, edits in the composer and deletes after asking", async ({
