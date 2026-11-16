@@ -206,10 +206,17 @@ export function registerQueueRoutes(
     store.move(ownerOf(account), ids, to);
     return { status: 200, payload: { ok: true } };
   });
-  directRoute(app, "POST", "/api/queue/cancel-all", async (account) => {
+  // A conversationId narrows Stop All to the work that chat submitted (MCP's cancel_all).
+  directRoute(app, "POST", "/api/queue/cancel-all", async (account, { body }) => {
     const ownerId = ownerOf(account);
+    const chat = body?.conversationId;
+    const work = ownWork(store, ownerId).filter(
+      (job) =>
+        chat === undefined ||
+        (job.input.chat as { conversationId?: string } | undefined)?.conversationId === chat,
+    );
     const outcomes = await Promise.all(
-      ownWork(store, ownerId).map(async (initial) => {
+      work.map(async (initial) => {
         let error: string | undefined;
         try {
           await queue.cancel(ownerId, initial.id);
