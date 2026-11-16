@@ -442,7 +442,7 @@ export function ActionBarGroups({
   labelled?: string[];
   menuPosition?: FloatingPosition;
   fit?: boolean;
-  /** Spreads phone controls across the row, stacking any retained names. */
+  /** Groups phone controls compactly, stacking any retained names. */
   stacked?: boolean;
   /** Give every named choice the same share of the row. */
   equal?: boolean;
