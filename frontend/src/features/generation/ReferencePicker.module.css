@@ -17,7 +17,8 @@
   gap: 6px;
 }
 
-.cell {
+/* Tile rules must outrank native button styles regardless of chunk load order. */
+.cell:global(.mantine-UnstyledButton-root) {
   position: relative;
   display: grid;
   place-items: center;
@@ -29,9 +30,6 @@
     border-color var(--studio-motion-duration) var(--studio-ease-enter),
     box-shadow var(--studio-motion-duration) var(--studio-ease-enter),
     opacity var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-.cell {
   width: 64px;
   height: 64px;
   color: var(--mantine-color-dimmed);
@@ -71,7 +69,7 @@
   white-space: nowrap;
 }
 
-:where(:root[data-phone]) .cell {
+:where(:root[data-phone]) .cell:global(.mantine-UnstyledButton-root) {
   width: 72px;
   height: 72px;
 }
@@ -80,7 +78,7 @@
   min-width: 0;
 }
 
-.upload {
+.upload:global(.mantine-Button-root) {
   width: 100%;
   height: auto;
   aspect-ratio: 1;

@@ -127,7 +127,7 @@ function useDefinitions() {
   return { profileList, guideList, profiles, guides, guideOf, users };
 }
 
-/** A profile's or guide's row menu: edit, duplicate, copy its ID or download it as JSON. */
+/** A profile's or guide's row menu: copy its ID, download it as JSON, duplicate or edit. */
 function rowMenu(
   edit: (editing: Editing) => void,
   kind: DefinitionKind,
@@ -137,14 +137,6 @@ function rowMenu(
 ) {
   return (
     <>
-      <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => edit({ kind, id })}>
-        Edit {noun}
-      </Menu.Item>
-      {duplicate && (
-        <Menu.Item leftSection={<icons.duplicate size={16} />} onClick={duplicate}>
-          Duplicate {noun}…
-        </Menu.Item>
-      )}
       <Menu.Item
         leftSection={<icons.copy size={16} />}
         onClick={() => void copyText(id, `${noun} ID`)}
@@ -158,6 +150,14 @@ function rowMenu(
         download={`${id}.json`}
       >
         Download {noun}
+      </Menu.Item>
+      {duplicate && (
+        <Menu.Item leftSection={<icons.duplicate size={16} />} onClick={duplicate}>
+          Duplicate {noun}…
+        </Menu.Item>
+      )}
+      <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => edit({ kind, id })}>
+        Edit {noun}
       </Menu.Item>
     </>
   );

@@ -180,22 +180,21 @@ export function LibraryCatalogueTable({
           onViewChange={setView}
           query={query}
           onQueryChange={setQuery}
-          // LoRAs filter by family alone, beside the search; models keep their filters' popup.
           filters={
-            models && (
-              <>
-                <Select
-                  label="Family"
-                  placeholder="All Families"
-                  data={families}
-                  value={family}
-                  onChange={setFamily}
-                  clearable
-                  searchable
-                  openOnFocus={false}
-                  comboboxProps={{ withinPortal: false }}
-                  data-mantine-stop-propagation
-                />
+            <>
+              <Select
+                label="Family"
+                placeholder="All Families"
+                data={families}
+                value={family}
+                onChange={setFamily}
+                clearable
+                searchable
+                openOnFocus={false}
+                comboboxProps={{ withinPortal: false }}
+                data-mantine-stop-propagation
+              />
+              {models && (
                 <Select
                   label="Type"
                   placeholder="All Types"
@@ -206,24 +205,24 @@ export function LibraryCatalogueTable({
                   comboboxProps={{ withinPortal: false }}
                   data-mantine-stop-propagation
                 />
-                {withModelType && (
-                  <Select
-                    label="Model Type"
-                    placeholder="All Model Types"
-                    data={[
-                      { value: "original", label: "Original" },
-                      { value: "finetune", label: "Fine-Tune" },
-                      { value: "unclassified", label: "Unclassified" },
-                    ]}
-                    value={modelType}
-                    onChange={setModelType}
-                    clearable
-                    comboboxProps={{ withinPortal: false }}
-                    data-mantine-stop-propagation
-                  />
-                )}
-              </>
-            )
+              )}
+              {withModelType && (
+                <Select
+                  label="Model Type"
+                  placeholder="All Model Types"
+                  data={[
+                    { value: "original", label: "Original" },
+                    { value: "finetune", label: "Fine-Tune" },
+                    { value: "unclassified", label: "Unclassified" },
+                  ]}
+                  value={modelType}
+                  onChange={setModelType}
+                  clearable
+                  comboboxProps={{ withinPortal: false }}
+                  data-mantine-stop-propagation
+                />
+              )}
+            </>
           }
           filterCount={filterCount}
           onClearFilters={() => {
@@ -233,20 +232,6 @@ export function LibraryCatalogueTable({
           }}
           actions={
             <>
-              {!models && (
-                <Select
-                  aria-label="Family"
-                  size="sm"
-                  radius="xl"
-                  w={phone ? "8.5rem" : "11rem"}
-                  data={[{ value: "all", label: "All Families" }, ...families]}
-                  value={family ?? "all"}
-                  onChange={(value) => setFamily(value === "all" ? null : value)}
-                  allowDeselect={false}
-                  comboboxProps={{ withinPortal: false }}
-                  data-mantine-stop-propagation
-                />
-              )}
               {onCheckUpdates && (
                 <Tooltip label="Check Updates">
                   <ActionIcon

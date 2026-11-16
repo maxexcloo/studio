@@ -1,6 +1,6 @@
 /**
  * The assistant's fixed options, edited in Library › Prompt Styles: `<data>/prompt-styles.json`
- * holds `{styles, meta}`, the styles in menu order, each `{id, kind, label, description,
+ * holds `{styles, meta}`, each style `{id, kind, label, description,
  * instruction, enabled, uncensored?}`. `kind` is the menu it belongs to: `improve` (Improve
  * Prompt's rewrite styles), `animate` (Animate's themes) or `change` (fixed AI edits); IDs are
  * unique within a kind. A data folder without the file has the built-in seed
@@ -135,9 +135,13 @@ export function createPromptStyleStore({ dataDir = currentDataDir() } = {}) {
     return list();
   }
 
-  /** A kind's enabled styles in menu order, then its Custom where it has one. */
+  /** A kind's enabled styles alphabetically, then its Custom where it has one. */
   const usable = (kind) => [
-    ...list().styles.filter((style) => style.kind === kind && style.enabled),
+    ...list()
+      .styles.filter((style) => style.kind === kind && style.enabled)
+      .sort((a, b) =>
+        a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" }),
+      ),
     ...(customStyles[kind] ? [customStyles[kind]] : []),
   ];
 
