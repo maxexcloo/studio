@@ -1247,13 +1247,13 @@ test("Near-misses beside the viewer's controls keep it open; the empty stage clo
   await expect(viewer).toBeHidden();
 });
 
-test("An opened video plays, muted when the browser refuses sound", async ({ page }) => {
+test("An opened video plays with sound and reveals its controls on pointer movement", async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
       (window as any).played = { muted: this.muted };
-      return this.muted
-        ? Promise.resolve()
-        : Promise.reject(new DOMException("Sound needs a gesture", "NotAllowedError"));
+      return Promise.resolve();
     };
   });
   const state = await fixtures(page);
@@ -1270,7 +1270,7 @@ test("An opened video plays, muted when the browser refuses sound", async ({ pag
   });
   await page.goto("/video");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).played)).toEqual({ muted: true });
+  await expect.poll(() => page.evaluate(() => (window as any).played)).toEqual({ muted: false });
   // Its controls stay hidden until a pointer moves over it.
   const video = page.getByRole("dialog", { name: "Generation", exact: true }).locator("video");
   await expect(video).not.toHaveAttribute("controls");
@@ -1303,6 +1303,7 @@ test("An opened video the browser won't play shows its still and its controls", 
   const video = page.getByRole("dialog", { name: "Generation", exact: true }).locator("video");
   await expect(video).toHaveAttribute("poster", image);
   await expect(video).toHaveAttribute("controls");
+  await expect(video).toHaveJSProperty("muted", false);
 });
 
 test("A video tile plays its preview while a mouse is over it", async ({ page }, testInfo) => {
