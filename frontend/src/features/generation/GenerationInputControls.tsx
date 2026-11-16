@@ -6,8 +6,9 @@ import type { GenerationInput, Profile } from "../../types";
 import { icons } from "../../ui/icons";
 import { chipProps, iconChipProps } from "./chip";
 import { GenerationSettings } from "./GenerationSettings";
+import { lengthChoices } from "./length";
 import { LoraPicker, type LoraPickerState } from "./LoraPicker";
-import { backendInputPatch, backendLabel, controlRange } from "./payload";
+import { backendInputPatch, backendLabel } from "./payload";
 import { ProfilePicker } from "./ProfilePicker";
 import { SizePicker } from "./SizePicker";
 
@@ -41,40 +42,6 @@ function ChoiceChip({
       </ComboboxPopover.Target>
     </ComboboxPopover>
   );
-}
-
-/**
- * A video's length choices in seconds, as the profile's own duration or as frames at its FPS on the
- * frame grid the worker accepts (counted from the minimum, as backend/validation.js does).
- */
-function lengthChoices(input: GenerationInput, profile?: Profile) {
-  if (input.kind !== "video" || !profile) return null;
-  const duration = profile.capabilities.duration === true;
-  const range = controlRange(profile, duration ? "duration" : "frames", { min: 1 });
-  const fps = duration ? 1 : input.fps;
-  if (!range || !(fps > 0)) return null;
-  const { min = 1, max = Infinity, step = 1 } = range;
-  const offset = (range as { offset?: number }).offset ?? min;
-  const current = Number(duration ? input.duration : input.frames);
-  const values = [2, 3, 5, 8, 10, 15]
-    .map((seconds) => offset + step * Math.round((seconds * fps - offset) / step))
-    .concat(current > 0 ? [current] : [])
-    .filter((value) => value >= min && value <= max);
-  return {
-    key: duration ? "duration" : "frames",
-    value: String(current),
-    data: [...new Set(values)]
-      .sort((a, b) => a - b)
-      // A frame grid's extra frame (81 at 16 FPS) still reads as whole seconds.
-      .map((value) => {
-        const seconds = value / fps;
-        const whole = Math.abs(seconds - Math.round(seconds)) < 0.2;
-        return {
-          value: String(value),
-          label: `${whole ? Math.round(seconds) : seconds.toFixed(1)} s`,
-        };
-      }),
-  };
 }
 
 interface MaskControl {
