@@ -20,6 +20,9 @@ import { usePhone } from "../../ui/usePhone";
 import { fittedPopup } from "../generation/chip";
 import { type Dream, type DreamSettings, dreamCountQuery, dreamQuery, dreamWhen } from "./queries";
 
+/** Notes a setting an administrator forces on every account (Settings › Dream). */
+export const lockedByAdministrator = "Set by an administrator.";
+
 /** Saves part of the Dream settings and shows the result at once. */
 export function useDreamSettings() {
   const client = useQueryClient();
@@ -45,15 +48,18 @@ export function useDreamSettings() {
 function SettingsForm({ dream }: { dream: Dream }) {
   const save = useDreamSettings();
   const { settings } = dream;
+  const locked = (key: keyof DreamSettings) => dream.locked.includes(key);
+  const note = (key: keyof DreamSettings) => (locked(key) ? ` ${lockedByAdministrator}` : "");
   const toggle = (
     key: "enabled" | "images" | "spicy" | "videos",
     label: string,
     description: string,
   ) => (
-    <SettingRow label={label} description={description}>
+    <SettingRow label={label} description={description + note(key)}>
       <Switch
         aria-label={label}
         checked={settings[key]}
+        disabled={locked(key)}
         onChange={(event) => save.mutate({ [key]: event.currentTarget.checked })}
       />
     </SettingRow>
@@ -78,12 +84,13 @@ function SettingsForm({ dream }: { dream: Dream }) {
   const backend = (key: "imageBackend" | "videoBackend", label: string) => (
     <SettingRow
       label={`${label} Run On`}
-      description="Uses ready models allowed for your account. Waits if unavailable."
+      description={`Uses ready models allowed for your account. Waits if unavailable.${note(key)}`}
     >
       <SegmentedControl
         role="radiogroup"
         aria-label={`Dream ${label} Run On`}
         value={settings[key]}
+        disabled={locked(key)}
         data={[
           { value: "local", label: "Local" },
           { value: "cloud", label: "Cloud" },

@@ -1,4 +1,4 @@
-/** Dream defaults are inherited until an account saves its own choice. */
+/** Each account's Dream settings until it saves its own choice. */
 export const dreamDefaults = {
   enabled: false,
   paused: false,
@@ -11,17 +11,18 @@ export const dreamDefaults = {
   videoBackend: "local" as "local" | "cloud",
 };
 export type DreamSettings = typeof dreamDefaults;
-export const dreamSettingKeys: Record<keyof DreamSettings, string> = {
-  enabled: "STUDIO_DREAM_ENABLED",
-  paused: "STUDIO_DREAM_PAUSED",
-  dailyImages: "STUDIO_DREAM_DAILY_IMAGES",
-  dailyVideos: "STUDIO_DREAM_DAILY_VIDEOS",
-  images: "STUDIO_DREAM_IMAGES",
-  videos: "STUDIO_DREAM_VIDEOS",
-  spicy: "STUDIO_DREAM_SPICY",
-  imageBackend: "STUDIO_DREAM_IMAGE_BACKEND",
-  videoBackend: "STUDIO_DREAM_VIDEO_BACKEND",
+/**
+ * The settings an administrator may force on every account (Settings › Dream), overriding each
+ * account's own choice; unset leaves the account's choice.
+ */
+export const dreamOverrideKeys = {
+  enabled: "STUDIO_DREAM_OVERRIDE_ENABLED",
+  paused: "STUDIO_DREAM_OVERRIDE_PAUSED",
+  spicy: "STUDIO_DREAM_OVERRIDE_SPICY",
+  imageBackend: "STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND",
+  videoBackend: "STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND",
 };
+export type DreamOverride = keyof typeof dreamOverrideKeys;
 export function dreamSettingError(key: keyof DreamSettings, value: unknown): string {
   if (key === "imageBackend" || key === "videoBackend")
     return value === "local" || value === "cloud" ? "" : `Choose Local or Cloud for ${key}.`;

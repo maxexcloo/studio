@@ -75,29 +75,26 @@ test("saving writes SQLite, refuses deployment values and clears back to the def
   });
 });
 
-test("Dream defaults save false, zero and independent routes, and deployment locks apply", async () => {
-  const { dreamDefaults } = await import("../shared/dream.ts");
-  assert.deepEqual(settings.dreamDefaultSettings(), dreamDefaults);
-  settings.saveDeploymentSetting("STUDIO_DREAM_DAILY_IMAGES", "0");
-  settings.saveDeploymentSetting("STUDIO_DREAM_VIDEOS", "0");
-  settings.saveDeploymentSetting("STUDIO_DREAM_IMAGE_BACKEND", "cloud");
-  assert.equal(settings.dreamDefaultSettings().dailyImages, 0);
-  assert.equal(settings.dreamDefaultSettings().videos, false);
-  assert.equal(settings.dreamDefaultSettings().imageBackend, "cloud");
-  assert.equal(settings.dreamDefaultSettings().videoBackend, "local");
-  assert.equal(settings.describeDreamDefaults().imageBackend.source, "studio");
-  process.env.STUDIO_DREAM_PAUSED = "1";
+test("Dream overrides force only what is set, off included, and deployment locks apply", () => {
+  assert.deepEqual(settings.dreamOverrides(), {});
+  settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_SPICY", "0");
+  settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND", "cloud");
+  assert.deepEqual(settings.dreamOverrides(), { spicy: false, imageBackend: "cloud" });
+  assert.equal(settings.describeDreamOverrides().imageBackend.source, "studio");
+  assert.equal(settings.describeDreamOverrides().enabled.value, null);
+  process.env.STUDIO_DREAM_OVERRIDE_PAUSED = "1";
   try {
-    assert.equal(settings.describeDreamDefaults().paused.locked, true);
-    assert.throws(() => settings.saveDeploymentSetting("STUDIO_DREAM_PAUSED", "0"), {
+    assert.equal(settings.describeDreamOverrides().paused.locked, true);
+    assert.equal(settings.dreamOverrides().paused, true);
+    assert.throws(() => settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_PAUSED", "0"), {
       status: 409,
     });
   } finally {
-    delete process.env.STUDIO_DREAM_PAUSED;
+    delete process.env.STUDIO_DREAM_OVERRIDE_PAUSED;
   }
 });
 
-test("Dream administration requires admin authority, validates inputs and reads saved defaults back", async () => {
+test("Dream administration requires admin authority, validates inputs and reads saved overrides back", async () => {
   const { registerDeploymentRoutes } = await import("./deployment-routes.js");
   const handlers = {};
   registerDeploymentRoutes(
@@ -138,23 +135,32 @@ test("Dream administration requires admin authority, validates inputs and reads 
         { role: "administrator", credential: "mcp-token" },
       ]) {
         assert.equal(
-          (await request(method, { key: "STUDIO_DREAM_ENABLED", value: true }, account)).statusCode,
+          (await request(method, { key: "STUDIO_DREAM_OVERRIDE_ENABLED", value: true }, account))
+            .statusCode,
           403,
         );
       }
     }
     for (const [key, value] of [
-      ["STUDIO_DREAM_DAILY_IMAGES", -1],
-      ["STUDIO_DREAM_VIDEOS", "false"],
-      ["STUDIO_DREAM_VIDEO_BACKEND", "auto"],
+      ["STUDIO_DREAM_OVERRIDE_PAUSED", "false"],
+      ["STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND", "auto"],
+      // Only the overridable settings are here; daily caps stay each account's.
+      ["STUDIO_DREAM_DAILY_IMAGES", 10],
     ]) {
       assert.equal((await request("POST", { key, value })).statusCode, 400);
     }
-    const saved = await request("POST", { key: "STUDIO_DREAM_VIDEO_BACKEND", value: "cloud" });
+    const saved = await request("POST", {
+      key: "STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND",
+      value: "cloud",
+    });
     assert.equal(saved.body.dream.videoBackend.value, "cloud");
     const read = await request("GET");
     assert.equal(read.body.dream.videoBackend.value, "cloud");
-    assert.equal(read.body.dream.dailyImages.value, 0);
+    const cleared = await request("POST", {
+      key: "STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND",
+      value: null,
+    });
+    assert.equal(cleared.body.dream.videoBackend.value, null);
   } finally {
     if (previous === undefined) delete process.env.STUDIO_MULTI_USER;
     else process.env.STUDIO_MULTI_USER = previous;

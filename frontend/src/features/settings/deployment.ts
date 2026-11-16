@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import type { DreamSettings } from "../../../../shared/dream";
+import type { DreamOverride, DreamSettings } from "../../../../shared/dream";
 import { api, post } from "../../api";
 import { modelsQuery } from "../generation/GenerationProvider";
 
@@ -17,14 +17,15 @@ export interface Deployment {
     profiles: { id: string; label: string; kind: string; ready: boolean }[];
   };
   catalogue: Flag[];
-  dream: { [K in keyof DreamSettings]: Source & { key: string; value: DreamSettings[K] } };
+  /** Settings › Dream: each override, `null` where each account chooses. */
+  dream: { [K in DreamOverride]: Source & { key: string; value: DreamSettings[K] | null } };
   integrations: {
     civitai: { token: { set: boolean } };
     huggingFace: { token: { set: boolean } };
     assistant: { available: boolean; note?: string; model?: string };
   };
 }
-/** Settings › Generation and Integrations: values an administrator saves for everyone. */
+/** Settings › Dream, Gallery, Generation and Integrations: values an administrator saves for everyone. */
 export const deploymentQuery = queryOptions({
   queryKey: ["settings-deployment"],
   queryFn: () => api<Deployment>("/api/settings/deployment"),
@@ -32,7 +33,7 @@ export const deploymentQuery = queryOptions({
 /** A locked setting's description ends saying so; others need no note. */
 export const lockedNote = (setting: Source) => (setting.locked ? " Set by the deployment." : "");
 
-type Change = { key: string; value: string | boolean | number };
+type Change = { key: string; value: string | boolean | number | null };
 const applied = (data: Deployment, { key, value }: Change): Deployment => {
   const setting = (entry: Setting) =>
     entry.key === key ? { ...entry, configured: String(value), source: "studio" as const } : entry;
