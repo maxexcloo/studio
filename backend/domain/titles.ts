@@ -17,7 +17,7 @@ interface TitleWriter {
  * title for the same prompt (another result of its run, Run Again) takes that one without a call.
  */
 export function createTitler(options: {
-  /** The Settings › Generation switch (STUDIO_GALLERY_TITLES). */
+  /** The Settings › Gallery switch (STUDIO_GALLERY_TITLES). */
   enabled(): boolean;
   writer: TitleWriter | null;
   idle(): boolean;

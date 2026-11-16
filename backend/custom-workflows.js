@@ -60,6 +60,11 @@ function loraStackConfig(meta = {}) {
         Number(stack.max) || (stack.adapter === "rgthree-power-v1" ? maxLoras : 4),
       ),
     ),
+    // Radiance's IQ8R models take no adapters: a run with LoRAs uses this (bf16) model instead,
+    // with `loras` (such as the speed LoRA the default model has baked in) ahead of the run's.
+    ...(stack.adapter === "radiance-tags-v1" && stack.model
+      ? { model: String(stack.model), loras: stack.loras || [] }
+      : {}),
   };
 }
 

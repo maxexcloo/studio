@@ -28,7 +28,7 @@ import { DreamDeck } from "./DreamDeck";
 import { DreamDigest } from "./DreamDigest";
 import { DreamHistory } from "./DreamHistory";
 import { DreamProjects } from "./DreamProjects";
-import { DreamSettingsButton, useDreamSettings } from "./DreamSettings";
+import { DreamSettingsButton, lockedByAdministrator, useDreamSettings } from "./DreamSettings";
 import { type Dream, type DreamMedia, dreamCountQuery, dreamQuery, dreamWhen } from "./queries";
 
 import classes from "./DreamPage.module.css";
@@ -41,20 +41,24 @@ function Empty({ dream }: { dream: Dream }) {
       <EmptyState
         fill
         action={
-          <Stack align="center" gap="sm">
-            <Button
-              leftSection={<icons.resume size={16} />}
-              loading={save.isPending}
-              onClick={() => save.mutate({ enabled: true })}
-            >
-              Turn On
-            </Button>
-            {save.error && (
-              <Alert color="red" title="Couldn't Turn On Dream">
-                {save.error.message}
-              </Alert>
-            )}
-          </Stack>
+          dream.locked.includes("enabled") ? (
+            <Text size="xs">{lockedByAdministrator}</Text>
+          ) : (
+            <Stack align="center" gap="sm">
+              <Button
+                leftSection={<icons.resume size={16} />}
+                loading={save.isPending}
+                onClick={() => save.mutate({ enabled: true })}
+              >
+                Turn On
+              </Button>
+              {save.error && (
+                <Alert color="red" title="Couldn't Turn On Dream">
+                  {save.error.message}
+                </Alert>
+              )}
+            </Stack>
+          )
         }
       >
         Dream Is Off
@@ -65,13 +69,17 @@ function Empty({ dream }: { dream: Dream }) {
       <EmptyState
         fill
         action={
-          <Button
-            leftSection={<icons.resume size={16} />}
-            loading={save.isPending}
-            onClick={() => save.mutate({ paused: false })}
-          >
-            Resume
-          </Button>
+          dream.locked.includes("paused") ? (
+            <Text size="xs">{lockedByAdministrator}</Text>
+          ) : (
+            <Button
+              leftSection={<icons.resume size={16} />}
+              loading={save.isPending}
+              onClick={() => save.mutate({ paused: false })}
+            >
+              Resume
+            </Button>
+          )
         }
       >
         Dream Is Paused
@@ -174,7 +182,7 @@ export function DreamPage() {
         {!phone && selector}
         <div ref={setUndoTarget} style={{ display: "contents" }} />
         <Group gap={4} wrap="nowrap" ml="auto">
-          {data?.settings.enabled && (
+          {data?.settings.enabled && !data.locked.includes("paused") && (
             <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
               <ActionIcon
                 variant="subtle"

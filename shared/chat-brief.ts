@@ -2,7 +2,7 @@
  * An account's chat brief: the standing rules and preferences every chat writes its prompts to,
  * so a new chat needn't be told them again. Its fields follow a Dream project's brief. Settings ›
  * Preferences and MCP's project tool (action brief) edit it; what to avoid stays the taste
- * profile's Always Avoid.
+ * profile's own Dislikes.
  */
 export const briefTexts = ["subjects", "ethnicity", "age", "body", "styles", "rules"] as const;
 /** Favourite profile ids and LoRA names, best first. */

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
-  dreamDefaultsFixture,
+  dreamOverridesFixture,
   fixtures,
   image,
   openTheme,
@@ -57,6 +57,8 @@ test("Settings follow the settled section order and run maintenance and worker r
   const order = [
     "Account",
     "Preferences",
+    "Dream",
+    "Gallery",
     "Generation",
     "Groups",
     "Users",
@@ -75,7 +77,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   if ((page.viewportSize()?.width || 1440) >= 768)
     await expect(
       page.getByRole("group", { name: "Administration", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(2, 6));
+    ).toHaveText(order.slice(2, 8));
   await section(page, "Settings", "Preferences");
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
@@ -99,7 +101,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   await expect.poll(() => statusReads).toBeGreaterThan(before);
 });
 
-test("Caption Gallery in Settings › Generation starts a pass, shows its progress and stops", async ({
+test("Caption Gallery in Settings › Gallery starts a pass, shows its progress and stops", async ({
   page,
 }) => {
   await fixtures(page);
@@ -137,7 +139,7 @@ test("Caption Gallery in Settings › Generation starts a pass, shows its progre
     if (action !== "captions") actions.push([action, route.request().postDataJSON()]);
     return route.fulfill({ json: status });
   });
-  await page.goto("/settings#generation");
+  await page.goto("/settings#gallery");
   const row = page.getByRole("region", { name: "Gallery", exact: true });
   await expect(row.getByText("Ready · 9,000 to caption", { exact: true })).toBeVisible();
   await row.getByRole("combobox", { name: "Images to Caption", exact: true }).click();
@@ -161,7 +163,7 @@ test("Caption Gallery in Settings › Generation starts a pass, shows its progre
   ]);
 });
 
-test("Unfinished Items in Settings › Generation retry, stop and clear any account's stuck jobs", async ({
+test("Unfinished Items in Settings › Gallery retry, stop and clear any account's stuck jobs", async ({
   page,
 }) => {
   await fixtures(page);
@@ -191,7 +193,7 @@ test("Unfinished Items in Settings › Generation retry, stop and clear any acco
     jobs = body.jobs ? [] : jobs.filter((entry) => entry.id !== body.id);
     return route.fulfill({ json: { job: jobs[0] } });
   });
-  await page.goto("/settings#generation");
+  await page.goto("/settings#gallery");
   const row = page.getByRole("region", { name: "Gallery", exact: true });
   await expect(row.getByText(/2 now\.$/)).toBeVisible();
   await row.getByRole("button", { name: "Review", exact: true }).click();
@@ -278,33 +280,33 @@ test("Tile Captions in Settings › Preferences pin phone tile captions", async 
   expect(state.preferences.preferences.tileCaptions).toBe(true);
 });
 
-test("An administrator turns Cloud Models, LoRAs and Uncensored Models off for itself in Settings › Preferences", async ({
+test("An administrator turns LoRAs and Uncensored off for itself in Settings › Preferences", async ({
   page,
 }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
-  state.preferences.grants = {
-    cloudModels: true,
-    loras: true,
-    spicyPrompts: true,
-    uncensoredModels: true,
-  };
+  state.preferences.grants = { cloudModels: true, loras: true, uncensoredModels: true };
   await page.goto("/settings#preferences");
   const models = page.getByRole("region", { name: "Models", exact: true });
-  await expect(models.getByRole("switch")).toHaveCount(3);
+  await expect(models.getByRole("switch")).toHaveCount(2);
   const loras = models.getByRole("switch", { name: "LoRAs", exact: true });
   await expect(loras).toBeChecked();
   await loras.click({ force: true });
   await expect(loras).not.toBeChecked();
   await expect.poll(() => state.preferences.preferences.loras).toBe(false);
-  const uncensored = models.getByRole("switch", { name: "Uncensored Models", exact: true });
+  const uncensored = models.getByRole("switch", { name: "Uncensored", exact: true });
   await expect(uncensored).toBeChecked();
   await uncensored.click({ force: true });
   await expect(uncensored).not.toBeChecked();
   await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
+  await expect(
+    page
+      .getByRole("region", { name: "Where Work Runs", exact: true })
+      .getByRole("switch", { name: "Cloud Models", exact: true }),
+  ).toBeChecked();
 });
 
-test("Where Work Runs in Settings › Preferences saves where each area runs and the Text model", async ({
+test("Settings › Preferences saves the Prompt Assistant and where each area runs", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -321,25 +323,9 @@ test("Where Work Runs in Settings › Preferences saves where each area runs and
     }),
   );
   await page.goto("/settings#preferences");
-  const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
-  const area = (name: string) => where.getByRole("radiogroup", { name, exact: true });
-  const choose = (name: string, choice: string) =>
-    area(name).locator("label").filter({ hasText: choice }).click();
-  await expect(where.getByRole("radiogroup")).toHaveCount(2);
-  expect(
-    await where
-      .getByRole("radiogroup")
-      .or(where.getByRole("combobox"))
-      .evaluateAll((controls) => controls.map((control) => control.getAttribute("aria-label"))),
-  ).toEqual(["Images", "Videos", "Text"]);
-  await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();
-  // Videos offers Animate's three choices, its saved tier showing.
-  await expect(area("Videos").getByRole("radio")).toHaveCount(3);
-  await expect(area("Videos").getByRole("radio", { name: "Quality" })).toBeChecked();
-  await choose("Images", "Cloud");
-  await expect.poll(() => state.preferences.preferences.images).toBe("cloud");
-  // Text picks the gateway text model, unsaved the account's default.
-  const writing = where.getByRole("combobox", { name: "Text", exact: true });
+  // Prompts leads with the Prompt Assistant, unsaved the account's default.
+  const prompts = page.getByRole("region", { name: "Prompts", exact: true });
+  const writing = prompts.getByRole("combobox", { name: "Prompt Assistant", exact: true });
   await expect(writing).toHaveValue("Uncensored · Cloud");
   await writing.click();
   await expect(page.getByRole("option")).toHaveText([
@@ -350,36 +336,25 @@ test("Where Work Runs in Settings › Preferences saves where each area runs and
   await page.getByRole("option", { name: "Auto · Local", exact: true }).click();
   await expect.poll(() => state.preferences.preferences.writingModel).toBe("local/auto");
   await expect(writing).toHaveValue("Auto · Local");
+  await expect(prompts.getByRole("switch", { name: "Keep Recent Prompts" })).toBeVisible();
+
+  const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
+  const area = (name: string) => where.getByRole("radiogroup", { name, exact: true });
+  const choose = (name: string, choice: string) =>
+    area(name).locator("label").filter({ hasText: choice }).click();
+  // Without a grant there is no Cloud Models switch, and Cloud stays a choice.
+  await expect(where.getByRole("switch")).toHaveCount(0);
+  await expect(where.getByRole("radiogroup")).toHaveCount(2);
+  await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();
+  // Videos offers Animate's three choices, its saved tier showing.
+  await expect(area("Videos").getByRole("radio")).toHaveCount(3);
+  await expect(area("Videos").getByRole("radio", { name: "Quality" })).toBeChecked();
+  await choose("Images", "Cloud");
+  await expect.poll(() => state.preferences.preferences.images).toBe("cloud");
   await choose("Videos", "Cloud");
   await expect.poll(() => state.preferences.preferences.videos).toBe("cloud");
   await choose("Videos", "Fast");
   await expect.poll(() => state.preferences.preferences.videos).toBe("fast");
-});
-
-test("Spicy Prompts shows in Settings › Preferences only with Uncensored Models", async ({
-  page,
-}) => {
-  const state = await fixtures(page);
-  await signIn(page, { id: "member", role: "user" });
-  await page.goto("/settings#preferences");
-  const prompts = page.getByRole("region", { name: "Prompts", exact: true });
-  await expect(prompts.getByRole("switch", { name: "Keep Recent Prompts" })).toBeVisible();
-  await expect(prompts.getByRole("switch", { name: "Spicy Prompts" })).toHaveCount(0);
-  state.preferences.grants = {
-    cloudModels: false,
-    loras: false,
-    spicyPrompts: true,
-    uncensoredModels: true,
-  };
-  await page.reload();
-  const spicy = prompts.getByRole("switch", { name: "Spicy Prompts", exact: true });
-  await expect(spicy).not.toBeChecked();
-  await expect(
-    prompts.getByText("Let prompt ideas, suggestions and proposed changes use explicit wording."),
-  ).toBeVisible();
-  await spicy.click({ force: true });
-  await expect(spicy).toBeChecked();
-  await expect.poll(() => state.preferences.preferences.spicyPrompts).toBe(true);
 });
 
 test("Finish Liked Images in Settings › Preferences saves its switch, quality and face detail", async ({
@@ -927,7 +902,7 @@ test("Status counts running workers, reads a parked service as Stopped and offer
   await expect(drawer.getByRole("button", { name: "Start Videos" })).toHaveCount(0);
 });
 
-test("Settings › Generation switches follow at once and settle back after a failed save", async ({
+test("Settings › Gallery switches follow at once and settle back after a failed save", async ({
   page,
 }) => {
   await fixtures(page);
@@ -956,7 +931,7 @@ test("Settings › Generation switches follow at once and settle back after a fa
           video: setting("STUDIO_DEFAULT_VIDEO_PROFILE"),
           profiles: [],
         },
-        dream: dreamDefaultsFixture(),
+        dream: dreamOverridesFixture(),
         catalogue: [
           {
             key: "STUDIO_GALLERY_CAPTIONS",
@@ -975,41 +950,40 @@ test("Settings › Generation switches follow at once and settle back after a fa
       },
     });
   });
-  await page.goto("/settings#generation");
+  await page.goto("/settings#gallery");
   const toggle = page
     .getByRole("region", { name: "Background AI", exact: true })
     .getByRole("switch", { name: "Gallery Captions", exact: true });
   await expect(toggle).toBeChecked();
   await toggle.click({ force: true });
-  // The switch moves before the server answers, and nothing else in the section locks.
+  // The switch moves before the server answers.
   await expect(toggle).not.toBeChecked();
-  await expect(page.getByRole("combobox", { name: "Default Image Profile" })).toBeEnabled();
   release();
   await expect(page.getByText("The setting could not be saved")).toBeVisible();
   await expect(toggle).toBeChecked();
 });
 
-test("Dream administration saves separate image and video defaults without changing the other controls", async ({
+test("Settings › Dream forces a setting on every account and hands it back to each account", async ({
   page,
 }) => {
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
-  await page.goto("/settings#generation");
-  const dream = page.getByRole("region", { name: "Dream", exact: true });
-  const images = dream.getByRole("radiogroup", { name: "Default Dream Images Run On" });
-  const videos = dream.getByRole("radiogroup", { name: "Default Dream Videos Run On" });
+  await page.goto("/settings#dream");
+  const images = page.getByRole("radiogroup", { name: "Dream Images Run On" });
+  const spicy = page.getByRole("radiogroup", { name: "Dream Spicy" });
+  const choice = (group: typeof images, name: string) =>
+    group.getByRole("radio", { name, exact: true });
+  await expect(choice(images, "Account's Choice")).toBeChecked();
   await images.getByText("Cloud", { exact: true }).click();
-  await expect(images.getByRole("radio", { name: "Cloud", exact: true })).toBeChecked();
-  await expect(videos.getByRole("radio", { name: "Local", exact: true })).toBeChecked();
-  const cap = dream.getByRole("textbox", { name: "Default Dream Images per Day", exact: true });
-  await cap.fill("0");
-  await cap.press("Tab");
-  await expect(cap).toHaveValue("0");
+  await spicy.getByText("Off", { exact: true }).click();
+  await expect(choice(images, "Cloud")).toBeChecked();
   await page.reload();
-  await expect(images.getByRole("radio", { name: "Cloud", exact: true })).toBeChecked();
-  await expect(videos.getByRole("radio", { name: "Local", exact: true })).toBeChecked();
-  await expect(cap).toHaveValue("0");
+  await expect(choice(images, "Cloud")).toBeChecked();
+  await expect(choice(spicy, "Off")).toBeChecked();
   await expect(
-    dream.getByRole("switch", { name: "Default Dream Enabled", exact: true }),
-  ).not.toBeChecked();
+    choice(page.getByRole("radiogroup", { name: "Dream Videos Run On" }), "Account's Choice"),
+  ).toBeChecked();
+  await spicy.getByText("Account's Choice", { exact: true }).click();
+  await page.reload();
+  await expect(choice(spicy, "Account's Choice")).toBeChecked();
 });

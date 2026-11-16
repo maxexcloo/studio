@@ -3747,7 +3747,7 @@ test("A set's prompts spread LoRA strengths left to Studio within their range, k
   ]);
   // Centred on the strength the account liked; with two left to Studio, the fourth leaves one out.
   f.app.get("/api/taste", (_req, res) =>
-    res.json({ loras: [{ name: "fixture-effect.safetensors", strength: 1, score: 2 }] }),
+    res.json({ loraScores: [{ name: "fixture-effect.safetensors", strength: 1, score: 2 }] }),
   );
   await generate(client, {
     prompts,
@@ -7379,7 +7379,11 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   f.app.get("/api/taste", (_req, res) => res.json({ summary: "Moody light", signals: 3 }));
   f.app.put(
     "/api/taste",
-    record("taste", (req) => ({ summary: "Moody light", addedAvoid: req.body.avoid, signals: 3 })),
+    record("taste", (req) => ({
+      summary: "Moody light",
+      preferences: req.body.preferences,
+      signals: 3,
+    })),
   );
   f.app.post(
     "/api/loras/library/ops",
@@ -7387,7 +7391,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   );
   assert.equal(data(await call(mine, "taste")).summary, "Moody light");
   await call(mine, "project", { action: "brief", avoid: "clowns" });
-  assert.deepEqual(seen.at(-1).body, { avoid: ["clowns"] });
+  assert.deepEqual(seen.at(-1).body, { preferences: { avoid: ["clowns"] } });
   assert.deepEqual(
     data(
       await call(mine, "taste", {
@@ -7873,11 +7877,12 @@ test("axis varies one thing at one seed, one image each, as a lettered side-by-s
 test("the account's brief comes back with a chat's first generate, picks its favourite model and refuses what it avoids", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
-  let avoid = [];
-  f.app.get("/api/taste", (_req, res) => res.json({ addedAvoid: avoid }));
+  // Learnt Dislikes guide the writer; only the user's own refuse a prompt.
+  const taste = { avoid: ["coat"], preferences: {} };
+  f.app.get("/api/taste", (_req, res) => res.json(taste));
   f.app.put("/api/taste", (req, res) => {
-    avoid = req.body.avoid;
-    res.json({ addedAvoid: avoid });
+    Object.assign(taste.preferences, req.body.preferences);
+    res.json(taste);
   });
   const saved = data(
     await call(client, "project", {

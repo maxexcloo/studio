@@ -28,7 +28,7 @@ type SuggestionSurface = "composer" | "viewer" | "animate" | "change" | "draft";
 // The viewer's next steps and Animate's motion ideas may send the image along.
 type Writer = TasteWriter<ReturnType<typeof userContent>>;
 // `count` records the requested count so older saved menus refresh once, even if a reply is short.
-// `spicy` marks steps worded explicitly, so a change of explicitWording writes them again.
+// `spicy` marks steps worded explicitly, so a change of Uncensored Models writes them again.
 type SavedSteps = {
   steps: NextStep[];
   at: string;
@@ -258,7 +258,7 @@ export function createSuggestions({
   /** Null where the account may not send prompts to the text model. */
   writer: (ownerId: string) => Writer | null;
   online: () => Promise<boolean>;
-  /** Whether what the owner is offered may be worded explicitly (account-policy.js `explicitWording`). */
+  /** Whether what the owner is offered may be worded explicitly (Uncensored Models). */
   explicit: (ownerId: string) => boolean;
   /** The owner's finished gallery item for a job, if it is theirs and visible. */
   item: (ownerId: string, jobId: string, itemId?: string) => SuggestionItem | undefined;
@@ -266,7 +266,7 @@ export function createSuggestions({
   image: (item: SuggestionItem) => Promise<ModelImage | null>;
   /** Keeps an image's latest next steps with it. */
   save: (item: SuggestionItem, nextSteps: SavedSteps) => void;
-  /** The Settings › Generation switch for the composer's prompt ideas (STUDIO_PROMPT_IDEAS). */
+  /** The Settings › Gallery switch for the composer's prompt ideas (STUDIO_PROMPT_IDEAS). */
   ideas: () => boolean;
   /** The switch for next steps, an image's and the composer draft's (STUDIO_NEXT_STEPS). */
   nextSteps: () => boolean;
@@ -671,9 +671,9 @@ export function createSuggestions({
         throw failure("Choose image or video ideas.", 400);
       // Switched off, the menu or ideas simply have none; the model is never asked.
       if (surface === "composer" && !ideas())
-        return empty("Prompt Ideas is off in Settings › Generation.");
+        return empty("Prompt Ideas is off in Settings › Gallery.");
       if ((surface === "viewer" || surface === "animate" || surface === "draft") && !nextSteps())
-        return empty("Suggestions are off in Settings › Generation.");
+        return empty("Suggestions are off in Settings › Gallery.");
       let source: SuggestionItem | undefined;
       if (surface === "viewer" || surface === "animate") {
         if (typeof body.jobId !== "string" || !body.jobId) throw failure("Choose a result.", 400);
@@ -776,7 +776,7 @@ type SuggestionService = ReturnType<typeof createSuggestions>;
  * and never with cloud.
  */
 export function createNextStepWork(options: {
-  /** The Settings › Generation switch (STUDIO_NEXT_STEPS). */
+  /** The Settings › Gallery switch (STUDIO_NEXT_STEPS). */
   enabled(): boolean;
   suggestions: Pick<SuggestionService, "prepare">;
   writer: { supportsVision(): Promise<boolean> } | null;

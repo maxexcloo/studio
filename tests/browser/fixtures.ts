@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 
 import { type Locator, type Page, expect } from "@playwright/test";
 
-import { dreamDefaults, dreamSettingKeys } from "../../shared/dream";
+import { dreamDefaults, dreamOverrideKeys } from "../../shared/dream";
 
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
 const familyLabels = { flux1: "FLUX.1", sdxl: "SDXL" };
@@ -188,7 +188,7 @@ export async function fixtures(page: Page) {
     canChangePassword: true,
   };
 
-  const deploymentDream = dreamDefaultsFixture();
+  const deploymentDream = dreamOverridesFixture();
   const administration = {
     accounts: [
       {
@@ -234,12 +234,11 @@ export async function fixtures(page: Page) {
     preferences: {
       cloudModels: true,
       loras: true,
-      spicyPrompts: false,
       tileCaptions: false,
       uncensoredModels: true,
     } as Record<string, unknown>,
     saved: [] as string[],
-    grants: { cloudModels: false, loras: false, spicyPrompts: false, uncensoredModels: false },
+    grants: { cloudModels: false, loras: false, uncensoredModels: false },
   };
 
   await page.route("**/api/**", async (route) => {
@@ -986,11 +985,11 @@ export async function promptMenu(scope: Page | Locator, box: string) {
   return page.getByRole("menu");
 }
 
-/** Opens the viewer's AI menu without entering its prompt editor. */
+/** Opens the viewer bar's AI menu, which holds its prompt's assistance. */
 export async function viewerPromptMenu(page: Page) {
   await page
     .getByRole("dialog", { name: "Generation", exact: true })
-    .getByRole("button", { name: "AI Prompt Actions", exact: true })
+    .getByRole("button", { name: "AI", exact: true })
     .click();
   return page.getByRole("menu");
 }
@@ -1021,7 +1020,7 @@ export async function editorMenu(scope: Page | Locator, box: string, tool: strin
  */
 export async function viewerAction(page: Page, label: string, ...options: string[]) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  const nested = ({ Report: "Edit", Similar: "Recreate" } as Record<string, string>)[label];
+  const nested = ({ Report: "Edit" } as Record<string, string>)[label];
   if (nested && (await viewer.getByRole("button", { name: label, exact: true }).count()) === 0)
     return viewerAction(page, nested, label, ...options);
   await viewer
@@ -1239,6 +1238,8 @@ export async function serveDream(
     discarded?: any[];
     history?: import("../../shared/taste").DreamActivity[];
     spicyAvailable?: boolean;
+    /** The settings an administrator forces, which the account can't change. */
+    locked?: (keyof typeof dreamDefaults)[];
     /** Older gallery images offered for calibration until judged. */
     calibration?: any[];
     /** Why Dream can't run, which makes it unavailable. */
@@ -1296,6 +1297,7 @@ export async function serveDream(
     since: options.since ?? null,
     today: { images: 12, videos: 1 },
     spicyAvailable: state.spicyAvailable,
+    locked: options.locked ?? [],
     status: !state.settings.enabled
       ? "off"
       : state.settings.paused
@@ -1305,33 +1307,34 @@ export async function serveDream(
           : "waiting",
     reason: options.reason,
   });
+  const fields = {
+    likes: [],
+    avoid: [],
+    styles: [],
+    note: "",
+    models: [],
+    loras: [],
+    shapes: [],
+    tags: [],
+  };
   const taste = {
     summary: "",
-    likes: [],
-    styles: [],
-    avoid: [],
-    addedAvoid: [],
-    note: "",
-    profiles: { image: [], video: [] },
-    loras: [],
+    ...fields,
+    loraScores: [],
     updatedAt: "",
     signals: 0,
     writer: false,
     ...options.taste,
     preferences: {},
-    learnt: {
-      likes: options.taste?.likes || [],
-      styles: options.taste?.styles || [],
-      avoid: options.taste?.avoid || [],
-      note: options.taste?.note || "",
-    },
+    learnt: Object.fromEntries(
+      Object.entries(fields).map(([key, none]) => [key, options.taste?.[key] ?? none]),
+    ),
   };
   await page.route(/\/api\/taste$/, (route) => {
     const request = route.request();
     if (request.method() === "PUT") {
       state.requests.push({ method: "PUT", path: "/api/taste", body: request.postDataJSON() });
       const body = request.postDataJSON();
-      if (body.avoid) taste.addedAvoid = body.avoid;
       for (const [key, value] of Object.entries(body.preferences || {})) {
         if (value === null) delete (taste.preferences as Record<string, unknown>)[key];
         else (taste.preferences as Record<string, unknown>)[key] = value;
@@ -1506,15 +1509,11 @@ export function videoClip() {
   }
 }
 
-export const dreamDefaultsFixture = () =>
+/** Settings › Dream with no overrides: every account chooses for itself. */
+export const dreamOverridesFixture = () =>
   Object.fromEntries(
-    Object.entries(dreamDefaults).map(([name, value]) => [
+    Object.entries(dreamOverrideKeys).map(([name, key]) => [
       name,
-      {
-        key: dreamSettingKeys[name as keyof typeof dreamDefaults],
-        value,
-        source: "default",
-        locked: false,
-      },
+      { key, value: null as unknown, source: "default", locked: false },
     ]),
   );

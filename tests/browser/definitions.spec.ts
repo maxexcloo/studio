@@ -271,6 +271,8 @@ test("Model classification saves and reads back while definition administration 
   await signIn(page, { id: "account-a", role: "user", features: { characters: false } });
   await serveProfiles(page, profiles);
   await page.goto("/library#presets");
+  // A hash-only navigation keeps the previous account in memory; load the new one's grants.
+  await page.reload();
   await expect(page.getByText("No Presets", { exact: true })).toBeVisible();
   await page.goto("/library#files");
   await expect(page.getByRole("table", { name: "Library Files", exact: true })).toHaveCount(0);

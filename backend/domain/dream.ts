@@ -666,7 +666,8 @@ export function suggestionsFrom(
  */
 export function createDream(options: {
   dataDir: string;
-  defaults?(): DreamSettings;
+  /** The settings an administrator forces on every account, over its own choice. */
+  overrides?(): Partial<DreamSettings>;
   store: Store;
   taste: Taste;
   owners(): string[];
@@ -764,15 +765,16 @@ export function createDream(options: {
     const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as
       | Partial<DreamRecord>
       | undefined;
+    const overrides = options.overrides?.() ?? {};
     return {
       recent: [],
       ...saved,
       settings: Object.fromEntries(
-        Object.entries(options.defaults?.() ?? dreamDefaults).map(([key, value]) => [
+        (Object.keys(dreamDefaults) as (keyof DreamSettings)[]).map((key) => [
           key,
-          saved?.settings?.[key as keyof DreamSettings] ?? value,
+          overrides[key] ?? saved?.settings?.[key] ?? dreamDefaults[key],
         ]),
-      ) as unknown as DreamSettings,
+      ) as DreamSettings,
     };
   }
   const write = (ownerId: string, record: DreamRecord, patch?: Partial<DreamSettings>) => {
@@ -951,9 +953,14 @@ export function createDream(options: {
         .filter(([attribute]) => attribute.startsWith(prefix))
         .map(([attribute, { score }]) => [attribute.slice(prefix.length), score]),
     );
+  /** One of the person's own shapes or tags where they set them, else one drawn by its score. */
+  const favourite = (taste: TasteRecord, field: "shapes" | "tags", prefix: string) => {
+    const own = taste.preferences[field];
+    return own ? drawn(own.map((value) => [value, 1])) : drawnValue(taste, prefix);
+  };
   /**
-   * A ready profile of the kind drawn by its taste score less its recent share (`spread`), else the
-   * default for the kind.
+   * A ready profile of the kind drawn by its taste score (evenly among the person's own favourite
+   * models where they set them) less its recent share (`spread`), else the default for the kind.
    */
   function exploitProfile(
     kind: Kind,
@@ -962,8 +969,14 @@ export function createDream(options: {
     weigh: (key: string) => number,
   ) {
     const profiles = catalogue.profiles.filter((profile) => kindOf(profile) === kind);
+    const own = taste.preferences.models;
     const scores = new Map(
-      [...taste.profiles.image, ...taste.profiles.video].map((entry) => [entry.id, entry.score]),
+      own
+        ? own.map((id) => [id, 1])
+        : [...taste.profiles.image, ...taste.profiles.video].map((entry) => [
+            entry.id,
+            entry.score,
+          ]),
     );
     const defaultId = catalogue.defaults?.[kind === "video" ? "videoModel" : "imageModel"];
     return (
@@ -1289,7 +1302,8 @@ export function createDream(options: {
   /**
    * For a share of exploited ideas, one LoRA the profile can load drawn by its taste score (a
    * a like adds one) less its recent share (`spread`), at the strength that scored best, else
-   * its recommended strength; never a disliked one, and none without LoRA access.
+   * its recommended strength; never a disliked one, and none without LoRA access. Where the person
+   * set their favourite LoRAs, it is one of those, drawn evenly.
    */
   function exploitLoras(
     ownerId: string,
@@ -1299,18 +1313,21 @@ export function createDream(options: {
   ) {
     const library = options.loraLibrary(ownerId);
     if (!library || !chance(shares.lora)) return [];
-    const learnt = new Map(taste.loras.map((lora) => [lora.name, lora]));
+    const learnt = new Map(taste.loraScores.map((lora) => [lora.name, lora]));
     const candidates = fit(
       profile,
       (profile.options?.loras || [])
         .filter((name) => library.ratings[name] !== "disliked")
         .map((name) => ({ name, strength: learnt.get(name)?.strength, enabled: true as const })),
     );
+    const own = taste.preferences.loras;
     const lora = drawn(
       candidates.map((lora): [DreamLora, number] => [
         lora,
-        ((learnt.get(lora.name)?.score ?? 0) + (library.ratings[lora.name] === "liked" ? 1 : 0)) *
-          weigh(`lora:${lora.name}`),
+        (own
+          ? Number(own.includes(lora.name))
+          : (learnt.get(lora.name)?.score ?? 0) +
+            (library.ratings[lora.name] === "liked" ? 1 : 0)) * weigh(`lora:${lora.name}`),
       ]),
     );
     return lora ? [lora] : [];
@@ -1324,7 +1341,7 @@ export function createDream(options: {
       ? drawnValue(taste, `steps:${profile.id}:`)
       : undefined;
     const cfg = drawnValue(taste, `cfg:${profile.id}:`);
-    const aspect = Number(kind === "image" && drawnValue(taste, "aspect:"));
+    const aspect = Number(kind === "image" && favourite(taste, "shapes", "aspect:"));
     const area = Number(profile.defaults?.width) * Number(profile.defaults?.height);
     // Sizes keep to multiples of 64, as the models' trained buckets do.
     const side = (length: number) => Math.max(64, Math.round(length / 64) * 64);
@@ -1826,7 +1843,7 @@ export function createDream(options: {
         continue;
       }
       // Equipment exploration accompanies concept exploration; More Like This keeps its source.
-      const learnt = new Set(taste.loras.map((lora) => lora.name));
+      const learnt = new Set(taste.loraScores.map((lora) => lora.name));
       const [fresh] = libraryLoras(ownerId, profile, true).filter((lora) => !learnt.has(lora.name));
       const otherProfile = exploreProfile(ownerId, kind, catalogue.profiles, profile);
       const open = [...(otherProfile ? ["profile"] : []), ...(fresh ? ["lora"] : []), "prompt"];
@@ -1919,7 +1936,8 @@ export function createDream(options: {
       // Spicy goes to a share of ideas, so the rest stay plain.
       const spicy = spicyShare(record, access);
       const explore = Boolean(axis);
-      const feature = steer || seed || axis === "prompt" ? undefined : drawnValue(taste, "tag:");
+      const feature =
+        steer || seed || axis === "prompt" ? undefined : favourite(taste, "tags", "tag:");
       // The prompt is written as the job's first stage (writeJob), streamed into its queue item.
       const writing: DreamWriting = {
         kind: "dream",
@@ -2645,6 +2663,8 @@ export function createDream(options: {
 
   return {
     read,
+    /** The settings an administrator forces, which accounts can't change. */
+    locked: () => Object.keys(options.overrides?.() ?? {}) as (keyof DreamSettings)[],
     history(ownerId: string): DreamActivity[] {
       const labels = {
         "calibrate-like": "Chose Gallery Image",
@@ -2837,6 +2857,12 @@ export function createDream(options: {
       write(ownerId, settle(ownerId, suggestionId).record);
     },
     async save(ownerId: string, patch: Partial<DreamSettings>) {
+      const overrides = options.overrides?.() ?? {};
+      const forced = (Object.keys(patch) as (keyof DreamSettings)[]).find(
+        (key) => key in overrides && patch[key] !== overrides[key],
+      );
+      if (forced)
+        throw failure(`An administrator set ${forced} for every account in Settings › Dream.`, 409);
       const record = read(ownerId);
       // Turning Dream on resumes it too.
       record.settings = { ...record.settings, ...(patch.enabled && { paused: false }), ...patch };

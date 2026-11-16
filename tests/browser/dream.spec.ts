@@ -280,6 +280,28 @@ test("Dream explains itself while off and saves its settings on the deck", async
   await expect.poll(() => dream.settings.images).toBe(false);
 });
 
+test("Dream settings an administrator forces stay locked for the account", async ({ page }) => {
+  await fixtures(page);
+  await serveDream(page, {
+    enabled: false,
+    spicyAvailable: true,
+    locked: ["enabled", "imageBackend"],
+  });
+  await page.goto("/dream");
+  await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
+  await expect(page.getByText("Set by an administrator.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Turn On", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Dream Settings", exact: true }).click();
+  const settings = page.getByRole("dialog", { name: "Dream Settings" });
+  await expect(settings.getByRole("switch", { name: "Dream", exact: true })).toBeDisabled();
+  await expect(
+    settings
+      .getByRole("radiogroup", { name: "Dream Images Run On" })
+      .getByRole("radio", { name: "Cloud", exact: true }),
+  ).toBeDisabled();
+  await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeEnabled();
+});
+
 test("While Dream is off, the deck compares gallery images in pairs", async ({ page }) => {
   await fixtures(page);
   const gallery = ["g1", "g2", "g3", "g4", "g5"].map((id) => ({
@@ -325,14 +347,11 @@ test("Taste displays readable preferences and saves explicit edits separately", 
       styles: ["film grain", "muted colour", "long exposure"],
       avoid: ["crowds"],
       note: "Quiet coastal scenes in soft, misty light.",
-      profiles: {
-        image: [
-          { id: "custom:image-p-h3-image-fast", score: 4 },
-          { id: "gone", score: -1 },
-        ],
-        video: [],
-      },
-      loras: [{ name: "detail.safetensors", strength: 0.8, score: 2 }],
+      models: ["custom:image-p-h3-image-fast", "gone"],
+      loras: ["detail.safetensors"],
+      loraScores: [{ name: "detail.safetensors", strength: 0.8, score: 2 }],
+      shapes: ["0.67", "1.78"],
+      tags: ["fox", "snow"],
       signals: 40,
     },
   });
@@ -342,6 +361,8 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   await expect(profile.getByText(/foxes in snow/)).toBeVisible();
   await expect(profile.getByText("Image Quality", { exact: true })).toBeVisible();
   await expect(profile.getByText("Detail Slider 0.8", { exact: true })).toBeVisible();
+  await expect(profile.getByText("Portrait 2:3; Landscape 16:9", { exact: true })).toBeVisible();
+  await expect(profile.getByText("fox; snow", { exact: true })).toBeVisible();
   await profile.getByRole("button", { name: "Edit", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "Edit Taste", exact: true });
   await editor.getByRole("combobox", { name: "Likes", exact: true }).press("Backspace");
@@ -356,7 +377,7 @@ test("Taste displays readable preferences and saves explicit edits separately", 
     await expect(textEditor).toBeHidden();
     await expect(editor).toBeVisible();
   } else await summary.fill("Quiet coastal scenes with lighthouses.");
-  await editor.getByLabel("Always Avoid", { exact: true }).fill("clowns");
+  await editor.getByRole("combobox", { name: "Dislikes", exact: true }).fill("clowns");
   await page.keyboard.press("Enter");
   await expect(editor.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
   expect(dream.requests).not.toContainEqual(
@@ -366,14 +387,15 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   await expect
     .poll(() => dream.requests.at(-1)?.body)
     .toEqual({
-      avoid: ["clowns"],
       preferences: {
         likes: ["misty harbours", "foxes in snow", "lighthouses", "quiet streets"],
+        avoid: ["crowds", "clowns"],
         note: "Quiet coastal scenes with lighthouses.",
       },
     });
   await expect(editor).toBeHidden();
   await expect(profile.getByText("Summary · Your Edit", { exact: true })).toBeVisible();
+  await expect(profile.getByText("crowds; clowns", { exact: true })).toBeVisible();
   await expect(
     profile.getByText("Quiet coastal scenes with lighthouses.", { exact: true }),
   ).toBeVisible();

@@ -15,7 +15,6 @@ import { canAdmin, clientOf } from "./access.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import {
   accountRoles,
-  explicitWording,
   mayUseFeature,
   mayUseGenerationProfile,
   promptWriter,
@@ -53,7 +52,7 @@ import { logEvent, logWarning } from "./crash-log.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { appVersion, dataDir } from "./data-dir.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
-import { dreamDefaultSettings, flagEnabled } from "./deployment-settings.js";
+import { dreamOverrides, flagEnabled } from "./deployment-settings.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
@@ -829,9 +828,9 @@ const textBusy = () =>
       .status()
       .some((workload) => workload.kind === "text" && workload.acceptedOperations > 0),
   );
-/** Whether what the owner is offered may be worded explicitly. */
+/** Whether what the owner is offered may be worded explicitly: Uncensored Models, always in single-user mode. */
 const explicitFor = (ownerId) =>
-  explicitWording(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId));
+  !ownerId || mayUseFeature(accountAccessForId(ownerId), "uncensoredModels");
 // Suggestions (domain/suggestions.ts): composer ideas and viewer next steps from taste.
 const suggestions = createSuggestions({
   taste,
@@ -871,7 +870,7 @@ registerSuggestionRoutes(app, {
 const projects = createProjects({ dataDir });
 const dream = createDream({
   dataDir,
-  defaults: dreamDefaultSettings,
+  overrides: dreamOverrides,
   store,
   taste,
   projects: (ownerId) => projects.list(ownerId),

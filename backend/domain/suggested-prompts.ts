@@ -29,7 +29,7 @@ interface PromptDescriber {
  * prompt assistant.
  */
 export function createPromptSuggester(options: {
-  /** The Settings › Generation switch (STUDIO_SUGGESTED_PROMPTS). */
+  /** The Settings › Gallery switch (STUDIO_SUGGESTED_PROMPTS). */
   enabled(): boolean;
   writer: PromptDescriber | null;
   idle(): boolean;
@@ -40,7 +40,7 @@ export function createPromptSuggester(options: {
   /** A small (≤512 px) copy of the picture, or null when there is none. */
   image(item: SuggestedPromptItem): Promise<ModelImage | null>;
   save(item: SuggestedPromptItem, prompt: string): void;
-  /** Whether the owner's prompts may be worded explicitly (account-policy.js `explicitWording`). */
+  /** Whether the owner's prompts may be worded explicitly (Uncensored Models). */
   explicit?(ownerId: string): boolean;
   now?: () => number;
   log?: { info(message: string): void };

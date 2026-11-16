@@ -15,6 +15,7 @@ import {
   maxCharacterImages,
 } from "../../shared/characters.ts";
 import { terminalStatuses } from "../../shared/queue.ts";
+import { shapeName } from "../../shared/taste.ts";
 import { mcpJson } from "./media.js";
 
 const maxResults = 50;
@@ -253,7 +254,7 @@ export function registerManageTools({
     server,
     "dream",
     "dream",
-    "The user's Dream (background images from their taste), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer to it) or variations (count new seeds) take item_id; answer takes pair_id and answer. settings sets enabled, paused, images, videos, spicy, dailyImages, dailyVideos. discarded lists discards.",
+    "The user's Dream (background images from their taste), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer to it) or variations (count new seeds) take item_id; answer takes pair_id and answer. settings sets enabled, paused, images, videos, spicy, dailyImages, dailyVideos, except those an administrator locked. discarded lists discards.",
     {
       action: z.enum([
         "status",
@@ -277,6 +278,7 @@ export function registerManageTools({
         status: dream.status,
         ...(dream.reason ? { reason: dream.reason } : {}),
         settings: dream.settings,
+        ...(dream.locked?.length ? { locked: dream.locked } : {}),
         today: dream.today,
         spicy_available: Boolean(dream.spicyAvailable),
         unseen: (dream.unseen || []).length,
@@ -440,9 +442,13 @@ export function registerManageTools({
       return mcpJson({
         summary: answer.summary || "",
         likes: answer.likes,
+        dislikes: answer.avoid,
         styles: answer.styles,
-        avoid: answer.avoid,
-        added_avoid: answer.addedAvoid,
+        models: answer.models,
+        loras: answer.loras,
+        shapes: answer.shapes?.map(shapeName),
+        tags: answer.tags,
+        user_set: Object.keys(answer.preferences || {}),
         updated_at: answer.updatedAt,
         signals: answer.signals,
       });
