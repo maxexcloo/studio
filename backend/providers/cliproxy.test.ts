@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { setImmediate } from "node:timers/promises";
 
 import sharp from "sharp";
 
@@ -29,6 +30,123 @@ const input: CloudRequest = {
   resolution: "1k",
   count: 1,
 };
+
+test("Grok 1.5 admission limits starts while accepted videos and local jobs run independently", async (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 10_000 });
+  const store = new Store(openDatabase(":memory:"));
+  const remote = fixture();
+  const adapter = createCloudQueueAdapter({
+    store,
+    provider: remote.provider,
+    resolve: async (job) => ({
+      ...input,
+      kind: "video",
+      model: String(job.input.model || "grok-imagine-video-1.5"),
+    }),
+    saveMedia: async () => {
+      throw new Error("Unexpected save");
+    },
+    saveGallery: async () => {},
+  });
+  const local: string[] = [];
+  const queue = new GenerationQueue(store, {
+    ...adapter,
+    submit: async (job) => {
+      if (job.resource.startsWith("worker:")) {
+        local.push(job.id);
+        return { status: "running" };
+      }
+      return adapter.submit(job);
+    },
+  });
+  const session = store.createSession("alice");
+  const videos = Array.from({ length: 3 }, () =>
+    store.enqueue(
+      "alice",
+      session.id,
+      { kind: "video" },
+      "animate",
+      undefined,
+      "provider:cliproxyapi",
+    ),
+  );
+  const other = store.enqueue(
+    "alice",
+    session.id,
+    { kind: "video", model: "grok-imagine-video" },
+    "animate",
+    undefined,
+    "provider:cliproxyapi",
+  );
+  const gpu = store.enqueue("alice", session.id, {}, "image", undefined, "worker:primary");
+  const tick = queue.tick();
+  try {
+    await setImmediate();
+    assert.equal(
+      remote.calls.filter((call) => call.body?.model === "grok-imagine-video-1.5").length,
+      2,
+    );
+    assert.equal(store.job("alice", other.id)?.status, "running");
+    assert.deepEqual(local, [gpu.id]);
+    assert.equal(store.job("alice", videos[0].id)?.status, "running");
+    assert.equal(store.job("alice", videos[1].id)?.status, "running");
+    t.mock.timers.tick(1000);
+    await tick;
+    assert.equal(
+      remote.calls.filter((call) => call.body?.model === "grok-imagine-video-1.5").length,
+      3,
+    );
+  } finally {
+    t.mock.timers.tick(1000);
+    await tick;
+    queue.stop();
+    store.close();
+  }
+});
+
+test("Stop during Grok rate admission prevents its POST and preserves accepted videos", async (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 10_000 });
+  const store = new Store(openDatabase(":memory:"));
+  const remote = fixture();
+  const adapter = createCloudQueueAdapter({
+    store,
+    provider: remote.provider,
+    resolve: async () => ({ ...input, kind: "video", model: "grok-imagine-video-1.5" }),
+    saveMedia: async () => {
+      throw new Error("Unexpected save");
+    },
+    saveGallery: async () => {},
+  });
+  const queue = new GenerationQueue(store, adapter);
+  const session = store.createSession("alice");
+  const videos = Array.from({ length: 3 }, () =>
+    store.enqueue(
+      "alice",
+      session.id,
+      { kind: "video" },
+      "animate",
+      undefined,
+      "provider:cliproxyapi",
+    ),
+  );
+  const tick = queue.tick();
+  try {
+    await setImmediate();
+    await queue.cancel("alice", videos[2].id);
+    t.mock.timers.tick(1000);
+    await tick;
+    assert.equal(remote.calls.filter((call) => call.path === "/v1/videos/generations").length, 2);
+    assert.equal(store.job("alice", videos[2].id)?.status, "cancelled");
+    assert.equal(store.job("alice", videos[0].id)?.status, "running");
+    assert.equal(store.job("alice", videos[1].id)?.status, "running");
+  } finally {
+    t.mock.timers.tick(1000);
+    await tick;
+    queue.stop();
+    store.close();
+  }
+});
+
 function fixture() {
   const calls: { path: string; body?: Record<string, unknown>; authenticated: boolean }[] = [];
   let completed = false;
