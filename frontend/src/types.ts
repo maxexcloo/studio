@@ -17,6 +17,8 @@ export interface Profile {
   recipe?: { modelLabel?: string; label?: string; conditioning?: string };
   workerIds?: string[];
   maxLoras?: number;
+  /** How the profile applies optional LoRAs, such as "radiance-tags-v1". */
+  loraAdapter?: string;
   loraNote?: string;
   provider?: string;
   ready?: boolean;

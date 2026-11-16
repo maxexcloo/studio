@@ -14,6 +14,7 @@ import {
   imageRequest,
   radianceImageNode,
   radianceVideoNode,
+  radianceWorkMs,
   videoFailure,
   videoRequest,
 } from "./providers/radiance.ts";
@@ -168,7 +169,7 @@ export async function runRadianceJob(
         showProgress(id, "Generating");
         made = record.video
           ? await runVideo(id, client, record, save, request.body, pollMs)
-          : await client.images(request.route, request.body, new AbortController().signal);
+          : await client.images(request.route, request.body, AbortSignal.timeout(radianceWorkMs));
       }
       // Keep accepted bytes in this process while local storage is unavailable.
       for (const [index, bytes] of made.entries()) {
