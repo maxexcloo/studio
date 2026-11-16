@@ -229,13 +229,15 @@ test("New Character saves a name, description and gallery images from the Refere
   await description.fill("red-haired ranger");
   const done = page.getByRole("button", { name: "Close Description", exact: true });
   if (await done.isVisible()) await done.click();
-  await editor.getByLabel("Likes", { exact: true }).fill("Tea, Earl Grey");
-  await editor.getByLabel("Likes", { exact: true }).press("Enter");
+  const likes = editor.getByRole("combobox", { name: "Likes", exact: true });
+  await likes.fill("Tea, Earl Grey");
+  await likes.press("Enter");
   const boundaryTag = "G".repeat(maxCharacterTrait - "Tea, Earl Grey".length - 1);
-  await editor.getByLabel("Likes", { exact: true }).fill(boundaryTag);
-  await editor.getByLabel("Likes", { exact: true }).press("Enter");
-  await editor.getByLabel("Dislikes", { exact: true }).fill("Noise");
-  await editor.getByLabel("Dislikes", { exact: true }).press("Enter");
+  await likes.fill(boundaryTag);
+  await likes.press("Enter");
+  const dislikes = editor.getByRole("combobox", { name: "Dislikes", exact: true });
+  await dislikes.fill("Noise");
+  await dislikes.press("Enter");
   // Add Images opens the gallery choices in a popup of their own.
   await editor.getByRole("button", { name: "Add Images", exact: true }).click();
   const picker = page.getByRole("dialog", { name: "Add Images", exact: true });
@@ -264,7 +266,6 @@ test("New Character saves a name, description and gallery images from the Refere
   await expect(
     editor.getByRole("button", { name: "Reference 1 · Images", exact: true }),
   ).toBeVisible();
-  const likes = editor.getByLabel("Likes", { exact: true });
   await expect(likes).toHaveAttribute("maxlength", "0");
   // TagsInput handles pasted phrases directly, so they also need whole-field validation.
   await likes.evaluate((input) => {
