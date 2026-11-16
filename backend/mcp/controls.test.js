@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   assertAdjustable,
   cfgIgnoresNegative,
+  fitSize,
   mcpControls,
   mcpLoras,
   prepareLoras,
@@ -271,4 +272,13 @@ test("reference roles and strengths are listed only where a profile declares the
   assert.deepEqual(controls.reference_strengths.slots, {
     style: { min: 0, max: 2, step: 0.05, default: 0.6 },
   });
+});
+
+test("a size past the profile's limit shrinks onto its grid, keeping its shape", () => {
+  const radiance = {
+    constraints: { width: { max: 1344, step: 32 }, height: { max: 1344, step: 32 } },
+  };
+  assert.deepEqual(fitSize(radiance, 2048, 1152), { width: 1344, height: 736 });
+  assert.equal(fitSize(radiance, 1344, 768), null);
+  assert.equal(fitSize({}, 4096, 4096), null);
 });
