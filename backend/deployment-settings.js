@@ -158,7 +158,7 @@ export function dreamDefaultSettings() {
         value === undefined || value === ""
           ? fallback
           : typeof fallback === "boolean"
-            ? value === "1"
+            ? value !== "0"
             : typeof fallback === "number"
               ? Number(value)
               : value,

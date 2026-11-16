@@ -731,7 +731,7 @@ test("split Count reserves one worker, moves together before starting and surviv
   }
 });
 
-test("an unavailable reserved worker holds siblings after cancellation without moving or resubmitting accepted work", async () => {
+test("waiting siblings leave an unavailable reserved worker together without moving or resubmitting accepted work", async () => {
   const { store, adapter, observations, submitted } = fixture();
   adapter.alternatives = () => ["worker:a", "worker:b"];
   let queue = new GenerationQueue(store, adapter);
@@ -753,12 +753,12 @@ test("an unavailable reserved worker holds siblings after cancellation without m
       queueBatch: "first",
     });
     adapter.alternatives = () => ["worker:b"];
-    adapter.eligible = async () => "Waiting for its reserved worker.";
+    adapter.eligible = async () => "Waiting for a worker.";
     observations.set("second", { status: "cancelled" });
     queue = new GenerationQueue(store, adapter);
     await queue.tick();
-    assert.equal(store.job("alice", "third")?.resource, "worker:a");
-    assert.equal(store.job("alice", "third")?.reason, "Waiting for its reserved worker.");
+    assert.equal(store.job("alice", "second")?.resource, "worker:a");
+    assert.equal(store.job("alice", "third")?.resource, "worker:b");
     await queue.cancel("alice", "third");
     await queue.tick();
     assert.equal(store.job("alice", "third")?.status, "cancelled");

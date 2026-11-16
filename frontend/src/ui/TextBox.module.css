@@ -24,15 +24,6 @@
   resize: none;
 }
 
-/* The page positions an overlay over its box; the phone editor lines it up under the text. */
-.overlay {
-  padding-top: var(--mantine-spacing-xs);
-}
-
-.overlay > * {
-  position: static;
-}
-
 /* Editing tools and form sends stay together above the keyboard. */
 .toolbar {
   flex-shrink: 0;
@@ -55,7 +46,7 @@
   display: none;
 }
 
-/* Copy and Reset/Undo keep accessible names when a named tool and send need the room. */
+/* Copy and Reset/Undo keep accessible names when the tools and send need the room. */
 .toolbar:has(.sends) .editAction {
   width: 32px;
   min-width: 0 !important;

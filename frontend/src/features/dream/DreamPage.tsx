@@ -29,7 +29,7 @@ import { DreamDigest } from "./DreamDigest";
 import { DreamHistory } from "./DreamHistory";
 import { DreamProjects } from "./DreamProjects";
 import { DreamSettingsButton, useDreamSettings } from "./DreamSettings";
-import { type Dream, type DreamMedia, dreamQuery, dreamWhen } from "./queries";
+import { type Dream, type DreamMedia, dreamCountQuery, dreamQuery, dreamWhen } from "./queries";
 
 import classes from "./DreamPage.module.css";
 
@@ -97,6 +97,7 @@ export function DreamPage() {
   const [undoTarget, setUndoTarget] = useState<HTMLDivElement | null>(null);
   const client = useQueryClient();
   const dream = useQuery(dreamQuery);
+  const count = useQuery(dreamCountQuery);
   useEffect(() => {
     void post("/api/dream/visit")
       .then(() => client.invalidateQueries({ queryKey: dreamQuery.queryKey, exact: true }))
@@ -126,14 +127,16 @@ export function DreamPage() {
       misses: group.misses.filter((item) => item.type === media),
     }))
     .filter((group) => group.items.length || group.misses.length);
+  // Unseen cards of each kind, so new work on the other kind is never hidden.
+  const counted = (label: string, unseen = 0) => (unseen ? `${label} (${unseen})` : label);
   const selector = ["deck", "overview", "discarded", "history"].includes(view) && (
     <SegmentedControl
       aria-label="Dream Media"
       value={media}
       onChange={(value) => setMedia(value as DreamMedia)}
       data={[
-        { value: "image", label: "Images" },
-        { value: "video", label: "Videos" },
+        { value: "image", label: counted("Images", count.data?.images) },
+        { value: "video", label: counted("Videos", count.data?.videos) },
       ]}
     />
   );

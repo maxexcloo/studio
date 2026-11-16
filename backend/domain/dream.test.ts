@@ -1633,8 +1633,11 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
 
   const request = await serve(t, fx);
   // The header's count takes a comparison as one.
+  const cards = dream.unseen("alice").filter((item) => !item.dream?.pair).length + 1;
   assert.deepEqual((await request("/count")).body, {
-    unseen: dream.unseen("alice").filter((item) => !item.dream?.pair).length + 1,
+    unseen: cards,
+    images: cards,
+    videos: 0,
     active: true,
   });
   const pair = a.dream!.pair!.id;

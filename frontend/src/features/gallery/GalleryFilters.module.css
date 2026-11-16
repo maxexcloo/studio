@@ -45,21 +45,21 @@
   white-space: nowrap;
 }
 
-/* A tablet's toolbar has no room for the count and the slider; the size buttons stay. */
+/* A tablet's toolbar has no room for the count and the slider, and its toggles drop their names
+   to keep one row; the size buttons stay. */
 @container (max-width: 56rem) {
   .mode .count,
-  .mode .slider {
+  .mode .slider,
+  .mode [data-icon-toggle] :global(.mantine-Button-label) {
     display: none;
+  }
+
+  .mode [data-icon-toggle] :global(.mantine-Button-section) {
+    margin-inline-end: 0;
   }
 }
 
 /* The view's switches sit on the panel's right edge, their labels on the left. */
 .toggles :global(.mantine-Switch-body) {
   justify-content: space-between;
-}
-
-.filterPair {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mantine-spacing-md);
 }
