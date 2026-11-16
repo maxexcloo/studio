@@ -13,6 +13,7 @@ import { ChevronDown, RectangleHorizontal } from "lucide-react";
 import {
   type Resolution,
   availableResolutions,
+  orderedAspects,
   resolutionSize,
   selectedResolution,
 } from "../../../../shared/resolution";
@@ -33,7 +34,7 @@ export function SizePicker({
   onChange: (patch: Partial<GenerationInput>) => void;
 }) {
   const touch = useTouch();
-  const presets = profile?.aspectPresets || [];
+  const presets = orderedAspects(profile?.aspectPresets || []);
   const reference = primaryReference(input.referenceDetails || [], profile);
   const framed =
     profile?.aspectPolicy === "reference" &&
@@ -54,21 +55,28 @@ export function SizePicker({
     return { w: width, h: height };
   };
   // A model with its own resolutions (Grok's 1K or 2K, 480p to 1080p) takes the shape from the
-  // aspect and the size from its resolution, so no pixel sizes show.
+  // aspect and the size from its resolution: a preset shows the size it draws there where known.
   const native = profile?.options?.resolutions || [];
   const nativeResolution = String(
     input.resolution ||
       profile?.defaults?.resolution ||
       (input.kind === "video" ? "720p" : Math.max(input.width, input.height) > 1024 ? "2k" : "1k"),
   );
+  const tiers = native.length
+    ? native.map((value) => ({ value, label: value.toUpperCase() }))
+    : choices.length
+      ? [{ value: "pixels", label: "Custom" }, ...choices]
+      : [];
+  const sized = (preset: (typeof presets)[number]): Size | undefined =>
+    tiered ? at(preset) : native.length ? preset.sizes?.[nativeResolution] : preset;
   const current = { w: input.width, h: input.height };
-  const shown = tiered ? at(current) : current;
   // A preset of the current shape is the active one; the exact size is in the title.
   const active = presets.find((preset) => preset.w * current.h === preset.h * current.w);
+  const shown = (active && native.length && sized(active)) || (tiered ? at(current) : current);
   const label = framed
     ? `Reference · ${aspect}`
     : active
-      ? `${active.label}${tiered ? ` · ${tier}` : native.length ? ` · ${nativeResolution.toUpperCase()}` : ` · ${shown.w} × ${shown.h}`}`
+      ? `${active.label} · ${tiered ? tier : native.length ? nativeResolution.toUpperCase() : `${shown.w} × ${shown.h}`}`
       : `${shown.w} × ${shown.h}`;
   return (
     <Popover position="top-start" width={300} trapFocus {...fittedPopup}>
@@ -102,32 +110,25 @@ export function SizePicker({
           </Stack>
         ) : (
           <Stack gap="sm">
-            {!!choices.length && (
+            {tiers.length > 1 && (
               <SegmentedControl
                 aria-label="Resolution"
                 fullWidth
-                value={tier || "pixels"}
+                value={native.length ? nativeResolution : tier || "pixels"}
                 onChange={(value) =>
-                  onChange({
-                    resolutionTier: value === "pixels" ? undefined : (value as Resolution),
-                  })
+                  onChange(
+                    native.length
+                      ? { resolution: value }
+                      : { resolutionTier: value === "pixels" ? undefined : (value as Resolution) },
+                  )
                 }
-                data={[{ value: "pixels", label: "Custom" }, ...choices]}
-              />
-            )}
-            {!!native.length && (
-              <SegmentedControl
-                aria-label="Resolution"
-                fullWidth
-                value={nativeResolution}
-                onChange={(value) => onChange({ resolution: value })}
-                data={native.map((value) => ({ value, label: value.toUpperCase() }))}
+                data={tiers}
               />
             )}
             {!!presets.length && (
               <Stack gap={4} role="group" aria-label="Aspect Presets">
                 {presets.map((preset) => {
-                  const size = tiered ? at(preset) : preset;
+                  const size = sized(preset);
                   const selected = preset === active;
                   return (
                     <Button
@@ -138,7 +139,7 @@ export function SizePicker({
                       color={selected ? undefined : "gray"}
                       aria-pressed={selected}
                       rightSection={
-                        !native.length && (
+                        size && (
                           <Text component="span" size="xs" c="dimmed">
                             {size.w} × {size.h}
                           </Text>

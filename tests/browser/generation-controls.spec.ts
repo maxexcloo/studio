@@ -1108,9 +1108,18 @@ test("A model with its own resolutions offers them with its aspects in the size 
 }) => {
   await fixtures(page);
   const presets = [
-    { label: "1:1", w: 1024, h: 1024 },
-    { label: "16:9", w: 1360, h: 765 },
-    { label: "9:16", w: 765, h: 1360 },
+    {
+      label: "16:9",
+      w: 1280,
+      h: 720,
+      sizes: { "1k": { w: 1280, h: 720 }, "2k": { w: 2816, h: 1584 } },
+    },
+    {
+      label: "1:1",
+      w: 1024,
+      h: 1024,
+      sizes: { "1k": { w: 1024, h: 1024 }, "2k": { w: 2048, h: 2048 } },
+    },
   ];
   await serveProfiles(page, [
     {
@@ -1123,8 +1132,11 @@ test("A model with its own resolutions offers them with its aspects in the size 
   await create(page);
   await page.getByRole("button", { name: "Aspect", exact: true }).click();
   await expect(page.getByRole("radiogroup", { name: "Resolution", exact: true })).toBeVisible();
+  // Each aspect shows the size the model draws at the chosen resolution, in the standard order.
+  const sizes = page.getByRole("group", { name: "Aspect Presets", exact: true });
+  await expect(sizes.getByRole("button")).toHaveText(["1:1 1024 × 1024", "16:9 1280 × 720"]);
   await page.getByText("2K", { exact: true }).click();
-  await page.getByRole("button", { name: "16:9", exact: true }).click();
+  await page.getByRole("button", { name: "16:9 2816 × 1584", exact: true }).click();
   await expect(page.getByRole("button", { name: "Aspect", exact: true })).toHaveText("16:9 · 2K");
 });
 
