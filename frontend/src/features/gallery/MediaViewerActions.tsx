@@ -81,6 +81,7 @@ export function MediaViewerActions({
     transfer,
     compare,
     edit: prompt.edit,
+    assist: prompt.assist,
     iterate,
     onApplied,
     onCompare,
