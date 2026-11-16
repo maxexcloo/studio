@@ -541,7 +541,7 @@ function gallerySearchText(item) {
 /**
  * A gallery filter for a search: every word must appear somewhere, or the
  * image looks like the search (`near`, from domain/image-search.ts), and
- Runs still generating always pass,
+ * Runs still generating pass the search and unfinished settings, but must match origin,
  * so a search never hides the progress of what is being made right now.
  * Null when there is nothing to filter by.
  */
@@ -570,13 +570,14 @@ export function galleryFilter({
   size = "",
   aspect = "",
   tag = "",
+  origin = "",
 } = {}) {
   const terms = searchTerms(q);
-  const filtered = galleryFiltersTest({ lora, model, workflow, size, aspect, tag });
+  const filtered = galleryFiltersTest({ lora, model, workflow, size, aspect, tag, origin });
   if (!terms.length && !filtered) return null;
   return (item) => {
-    if (item.status === "pending") return true;
     if (filtered && !filtered(item)) return false;
+    if (item.status === "pending") return true;
     if (!terms.length) return true;
     const text = gallerySearchText(item);
     return terms.every((term) => text.includes(term)) || Boolean(near?.(item));

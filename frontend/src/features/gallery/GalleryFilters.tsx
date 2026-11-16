@@ -17,6 +17,7 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 import { ChevronDown, type LucideIcon, X } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
+import { galleryOrigins } from "../../../../shared/gallery-origin";
 import { loraName, profileNameParts } from "../../../../shared/profiles";
 import { api } from "../../api";
 import type { MediaKind, Profile, Rating } from "../../types";
@@ -52,7 +53,7 @@ export interface FilterChip {
 }
 const keysOf = (option: GalleryFilterOption) => option.keys || [option.value];
 
-const facets = ["model", "lora", "size", "aspect", "tag"] as const;
+const facets = ["model", "lora", "size", "aspect", "tag", "origin"] as const;
 type Facet = (typeof facets)[number];
 type GalleryDate = "" | "day" | "week" | "month" | "year";
 const dates: { value: GalleryDate; label: string; chip: string; days: number }[] = [
@@ -82,6 +83,7 @@ export const emptyGalleryFilters: GalleryFilterValues = {
   size: [],
   aspect: [],
   tag: [],
+  origin: [],
   date: "",
   rating: "",
   uploads: false,
@@ -197,6 +199,7 @@ function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues
       size: facets.data?.sizes || [],
       aspect: facets.data?.aspects || [],
       tag: facets.data?.tags || [],
+      origin: galleryOrigins,
     } satisfies Record<Facet, GalleryFilterOption[]>,
   };
 }
@@ -546,6 +549,7 @@ export function GalleryFilterPanel({
             />
           </Input.Wrapper>
         )}
+        {many("origin", "Origin")}
         {lists.tag.length > 0 && many("tag", "Tags")}
       </Pair>
       {!inline && <Divider />}
