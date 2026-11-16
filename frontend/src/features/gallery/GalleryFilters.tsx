@@ -134,7 +134,7 @@ function modelKeyName(key: string) {
     .filter(
       (word) =>
         word &&
-        !/^(comfyui|radiance|bf16|fp(4|8|16|32)|nvfp4|mxfp4|e4m3fn|e5m2|scaled|gguf|nf4|int[48]|q\d(_k)?(_[a-z0-9]+)?)$/i.test(
+        !/^(comfyui|radiance|bf16|fp(4|8|16|32)|iq\d+r|i8|nvfp4|mxfp4|e4m3fn|e5m2|scaled|gguf|nf4|int[48]|q\d(_k)?(_[a-z0-9]+)?)$/i.test(
           word,
         ),
     );

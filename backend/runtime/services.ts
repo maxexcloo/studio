@@ -12,6 +12,7 @@ interface Worker {
   name: string;
   url: string;
   capabilities: string[];
+  backend?: string;
 }
 type Environment = Record<string, string | undefined>;
 type Probe = Pick<
@@ -111,7 +112,8 @@ export function createServicesObserver({
 }: Options) {
   const cache = new Map<string, { until: number; result: Promise<Probe> }>();
   const managed = controller?.workloads ?? [];
-  function probe(endpoint: string, kind: ServiceKind): Promise<Probe> {
+  /** `radiance`: a Radiance worker, which answers /health as text runtimes do. */
+  function probe(endpoint: string, kind: ServiceKind, radiance = false): Promise<Probe> {
     for (const [key, entry] of cache) if (entry.until <= now()) cache.delete(key);
     // A worker that runs images and videos answers one health check for both.
     const key = kind === "text" ? `text:${endpoint}` : endpoint;
@@ -139,11 +141,11 @@ export function createServicesObserver({
             checkedAt,
           };
         }
-        if (kind === "text") {
+        if (kind === "text" || radiance) {
           await response.body?.cancel();
           return {
             state: "healthy",
-            reason: "The direct text runtime health endpoint is ready.",
+            reason: `The direct ${radiance ? "Radiance" : "text runtime"} health endpoint is ready.`,
             checkedAt,
           };
         }
@@ -202,13 +204,17 @@ export function createServicesObserver({
     const services: ServicesStatus["services"] = {};
     const parked = (await controller?.parked()) ?? new Set<string>();
     const observe = async (
-      { url, ...target }: { id: string; label: string; url: string; workloads?: string[] },
+      {
+        url,
+        radiance,
+        ...target
+      }: { id: string; label: string; url: string; workloads?: string[]; radiance?: boolean },
       kind: ServiceKind,
     ): Promise<ServiceEndpoint> => {
       let endpoint: string | undefined;
       try {
         endpoint = url
-          ? directAddress(url, kind === "text" ? "health" : "system_stats")
+          ? directAddress(url, kind === "text" || radiance ? "health" : "system_stats")
           : undefined;
         const gateway = environment.STUDIO_ASSISTANT_URL;
         if (
@@ -229,7 +235,7 @@ export function createServicesObserver({
             checkedAt: new Date(now()).toISOString(),
           }
         : endpoint
-          ? { ...(await probe(endpoint, kind)) }
+          ? { ...(await probe(endpoint, kind, radiance)) }
           : {
               state: "unknown",
               reason: "No direct runtime health endpoint is configured for this workload.",
@@ -253,6 +259,7 @@ export function createServicesObserver({
         id: worker.id,
         label: worker.name,
         url: worker.url,
+        ...(worker.backend === "radiance" ? { radiance: true } : {}),
         ...(matches.length ? { workloads: matches.map((item) => item.id) } : {}),
       };
     };

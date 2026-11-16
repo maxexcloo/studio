@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM docker.io/stilldeadcode/radiance:1.17.0 AS radiance
+FROM docker.io/stilldeadcode/radiance:2.1.0 AS radiance
 FROM docker.io/yanwk/comfyui-boot:rocm-20261111 AS comfyui-boot
 
 FROM comfyui-boot AS sources
@@ -28,7 +28,7 @@ COPY worker/comfyui/ /root/ComfyUI/custom_nodes/
 COPY worker/patches/ /opt/studio/patches/
 COPY worker/entrypoint.sh /opt/studio/
 RUN python3 /opt/studio/patches/patch_minimax.py /root/ComfyUI \
-    && python3 -m compileall -q /root/ComfyUI/custom_nodes/radiance /root/ComfyUI/custom_nodes/studio_worker
+    && python3 -m compileall -q /root/ComfyUI/custom_nodes/studio_worker
 # Update affected runtime packages through the official repositories; other image repositories are unrelated.
 RUN sed -i 's|http://download.opensuse.org/|https://download.opensuse.org/|g' /etc/zypp/repos.d/*.repo \
     && zypper --non-interactive refresh repo-oss repo-update \
@@ -37,14 +37,15 @@ RUN sed -i 's|http://download.opensuse.org/|https://download.opensuse.org/|g' /e
     && zypper clean --all \
     # renovate: datasource=pypi depName=uv
     && python3 -m pip install --no-cache-dir uv==0.13.8
-# Radiance comes last: a Radiance update then changes only these layers, not the whole image.
+# Radiance's rad-convert converts fine-tunes (studio_worker/convert.py). It comes last, so a
+# Radiance update changes only these layers.
 COPY --from=radiance /opt/radiance /opt/radiance
 COPY --from=radiance /lib64/ld-linux-x86-64.so.2 /opt/radiance/runtime/ld-linux-x86-64.so.2
 COPY --from=radiance /usr/lib/x86_64-linux-gnu /opt/radiance/runtime/lib
 COPY LICENSE NOTICE /opt/studio/
-# The packaged Radiance runtime and the notices must be in the image.
+# The packaged rad-convert and the notices must be in the image.
 RUN test -x /opt/radiance/runtime/ld-linux-x86-64.so.2 \
-    && test -x /opt/radiance/bin/radiance \
+    && test -x /opt/radiance/bin/rad-convert \
     && test -s /opt/studio/LICENSE \
     && test -s /opt/studio/NOTICE
 # Stops a ROCm profiler-registration thread spinning a CPU core while GPU contexts are idle; set

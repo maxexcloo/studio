@@ -136,7 +136,7 @@ function applyRgthreeLoraStack(graph, body, config) {
   }
 }
 
-// Radiance takes the stack as one JSON string and adds the LoRA tags itself, so the prompt text stays as written.
+// Radiance takes the stack as one JSON string, sent as its request's `loras` (providers/radiance.ts), so the prompt text stays as written.
 // LoRAs the profile itself names (a speed LoRA such as Lightning) stay first; the request's stack follows.
 function applyRadianceLoraStack(graph, body, config) {
   const node = graph[config.node];

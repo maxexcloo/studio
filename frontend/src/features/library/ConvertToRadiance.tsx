@@ -45,12 +45,12 @@ export const radianceConversionQuery = queryOptions({
   refetchInterval: (query) => (query.state.data?.conversion?.status === "running" ? 2000 : false),
 });
 
-/** A model name from the profile's: "FinePorn 6 · Fast" suggests "fineporn-6-fp8". */
+/** A model name from the profile's: "FinePorn 6 · Fast" suggests "fineporn-6-iq8r". */
 const suggestedName = (name: string) =>
   `${(profileNameParts(name)[0] || "fine-tune")
     .toLowerCase()
     .replace(/[^a-z0-9.]+/g, "-")
-    .replace(/^-+|-+$/g, "")}-fp8`;
+    .replace(/^-+|-+$/g, "")}-iq8r`;
 
 /**
  * Library › Profiles › Convert to Radiance…: converts a Krea 2 profile's fine-tune to a Radiance

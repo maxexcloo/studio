@@ -6,6 +6,7 @@ import { dreamOwnership } from "./dream-ownership.js";
 import { galleryRatings } from "./gallery-ratings.js";
 import { legacyShapes } from "./legacy-shapes.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
+import { radianceModels } from "./radiance-models.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -33,6 +34,12 @@ const steps = [
     name: "galleryRatings",
     run: galleryRatings,
     changes: (plan) => plan.likes + plan.unstarred + plan.dislikes + plan.signals,
+    online: true,
+  },
+  {
+    name: "radianceModels",
+    run: radianceModels,
+    changes: (plan) => plan.profiles.length,
     online: true,
   },
   {

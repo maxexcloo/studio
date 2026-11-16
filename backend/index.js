@@ -201,7 +201,13 @@ import { loadSharp } from "./sharp-loader.js";
 import { installShutdown } from "./shutdown.js";
 import { registerStatusRoutes } from "./status-routes.js";
 import { registerUpscaleRoutes } from "./upscale-routes.js";
-import { defaultWorker, defaultWorkerId, listWorkers, useWorkloadWorkers } from "./workers.js";
+import {
+  defaultWorker,
+  defaultWorkerId,
+  isRadianceWorker,
+  listWorkers,
+  useWorkloadWorkers,
+} from "./workers.js";
 import { flushWorkflowPreferences } from "./workflow-catalogue.js";
 import { registerWorkflowRoutes } from "./workflow-routes.js";
 
@@ -487,9 +493,22 @@ registerLibraryRoutes(app, {
 
 registerWorkflowRoutes(app, { loadComfyContext });
 
-const profileObjectInfo = async (kind) =>
-  (await loadComfyContext(routeJob(kind === "video" ? "video" : "image")?.id || defaultWorkerId()))
-    .info;
+// The node lists a profile's graphs are checked against: a ComfyUI worker's, with Radiance's nodes.
+const profileObjectInfo = async (kind) => {
+  const capability = kind === "video" ? "video" : "image";
+  const radiance = listWorkers().find(
+    (worker) => isRadianceWorker(worker) && worker.capabilities.includes(capability),
+  );
+  const [info, radianceInfo] = await Promise.all([
+    loadComfyContext(routeJob(capability)?.id || defaultWorkerId()).then((context) => context.info),
+    radiance &&
+      loadComfyContext(radiance.id).then(
+        (context) => context.info,
+        () => null,
+      ),
+  ]);
+  return { ...info, ...radianceInfo };
+};
 registerProfileEditorRoutes(app, {
   objectInfo: profileObjectInfo,
   accountName: (account) => account?.userId || "",
@@ -501,6 +520,15 @@ registerProfileRoutes(app, {
   promptStyles: () => promptStyleStore(),
   objectInfo: profileObjectInfo,
   accountName: (account) => account?.userId || "",
+  // Radiance reads a converted model's entry (studio_worker/convert.py) when its pod starts, so a
+  // running one restarts; a stopped one reads it when it next starts.
+  onConverted: async (by) => {
+    const workload = runtime?.controller.workloads.find((item) => item.backend === "radiance");
+    if (workload)
+      await runtime.controller
+        .restart(workload.id, `${by || "Studio"}: serving a converted model`)
+        .catch(() => null);
+  },
   exportOptions: () => ({
     dataDir,
     workflowsDir: userWorkflowsDir,
