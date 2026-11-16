@@ -557,18 +557,18 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await name.getByRole("button").click();
   await expect(name).toHaveAttribute("aria-sort", "descending");
   await expect(names).toHaveText(["XL Base", "Flux Base"]);
-  await page.getByRole("button", { name: "Filter Models", exact: true }).click();
+  await page.getByRole("button", { name: "Filter Files", exact: true }).click();
   await page.getByRole("combobox", { name: "Family", exact: true }).click();
   await page.getByRole("option", { name: "SDXL", exact: true }).click();
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("XL Base");
   await page
-    .getByRole("dialog", { name: "Filter Models", exact: true })
+    .getByRole("dialog", { name: "Filter Files", exact: true })
     .getByRole("button", { name: "Clear", exact: true })
     .click();
   await expect(table.getByRole("row")).toHaveCount(3);
-  await page.getByRole("button", { name: "Filter Models", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Filter Models", exact: true })).toBeHidden();
+  await page.getByRole("button", { name: "Filter Files", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Filter Files", exact: true })).toBeHidden();
   await (await toolbarSearch(page, "Files")).fill("flux");
   await expect(table.getByRole("row")).toHaveCount(2);
   // Escape leaves search, keeping the query and the Library open.
