@@ -342,13 +342,9 @@ export function createServicesObserver({
       ...(statuses ? { workers: statuses } : {}),
       runtime: {
         configured: Boolean(controller),
-        automaticLifecycle: controller?.automaticLifecycle === true,
-        swap: Boolean(controller) && (administrator || controller!.settings.everyoneSwaps === true),
-        reason: !controller
-          ? "Studio runtime control is not configured; GPU workloads are neither observed nor switched."
-          : controller.automaticLifecycle
-            ? "Studio starts and stops GPU workloads as queued work needs them."
-            : "Studio switches GPU workloads only when an administrator applies a placement.",
+        reason: controller
+          ? "Studio switches GPU workloads only when an administrator applies a placement."
+          : "Studio runtime control is not configured; GPU workloads are neither observed nor switched.",
       },
     };
   };

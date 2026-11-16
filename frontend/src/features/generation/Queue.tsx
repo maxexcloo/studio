@@ -48,7 +48,6 @@ import { usePhone } from "../../ui/usePhone";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
 import { useTryAgain } from "../gallery/useTryAgain";
-import { useJobSwap } from "../runtime/JobSwap";
 import { useGenerationActions } from "./GenerationProvider";
 import { loraInfoQuery } from "./LoraPicker";
 import { isProfile, profileName, shownProfileName } from "./payload";
@@ -429,14 +428,11 @@ function QueueRow({
   job,
   sortable,
   drag,
-  onSwap,
 }: {
   job: QueueJob;
   /** Shows its drag handle, which works once `drag` arrives with the sortable list. */
   sortable: boolean;
   drag?: QueueRowDrag;
-  /** Offers to swap running text out for this waiting work, when the account may. */
-  onSwap?: () => void;
 }) {
   const [opened, setOpened] = useState(false);
   const detailsId = useId();
@@ -480,11 +476,6 @@ function QueueRow({
             </Group>
           </Stack>
         </UnstyledButton>
-        {onSwap && (
-          <Button variant="default" size="compact-sm" miw="max-content" onClick={onSwap}>
-            Swap to {job.input?.kind === "video" ? "Videos" : "Images"}
-          </Button>
-        )}
         {failed && <ClearJob job={job} />}
         <QueueJobAction job={job} compact />
       </Group>
@@ -844,7 +835,6 @@ export function Queue() {
   const action = useQueueAction();
   const everyone = usePausesEveryone();
   const client = useQueryClient();
-  const swap = useJobSwap();
   // Loads dragging ahead of a second waiting item, so the rows aren't replaced when it arrives.
   useEffect(() => void loadSortable(), []);
   if (queue.error) return <Alert color="red">{queue.error.message}</Alert>;
@@ -878,13 +868,7 @@ export function Queue() {
   const movable = entries.filter((entry) => waiting(entry).length > 0);
   const sortable = movable.length > 1;
   const jobRow = (job: QueueJob, drag?: QueueRowDrag, handle = false) => (
-    <QueueRow
-      key={job.id}
-      job={job}
-      sortable={handle}
-      drag={drag}
-      onSwap={swap.swappable(job) ? () => swap.offer(job) : undefined}
-    />
+    <QueueRow key={job.id} job={job} sortable={handle} drag={drag} />
   );
   const row = (entry: QueueEntry, drag?: QueueRowDrag) =>
     entry.set ? (
@@ -938,7 +922,6 @@ export function Queue() {
       ) : (
         entries.map((entry) => row(entry))
       )}
-      {swap.dialog}
     </Stack>
   );
 }

@@ -28,24 +28,6 @@ export interface RuntimePreview {
   signature: string;
 }
 
-/**
- * A previewed swap for waiting media work (`POST /api/queue/:id/swap`): its placement, with each
- * workload's name for accounts that can't read Settings › Workers.
- */
-export interface RuntimeSwap extends RuntimePreview {
-  labels: Record<string, string>;
-  /** The stopping text workload Run When Idle may start again once Studio is idle. */
-  runWhenIdle?: string;
-}
-
-/** Why media work waits while running text holds the GPUs it needs; it marks the work as swappable. */
-export const textHoldsGpus = (names: string[]) =>
-  `Waiting for a GPU: ${names.join(", ")} ${names.length === 1 ? "is running; stop it" : "are running; stop them"} in Settings › Workers.`;
-export const waitsOnText = (reason?: string) =>
-  /^Waiting for a GPU: .+ (is running; stop it|are running; stop them) in Settings › Workers\.$/.test(
-    reason ?? "",
-  );
-
 export interface RuntimeOperation {
   id: string;
   type: "apply" | "restart";
@@ -64,20 +46,6 @@ export interface RuntimeOperation {
   error?: string;
 }
 
-/**
- * Automatic control starts media workloads for queued work and settles idle pools. It stops no text
- * workload and starts only a text workload chosen as `idleWorkload`.
- */
-export interface RuntimeSettings {
-  automatic: boolean;
-  /** Minutes without queued or running work before a pool is idle; 0 never. */
-  parkIdleMinutes: number;
-  /** The workload to start once its pool is idle, parking its idle media; absent (or "" when set) is None. */
-  idleWorkload?: string;
-  /** Ordinary accounts may swap a text workload out for their waiting media work, as administrators can. */
-  everyoneSwaps?: boolean;
-}
-
 /** The tail of one pod's container log (`GET /api/runtime/workloads/:id/logs`), oldest line first. */
 export interface RuntimePodLog {
   name: string;
@@ -92,7 +60,6 @@ export interface RuntimePodLog {
 }
 
 export interface RuntimeStatus {
-  settings: RuntimeSettings;
   pools: { id: string; capacity: number; used: number }[];
   operation?: RuntimeOperation;
   history: RuntimeOperation[];
