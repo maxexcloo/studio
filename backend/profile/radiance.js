@@ -13,7 +13,12 @@
  */
 import { civitaiJson, isCivitaiHost } from "../civitai/access.js";
 import { civitaiFileSpec, civitaiLink, civitaiModelFiles } from "../civitai/import.js";
-import { backendIdsOf, graphFromJson, sharedProfileFields } from "../custom-workflows.js";
+import {
+  backendIdsOf,
+  graphFromJson,
+  profileOnBackend,
+  sharedProfileFields,
+} from "../custom-workflows.js";
 import { hfFetch, hfTokenValue } from "../hf-access.js";
 import { resolveModelLink } from "../library/downloads.js";
 import { workerRadiance } from "../worker-models.js";
@@ -22,13 +27,26 @@ import { readEditableProfile, saveEditableProfile } from "./editor.js";
 
 const invalid = (message) => Object.assign(new Error(message), { status: 400 });
 
+/**
+ * The ComfyUI profile a conversion starts from: the profile itself, or the ComfyUI backend of one
+ * already converted, so a new Radiance format can convert it again. Null for other combinations.
+ */
+function comfyuiSource(raw) {
+  const ids = backendIdsOf(raw);
+  if (!ids.length) return raw;
+  return ids.includes("comfyui") && ids.every((id) => ["comfyui", "radiance"].includes(id))
+    ? profileOnBackend(raw, "comfyui").raw
+    : null;
+}
+
 /** Why a profile can't take a converted Radiance backend, or "" when it can. */
 function conversionRefusal(raw) {
   const studio = raw?.studio || {};
   if (studio.kind !== "image" || studio.family !== "krea2")
     return "Only Krea 2 image profiles convert to Radiance.";
-  if (backendIdsOf(raw).length) return "This profile already has its backends.";
-  if (graphBackend(raw) !== "comfyui") return "Only a profile that runs on ComfyUI converts.";
+  const source = comfyuiSource(raw);
+  if (!source) return "This profile already has its backends.";
+  if (graphBackend(source) !== "comfyui") return "Only a profile that runs on ComfyUI converts.";
   return "";
 }
 
@@ -104,10 +122,11 @@ function radianceProfile(studio, model) {
 export function withRadianceBackend(raw, model) {
   const refusal = conversionRefusal(raw);
   if (refusal) throw invalid(refusal);
-  const comfyui = { studio: raw.studio, graph: graphFromJson(raw) };
+  const source = comfyuiSource(raw);
+  const comfyui = { studio: source.studio, graph: graphFromJson(source) };
   return combinedText(raw.studio.id, raw.studio.name, "radiance", {
     comfyui,
-    radiance: radianceProfile(raw.studio, model),
+    radiance: radianceProfile(source.studio, model),
   });
 }
 
