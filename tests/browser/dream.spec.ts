@@ -816,3 +816,53 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
       },
     ]);
 });
+
+test("new Dream generations follow the active comparison, survive Undo and precede calibration", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const dated = (id: string, day: number) =>
+    dreamItem(id, {
+      createdAt: `2026-11-${String(day).padStart(2, "0")}T00:00:00.000Z`,
+    });
+  const pair = (id: string, day: number) =>
+    [0, 1].map((side) => {
+      const item = dated(`${id}-${side}`, day);
+      return {
+        ...item,
+        dream: { ...item.dream, pair: { id, side, question: `Which ${id}?`, label: String(side) } },
+      };
+    });
+  const dream = await serveDream(page, {
+    unseen: [dated("old", 1), dated("middle", 5), ...pair("original", 10)],
+    calibration: [dreamItem("gallery-a"), dreamItem("gallery-b")],
+  });
+  await page.goto("/dream");
+  const original = page.getByRole("group", { name: "Which original?", exact: true });
+  await expect(original).toBeVisible();
+  dream.unseen.push(dated("latest", 16), ...pair("arrived", 15));
+  // A settings reply refreshes the unseen pool without waiting for the polling interval.
+  const refreshed = page.waitForResponse(
+    (response) => response.url().endsWith("/api/dream/settings") && response.ok(),
+  );
+  await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
+  await refreshed;
+  await expect(original).toBeVisible();
+  await page.getByRole("button", { name: "A", exact: true }).click();
+  await expect(current(page)).toContainText("Dream prompt latest");
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(original).toBeVisible();
+  expect(dream.requests.filter((request) => request.path.includes("/answer"))).toEqual([]);
+  await page.getByRole("button", { name: "Both", exact: true }).click();
+  await expect(current(page)).toContainText("Dream prompt latest");
+  await page.getByRole("button", { name: "Keep", exact: true }).click();
+  await expect(page.getByRole("group", { name: "Which arrived?", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Both", exact: true }).click();
+  await expect(current(page)).toContainText("Dream prompt middle");
+  await page.getByRole("button", { name: "Keep", exact: true }).click();
+  await expect(current(page)).toContainText("Dream prompt old");
+  await page.getByRole("button", { name: "Keep", exact: true }).click();
+  await expect(
+    page.getByRole("group", { name: "Current Gallery Image", exact: true }),
+  ).toBeVisible();
+});

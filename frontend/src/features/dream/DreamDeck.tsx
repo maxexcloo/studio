@@ -21,7 +21,7 @@ import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import { type Verdict, viewerChoices } from "./choices";
-import { type DeckCard, type PairDeckCard, deckCards } from "./deck";
+import { type DeckCard, type PairDeckCard, cardIds, deckCards } from "./deck";
 import { PairContent, sideLabel } from "./PairCard";
 import {
   type DreamItem,
@@ -184,8 +184,6 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
   });
 }
 
-const ids = (card: DeckCard) =>
-  card.kind === "pair" ? card.items.map((item) => item.id) : [card.item.id];
 /** How many Dream results a card holds; calibration cards hold none. */
 const dreamed = (card: DeckCard) =>
   card.kind === "dream" ? 1 : card.kind === "pair" && card.pairId ? 2 : 0;
@@ -268,6 +266,7 @@ export function DreamDeck({
 }) {
   const phone = usePhone();
   const touch = useTouch();
+  const [current, setCurrent] = useState<DeckCard>();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
   const [counts, setCounts] = useState({ judged: 0, dreamed: 0 });
   // The id of the top card's item open in the viewer; after a verdict it follows the next card.
@@ -275,17 +274,20 @@ export function DreamDeck({
   // The side a tap chose, outlined while its card leaves.
   const [picked, setPicked] = useState<{ key: string; side: 0 | 1 } | null>(null);
   /** Puts a card back on the deck, after a failed verdict or an Undo. */
-  const restore = (card: DeckCard) =>
+  const restore = (card: DeckCard) => {
+    setCurrent(card);
     setDecided((previous) => {
       const next = new Set(previous);
-      for (const id of ids(card)) next.delete(id);
+      for (const id of cardIds(card)) next.delete(id);
       return next;
     });
+  };
   const judge = useJudge(restore);
   const unseen = items.filter((item) => !decided.has(item.id));
   const gallery = useCalibration(pairsOnly ? 2 : 1, decided, media);
-  const cards = deckCards(unseen, gallery.items, counts.judged, { pairsOnly, media });
+  const cards = deckCards(unseen, gallery.items, counts.judged, { pairsOnly, media, current });
   const [top, next] = cards;
+  if (top !== current) setCurrent(top);
   usePrefetch(cards[2]);
   const fly = useRef<Fly | null>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -296,9 +298,10 @@ export function DreamDeck({
 
   /** Takes the card off the deck. */
   function decide(card: DeckCard) {
+    setCurrent(undefined);
     setDecided((previous) => {
       const next = new Set(previous);
-      for (const id of ids(card)) next.add(id);
+      for (const id of cardIds(card)) next.add(id);
       return next;
     });
     setCounts((previous) => ({
