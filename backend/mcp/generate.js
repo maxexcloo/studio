@@ -48,6 +48,7 @@ import {
   accountBrief,
   accountBriefLine,
   assertAvoided,
+  assertNotDisliked,
   briefLine,
   keptChoices,
   projectArgs,
@@ -1219,11 +1220,7 @@ export function registerGenerateTools({
       );
     }
     if (project) assertAvoided(project, args.prompts);
-    if (account.avoid.length)
-      assertAvoided(
-        { name: "the user's brief", brief: { avoid: account.avoid.join("\n") } },
-        args.prompts,
-      );
+    assertNotDisliked(account, args.prompts);
     if ([args.profile_id, profile_ids, each_profile].filter(Boolean).length > 1)
       throw new Error(
         "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call generate again.",
@@ -1311,7 +1308,7 @@ export function registerGenerateTools({
         } catch {
           // Gone or no longer granted: Studio picks as usual.
         }
-      // Otherwise the first ready favourite in the user's brief that fits.
+      // Otherwise the first ready favourite in the user's taste that fits.
       let favourite = null;
       if (
         args.profile_id === undefined &&
@@ -1319,11 +1316,11 @@ export function registerGenerateTools({
         !keptModel &&
         !card &&
         !args.loras?.length &&
-        account.brief.profiles?.length
+        account.models.length
       ) {
         const ready = localUnlessAsked(await media.profiles(kind || "image", owner), { request });
         const pool = wanted ? profilesForTier(ready, wanted) : ready;
-        const found = account.brief.profiles
+        const found = account.models
           .map((id) => pool.find((profile) => profile.id === id))
           .find((profile) => profile && (profile.mediaInputs || []).length >= references);
         if (found)
@@ -1722,11 +1719,7 @@ export function registerGenerateTools({
       accountBrief(media, owner, signal),
     ]);
     if (project) assertAvoided(project, checked);
-    if (account.avoid.length)
-      assertAvoided(
-        { name: "the user's brief", brief: { avoid: account.avoid.join("\n") } },
-        checked,
-      );
+    assertNotDisliked(account, checked);
     // Each plan's chosen prompts, grouped by how many images each runs, become a submission.
     const all = await media.profiles("all", owner);
     const seed = crypto.randomInt(2 ** 31);

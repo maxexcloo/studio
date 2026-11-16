@@ -30,8 +30,6 @@ test("chat briefs persist per account, patch only named fields and clear without
         body: "tall",
         styles: "film",
         rules: "Keep the outfit",
-        profiles: ["model-a"],
-        loras: ["film", "film"],
       })
     ).status,
     200,
@@ -41,16 +39,14 @@ test("chat briefs persist per account, patch only named fields and clear without
   assert.equal(saved.subjects, "Portraits");
   assert.equal(saved.rules, "Keep the outfit");
   assert.equal(saved.styles, "natural light");
-  assert.deepEqual(saved.loras, ["film"]);
   assert.deepEqual(readRuntimeDocument(directory, "preferences:alice").chatBrief, saved);
   assert.deepEqual((await call("GET", "bob")).payload.brief, {});
   assert.equal((await call("PATCH", "alice", { invented: true })).status, 400);
   assert.equal((await call("PATCH", "alice", { age: "x".repeat(301) })).status, 400);
   assert.deepEqual((await call("GET", "alice")).payload.brief, saved);
-  await call("PATCH", "alice", { subjects: "", profiles: [] });
+  await call("PATCH", "alice", { subjects: "" });
   const cleared = (await call("GET", "alice")).payload.brief;
   assert.equal(cleared.subjects, undefined);
-  assert.equal(cleared.profiles, undefined);
   assert.equal(cleared.rules, saved.rules);
   assert.equal(accountPreferences("alice").tileCaptions, false);
 });

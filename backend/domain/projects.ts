@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { cleanBrief } from "../../shared/chat-brief.ts";
 import {
   type Project,
   type ProjectContent,
   maxProjectBrief,
+  maxProjectLoras,
   maxProjectName,
   maxProjectProfiles,
   projectAspects,
@@ -56,11 +56,13 @@ export function projectPatch(body: unknown): ProjectPatch {
       if (value !== undefined)
         Object.assign(patch.brief, { [key]: text(value, key, maxProjectBrief) });
     if (loras !== undefined) {
-      try {
-        patch.brief.loras = cleanBrief({ loras }).loras || [];
-      } catch (error) {
-        throw failure((error as Error).message, 400);
-      }
+      if (
+        !Array.isArray(loras) ||
+        loras.length > maxProjectLoras ||
+        loras.some((name) => typeof name !== "string" || !name.trim() || name.length > 200)
+      )
+        throw failure(`List at most ${maxProjectLoras} favourite LoRAs.`, 400);
+      patch.brief.loras = [...new Set(loras.map((name: string) => name.trim()))];
     }
   }
   if (constraints !== undefined) {
