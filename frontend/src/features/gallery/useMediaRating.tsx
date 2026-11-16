@@ -47,7 +47,7 @@ function withRating(value: unknown, ids: Set<string>, rating: Rating | null): un
   return changed ?? value;
 }
 
-export interface RatingChange {
+interface RatingChange {
   ids: string[];
   /** Liked, disliked, or null to take a rating back. */
   rating: Rating | null;
