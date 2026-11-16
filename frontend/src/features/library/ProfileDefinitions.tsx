@@ -348,8 +348,8 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 {rowMenu(setEditing, "profile", "Profile", entry.id, () =>
                   duplicating.mutate(entry.id),
                 )}
-                {/* A Krea 2 profile on ComfyUI alone can take a converted Radiance backend. */}
-                {entry.family === "krea2" && entry.kind === "image" && !entry.backend && (
+                {/* A Krea 2 profile on ComfyUI can take a converted Radiance backend, or a newer one. */}
+                {entry.family === "krea2" && entry.kind === "image" && (
                   <Menu.Item leftSection={<Zap size={16} />} onClick={() => setConverting(entry)}>
                     Convert to Radiance…
                   </Menu.Item>
