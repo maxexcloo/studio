@@ -36,6 +36,7 @@ import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {
   capabilityForProfile,
   defaultWorkerId,
+  isRadianceWorker,
   listWorkers,
   noWorkerMessage,
   workerById,
@@ -352,7 +353,12 @@ export function createGenerationSubmission({
         body.prompt = prompt;
       }
     }
-    if (body.referenceAssets?.length && !body.referenceAssets.every((item) => item.comfyName)) {
+    // Radiance uploads references with its request rather than staging them in ComfyUI.
+    if (
+      !isRadianceWorker(workerById(backend)) &&
+      body.referenceAssets?.length &&
+      !body.referenceAssets.every((item) => item.comfyName)
+    ) {
       try {
         body.referenceAssets = await stageReferenceAssetsForAccount(
           backend,

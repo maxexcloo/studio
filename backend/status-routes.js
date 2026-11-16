@@ -4,7 +4,7 @@ import path from "node:path";
 import { upscaleQualities } from "../shared/upscale.ts";
 import { canAdmin } from "./access.js";
 import { ownedQuery, ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
-import { profileOnBackendKey, readyWorkers } from "./comfy/backends.js";
+import { readyWorkers } from "./comfy/backends.js";
 import { isComfyTimeout } from "./comfy/comfy.js";
 import { appVersion, dataDir } from "./data-dir.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
@@ -128,10 +128,9 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
     });
     const free = earliest(
       freeAt,
-      readyWorkers(
-        capabilityForProfile(input),
-        profileOnBackendKey(input.profileId, input.profileBackend),
-      ).map((worker) => `worker:${worker.id}`),
+      readyWorkers(capabilityForProfile(input), input.profileId, input.profileBackend).map(
+        (worker) => `worker:${worker.id}`,
+      ),
     );
     const queueMs = free === null ? null : Math.max(0, free - now);
     return {
