@@ -306,12 +306,14 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       : { status: 404, payload: { error: "That item is no longer in the gallery." } };
   });
 
+  /** The account's result a permanent number ("12", never "0" or "012") names, or null. */
+  const resultNumber = (ownerId, number) =>
+    /^[1-9]\d{0,8}$/.test(number) ? resultNumbers.find(ownerId, Number(number)) : null;
+
   // Viewer links name the account's permanent output number, even before its media is saved.
   directRoute(app, "GET", "/api/gallery/results/:number", (account, { params }) => {
     const ownerId = account?.userId || "";
-    const found = /^[1-9]\d{0,8}$/.test(params.number)
-      ? resultNumbers.find(ownerId, Number(params.number))
-      : null;
+    const found = resultNumber(ownerId, params.number);
     const saved = found && galleryJobItems(found.jobId, ownerId);
     let item = saved && saved.find((item) => (item.index ?? 0) === found.index);
     if (item) [item] = filterVisibleGallery([item], { disliked: true });
@@ -329,9 +331,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
 
   // The result an account's number names ("#12"), as chats refer to it.
   directRoute(app, "GET", "/api/results/:number", (account, { params }) => {
-    const found = /^\d{1,9}$/.test(params.number)
-      ? resultNumbers.find(account?.userId || "", Number(params.number))
-      : null;
+    const found = resultNumber(account?.userId || "", params.number);
     return found
       ? { status: 200, payload: found }
       : { status: 404, payload: { error: `There is no result #${params.number}.` } };

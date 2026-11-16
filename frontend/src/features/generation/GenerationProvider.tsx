@@ -44,9 +44,17 @@ export const initialInput: GenerationInput = {
   referenceAssets: [],
 };
 export function inputForProfile(previous: GenerationInput, profile: Profile): GenerationInput {
+  // Another model of the same output keeps the picked shape at its own preset for it.
+  const shape =
+    previous.profileId && previous.kind === profile.kind && previous.width && previous.height
+      ? profile.aspectPresets?.find(
+          (preset) => preset.w * previous.height === preset.h * previous.width,
+        )
+      : undefined;
   return {
     ...initialInput,
     ...profile.defaults,
+    ...(shape ? { width: shape.w, height: shape.h } : {}),
     prompt: previous.prompt,
     cardParts: previous.cardParts,
     negative: previous.negative,
