@@ -148,12 +148,14 @@ function form(fields: Values, files: RadianceFile[]) {
 export function imageRequest(values: Values, references: Uint8Array[] = []) {
   const model = String(values.model || "");
   const limits = radianceImageLimits(model);
-  const width = Number(values.width);
-  const height = Number(values.height);
   if (!String(values.prompt || "").trim()) throw new Error("Enter an image prompt.");
-  if (width % 32 || height % 32) throw new Error("Image dimensions must be multiples of 32.");
-  if (width > limits.maxSide || height > limits.maxSide)
-    throw new Error(`This Radiance model supports dimensions up to ${limits.maxSide} pixels.`);
+  if (Number(values.width) % 32 || Number(values.height) % 32)
+    throw new Error("Image dimensions must be multiples of 32.");
+  // A size past the model's longest side shrinks to fit on the 32-pixel grid, keeping its shape.
+  const scale = Math.min(1, limits.maxSide / Math.max(Number(values.width), Number(values.height)));
+  const [width, height] = [values.width, values.height].map(
+    (side) => Math.floor((Number(side) * scale) / 32) * 32,
+  );
   const body: Values = {
     model,
     prompt: values.prompt,
