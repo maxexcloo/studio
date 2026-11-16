@@ -15,6 +15,7 @@ import {
   maxCharacterImages,
 } from "../../shared/characters.ts";
 import { terminalStatuses } from "../../shared/queue.ts";
+import { shapeName } from "../../shared/taste.ts";
 import { mcpJson } from "./media.js";
 
 const maxResults = 50;
@@ -441,9 +442,13 @@ export function registerManageTools({
       return mcpJson({
         summary: answer.summary || "",
         likes: answer.likes,
+        dislikes: answer.avoid,
         styles: answer.styles,
-        avoid: answer.avoid,
-        added_avoid: answer.addedAvoid,
+        models: answer.models,
+        loras: answer.loras,
+        shapes: answer.shapes?.map(shapeName),
+        tags: answer.tags,
+        user_set: Object.keys(answer.preferences || {}),
         updated_at: answer.updatedAt,
         signals: answer.signals,
       });

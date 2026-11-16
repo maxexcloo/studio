@@ -618,6 +618,16 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   assert.match(state.calls.at(-1)!.system, /Explore this time: go beyond their taste profile/);
 });
 
+test("Dream draws from the models and tags a person set over those it learnt", async (t) => {
+  const { dream, state, taste, dreamOnce } = fixture(t);
+  taste.record("alice", [tasteSignal("like", "a", { profileId: "qwen", tags: ["fox"] })]);
+  taste.edit("alice", { models: ["flux"], tags: ["harbour"] });
+  await dream.save("alice", { enabled: true });
+  const job = await dreamOnce();
+  assert.deepEqual([job?.input.profileId, job?.dream?.arm], ["flux", "exploit"]);
+  assert.match(state.calls[0].system, /Keep this taste they like: harbour\./);
+});
+
 test("Fresh concepts rotate anchors and inspirations without overriding a model experiment", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   state.access.alice!.uncensored = true;

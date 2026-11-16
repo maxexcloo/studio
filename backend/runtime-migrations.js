@@ -9,6 +9,7 @@ import { legacyShapes } from "./legacy-shapes.js";
 import { loraStacks } from "./lora-stacks.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
 import { migrateRadianceQueue } from "./radiance-queue-migration.js";
+import { tasteDislikes } from "./taste-dislikes.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -60,6 +61,12 @@ const steps = [
     name: "dreamDefaultChoices",
     run: dreamDefaultChoices,
     changes: (plan) => plan.settings + plan.accounts,
+    online: true,
+  },
+  {
+    name: "tasteDislikes",
+    run: tasteDislikes,
+    changes: (plan) => plan.accounts,
     online: true,
   },
 ];
