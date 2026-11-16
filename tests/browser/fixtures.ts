@@ -1238,9 +1238,11 @@ export async function serveDream(
     projects?: any[];
     /** When the visit before this one ended. */
     since?: string;
-    /** Library › Characters' suggested cards; accepting one adds it to `characters`. */
+    /** Suggested cards; accepting one adds it to its matching collection. */
     suggestions?: any[];
     characters?: any[];
+    outfits?: any[];
+    scenes?: any[];
   } = {},
 ) {
   const state = {
@@ -1405,7 +1407,7 @@ export async function serveDream(
         })),
         missing: 0,
       };
-      options.characters?.push(card);
+      options[suggestion.kind as "characters" | "outfits" | "scenes"]?.push(card);
       return route.fulfill({ json: { card } });
     }
     if (path === "/api/dream/projects") {

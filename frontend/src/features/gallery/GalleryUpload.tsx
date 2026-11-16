@@ -1,12 +1,14 @@
-import { Button, Menu, Stack, Text } from "@mantine/core";
+import { Alert, Button, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, FolderUp } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, FolderUp, Import } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { api } from "../../api";
+import { api, post } from "../../api";
 import { menuWidth } from "../../theme";
+import type { MediaKind } from "../../types";
 import { ActionMenuItems } from "../../ui/ActionBar";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import { PopupTooltip } from "../../ui/PopupTooltip";
@@ -52,6 +54,26 @@ async function entryFiles(entry: FileSystemEntry): Promise<File[]> {
 export function useGalleryUpload(onUploaded: () => void) {
   const client = useQueryClient();
   const [uploading, setUploading] = useState(false);
+  const added = () => {
+    void client.invalidateQueries({ queryKey: galleryKey });
+    onUploaded();
+  };
+  const reddit = useMutation({
+    meta: { inlineError: true },
+    mutationFn: (url: string) =>
+      post<{ imported: number; failed: { image: number; error: string }[] }>(
+        "/api/gallery/import/reddit",
+        { url: url.trim() },
+      ),
+    onSuccess: (result) => {
+      added();
+      if (result.failed.length)
+        notifications.show({
+          color: "red",
+          message: `${plural(result.imported, "image")} added to Uploads. ${result.failed.map((entry) => `Image ${entry.image}: ${entry.error}`).join(" ")}`,
+        });
+    },
+  });
   async function upload(files: File[]) {
     const chosen = files.filter((file) => uploadTypes.includes(file.type));
     const skipped = files.length - chosen.length;
@@ -116,18 +138,27 @@ export function useGalleryUpload(onUploaded: () => void) {
         ),
       });
     if (!uploaded) return;
-    void client.invalidateQueries({ queryKey: galleryKey });
-    onUploaded();
+    added();
   }
-  return { upload, uploading };
+  return { upload, uploading, reddit };
 }
 
 /**
- * The gallery toolbar's Upload ▾: many files or a whole folder, saved as the account's own uploads.
- * Library › Import takes a Reddit post's images.
+ * The gallery toolbar's Upload ▾: files, folders and Reddit images saved as the account's uploads.
  */
-export function GalleryUpload({ upload }: { upload: ReturnType<typeof useGalleryUpload> }) {
+export function GalleryUpload({
+  kind,
+  upload,
+}: {
+  kind: MediaKind;
+  upload: ReturnType<typeof useGalleryUpload>;
+}) {
   const phone = usePhone();
+  const [importing, setImporting] = useState(false);
+  const [url, setUrl] = useState("");
+  const closeImport = () => {
+    if (!upload.reddit.isPending) setImporting(false);
+  };
   const filesInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const take = (input: HTMLInputElement) => {
@@ -169,10 +200,67 @@ export function GalleryUpload({ upload }: { upload: ReturnType<typeof useGallery
                   onClick: () => folderInput.current?.click(),
                 },
               ],
+              ...(kind === "image"
+                ? [
+                    [
+                      {
+                        id: "import-reddit",
+                        label: "Import From Reddit…",
+                        icon: Import,
+                        onClick: () => {
+                          upload.reddit.reset();
+                          setImporting(true);
+                        },
+                      },
+                    ],
+                  ]
+                : []),
             ]}
           />
         </Menu.Dropdown>
       </Menu>
+      <Modal
+        opened={importing}
+        onClose={closeImport}
+        title="Import From Reddit"
+        size="md"
+        fullScreen={phone}
+        closeOnClickOutside={!upload.reddit.isPending}
+        closeOnEscape={!upload.reddit.isPending}
+        closeButtonProps={{ disabled: upload.reddit.isPending }}
+      >
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            upload.reddit.mutate(url, {
+              onSuccess: () => {
+                setImporting(false);
+                setUrl("");
+              },
+            });
+          }}
+        >
+          <Stack>
+            <Text size="sm" c="dimmed">
+              Save the post's images to your private Uploads.
+            </Text>
+            <TextInput
+              label="Reddit Link"
+              placeholder="https://www.reddit.com/r/…/comments/…"
+              type="url"
+              required
+              value={url}
+              onChange={(event) => setUrl(event.currentTarget.value)}
+            />
+            {upload.reddit.error && <Alert color="red">{upload.reddit.error.message}</Alert>}
+            <DialogFooter onCancel={closeImport} pending={upload.reddit.isPending}>
+              <Button type="submit" loading={upload.reddit.isPending} disabled={!url.trim()}>
+                Import
+              </Button>
+            </DialogFooter>
+          </Stack>
+        </form>
+      </Modal>
       <input
         ref={filesInput}
         type="file"

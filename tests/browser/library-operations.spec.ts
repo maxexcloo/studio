@@ -17,24 +17,33 @@ import {
   toolbarSearch,
 } from "./fixtures";
 
-test("The Library groups its sections under headings and opens on Models", async ({ page }) => {
+test("The Library separates Personal and Administration and opens on personal cards", async ({
+  page,
+}) => {
   await fixtures(page);
   await page.goto("/library");
   const groups = {
-    Cards: ["Characters", "Outfits", "Scenes"],
-    "Models & LoRAs": ["Models", "LoRAs", "Unused"],
-    Prompting: ["Guides", "Presets", "Profiles", "Prompt Styles"],
-    "Add Models": ["Imports", "Downloads"],
+    Personal: ["Characters", "Outfits", "Presets", "Scenes"],
+    Administration: [
+      "Downloads",
+      "Guides",
+      "Imports",
+      "LoRAs",
+      "Models",
+      "Profiles",
+      "Prompt Styles",
+      "Unused",
+    ],
   };
   const order = Object.values(groups).flat();
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
-    await expect(select).toHaveValue("Models");
+    await expect(select).toHaveValue("Characters");
     await select.click();
     await expect(page.getByRole("option")).toHaveText(order);
   } else {
     const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
-    await expect(nav.getByRole("link", { name: "Models", exact: true })).toHaveAttribute(
+    await expect(nav.getByRole("link", { name: "Characters", exact: true })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -454,25 +463,6 @@ test("Clear Failed removes failed imports and says how many; Remove takes one", 
     .getByRole("button", { name: "Delete", exact: true })
     .click();
   await expect(page.getByText("No Imports", { exact: true })).toBeVisible();
-});
-
-test("A Reddit link in Library › Import adds the post's images to Uploads", async ({ page }) => {
-  await fixtures(page);
-  const requests: unknown[] = [];
-  await page.route("**/api/library/imports**", (route) => route.fulfill({ json: { imports: [] } }));
-  await page.route("**/api/gallery/import/reddit", (route) => {
-    requests.push(route.request().postDataJSON());
-    return route.fulfill({ json: { title: "Birds", imported: 3, failed: [] } });
-  });
-  await page.goto("/images");
-  await openNav(page, "Library");
-  await section(page, "Library", "Imports");
-  const link = page.getByRole("textbox", { name: "Civitai, Hugging Face or Reddit Link" });
-  await link.fill("https://www.reddit.com/r/birds/comments/abc/birds/");
-  await page.getByRole("button", { name: "Import", exact: true }).click();
-  await expect(page.getByText("3 images added to Uploads.", { exact: true })).toBeVisible();
-  await expect(link).toHaveValue("");
-  expect(requests).toEqual([{ url: "https://www.reddit.com/r/birds/comments/abc/birds/" }]);
 });
 
 test("Catalogue views, sorting, search and filters order and narrow the list", async ({ page }) => {
