@@ -138,18 +138,18 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // Select, then Like, Dislike, Report, Share | Animate, Edit, Recreate, Upscale | Similar, Delete.
+  // Select, then AI, Report, Like, Dislike | Animate, Edit, Recreate, Upscale | Share, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Select",
+    "AI",
+    "Report",
     "Like",
     "Dislike",
-    "Report",
-    "Share",
     "Animate",
     "Edit",
     "Recreate",
     "Upscale",
-    "Similar",
+    "Share",
     "Delete",
   ]);
   await page.keyboard.press("Escape");
@@ -452,6 +452,7 @@ test("Similar ranks the gallery by an image from its tile menu or the viewer, as
   state.gallery.push({ ...state.gallery[0], id: "tile-moth", jobId: "", prompt: "A paper moth" });
   await page.reload();
   await tileMenu(page);
+  await page.getByRole("menuitem", { name: "AI", exact: true }).click();
   await page.getByRole("menuitem", { name: "Similar", exact: true }).click();
   const chip = (label: string) =>
     page.getByRole("button", { name: `Remove ${label} Filter`, exact: true });
@@ -470,7 +471,7 @@ test("Similar ranks the gallery by an image from its tile menu or the viewer, as
 
   await page.getByRole("button", { name: "Open image: Paper Moth", exact: true }).click();
   // The chip's choice holds for the next Similar.
-  await viewerAction(page, "Similar");
+  await viewerAction(page, "AI", "Similar");
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(chip("Close to Paper Moth")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Open image:/ }).first()).toHaveAccessibleName(

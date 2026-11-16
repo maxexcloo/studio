@@ -77,10 +77,7 @@
   padding-top: var(--mantine-spacing-xs);
 }
 
-/*
- * Beside the text stand its send and ⋯, at its top, so they stay put while a focused box grows or
- * shrinks under a tap; the text fills the row's height.
- */
+/* Beside the text stand its send and ⋯, centred on its height; the text fills the row's height. */
 .columned {
   position: relative;
   display: flex;
@@ -103,7 +100,7 @@
   display: flex;
   flex-shrink: 0;
   gap: var(--mantine-spacing-xs);
-  align-items: flex-start;
+  align-items: center;
 }
 
 /* A tool's popup opens from the box's end, where the ⋯ stands. */
@@ -112,6 +109,11 @@
   top: 0;
   right: 0;
   pointer-events: none;
+}
+
+.columned > .anchor {
+  top: 50%;
+  translate: 0 -50%;
 }
 
 .anchor > * {
