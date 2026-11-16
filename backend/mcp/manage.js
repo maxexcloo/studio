@@ -189,7 +189,10 @@ export function registerManageTools({
         const answer = await api("POST", `/api/queue/${route}`, {}, signal);
         if (action === "cancel_all")
           return mcpJson({
-            cancelled: (answer.outcomes || []).filter((outcome) => outcome.cancelRequested).length,
+            cancelled: (answer.outcomes || []).filter(
+              (outcome) =>
+                !outcome.error && (outcome.job?.status === "cancelled" || outcome.cancelRequested),
+            ).length,
             ...(answer.outcomes?.some((outcome) => outcome.error)
               ? { note: "Some jobs could not confirm their cancel; check queue list." }
               : {}),

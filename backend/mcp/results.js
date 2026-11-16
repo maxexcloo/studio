@@ -416,7 +416,6 @@ export function registerResultTools({
     async ({ job_id }, signal) => {
       const id = await resolve(job_id, signal);
       media.own(owner, id);
-      await media.job(owner, id);
       return mcpJson(
         await media.request("POST", `/api/jobs/${encodeURIComponent(id)}/cancel`, {}, owner),
       );
