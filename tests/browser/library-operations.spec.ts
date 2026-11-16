@@ -335,17 +335,15 @@ test("Update All applies every free update in one request", async ({ page }) => 
   await section(page, "Library", "LoRAs");
   const loras = page.getByRole("region", { name: "Library: LoRAs", exact: true });
   await loras.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
-  const family = loras.getByRole("combobox", { name: "Family", exact: true });
+  const filters = page.getByRole("dialog", { name: "Filter LoRAs", exact: true });
+  const family = filters.getByRole("combobox", { name: "Family", exact: true });
   await expect(family).toHaveValue("");
   await family.click();
   await page.getByRole("option", { name: "SDXL", exact: true }).click();
   const table = loras.getByRole("table", { name: "Library LoRAs", exact: true });
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("Detail");
-  await page
-    .getByRole("dialog", { name: "Filter LoRAs", exact: true })
-    .getByRole("button", { name: "Clear", exact: true })
-    .click();
+  await filters.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(table.getByRole("row")).toHaveCount(3);
   await loras.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   await loras.getByRole("button", { name: "Update All", exact: true }).click();

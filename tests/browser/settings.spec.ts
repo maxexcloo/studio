@@ -996,7 +996,8 @@ test("Dream administration saves separate image and video defaults without chang
   const dream = page.getByRole("region", { name: "Dream", exact: true });
   const images = dream.getByRole("radiogroup", { name: "Default Dream Images Run On" });
   const videos = dream.getByRole("radiogroup", { name: "Default Dream Videos Run On" });
-  await images.getByRole("radio", { name: "Cloud", exact: true }).check();
+  await images.getByText("Cloud", { exact: true }).click();
+  await expect(images.getByRole("radio", { name: "Cloud", exact: true })).toBeChecked();
   await expect(videos.getByRole("radio", { name: "Local", exact: true })).toBeChecked();
   const cap = dream.getByRole("textbox", { name: "Default Dream Images per Day", exact: true });
   await cap.fill("0");
