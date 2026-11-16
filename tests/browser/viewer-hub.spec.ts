@@ -377,7 +377,7 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
     ).toBeVisible();
   }
   await field.fill("The bird unfolds its wings.");
-  const more = surface.getByRole("button", { name: "More Instruction Actions", exact: true });
+  const more = surface.getByRole("button", { name: "AI Instruction Actions", exact: true });
   const edit = async (name: string) => {
     if (phone) return surface.getByRole("button", { name, exact: true }).click();
     await more.click();
@@ -494,8 +494,7 @@ test("A regenerated result shows beside its source until All Versions collapses 
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   const tiles = page.getByRole("button", { name: /^Open image: Amber Bird/ });
   await expect(tiles).toHaveCount(2);
-  if (test.info().project.use.isMobile)
-    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("switch", { name: "All Versions", exact: true }).click();
   await expect(tiles).toHaveCount(1);
   await expect(tiles).toHaveAccessibleName("Open image: Amber Bird, Version 1 of 2");
@@ -640,7 +639,23 @@ test("Recreate › More Like This Set asks for new variations of a result's set"
     }),
   );
   await viewerAction(page, "Recreate", "More Like This Set");
-  await expect.poll(() => asked).toEqual([{ itemId: "hub" }]);
+  await expect.poll(() => asked).toEqual([{ itemId: "hub", scope: "set" }]);
+});
+
+test("Recreate › More Like This explicitly selects only the current image", async ({ page }) => {
+  const asked: unknown[] = [];
+  await seed(page, { resultSet: { id: "set-a", title: "Variety Test", index: 0 } }, (page) =>
+    page.route("**/api/result-sets/more", (route) => {
+      asked.push(route.request().postDataJSON());
+      return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
+    }),
+  );
+  await viewerAction(page, "Recreate");
+  await expect(
+    page.getByRole("menuitem", { name: "More Like This Set", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("menuitem", { name: "More Like This", exact: true }).click();
+  await expect.poll(() => asked).toEqual([{ itemId: "hub", scope: "image" }]);
 });
 
 test("More Like This Set is offered only for a result in a set", async ({ page }) => {
@@ -1247,13 +1262,13 @@ test("Near-misses beside the viewer's controls keep it open; the empty stage clo
   await expect(viewer).toBeHidden();
 });
 
-test("An opened video plays, muted when the browser refuses sound", async ({ page }) => {
+test("An opened video plays with sound and reveals its controls on pointer movement", async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
       (window as any).played = { muted: this.muted };
-      return this.muted
-        ? Promise.resolve()
-        : Promise.reject(new DOMException("Sound needs a gesture", "NotAllowedError"));
+      return Promise.resolve();
     };
   });
   const state = await fixtures(page);
@@ -1270,7 +1285,7 @@ test("An opened video plays, muted when the browser refuses sound", async ({ pag
   });
   await page.goto("/video");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).played)).toEqual({ muted: true });
+  await expect.poll(() => page.evaluate(() => (window as any).played)).toEqual({ muted: false });
   // Its controls stay hidden until a pointer moves over it.
   const video = page.getByRole("dialog", { name: "Generation", exact: true }).locator("video");
   await expect(video).not.toHaveAttribute("controls");
@@ -1303,6 +1318,7 @@ test("An opened video the browser won't play shows its still and its controls", 
   const video = page.getByRole("dialog", { name: "Generation", exact: true }).locator("video");
   await expect(video).toHaveAttribute("poster", image);
   await expect(video).toHaveAttribute("controls");
+  await expect(video).toHaveJSProperty("muted", false);
 });
 
 test("A video tile plays its preview while a mouse is over it", async ({ page }, testInfo) => {
@@ -2067,7 +2083,7 @@ test("Phone viewer keeps Report under Edit and Similar under Recreate", async ({
   test.skip(!testInfo.project.use.isMobile, "Phone action grouping");
   const { viewer } = await seed(page);
   const bar = viewer.getByRole("group", { name: "Generation Actions", exact: true });
-  await expect(bar.getByRole("button", { name: "Suggestions", exact: true })).toBeVisible();
+  await expect(bar.getByRole("button", { name: "AI Prompt Actions", exact: true })).toBeVisible();
   await expect(bar.getByRole("button", { name: "Report", exact: true })).toHaveCount(0);
   await expect(bar.getByRole("button", { name: "Similar", exact: true })).toHaveCount(0);
   const edit = bar.getByRole("button", { name: "Edit", exact: true });

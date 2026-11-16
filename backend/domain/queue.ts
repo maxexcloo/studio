@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 import {
   type GenerationInput,
   type PromptWriting,
@@ -344,6 +346,12 @@ export class GenerationQueue {
       if (job.status !== "waiting" || job.reason !== reason)
         save({ ...job, status: "waiting", reason });
     };
+    const saveObservation = (latest: OwnedJob, observation: Partial<JobObservation>) => {
+      const changed = Object.entries(observation).some(
+        ([key, value]) => !isDeepStrictEqual(latest[key as keyof JobObservation], value),
+      );
+      return changed ? this.store.save({ ...latest, ...observation }) : latest;
+    };
     for (const job of jobs.values()) {
       if (!pendingStatuses.has(job.status) || this.acceptedIds.has(job.id)) continue;
       // A prompt already being written finishes; its job then waits as Paused.
@@ -380,17 +388,14 @@ export class GenerationQueue {
             if (!observed) {
               const latest = this.store.job(job.ownerId, job.id)!;
               if (!terminalStatuses.has(latest.status))
-                this.store.save({
-                  ...latest,
+                saveObservation(latest, {
                   reason: "Recovering the recorded generation; it will not be submitted again.",
                 });
               return;
             }
-            job = {
-              ...this.store.job(job.ownerId, job.id)!,
-              ...observed,
-              reason: observed.reason || "",
-            };
+            const latest = this.store.job(job.ownerId, job.id)!;
+            const observation = { ...observed, reason: observed.reason || "" };
+            job = { ...latest, ...observation };
             if (observed.status === "completed") {
               job = this.store.save({ ...job, status: "saving" });
               let saved;
@@ -406,7 +411,7 @@ export class GenerationQueue {
               this.loaded.set(completed.resource, completed);
               await this.adapter.settled?.(completed);
             } else {
-              this.store.save(job);
+              job = saveObservation(latest, observation);
               if (terminalStatuses.has(job.status)) {
                 this.progressSeen.delete(job.id);
                 await this.adapter.settled?.(job);
@@ -414,8 +419,7 @@ export class GenerationQueue {
             }
           } catch (error) {
             const latest = this.store.job(job.ownerId, job.id)!;
-            this.store.save({
-              ...latest,
+            saveObservation(latest, {
               reason: `Waiting for the recorded generation: ${(error as Error).message}`,
             });
           } finally {
@@ -689,11 +693,13 @@ export class GenerationQueue {
       )
       .sort((a, b) => tier(a.job) - tier(b.job));
     for (const { job } of movable) {
-      const members = job.queueBatch ? batches.get(job.queueBatch)! : [job];
-      // One prompt's split Count moves as a unit until it starts, then keeps its reservation.
+      const batch = job.queueBatch ? batches.get(job.queueBatch)! : [job];
+      const members = batch.filter(pending);
+      // One prompt's split Count moves its waiting jobs as a unit. Once part of it starts, the rest
+      // keep that worker unless it can't take them.
       if (
         job.queueBatch &&
-        (job.id !== job.queueBatch || members.some((member) => !pending(member)))
+        (job.id !== members[0].id || (members.length < batch.length && !stranded(job)))
       )
         continue;
       const targets = this.adapter

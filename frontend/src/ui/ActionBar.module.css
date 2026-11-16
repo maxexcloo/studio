@@ -52,10 +52,10 @@
     color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
-/* Phone bars spread every action across the row, each name under its icon. */
+/* Phone item actions stay together; verdict bars opt into equal widths below. */
 .actions[data-stacked] {
   width: 100%;
-  justify-content: space-between;
+  justify-content: center;
   gap: 0;
 }
 

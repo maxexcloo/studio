@@ -1,21 +1,15 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 import type { CardKind } from "../../../../shared/characters";
+import type { DreamSettings } from "../../../../shared/dream";
 import type { DigestGroup, Project, Review } from "../../../../shared/projects";
 import type { DreamActivity } from "../../../../shared/taste";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
 
-/** One account's Dream settings (backend/domain/dream.ts). */
-export interface DreamSettings {
-  enabled: boolean;
-  paused: boolean;
-  dailyImages: number;
-  dailyVideos: number;
-  images: boolean;
-  videos: boolean;
-  spicy: boolean;
-}
+export type DreamMedia = "image" | "video";
+
+export type { DreamSettings } from "../../../../shared/dream";
 export type DreamStatus = "off" | "paused" | "waiting" | "generating" | "capped" | "unavailable";
 export type DreamItem = MediaItem & {
   dream?: {
@@ -59,27 +53,29 @@ export const dreamQuery = queryOptions({
 /** The header's count of results waiting for a verdict, a comparison counting once. */
 export const dreamCountQuery = queryOptions({
   queryKey: ["dream", "count"],
-  queryFn: () => api<{ unseen: number; active: boolean }>("/api/dream/count"),
+  queryFn: () =>
+    api<{ unseen: number; images: number; videos: number; active: boolean }>("/api/dream/count"),
   refetchInterval: (query) => (query.state.data?.active ? 15_000 : false),
   refetchOnWindowFocus: "always",
 });
-export const discardedQuery = infiniteQueryOptions({
-  queryKey: ["dream", "discarded"],
-  queryFn: ({ pageParam }) =>
-    api<{ items: DreamItem[]; nextCursor: string }>(
-      `/api/dream/discarded?limit=40&cursor=${encodeURIComponent(pageParam)}`,
-    ),
-  initialPageParam: "",
-  getNextPageParam: (page) => page.nextCursor || undefined,
-});
+export const discardedQuery = (media: DreamMedia) =>
+  infiniteQueryOptions({
+    queryKey: ["dream", "discarded", media],
+    queryFn: ({ pageParam }) =>
+      api<{ items: DreamItem[]; nextCursor: string }>(
+        `/api/dream/discarded?media=${media}&limit=40&cursor=${encodeURIComponent(pageParam)}`,
+      ),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.nextCursor || undefined,
+  });
 /**
  * Older gallery images to calibrate the taste profile with, unjudged first. Each round is a new
  * random draw, kept apart from `["dream"]` so judging a card never reshuffles the deck.
  */
-export const calibrationQuery = (round: number) =>
+export const calibrationQuery = (round: number, media: DreamMedia) =>
   queryOptions({
-    queryKey: ["dream-calibration", round],
-    queryFn: () => api<{ items: MediaItem[] }>("/api/dream/calibration?limit=12"),
+    queryKey: ["dream-calibration", media, round],
+    queryFn: () => api<{ items: MediaItem[] }>(`/api/dream/calibration?media=${media}&limit=12`),
     staleTime: Infinity,
     // A later visit draws afresh rather than replaying images already judged.
     gcTime: 0,
@@ -132,7 +128,8 @@ export const suggestionsQuery = queryOptions({
 export const suggestionPath = (suggestion: { id: string }, action: "accept" | "dismiss") =>
   `/api/dream/suggestions/${encodeURIComponent(suggestion.id)}/${action}`;
 
-export const historyQuery = queryOptions({
-  queryKey: ["dream", "history"],
-  queryFn: () => api<{ items: DreamActivity[] }>("/api/dream/history"),
-});
+export const historyQuery = (media: DreamMedia) =>
+  queryOptions({
+    queryKey: ["dream", "history", media],
+    queryFn: () => api<{ items: DreamActivity[] }>(`/api/dream/history?media=${media}`),
+  });

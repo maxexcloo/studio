@@ -1,4 +1,4 @@
-import { Box, Group } from "@mantine/core";
+import { Box } from "@mantine/core";
 import { type Ref, type RefObject, useRef } from "react";
 
 import type { MediaItem } from "../../types";
@@ -8,7 +8,7 @@ import { compactViewerActions, namedItemActions } from "./itemActions";
 import { useMediaActions, useMediaDialogs } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import type { Iteration } from "./useMediaAction";
-import { ViewerPrompt, ViewerSuggestions, useViewerPrompt } from "./ViewerPrompt";
+import { ViewerPrompt, useViewerPrompt } from "./ViewerPrompt";
 
 import classes from "./MediaViewer.module.css";
 
@@ -100,17 +100,9 @@ export function MediaViewerActions({
       onClick={(event) => event.stopPropagation()}
     >
       {item.jobId && (
-        <Group
-          className={classes.promptRow}
-          wrap="nowrap"
-          gap="xs"
-          display={promptHidden ? "none" : undefined}
-        >
-          <Box flex={1} miw={0}>
-            <ViewerPrompt state={prompt} iterate={iterate} pending={pending} />
-          </Box>
-          <ViewerSuggestions state={prompt} />
-        </Group>
+        <Box className={classes.promptRow} miw={0} display={promptHidden ? "none" : undefined}>
+          <ViewerPrompt state={prompt} iterate={iterate} pending={pending} />
+        </Box>
       )}
       <ViewerActionGroups groups={groups} labelled={namedItemActions} />
       {dialogs}

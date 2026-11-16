@@ -125,7 +125,8 @@ recur across features.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
   phone media item bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and
-  only then do they wrap, never scrolling.
+  only then do they wrap, never scrolling. The phone viewer bar alone nests
+  Report under Edit and Similar under Recreate to fit one row.
 - Like and Dislike rate an item and teach taste. A Dislike never deletes: it
   hides the item with Undo, and the gallery's Disliked filter shows it again.
 - A finished selection action ends the selection, keeping selected only the
@@ -163,12 +164,15 @@ recur across features.
   waits for a tap.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`.
-- Use the shared `TextBox`. Desktop fields expose only ⋯, with Copy and
-  Clear/Reset/Undo alongside the tools in one flat menu, each tool's options
-  under its name. Composer fields edit in place; other phone text boxes open
-  the shared full-screen editor. Phone controls show Copy, Clear/Reset/Undo
-  and More above the keyboard, with tools in More and form sends separate.
-  A box without tools has no ⋯, Copy or Clear.
+- Use the shared `TextBox`. Desktop fields expose one menu button, with Copy
+  and Clear/Reset/Undo alongside the tools in one flat menu, each tool's
+  options under its name. The button is ⋯, or the AI icon when the box has
+  an AI tool; the AI icon (`icons.assistant`) marks everything AI does.
+  Composer fields edit in place; other phone text boxes open the shared
+  full-screen editor, and AI tools stay beside the text before it opens.
+  Phone controls show Copy, Clear/Reset/Undo and More above the keyboard,
+  with tools in More and form sends separate. A box without tools has no ⋯,
+  Copy or Clear.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating
@@ -230,7 +234,8 @@ recur across features.
   `MutationCache` default notification; avoid duplicate error surfaces.
 - Routine success appears where it happened: a saved row, a copy check or a
   brief action label (`useFlash`). Notifications serve failures, Undo and
-  outcomes with nowhere else to show, clear of actions. Generation submission
+  outcomes with nowhere else to show: small banners that drop from the top
+  and swipe back up. Generation submission
   and completion appear in their gallery or strip as soon as the queue reports
   them.
 

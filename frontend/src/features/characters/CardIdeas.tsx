@@ -73,7 +73,7 @@ export function useCardIdeas({
           ? options.map((idea): Action => ({
               id: `idea:${idea}`,
               label: idea,
-              icon: icons.suggestions,
+              icon: icons.assistant,
               onClick: () => pick(idea),
             }))
           : [{ id: "none", label: "No Suggestions", disabled: true }]),

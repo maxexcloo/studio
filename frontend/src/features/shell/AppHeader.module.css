@@ -29,19 +29,27 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Portrait phones give the centred modes their own row below the brand and account controls. */
+/* Compact phone controls retain their touch height in one centred header row. */
 :where(:root[data-phone]) .bar {
-  gap: 4px !important;
+  gap: 0 !important;
 }
+
+:where(:root[data-phone]) .home {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+:where(:root[data-phone]) .home h3 {
+  font-size: var(--mantine-font-size-lg);
+}
+
+:where(:root[data-phone]) .header :is(button, a):not(.home) {
+  width: 32px;
+  min-width: 0 !important;
+  padding-inline: 0;
+}
+
 :where(:root[data-phone]) .modes {
   padding: 2px;
-}
-
-:where(:root[data-phone]:not([data-phone="sideways"])) .header {
-  align-items: flex-start;
-  padding-top: var(--mantine-spacing-xs);
-}
-
-:where(:root[data-phone]:not([data-phone="sideways"])) .modes {
-  bottom: var(--mantine-spacing-xs);
 }

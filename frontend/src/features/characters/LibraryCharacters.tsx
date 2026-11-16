@@ -97,7 +97,10 @@ function CharacterStory({ card }: { card: CharacterCard }) {
   const lines = [
     [card.age && `Age ${card.age}`, card.job].filter(Boolean).join(" · "),
     card.backstory,
-    [card.likes && `Likes ${card.likes}`, card.dislikes && `Dislikes ${card.dislikes}`]
+    [
+      card.likes && `Likes ${card.likes.split("\n").join(", ")}`,
+      card.dislikes && `Dislikes ${card.dislikes.split("\n").join(", ")}`,
+    ]
       .filter(Boolean)
       .join(" · "),
   ].filter(Boolean);

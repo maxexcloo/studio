@@ -37,21 +37,23 @@ after(() => {
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
-async function fixture(t) {
+async function fixture(t, conversation = "") {
   const store = new Store(openDatabase(":memory:"));
   const jobs = {};
-  for (const [name, owner, status] of [
-    ["pending", alice.id, "queued"],
-    ["requested", alice.id, "running"],
-    ["confirmed", alice.id, "running"],
+  // pending and confirmed came from chat-a; the rest from elsewhere.
+  for (const [name, owner, status, chat] of [
+    ["pending", alice.id, "queued", "chat-a"],
+    ["requested", alice.id, "running", "chat-b"],
+    ["confirmed", alice.id, "running", "chat-a"],
     ["unconfirmed", alice.id, "running"],
-    ["completed", alice.id, "completed"],
+    ["completed", alice.id, "completed", "chat-a"],
     ["failed", alice.id, "failed"],
     ["dream", alice.id, "queued"],
-    ["foreign", bob.id, "queued"],
+    ["foreign", bob.id, "queued", "chat-a"],
   ]) {
     const session = store.createSession(owner);
-    const job = store.enqueue(owner, session.id, {}, "image", undefined, undefined, name);
+    const input = chat ? { chat: { conversationId: chat } } : {};
+    const job = store.enqueue(owner, session.id, input, "image", undefined, undefined, name);
     store.save({
       ...job,
       status,
@@ -116,7 +118,11 @@ async function fixture(t) {
   await client.connect(
     new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
       requestInit: {
-        headers: { Authorization: "Bearer fixture-gateway", "x-ai-user-id": alice.id },
+        headers: {
+          Authorization: "Bearer fixture-gateway",
+          "x-ai-user-id": alice.id,
+          ...(conversation ? { "x-studio-conversation-id": conversation } : {}),
+        },
       },
     }),
   );
@@ -134,15 +140,19 @@ test("SDK Cancel All counts a pending cancellation without a requested flag", as
   const f = await fixture(t);
   for (const name of ["confirmed", "requested", "unconfirmed"])
     f.store.save({ ...f.jobs[name], status: "completed" });
-  assert.deepEqual(data(await f.call("queue", { action: "cancel_all" })), { cancelled: 1 });
+  assert.deepEqual(data(await f.call("queue", { action: "cancel_all", scope: "account" })), {
+    scope: "account",
+    cancelled: 1,
+  });
   assert.equal(f.requests[0].answer.payload.outcomes[0].cancelRequested, false);
   assert.deepEqual(f.providerCalls, []);
 });
 
 test("SDK Cancel All counts real route confirmations and acknowledged requests, excluding provider errors", async (t) => {
   const f = await fixture(t);
-  const reply = data(await f.call("queue", { action: "cancel_all" }));
+  const reply = data(await f.call("queue", { action: "cancel_all", scope: "account" }));
   assert.deepEqual(reply, {
+    scope: "account",
     cancelled: 3,
     note: "Some jobs could not confirm their cancel; check queue list.",
   });
@@ -170,10 +180,32 @@ test("SDK Cancel All counts real route confirmations and acknowledged requests, 
   assert.deepEqual(f.providerCalls.sort(), ["confirmed", "requested", "unconfirmed"]);
   for (const name of ["completed", "dream", "failed", "foreign"])
     assert.deepEqual(f.store.job(f.jobs[name].ownerId, name), f.jobs[name]);
-  assert.deepEqual(data(await f.call("queue", { action: "cancel_all" })), {
+  assert.deepEqual(data(await f.call("queue", { action: "cancel_all", scope: "account" })), {
+    scope: "account",
     cancelled: 1,
     note: "Some jobs could not confirm their cancel; check queue list.",
   });
+});
+
+test("SDK Cancel All stops only the calling chat's work unless asked for the account", async (t) => {
+  const unnamed = await fixture(t);
+  const refused = await unnamed.call("queue", { action: "cancel_all" });
+  assert.equal(refused.isError, true);
+  assert.match(refused.content[0].text, /no conversation id.*scope "account"/);
+  assert.deepEqual(unnamed.requests, []);
+
+  const f = await fixture(t, "chat-a");
+  assert.deepEqual(data(await f.call("queue", { action: "cancel_all" })), {
+    scope: "chat",
+    cancelled: 2,
+  });
+  assert.deepEqual(f.providerCalls, ["confirmed"]);
+  assert.equal(f.store.job(alice.id, "pending").status, "cancelled");
+  for (const name of ["requested", "unconfirmed", "completed", "failed", "dream", "foreign"])
+    assert.deepEqual(f.store.job(f.jobs[name].ownerId, name), f.jobs[name]);
+  const misplaced = await f.call("queue", { action: "list", scope: "account" });
+  assert.equal(misplaced.isError, true);
+  assert.match(misplaced.content[0].text, /scope is for cancel_all/);
 });
 
 test("SDK Cancel preserves ownership, stale responses and provider errors with only its mutation route", async (t) => {

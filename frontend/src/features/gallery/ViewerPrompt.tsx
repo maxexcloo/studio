@@ -1,15 +1,11 @@
-import { Button, Menu } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import type { Change } from "../../../../shared/suggestions";
-import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
-import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
+import { type Action, type ActionGroups } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
-import { PopupTooltip } from "../../ui/PopupTooltip";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import {
@@ -110,7 +106,7 @@ export function useViewerPrompt(
     ? {
         id: "suggestions",
         label: "Suggestions",
-        icon: icons.suggestions,
+        icon: icons.assistant,
         onOpen: () => setSuggestionSource({ item: item.id, prompt: ask.typed ?? prompt }),
         menu: assistMenu({
           settings: [
@@ -127,7 +123,7 @@ export function useViewerPrompt(
           templates: (assistant?.changes ?? []).map((change) => ({
             id: `change:${change.id}`,
             label: change.label,
-            icon: icons.suggestions,
+            icon: icons.assistant,
             disabled: ask.pending,
             onClick: () => pick(change.instruction),
           })),
@@ -148,33 +144,6 @@ export function useViewerPrompt(
 }
 
 export type ViewerPromptState = ReturnType<typeof useViewerPrompt>;
-
-/** The same choices as the prompt's tools, available without opening its phone editor. */
-export function ViewerSuggestions({ state }: { state: ViewerPromptState }) {
-  const action = state.suggestionsTool;
-  if (!action) return null;
-  return (
-    <Menu position="top-end" width={menuWidth} onOpen={action.onOpen}>
-      <PopupTooltip label="Suggestions">
-        <Menu.Target>
-          <Button
-            variant="subtle"
-            color="gray"
-            size="compact-xs"
-            leftSection={<icons.suggestions size={16} />}
-            rightSection={<ChevronDown size={12} />}
-            loading={state.ask.pending}
-          >
-            Suggestions
-          </Button>
-        </Menu.Target>
-      </PopupTooltip>
-      <Menu.Dropdown>
-        <ActionMenuItems groups={action.menu!} />
-      </Menu.Dropdown>
-    </Menu>
-  );
-}
 
 /** The prompt field, at the top of the viewer's action bar. At rest it is one line; focused, all. */
 export function ViewerPrompt({

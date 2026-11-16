@@ -671,7 +671,6 @@ export function publicJob({
   priority,
   dream: _dream,
   faceRedo: _faceRedo,
-  queueBatch: _queueBatch,
   input: { clientJobId: _clientJobId, ...input },
   ...job
 }: OwnedJob): QueueJob {

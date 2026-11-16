@@ -2,6 +2,7 @@ import { characterGenerated } from "./character-generated.js";
 import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
+import { dreamInheritedSettings } from "./dream-inherited-settings.js";
 import { dreamOwnership } from "./dream-ownership.js";
 import { galleryRatings } from "./gallery-ratings.js";
 import { legacyShapes } from "./legacy-shapes.js";
@@ -46,6 +47,12 @@ const steps = [
     name: "legacyShapes",
     run: legacyShapes,
     changes: (plan) => plan.arms + plan.notes + (plan.editsFile ? 1 : 0),
+    online: true,
+  },
+  {
+    name: "dreamInheritedSettings",
+    run: dreamInheritedSettings,
+    changes: (plan) => plan.settings,
     online: true,
   },
 ];

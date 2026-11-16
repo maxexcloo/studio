@@ -513,42 +513,58 @@ export type QueueEntry = {
 };
 
 /**
- * The queue's rows in order: each set of several jobs one group, where its first shown job is,
- * Dream's jobs each their own row, after everyone else's.
+ * Rows for the `shown` jobs: those sharing a `group` with another of `all` as one entry, where its
+ * first shown job is, titled from its first job's input; the rest each their own row.
  */
-export function queueEntries(all: QueueJob[]): QueueEntry[] {
+function groupedEntries(
+  all: QueueJob[],
+  shown: QueueJob[],
+  group: (job: QueueJob) => string | undefined,
+  title: (input: QueueJob["input"]) => string,
+): QueueEntry[] {
   const members = new Map<string, QueueJob[]>();
-  for (const job of all)
-    if (job.queueSet && !job.dream)
-      members.set(job.queueSet, [...(members.get(job.queueSet) || []), job]);
-  const sets = new Map<string, QueueEntry>();
+  for (const job of all) {
+    const id = group(job);
+    if (id) members.set(id, [...(members.get(id) || []), job]);
+  }
+  const groups = new Map<string, QueueEntry>();
   const entries: QueueEntry[] = [];
-  for (const job of shownJobs(all)) {
-    const set = job.dream ? undefined : job.queueSet;
-    const group = set ? members.get(set) : undefined;
-    if (!set || !group || group.length < 2) {
+  for (const job of shown) {
+    const id = group(job);
+    const together = id ? members.get(id) : undefined;
+    if (!id || !together || together.length < 2) {
       entries.push({ id: job.id, jobs: [job] });
       continue;
     }
-    const entry = sets.get(set);
+    const entry = groups.get(id);
     if (entry) {
       entry.jobs.push(job);
       continue;
     }
-    const first = group[0].input;
-    const resultSet = first?.resultSet as { title?: string } | undefined;
     const created = {
-      id: `set:${set}`,
+      id: `set:${id}`,
       jobs: [job],
-      set: {
-        id: set,
-        title: String(resultSet?.title || first?.prompt || "Generations"),
-        members: group,
-      },
+      set: { id, title: title(together[0].input), members: together },
     };
-    sets.set(set, created);
+    groups.set(id, created);
     entries.push(created);
   }
+  return entries;
+}
+const resultSetOf = (input: QueueJob["input"]) =>
+  input?.resultSet as { title?: string; variation?: string } | undefined;
+
+/**
+ * The queue's rows in order: each set of several jobs one group, where its first shown job is,
+ * Dream's jobs each their own row, after everyone else's.
+ */
+export function queueEntries(all: QueueJob[]): QueueEntry[] {
+  const entries = groupedEntries(
+    all,
+    shownJobs(all),
+    (job) => (job.dream ? undefined : job.queueSet),
+    (input) => String(resultSetOf(input)?.title || input?.prompt || "Generations"),
+  );
   // Dream's work waits below everyone's own, so it lists last too.
   return [
     ...entries.filter((entry) => !entry.jobs[0].dream),
@@ -557,20 +573,36 @@ export function queueEntries(all: QueueJob[]): QueueEntry[] {
 }
 
 /**
+ * A set's rows once opened: one per prompt, its Count's separate runs together, where the set has
+ * several prompts; else each of its jobs.
+ */
+function promptEntries({ jobs, set }: QueueEntry) {
+  const prompts = new Set(set!.members.map((job) => job.queueBatch ?? job.id)).size > 1;
+  return groupedEntries(
+    set!.members,
+    jobs,
+    (job) => (prompts ? job.queueBatch : undefined),
+    (input) => String(resultSetOf(input)?.variation || input?.prompt || "Generation"),
+  );
+}
+
+/**
  * A set's group row: its title and progress, Stop for its unfinished work (or Retry Failed once
- * only failures remain), its handle moving its waiting work together, and its jobs below once
- * opened.
+ * only failures remain), its handle moving its waiting work together, and its prompts or jobs
+ * below once opened. A `prompt` row is one prompt's separate runs within a set.
  */
 function QueueSetRow({
   entry,
   sortable,
   drag,
   row,
+  prompt = false,
 }: {
   entry: QueueEntry;
   sortable: boolean;
   drag?: QueueRowDrag;
   row: (job: QueueJob) => ReactNode;
+  prompt?: boolean;
 }) {
   const [opened, setOpened] = useState(false);
   const jobsId = useId();
@@ -643,7 +675,7 @@ function QueueSetRow({
         {unfinished.length ? (
           <RowButton
             label="Stop"
-            name="Stop Set"
+            name={prompt ? "Stop Prompt" : "Stop Set"}
             icon={icons.stop}
             pending={busy === "stop"}
             onClick={() => void stop()}
@@ -654,7 +686,13 @@ function QueueSetRow({
       </Group>
       <Collapse id={jobsId} expanded={opened} keepMounted={false}>
         <div className={classes.set}>
-          {entry.jobs.map(row)}
+          {promptEntries(entry).map((part) =>
+            part.set ? (
+              <QueueSetRow key={part.id} entry={part} sortable={false} row={row} prompt />
+            ) : (
+              row(part.jobs[0])
+            ),
+          )}
           {unfinished.length > 0 && failed.length > 0 && (
             <Group justify="end" py="xs">
               {retryButton}

@@ -27,12 +27,3 @@
   -webkit-backdrop-filter: var(--studio-glass-filter);
   border-bottom: 1px solid var(--studio-glass-border);
 }
-
-:root:not([data-phone]) .toolbar::after {
-  content: "";
-  position: absolute;
-  inset: 100% 0 auto;
-  height: var(--mantine-spacing-sm);
-  background: linear-gradient(var(--studio-glass-chrome), transparent);
-  pointer-events: none;
-}

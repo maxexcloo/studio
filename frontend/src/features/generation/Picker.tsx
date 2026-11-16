@@ -28,6 +28,7 @@ import {
   type ReactNode,
   type Ref,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -417,6 +418,8 @@ export function PickerTile({
   preview?: { label: string; open: () => void; image?: PreviewImage };
   row?: boolean;
 }) {
+  // Mantine omits target IDs withRoles=false; outside presses still need the preview's target.
+  const previewId = useId();
   const [state, setState] = useState<"loaded" | "failed">();
   const peekable = !useTouch() && Boolean(preview?.image);
   const [peek, setPeek] = useState(false);
@@ -435,6 +438,7 @@ export function PickerTile({
   }
   return (
     <Popover
+      id={previewId}
       opened={peekable && peek}
       onChange={setPeek}
       position="right"
@@ -445,6 +449,7 @@ export function PickerTile({
     >
       <Popover.Target>
         <div
+          id={previewId}
           className={classes.tile}
           role="listitem"
           data-row={row || undefined}
@@ -771,7 +776,6 @@ const ignore = () => {};
  */
 export function SaveButton<T extends SavedItem>({
   noun,
-  label,
   naming,
   current,
   edited,
@@ -784,14 +788,11 @@ export function SaveButton<T extends SavedItem>({
   edited: boolean;
   disabled: boolean;
   onUpdate: (record: T) => Promise<unknown>;
-  label?: string;
 }) {
-  const phone = usePhone();
   return (
     <Button
       size="compact-sm"
       variant="subtle"
-      // A phone sheet's footer is one tight row, beside the record's name above.
       aria-label={`Save ${noun}`}
       disabled={disabled || (!!current && !edited)}
       onClick={() =>
@@ -800,7 +801,7 @@ export function SaveButton<T extends SavedItem>({
           : naming.name("save")
       }
     >
-      {label ?? (phone ? "Save" : `Save ${noun}`)}
+      Save
     </Button>
   );
 }

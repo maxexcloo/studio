@@ -2,6 +2,7 @@ import { notifications } from "@mantine/notifications";
 import {
   type QueryClient,
   queryOptions,
+  useIsMutating,
   useMutation,
   useQuery,
   useQueryClient,
@@ -11,6 +12,7 @@ import { isCloudProfile } from "../../../../shared/profiles";
 import type { StudioSession } from "../../../../shared/queue";
 import { api, post } from "../../api";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
+import type { Action } from "../../ui/ActionBar";
 import { useRemembered } from "../auth/useRemembered";
 import {
   initialInput,
@@ -18,6 +20,7 @@ import {
   useGeneration,
   useGenerationActions,
 } from "../generation/GenerationProvider";
+import { lengthChoices } from "../generation/length";
 import { useOpenComposer } from "../generation/openComposer";
 import {
   backendLabel,
@@ -29,6 +32,7 @@ import {
 import { assistantQuery } from "../generation/PromptAssistant";
 import { queueJobQuery, queueQuery } from "../generation/Queue";
 import { type VideosPreference, useVideosPreference } from "../settings/accountPreferences";
+import { animationInput, retainedAnimationProfile } from "./animateLength";
 import { galleryKey } from "./queries";
 import { useItemMutation } from "./useItemMutation";
 
@@ -45,6 +49,9 @@ interface AnimateChoice {
   /** Why it runs somewhere other than the account prefers. */
   note?: string;
 }
+
+/** The preferred animation length in seconds; unset keeps the selected profile's default. */
+export const useAnimateLength = () => useRemembered<number | null>("animate-length", null);
 
 /** Animate's Review Prompt: templates write the prompt for editing before it runs; off until chosen. */
 export const useAnimateReview = () => useRemembered<boolean>("animate-review", false);
@@ -75,12 +82,59 @@ export const animateProfileQuery = (item: Pick<MediaItem, "width" | "height">) =
     retry: false,
   });
 
+/** The same per-account Length setting in every Animate menu. */
+export function useAnimateLengthSetting(item?: MediaItem): Action {
+  const [seconds, setSeconds] = useAnimateLength();
+  const [videos] = useVideosPreference();
+  const switching =
+    useIsMutating({
+      predicate: (mutation) =>
+        (mutation.state.variables as { videos?: VideosPreference } | undefined)?.videos !==
+        undefined,
+    }) > 0;
+  const models = useQuery(modelsQuery);
+  const retained = item && retainedAnimationProfile(models.data?.profiles || [], item, videos);
+  const choice = useQuery({
+    ...animateProfileQuery(item || {}),
+    enabled: Boolean(item && !retained && !switching),
+  });
+  const listed =
+    retained || models.data?.profiles.find((profile) => isProfile(profile, choice.data?.profileId));
+  const profile = profileForBackend(listed, undefined, true);
+  const input = listed && animationInput({ ...initialInput, kind: "video" }, listed, seconds);
+  const options =
+    input &&
+    profile &&
+    lengthChoices(input, {
+      ...profile,
+      capabilities: { ...profile.capabilities, ...profile.imageModes?.reference?.capabilities },
+    });
+  const fps = options?.key === "duration" ? 1 : input?.fps;
+  return {
+    id: "animate-length",
+    label: "Length",
+    loading: switching || models.isPending || (!retained && choice.isLoading),
+    disabled:
+      switching || !item || !options || options.data.length < 2 || (!retained && choice.isLoading),
+    choice: {
+      label: "Length (Seconds)",
+      value: options?.value || "fixed",
+      options: options?.data.map((option) => ({
+        ...option,
+        label: option.label.replace(" s", ""),
+      })) || [{ value: "fixed", label: "Fixed Length" }],
+      onChange: (value) => setSeconds(Number(value) / fps!),
+    },
+  };
+}
+
 /** The draft that reruns, refines or animates a saved result with its recorded settings. */
 export async function mediaDraft(
   item: MediaItem,
   operation: Operation,
   client: QueryClient,
   videos?: VideosPreference,
+  seconds?: number | null,
 ) {
   // An action can run before the composer's models load.
   const { profiles } = await client.ensureQueryData(modelsQuery);
@@ -101,12 +155,14 @@ export async function mediaDraft(
   );
   // Animating an image takes Animate's own pick, so the composer shows the model that will run; a
   // video continues on its own model unless videos run on Cloud or its model is unavailable or stopped.
+  const retained =
+    targetKind === "video" ? retainedAnimationProfile(profiles, item, videos) : undefined;
   const choice =
-    targetKind === "video" &&
-    (item.type === "image" || videos === "cloud" || original?.ready === false || !original)
+    targetKind === "video" && !retained
       ? await client.fetchQuery(animateProfileQuery(item))
       : undefined;
   const profile =
+    retained ||
     (choice && profiles.find((profile) => isProfile(profile, choice.profileId))) ||
     original ||
     (operation !== "image" ? compatible.find((profile) => profile.ready !== false) : undefined);
@@ -182,6 +238,10 @@ export async function mediaDraft(
     rerun && !profileBackend
       ? `${profileName(profile)} no longer runs on ${backendLabel(ran)}, so this run uses ${backendLabel(profile.backend!)}.`
       : undefined;
+  const timing =
+    operation === "animate" || operation === "extend"
+      ? animationInput({ ...initialInput, kind: "video" }, profile, seconds)
+      : undefined;
   return {
     profile,
     choice,
@@ -202,6 +262,7 @@ export async function mediaDraft(
         ...(operation === "image"
           ? { ...source?.input, ...item.settings }
           : profile.imageModes?.reference?.defaults),
+        ...(timing ? { duration: timing.duration, frames: timing.frames, fps: timing.fps } : {}),
         kind: targetKind,
         profileId: profile.id,
         model: profile.model,
@@ -229,10 +290,17 @@ export function useMediaAction(item: MediaItem, prepared?: () => void) {
   const { setDraft } = useGenerationActions();
   const client = useQueryClient();
   const [videos] = useVideosPreference();
+  const [seconds] = useAnimateLength();
   const openComposer = useOpenComposer();
   return useItemMutation(item.id, "prepare", {
     mutationFn: async (operation: Operation) => {
-      const { profile, choice, draft, note } = await mediaDraft(item, operation, client, videos);
+      const { profile, choice, draft, note } = await mediaDraft(
+        item,
+        operation,
+        client,
+        videos,
+        seconds,
+      );
       // The composer's profile chip doesn't say where a video runs, nor why it runs elsewhere.
       const cloud =
         draft.input.kind === "video" && isCloudProfile(profile)
@@ -268,6 +336,7 @@ export interface WrittenPrompt {
   prompt: string;
   model?: string;
   thinking?: string;
+  prepared?: Awaited<ReturnType<typeof mediaDraft>>;
 }
 /** How a given prompt runs: as Prompt › Edit would (a video animates again), an image edit or its animation. */
 type PromptOperation = "image" | "refine" | "animate";
@@ -289,16 +358,20 @@ export function useIterate() {
   const { input: composer } = useGeneration();
   const client = useQueryClient();
   const [videos] = useVideosPreference();
+  const [seconds] = useAnimateLength();
   return async (item: MediaItem, iteration: Iteration) => {
     const animate = iteration.kind === "animate";
     const written = animate ? iteration.written : undefined;
     const given = iteration.kind === "prompt" ? iteration : undefined;
-    const { profile, choice, seed, draft, note } = await mediaDraft(
-      item,
-      given?.operation ?? (animate ? "animate" : "image"),
-      client,
-      videos,
-    );
+    const { profile, choice, seed, draft, note } =
+      written?.prepared ??
+      (await mediaDraft(
+        item,
+        given?.operation ?? (animate ? "animate" : "image"),
+        client,
+        videos,
+        animate ? seconds : undefined,
+      ));
     // An animation that can't run where the account prefers says where it runs instead.
     if (note || choice?.note) notifications.show({ message: note || choice?.note });
     const prompt = given?.prompt ?? (animate ? (written?.prompt ?? "") : draft.input.prompt);
@@ -321,7 +394,14 @@ export function useIterate() {
       // The queue item writes the motion prompt first (backend/prompt-stage.js), then animates; a
       // reviewed prompt was written already and keeps its record.
       ...(written
-        ? { writing: { kind: "animate", ...written } }
+        ? {
+            writing: {
+              kind: "animate",
+              prompt: written.prompt,
+              model: written.model,
+              thinking: written.thinking,
+            },
+          }
         : animate
           ? {
               writing: {
@@ -370,6 +450,7 @@ interface AnimateReview extends WrittenPrompt {
 export function useAnimateWriter(item: MediaItem) {
   const client = useQueryClient();
   const [videos] = useVideosPreference();
+  const [seconds] = useAnimateLength();
   return useMutation({
     // Its failure shows in the dialog.
     meta: { inlineError: true },
@@ -382,7 +463,8 @@ export function useAnimateWriter(item: MediaItem) {
       instruction?: string;
       signal: AbortSignal;
     }): Promise<AnimateReview> => {
-      const { profile, choice, draft } = await mediaDraft(item, "animate", client, videos);
+      const prepared = await mediaDraft(item, "animate", client, videos, seconds);
+      const { profile, choice, draft } = prepared;
       // The clip's length paces the beats, as in the queue stage: the run's input as it would queue.
       const { duration, frames, fps } = generationInput(
         draft.input,
@@ -405,6 +487,7 @@ export function useAnimateWriter(item: MediaItem) {
         signal,
       });
       return {
+        prepared,
         prompt: written.prompt,
         model: written.model,
         thinking: written.thinking,

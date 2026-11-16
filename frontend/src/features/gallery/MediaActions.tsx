@@ -66,6 +66,8 @@ import {
   type EditAsk,
   type Iteration,
   animateProfileQuery,
+  typedPrompt,
+  useAnimateLengthSetting,
   useAnimateReview,
   useAnimateTemplates,
   useEditReview,
@@ -343,29 +345,46 @@ export function useMediaActions(
   });
   const assistant = useQuery(assistantQuery);
   const assisted = Boolean(assistant.data?.available);
-  // The assistant writes new variations into the item's MCP result set, in the queue.
-  const moreSet = useItemMutation(item.id, "more-like-set", {
-    mutationFn: () => post("/api/result-sets/more", { itemId: item.id }),
+  // The queue writes variations of this image or its set with the run's settings.
+  const more = useItemMutation(item.id, "more-like", {
+    mutationFn: (scope: "image" | "set") =>
+      post("/api/result-sets/more", { itemId: item.id, scope }),
     onSuccess: () =>
       void Promise.all(
         [queueQuery.queryKey, galleryKey].map((queryKey) => client.invalidateQueries({ queryKey })),
       ),
   });
-  const moreLikeSet: Action[] =
-    ready && !item.uploaded && item.resultSet && assisted
+  const moreLike: Action[] =
+    ready && !item.uploaded && item.jobId && assisted
       ? [
-          {
-            id: "more-like-set",
-            label: "More Like This Set",
-            icon: icons.suggestions,
-            disabled: moreSet.isPending,
-            onClick: () => moreSet.mutate(),
-          },
+          ...(image && (item.prompt?.trim() || typedPrompt(item).trim())
+            ? [
+                {
+                  id: "more-like-image",
+                  label: "More Like This",
+                  icon: icons.assistant,
+                  disabled: more.isPending,
+                  onClick: () => more.mutate("image"),
+                },
+              ]
+            : []),
+          ...(item.resultSet
+            ? [
+                {
+                  id: "more-like-set",
+                  label: "More Like This Set",
+                  icon: icons.assistant,
+                  disabled: more.isPending,
+                  onClick: () => more.mutate("set"),
+                },
+              ]
+            : []),
         ]
       : [];
   // Animate says why no model can run before anything queues.
   const [videos, setVideos] = useVideosPreference();
   const [review, setReview] = useAnimateReview();
+  const length = useAnimateLengthSetting(item);
   // The menu keeps its choice while a switch loads.
   const animation = useQuery({
     ...animateProfileQuery(item),
@@ -402,7 +421,7 @@ export function useMediaActions(
   const refusal = animation.error?.message;
   // A video's templates continue the clip from its last frame at once; it keeps the clip's own
   // model unless videos run on Cloud.
-  const animateDisabled = video ? action.isPending : !animation.data;
+  const animateDisabled = action.isPending || length.loading || (!video && !animation.data);
   const templates = useAnimateTemplates();
   const templateItem = (template: AssistantOption): Action => ({
     id: `animate-${template.id}`,
@@ -420,7 +439,7 @@ export function useMediaActions(
     query: motionIdeasQuery(item.jobId ?? "", item.id),
     fresh: () => askMotionIdeas(item.jobId!, true, item.id),
     enabled: motionsFor === item.id,
-    disabled: !animation.data,
+    disabled: animateDisabled,
     onPick: (instruction) =>
       review
         ? onAnimate({ theme: "custom", instruction })
@@ -476,7 +495,7 @@ export function useMediaActions(
         onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
         menu: assistMenu({
           loading: optionsLoading,
-          settings: [...modelChoice, ...reviewItems],
+          settings: [...modelChoice, length, ...reviewItems],
           suggestions: motionsOffered ? motions.group : [],
           templates: templates.filter((template) => template.id !== "custom").map(templateItem),
           custom: templates.filter((template) => template.id === "custom").map(templateItem),
@@ -525,7 +544,7 @@ export function useMediaActions(
             ? (assistant.data?.changes ?? []).map((change) => ({
                 id: `change:${change.id}`,
                 label: change.label,
-                icon: icons.suggestions,
+                icon: icons.assistant,
                 disabled: editAsk.pending,
                 onClick: () => editAsk.pick(change.instruction),
               }))
@@ -591,7 +610,7 @@ export function useMediaActions(
                   },
                 ],
             [
-              ...moreLikeSet,
+              ...moreLike,
               ...(image && comparison
                 ? [
                     {
