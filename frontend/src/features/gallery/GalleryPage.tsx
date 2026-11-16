@@ -591,12 +591,14 @@ export function GalleryPage() {
           }
           toggles={
             <>
-              {view === "grid" && (
+              {kind === "image" && (
                 <Switch
-                  label="Originals Only"
+                  label="Comparisons"
                   labelPosition="left"
-                  checked={originalsOnly}
-                  onChange={(event) => setOriginalsOnly(event.currentTarget.checked)}
+                  checked={filters.comparisons}
+                  onChange={(event) =>
+                    setFilters({ ...filters, comparisons: event.currentTarget.checked })
+                  }
                 />
               )}
               {phone && (
@@ -613,14 +615,12 @@ export function GalleryPage() {
                   }
                 />
               )}
-              {kind === "image" && (
+              {view === "grid" && (
                 <Switch
-                  label="Comparisons"
+                  label="Originals Only"
                   labelPosition="left"
-                  checked={filters.comparisons}
-                  onChange={(event) =>
-                    setFilters({ ...filters, comparisons: event.currentTarget.checked })
-                  }
+                  checked={originalsOnly}
+                  onChange={(event) => setOriginalsOnly(event.currentTarget.checked)}
                 />
               )}
             </>
