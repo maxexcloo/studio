@@ -8,7 +8,7 @@ import { fixtures, image, selectionMenuItem, showOnly, signIn, stamp } from "./f
 
 const png = (name: string) => ({ name, mimeType: "image/png", buffer: Buffer.from(name) });
 
-test("Upload takes many files or a folder, lists each failure and shows the new uploads", async ({
+test("Import uploads many files or a folder, lists each failure and shows the new uploads", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -22,11 +22,12 @@ test("Upload takes many files or a folder, lists each failure and shows the new 
   });
   await page.goto("/images");
 
-  await page.getByRole("button", { name: "Upload", exact: true }).click();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
   await expect(page.getByRole("menuitem")).toHaveText([
     "Upload Files…",
     "Upload Folder…",
-    "Import From Reddit…",
+    "From URL…",
+    "From Clipboard",
   ]);
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("menuitem", { name: "Upload Files…", exact: true }).click();
@@ -110,13 +111,13 @@ test("Recreate › Run Suggested Prompts on several uploads queues each suggeste
   ]);
 });
 
-test("An ordinary account imports Reddit images in Gallery with retry and partial failure feedback", async ({
+test("An ordinary account imports a Reddit post From URL with retry and partial failure feedback", async ({
   page,
 }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "member", role: "user" });
   const requests: unknown[] = [];
-  await page.route("**/api/gallery/import/reddit", (route) => {
+  await page.route("**/api/gallery/import/link", (route) => {
     requests.push(route.request().postDataJSON());
     if (requests.length === 1)
       return route.fulfill({
@@ -142,17 +143,17 @@ test("An ordinary account imports Reddit images in Gallery with retry and partia
     });
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Upload", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Import From Reddit…", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Import From Reddit", exact: true });
-  const link = dialog.getByRole("textbox", { name: "Reddit Link", exact: true });
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await page.getByRole("menuitem", { name: "From URL…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Import From URL", exact: true });
+  const link = dialog.getByRole("textbox", { name: "Link", exact: true });
   const url = "https://www.reddit.com/r/birds/comments/abc/birds/";
   await link.fill(url);
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(dialog).toBeHidden();
   expect(requests).toEqual([]);
-  await page.getByRole("button", { name: "Upload", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Import From Reddit…", exact: true }).click();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await page.getByRole("menuitem", { name: "From URL…", exact: true }).click();
   await expect(link).toHaveValue(url);
   await dialog.getByRole("button", { name: "Import", exact: true }).click();
   await expect(

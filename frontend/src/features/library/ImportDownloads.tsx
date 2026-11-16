@@ -1,12 +1,12 @@
-import { Alert, Badge, Group, Menu, Progress, Stack, Text } from "@mantine/core";
+import { Alert, Badge, Group, Menu, Progress, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 import { failure, post } from "../../api";
 import { formatBytes } from "../../ui/bytes";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
-import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
+import { SettingGroup } from "../../ui/SettingRows";
 import { fetchModels, modelsQuery } from "../generation/GenerationProvider";
 import {
   type DownloadState,
@@ -33,9 +33,9 @@ const statusColours: Record<string, string> = {
 };
 const downloadKey = (item: ModelDownload) => item.id || `${item.folder}/${item.file}`;
 
-export function LibraryDownloads({ heading, active }: { heading: ReactNode; active: boolean }) {
+/** Library › Imports' model downloads; stopping one keeps its partial file to resume. */
+export function ImportDownloads({ active, query: search }: { active: boolean; query: string }) {
   const client = useQueryClient();
-  const [search, setSearch] = useState("");
   const seenCompleted = useRef(new Set<string>());
   const query = useQuery({
     ...downloadsQuery,
@@ -81,14 +81,7 @@ export function LibraryDownloads({ heading, active }: { heading: ReactNode; acti
     },
   });
   return (
-    <Stack gap="md">
-      <SectionHeader heading={heading}>
-        <SectionToolbar
-          label="Downloads"
-          query={search}
-          onQueryChange={downloads.length ? setSearch : undefined}
-        />
-      </SectionHeader>
+    <SettingGroup title="Downloads">
       {/* A failed first load shows only its error, not an empty list. */}
       {query.error && !query.data ? (
         <Alert color="red">{query.error.message}</Alert>
@@ -102,6 +95,7 @@ export function LibraryDownloads({ heading, active }: { heading: ReactNode; acti
           query={search}
           searchText={(item) => [item.label, item.file, item.folder, statusLabel(item.status)]}
           empty="No Downloads"
+          compact
           columns={[
             {
               key: "file",
@@ -185,6 +179,6 @@ export function LibraryDownloads({ heading, active }: { heading: ReactNode; acti
           }}
         />
       )}
-    </Stack>
+    </SettingGroup>
   );
 }

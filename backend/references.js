@@ -95,6 +95,32 @@ async function sweepUploadsInFlight() {
   }
 }
 
+/** A fetched image or video, streamed to a temporary `file` as readMultipartUpload does. */
+export async function readStreamUpload(body, { name, mime }) {
+  await fs.promises.mkdir(uploadsInFlight, { recursive: true });
+  await sweepUploadsInFlight();
+  const temporary = path.join(uploadsInFlight, crypto.randomUUID());
+  let size = 0;
+  try {
+    await pipeline(
+      body,
+      async function* (chunks) {
+        for await (const chunk of chunks) {
+          size += chunk.length;
+          if (size > maxVideoBytes)
+            throw new Error(`Videos can be up to ${megabytes(maxVideoBytes)} MB.`);
+          yield chunk;
+        }
+      },
+      fs.createWriteStream(temporary, { mode: 0o600 }),
+    );
+  } catch (error) {
+    await fs.promises.rm(temporary, { force: true });
+    throw error;
+  }
+  return { file: temporary, name: safeName(name), mime, size };
+}
+
 /**
  * The `image` field of a multipart upload, an image or a video up to `maxVideoBytes`, streamed to a
  * temporary `file` so no upload is held in memory. saveUpload moves or removes the file.
