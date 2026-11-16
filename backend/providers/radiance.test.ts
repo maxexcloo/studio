@@ -59,6 +59,37 @@ test("an edit reaches Radiance as multipart fields through the default client", 
   assert.match(received, /name="image\[\]"; filename="image\[\]\.png"/);
 });
 
+test("the API key authenticates model discovery, JSON generation and multipart edits", async () => {
+  const requests: RequestInit[] = [];
+  const client = new RadianceClient(
+    "http://radiance:8000",
+    (async (_url, init) => {
+      requests.push(init!);
+      return Response.json({ data: [{ id: image.model, b64_json: "AQ==" }] });
+    }) as typeof fetch,
+    "test-api-key",
+  );
+  await client.models();
+  await client.images("/v1/images/generations", { model: image.model }, AbortSignal.timeout(1000));
+  const edit = imageRequest(image, [new Uint8Array([1])]);
+  await client.images(edit.route, edit.body, AbortSignal.timeout(1000));
+  for (const request of requests)
+    assert.equal(new Headers(request.headers).get("authorization"), "Bearer test-api-key");
+  assert.equal(new Headers(requests[1].headers).get("content-type"), "application/json");
+  assert.equal(new Headers(requests[2].headers).has("content-type"), false);
+  assert.equal(requests[2].body, edit.body);
+
+  const local = new RadianceClient(
+    "http://localhost:8000",
+    (async (_url, init) => {
+      assert.equal(new Headers(init?.headers).has("authorization"), false);
+      return Response.json({ data: [] });
+    }) as typeof fetch,
+    "",
+  );
+  await local.models();
+});
+
 test("a video sized for another model's area shrinks to H3's on the 32-pixel grid", () => {
   const { body } = videoRequest({
     model: "minimax-h3-i8",
