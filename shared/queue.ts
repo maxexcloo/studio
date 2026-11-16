@@ -90,6 +90,8 @@ export interface QueueJob {
   backend?: string;
   /** The set of jobs one request queued together (an MCP `generate` call of several, a split run). */
   queueSet?: string;
+  /** The first job of one prompt's Count, when its outputs need separate provider runs. */
+  queueBatch?: string;
   /** Dream's background work, queued below every account's own work. */
   dream?: true;
   createdAt: string;
