@@ -630,7 +630,7 @@ export function savedItems<T extends SavedItem>(items: T[], query: string, sort:
     .map(({ item }) => item);
 }
 
-/** The header action that sorts a picker's list: saved stacks and presets, and the LoRAs. */
+/** The header action that sorts a picker's list: presets and LoRAs. */
 export function SortMenu<Sort extends string>({
   label = "Sort",
   labels,
