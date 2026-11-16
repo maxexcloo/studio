@@ -175,3 +175,43 @@ test("Radiance catalogue distinguishes failed models from cold models and expose
   );
   assert.equal(failed, undefined, "a failed model is not offered as ready");
 });
+
+test("a Radiance profile that loads reference images is offered", async () => {
+  const { inferModels } = await import("./model/models.js");
+  const model = "qwen-image-2.1-turbo-iq8r";
+  saveImportedWorkflow({
+    studio: {
+      id: "qwen-references",
+      kind: "image",
+      family: "qwen_image_21",
+      defaults: { model, width: 1344, height: 1344 },
+      controls: Object.fromEntries(
+        ["model", "prompt", "width", "height"].map((input) => [input, { node: "1", input }]),
+      ),
+      mediaInputs: [
+        {
+          id: "reference",
+          kind: "image",
+          label: "Reference Image",
+          required: false,
+          control: { input: "image", node: "3" },
+          max: 1,
+          min: 0,
+        },
+      ],
+    },
+    graph: {
+      1: {
+        class_type: "RadianceImageGenerate",
+        inputs: { model, "images.image_1": ["3", 0] },
+      },
+      2: { class_type: "SaveImage", inputs: { images: ["1", 0] } },
+      3: { class_type: "LoadImage", inputs: { image: "reference.png" } },
+    },
+  });
+  const nodes = radianceInfo([{ id: model, state: "cold" }]);
+  const offered = inferModels(nodes, { radiance: [{ id: model, state: "cold" }] }).profiles.find(
+    (item) => item.id === "custom:qwen-references",
+  );
+  assert.ok(offered, "LoadImage is a node Studio fills itself");
+});
