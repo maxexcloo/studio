@@ -538,10 +538,11 @@ export function registerGenerateTools({
    */
   const submit = async (profile, args, record = {}, { guide = true } = {}) => {
     const fresh = guide && review(refs, profile.id);
-    // A set over maxJobsPerCall images queues in batches of that size, one after another.
+    // Transport chunks share one set; each prompt keeps its own execution batch.
     const count = args.count ?? mcpGenerationCount;
     const size = Math.max(1, Math.floor(maxJobsPerCall / count));
     const prompts = args.prompts || [""];
+    const queueSet = crypto.randomUUID();
     let queued;
     try {
       for (let at = 0; at < prompts.length; at += size) {
@@ -552,6 +553,9 @@ export function registerGenerateTools({
               ? {
                   ...args,
                   prompts: prompts.slice(at, at + size),
+                  ...(args.prompt_references
+                    ? { prompt_references: args.prompt_references.slice(at, at + size) }
+                    : {}),
                   ...(args.titles ? { titles: args.titles.slice(at, at + size) } : {}),
                   ...(args.result_set ? { result_set: { ...args.result_set, first: at } } : {}),
                   ...(Number.isInteger(args.seed) && !args.same_seed
@@ -561,6 +565,7 @@ export function registerGenerateTools({
               : args,
             refs,
             { ...record, ...(conversation ? { conversation } : {}) },
+            queueSet,
           )
           .catch((error) => {
             if (!queued) throw error;
