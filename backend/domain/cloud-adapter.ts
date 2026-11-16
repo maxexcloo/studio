@@ -1,3 +1,5 @@
+import { setTimeout as delay } from "node:timers/promises";
+
 import type { QueueMedia } from "../../shared/queue.ts";
 import { CliProxyMedia, type CloudRequest } from "../providers/cliproxy.ts";
 import type { JobObservation, QueueAdapter } from "./queue.ts";
@@ -73,6 +75,8 @@ export function createCloudQueueAdapter({
   now = Date.now,
 }: CloudAdapterOptions): QueueAdapter {
   const submitting = new Set<string>();
+  let videoStarts: number[] = [];
+  let videoAdmission = Promise.resolve();
   // When each running video is next polled; in memory, so a restart polls at once.
   const polls = new Map<
     string,
@@ -176,6 +180,25 @@ export function createCloudQueueAdapter({
         return { status: "cancelled" as const, reason: "Cancelled before provider submission." };
       const signal = AbortSignal.timeout(300_000);
       if (input.kind === "video") {
+        // This model's deployed team limit is two starts per second, not two running videos.
+        if (input.model === "grok-imagine-video-1.5") {
+          const admission = videoAdmission.then(async () => {
+            const wait = (videoStarts.at(-2) ?? -Infinity) + 1000 - now();
+            if (wait > 0) await delay(wait, undefined, { signal });
+            signal.throwIfAborted();
+            if (!cancelled(job)) videoStarts = [...videoStarts.slice(-1), now()];
+          });
+          videoAdmission = admission.catch(() => {});
+          await admission;
+          if (cancelled(job))
+            return result(
+              save(job, {
+                ...state,
+                state: "cancelled",
+                reason: "Cancelled before provider submission.",
+              }),
+            );
+        }
         const providerId = await provider.video(input, signal);
         state = save(job, { ...state, state: "running", providerId });
         const latest = store.job(job.ownerId, job.id)!;
