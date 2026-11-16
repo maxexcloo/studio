@@ -115,7 +115,12 @@ export function registerResultTools({
       aspect: z.enum(["landscape", "portrait", "square"]).optional(),
       uploads: z.boolean().default(false),
       summary: z.boolean().default(false),
-      limit: z.number().int().min(1).max(24).default(8),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(24, "limit is at most 24; pass the reply's cursor for the next page.")
+        .default(8),
       cursor: z.string().trim().max(400).optional(),
     },
     async ({ liked, disliked, summary, ...args }, signal) => {
@@ -299,7 +304,10 @@ export function registerResultTools({
       compare_to_output_index: z.number().int().min(0).max(999).default(0),
       also: z
         .array(z.string().min(1).max(200))
-        .max(maxJobsPerCall - 1)
+        .max(
+          maxJobsPerCall - 1,
+          `also takes at most ${maxJobsPerCall - 1} images; review the rest in another call only if asked.`,
+        )
         .optional()
         .describe("One image each."),
     },

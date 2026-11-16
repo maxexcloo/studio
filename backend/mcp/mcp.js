@@ -378,6 +378,7 @@ export function registerMcpRoutes(
         media,
         owner,
         refs,
+        chat: actor.conversation,
         resolve,
         resolveOutput,
         referenceAsset,

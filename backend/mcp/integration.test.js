@@ -1110,8 +1110,9 @@ test("media and administrator credentials discover only their own friendly tools
     // a person's rules in proportion with the shape of liked portraits, to 20,050 for naming a
     // person's age and ethnicity first, to 20,250 for Search's dislikes, pages and summary and for
     // leaving LoRA strengths to vary, and to 21,750 for generate's chat context and create_characters;
-    // sets, axis comparisons and the user's brief were then fitted within it.
-    JSON.stringify(tools).length + media.getInstructions().length < 21750,
+    // sets, axis comparisons and the user's brief were then fitted within it; then to 21,900 for
+    // cancel_all's chat and account scopes.
+    JSON.stringify(tools).length + media.getInstructions().length < 21900,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -2330,6 +2331,9 @@ test("Search and Review distinguish recorded user ratings from visual judgement"
   );
   assert.match(texts(search), /user feedback: liked/);
   assert.match(texts(search), /user feedback: unrated/);
+  const tooMany = await call(client, "review", { job_id: "#2", also: Array(84).fill("#2") });
+  assert.equal(tooMany.isError, true);
+  assert.match(texts(tooMany), /also takes at most 9 images; review the rest in another call/);
   const review = await call(client, "review", { job_id: "#2" });
   const record = JSON.parse(
     texts(review)
@@ -7289,7 +7293,10 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   assert.equal(retried.ref, undefined);
   await call(mine, "queue", { action: "pause" });
   assert.equal(seen.at(-1).path, "/api/queue/pause");
-  assert.deepEqual(data(await call(mine, "queue", { action: "cancel_all" })), { cancelled: 1 });
+  assert.deepEqual(data(await call(mine, "queue", { action: "cancel_all", scope: "account" })), {
+    scope: "account",
+    cancelled: 1,
+  });
   await failure(mine, "queue", { action: "move", job_id: "composer-job" });
   // Another account's list never adopts a job this account already holds.
   await call(other, "queue", { action: "list" });
