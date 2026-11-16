@@ -72,7 +72,12 @@ export function submitBlockedReason({
   assisting: boolean;
 }) {
   const referenceCount = references.length || input.referenceAssets.length;
-  const profile = profileForBackend(listedProfile, input.profileBackend, referenceCount > 0);
+  const profile = profileForBackend(
+    listedProfile,
+    input.profileBackend,
+    referenceCount > 0,
+    input.loras.some((lora) => lora.enabled),
+  );
   const referenceMaximum = profile?.mediaInputs?.length
     ? profile.mediaInputs.reduce((total, slot) => total + (slot.max ?? 1), 0)
     : profile?.capabilities.startImage

@@ -21,15 +21,16 @@ export const backendLabel = (id: string) => profileBackendLabels[id] || id;
 
 /**
  * A run's backend supplies its own settings, controls and reference slots: `backend` when asked
- * for, else the one a run with or without `references` uses (runBackend).
+ * for, else the one a run with or without `references` and `loras` uses (runBackend).
  */
 export function profileForBackend(
   profile: Profile | undefined,
   backend?: string,
   references = false,
+  loras = false,
 ) {
   const id = profile?.backend
-    ? runBackend(profile.backendOptions || [], profile.backend, backend, references)
+    ? runBackend(profile.backendOptions || [], profile.backend, backend, references, loras)
     : backend;
   const option = profile?.backendOptions?.find((option) => option.id === id);
   return profile && option?.profile
