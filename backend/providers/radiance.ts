@@ -267,10 +267,17 @@ export const radianceWorkMs = 30 * 60_000;
 export class RadianceClient {
   private base: string;
   private fetchImpl: typeof fetch;
+  private key?: string;
 
-  constructor(base: string, fetchImpl: typeof fetch = longFetch) {
+  /** `key`: the fleet's API key (STUDIO_RADIANCE_KEY), sent when set. */
+  constructor(
+    base: string,
+    fetchImpl: typeof fetch = longFetch,
+    key = process.env.STUDIO_RADIANCE_KEY,
+  ) {
     this.base = base.replace(/\/$/, "");
     this.fetchImpl = fetchImpl;
+    this.key = key;
   }
 
   private async call(
@@ -284,7 +291,10 @@ export class RadianceClient {
       method,
       redirect: "error",
       signal: signal || AbortSignal.timeout(30_000),
-      ...(body && !multipart ? { headers: { "content-type": "application/json" } } : {}),
+      headers: {
+        ...(body && !multipart ? { "content-type": "application/json" } : {}),
+        ...(this.key ? { authorization: `Bearer ${this.key}` } : {}),
+      },
       ...(body ? { body: multipart ? (body as unknown as BodyInit) : JSON.stringify(body) } : {}),
     });
     if (!response.ok) {
