@@ -1914,6 +1914,10 @@ test("The final job completing during pagination defers one head refresh until t
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByRole("img", { name: "Browse Result 59", exact: true })).toBeVisible();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  // Let the viewer reveal its current tile before scrolling away from it.
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 59", exact: true }),
+  ).toBeFocused();
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(
     page.getByRole("button", { name: "Open image: Finished While Paging", exact: true }),

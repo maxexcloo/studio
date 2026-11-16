@@ -341,7 +341,10 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
     const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
     if (phone) await field.click();
     const surface = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
-    await surface.getByRole("textbox", { name: "Prompt", exact: true }).fill(value);
+    const input = surface.getByRole("textbox", { name: "Prompt", exact: true });
+    if (phone) await input.click();
+    await input.fill(value);
+    await expect(input).toHaveValue(value);
     return surface;
   };
   const edited = "An amber bird over a misty harbour";

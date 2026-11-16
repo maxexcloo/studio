@@ -49,6 +49,10 @@ test("Nested pickers consume outside presses one layer at a time", async ({ page
   await press(videos);
   await expect(parent).toBeHidden();
   await expect(page).toHaveURL(composerUrl);
+  // The expanded composer is the remaining layer; its outside press collapses it first.
+  await press(videos);
+  await expect(page.getByRole("button", { name: "Choose LoRAs", exact: true })).toBeHidden();
+  await expect(page).toHaveURL(new URL("/images", composerUrl).href);
   await press(videos);
   await expect(page).toHaveURL(/\/video$/);
 });
