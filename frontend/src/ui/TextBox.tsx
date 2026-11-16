@@ -13,7 +13,7 @@ import {
   useProps,
 } from "@mantine/core";
 import { useMergedRef } from "@mantine/hooks";
-import { ArrowUp, Check, type LucideIcon } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, type LucideIcon } from "lucide-react";
 import {
   type CSSProperties,
   Fragment,
@@ -48,6 +48,7 @@ export function TextBox({
   onChange,
   tools,
   copy = true,
+  toolLabel,
   send,
   busy,
   popups,
@@ -67,6 +68,8 @@ export function TextBox({
   onChange: (value: string) => void;
   /** The box's own tools, in its ⋯ menu; with them (even none) come Copy and Clear. */
   tools?: Action[];
+  /** Names a single tool directly on the phone editor, such as Suggestions. */
+  toolLabel?: string;
   /** Omits duplicate Copy where the page offers it; the full-screen editor always offers it. */
   copy?: boolean;
   /** The send, and a proposal's Undo, which stay beside the text. */
@@ -102,6 +105,7 @@ export function TextBox({
   const mobile = usePhone();
   const phone = mobile && !inline;
   const [editing, setEditing] = useState(false);
+  const namedTool = phone && editing && tools?.length === 1 ? toolLabel : undefined;
   const content = useRef<HTMLDivElement>(null);
   const more = useRef<HTMLButtonElement>(null);
   const [menuOpened, setMenuOpened] = useState(false);
@@ -154,8 +158,11 @@ export function TextBox({
       size="compact-xs"
       disabled={action.disabled}
       onClick={action.onClick}
+      className={classes.editAction}
+      aria-label={action.label}
     >
-      {action.label}
+      {action.icon && <action.icon size={16} className={classes.editIcon} />}
+      <span className={classes.editText}>{action.label}</span>
     </Button>
   ));
   const spins = tools !== undefined && (!phone || editing) && !hideTools;
@@ -216,7 +223,7 @@ export function TextBox({
         })
       }
     >
-      <PopupTooltip label={busy || "More Actions"}>
+      <PopupTooltip label={busy || namedTool || "More Actions"}>
         <Menu.Target>
           {mobile ? (
             <Button
@@ -225,13 +232,14 @@ export function TextBox({
               variant="subtle"
               color="gray"
               size="compact-xs"
-              aria-label={`More ${title} Actions`}
+              aria-label={namedTool || `More ${title} Actions`}
               disabled={tools.length === 0 && (mobile || edits.length === 0)}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
+              rightSection={namedTool ? <ChevronDown size={12} /> : undefined}
               leftSection={busy ? <Loader size={16} /> : undefined}
             >
-              More
+              {namedTool || "More"}
             </Button>
           ) : (
             <ActionIcon
@@ -368,6 +376,7 @@ export function TextBox({
                   <Button
                     key={each.label}
                     aria-label={each.label}
+                    className={primary ? undefined : classes.secondarySend}
                     variant={primary ? "filled" : "light"}
                     radius="xl"
                     size="compact-xs"
