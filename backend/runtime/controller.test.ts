@@ -32,14 +32,8 @@ const workloads = [
 function fixture(
   running: string[],
   {
-    automaticLifecycle = false,
-    parkIdleAfterMs = 0,
-    idleWorkload,
     store,
   }: {
-    automaticLifecycle?: boolean;
-    parkIdleAfterMs?: number;
-    idleWorkload?: string;
     store?: RuntimeStore;
   } = {},
 ) {
@@ -65,13 +59,7 @@ function fixture(
     },
     timeouts: { drain: 60 * 60_000, stop: 60_000, start: 60_000 },
   });
-  if (automaticLifecycle || parkIdleAfterMs)
-    controller.configure({
-      automatic: automaticLifecycle,
-      parkIdleMinutes: parkIdleAfterMs / 60_000,
-      idleWorkload,
-    });
-  return { kube, controller, advance: (ms: number) => void (clock += ms) };
+  return { kube, controller };
 }
 
 test("status reports phases, GPU use and why a pod is not ready", async () => {
@@ -224,46 +212,19 @@ test("restart scales to zero, waits for the pod to go and scales back; a stopped
   assert.deepEqual(recorded.after, ["text"]);
 });
 
-test("generation waits on a stopped workload: off says so, automatic starts media in place of media", async () => {
-  const manual = fixture(["image"]);
-  await assert.rejects(
-    manual.controller.acquire("video"),
-    /Video is stopped: an administrator can start it/,
-  );
-  assert.deepEqual(manual.kube.log, []);
-  const { kube, controller } = fixture(["image", "text"], { automaticLifecycle: true });
-  await assert.rejects(controller.acquire("video"), { message: "Waiting for Video to start." });
-  await assert.rejects(
-    controller.acquire("video"),
-    /Video to start after the current runtime change/,
-  );
-  await controller.settled;
-  assert.deepEqual(kube.log, [
-    "scale comfyui/image 0",
-    "gone comfyui/image",
-    "scale comfyui-video/video 1",
-  ]);
-  // Two-GPU video and one-GPU video share an address; whichever runs serves it.
-  (await controller.acquire(["video", "video-tp2"])).release();
-  (await controller.acquire("text")).release();
-});
-
-test("an automatic switch names its work, and one that gives up leaves what runs in place", async () => {
-  const { kube, controller } = fixture(["image"], { automaticLifecycle: true });
-  const lease = await controller.acquire("image");
-  await assert.rejects(controller.acquire("video-tp2", "job 3d8aa1cc"), {
-    message: "Waiting for Video-tp2 to start.",
+test("generation waits on a stopped workload and starts nothing", async () => {
+  const { kube, controller } = fixture(["image", "video"]);
+  await assert.rejects(controller.acquire("video-tp2"), {
+    status: 503,
+    message: "Video-tp2 is stopped: an administrator can start it in Settings › Workers.",
   });
-  await controller.settled;
-  const [failed] = (await controller.observe()).history;
-  assert.equal(failed.requestedBy, "automatic: starting Video-tp2 for job 3d8aa1cc");
-  assert.match(failed.error!, /nothing was stopped/);
-  assert.deepEqual(kube.log, []);
-  // Nothing was stopped outside Studio, so there is nothing to restore, and Video-tp2 reads Stopped.
+  await assert.rejects(controller.acquire("text"), /Text is stopped/);
   await controller.reconcile();
-  assert.equal((await controller.observe()).history.length, 1);
-  assert.deepEqual([...(await controller.parked())], ["video", "video-tp2", "text", "gaming"]);
-  lease.release();
+  assert.deepEqual(kube.log, []);
+  assert.deepEqual((await controller.observe()).history, []);
+  assert.deepEqual([...(await controller.parked())], ["video-tp2", "text", "gaming"]);
+  // Two-GPU video and one-GPU video share an address; whichever runs serves it.
+  (await controller.acquire(["video-tp2", "video"])).release();
 });
 
 test("a change doesn't wait on work for a workload without pods, and an administrator can stop it", async () => {
@@ -291,18 +252,8 @@ test("a change doesn't wait on work for a workload without pods, and an administ
   lease.release();
 });
 
-test("automatic control never stops or starts text; an administrator's apply can stop it", async () => {
-  const { kube, controller } = fixture(["text"], { automaticLifecycle: true });
-  await assert.rejects(controller.acquire("video-tp2"), {
-    status: 503,
-    message: "Waiting for a GPU: Text is running; stop it in Settings › Workers.",
-  });
-  await assert.rejects(
-    controller.acquire("gaming"),
-    /automatic control doesn't start text for queued work/,
-  );
-  assert.deepEqual(kube.log, []);
-  assert.deepEqual((await controller.observe()).history, []);
+test("an administrator's apply can stop text for media", async () => {
+  const { kube, controller } = fixture(["text"]);
   const preview = await controller.preview(["video-tp2"]);
   assert.deepEqual(preview.stop, ["text"]);
   await controller.apply(["video-tp2"], preview.signature, "account:admin");
@@ -312,36 +263,6 @@ test("automatic control never stops or starts text; an administrator's apply can
     "gone text/text",
     "scale comfyui-video/video-tp2 1",
   ]);
-  (await controller.acquire("video-tp2")).release();
-});
-
-test("a swap stops the text holding waiting media work's GPUs, records who asked and lets the work run", async () => {
-  const { kube, controller, advance } = fixture([], {
-    automaticLifecycle: true,
-    parkIdleAfterMs: 15 * 60_000,
-    idleWorkload: "text",
-  });
-  advance(15 * 60_000);
-  await controller.settleIdle();
-  await controller.settled;
-  await assert.rejects(controller.acquire("video-tp2"), /Text \(Run When Idle\) is running/);
-  // Media that fits beside the text has nothing to swap.
-  await assert.rejects(controller.previewSwap(["image"]), { status: 409 });
-  const preview = await controller.previewSwap(["video-tp2"]);
-  assert.deepEqual(
-    [preview.stop, preview.start, preview.labels, preview.runWhenIdle],
-    [["text"], ["video-tp2"], { text: "Text", "video-tp2": "Video-tp2" }, "Text"],
-  );
-  await assert.rejects(controller.swap(["video-tp2"], "stale", "account:admin"), { status: 409 });
-  const operation = await controller.swap(["video-tp2"], preview.signature, "account:admin");
-  assert.equal(operation.requestedBy, "account:admin: swap to videos");
-  await controller.settled;
-  assert.deepEqual(kube.log.slice(1), [
-    "scale text/text 0",
-    "gone text/text",
-    "scale comfyui-video/video-tp2 1",
-  ]);
-  assert.equal((await controller.observe()).history[0].status, "completed");
   (await controller.acquire("video-tp2")).release();
 });
 
@@ -366,7 +287,7 @@ test("an explicit start uses a free GPU, else names what it stops, media before 
 });
 
 test("restoring the last placement leaves text started outside Studio running", async () => {
-  const { kube, controller } = fixture(["image", "video"], { automaticLifecycle: true });
+  const { kube, controller } = fixture(["image", "video"]);
   const preview = await controller.preview(["image", "video"]);
   await controller.apply(["image", "video"], preview.signature, "local");
   await controller.settled;
@@ -388,7 +309,7 @@ test("restoring the last placement leaves text started outside Studio running", 
   assert.equal(kube.log.at(-1), "scale comfyui/image 1");
 });
 
-test("a deployment reset outside Studio shows as drift and is restored, even without automatic control", async () => {
+test("a deployment reset outside Studio shows as drift and is restored", async () => {
   const { kube, controller } = fixture(["image"]);
   const preview = await controller.preview(["image", "text"]);
   await controller.apply(["image", "text"], preview.signature, "local");
@@ -412,8 +333,8 @@ test("a deployment reset outside Studio shows as drift and is restored, even wit
   );
 });
 
-test("work queued after an outside stop restores the whole placement rather than its own workload", async () => {
-  const { kube, controller } = fixture(["image"], { automaticLifecycle: true });
+test("work queued after an outside stop waits while the whole placement is restored", async () => {
+  const { kube, controller } = fixture(["image"]);
   const preview = await controller.preview(["image", "video"]);
   await controller.apply(["image", "video"], preview.signature, "local");
   await controller.settled;
@@ -423,21 +344,14 @@ test("work queued after an outside stop restores the whole placement rather than
     for (const pod of kube.deployments.get(id)!.pods) pod.deleting = true;
   }
   kube.tick();
-  await assert.rejects(controller.acquire("video", "job 4178af4e"), {
-    message: "Waiting for Video to start.",
+  await assert.rejects(controller.acquire("video"), {
+    message: "Video stopped outside Studio; Studio restores it once its GPUs are free.",
   });
+  await controller.reconcile();
   await controller.settled;
   const [restored] = (await controller.observe()).history;
-  assert.deepEqual(restored.target, ["image", "video"]);
-  assert.deepEqual(restored.stop, []);
-  assert.deepEqual(
-    (await controller.running("image")).map((item) => item.id),
-    ["image"],
-  );
-  assert.deepEqual(
-    (await controller.running("video")).map((item) => item.id),
-    ["video"],
-  );
+  assert.deepEqual([restored.target, restored.stop], [["image", "video"], []]);
+  (await controller.acquire("video")).release();
 });
 
 test("history survives a restart and a change cut short is marked interrupted", async () => {
@@ -462,133 +376,4 @@ test("history survives a restart and a change cut short is marked interrupted", 
   assert.equal((await second.controller.observe()).history.length, 1);
   lease.release();
   await first.controller.settled;
-});
-
-test("automatic control parks media idle for its set time, never text or busy work", async () => {
-  const { kube, controller, advance } = fixture(["image", "text"], {
-    automaticLifecycle: true,
-    parkIdleAfterMs: 15 * 60_000,
-  });
-  // First seen running counts as used then.
-  await controller.settleIdle();
-  advance(10 * 60_000);
-  await controller.settleIdle();
-  await controller.settled;
-  assert.deepEqual(kube.log, []);
-  // Work in progress keeps it running however long it takes.
-  const lease = controller.retain("image");
-  advance(20 * 60_000);
-  await controller.settleIdle();
-  assert.deepEqual(kube.log, []);
-  lease.release();
-  advance(15 * 60_000);
-  await controller.settleIdle();
-  await controller.settled;
-  assert.deepEqual(kube.log, ["scale comfyui/image 0", "gone comfyui/image"]);
-  const status = await controller.observe();
-  assert.match(status.history[0].requestedBy, /parking Image after 15 minutes without work/);
-  assert.equal(kube.deployments.get("text/text")!.replicas, 1);
-});
-
-test("idle parking stays off without automatic control or a set time", async () => {
-  for (const options of [{ parkIdleAfterMs: 60_000 }, { automaticLifecycle: true }]) {
-    const { kube, controller, advance } = fixture(["image"], options);
-    await controller.settleIdle();
-    advance(60 * 60_000);
-    await controller.settleIdle();
-    await controller.settled;
-    assert.deepEqual(kube.log, []);
-  }
-});
-
-test("an idle pool starts the Run When Idle workload, parking its idle media; None starts nothing", async () => {
-  const none = fixture(["image"], { automaticLifecycle: true, parkIdleAfterMs: 15 * 60_000 });
-  await none.controller.settleIdle();
-  none.advance(15 * 60_000);
-  await none.controller.settleIdle();
-  await none.controller.settled;
-  assert.deepEqual(none.kube.log, ["scale comfyui/image 0", "gone comfyui/image"]);
-  const { kube, controller, advance } = fixture(["image"], {
-    automaticLifecycle: true,
-    parkIdleAfterMs: 15 * 60_000,
-    idleWorkload: "video-tp2",
-  });
-  await controller.settleIdle();
-  advance(10 * 60_000);
-  await controller.settleIdle();
-  assert.deepEqual(kube.log, []);
-  advance(5 * 60_000);
-  await controller.settleIdle();
-  await controller.settled;
-  assert.deepEqual(kube.log, [
-    "scale comfyui/image 0",
-    "gone comfyui/image",
-    "scale comfyui-video/video-tp2 1",
-  ]);
-  assert.equal(
-    (await controller.observe()).history[0].requestedBy,
-    "automatic: parking Image and starting Video-tp2 (Run When Idle) after 15 minutes without work",
-  );
-  // Running already, it is never parked as idle.
-  advance(60 * 60_000);
-  await controller.settleIdle();
-  await controller.settled;
-  assert.equal(kube.log.length, 3);
-});
-
-test("queued work still starts what it needs over the Run When Idle workload", async () => {
-  const { kube, controller, advance } = fixture(["video-tp2"], {
-    automaticLifecycle: true,
-    parkIdleAfterMs: 15 * 60_000,
-    idleWorkload: "video-tp2",
-  });
-  await assert.rejects(controller.acquire("image"), { message: "Waiting for Image to start." });
-  await controller.settled;
-  assert.deepEqual(kube.log, [
-    "scale comfyui-video/video-tp2 0",
-    "gone comfyui-video/video-tp2",
-    "scale comfyui/image 1",
-  ]);
-  // Work keeps the pool busy; it is idle only once nothing has run or queued for the set time.
-  controller.retain("image").release();
-  advance(10 * 60_000);
-  await controller.settleIdle();
-  assert.equal(kube.log.length, 3);
-  advance(5 * 60_000);
-  await controller.settleIdle();
-  await controller.settled;
-  assert.deepEqual(kube.log.slice(3), [
-    "scale comfyui/image 0",
-    "gone comfyui/image",
-    "scale comfyui-video/video-tp2 1",
-  ]);
-});
-
-test("a text Run When Idle choice starts when idle and stays while media work waits", async () => {
-  const { kube, controller, advance } = fixture([], {
-    automaticLifecycle: true,
-    parkIdleAfterMs: 15 * 60_000,
-    idleWorkload: "text",
-  });
-  advance(15 * 60_000);
-  await controller.settleIdle();
-  await controller.settled;
-  assert.deepEqual(kube.log, ["scale text/text 1"]);
-  await assert.rejects(controller.acquire("video-tp2"), {
-    message: "Waiting for a GPU: Text (Run When Idle) is running; stop it in Settings › Workers.",
-  });
-  await controller.settled;
-  assert.deepEqual(kube.log, ["scale text/text 1"]);
-  // One-GPU media still fits beside it.
-  await assert.rejects(controller.acquire("image"), { message: "Waiting for Image to start." });
-  await controller.settled;
-  assert.deepEqual(kube.log, ["scale text/text 1", "scale comfyui/image 1"]);
-  assert.throws(
-    () => controller.configure({ automatic: true, parkIdleMinutes: 15, idleWorkload: "nope" }),
-    {
-      status: 400,
-    },
-  );
-  controller.configure({ automatic: true, parkIdleMinutes: 15, idleWorkload: "" });
-  assert.deepEqual(controller.settings, { automatic: true, parkIdleMinutes: 15 });
 });

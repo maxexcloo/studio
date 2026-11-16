@@ -68,17 +68,6 @@ export function createRuntimeRouter(
       202,
     ),
   );
-  router.put(
-    "/settings",
-    handle((request) =>
-      controller.configure({
-        automatic: request.body?.automatic,
-        parkIdleMinutes: request.body?.parkIdleMinutes,
-        idleWorkload: request.body?.idleWorkload,
-        everyoneSwaps: request.body?.everyoneSwaps,
-      }),
-    ),
-  );
   router.get(
     "/workloads/:id/logs",
     handle((request) => controller.logs(String(request.params.id), logLines(request))),
@@ -109,41 +98,6 @@ export function createRuntimeRouter(
   router.post(
     "/operations/:id/cancel",
     handle((request) => controller.cancel(String(request.params.id), requestedBy(request))),
-  );
-  return router;
-}
-
-/**
- * `POST /api/queue/:id/swap` for the caller's waiting media work that running text holds the GPUs
- * for: without `signature` it previews the swap, with one it applies it. Administrators may always
- * swap, ordinary accounts only with Let Everyone Swap Models on. `workloads` gives a waiting job's
- * deployments, none when the caller has no such job.
- */
-export function createSwapRouter(
-  controller: RuntimeController,
-  {
-    admin,
-    workloads,
-    requestedBy,
-  }: {
-    admin: (request: Request) => boolean;
-    workloads: (request: Request, id: string) => string[];
-    requestedBy: (request: Request) => string;
-  },
-) {
-  const router = Router();
-  router.post(
-    "/api/queue/:id/swap",
-    handle((request) => {
-      if (!admin(request) && !controller.settings.everyoneSwaps)
-        throw Object.assign(new Error("Only an administrator can swap models."), { status: 403 });
-      const candidates = workloads(request, String(request.params.id));
-      if (!candidates.length)
-        throw Object.assign(new Error("No waiting work of yours has that id."), { status: 404 });
-      return request.body?.signature
-        ? controller.swap(candidates, String(request.body.signature), requestedBy(request))
-        : controller.previewSwap(candidates);
-    }),
   );
   return router;
 }

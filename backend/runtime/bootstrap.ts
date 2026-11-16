@@ -56,11 +56,8 @@ export async function loadRuntime(
     fetchImpl,
     ...document<BenchmarkRun[]>("runtime-benchmarks"),
   });
-  // Restores the last placement after an outside stop; settling idle pools needs automatic control.
-  setInterval(() => {
-    void controller.reconcile().catch(() => {});
-    void controller.settleIdle().catch(() => {});
-  }, 30_000).unref();
+  // Restores the last placement after an outside stop.
+  setInterval(() => void controller.reconcile().catch(() => {}), 30_000).unref();
   return { controller, benchmarks };
 }
 
