@@ -31,6 +31,7 @@ export function ReferenceSlots({
   onDrop,
   onView,
   caption = true,
+  emptyLabel,
 }: {
   references: ReferenceAsset[];
   profile?: SlotLayout;
@@ -42,6 +43,7 @@ export function ReferenceSlots({
   onView?: (asset: ReferenceAsset) => void;
   /** Names each group under its slots and counts them; off where the form's label already does. */
   caption?: boolean;
+  emptyLabel?: string;
 }) {
   const [over, setOver] = useState<string | null>(null);
   const dropProps = (key: string, cellTarget: ReferenceTarget) => ({
@@ -87,11 +89,21 @@ export function ReferenceSlots({
                     data-required={(group.required && !group.assets.length) || undefined}
                     data-target={active || undefined}
                     aria-pressed={active}
-                    aria-label={`Slot ${number} · ${group.label}${group.required ? " · Required" : ""}`}
+                    aria-label={
+                      emptyLabel ||
+                      `Slot ${number} · ${group.label}${group.required ? " · Required" : ""}`
+                    }
                     onClick={() => onChoose(cellTarget)}
                     {...dropProps(`${group.slot}:empty`, cellTarget)}
                   >
-                    <icons.add size={18} aria-hidden />
+                    <Stack align="center" gap={4}>
+                      <icons.add size={18} aria-hidden />
+                      {emptyLabel && (
+                        <Text size="xs" ta="center">
+                          {emptyLabel}
+                        </Text>
+                      )}
+                    </Stack>
                     <Badge className={classes.number} size="xs" circle variant="default">
                       {number}
                     </Badge>

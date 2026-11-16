@@ -560,7 +560,7 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
   }
 });
 
-test("Prompt Styles switch, reorder and edit the assistant's fixed options by menu", async ({
+test("Prompt Styles filter, switch and edit the assistant's alphabetical options", async ({
   page,
 }) => {
   await fixtures(page);
@@ -594,32 +594,37 @@ test("Prompt Styles switch, reorder and edit the assistant's fixed options by me
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Prompt Styles");
-  const improve = page.getByRole("table", { name: "Improve Prompt Styles", exact: true });
-  const animate = page.getByRole("table", { name: "Animate Styles", exact: true });
-  await expect(improve.getByText("Spicy line.")).toBeVisible();
-  await expect(animate.getByText("Cinematic Camera", { exact: true })).toBeVisible();
-  await expect(page.getByText("None Yet", { exact: true })).toBeVisible();
-
+  const table = page.getByRole("table", { name: "Prompt Styles", exact: true });
+  await expect(table.getByRole("row").locator("td:first-child p:first-child")).toHaveText([
+    "Candid",
+    "Cinematic Camera",
+    "Spicy Uncensored",
+  ]);
+  await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
+  const type = page.getByRole("combobox", { name: "Type", exact: true });
+  await type.click();
+  await page.getByRole("option", { name: "Improve Prompt", exact: true }).click();
+  await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
+  await expect(table.getByText("Spicy line.")).toBeVisible();
+  await expect(table.getByText("Cinematic Camera", { exact: true })).toBeHidden();
   // A switch applies at once, over the list's hash. Its track takes the pointer, as it has no
   // visible label, so the click goes to the switch directly.
-  await improve.getByRole("switch", { name: "Enable Candid", exact: true }).dispatchEvent("click");
+  await table.getByRole("switch", { name: "Enable Candid", exact: true }).dispatchEvent("click");
   await expect.poll(() => saves.length).toBe(1);
   expect(saves[0].baseHash).toBe("h1");
   expect(saves[0].styles[0]).toMatchObject({ id: "candid", enabled: false });
-  await expect(
-    improve.getByRole("switch", { name: "Enable Candid", exact: true }),
-  ).not.toBeChecked();
+  await expect(table.getByRole("switch", { name: "Enable Candid", exact: true })).not.toBeChecked();
 
-  // Moving a style changes its menu's order, leaving the other menus' styles where they are.
-  await improve.getByRole("button", { name: "Actions for Spicy", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Move Up", exact: true }).click();
-  await expect
-    .poll(() => saves.at(-1).styles.map((entry: any) => entry.id))
-    .toEqual(["spicy", "candid", "cinematic"]);
-  await expect(page.getByRole("menu", { name: "Actions for Spicy", exact: true })).toBeHidden();
-
+  await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
+  await type.click();
+  await page.getByRole("option", { name: "Animate", exact: true }).click();
+  await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
+  await page.getByRole("button", { name: "New Style", exact: true }).click();
+  const creating = page.getByRole("dialog", { name: "New Prompt Style", exact: true });
+  await expect(creating.getByRole("radio", { name: "Animate", exact: true })).toBeChecked();
+  await creating.getByRole("button", { name: "Cancel", exact: true }).click();
   // Editing keeps the style's ID and kind and saves in a dialog.
-  await animate.getByRole("button", { name: "Actions for Cinematic Camera", exact: true }).click();
+  await table.getByRole("button", { name: "Actions for Cinematic Camera", exact: true }).click();
   await page
     .getByRole("menu", { name: "Actions for Cinematic Camera", exact: true })
     .getByRole("menuitem", { name: "Edit Style", exact: true })
@@ -633,5 +638,5 @@ test("Prompt Styles switch, reorder and edit the assistant's fixed options by me
     kind: "animate",
     description: "A moving camera.",
   });
-  await expect(animate.getByText("A moving camera.")).toBeVisible();
+  await expect(table.getByText("A moving camera.")).toBeVisible();
 });
