@@ -8,15 +8,15 @@ import {
   Popover,
   Scroller,
   SegmentedControl,
-  Select,
   Stack,
   Text,
   Tooltip,
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { ChevronDown, type LucideIcon, X } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
+import { galleryOrigins } from "../../../../shared/gallery-origin";
 import { loraName, profileNameParts } from "../../../../shared/profiles";
 import { api } from "../../api";
 import type { MediaKind, Profile, Rating } from "../../types";
@@ -52,7 +52,7 @@ export interface FilterChip {
 }
 const keysOf = (option: GalleryFilterOption) => option.keys || [option.value];
 
-const facets = ["model", "lora", "size", "aspect", "tag"] as const;
+const facets = ["model", "lora", "size", "aspect", "tag", "origin"] as const;
 type Facet = (typeof facets)[number];
 type GalleryDate = "" | "day" | "week" | "month" | "year";
 const dates: { value: GalleryDate; label: string; chip: string; days: number }[] = [
@@ -82,6 +82,7 @@ export const emptyGalleryFilters: GalleryFilterValues = {
   size: [],
   aspect: [],
   tag: [],
+  origin: [],
   date: "",
   rating: "",
   uploads: false,
@@ -197,6 +198,7 @@ function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues
       size: facets.data?.sizes || [],
       aspect: facets.data?.aspects || [],
       tag: facets.data?.tags || [],
+      origin: galleryOrigins,
     } satisfies Record<Facet, GalleryFilterOption[]>,
   };
 }
@@ -382,10 +384,11 @@ export function FilterToggle({
 }) {
   const iconOnly = usePhone() && Icon !== undefined;
   return (
-    <Tooltip label={label} disabled={!iconOnly}>
+    <Tooltip label={label} disabled={!Icon}>
       <Button
         {...(iconOnly ? iconChipProps : chipProps)}
-        aria-label={iconOnly ? label : undefined}
+        aria-label={Icon ? label : undefined}
+        data-icon-toggle={Icon ? true : undefined}
         aria-pressed={on}
         title={title}
         variant={on ? "light" : "default"}
@@ -410,8 +413,7 @@ export function GalleryFilterPanel({
   onChange,
   view,
   toggles,
-  inline = false,
-}: FilterProps & { view?: ReactNode; toggles?: ReactNode; inline?: boolean }) {
+}: FilterProps & { view?: ReactNode; toggles?: ReactNode }) {
   const { facets, options } = useFacetOptions(kind, value);
   // Tags list the most used first, each with its count, and keep a chosen tag no longer among them.
   const counts = new Map(options.tag.map((option) => [option.value, option.count]));
@@ -425,11 +427,10 @@ export function GalleryFilterPanel({
   // A clean name stands for all its recorded values; typing any part of it finds it.
   const many = (key: Facet, label: string) => (
     <MultiSelect
-      size={inline ? "xs" : "sm"}
-      className={inline ? classes.facet : undefined}
+      size="sm"
       aria-label={label}
-      label={inline ? undefined : label}
-      placeholder={value[key].length ? undefined : inline ? label : "Any"}
+      label={label}
+      placeholder={value[key].length ? undefined : "Any"}
       data={lists[key]}
       renderOption={
         key === "tag"
@@ -460,7 +461,7 @@ export function GalleryFilterPanel({
       nothingFoundMessage="No Matches"
       rightSection={value[key].length ? undefined : <ChevronDown size={14} />}
       rightSectionPointerEvents="none"
-      comboboxProps={{ withinPortal: inline }}
+      comboboxProps={{ withinPortal: false }}
     />
   );
   const choices = (key: "size" | "aspect", label: string) => (
@@ -490,11 +491,8 @@ export function GalleryFilterPanel({
       </Group>
     </Input.Wrapper>
   );
-  const Panel = inline ? Group : Stack;
-  const Pair = inline ? Fragment : "div";
-  const pairProps = inline ? {} : { className: classes.filterPair };
   return (
-    <Panel gap={inline ? "xs" : "md"} py={inline ? "xs" : undefined}>
+    <Stack gap="md">
       {facets.error && (
         <Button
           {...chipProps}
@@ -507,62 +505,45 @@ export function GalleryFilterPanel({
           Couldn't Load Filters
         </Button>
       )}
-      {view &&
-        (inline ? (
-          <Group gap="xs">
+      {view && (
+        <Input.Wrapper label="View">
+          <Stack gap="xs" mt={4} className={classes.toggles}>
             {view}
             {toggles}
-          </Group>
-        ) : (
-          <Input.Wrapper label="View">
-            <Stack gap="xs" mt={4} className={classes.toggles}>
-              {view}
-              {toggles}
-            </Stack>
-          </Input.Wrapper>
-        ))}
-      {!inline && view && <Divider />}
-      <Pair {...pairProps}>
-        {inline ? (
-          <Select
-            aria-label="Date"
-            className={classes.date}
-            size="xs"
-            value={value.date}
-            onChange={(date) => onChange({ ...value, date: date as GalleryDate })}
-            data={dates.map(({ value, chip }) => ({ value, label: chip || "Any Date" }))}
-            allowDeselect={false}
-          />
-        ) : (
-          <Input.Wrapper label="Date">
-            <SegmentedControl
-              aria-label="Date"
-              fullWidth
-              size="xs"
-              mt={4}
-              value={value.date}
-              onChange={(date) => onChange({ ...value, date: date as GalleryDate })}
-              data={dates.map(({ value, label }) => ({ value, label }))}
-            />
-          </Input.Wrapper>
-        )}
+          </Stack>
+        </Input.Wrapper>
+      )}
+      {view && <Divider />}
+      <Input.Wrapper label="Date">
+        <SegmentedControl
+          aria-label="Date"
+          fullWidth
+          size="xs"
+          mt={4}
+          value={value.date}
+          onChange={(date) => onChange({ ...value, date: date as GalleryDate })}
+          data={dates.map(({ value, label }) => ({ value, label }))}
+        />
+      </Input.Wrapper>
+      <Divider />
+      <Stack gap="md">
+        {many("origin", "Origin")}
         {lists.tag.length > 0 && many("tag", "Tags")}
-      </Pair>
-      {!inline && <Divider />}
-      <Pair {...pairProps}>
+      </Stack>
+      <Divider />
+      <Stack gap="md">
         {many("model", "Models")}
         {many("lora", "LoRAs")}
-      </Pair>
+      </Stack>
       {(options.aspect.length > 0 || options.size.length > 0) && (
         <>
-          {!inline && <Divider />}
-          <Pair {...pairProps}>
-            {options.aspect.length > 0 &&
-              (inline ? many("aspect", "Aspect Ratio") : choices("aspect", "Aspect Ratio"))}
-            {options.size.length > 0 && (inline ? many("size", "Size") : choices("size", "Size"))}
-          </Pair>
+          <Divider />
+          <Stack gap="md">
+            {options.aspect.length > 0 && choices("aspect", "Aspect Ratio")}
+            {options.size.length > 0 && choices("size", "Size")}
+          </Stack>
         </>
       )}
-    </Panel>
+    </Stack>
   );
 }

@@ -3,6 +3,8 @@ import { createRequire } from "node:module";
 
 import { type Locator, type Page, expect } from "@playwright/test";
 
+import { dreamDefaults, dreamSettingKeys } from "../../shared/dream";
+
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
 const familyLabels = { flux1: "FLUX.1", sdxl: "SDXL" };
 
@@ -186,6 +188,7 @@ export async function fixtures(page: Page) {
     canChangePassword: true,
   };
 
+  const deploymentDream = dreamDefaultsFixture();
   const administration = {
     accounts: [
       {
@@ -270,6 +273,10 @@ export async function fixtures(page: Page) {
       return respond(preferences);
     }
     if (path === "/api/settings/deployment") {
+      if (method === "POST") {
+        const setting = Object.values(deploymentDream).find((entry) => entry.key === body.key);
+        if (setting) setting.value = body.value;
+      }
       const setting = (key: string) => ({
         key,
         configured: "",
@@ -284,6 +291,7 @@ export async function fixtures(page: Page) {
           profiles: [],
         },
         catalogue: [],
+        dream: deploymentDream,
         integrations: {
           civitai: { token: { set: false } },
           huggingFace: { token: { set: false } },
@@ -963,25 +971,25 @@ export async function compareUpscale(page: Page) {
 
 /** Chooses a text box's tool from its ⋯ menu, such as Recent Prompts from the Prompt's. */
 export async function promptTool(scope: Page | Locator, box: string, label: string) {
-  await scope.getByRole("button", { name: `More ${box} Actions`, exact: true }).click();
+  await scope.getByRole("button", { name: new RegExp(`^(AI|More) ${box} Actions$`) }).click();
   const page = "page" in scope ? scope.page() : scope;
   await page.getByRole("menuitem", { name: label, exact: true }).click();
 }
 
 /** Opens a text box's ⋯ menu, which lists each tool's options under its name, one level deep. */
 export async function promptMenu(scope: Page | Locator, box: string) {
-  await scope.getByRole("button", { name: `More ${box} Actions`, exact: true }).click();
+  await scope.getByRole("button", { name: new RegExp(`^(AI|More) ${box} Actions$`) }).click();
   const page = "page" in scope ? scope.page() : scope;
   return page.getByRole("menu");
 }
 
-/** Opens the viewer's named Suggestions control without entering its prompt editor. */
+/** Opens the viewer's AI menu without entering its prompt editor. */
 export async function viewerPromptMenu(page: Page) {
   await page
     .getByRole("dialog", { name: "Generation", exact: true })
-    .getByRole("button", { name: "Suggestions", exact: true })
+    .getByRole("button", { name: "AI Prompt Actions", exact: true })
     .click();
-  return page.getByRole("menu", { name: "Suggestions", exact: true });
+  return page.getByRole("menu");
 }
 
 /** Returns from the shared phone text editor when a test continues on its parent surface. */
@@ -997,7 +1005,7 @@ export async function editorMenu(scope: Page | Locator, box: string, tool: strin
   const page = "page" in scope ? scope.page() : scope;
   await page
     .getByRole("dialog", { name: box, exact: true })
-    .getByRole("button", { name: `More ${box} Actions`, exact: true })
+    .getByRole("button", { name: new RegExp(`^(AI|More) ${box} Actions$`) })
     .click();
   const menu = page.getByRole("menu");
   await expect(menu.getByText(tool, { exact: true })).toBeVisible();
@@ -1247,13 +1255,8 @@ export async function serveDream(
 ) {
   const state = {
     settings: {
+      ...dreamDefaults,
       enabled: options.enabled ?? true,
-      paused: false,
-      dailyImages: 40,
-      dailyVideos: 4,
-      images: true,
-      videos: false,
-      spicy: false,
     },
     unseen: options.unseen ?? [],
     discarded: options.discarded ?? [],
@@ -1350,7 +1353,16 @@ export async function serveDream(
     if (method !== "GET") state.requests.push({ method, path, body });
     if (path === "/api/dream") return route.fulfill({ json: show() });
     if (path === "/api/dream/history")
-      return route.fulfill({ json: { items: options.history || [] } });
+      return route.fulfill({
+        json: {
+          items: (options.history || []).filter(
+            (entry) =>
+              !url.searchParams.has("media") ||
+              (entry.item.media === url.searchParams.get("media") &&
+                (!entry.other || entry.other.media === url.searchParams.get("media"))),
+          ),
+        },
+      });
     if (path === "/api/dream/count")
       return route.fulfill({
         json: {
@@ -1365,7 +1377,13 @@ export async function serveDream(
     if (path === "/api/dream/calibration") {
       if (method === "GET")
         return route.fulfill({
-          json: { items: state.calibration.filter((item) => !state.judged.has(item.id)) },
+          json: {
+            items: state.calibration.filter(
+              (item) =>
+                !state.judged.has(item.id) &&
+                item.type === (url.searchParams.get("media") || "image"),
+            ),
+          },
         });
       for (const id of [...(body.liked || []), ...(body.passed || [])]) state.judged.add(id);
       return route.fulfill({ json: { ok: true } });
@@ -1376,12 +1394,15 @@ export async function serveDream(
         state.discarded = [];
         return route.fulfill({ json: { deleted } });
       }
+      const filtered = state.discarded.filter(
+        (item) => !url.searchParams.has("media") || item.type === url.searchParams.get("media"),
+      );
       const start = Number(url.searchParams.get("cursor") || 0);
       const limit = Number(url.searchParams.get("limit") || 40);
       return route.fulfill({
         json: {
-          items: state.discarded.slice(start, start + limit),
-          nextCursor: start + limit < state.discarded.length ? String(start + limit) : "",
+          items: filtered.slice(start, start + limit),
+          nextCursor: start + limit < filtered.length ? String(start + limit) : "",
         },
       });
     }
@@ -1481,3 +1502,16 @@ export function videoClip() {
     return undefined;
   }
 }
+
+export const dreamDefaultsFixture = () =>
+  Object.fromEntries(
+    Object.entries(dreamDefaults).map(([name, value]) => [
+      name,
+      {
+        key: dreamSettingKeys[name as keyof typeof dreamDefaults],
+        value,
+        source: "default",
+        locked: false,
+      },
+    ]),
+  );

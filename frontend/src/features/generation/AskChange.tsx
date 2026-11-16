@@ -195,14 +195,14 @@ export function useChangeSuggestions<K extends QueryKey>({
   const action: Action = {
     id: "suggestions",
     label: "Suggestions",
-    icon: icons.suggestions,
+    icon: icons.assistant,
     disabled,
     menu: [options, [again]],
   };
   // The same under a heading, as one group of an assistant menu (assistMenu).
   const group: Action[] = [
     { id: "suggestions-heading", label: "Suggested", heading: true },
-    ...options.map((option) => ({ ...option, icon: icons.suggestions })),
+    ...options.map((option) => ({ ...option, icon: icons.assistant })),
     again,
   ];
   return { action, group, loading };

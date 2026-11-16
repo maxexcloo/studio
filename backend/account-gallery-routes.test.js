@@ -430,3 +430,106 @@ test("search adds images that look like it to the text matches, and filters stil
     near = () => null;
   }
 });
+
+test("origin filters retain ownership, other filters and stable cursors as matching results arrive", async () => {
+  const ownerId = "origin-account";
+  const request = {
+    studioAccount: { userId: ownerId, role: "user", authenticated: true, features: {} },
+    query: {},
+  };
+  const dream = (jobId, extra = {}) => ({
+    ...item(ownerId, jobId),
+    dream: { state: "kept" },
+    prompt: "a lantern",
+    rating: "liked",
+    resultSet: { id: "origin-set", title: "Lanterns" },
+    width: 1024,
+    height: 1024,
+    ...extra,
+  });
+  const rows = [
+    dream("origin-z"),
+    dream("origin-m"),
+    dream("origin-a"),
+    dream("origin-other-owner", { ownerId: "origin-stranger" }),
+    dream("origin-pooled", { dream: { state: "unseen" } }),
+    dream("origin-discarded", { dream: { state: "discarded" }, rating: "disliked" }),
+    dream("origin-unrated", { rating: undefined }),
+    dream("origin-video", { type: "video" }),
+    dream("origin-other-model", { model: "other" }),
+    dream("origin-other-set", { resultSet: { id: "other-set", title: "Other" } }),
+    dream("origin-old", { createdAt: "2025-01-01" }),
+    dream("origin-chat", { dream: undefined, chat: { conversationId: "chat" } }),
+    dream("origin-unknown", { dream: undefined }),
+  ];
+  setGallery(rows);
+  const query = {
+    origin: "dream",
+    q: "lantern",
+    rating: "liked",
+    type: "image",
+    model: "test-model",
+    set: "origin-set",
+    since: "2026-01-01",
+    size: "up-to-1k",
+    aspect: "square",
+    limit: "1",
+  };
+  const read = (extra = {}) =>
+    call(routes["/api/gallery"], { ...request, query: { ...query, ...extra } });
+  const ids = (page) => page.items.map((row) => row.id);
+  const first = await read();
+  assert.deepEqual(ids(first), ["origin-z-0"]);
+  assert.equal(first.totalApprox, 3);
+  const added = dream("origin-new", { createdAt: "2026-11-01" });
+  setGallery([added, ...rows]);
+  assert.deepEqual(ids(await read()), [added.id], "refresh includes new matching work");
+  const rest = await read({ cursor: first.nextCursor, limit: "500" });
+  assert.deepEqual(
+    ids(rest),
+    ["origin-m-0", "origin-a-0"],
+    "quick select's later page keeps the same matches without repeats",
+  );
+  assert.equal(rest.hasMore, false);
+  assert.equal(rest.totalApprox, 4);
+  const all = await read({ origin: ["chat", "dream"], limit: "500" });
+  assert.equal(all.items.length, 5);
+  assert.ok(ids(all).includes("origin-chat-0"));
+  assert.deepEqual(ids(await read({ origin: "chat", limit: "500" })), ["origin-chat-0"]);
+  const disliked = await read({ rating: "disliked", limit: "500" });
+  assert.deepEqual(ids(disliked), ["origin-discarded-0"]);
+});
+
+test("origin filters narrow queued and running tiles without hiding matching unfinished work", async () => {
+  const ownerId = "origin-pending-account";
+  saveAccountPreferences(ownerId, { galleryWork: "queued" });
+  const session = queue.createSession(ownerId);
+  const input = { kind: "image", prompt: "a lantern", chat: { conversationId: "chat" } };
+  const waiting = queue.enqueue(ownerId, session.id, input, "image");
+  const unknown = queue.enqueue(
+    ownerId,
+    session.id,
+    { kind: "image", prompt: "a lantern" },
+    "image",
+  );
+  const started = queue.enqueue(ownerId, session.id, input, "image");
+  const running = {
+    ...item(ownerId, started.id),
+    status: "pending",
+    chat: input.chat,
+  };
+  setGallery([running]);
+  const read = (origin) =>
+    call(routes["/api/gallery"], {
+      studioAccount: { userId: ownerId, role: "user", authenticated: true, features: {} },
+      query: { origin, q: "unfinished prompt", model: "unfinished model" },
+    });
+  const chat = await read("chat");
+  assert.deepEqual(
+    chat.items.map((item) => item.jobId),
+    [waiting.id, running.jobId],
+  );
+  assert.deepEqual((await read("dream")).items, []);
+  assert.equal((await read("")).items.length, 3);
+  for (const job of [started, waiting, unknown]) queue.save({ ...job, status: "cancelled" });
+});

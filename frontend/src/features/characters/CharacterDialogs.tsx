@@ -62,7 +62,7 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
   };
 }
 
-/** A card's ⋯ menu: Use in Composer, Edit Character, Make Sheet, then Delete Character. */
+/** A card's ⋯ menu: Edit Character, Make Sheet, Use in Composer, then Delete Character. */
 export function CharacterMenu({
   card,
   onEdit,
@@ -91,6 +91,14 @@ export function CharacterMenu({
         <ActionMenuItems
           groups={[
             [
+              { id: "edit", label: "Edit Character", icon: icons.edit, onClick: onEdit },
+              {
+                id: "sheet",
+                label: "Make Sheet",
+                icon: icons.sheet,
+                disabled: !card.references.length || card.sheet?.status === "making",
+                onClick: onSheet,
+              },
               ...(onUse
                 ? [
                     {
@@ -102,15 +110,6 @@ export function CharacterMenu({
                     },
                   ]
                 : []),
-              { id: "edit", label: "Edit Character", icon: icons.edit, onClick: onEdit },
-              {
-                id: "sheet",
-                label: "Make Sheet",
-                description: "Face, front, side and back views",
-                icon: icons.sheet,
-                disabled: !card.references.length || card.sheet?.status === "making",
-                onClick: onSheet,
-              },
             ],
             [
               {

@@ -57,7 +57,14 @@ window.addEventListener(
     pressed = { event, layers };
     const top = layers.at(-1);
     const context = top && popups.get(top);
-    if (event.key === "Escape" && !event.isComposing && top && context?.closeOnEscape) {
+    // Inside the dropdown, Mantine's native handler also returns focus synchronously.
+    if (
+      event.key === "Escape" &&
+      !event.isComposing &&
+      top &&
+      context?.closeOnEscape &&
+      !top.contains(event.target as Node)
+    ) {
       dismiss(context);
       event.preventDefault();
       event.stopPropagation();
@@ -131,9 +138,12 @@ window.addEventListener(
               return list && top.contains(list);
             }),
       );
-    const control = trigger?.closest(".mantine-Input-wrapper") || trigger;
-    closing = !top.contains(target) && !control?.contains(target);
-    if (closing && top.dataset.popupOutside !== "false") {
+    const control =
+      (trigger?.getAttribute("role") === "combobox" && trigger.closest(".mantine-Input-wrapper")) ||
+      trigger;
+    closing =
+      top.dataset.popupOutside !== "false" && !top.contains(target) && !control?.contains(target);
+    if (closing) {
       dismiss(context);
       // The same press must not arm a hold or another action beneath the popup.
       event.stopPropagation();

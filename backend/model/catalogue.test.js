@@ -85,7 +85,7 @@ test("uncensored LoRAs need Uncensored Models, in discovery and at admission", (
   assert.equal(loraAllowed(undefined)("explicit.safetensors"), true);
 });
 
-test("Dream runs the ready local profiles the composer offers, unless their worker was stopped", () => {
+test("Dream offers ready local and cloud profiles the composer offers, unless their worker was stopped", () => {
   const { profiles, defaults } = dreamCatalogue({
     defaults: { imageModel: "grok-image", videoModel: "wan" },
     profiles: [
@@ -98,9 +98,9 @@ test("Dream runs the ready local profiles the composer offers, unless their work
   });
   assert.deepEqual(
     profiles.map((profile) => profile.id),
-    ["flux"],
+    ["grok-image", "flux"],
   );
-  assert.deepEqual(defaults, { imageModel: "flux", videoModel: undefined });
+  assert.deepEqual(defaults, { imageModel: "grok-image", videoModel: undefined });
 });
 
 test("default profiles sit on the preferred side while it can run, otherwise the other with a note", () => {

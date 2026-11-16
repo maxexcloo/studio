@@ -198,6 +198,55 @@ test("a request's jobs group as one set that moves and stops together", async ({
   await expect(stopAll).toBeVisible();
 });
 
+test("a request of several prompts lists each prompt once, its split runs stopping together", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await signIn(page, { id: "user", role: "user" });
+  const job = (id: string, prompt: string, queueBatch?: string) => ({
+    id,
+    jobId: id,
+    sessionId: "s",
+    operation: "animate",
+    status: "queued",
+    reason: "",
+    input: { prompt, kind: "video", resultSet: { id: "result-set", title: "Fox Clips", index: 0 } },
+    queueSet: "request",
+    ...(queueBatch && { queueBatch }),
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  state.jobs.push(
+    job("fox-1", "A fox runs", "fox-1"),
+    job("fox-2", "A fox runs", "fox-1"),
+    job("owl-1", "An owl flies", "owl-1"),
+    job("owl-2", "An owl flies", "owl-1"),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  await expect(queue.getByText("Generations (1)", { exact: true })).toBeVisible();
+  await queue.getByRole("button", { name: /^Fox Clips/ }).click();
+  const fox = queue.getByRole("button", { name: /^A fox runs/ });
+  await expect(fox).toContainText("0 of 2 Done");
+  await expect(queue.getByRole("button", { name: /^An owl flies/ })).toBeVisible();
+  await expect(queue.getByRole("button", { name: "Stop Prompt", exact: true })).toHaveCount(2);
+
+  // A prompt's Stop stops only its own runs.
+  await queue.getByRole("button", { name: "Stop Prompt", exact: true }).first().click();
+  await expect
+    .poll(() => state.jobs.map((item) => [item.id, item.status]))
+    .toEqual([
+      ["fox-1", "cancelled"],
+      ["fox-2", "cancelled"],
+      ["owl-1", "queued"],
+      ["owl-2", "queued"],
+    ]);
+  await expect(fox).toBeHidden();
+});
+
 test("Retry and a set's Retry Failed go through the shared retry, replacing the failed originals", async ({
   page,
 }) => {

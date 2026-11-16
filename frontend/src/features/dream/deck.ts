@@ -1,5 +1,5 @@
 import type { MediaItem } from "../../types";
-import type { DreamItem } from "./queries";
+import type { DreamItem, DreamMedia } from "./queries";
 
 /**
  * A pair asks its question about two images: a Dream comparison (`pairId`, alike but for the one
@@ -26,7 +26,10 @@ function dreamCards(dream: DreamItem[]): DeckCard[] {
     const pair = item.dream?.pair;
     if (pair && paired.has(pair.id)) continue;
     const other =
-      pair && dream.find((entry) => entry !== item && entry.dream?.pair?.id === pair.id);
+      pair &&
+      dream.find(
+        (entry) => entry !== item && entry.type === item.type && entry.dream?.pair?.id === pair.id,
+      );
     if (!pair || !other) {
       cards.push({ kind: "dream", key: item.id, item });
       continue;
@@ -45,36 +48,57 @@ function dreamCards(dream: DreamItem[]): DeckCard[] {
   return cards;
 }
 
-/** Every fourth card is a this-or-that pair of gallery images, so comparisons keep a steady share. */
-const pairEvery = 4;
+export const cardIds = (card: DeckCard) =>
+  card.kind === "pair" ? card.items.map((item) => item.id) : [card.item.id];
 
 /**
- * The next `depth` cards after `judged` judged ones: a pair of gallery images every `pairEvery`
- * cards while there are two, Dream's unseen results between them, then single gallery images for
- * calibration once Dream has nothing unseen. With `pairsOnly` (Dream is off) every card is a pair.
- * Counting from what was judged keeps the order steady as cards leave the deck.
+ * Newest unseen Dream results come first, with genuine comparisons kept together. The active
+ * card stays until judged; arrivals take the next places. Gallery calibration follows only
+ * after unseen Dream results, pairing every fourth card, or every card while Dream is off.
  */
 export function deckCards(
   dream: DreamItem[],
   calibration: MediaItem[],
   judged: number,
-  { depth = 3, pairsOnly = false } = {},
+  {
+    depth = 3,
+    pairsOnly = false,
+    media = "image",
+    current,
+  }: { depth?: number; pairsOnly?: boolean; media?: DreamMedia; current?: DeckCard } = {},
 ) {
-  const unseen = pairsOnly ? [] : dreamCards(dream);
-  const gallery = [...calibration];
-  const cards: DeckCard[] = [];
-  for (let count = judged; cards.length < depth; count++) {
-    if ((pairsOnly || count % pairEvery === pairEvery - 1) && gallery.length >= 2) {
-      const items = gallery.splice(0, 2) as [MediaItem, MediaItem];
+  const dreamed = pairsOnly ? [] : dream.filter((item) => item.type === media);
+  const gallery = calibration.filter((item) => item.type === media);
+  const pool =
+    current?.kind === "dream" || (current?.kind === "pair" && current.pairId) ? dreamed : gallery;
+  const held =
+    current && cardIds(current).every((id) => pool.some((item) => item.id === id))
+      ? current
+      : undefined;
+  const heldIds = new Set(held ? cardIds(held) : []);
+  const unseen = dreamCards(
+    dreamed
+      .filter((item) => !heldIds.has(item.id))
+      .sort((a, b) =>
+        String(b.createdAt || b.dream?.at || "").localeCompare(
+          String(a.createdAt || a.dream?.at || ""),
+        ),
+      ),
+  );
+  const remaining = gallery.filter((item) => !heldIds.has(item.id));
+  const cards: DeckCard[] = held ? [held] : [];
+  for (let count = judged + cards.length; cards.length < depth; count++) {
+    if (unseen.length) cards.push(unseen.shift()!);
+    else if ((pairsOnly || count % 4 === 3) && remaining.length >= 2) {
+      const items = remaining.splice(0, 2) as [MediaItem, MediaItem];
       cards.push({
         kind: "pair",
         key: `${items[0].id}+${items[1].id}`,
         items,
-        question: "Which Image?",
+        question: media === "video" ? "Which Video?" : "Which Image?",
       });
-    } else if (unseen.length) cards.push(unseen.shift()!);
-    else if (gallery.length && !pairsOnly) {
-      const item = gallery.shift()!;
+    } else if (remaining.length && !pairsOnly) {
+      const item = remaining.shift()!;
       cards.push({ kind: "calibration", key: item.id, item });
     } else break;
   }

@@ -156,7 +156,8 @@
 }
 .actions {
   flex-shrink: 0;
-  padding-bottom: env(safe-area-inset-bottom);
+  width: min(100%, var(--studio-composer-width));
+  padding-bottom: calc(4px + env(safe-area-inset-bottom));
 }
 .thumb {
   display: block;
