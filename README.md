@@ -29,7 +29,7 @@ Run one application replica with `Recreate`; two schedulers must not control the
 
 ## Configuration
 
-Studio reads its settings from the environment, or from `.env` in the project folder at start (the shell wins). Values an administrator saves in **Settings › Generation** live in `studio.sqlite` and apply at once; a value the environment sets shows as locked there. Studio never writes an env file.
+Studio reads its settings from the environment, or from `.env` in the project folder at start (the shell wins). Values an administrator saves in **Settings** (Dream, Gallery and Generation) live in `studio.sqlite` and apply at once; a value the environment sets shows as locked there. Studio never writes an env file.
 
 ```bash
 HOST=127.0.0.1
@@ -92,7 +92,7 @@ Every MCP action calls the route its UI action calls with the caller's own crede
 
 The prompt assistant uses an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` (such as `cloud/auto`). Prompt writing uses the text model each account picks; Studio's own calls go to `STUDIO_LOCAL_TEXT_MODEL` (such as `local/auto`) while a text workload runs, otherwise the cloud model. Without the gateway, the assistant is off.
 
-**Background AI** (**Settings › Generation**) has a switch for each call Studio makes on its own, each on by default; `0` turns it off: `STUDIO_FACE_CHECK`, `STUDIO_FACE_REDO`, `STUDIO_GALLERY_CAPTIONS`, `STUDIO_GALLERY_TITLES`, `STUDIO_IMAGE_SEARCH`, `STUDIO_NEXT_STEPS`, `STUDIO_PROMPT_IDEAS`, `STUDIO_SUGGESTED_PROMPTS` and `STUDIO_TASTE_UPDATES`. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use. `STUDIO_GALLERY_WHILE_BUSY=1` lets that work run while Studio is generating.
+**Background AI** (**Settings › Gallery**) has a switch for each call Studio makes on its own, each on by default; `0` turns it off: `STUDIO_FACE_CHECK`, `STUDIO_FACE_REDO`, `STUDIO_GALLERY_CAPTIONS`, `STUDIO_GALLERY_TITLES`, `STUDIO_IMAGE_SEARCH`, `STUDIO_NEXT_STEPS`, `STUDIO_PROMPT_IDEAS`, `STUDIO_SUGGESTED_PROMPTS` and `STUDIO_TASTE_UPDATES`. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use. `STUDIO_GALLERY_WHILE_BUSY=1` lets that work run while Studio is generating.
 
 `mise run eval:assistant` replays the recorded cases in `backend/fixtures/assistant-evals/` against the live gateway; `--record` writes the replies back for review.
 

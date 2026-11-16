@@ -6,22 +6,10 @@ import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSecti
 import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
 export const librarySections = {
-  characters: {
-    label: "Characters",
-    description: "Your character cards: reference images and descriptions to reuse in Composer.",
-    icon: icons.character,
-    group: "Personal",
-  },
-  outfits: {
-    label: "Outfits",
-    description: "Your reusable outfit descriptions. Images help you recognise each card.",
-    icon: icons.outfit,
-    group: "Personal",
-  },
-  scenes: {
-    label: "Scenes",
-    description: "Your reusable scene descriptions. Images help you recognise each card.",
-    icon: icons.scene,
+  chatBrief: {
+    label: "Chat Brief",
+    description: "Standing rules every chat keeps to, so you needn't repeat them.",
+    icon: icons.chat,
     group: "Personal",
   },
   presets: {
@@ -30,6 +18,24 @@ export const librarySections = {
       "Your saved presets: a prompt, model, settings or LoRAs to start from, or any mix of them.",
     icon: icons.preset,
     group: "Personal",
+  },
+  characters: {
+    label: "Characters",
+    description: "Your character cards: reference images and descriptions to reuse in Composer.",
+    icon: icons.character,
+    group: "Cards",
+  },
+  outfits: {
+    label: "Outfits",
+    description: "Your reusable outfit descriptions. Images help you recognise each card.",
+    icon: icons.outfit,
+    group: "Cards",
+  },
+  scenes: {
+    label: "Scenes",
+    description: "Your reusable scene descriptions. Images help you recognise each card.",
+    icon: icons.scene,
+    group: "Cards",
   },
   guides: {
     label: "Guides",
@@ -91,7 +97,7 @@ export const librarySections = {
     apart: true,
   },
 };
-/** Administrators see the whole Library; other accounts only their cards and Presets. */
+/** Administrators see the whole Library; other accounts only their Chat Brief, Presets and cards. */
 export function useLibraryNavigation() {
   const admin = useIsAdmin();
   const characters = useGroupFeature("characters");

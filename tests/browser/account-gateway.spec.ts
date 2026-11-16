@@ -135,25 +135,27 @@ test("Personal MCP credentials can be issued, viewed again hidden until Show, ro
   await page.goto("/settings#account");
   await expect(page.getByText(status.endpoint, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Create Token", exact: true }).click();
-  const token = page.getByRole("textbox", { name: "MCP Token", exact: true });
   const setting = page.getByRole("region", { name: "MCP Token", exact: true });
+  const token = (value: string) => setting.getByText(value, { exact: true });
+  const hidden = setting.getByText(/browser-fixture/);
   await expect(setting).toBeVisible();
-  await expect(token).not.toHaveValue(/browser-fixture/);
+  await expect(hidden).toHaveCount(0);
   await expect(setting.getByRole("button", { name: "Copy Token", exact: true })).toBeEnabled();
-  await expect(
-    setting.getByRole("button", { name: "Copy URL with Token", exact: true }),
-  ).toBeEnabled();
+  // The endpoint's Copy URL menu also copies the URL with the token.
+  await setting.getByRole("button", { name: "Copy URL", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "URL with Token", exact: true })).toBeEnabled();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Show", exact: true }).click();
-  await expect(token).toHaveValue("browser-fixture-token-1");
+  await expect(token("browser-fixture-token-1")).toBeVisible();
   await page.getByRole("button", { name: "Hide", exact: true }).click();
-  await expect(token).not.toHaveValue(/browser-fixture/);
+  await expect(hidden).toHaveCount(0);
   await expect(setting.getByText("Token Active", { exact: true })).toBeVisible();
   // Back in Account, the token is hidden until Show.
   await section(page, "Settings", "Users");
   await section(page, "Settings", "Account");
-  await expect(token).not.toHaveValue(/browser-fixture/);
+  await expect(hidden).toHaveCount(0);
   await page.getByRole("button", { name: "Show", exact: true }).click();
-  await expect(token).toHaveValue("browser-fixture-token-1");
+  await expect(token("browser-fixture-token-1")).toBeVisible();
   // Rotating and revoking sit in the Danger Zone and confirm first.
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("button", { name: "Rotate Token", exact: true }).click();
@@ -161,16 +163,16 @@ test("Personal MCP credentials can be issued, viewed again hidden until Show, ro
     .getByRole("dialog", { name: "Rotate Token", exact: true })
     .getByRole("button", { name: "Rotate", exact: true })
     .click();
-  await expect(token).not.toHaveValue(/browser-fixture/);
+  await expect(hidden).toHaveCount(0);
   await page.getByRole("button", { name: "Show", exact: true }).click();
-  await expect(token).toHaveValue("browser-fixture-token-2");
+  await expect(token("browser-fixture-token-2")).toBeVisible();
   await danger.getByRole("button", { name: "Revoke Token", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Revoke Token", exact: true })
     .getByRole("button", { name: "Revoke", exact: true })
     .click();
   await expect(page.getByText("No Token Issued", { exact: true })).toBeVisible();
-  await expect(token).toHaveCount(0);
+  await expect(setting.getByRole("button", { name: "Show", exact: true })).toHaveCount(0);
   // A token issued while away from Account stays hidden on return.
   await page.getByRole("button", { name: "Create Token", exact: true }).click();
   await expect.poll(() => issued).toBe(3);
@@ -178,13 +180,13 @@ test("Personal MCP credentials can be issued, viewed again hidden until Show, ro
   await section(page, "Settings", "Account");
   finishLateIssuance();
   await expect(page.getByRole("button", { name: "Rotate Token", exact: true })).toBeEnabled();
-  await expect(token).not.toHaveValue(/browser-fixture/);
+  await expect(hidden).toHaveCount(0);
   expect({ issued, revoked }).toEqual({ issued: 3, revoked: 1 });
   // A token from before tokens were kept can't be shown: Rotate to view.
   status.viewable = false;
   await page.reload();
   await expect(page.getByText(/^Rotate it in the Danger Zone to view\./)).toBeVisible();
-  await expect(token).toHaveCount(0);
+  await expect(setting.getByRole("button", { name: "Show", exact: true })).toHaveCount(0);
 });
 
 test("Sign-in gate keeps account data behind authentication", async ({ page }) => {

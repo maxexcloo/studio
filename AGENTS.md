@@ -126,7 +126,7 @@ recur across features.
   phone media item bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and
   only then do they wrap, never scrolling. The phone viewer bar alone nests
-  Report under Edit and Similar under Recreate to fit one row.
+  Report under Edit to fit one row.
 - Like and Dislike rate an item and teach taste. A Dislike never deletes: it
   hides the item with Undo, and the gallery's Disliked filter shows it again.
 - A finished selection action ends the selection, keeping selected only the
@@ -167,7 +167,8 @@ recur across features.
 - Use the shared `TextBox`. Desktop fields expose one menu button, with Copy
   and Clear/Reset/Undo alongside the tools in one flat menu, each tool's
   options under its name. The button is ⋯, or the AI icon when the box has
-  an AI tool; the AI icon (`icons.assistant`) marks everything AI does.
+  an AI tool; the AI icon (`icons.assistant`) marks everything AI does. The
+  viewer's prompt keeps its AI tools in the bar's AI menu instead.
   Composer fields edit in place; other phone text boxes open the shared
   full-screen editor, and AI tools stay beside the text before it opens.
   Phone controls show Copy, Clear/Reset/Undo and More above the keyboard,

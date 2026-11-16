@@ -2,6 +2,7 @@ import { characterGenerated } from "./character-generated.js";
 import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
+import { dreamDefaultChoices } from "./dream-default-choices.js";
 import { dreamOwnership } from "./dream-ownership.js";
 import { galleryRatings } from "./gallery-ratings.js";
 import { legacyShapes } from "./legacy-shapes.js";
@@ -9,6 +10,7 @@ import { loraStacks } from "./lora-stacks.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
 import { migrateRadianceQueue } from "./radiance-queue-migration.js";
 import { runtimeSettings } from "./runtime-settings.js";
+import { tasteDislikes } from "./taste-dislikes.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -53,6 +55,18 @@ const steps = [
   {
     name: "loraStacks",
     run: loraStacks,
+    changes: (plan) => plan.accounts,
+    online: true,
+  },
+  {
+    name: "dreamDefaultChoices",
+    run: dreamDefaultChoices,
+    changes: (plan) => plan.settings + plan.accounts,
+    online: true,
+  },
+  {
+    name: "tasteDislikes",
+    run: tasteDislikes,
     changes: (plan) => plan.accounts,
     online: true,
   },

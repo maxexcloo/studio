@@ -1,4 +1,4 @@
-import { dreamDefaults, dreamSettingKeys } from "../shared/dream.ts";
+import { dreamOverrideKeys } from "../shared/dream.ts";
 import { dataDir } from "./data-dir.js";
 import { savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
@@ -28,7 +28,7 @@ const flag = (key, label, description, defaultOn = true) => ({
 });
 
 /**
- * Settings › Generation switches. Background AI (A–Z) covers every model call Studio makes on its
+ * Settings › Gallery switches. Background AI (A–Z) covers every model call Studio makes on its
  * own; what a person asks for (Improve, Ask for a Change, Animate) is never switched
  * off here. Run While Busy sits with the gallery passes.
  */
@@ -86,11 +86,11 @@ export const catalogueFlags = [
   ),
 ];
 
-/** The default profiles Settings › Generation › Defaults saves. */
+/** The default profiles Settings › Generation saves. */
 export const defaultProfileKeys = ["STUDIO_DEFAULT_IMAGE_PROFILE", "STUDIO_DEFAULT_VIDEO_PROFILE"];
 const known = new Set([
   ...defaultProfileKeys,
-  ...Object.values(dreamSettingKeys),
+  ...Object.values(dreamOverrideKeys),
   ...catalogueFlags.map((item) => item.key),
 ]);
 
@@ -148,31 +148,24 @@ export function isCatalogueFlag(key) {
   return catalogueFlags.some((item) => item.key === key);
 }
 
-/** Global defaults only; Dream resolves account choices without writing inherited values back. */
-export function dreamDefaultSettings() {
+/** The Dream settings an administrator forces on every account; the rest stay each account's choice. */
+export function dreamOverrides() {
   return Object.fromEntries(
-    Object.entries(dreamDefaults).map(([name, fallback]) => {
-      const value = process.env[dreamSettingKeys[name]];
-      return [
-        name,
-        value === undefined || value === ""
-          ? fallback
-          : typeof fallback === "boolean"
-            ? value !== "0"
-            : typeof fallback === "number"
-              ? Number(value)
-              : value,
-      ];
+    Object.entries(dreamOverrideKeys).flatMap(([name, key]) => {
+      const value = process.env[key];
+      if (!value) return [];
+      return [[name, name.endsWith("Backend") ? value : value !== "0"]];
     }),
   );
 }
 
-export function describeDreamDefaults() {
-  const defaults = dreamDefaultSettings();
+/** Each override with its source; `null` leaves the setting to each account. */
+export function describeDreamOverrides() {
+  const overrides = dreamOverrides();
   return Object.fromEntries(
-    Object.entries(dreamSettingKeys).map(([name, key]) => [
+    Object.entries(dreamOverrideKeys).map(([name, key]) => [
       name,
-      { key, value: defaults[name], ...settingSource(key) },
+      { key, value: overrides[name] ?? null, ...settingSource(key) },
     ]),
   );
 }

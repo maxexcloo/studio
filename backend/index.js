@@ -53,7 +53,7 @@ import { logEvent, logWarning } from "./crash-log.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { appVersion, dataDir } from "./data-dir.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
-import { dreamDefaultSettings, flagEnabled } from "./deployment-settings.js";
+import { dreamOverrides, flagEnabled } from "./deployment-settings.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
@@ -860,7 +860,7 @@ registerSuggestionRoutes(app, {
 const projects = createProjects({ dataDir });
 const dream = createDream({
   dataDir,
-  defaults: dreamDefaultSettings,
+  overrides: dreamOverrides,
   store,
   taste,
   projects: (ownerId) => projects.list(ownerId),

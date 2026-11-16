@@ -155,14 +155,14 @@ export function projectTargets({ name, constraints }, targets, known, { referenc
 }
 
 /**
- * The account's chat brief and Always Avoid, for generate; taste may be unavailable to the account.
+ * The account's chat brief and its own taste Dislikes, for generate; taste may be unavailable to the account.
  */
 export async function accountBrief(media, owner, signal) {
   const [brief, taste] = await Promise.all([
     media.request("GET", "/api/chat-brief", undefined, owner, { signal }),
     media.request("GET", "/api/taste", undefined, owner, { signal }).catch(() => null),
   ]);
-  return { brief: brief?.brief || {}, avoid: taste?.addedAvoid || [] };
+  return { brief: brief?.brief || {}, avoid: taste?.preferences?.avoid || [] };
 }
 
 /** The account's brief as generate's reply gives it, profiles by label; "" when there is none. */
@@ -213,7 +213,7 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
   };
   /**
    * The project tool's brief action: the user's own brief for all chats, from the fields it shares
-   * with a project's (subjects, styles, avoid as Always Avoid, profiles as favourites), with
+   * with a project's (subjects, styles, avoid as their own taste Dislikes, profiles as favourites), with
    * ethnicity, age, body and favourite lora_names; only what is given changes.
    */
   const accountBriefAction = async ({ avoid, profiles, lora_names, ...fields }, signal) => {
@@ -231,12 +231,19 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
       Object.keys(change).length
         ? api("PATCH", "/api/chat-brief", change, signal)
         : api("GET", "/api/chat-brief", undefined, signal),
-      listed ? api("PUT", "/api/taste", { avoid: listed }, signal) : null,
+      listed
+        ? api(
+            "PUT",
+            "/api/taste",
+            { preferences: { avoid: listed.length ? listed : null } },
+            signal,
+          )
+        : null,
     ]);
     const label = (id) => all.find((profile) => profile.id === id)?.label || id;
     return mcpJson({
       user_brief: { ...brief, ...(brief.profiles ? { profiles: brief.profiles.map(label) } : {}) },
-      ...(taste ? { avoid: taste.addedAvoid } : {}),
+      ...(taste ? { avoid: taste.preferences.avoid || [] } : {}),
       ...(Object.keys(change).length || listed
         ? { note: "Tell the user it holds for every chat; Settings › Preferences edits it." }
         : {}),

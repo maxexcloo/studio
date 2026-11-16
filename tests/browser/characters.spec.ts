@@ -487,17 +487,23 @@ test("A member sees only their cards and Presets in the Library, and a group wit
 }) => {
   await fixtures(page);
   await signIn(page, { id: "member", role: "user", features: {} });
-  await page.goto("/library");
+  await page.goto("/library#characters");
   await expect(page.getByText("No Characters", { exact: true })).toBeVisible();
   // The administration sections stay hidden.
   const select = page.getByRole("combobox", { name: "Library Section", exact: true });
   const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
   await expect(select.or(nav)).toBeVisible();
   if (await nav.isVisible())
-    await expect(nav.getByRole("link")).toHaveText(["Characters", "Outfits", "Scenes", "Presets"]);
+    await expect(nav.getByRole("link")).toHaveText([
+      "Chat Brief",
+      "Presets",
+      "Characters",
+      "Outfits",
+      "Scenes",
+    ]);
   else await expect(select).toHaveValue("Characters");
   await signIn(page, { id: "member", role: "user", features: { characters: false } });
-  await page.goto("/library#imports");
+  await page.goto("/library#presets");
   // A hash-only navigation keeps the previous account in memory; load the new group's grants.
   await page.reload();
   await expect(page.getByText("No Presets", { exact: true })).toBeVisible();
@@ -664,7 +670,7 @@ test("Dream suggestions are reviewed and accepted in their matching Library sect
     outfits: state.outfits,
     scenes: state.scenes,
   });
-  await page.goto("/library");
+  await page.goto("/library#characters");
   const suggestions = page.getByRole("list", { name: "Suggestions", exact: true });
   await expect(suggestions.getByRole("listitem")).toHaveCount(1);
   await expect(suggestions.getByRole("listitem", { name: "Ranger", exact: true })).toBeVisible();
