@@ -44,7 +44,6 @@ import { useFlash } from "../../ui/useFlash";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import { FilterButton } from "../gallery/GalleryFilters";
-import type { PreviewImage } from "../gallery/ImagePreview";
 import { escapePanel, fittedPopup } from "./chip";
 
 import classes from "./Picker.module.css";
@@ -415,7 +414,7 @@ export function PickerTile({
   /** A corner control such as a LoRA's rating or Delete. */
   action?: ReactNode;
   drag?: [type: string, data: string];
-  preview?: { label: string; open: () => void; image?: PreviewImage };
+  preview?: { label: string; open: () => void; image?: { src: string; alt: string } };
   row?: boolean;
 }) {
   // Mantine omits target IDs withRoles=false; outside presses still need the preview's target.

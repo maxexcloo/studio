@@ -11,6 +11,7 @@ import {
   Tooltip,
   UnstyledButton,
   VisuallyHidden,
+  getDefaultZIndex,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
@@ -227,6 +228,7 @@ export function MediaViewer({
   actions,
   itemLabel,
   sideBySide = false,
+  bare = false,
 }: {
   item: MediaItem;
   close: () => void;
@@ -243,8 +245,11 @@ export function MediaViewer({
   itemLabel?: (item: MediaItem) => string;
   /** Offers the items side by side on desktop, as the first action in the bar. */
   sideBySide?: boolean;
+  /** Only the media and its navigation, over any dialog: no details, actions or item keys. */
+  bare?: boolean;
 }) {
   const phone = usePhone();
+  const noun = bare ? "Image" : "Generation";
   const [together, setTogether] = useState(false);
   const [version, setVersion] = useState<{ id: string; active: boolean } | null>(null);
   const displayed = version?.id === item.id ? { ...item, upscaleActive: version.active } : item;
@@ -455,6 +460,7 @@ export function MediaViewer({
     });
     if (direction === "down") close();
     else if (direction === "up") {
+      if (bare) return;
       setSheet(phone);
       if (phone) setChromeHidden(false);
     } else {
@@ -472,7 +478,9 @@ export function MediaViewer({
         // Escape is handled below so nested menus, popovers and sheets close only themselves.
         closeOnEscape={false}
         withCloseButton={false}
-        title={<VisuallyHidden>Generation</VisuallyHidden>}
+        title={<VisuallyHidden>{bare ? "Preview" : "Generation"}</VisuallyHidden>}
+        // Over the popover or dialog a bare viewer opens from.
+        zIndex={bare ? getDefaultZIndex("popover") : undefined}
         returnFocus={false}
         removeScrollProps={{ allowPinchZoom: true }}
         fullScreen
@@ -518,9 +526,11 @@ export function MediaViewer({
           )
             return;
           // A surface's own actions take E for their Edit and F for their Like, and leave Delete alone.
-          const shortcut = (
-            actions ? { ...viewerShortcuts, e: "edit", f: "like" } : viewerShortcuts
-          )[event.key.toLowerCase()];
+          const shortcut =
+            !bare &&
+            (actions ? { ...viewerShortcuts, e: "edit", f: "like" } : viewerShortcuts)[
+              event.key.toLowerCase()
+            ];
           const found =
             shortcut && findAction(actions?.groups ?? shortcutActions.current, shortcut);
           if (found) {
@@ -537,13 +547,14 @@ export function MediaViewer({
               action.onClick();
           } else if (
             !actions &&
+            !bare &&
             event.key.toLowerCase() === "f" &&
             item.status === "done" &&
             item.url
           ) {
             event.preventDefault();
             if (!rating.isPending && !event.repeat) rating.like();
-          } else if (!actions && event.key === "Delete") {
+          } else if (!actions && !bare && event.key === "Delete") {
             event.preventDefault();
             setDeleting(true);
           } else if (canNavigate && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
@@ -603,19 +614,26 @@ export function MediaViewer({
                 <span />
               )}
               <Group gap={6} wrap="nowrap">
-                <Tooltip label={phone ? "Details" : details ? "Hide Details" : "Show Details"}>
-                  <ActionIcon
-                    data-autofocus
-                    variant="default"
-                    aria-label="Generation Details"
-                    aria-expanded={phone ? sheet : details}
-                    onClick={toggleDetails}
-                  >
-                    <icons.details size={18} />
-                  </ActionIcon>
-                </Tooltip>
+                {!bare && (
+                  <Tooltip label={phone ? "Details" : details ? "Hide Details" : "Show Details"}>
+                    <ActionIcon
+                      data-autofocus
+                      variant="default"
+                      aria-label="Generation Details"
+                      aria-expanded={phone ? sheet : details}
+                      onClick={toggleDetails}
+                    >
+                      <icons.details size={18} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
                 <Tooltip label="Close (Esc)">
-                  <ActionIcon variant="default" aria-label="Close Generation" onClick={close}>
+                  <ActionIcon
+                    data-autofocus={bare || undefined}
+                    variant="default"
+                    aria-label={bare ? "Close Preview" : "Close Generation"}
+                    onClick={close}
+                  >
                     <X size={18} />
                   </ActionIcon>
                 </Tooltip>
@@ -671,9 +689,9 @@ export function MediaViewer({
                       justify="space-between"
                       wrap="nowrap"
                     >
-                      <Tooltip label="Previous Generation (←)">
+                      <Tooltip label={`Previous ${noun} (←)`}>
                         <ActionIcon
-                          aria-label="Previous Generation"
+                          aria-label={`Previous ${noun}`}
                           variant="default"
                           // Stays focusable at an end, so arrow keys keep working.
                           data-disabled={currentIndex === 0 || undefined}
@@ -686,9 +704,9 @@ export function MediaViewer({
                           <icons.previous size={20} />
                         </ActionIcon>
                       </Tooltip>
-                      <Tooltip label="Next Generation (→)">
+                      <Tooltip label={`Next ${noun} (→)`}>
                         <ActionIcon
-                          aria-label="Next Generation"
+                          aria-label={`Next ${noun}`}
                           variant="default"
                           data-disabled={currentIndex === viewable.length - 1 || undefined}
                           aria-disabled={currentIndex === viewable.length - 1 || undefined}
@@ -747,67 +765,69 @@ export function MediaViewer({
                 </>
               )}
             </div>
-            <MediaViewerDock
-              item={displayed}
-              family={family}
-              set={members}
-              choose={(next) => {
-                setCompare(false);
-                navigate?.(next);
-              }}
-              actions={
-                actions ? (
-                  <ActionBarSurface
-                    ref={bar}
-                    aria-label={actions.label}
-                    radius="lg"
-                    className={classes.actions}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <ViewerActionGroups
-                      groups={
-                        sideBySide && canNavigate && !phone
-                          ? [
-                              [
-                                {
-                                  id: "side-by-side",
-                                  label: "Side by Side",
-                                  icon: icons.compareSideBySide,
-                                  pressed: together,
-                                  onClick: () => setTogether((value) => !value),
-                                },
-                              ],
-                              ...actions.groups,
-                            ]
-                          : actions.groups
-                      }
-                      labelled={[...actions.labelled, "side-by-side"]}
-                      equal={actions.equal}
+            {!bare && (
+              <MediaViewerDock
+                item={displayed}
+                family={family}
+                set={members}
+                choose={(next) => {
+                  setCompare(false);
+                  navigate?.(next);
+                }}
+                actions={
+                  actions ? (
+                    <ActionBarSurface
+                      ref={bar}
+                      aria-label={actions.label}
+                      radius="lg"
+                      className={classes.actions}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <ViewerActionGroups
+                        groups={
+                          sideBySide && canNavigate && !phone
+                            ? [
+                                [
+                                  {
+                                    id: "side-by-side",
+                                    label: "Side by Side",
+                                    icon: icons.compareSideBySide,
+                                    pressed: together,
+                                    onClick: () => setTogether((value) => !value),
+                                  },
+                                ],
+                                ...actions.groups,
+                              ]
+                            : actions.groups
+                        }
+                        labelled={[...actions.labelled, "side-by-side"]}
+                        equal={actions.equal}
+                      />
+                    </ActionBarSurface>
+                  ) : (
+                    <MediaViewerActions
+                      item={displayed}
+                      compare={compare}
+                      iterate={iterate}
+                      pending={pending}
+                      onCompare={() => setCompare((value) => !value)}
+                      onDelete={() => setDeleting(true)}
+                      onRetried={setReplacement}
+                      onVersionChange={(id, active) => setVersion({ id, active })}
+                      shortcuts={shortcutActions}
+                      ref={bar}
+                      promptHidden={phone && sheet}
+                      onApplied={() => {
+                        restoreFocus.current = false;
+                        close();
+                      }}
                     />
-                  </ActionBarSurface>
-                ) : (
-                  <MediaViewerActions
-                    item={displayed}
-                    compare={compare}
-                    iterate={iterate}
-                    pending={pending}
-                    onCompare={() => setCompare((value) => !value)}
-                    onDelete={() => setDeleting(true)}
-                    onRetried={setReplacement}
-                    onVersionChange={(id, active) => setVersion({ id, active })}
-                    shortcuts={shortcutActions}
-                    ref={bar}
-                    promptHidden={phone && sheet}
-                    onApplied={() => {
-                      restoreFocus.current = false;
-                      close();
-                    }}
-                  />
-                )
-              }
-            />
+                  )
+                }
+              />
+            )}
           </div>
-          {!phone && (
+          {!phone && !bare && (
             // The track opens at once so the stage re-centres while the panel slides in.
             <div className={classes.asideTrack} data-open={details || undefined}>
               <aside
@@ -831,7 +851,7 @@ export function MediaViewer({
             </div>
           )}
         </div>
-        {phone && (
+        {phone && !bare && (
           <Drawer
             id="details-sheet"
             opened={sheet}

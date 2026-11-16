@@ -366,7 +366,8 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   // Only the tiles near the view render.
   await expect(grid.getByRole("button", { name: "Use reference: Result 0" })).toHaveCount(0);
   expect(await grid.getByRole("listitem").count()).toBeLessThan(150);
-  // Choosing stays a tap; Preview opens the image above the picker. Space on a tile opens it too
+  // Choosing stays a tap; Preview opens the image in the bare viewer above the picker, without
+  // details or actions. Space on a tile opens it too
   // on touch screens; on desktop it shows the image beside the tile, as hovering Preview does.
   const tile = grid.getByRole("button", { name: "Use reference: Result 148", exact: true });
   await tile.click();
@@ -379,30 +380,25 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
     })
     .getByRole("button", { name: "Preview", exact: true });
   await previewButton.click();
-  const preview = page.getByRole("dialog", { name: /^Result 147/ });
+  const preview = page.getByRole("dialog", { name: "Preview", exact: true });
   await expect(preview).toBeVisible();
   await expect(preview.getByRole("img", { name: fullPrompt, exact: true })).toBeVisible();
-  const heading = preview.getByRole("button", { name: "Result 147 · 148 of 150", exact: true });
-  await expect(heading).toHaveAttribute("aria-expanded", "false");
-  await expect(preview.getByText(fullPrompt, { exact: true })).toHaveCount(0);
-  await heading.click();
-  await expect(heading).toHaveAttribute("aria-expanded", "true");
-  await expect(preview.getByText(fullPrompt, { exact: true })).toBeVisible();
-  await heading.click();
-  await expect(preview.getByText(fullPrompt, { exact: true })).toHaveCount(0);
+  await expect(preview.getByText("148 / 150", { exact: true })).toBeVisible();
+  await expect(preview.getByRole("button", { name: "Generation Details" })).toHaveCount(0);
+  await expect(preview.getByRole("group", { name: "Generation Actions" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();
   await expect(picker).toBeVisible();
   await chosen.focus();
   await page.keyboard.press("Space");
   if (test.info().project.use.hasTouch) {
-    await expect(page.getByRole("dialog", { name: /^Result 148/ })).toBeVisible();
+    await expect(preview.getByRole("img", { name: "Result 148", exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
   } else {
     const beside = (name: string) =>
       page.locator("[data-popup]").getByRole("img", { name, exact: true });
     await expect(beside("Result 148")).toBeVisible();
-    await expect(page.getByRole("dialog", { name: /^Result 148/ })).toHaveCount(0);
+    await expect(preview).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(beside("Result 148")).toBeHidden();
     await expect(chosen).toBeFocused();
