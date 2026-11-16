@@ -6,15 +6,13 @@
  * jobs keep the id and report the profile as missing; restoring means saving its last version as a
  * new profile.
  * Retiring it into a `replacement` of the same kind instead records the id as that profile's alias
- * (profile/store.js), so those records resolve to it, and moves workflow preferences and LoRA
- * stacks onto it, as merging duplicates does (profile/merge.js).
+ * (profile/store.js), so those records resolve to it, and moves workflow preferences onto it, as
+ * merging duplicates does (profile/merge.js).
  */
 import fs from "node:fs";
 import path from "node:path";
 
-import { repointLoraStacks } from "../combined-profiles.js";
 import { userWorkflowsDir } from "../custom-workflows.js";
-import { dataDir } from "../data-dir.js";
 import { repointWorkflowPreferences } from "../workflow-catalogue.js";
 import { readEditableProfile } from "./editor.js";
 import { guideStore, profileStore } from "./store.js";
@@ -39,10 +37,7 @@ export function removeProfile(id, { baseHash = "", by = "", replacement = "" } =
   store.record(id, text, { by, origin: "studio", note: "Before removing" });
   if (replacement) store.addAliases([{ from: id, to: replacement, reason: "retired" }], { by, at });
   fs.rmSync(path.join(userWorkflowsDir, `${id}.json`));
-  if (replacement) {
-    repointWorkflowPreferences((value) => store.canonical(value));
-    repointLoraStacks(dataDir, (value) => store.canonical(value));
-  }
+  if (replacement) repointWorkflowPreferences((value) => store.canonical(value));
   guideStore().moveProfileBindings({ remove: [`custom:${id}`] }, { by, note: `Removed ${id}` });
   return { removed: id, ...(replacement ? { replacement } : {}) };
 }

@@ -199,8 +199,15 @@ function fixture(t: TestContext, catalogue = profiles) {
       );
     },
     loraLibrary: (ownerId) => state.loras[ownerId] ?? null,
-    // As the LoRA policy would: klein.safetensors is for another model family.
-    fitLoras: (_profile, loras) => loras.filter((lora) => lora.name !== "klein.safetensors"),
+    // As the LoRA policy would: klein.safetensors is for another model family, and film
+    // recommends 0.6.
+    fitLoras: (_profile, loras) =>
+      loras
+        .filter((lora) => lora.name !== "klein.safetensors")
+        .map((lora) => ({
+          ...lora,
+          strength: lora.strength ?? (lora.name === "film.safetensors" ? 0.6 : 1),
+        })),
     loraName: (name) => name.replace(/\.safetensors$/, ""),
     inspiration: () => state.inspiration,
     reference: (_account, itemId, frame) => {
@@ -582,7 +589,6 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
       "film.safetensors": "liked",
       "ink.safetensors": "disliked",
     },
-    strengths: {},
   };
   state.inspiration = [
     {
@@ -1459,7 +1465,7 @@ test("Calibration offers the account's older Studio generations, unjudged first,
 test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and explores untried ones", async (t) => {
   const { dream, state, store, taste, dreamOnce } = fixture(t, [profiles[0]]);
   // A LoRA for another family is left out; the run goes ahead without it.
-  state.loras.alice = { ratings: { "klein.safetensors": "liked" }, strengths: {} };
+  state.loras.alice = { ratings: { "klein.safetensors": "liked" } };
   await dream.save("alice", { enabled: true });
   assert.deepEqual((await dreamOnce())!.input.loras, []);
   state.loras.alice = {
@@ -1470,13 +1476,12 @@ test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and ex
       "film.safetensors": "liked",
       "ink.safetensors": "disliked",
     },
-    strengths: { "family:flux": { "film.safetensors": 0.6 } },
   };
   const loras = (job: { id: string }) =>
     (store.job("alice", job.id)!.input.loras as { name: string; strength: number }[]).map(
       (lora) => [lora.name, lora.strength],
     );
-  // Liked alone: the first of those alike, at its saved strength.
+  // Liked alone: the first of those alike, at its recommended strength.
   assert.deepEqual(loras((await dreamOnce())!), [["fox.safetensors", 1]]);
   // A liked result with film at 0.8 outweighs it, at the strength it was liked at.
   taste.record("alice", [
@@ -1506,7 +1511,7 @@ test("Dream adds no LoRAs on a profile that does best without them", async (t) =
   const { dream, state, store, dreamOnce } = fixture(t, [
     { ...profiles[0], capabilities: { defaultLoras: false } },
   ]);
-  state.loras.alice = { ratings: { "fox.safetensors": "liked" }, strengths: {} };
+  state.loras.alice = { ratings: { "fox.safetensors": "liked" } };
   await dream.save("alice", { enabled: true });
   const job = (await dreamOnce())!;
   assert.deepEqual(store.job("alice", job.id)!.input.loras, []);

@@ -10,7 +10,7 @@ import path from "node:path";
 import express from "express";
 
 import { cardKinds, characterImageIds } from "../shared/characters.ts";
-import { isCloudProfile, loraName } from "../shared/profiles.ts";
+import { isCloudProfile, loraDefaultStrength, loraName } from "../shared/profiles.ts";
 import { canAdmin, clientOf } from "./access.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import {
@@ -925,9 +925,9 @@ const dream = createDream({
     loras.flatMap((lora) => {
       const info = catalogueLoraInfo(lora.name);
       const range = strengthRange(info);
-      const strength = range
-        ? Math.min(range.max, Math.max(range.min, lora.strength))
-        : lora.strength;
+      // The LoRA picker's default for a LoRA added without a strength.
+      const wanted = lora.strength ?? loraDefaultStrength(info, 1);
+      const strength = range ? Math.min(range.max, Math.max(range.min, wanted)) : wanted;
       return info?.hidden || optionalLoraPolicyIssue({ name: lora.name, strength }, info, profile)
         ? []
         : [{ ...lora, strength }];
