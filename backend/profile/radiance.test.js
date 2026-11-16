@@ -50,7 +50,14 @@ test("a converted model joins the profile as a text-only Radiance backend", () =
   assert.deepEqual(radiance.mediaInputs, []);
   assert.equal(raw.studio.backends.radiance.graph[1].class_type, "RadianceImageGenerate");
   assert.equal(radiance.loraStack.adapter, "radiance-tags-v1");
-  assert.throws(() => withRadianceBackend(raw, "again.rad"), /already has its backends/);
+  // A converted profile converts again from its ComfyUI backend, replacing the Radiance one.
+  const again = JSON.parse(withRadianceBackend(raw, "fine-tune-v2-iq8r"));
+  assert.deepEqual(Object.keys(again.studio.backends), ["comfyui", "radiance"]);
+  assert.deepEqual(again.studio.backends.comfyui, raw.studio.backends.comfyui);
+  assert.equal(
+    metadataFromJson(again, `${id}.json`, { backend: "radiance" }).defaults.model,
+    "fine-tune-v2-iq8r",
+  );
   assert.throws(
     () => withRadianceBackend({ ...profile, studio: { ...profile.studio, family: "flux2" } }, "x"),
     /Only Krea 2/,
