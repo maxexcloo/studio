@@ -40,7 +40,7 @@ export function LibraryPage() {
   const catalogueActive = ["models", "loras"].includes(activeSection);
   const catalogue = useQuery({
     ...catalogueQuery,
-    enabled: admin,
+    enabled: admin && catalogueActive,
     refetchInterval: (query) =>
       catalogueActive &&
       query.state.data?.items.some((item) => item.applied?.state === "downloading")
