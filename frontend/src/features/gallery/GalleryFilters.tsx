@@ -513,33 +513,34 @@ export function GalleryFilterPanel({
         </Input.Wrapper>
       )}
       {view && <Divider />}
-      <div className={classes.filterPair}>
-        <Input.Wrapper label="Date">
-          <SegmentedControl
-            aria-label="Date"
-            fullWidth
-            size="xs"
-            mt={4}
-            value={value.date}
-            onChange={(date) => onChange({ ...value, date: date as GalleryDate })}
-            data={dates.map(({ value, label }) => ({ value, label }))}
-          />
-        </Input.Wrapper>
+      <Input.Wrapper label="Date">
+        <SegmentedControl
+          aria-label="Date"
+          fullWidth
+          size="xs"
+          mt={4}
+          value={value.date}
+          onChange={(date) => onChange({ ...value, date: date as GalleryDate })}
+          data={dates.map(({ value, label }) => ({ value, label }))}
+        />
+      </Input.Wrapper>
+      <Divider />
+      <Stack gap="md">
         {many("origin", "Origin")}
         {lists.tag.length > 0 && many("tag", "Tags")}
-      </div>
+      </Stack>
       <Divider />
-      <div className={classes.filterPair}>
+      <Stack gap="md">
         {many("model", "Models")}
         {many("lora", "LoRAs")}
-      </div>
+      </Stack>
       {(options.aspect.length > 0 || options.size.length > 0) && (
         <>
           <Divider />
-          <div className={classes.filterPair}>
+          <Stack gap="md">
             {options.aspect.length > 0 && choices("aspect", "Aspect Ratio")}
             {options.size.length > 0 && choices("size", "Size")}
-          </div>
+          </Stack>
         </>
       )}
     </Stack>

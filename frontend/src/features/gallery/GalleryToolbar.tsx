@@ -132,13 +132,7 @@ export function GalleryToolbar({
     );
   const filterChips = <FilterChips chips={chips} onClear={clear} />;
   const row = (
-    <Group
-      ref={toolbar}
-      gap="xs"
-      mih={44}
-      wrap={phone ? "nowrap" : "wrap"}
-      className={classes.mode}
-    >
+    <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
       {phone ? (
         <Tooltip label="Search Gallery">
           <Button
@@ -218,8 +212,8 @@ export function GalleryToolbar({
         on={value.uploads}
         onToggle={() => onChange({ ...value, uploads: !value.uploads, rating: "" })}
       />
-      {/* Keep the actions at the end of the row. */}
-      <div className={classes.chips} />
+      {/* Desktop chips fill the row's free width; either way the actions end the row. */}
+      {phone || !chips.length ? <div className={classes.chips} /> : filterChips}
       {results && !phone && (
         <Text size="sm" c="dimmed" className={classes.count}>
           {results}
@@ -232,7 +226,7 @@ export function GalleryToolbar({
   return (
     <>
       {row}
-      {chips.length > 0 && filterChips}
+      {phone && chips.length > 0 && filterChips}
     </>
   );
 }

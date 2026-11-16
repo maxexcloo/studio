@@ -57,9 +57,3 @@
 .toggles :global(.mantine-Switch-body) {
   justify-content: space-between;
 }
-
-.filterPair {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mantine-spacing-md);
-}
