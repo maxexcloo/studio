@@ -10,12 +10,7 @@ import express from "express";
 
 import type { CardKind, Character } from "../../shared/characters.ts";
 import { type DreamSettings, dreamDefaults } from "../../shared/dream.ts";
-import {
-  closeRuntimeDatabase,
-  openDatabase,
-  readRuntimeDocument,
-  writeRuntimeDocument,
-} from "../persistence/runtime.ts";
+import { closeRuntimeDatabase, openDatabase, readRuntimeDocument } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import { registerDreamRoutes } from "./dream-routes.ts";
 import {
@@ -62,7 +57,7 @@ function fixture(t: TestContext, catalogue = profiles) {
   const taste = createTaste({ dataDir, writer: () => null });
   const projects = createProjects({ dataDir, now: () => state.clock });
   const state = {
-    defaults: { ...dreamDefaults } as DreamSettings,
+    overrides: {} as Partial<DreamSettings>,
     clock: Date.now(),
     items: [] as DreamItem[],
     reads: [] as Record<string, unknown>[],
@@ -136,7 +131,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       .slice(0, query.sample ?? query.limit);
   const dream = createDream({
     dataDir,
-    defaults: () => state.defaults,
+    overrides: () => state.overrides,
     store,
     taste,
     projects: (ownerId) => projects.list(ownerId),
@@ -2026,43 +2021,35 @@ test("A Dream video skips a source that left the gallery and animates the next",
   assert.match(dream.status("alice").reason!, /^Dream videos animate a kept, liked/);
 });
 
-test("administrator defaults stay inherited through visits, generation and partial account saves", async (t) => {
-  const { dream, state, dataDir, dreamOnce } = fixture(t);
-  state.defaults.enabled = true;
-  state.defaults.dailyImages = 12;
-  state.defaults.spicy = true;
-  assert.equal(dream.read("alice").settings.dailyImages, 12);
-  dream.visit("alice");
-  await dream.save("alice", { videos: false, dailyVideos: 0 });
-  const inherited = await dreamOnce();
-  assert.equal(inherited?.dream?.spicy, undefined);
+test("administrator overrides win over account choices, which they leave saved, and lock them", async (t) => {
+  const { dream, projects, state, dataDir, dreamOnce } = fixture(t);
+  await dream.save("alice", { spicy: true, dailyImages: 12 });
+  state.overrides = { enabled: true, spicy: false };
+  assert.deepEqual(dream.locked(), ["enabled", "spicy"]);
+  assert.deepEqual(dream.read("alice").settings, {
+    ...dreamDefaults,
+    enabled: true,
+    dailyImages: 12,
+  });
+  const forced = await dreamOnce();
+  assert.equal(forced?.dream?.spicy, undefined);
   assert.match(state.calls[0].system, /safe for work/);
+  await assert.rejects(dream.save("alice", { spicy: true }), { status: 409 });
+  // Saving the forced value, or anything else, still works.
+  await dream.save("alice", { enabled: true, dailyImages: 18 });
   assert.deepEqual(
     (readRuntimeDocument(dataDir, "dream:alice") as { settings: Partial<DreamSettings> }).settings,
-    {
-      videos: false,
-      dailyVideos: 0,
-    },
+    { spicy: true, dailyImages: 18, enabled: true, paused: false },
   );
-  state.defaults.dailyImages = 18;
-  state.defaults.videos = true;
-  state.defaults.dailyVideos = 8;
-  const resolved = dream.read("alice").settings;
-  assert.equal(resolved.dailyImages, 18);
-  assert.equal(resolved.videos, false);
-  assert.equal(resolved.dailyVideos, 0);
-  assert.equal(resolved.enabled, true);
+  state.overrides = {};
+  assert.equal(dream.read("alice").settings.spicy, true);
+  assert.equal(dream.read("bob").settings.enabled, false);
 
-  const existing = { ...dreamDefaults, enabled: false, dailyImages: 0, spicy: false };
-  writeRuntimeDocument(dataDir, "dream:bob", { settings: existing });
-  dream.visit("bob");
-  assert.deepEqual(dream.read("bob").settings, existing);
-  assert.deepEqual(
-    (readRuntimeDocument(dataDir, "dream:bob") as { settings: Partial<DreamSettings> }).settings,
-    existing,
-  );
-  const request = await serve(t, fixture(t));
+  state.overrides = { imageBackend: "cloud" };
+  const request = await serve(t, { dream, projects });
   assert.equal((await request("/settings", { imageBackend: "auto" }, "PUT")).status, 400);
+  assert.equal((await request("/settings", { imageBackend: "local" }, "PUT")).status, 409);
+  assert.deepEqual((await request("")).body.locked, ["imageBackend"]);
 });
 
 test("Dream routes images to the selected allowed backend and never substitutes a local model for Cloud", async (t) => {
@@ -2073,8 +2060,7 @@ test("Dream routes images to the selected allowed backend and never substitutes 
     label: "Cloud Image",
   };
   const fx = fixture(t, [...profiles, cloud]);
-  fx.state.defaults.enabled = true;
-  fx.state.defaults.imageBackend = "cloud";
+  await fx.dream.save("alice", { enabled: true, imageBackend: "cloud" });
   fx.state.online.image = "parked";
   const job = await fx.dreamOnce();
   assert.equal(job?.input.profileId, cloud.id);
@@ -2084,8 +2070,7 @@ test("Dream routes images to the selected allowed backend and never substitutes 
   assert.match(fx.dream.status("alice").reason!, /stopped/);
 
   const denied = fixture(t);
-  denied.state.defaults.enabled = true;
-  denied.state.defaults.imageBackend = "cloud";
+  await denied.dream.save("alice", { enabled: true, imageBackend: "cloud" });
   assert.equal(await denied.dreamOnce(), undefined);
   assert.match(
     denied.dream.status("alice").reason!,
@@ -2101,7 +2086,7 @@ test("Dream routes images to the selected allowed backend and never substitutes 
 
 test("Dream sets aside a profile whose last three jobs failed until the failures age out", async (t) => {
   const fx = fixture(t, [profiles[0]]);
-  fx.state.defaults.enabled = true;
+  await fx.dream.save("alice", { enabled: true });
   const fail = async () => {
     await fx.dream.tick();
     const [job] = fx.live("alice");
@@ -2140,13 +2125,12 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
     mediaInputs: [{ id: "start", required: true }],
   };
   const fx = fixture(t, [...profiles, cloud]);
-  fx.state.defaults = {
-    ...dreamDefaults,
+  await fx.dream.save("alice", {
     enabled: true,
     images: false,
     videos: true,
     videoBackend: "cloud",
-  };
+  });
   fx.state.video = cloud.id;
   fx.state.online.video = "parked";
   fx.generated({

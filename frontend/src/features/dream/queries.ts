@@ -38,6 +38,8 @@ export interface Dream {
   /** What Dream has made today, counted against the daily caps. */
   today: { images: number; videos: number };
   spicyAvailable: boolean;
+  /** The settings an administrator forces on every account, which this one can't change. */
+  locked: (keyof DreamSettings)[];
   status: DreamStatus;
   /** Why Dream is waiting or can't run, where the backend says. */
   reason?: string;

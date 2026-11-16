@@ -280,6 +280,28 @@ test("Dream explains itself while off and saves its settings on the deck", async
   await expect.poll(() => dream.settings.images).toBe(false);
 });
 
+test("Dream settings an administrator forces stay locked for the account", async ({ page }) => {
+  await fixtures(page);
+  await serveDream(page, {
+    enabled: false,
+    spicyAvailable: true,
+    locked: ["enabled", "imageBackend"],
+  });
+  await page.goto("/dream");
+  await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
+  await expect(page.getByText("Set by an administrator.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Turn On", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Dream Settings", exact: true }).click();
+  const settings = page.getByRole("dialog", { name: "Dream Settings" });
+  await expect(settings.getByRole("switch", { name: "Dream", exact: true })).toBeDisabled();
+  await expect(
+    settings
+      .getByRole("radiogroup", { name: "Dream Images Run On" })
+      .getByRole("radio", { name: "Cloud", exact: true }),
+  ).toBeDisabled();
+  await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeEnabled();
+});
+
 test("While Dream is off, the deck compares gallery images in pairs", async ({ page }) => {
   await fixtures(page);
   const gallery = ["g1", "g2", "g3", "g4", "g5"].map((id) => ({

@@ -606,7 +606,7 @@ const phrases = (value: unknown, limit: number, longest = maxTastePhrase) =>
  * Per-account taste records in the runtime document store, as `taste:<ownerId>`. Scores are rebuilt
  * from the signals on every read. The text model summarises the signals into words after every ten
  * (at most every ten minutes, never while text is offline, and only while `updates` allows: the
- * Settings › Generation switch STUDIO_TASTE_UPDATES) and on request. `writer` is null where the
+ * Settings › Gallery switch STUDIO_TASTE_UPDATES) and on request. `writer` is null where the
  * account may not send prompts to it.
  */
 export function createTaste({

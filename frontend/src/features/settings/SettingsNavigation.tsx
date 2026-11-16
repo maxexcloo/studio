@@ -1,4 +1,4 @@
-import { Boxes, Info, Plug, Server, Shield, UserRound, UsersRound } from "lucide-react";
+import { Boxes, Images, Info, Plug, Server, Shield, UserRound, UsersRound } from "lucide-react";
 
 import { icons } from "../../ui/icons";
 import {
@@ -23,9 +23,24 @@ const settingSections = {
     icon: icons.settings,
     group: "Personal",
   },
+  dream: {
+    label: "Dream",
+    description:
+      "Dream settings forced on every account, which can't change them; Account's Choice leaves each account free.",
+    icon: icons.dream,
+    admin: true,
+    group: "Administration",
+  },
+  gallery: {
+    label: "Gallery",
+    description: "Background AI and the passes that caption, check and index the gallery.",
+    icon: Images,
+    admin: true,
+    group: "Administration",
+  },
   generation: {
     label: "Generation",
-    description: "Default profiles, catalogue features and gallery passes for everyone.",
+    description: "The profiles new drafts start on for everyone.",
     icon: Boxes,
     admin: true,
     group: "Administration",

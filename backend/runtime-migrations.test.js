@@ -38,6 +38,7 @@ test("the migrations route answers administrators with every step's plan, and lo
     characterGenerated: { applied, characters: 0, cards: [] },
     legacyShapes: { applied, arms: 0, notes: 0, editsFile: false },
     loraStacks: { applied, accounts: 0 },
+    dreamDefaultChoices: { applied, settings: 0, accounts: 0 },
     tasteDislikes: { applied, accounts: 0 },
   });
   assert.deepEqual(await post({}), {
@@ -49,7 +50,7 @@ test("the migrations route answers administrators with every step's plan, and lo
     body: { ok: true, apply: true, steps: steps(true) },
   });
   assert.deepEqual(lines, [
-    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; tasteDislikes: 0 nothing to do",
-    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; tasteDislikes: 0 nothing to do",
+    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do",
+    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do",
   ]);
 });
