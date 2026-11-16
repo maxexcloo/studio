@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { compareVariants } from "../../../../shared/compare";
-import { isCloudProfile, loraName } from "../../../../shared/profiles";
+import { isCloudProfile, loraName, loraStrengthSweep } from "../../../../shared/profiles";
 import { post } from "../../api";
 import type { GenerationInput, MediaItem, Profile } from "../../types";
 import { galleryKey } from "../gallery/queries";
@@ -206,8 +206,8 @@ export function useStageComparison() {
       const profile = suits(preferred) ? preferred : profiles.find(suits);
       if (!profile) throw new Error("No ready image profile can run this LoRA.");
       const input = { ...inputForProfile({ ...initialInput, prompt }, profile), loras: [] };
-      // Without the LoRA, then three strengths.
-      const variants = [0, 0.6, 0.8, 1].map((strength) => ({
+      // Without the LoRA, then its default and the strengths beside it.
+      const variants = loraStrengthSweep(info.loras[name]).map((strength) => ({
         references: [],
         input: {
           ...input,

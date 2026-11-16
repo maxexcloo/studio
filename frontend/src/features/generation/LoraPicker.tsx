@@ -23,6 +23,8 @@ import {
   loraDefaultStrength,
   loraFamilyId,
   loraName,
+  loraStrengthIssue,
+  loraStrengthRange,
 } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, Profile, Rating } from "../../types";
@@ -91,8 +93,6 @@ const loraTabs = [
   { value: "liked", label: "Liked" },
 ] as const;
 type LoraTab = (typeof loraTabs)[number]["value"];
-/** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
-const defaultStrength = (info: LoraInfo | undefined) => loraDefaultStrength(info, 1);
 /** Whether a LoRA lists the family, however the profile spells it. */
 const fitsFamily = (families: string[], family: string) =>
   families.some((value) => loraFamilyId(value) === loraFamilyId(family));
@@ -381,7 +381,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
             ...input.loras,
             {
               name: file,
-              strength: defaultStrength(metadata[file]),
+              strength: loraDefaultStrength(metadata[file]),
               enabled: true,
               triggers: true,
             },
@@ -669,11 +669,9 @@ function StackEntry({
   onRemove: () => void;
 }) {
   const range = info?.strengthRange;
-  const step = range?.step ?? 0.05;
-  // The catalogue's published range bounds the control; without one, 0 to 2.
-  const min = range?.min ?? 0;
-  const max = range?.max ?? 2;
+  const { min, max, step } = loraStrengthRange(info);
   const enabled = lora.enabled !== false;
+  const strengthIssue = enabled && loraStrengthIssue(info, lora.strength, title);
   // The trigger words switched on lead the prompt when the run is sent (backend/lora/prompts.js).
   const triggers = info?.triggers || [];
   const chosenTriggers =
@@ -707,14 +705,20 @@ function StackEntry({
           min={min}
           max={max}
           step={step}
-          mark={info?.recommendedStrength ?? range?.default}
+          mark={loraDefaultStrength(info)}
           onChange={(strength) => onChange({ strength })}
         />
-        {range && (
-          <Text size="xs" c="dimmed">
-            Suggested {range.min} to {range.max}
-            {range.default !== undefined && `, default ${range.default}`}
+        {strengthIssue ? (
+          <Text size="xs" c="red">
+            {strengthIssue}
           </Text>
+        ) : (
+          range && (
+            <Text size="xs" c="dimmed">
+              Suggested {range.min} to {range.max}
+              {range.default !== undefined && `, default ${range.default}`}
+            </Text>
+          )
         )}
         {!compatible && (
           <Text size="xs" c="yellow">

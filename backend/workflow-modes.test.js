@@ -212,7 +212,7 @@ test("trusted optional adapter policy validates conditioning and full publisher 
         { ...request, loras: [{ name: "style.safetensors", strength: 11 }] },
         info,
       ),
-    /published range/,
+    /supports strength -3 to 10/,
   );
   prepared.studio.recipe.conditioning = "Ref2VA";
   saveImportedWorkflow(prepared);

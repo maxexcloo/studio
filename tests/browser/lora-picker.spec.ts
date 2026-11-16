@@ -293,6 +293,9 @@ test("LoRAs without a family show under All Families", async ({ page }) => {
   await expect(
     page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }),
   ).toHaveValue("0.8");
+  // A typed strength outside the range says which strengths the LoRA accepts.
+  await page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }).fill("1.5");
+  await expect(page.getByText("Detail Slider supports strength 0.2 to 0.8.")).toBeVisible();
 });
 
 test("Phones open the stack first and add LoRAs from a list that scrolls under its search", async ({

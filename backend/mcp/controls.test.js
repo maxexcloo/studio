@@ -145,7 +145,7 @@ test("LoRA discovery indexes compatible optional effects compactly and bounds lo
   );
   const detailed = mcpLoras(subject, infos, { query: "ink" });
   assert.equal(detailed.loras[0].description.length, 280);
-  assert.deepEqual(detailed.loras[0].strength, { recommended: 0.7 });
+  assert.deepEqual(detailed.loras[0].strength, { recommended: 1, min: 0, max: 2 });
   assert.deepEqual(mcpLoras(subject, infos, { names: ["LORA_1234_V2"] }).loras[0].strength, {
     recommended: 1.1,
     min: 0,
@@ -187,6 +187,10 @@ test("Generate LoRA names resolve without folder, extension or case and take the
   assert.deepEqual(
     prepareLoras(subject, infos, [{ name: "ink wash" }, { name: "Ink-Wash", strength: 0.5 }]),
     [{ name: "styles/Ink-Wash.safetensors", strength: 1.1 }],
+  );
+  assert.throws(
+    () => prepareLoras(subject, infos, [{ name: "ink wash", strength: 2 }]),
+    /supports strength 0 to 1\.5\./,
   );
   assert.deepEqual(prepareLoras(subject, infos, [{ name: "ink wash", triggers: false }]), [
     { name: "styles/Ink-Wash.safetensors", strength: 1.1, triggers: false },
