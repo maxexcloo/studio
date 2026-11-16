@@ -255,6 +255,7 @@ export function ViewerPrompt({
         onChange={setPrompt}
         onKeyDown={keys}
         tools={suggestionsTool ? [suggestionsTool] : []}
+        toolLabel="Suggestions"
         copy={false}
         reset={original}
         send={send}
