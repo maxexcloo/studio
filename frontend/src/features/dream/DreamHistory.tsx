@@ -6,7 +6,7 @@ import type { DreamActivity } from "../../../../shared/taste";
 import { DataTable } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
 import { viewerItemId } from "../gallery/viewerLink";
-import { historyQuery } from "./queries";
+import { type DreamMedia, historyQuery } from "./queries";
 
 function Result({ item }: { item: DreamActivity["item"] }) {
   return item.id ? (
@@ -26,8 +26,8 @@ function Result({ item }: { item: DreamActivity["item"] }) {
   );
 }
 
-export function DreamHistory() {
-  const history = useQuery(historyQuery);
+export function DreamHistory({ media }: { media: DreamMedia }) {
+  const history = useQuery(historyQuery(media));
   if (history.isError)
     return (
       <Alert color="red" title="Couldn't Load History">

@@ -24,20 +24,11 @@
   resize: none;
 }
 
-/* The page positions an overlay over its box; the phone editor lines it up under the text. */
-.overlay {
-  padding-top: var(--mantine-spacing-xs);
-}
-
-.overlay > * {
-  position: static;
-}
-
-/* Named tools and form sends share a row, wrapping only when they outgrow the surface. */
+/* Editing tools and form sends stay together above the keyboard. */
 .toolbar {
   flex-shrink: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0;
   padding-top: var(--mantine-spacing-xs);
@@ -47,7 +38,27 @@
 .editActions {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.editIcon {
+  display: none;
+}
+
+/* Copy and Reset/Undo keep accessible names when the tools and send need the room. */
+.toolbar:has(.sends) .editAction {
+  width: 32px;
+  min-width: 0 !important;
+  padding-inline: 0;
+}
+
+.toolbar:has(.sends) .editText {
+  display: none;
+}
+
+.toolbar:has(.sends) .editIcon {
+  display: block;
 }
 
 .sends {
@@ -185,4 +196,18 @@
   font-size: 1.0625rem;
   line-height: 1.55;
   resize: none;
+}
+
+.secondarySend {
+  width: 32px;
+  min-width: 0 !important;
+  padding-inline: 0;
+}
+
+.secondarySend :global(.mantine-Button-label) {
+  display: none;
+}
+
+.secondarySend :global(.mantine-Button-section) {
+  margin: 0;
 }

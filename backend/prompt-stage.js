@@ -24,7 +24,8 @@ import { sheetRequest, writeSheetPrompt } from "./prompt-sheet.js";
 export function writingRequest(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   if (value.kind === "animate") return animateRequest(value);
-  if (value.kind === "set") return { kind: "set" };
+  if (value.kind === "set")
+    return { kind: "set", ...(value.scope === "image" ? { scope: "image" } : {}) };
   if (value.kind === "sheet") return sheetRequest(value);
   if (value.kind === "dream") return dreamRequest(value);
   return null;
@@ -78,6 +79,9 @@ export function createPromptStage({
         profile,
         guide: guide(profile),
         title: job.input.resultSet?.title || "",
+        scope: writing.scope,
+        frame: () => frame(access, job.parentItemId),
+        caption: () => caption(access, job.parentItemId),
         ...setPrompts(job),
         writer,
         signal,

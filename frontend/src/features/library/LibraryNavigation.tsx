@@ -18,6 +18,12 @@ export const librarySections = {
     icon: icons.outfit,
     group: "Personal",
   },
+  scenes: {
+    label: "Scenes",
+    description: "Your reusable scene descriptions. Images help you recognise each card.",
+    icon: icons.scene,
+    group: "Personal",
+  },
   presets: {
     label: "Presets",
     description:
@@ -25,31 +31,10 @@ export const librarySections = {
     icon: icons.preset,
     group: "Personal",
   },
-  scenes: {
-    label: "Scenes",
-    description: "Your reusable scene descriptions. Images help you recognise each card.",
-    icon: icons.scene,
-    group: "Personal",
-  },
-  downloads: {
-    label: "Downloads",
-    description: "Shared model downloads. Stopping keeps partial files to resume.",
-    icon: HardDriveDownload,
-    admin: true,
-    group: "Administration",
-  },
   guides: {
     label: "Guides",
     description: "Shared prompting guides for profiles and families. Every saved version is kept.",
     icon: BookOpen,
-    admin: true,
-    group: "Administration",
-  },
-  imports: {
-    label: "Imports",
-    description:
-      "Shared models and recipes from Civitai, Hugging Face or recipe images. Use Images › Upload for private images and Reddit posts.",
-    icon: Import,
     admin: true,
     group: "Administration",
   },
@@ -89,6 +74,21 @@ export const librarySections = {
     icon: ArchiveX,
     admin: true,
     group: "Administration",
+  },
+  downloads: {
+    label: "Downloads",
+    description: "Shared model downloads. Stopping keeps partial files to resume.",
+    icon: HardDriveDownload,
+    admin: true,
+    apart: true,
+  },
+  imports: {
+    label: "Imports",
+    description:
+      "Shared models and recipes from Civitai, Hugging Face or recipe images. Use Images › Upload for private images and Reddit posts.",
+    icon: Import,
+    admin: true,
+    apart: true,
   },
 };
 /** Administrators see the whole Library; other accounts only their cards and Presets. */

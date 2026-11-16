@@ -1,8 +1,10 @@
+import { dreamDefaults, dreamSettingError, dreamSettingKeys } from "../shared/dream.ts";
 import { assistantIntegration } from "./assistant-routes.js";
 import { civitaiTokenStatus } from "./civitai/access.js";
 import {
   catalogueFlags,
   defaultProfileKeys,
+  describeDreamDefaults,
   describeFlag,
   isCatalogueFlag,
   saveDeploymentSetting,
@@ -47,6 +49,7 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
         profiles,
       },
       catalogue: catalogueFlags.map(describeFlag),
+      dream: describeDreamDefaults(),
       integrations: {
         civitai: { token: civitaiTokenStatus() },
         huggingFace: { token: { set: Boolean(hfTokenValue()) } },
@@ -59,6 +62,23 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
     if (!requireAdmin(req, res)) return;
     const key = String(req.body?.key || "");
     const value = req.body?.value;
+    const dreamKey = Object.keys(dreamSettingKeys).find((name) => dreamSettingKeys[name] === key);
+    if (dreamKey) {
+      const error = dreamSettingError(dreamKey, value);
+      if (error) return res.status(400).json({ ok: false, error });
+      saveDeploymentSetting(
+        key,
+        value === dreamDefaults[dreamKey]
+          ? ""
+          : typeof value === "boolean"
+            ? value
+              ? "1"
+              : "0"
+            : String(value),
+      );
+      res.json({ ok: true, dream: describeDreamDefaults() });
+      return;
+    }
     if (isCatalogueFlag(key)) {
       if (typeof value !== "boolean") throw new Error("Choose on or off.");
       res.json({ ok: true, setting: { ...saveFlag(key, value), key } });

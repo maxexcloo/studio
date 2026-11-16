@@ -315,7 +315,7 @@ type Rating = { rating: number; note: string };
 
 /**
  * A card's images as numbered slots, reordered by drag or each slot's menu, whose Preview shows one
- * full size. Add Images, or an empty slot, opens the References sheet's gallery choices in their
+ * full size. An empty slot opens the References sheet's gallery choices in their
  * own popup (tabs, search, Filter ▾, Upload and tiles), so the form stays short; a tap fills the
  * chosen slot, else the next empty one, and a chosen image's tile removes it. Rate Images scores
  * each as the kind's reference.
@@ -421,6 +421,7 @@ function CardImages({
           // Only a slot chosen to fill or replace stands out; the next empty one is plain.
           target={chosen}
           caption={false}
+          emptyLabel={`Add ${noun}`}
           onChoose={(next) => {
             setChosen(next);
             // Choosing an empty slot, or one to replace, picks its image.
@@ -442,16 +443,8 @@ function CardImages({
             )
           }
         />
-        <Group gap="xs">
-          <Button
-            {...chipProps}
-            leftSection={<icons.add size={15} />}
-            disabled={!target && !images.length}
-            onClick={() => setPicking(true)}
-          >
-            Add {noun}
-          </Button>
-          {assistant && images.length > 0 && (
+        {assistant && images.length > 0 && (
+          <Group gap="xs">
             <Button
               {...chipProps}
               leftSection={<icons.assistant size={15} />}
@@ -460,8 +453,8 @@ function CardImages({
             >
               Rate {noun}
             </Button>
-          )}
-        </Group>
+          </Group>
+        )}
         {rate.error && (
           <Text size="xs" c="red">
             {rate.error.message}

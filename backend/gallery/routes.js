@@ -112,7 +112,7 @@ export function galleryJobResponse(store, account, id, settings = false) {
 export function registerGalleryReadRoutes(app, { near, similar, store, compared }) {
   /**
    * A gallery search from the query string, or null. `lora`, `model`, `size`,
-   * `aspect` and `tag` may repeat (any of them matches); `q` and `workflow` are
+   * `aspect`, `origin` and `tag` may repeat (any of them matches); `q` and `workflow` are
    * single values.
    */
   const one = (value) => String((Array.isArray(value) ? value[0] : value) ?? "").slice(0, 200);
@@ -127,7 +127,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       near: looksLike,
       workflow: one(query.workflow),
       ...Object.fromEntries(
-        ["lora", "model", "size", "aspect", "tag"].map((key) => [key, many(query[key])]),
+        ["lora", "model", "size", "aspect", "tag", "origin"].map((key) => [key, many(query[key])]),
       ),
     });
   }

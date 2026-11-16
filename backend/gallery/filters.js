@@ -1,8 +1,9 @@
 /**
- * Structured gallery filters. `lora`, `model`, `size`, `aspect` and `tag` each take
+ * Structured gallery filters. `lora`, `model`, `size`, `aspect`, `origin` and `tag` each take
  * one value or several: any of a filter's values matches, and every filter
  * that is on must match. `workflow` is a single value.
  */
+import { galleryOrigin } from "../../shared/gallery-origin.ts";
 import { canonicalProfileId } from "../profile/store.js";
 
 /** Long-edge size bands, without overlap: each upper bound is inclusive, the next band starts one pixel above. */
@@ -66,8 +67,10 @@ export function galleryFiltersTest(filters = {}) {
   const sizes = filterValues(filters.size);
   const aspects = filterValues(filters.aspect);
   const tags = filterValues(filters.tag);
+  const origins = filterValues(filters.origin);
   const text = Object.keys(terms).filter((key) => terms[key].length);
-  if (!text.length && !sizes.length && !aspects.length && !tags.length) return null;
+  if (!text.length && !sizes.length && !aspects.length && !tags.length && !origins.length)
+    return null;
   const kept = new Map();
   const canonical = (id) => {
     if (!kept.has(id)) kept.set(id, canonicalProfileId(id));
@@ -81,7 +84,8 @@ export function galleryFiltersTest(filters = {}) {
     workflow: (settings) => [settings.workflow, settings.profileId, canonical(settings.profileId)],
   };
   return (item) => {
-    // Pending jobs always show; they have no final size yet.
+    if (origins.length && !origins.includes(galleryOrigin(item))) return false;
+    // Matching pending jobs show regardless of their unfinished settings and dimensions.
     if (item.status === "pending") return true;
     const settings = item.settings || {};
     for (const key of text) {

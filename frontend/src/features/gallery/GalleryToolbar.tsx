@@ -132,13 +132,7 @@ export function GalleryToolbar({
     );
   const filterChips = <FilterChips chips={chips} onClear={clear} />;
   const row = (
-    <Group
-      ref={toolbar}
-      gap="xs"
-      mih={44}
-      wrap={phone ? "nowrap" : "wrap"}
-      className={classes.mode}
-    >
+    <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
       {phone ? (
         <Tooltip label="Search Gallery">
           <Button
@@ -155,43 +149,41 @@ export function GalleryToolbar({
       ) : (
         search
       )}
-      {phone && (
-        <ChipPopup
-          title="Filters"
-          opened={filtering}
-          onOpenedChange={setFiltering}
-          width={340}
-          position="bottom-start"
-          headerEnd={
-            <>
-              {results && (
-                <Text size="sm" c="dimmed">
-                  {results}
-                </Text>
-              )}
-              <Button size="compact-sm" variant="subtle" disabled={!chips.length} onClick={clear}>
-                Clear
-              </Button>
-            </>
-          }
-          target={
-            <FilterButton
-              label="Gallery Filters"
-              count={chips.length}
-              opened={filtering}
-              onClick={() => setFiltering(!filtering)}
-            />
-          }
-        >
-          <GalleryFilterPanel
-            kind={kind}
-            value={value}
-            onChange={onChange}
-            view={view}
-            toggles={toggles}
+      <ChipPopup
+        title="Filters"
+        opened={filtering}
+        onOpenedChange={setFiltering}
+        width={340}
+        position="bottom-start"
+        headerEnd={
+          <>
+            {results && (
+              <Text size="sm" c="dimmed">
+                {results}
+              </Text>
+            )}
+            <Button size="compact-sm" variant="subtle" disabled={!chips.length} onClick={clear}>
+              Clear
+            </Button>
+          </>
+        }
+        target={
+          <FilterButton
+            label="Gallery Filters"
+            count={chips.length}
+            opened={filtering}
+            onClick={() => setFiltering(!filtering)}
           />
-        </ChipPopup>
-      )}
+        }
+      >
+        <GalleryFilterPanel
+          kind={kind}
+          value={value}
+          onChange={onChange}
+          view={view}
+          toggles={toggles}
+        />
+      </ChipPopup>
       <FilterToggle
         label="Liked"
         icon={icons.like}
@@ -220,8 +212,8 @@ export function GalleryToolbar({
         on={value.uploads}
         onToggle={() => onChange({ ...value, uploads: !value.uploads, rating: "" })}
       />
-      {/* Keep the actions at the end of the row. */}
-      <div className={classes.chips} />
+      {/* Desktop chips fill the row's free width; either way the actions end the row. */}
+      {phone || !chips.length ? <div className={classes.chips} /> : filterChips}
       {results && !phone && (
         <Text size="sm" c="dimmed" className={classes.count}>
           {results}
@@ -234,17 +226,7 @@ export function GalleryToolbar({
   return (
     <>
       {row}
-      {!phone && (
-        <GalleryFilterPanel
-          inline
-          kind={kind}
-          value={value}
-          onChange={onChange}
-          view={view}
-          toggles={toggles}
-        />
-      )}
-      {chips.length > 0 && filterChips}
+      {phone && chips.length > 0 && filterChips}
     </>
   );
 }

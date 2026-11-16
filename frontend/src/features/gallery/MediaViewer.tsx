@@ -46,6 +46,8 @@ import { setMembers, setPosition } from "./resultSets";
 import { type SwipeDirection, swipeDirection } from "./swipe";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { useMediaRating } from "./useMediaRating";
+import { useVideoSound } from "./useVideoSound";
+import { playVideo } from "./videoPlayback";
 
 import classes from "./MediaViewer.module.css";
 const MediaComparison = lazy(() =>
@@ -83,35 +85,6 @@ function nearControl(event: React.MouseEvent<HTMLElement>) {
   });
 }
 
-/**
- * Plays each opened video, muted if the browser refuses sound, pauses it while the tab is hidden
- * and releases the player when it leaves. The keyed element gets a fresh call per source. Should
- * the browser refuse to play it at all, `refused` shows its controls so a tap can start it.
- */
-function playVideo(media: HTMLVideoElement, refused: () => void) {
-  const pause = () => {
-    if (document.hidden) media.pause();
-  };
-  document.addEventListener("visibilitychange", pause);
-  media
-    .play()
-    .catch(() => {
-      // A player already released stays stopped.
-      if (!media.isConnected || media.muted) throw new Error("Not played");
-      media.muted = true;
-      return media.play();
-    })
-    .catch(() => {
-      if (media.isConnected) refused();
-    });
-  return () => {
-    document.removeEventListener("visibilitychange", pause);
-    media.pause();
-    media.removeAttribute("src");
-    media.load();
-  };
-}
-
 // One key runs a viewer action, as its bar would (Settings › Studio lists them).
 const viewerShortcuts: Record<string, string> = {
   e: "edit-image",
@@ -144,6 +117,7 @@ function ViewerVideo({
   swipe: ReturnType<typeof useTouchSwipe>;
   onTap: () => void;
 }) {
+  const sound = useVideoSound();
   const [controls, setControls] = useState(false);
   const controlsShown = useRef(false);
   const [refused, setRefused] = useState(false);
@@ -162,6 +136,7 @@ function ViewerVideo({
   return (
     <video
       ref={play}
+      {...sound}
       data-media-id={id}
       src={src}
       poster={poster}

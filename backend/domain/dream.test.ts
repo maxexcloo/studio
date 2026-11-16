@@ -9,7 +9,13 @@ import test, { type TestContext } from "node:test";
 import express from "express";
 
 import type { CardKind, Character } from "../../shared/characters.ts";
-import { closeRuntimeDatabase, openDatabase } from "../persistence/runtime.ts";
+import { type DreamSettings, dreamDefaults } from "../../shared/dream.ts";
+import {
+  closeRuntimeDatabase,
+  openDatabase,
+  readRuntimeDocument,
+  writeRuntimeDocument,
+} from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import { registerDreamRoutes } from "./dream-routes.ts";
 import {
@@ -56,6 +62,7 @@ function fixture(t: TestContext, catalogue = profiles) {
   const taste = createTaste({ dataDir, writer: () => null });
   const projects = createProjects({ dataDir, now: () => state.clock });
   const state = {
+    defaults: { ...dreamDefaults } as DreamSettings,
     clock: Date.now(),
     items: [] as DreamItem[],
     reads: [] as Record<string, unknown>[],
@@ -65,10 +72,15 @@ function fixture(t: TestContext, catalogue = profiles) {
         { ...everything, account: { userId, role: "user" } },
       ]),
     ) as Record<string, DreamAccess | null>,
-    online: { text: true, image: true, video: true } as Record<string, boolean | "parked">,
+    onlineCalls: [] as { kind: string; backend: string }[],
+    online: { cloud: true, text: true, image: true, video: true } as Record<
+      string,
+      boolean | "parked"
+    >,
     textBusy: false,
     slots: 1,
     prompts: 0,
+    replies: [] as { prompt: string; title?: string }[],
     calls: [] as { model: string; system: string; user: string }[],
     logs: [] as string[],
     loras: {} as Record<string, DreamLoraLibrary>,
@@ -93,7 +105,10 @@ function fixture(t: TestContext, catalogue = profiles) {
     store,
     queue: { tick: async () => undefined } as unknown as GenerationQueue,
     validate: async () => ({ status: 200, payload: { ok: true } }),
-    resourceFor: async (input) => `worker:${input.kind === "video" ? "video" : "image"}`,
+    resourceFor: async (input) =>
+      catalogue.find((profile) => profile.id === input.profileId)?.provider === "cliproxyapi"
+        ? "provider:cliproxyapi"
+        : `worker:${input.kind === "video" ? "video" : "image"}`,
     pendingItems: (id, input) => [
       { id: `${id}-0`, jobId: id, status: "pending", prompt: input.prompt },
     ],
@@ -121,6 +136,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       .slice(0, query.sample ?? query.limit);
   const dream = createDream({
     dataDir,
+    defaults: () => state.defaults,
     store,
     taste,
     projects: (ownerId) => projects.list(ownerId),
@@ -131,10 +147,14 @@ function fixture(t: TestContext, catalogue = profiles) {
       profiles: catalogue,
       defaults: { imageModel: "flux", videoModel: "wan" },
     }),
-    online: async (kind) => {
+    online: async (kind, backend) => {
+      state.onlineCalls.push({ kind, backend });
       const reach = (value: boolean | "parked") =>
         value === "parked" ? value : value ? "online" : "offline";
-      return { text: reach(state.online.text), media: reach(state.online[kind]) };
+      return {
+        text: reach(state.online.text),
+        media: reach(state.online[backend === "cloud" ? "cloud" : kind]),
+      };
     },
     textBusy: () => state.textBusy,
     slots: () => state.slots,
@@ -150,6 +170,7 @@ function fixture(t: TestContext, catalogue = profiles) {
             prompt: `dream ${state.prompts}`,
             why: "You like foxes.",
             title: `Fox Dream ${state.prompts}`,
+            ...state.replies.shift(),
           }),
         };
       },
@@ -302,6 +323,8 @@ test("Dream is off until turned on, queues one hidden job per account only while
     images: true,
     videos: false,
     spicy: false,
+    imageBackend: "local",
+    videoBackend: "local",
   });
   await dream.tick();
   assert.equal(dreamJobs().length, 0);
@@ -502,7 +525,7 @@ test("Dream stops at today's cap per kind, however much waits unseen, and animat
   assert.equal(live().length, 0);
 });
 
-test("Dream draws a ready profile by its taste, explores one axis at a time and keeps Spicy to accounts with Uncensored Models", async (t) => {
+test("Dream draws a ready profile by its taste, explores concepts alongside profiles and LoRAs and keeps Spicy to accounts with Uncensored Models", async (t) => {
   const { dream, state, taste, dreamOnce, generated } = fixture(t);
   const liked = (id: string, profileId: string) => {
     generated({
@@ -525,7 +548,7 @@ test("Dream draws a ready profile by its taste, explores one axis at a time and 
   assert.equal(job?.dream?.arm, "exploit");
   assert.match(state.calls[0].user, /- liked [ab]/);
   // An exploited idea features something they like.
-  assert.match(state.calls[0].system, /feature this, which they like: fox\./);
+  assert.match(state.calls[0].system, /Keep this taste they like: fox\./);
   // No uncensored grant: Spicy never applies, whatever the setting says.
   assert.equal(state.calls[0].model, "writer");
   assert.match(state.calls[0].system, /safe for work/);
@@ -542,13 +565,15 @@ test("Dream draws a ready profile by its taste, explores one axis at a time and 
     onDelta() {},
   });
   assert.match(state.calls[2].system, /safe for work/);
-  // A share of ideas explores one axis; the first tries the profile used least, here one never used.
+  // New concepts also try the profile used least, here one never used.
   state.rolls = [99];
   const explored = await dreamOnce();
   assert.equal(explored?.input.profileId, "flux");
   assert.equal(explored?.dream?.arm, "explore:profile");
+  assert.match(state.calls.at(-1)!.system, /Change at least three/);
+  assert.equal((explored?.input.writing as { explore?: boolean })?.explore, true);
   assert.equal(explored?.dream?.why, "Trying FLUX for the first time · You like foxes.");
-  // The next explores the prompt: half from a Library import, on its profile with its LoRAs, for
+  // The next explores a concept from a Library import, on its profile with its LoRAs, for
   // Uncensored Models only, since imports carry no content rating.
   state.access.alice!.uncensored = true;
   state.loras.alice = {
@@ -590,6 +615,112 @@ test("Dream draws a ready profile by its taste, explores one axis at a time and 
   assert.deepEqual([beyond?.input.profileId, beyond?.dream?.arm], ["qwen", "explore:prompt"]);
   assert.doesNotMatch(state.calls.at(-1)!.user, /Inspiration/);
   assert.match(state.calls.at(-1)!.system, /Explore this time: go beyond their taste profile/);
+});
+
+test("Fresh concepts rotate anchors and inspirations without overriding a model experiment", async (t) => {
+  const { dream, state, dreamOnce } = fixture(t);
+  state.access.alice!.uncensored = true;
+  state.inspiration = [
+    { prompt: "a lighthouse in a storm", profileId: "flux", loras: [] },
+    { prompt: "a clockmaker repairing a mechanical bird", profileId: "flux", loras: [] },
+    { prompt: "a lighthouse in a storm", profileId: "flux", loras: [] },
+  ];
+  await dream.save("alice", { enabled: true });
+  const seen: string[] = [];
+  const anchors: string[][] = [];
+  for (let index = 0; index < 13; index++) {
+    state.rolls = [99, 0];
+    const job = await dreamOnce();
+    assert.ok(job);
+    assert.equal((job.input.writing as { explore?: boolean }).explore, true);
+    seen.push((job.input.writing as { inspiration: string }).inspiration);
+    anchors.push(dream.read("alice").anchors!.slice(0, 8));
+    assert.match(state.calls.at(-1)!.system, /Change at least three/);
+    assert.match(
+      state.calls.at(-1)!.system,
+      /Do not copy its complete concept or merely paraphrase it/,
+    );
+    if (index === 0) {
+      assert.equal(job.dream?.arm, "explore:profile");
+      assert.equal(job.input.profileId, "qwen");
+    }
+  }
+  assert.notEqual(seen[0], seen[1], "Duplicate catalogue entries do not repeat an inspiration");
+  assert.equal(seen[0], seen[2], "Exhausted inspirations return oldest first");
+  for (const axis of ["subject", "action", "setting", "camera or composition"]) {
+    const choices = anchors
+      .slice(0, axis === "camera or composition" ? 10 : 12)
+      .map((draw) => draw.find((value) => value.startsWith(`${axis}:`)));
+    assert.equal(
+      new Set(choices).size,
+      choices.length,
+      `${axis} rotates independently of prompt wording`,
+    );
+  }
+  assert.equal(anchors[0][0], anchors[12][0], "An exhausted axis returns to its oldest choice");
+  assert.equal(dream.read("bob").anchors, undefined);
+  assert.equal(dream.read("bob").inspirations, undefined);
+  state.inspiration = [{ prompt: "a newly saved concept", loras: [] }];
+  state.rolls = [99, 0];
+  const next = await dreamOnce();
+  assert.ok(next);
+  assert.equal(
+    (next.input.writing as { inspiration: string }).inspiration,
+    "a newly saved concept",
+  );
+});
+
+test("Fresh concept retries reject liked prompt copies and show the rejected concept", async (t) => {
+  const { dream, state, generated, dreamOnce } = fixture(t);
+  const prompt = "A red fox repairing a clockwork boat in a sunlit workshop, viewed from above";
+  generated({
+    id: "liked",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    rating: "liked",
+    prompt,
+  });
+  state.replies = [
+    {
+      prompt: "Viewed from above, a red fox repairing a clockwork boat in a sunlit workshop",
+      title: "Clockwork Boat",
+    },
+    {
+      prompt: "An octopus conducting a coral orchestra in a wide underwater amphitheatre",
+      title: "Coral Orchestra",
+    },
+  ];
+  await dream.save("alice", { enabled: true });
+  state.rolls = [99];
+  const job = await dreamOnce();
+  assert.equal(
+    job?.input.prompt,
+    "An octopus conducting a coral orchestra in a wide underwater amphitheatre",
+  );
+  assert.equal(state.calls.length, 2);
+  assert.match(state.calls[1].user, /Rejected prompt: Viewed from above/);
+  assert.match(state.calls[1].user, /too close to a recent or liked prompt/);
+  assert.match(state.calls[1].user, /do not paraphrase the rejected idea/);
+  assert.deepEqual(dream.read("alice").subjects, ["Coral Orchestra"]);
+});
+
+test("More Like This permits close iterations while keeping species and source identity", async (t) => {
+  const { dream, state, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  const original = "An adult golden retriever carrying a red ball across a grassy field";
+  state.replies = [{ prompt: original, title: "Golden Retriever" }];
+  const first = await dreamOnce();
+  assert.ok(first);
+  const item = state.items.find((item) => item.jobId === first.id)!;
+  dream.more("alice", String(item.id));
+  const iteration = "An adult golden retriever carrying a blue ball across a grassy field";
+  state.replies = [{ prompt: iteration, title: "Golden Retriever" }];
+  const next = await dreamOnce();
+  assert.equal(next?.input.prompt, iteration);
+  assert.match(state.calls.at(-1)!.system, /including species and breed/);
+  assert.doesNotMatch(state.calls.at(-1)!.system, /Change at least three/);
+  assert.doesNotMatch(state.calls.at(-1)!.user, /Recent Dream ideas to avoid/);
 });
 
 test("Dream skips unavailable accounts and offline services, logging each reason once", async (t) => {
@@ -754,7 +885,11 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
       ["keep", job.id, "exploit"],
     ],
   );
-  const discarded = await request("/discarded?limit=1");
+  assert.deepEqual((await request("/discarded?media=video&limit=1")).body, {
+    items: [],
+    nextCursor: "",
+  });
+  const discarded = await request("/discarded?media=image&limit=1");
   assert.equal(discarded.body.items[0].prompt, "dream 2");
   assert.equal(discarded.body.nextCursor, "");
 
@@ -1064,12 +1199,40 @@ test("While Dream is off, gallery comparisons still rate images and queue nothin
   assert.deepEqual(dreamJobs("alice"), []);
 });
 
-test("The explore share starts at a fifth and follows how often explored results are kept against the rest", async (t) => {
+test("Dream-off video comparisons rate videos without queueing work", async (t) => {
+  const { dream, state, dreamJobs, generated } = fixture(t);
+  const createdAt = new Date(state.clock - 2 * 86_400_000).toISOString();
+  generated(
+    ...["a", "b"].map((id) => ({
+      id,
+      jobId: `job-${id}`,
+      ownerId: "alice",
+      type: "video",
+      status: "done",
+      createdAt,
+    })),
+  );
+  assert.deepEqual(
+    dream
+      .calibration("alice", 12, "video")
+      .map((item) => item.id)
+      .sort(),
+    ["a", "b"],
+  );
+  dream.calibrate("alice", { liked: ["a"], passed: ["b"] });
+  assert.deepEqual(dream.read("alice").ratings, { a: 1516, b: 1484 });
+  await dream.tick();
+  assert.deepEqual(dreamJobs("alice"), []);
+});
+
+test("Fresh concepts start at three quarters and stay the majority as verdicts adapt the share", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
-  // At a fifth, a roll of 70 of 100 exploits.
-  state.rolls = [70];
+  // A quarter remains available for familiar work.
+  state.rolls = [20];
   assert.equal((await dreamOnce())?.dream?.arm, "exploit");
+  state.rolls = [25];
+  assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
   let made = 0;
   const decided = (count: number, arm: string, verdict: "kept" | "discarded", pair = false) => {
     for (let index = 0; index < count; index++)
@@ -1099,20 +1262,20 @@ test("The explore share starts at a fifth and follows how often explored results
         },
       });
   };
-  // Explored results kept and the rest passed: at most half explore.
+  // Positive verdicts raise fresh concepts to nine tenths.
   decided(10, "explore:prompt", "kept");
   decided(10, "exploit", "discarded");
-  state.rolls = [70];
+  state.rolls = [10];
   assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
-  state.rolls = [40];
+  state.rolls = [5];
   assert.equal((await dreamOnce())?.dream?.arm, "exploit");
-  // The other way round, a tenth still explores; comparisons ask something else and count for neither.
+  // Poor verdicts still leave a majority of fresh concepts; comparisons do not count.
   decided(20, "explore:lora", "discarded");
   decided(60, "continue:pose", "kept");
   decided(30, "explore:steps", "kept", true);
-  state.rolls = [85];
+  state.rolls = [35];
   assert.equal((await dreamOnce())?.dream?.arm, "exploit");
-  state.rolls = [92];
+  state.rolls = [40];
   assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
 });
 
@@ -1182,6 +1345,37 @@ test("Dream keeps discards disliked and hidden, never deleting them unasked, and
   assert.deepEqual(ids(), ["new", "kept", "bob-old"]);
 });
 
+test("Discard pagination counts only the chosen media and retains owner scope", async (t) => {
+  const fx = fixture(t);
+  const { state } = fx;
+  state.items.push(
+    ...["image", "video", "image", "video"].map((type, index) => ({
+      id: String(index),
+      ownerId: "alice",
+      type,
+      status: "done",
+      dream: { prompt: "p", why: "", at: "", state: "discarded" as const },
+    })),
+    {
+      id: "bob-video",
+      ownerId: "bob",
+      type: "video",
+      status: "done",
+      dream: { prompt: "p", why: "", at: "", state: "discarded" },
+    },
+  );
+  const request = await serve(t, fx);
+  const first = (await request("/discarded?media=video&limit=1")).body;
+  assert.equal(first.items.length, 1);
+  assert.equal(first.items[0].type, "video");
+  assert.equal(first.nextCursor, "1");
+  const second = (await request(`/discarded?media=video&limit=1&cursor=${first.nextCursor}`)).body;
+  assert.equal(second.items[0].type, "video");
+  assert.notEqual(second.items[0].id, first.items[0].id);
+  assert.equal(second.nextCursor, "");
+  assert.ok([...first.items, ...second.items].every((item) => item.ownerId === "alice"));
+});
+
 test("Calibration offers the account's older Studio generations, unjudged first, and only teaches the taste profile", async (t) => {
   const fx = fixture(t);
   const { state, taste, generated } = fx;
@@ -1233,6 +1427,26 @@ test("Calibration offers the account's older Studio generations, unjudged first,
       ["calibrate-like", "job-a", "prompt a"],
     ],
   );
+  assert.deepEqual(
+    (await request("/calibration?media=video&limit=10")).body.items.map(
+      (item: DreamItem) => item.id,
+    ),
+    ["clip"],
+  );
+  assert.equal((await request("/calibration", { liked: ["clip"], passed: ["a"] })).status, 400);
+  assert.equal((await request("/calibration", { liked: ["clip"] })).status, 200);
+  assert.equal(taste.read("alice").signals[0].media, "video");
+  assert.deepEqual(
+    (await request("/history?media=video")).body.items.map(
+      (item: { item: { media: string } }) => item.item.media,
+    ),
+    ["video"],
+  );
+  assert.ok(
+    (await request("/history?media=image")).body.items.every(
+      (item: { item: { media: string } }) => item.item.media === "image",
+    ),
+  );
   // Judged images come after unjudged ones; nothing in the gallery changed.
   generated(image("d"));
   assert.equal((await request("/calibration?limit=1")).body.items[0].id, "d");
@@ -1279,6 +1493,8 @@ test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and ex
   const tried = (await dreamOnce())!;
   assert.deepEqual(loras(tried), [["ink.safetensors", 1]]);
   assert.equal(tried.dream?.arm, "explore:lora");
+  assert.match(state.calls.at(-1)!.system, /Change at least three/);
+  assert.equal((tried.input.writing as { explore?: boolean }).explore, true);
   assert.match(String(tried.dream?.why), /^Testing ink · /);
   // Without LoRA access nothing is added.
   state.loras = {};
@@ -1417,8 +1633,11 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
 
   const request = await serve(t, fx);
   // The header's count takes a comparison as one.
+  const cards = dream.unseen("alice").filter((item) => !item.dream?.pair).length + 1;
   assert.deepEqual((await request("/count")).body, {
-    unseen: dream.unseen("alice").filter((item) => !item.dream?.pair).length + 1,
+    unseen: cards,
+    images: cards,
+    videos: 0,
     active: true,
   });
   const pair = a.dream!.pair!.id;
@@ -1790,4 +2009,142 @@ test("A Dream video skips a source that left the gallery and animates the next",
   finish("alice", live("alice")[0].id);
   assert.equal(await dreamOnce(), undefined);
   assert.match(dream.status("alice").reason!, /^Dream videos animate a kept, liked/);
+});
+
+test("administrator defaults stay inherited through visits, generation and partial account saves", async (t) => {
+  const { dream, state, dataDir, dreamOnce } = fixture(t);
+  state.defaults.enabled = true;
+  state.defaults.dailyImages = 12;
+  state.defaults.spicy = true;
+  assert.equal(dream.read("alice").settings.dailyImages, 12);
+  dream.visit("alice");
+  await dream.save("alice", { videos: false, dailyVideos: 0 });
+  const inherited = await dreamOnce();
+  assert.equal(inherited?.dream?.spicy, undefined);
+  assert.match(state.calls[0].system, /safe for work/);
+  assert.deepEqual(
+    (readRuntimeDocument(dataDir, "dream:alice") as { settings: Partial<DreamSettings> }).settings,
+    {
+      videos: false,
+      dailyVideos: 0,
+    },
+  );
+  state.defaults.dailyImages = 18;
+  state.defaults.videos = true;
+  state.defaults.dailyVideos = 8;
+  const resolved = dream.read("alice").settings;
+  assert.equal(resolved.dailyImages, 18);
+  assert.equal(resolved.videos, false);
+  assert.equal(resolved.dailyVideos, 0);
+  assert.equal(resolved.enabled, true);
+
+  const existing = { ...dreamDefaults, enabled: false, dailyImages: 0, spicy: false };
+  writeRuntimeDocument(dataDir, "dream:bob", { settings: existing });
+  dream.visit("bob");
+  assert.deepEqual(dream.read("bob").settings, existing);
+  assert.deepEqual(
+    (readRuntimeDocument(dataDir, "dream:bob") as { settings: Partial<DreamSettings> }).settings,
+    existing,
+  );
+  const request = await serve(t, fixture(t));
+  assert.equal((await request("/settings", { imageBackend: "auto" }, "PUT")).status, 400);
+});
+
+test("Dream routes images to the selected allowed backend and never substitutes a local model for Cloud", async (t) => {
+  const cloud = {
+    id: "custom:cloud-image",
+    provider: "cliproxyapi",
+    kind: "image",
+    label: "Cloud Image",
+  };
+  const fx = fixture(t, [...profiles, cloud]);
+  fx.state.defaults.enabled = true;
+  fx.state.defaults.imageBackend = "cloud";
+  fx.state.online.image = "parked";
+  const job = await fx.dreamOnce();
+  assert.equal(job?.input.profileId, cloud.id);
+  assert.equal(fx.state.onlineCalls.find((call) => call.backend === "cloud")?.kind, "image");
+  await fx.dream.save("alice", { imageBackend: "local" });
+  assert.equal(await fx.dreamOnce(), undefined);
+  assert.match(fx.dream.status("alice").reason!, /stopped/);
+
+  const denied = fixture(t);
+  denied.state.defaults.enabled = true;
+  denied.state.defaults.imageBackend = "cloud";
+  assert.equal(await denied.dreamOnce(), undefined);
+  assert.match(
+    denied.dream.status("alice").reason!,
+    /No ready cloud image model available to this account/,
+  );
+  denied.state.online.cloud = false;
+  await denied.dream.tick();
+  assert.match(denied.dream.status("alice").reason!, /cloud image service is offline/);
+  denied.state.access.alice = null;
+  const request = await serve(t, denied);
+  assert.equal((await request("/settings", { imageBackend: "local" }, "PUT")).status, 403);
+});
+
+test("More Like This waits for its exact source profile when the Dream backend changes", async (t) => {
+  const fx = fixture(t, [
+    ...profiles,
+    { id: "custom:cloud-image", provider: "cliproxyapi", kind: "image" },
+  ]);
+  await fx.dream.save("alice", { enabled: true });
+  const source = (await fx.dreamOnce())!;
+  fx.dream.more("alice", `${source.id}-0`);
+  await fx.dream.save("alice", { imageBackend: "cloud" });
+  assert.equal(await fx.dreamOnce(), undefined);
+  assert.match(fx.dream.status("alice").reason!, /source image's model/);
+  await fx.dream.save("alice", { imageBackend: "local" });
+  const continued = await fx.dreamOnce();
+  assert.equal(continued?.input.profileId, source.input.profileId);
+});
+
+test("Dream videos honour a separate Cloud preference and retain source lineage", async (t) => {
+  const cloud = {
+    id: "custom:cloud-video",
+    provider: "cliproxyapi",
+    kind: "video",
+    mediaInputs: [{ id: "start", required: true }],
+  };
+  const fx = fixture(t, [...profiles, cloud]);
+  fx.state.defaults = {
+    ...dreamDefaults,
+    enabled: true,
+    images: false,
+    videos: true,
+    videoBackend: "cloud",
+  };
+  fx.state.video = cloud.id;
+  fx.state.online.video = "parked";
+  fx.generated({
+    id: "kept",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    rating: "liked",
+    prompt: "A fox",
+  });
+  const job = await fx.dreamOnce();
+  assert.equal(job?.input.profileId, cloud.id);
+  assert.equal(
+    (job?.input.referenceAssets as { assetId: string }[] | undefined)?.[0]?.assetId,
+    "asset-kept",
+  );
+  assert.ok(fx.state.onlineCalls.some((call) => call.kind === "video" && call.backend === "cloud"));
+  fx.generated({
+    id: "clip",
+    ownerId: "alice",
+    type: "video",
+    status: "done",
+    rating: "liked",
+    settings: { profileId: "wan" },
+  });
+  assert.equal(await fx.dreamOnce(), undefined);
+  assert.match(fx.dream.status("alice").reason!, /selected Dream backend/);
+  await fx.dream.save("alice", { videoBackend: "local" });
+  fx.state.online.video = true;
+  const extension = await fx.dreamOnce();
+  assert.equal(extension?.input.profileId, "wan");
+  assert.equal(extension?.dream?.arm, "extend");
 });
