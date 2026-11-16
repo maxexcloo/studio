@@ -26,7 +26,6 @@ import {
   Info,
   Layers,
   LayoutDashboard,
-  Lightbulb,
   ListFilter,
   ListX,
   type LucideIcon,
@@ -52,7 +51,6 @@ import {
   Share,
   Shirt,
   SlidersHorizontal,
-  Sparkles,
   TextCursorInput,
   ThumbsDown,
   ThumbsUp,
@@ -70,7 +68,7 @@ export const icons = {
   add: Plus,
   animate: Play,
   /** The prompt assistant and its ideas. */
-  assistant: Sparkles,
+  assistant: WandSparkles,
   /** Measuring a local text model's speed (Settings › Workers). */
   benchmark: Gauge,
   /** Character cards: their tab, section and Use as Character. */
@@ -156,7 +154,7 @@ export const icons = {
   /** Stopping work: a stop sign rather than a bare square, which reads as a checkbox. */
   stop: CircleStop,
   /** Short changes offered for an image or draft. */
-  suggestions: Lightbulb,
+  suggestions: WandSparkles,
   undo: Undo2,
   upload: Upload,
   /** The uploaded images: the gallery's Uploads toggle, apart from the Upload action. */

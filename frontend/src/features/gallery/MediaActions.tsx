@@ -66,6 +66,7 @@ import {
   type EditAsk,
   type Iteration,
   animateProfileQuery,
+  typedPrompt,
   useAnimateLengthSetting,
   useAnimateReview,
   useAnimateTemplates,
@@ -344,24 +345,40 @@ export function useMediaActions(
   });
   const assistant = useQuery(assistantQuery);
   const assisted = Boolean(assistant.data?.available);
-  // The assistant writes new variations into the item's MCP result set, in the queue.
-  const moreSet = useItemMutation(item.id, "more-like-set", {
-    mutationFn: () => post("/api/result-sets/more", { itemId: item.id }),
+  // The queue writes variations of this image or its set with the run's settings.
+  const more = useItemMutation(item.id, "more-like", {
+    mutationFn: (scope: "image" | "set") =>
+      post("/api/result-sets/more", { itemId: item.id, scope }),
     onSuccess: () =>
       void Promise.all(
         [queueQuery.queryKey, galleryKey].map((queryKey) => client.invalidateQueries({ queryKey })),
       ),
   });
-  const moreLikeSet: Action[] =
-    ready && !item.uploaded && item.resultSet && assisted
+  const moreLike: Action[] =
+    ready && !item.uploaded && item.jobId && assisted
       ? [
-          {
-            id: "more-like-set",
-            label: "More Like This Set",
-            icon: icons.suggestions,
-            disabled: moreSet.isPending,
-            onClick: () => moreSet.mutate(),
-          },
+          ...(image && (item.prompt?.trim() || typedPrompt(item).trim())
+            ? [
+                {
+                  id: "more-like-image",
+                  label: "More Like This",
+                  icon: icons.assistant,
+                  disabled: more.isPending,
+                  onClick: () => more.mutate("image"),
+                },
+              ]
+            : []),
+          ...(item.resultSet
+            ? [
+                {
+                  id: "more-like-set",
+                  label: "More Like This Set",
+                  icon: icons.suggestions,
+                  disabled: more.isPending,
+                  onClick: () => more.mutate("set"),
+                },
+              ]
+            : []),
         ]
       : [];
   // Animate says why no model can run before anything queues.
@@ -593,7 +610,7 @@ export function useMediaActions(
                   },
                 ],
             [
-              ...moreLikeSet,
+              ...moreLike,
               ...(image && comparison
                 ? [
                     {

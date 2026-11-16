@@ -129,6 +129,9 @@ test("The viewer directly offers Suggested and Templates without styles or item 
   );
   await expect(mediaMenu.getByRole("menuitem", { name: "Custom…", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
+  await expect(viewer.getByRole("button", { name: "AI Prompt Actions", exact: true })).toHaveCount(
+    1,
+  );
   const menu = await viewerPromptMenu(page);
   await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toHaveCount(0);
   await expect(menu.getByText("Suggested", { exact: true })).toBeVisible();
@@ -137,6 +140,11 @@ test("The viewer directly offers Suggested and Templates without styles or item 
     "aria-checked",
     "false",
   );
+  await page.keyboard.press("Escape");
+  await expect(
+    viewer.getByRole("button", { name: "AI Prompt Actions", exact: true }),
+  ).toBeFocused();
+  await viewerPromptMenu(page);
   const thinking = menu.getByRole("menuitem", { name: "Loading…", exact: true });
   await expect(thinking).toBeDisabled();
   release[0]();
@@ -352,8 +360,8 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   const surface = await editPrompt("An amber bird in bright sunlight");
   if (phone) {
     await surface.getByRole("button", { name: "Reset", exact: true }).click();
-    await surface.getByRole("button", { name: "Suggestions", exact: true }).click();
-    const tools = page.getByRole("menu", { name: "Suggestions", exact: true });
+    await surface.getByRole("button", { name: "AI Prompt Actions", exact: true }).click();
+    const tools = page.getByRole("menu");
     await expect(tools.getByText("Suggested", { exact: true })).toBeVisible();
     await expect(tools.getByText("Templates", { exact: true })).toBeVisible();
     await expect(
