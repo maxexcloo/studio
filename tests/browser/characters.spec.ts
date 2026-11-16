@@ -185,8 +185,7 @@ test("Use in Composer stages Library cards in the composer, moving to a model th
   await serveProfiles(page, [...profiles, keeper]);
   await page.goto("/library#characters");
   await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
-  // The usual action leads the card's menu.
-  await expect(page.getByRole("menuitem").first()).toHaveText("Use in Composer");
+  await expect(page.getByRole("menuitem").first()).toHaveText("Edit Character");
   await page.getByRole("menuitem", { name: "Use in Composer", exact: true }).click();
   await expect(page).toHaveURL(/\/images\?.*compose=1/);
   await expect(
@@ -230,6 +229,12 @@ test("New Character saves a name, description and gallery images from the Refere
   await description.fill("red-haired ranger");
   const done = page.getByRole("button", { name: "Close Description", exact: true });
   if (await done.isVisible()) await done.click();
+  await editor.getByLabel("Likes", { exact: true }).fill("Tea, Earl Grey");
+  await editor.getByLabel("Likes", { exact: true }).press("Enter");
+  await editor.getByLabel("Likes", { exact: true }).fill("Gardens");
+  await editor.getByLabel("Likes", { exact: true }).press("Enter");
+  await editor.getByLabel("Dislikes", { exact: true }).fill("Noise");
+  await editor.getByLabel("Dislikes", { exact: true }).press("Enter");
   // Add Images opens the gallery choices in a popup of their own.
   await editor.getByRole("button", { name: "Add Images", exact: true }).click();
   const picker = page.getByRole("dialog", { name: "Add Images", exact: true });
@@ -261,12 +266,16 @@ test("New Character saves a name, description and gallery images from the Refere
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(
-    state.characters.map(({ name, description, referenceIds }) => [
+    state.characters.map(({ name, description, referenceIds, likes, dislikes }) => [
       name,
       description,
       referenceIds,
+      likes,
+      dislikes,
     ]),
-  ).toEqual([["Mara", "red-haired ranger", ["asset-portrait"]]]);
+  ).toEqual([
+    ["Mara", "red-haired ranger", ["asset-portrait"], "Tea, Earl Grey\nGardens", "Noise"],
+  ]);
   await expect(
     references.getByRole("button", { name: "Use character: Mara", exact: true }),
   ).toBeVisible();
@@ -465,7 +474,7 @@ test("A member sees only their cards and Presets in the Library, and a group wit
   const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
   await expect(select.or(nav)).toBeVisible();
   if (await nav.isVisible())
-    await expect(nav.getByRole("link")).toHaveText(["Characters", "Outfits", "Presets", "Scenes"]);
+    await expect(nav.getByRole("link")).toHaveText(["Characters", "Outfits", "Scenes", "Presets"]);
   else await expect(select).toHaveValue("Characters");
   await signIn(page, { id: "member", role: "user", features: { characters: false } });
   await page.goto("/library#imports");

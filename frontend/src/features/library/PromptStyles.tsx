@@ -5,6 +5,7 @@ import {
   Menu,
   Modal,
   SegmentedControl,
+  Select,
   Stack,
   Switch,
   Text,
@@ -18,7 +19,6 @@ import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
-import { SettingGroup } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -69,22 +69,10 @@ type Kind = PromptStyle["kind"];
 /** A style's ID is unique within its menu; a refetch replaces the objects an open dialog holds. */
 const same = (a: PromptStyle, b: PromptStyle) => a.id === b.id && a.kind === b.kind;
 /** Each kind's menu, in the order the section lists them. */
-const kinds: { value: Kind; label: string; description: string }[] = [
-  {
-    value: "improve",
-    label: "Improve Prompt",
-    description: "Styles Improve Prompt rewrites a prompt in, listed before Custom…",
-  },
-  {
-    value: "animate",
-    label: "Animate",
-    description: "Templates Animate writes a motion prompt for, listed before Custom…",
-  },
-  {
-    value: "change",
-    label: "Edit",
-    description: "Templates Edit asks the assistant for, listed before Custom…",
-  },
+const kinds: { value: Kind; label: string }[] = [
+  { value: "animate", label: "Animate" },
+  { value: "change", label: "Edit" },
+  { value: "improve", label: "Improve Prompt" },
 ];
 
 function StyleEditor({
@@ -256,19 +244,19 @@ function StyleVersions({ hash, close }: { hash: string; close: () => void }) {
 }
 
 /**
- * Library › Prompt Styles: the assistant's fixed options, by the menu they belong to, each in menu
- * order; Improve Prompt's and Animate's Custom… always come last.
+ * Library › Prompt Styles: the assistant's fixed options, alphabetically with a type filter.
  */
 export function PromptStyles({ heading }: { heading: ReactNode }) {
   const client = useQueryClient();
   const list = useQuery(promptStylesQuery);
   const [query, setQuery] = useState("");
+  const [kind, setKind] = useState<Kind | "all">("all");
   const [editing, setEditing] = useState<{ style: PromptStyle | null; kind: Kind } | null>(null);
   const [deleting, setDeleting] = useState<PromptStyle | null>(null);
   const [versions, setVersions] = useState(false);
   const { save, refresh } = useSaveStyles();
   const styles = list.data?.styles || [];
-  // Switches and moves apply at once, showing the change before the save answers.
+  // Switches apply at once, showing the change before the save answers.
   const apply = useMutation({
     mutationFn: (next: PromptStyle[]) => {
       client.setQueryData(promptStylesQuery.queryKey, (current) =>
@@ -287,11 +275,6 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
     },
   });
   const approve = useMutation({ mutationFn: () => post(`${path}/approve`), onSettled: refresh });
-  // Swaps a style with its neighbour in the same menu.
-  const move = (style: PromptStyle, neighbour: PromptStyle) =>
-    apply.mutate(
-      styles.map((entry) => (entry === style ? neighbour : entry === neighbour ? style : entry)),
-    );
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
@@ -299,12 +282,24 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
           label="Prompt Styles"
           query={query}
           onQueryChange={setQuery}
+          filters={
+            <Select
+              label="Type"
+              data={[{ value: "all", label: "All" }, ...kinds]}
+              value={kind}
+              onChange={(value) => setKind(value as Kind | "all")}
+              allowDeselect={false}
+              comboboxProps={{ withinPortal: false }}
+            />
+          }
+          filterCount={Number(kind !== "all")}
+          onClearFilters={() => setKind("all")}
           more={[{ label: "Versions", icon: icons.versions, onClick: () => setVersions(true) }]}
           actions={
             <ToolbarAction
               label="New Style"
               icon={icons.add}
-              onClick={() => setEditing({ style: null, kind: "improve" })}
+              onClick={() => setEditing({ style: null, kind: kind === "all" ? "improve" : kind })}
             />
           }
         />
@@ -322,101 +317,82 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
       {list.error ? (
         <Alert color="red">{list.error.message}</Alert>
       ) : (
-        kinds.map(({ value: kind, label, description }) => {
-          const rows = styles.filter((style) => style.kind === kind);
-          return (
-            <SettingGroup key={kind} title={label}>
-              <Text size="sm" c="dimmed">
-                {description}
-              </Text>
-              <DataTable
-                label={`${label} Styles`}
-                rows={rows}
-                rowKey={(style) => style.id}
-                rowName={(style) => style.label}
-                loading={list.isPending && "Loading Prompt Styles"}
-                query={query}
-                searchText={(style) => [style.label, style.description, style.instruction]}
-                empty="None Yet"
-                compact
-                columns={[
-                  {
-                    key: "name",
-                    header: "Name",
-                    main: true,
-                    cell: (style) => (
-                      <Stack gap={2}>
-                        <Text size="sm" fw={500}>
-                          {style.label}{" "}
-                          {style.uncensored && (
-                            <Badge size="sm" color="orange">
-                              Uncensored
-                            </Badge>
-                          )}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {style.description}
-                        </Text>
-                      </Stack>
-                    ),
-                  },
-                  {
-                    key: "enabled",
-                    header: "Enabled",
-                    width: 96,
-                    cell: (style) => (
-                      <Switch
-                        aria-label={`Enable ${style.label}`}
-                        checked={style.enabled}
-                        onChange={(event) =>
-                          apply.mutate(
-                            styles.map((entry) =>
-                              entry === style
-                                ? { ...entry, enabled: event.currentTarget.checked }
-                                : entry,
-                            ),
-                          )
-                        }
-                      />
-                    ),
-                  },
-                ]}
-                rowActions={(style) => {
-                  const index = rows.indexOf(style);
-                  return (
-                    <>
-                      <Menu.Item
-                        leftSection={<icons.edit size={16} />}
-                        onClick={() => setEditing({ style, kind })}
-                      >
-                        Edit Style
-                      </Menu.Item>
-                      <Menu.Item
-                        disabled={index === 0}
-                        onClick={() => move(style, rows[index - 1])}
-                      >
-                        Move Up
-                      </Menu.Item>
-                      <Menu.Item
-                        disabled={index === rows.length - 1}
-                        onClick={() => move(style, rows[index + 1])}
-                      >
-                        Move Down
-                      </Menu.Item>
-                      <Menu.Item
-                        color="red"
-                        leftSection={<icons.delete size={16} />}
-                        onClick={() => setDeleting(style)}
-                      >
-                        Delete Style
-                      </Menu.Item>
-                    </>
-                  );
-                }}
-              />
-            </SettingGroup>
-          );
-        })
+        <DataTable
+          label="Prompt Styles"
+          rows={styles.filter((style) => kind === "all" || style.kind === kind)}
+          rowKey={(style) => `${style.kind}:${style.id}`}
+          rowName={(style) => style.label}
+          loading={list.isPending && "Loading Prompt Styles"}
+          query={query}
+          searchText={(style) => [style.label, style.description, style.instruction]}
+          empty="None Yet"
+          initialSort={{ key: "name", descending: false }}
+          columns={[
+            {
+              key: "name",
+              header: "Name",
+              sortValue: (style) => style.label,
+              main: true,
+              cell: (style) => (
+                <Stack gap={2}>
+                  <Text size="sm" fw={500}>
+                    {style.label}{" "}
+                    {style.uncensored && (
+                      <Badge size="sm" color="orange">
+                        Uncensored
+                      </Badge>
+                    )}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {style.description}
+                  </Text>
+                </Stack>
+              ),
+            },
+            {
+              key: "kind",
+              header: "Type",
+              cell: (style) => kinds.find((kind) => kind.value === style.kind)!.label,
+            },
+            {
+              key: "enabled",
+              header: "Enabled",
+              width: 96,
+              cell: (style) => (
+                <Switch
+                  aria-label={`Enable ${style.label}`}
+                  checked={style.enabled}
+                  onChange={(event) =>
+                    apply.mutate(
+                      styles.map((entry) =>
+                        entry === style
+                          ? { ...entry, enabled: event.currentTarget.checked }
+                          : entry,
+                      ),
+                    )
+                  }
+                />
+              ),
+            },
+          ]}
+          rowActions={(style) => (
+            <>
+              <Menu.Item
+                leftSection={<icons.edit size={16} />}
+                onClick={() => setEditing({ style, kind: style.kind })}
+              >
+                Edit Style
+              </Menu.Item>
+              <Menu.Item
+                color="red"
+                leftSection={<icons.delete size={16} />}
+                onClick={() => setDeleting(style)}
+              >
+                Delete Style
+              </Menu.Item>
+            </>
+          )}
+        />
       )}
       {editing && (
         <StyleEditor

@@ -46,12 +46,12 @@ test("a stale edit is refused, and revert restores an earlier version as a new o
   assert.equal(reverted.meta.version, 3);
 });
 
-test("each kind keeps its own order and Custom, and the default falls back to the first enabled style", () => {
+test("each kind sorts enabled labels before Custom, and the default falls back to the first style", () => {
   const styles = store();
   const { styles: seed } = styles.list();
   const enhance = seed.find((style) => style.id === "enhance");
   const rest = seed.filter((style) => style !== enhance);
-  styles.save([...rest, { ...enhance, enabled: false }]);
+  styles.save([...rest].reverse().concat({ ...enhance, enabled: false }));
   const ids = (kind) => styles.usable(kind).map((style) => style.id);
   assert.deepEqual(ids("improve"), [
     ...rest.filter((style) => style.kind === "improve").map((style) => style.id),
@@ -66,13 +66,13 @@ test("each kind keeps its own order and Custom, and the default falls back to th
     "custom",
   ]);
   assert.deepEqual(ids("change"), [
+    "detail",
     "closer",
-    "wider",
-    "warmer",
     "cooler",
     "night",
-    "detail",
     "simple-background",
+    "warmer",
+    "wider",
   ]);
   // An ID may repeat across kinds: Cinematic is a style and a theme.
   assert.equal(styles.style("animate", "cinematic").label, "Cinematic Camera");

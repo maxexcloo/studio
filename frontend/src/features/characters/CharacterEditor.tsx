@@ -7,6 +7,7 @@ import {
   NumberInput,
   Paper,
   Stack,
+  TagsInput,
   Text,
   TextInput,
 } from "@mantine/core";
@@ -260,16 +261,18 @@ function CharacterStory({ story, onStory }: { story: Story; onStory: (story: Sto
       </Group>
       <TextBox label="Backstory" autosize minRows={2} {...text("backstory")} />
       <Group grow align="flex-start">
-        <TextInput
-          label="Likes"
-          {...text("likes")}
-          onChange={(event) => text("likes").onChange(event.currentTarget.value)}
-        />
-        <TextInput
-          label="Dislikes"
-          {...text("dislikes")}
-          onChange={(event) => text("dislikes").onChange(event.currentTarget.value)}
-        />
+        {(["likes", "dislikes"] as const).map((key) => (
+          <TagsInput
+            key={key}
+            label={key === "likes" ? "Likes" : "Dislikes"}
+            maxLength={maxCharacterTrait}
+            // Keep comma-containing phrases intact in the stored newline-separated text.
+            splitChars={[]}
+            value={story[key] ? story[key].split("\n") : []}
+            onChange={(values) => onStory({ ...story, [key]: values.join("\n") })}
+            comboboxProps={{ withinPortal: false }}
+          />
+        ))}
       </Group>
     </>
   );
