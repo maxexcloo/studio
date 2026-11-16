@@ -384,10 +384,11 @@ export function FilterToggle({
 }) {
   const iconOnly = usePhone() && Icon !== undefined;
   return (
-    <Tooltip label={label} disabled={!iconOnly}>
+    <Tooltip label={label} disabled={!Icon}>
       <Button
         {...(iconOnly ? iconChipProps : chipProps)}
-        aria-label={iconOnly ? label : undefined}
+        aria-label={Icon ? label : undefined}
+        data-icon-toggle={Icon ? true : undefined}
         aria-pressed={on}
         title={title}
         variant={on ? "light" : "default"}
