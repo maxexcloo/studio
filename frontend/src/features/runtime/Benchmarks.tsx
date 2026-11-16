@@ -209,7 +209,9 @@ export function BenchmarkResults() {
           {
             value: "pod",
             label: "Pod",
-            content: <PodLog path={`/api/runtime/benchmarks/${encodeURIComponent(logId)}/logs`} />,
+            content: logId && (
+              <PodLog path={`/api/runtime/benchmarks/${encodeURIComponent(logId)}/logs`} />
+            ),
           },
         ]}
       />

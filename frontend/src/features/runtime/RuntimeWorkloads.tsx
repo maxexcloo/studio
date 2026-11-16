@@ -232,7 +232,9 @@ function WorkloadLog({
         {
           value: "pod",
           label: "Pod",
-          content: <PodLog path={`/api/runtime/workloads/${encodeURIComponent(id)}/logs`} />,
+          content: workload && (
+            <PodLog path={`/api/runtime/workloads/${encodeURIComponent(id)}/logs`} />
+          ),
         },
       ]}
     />
