@@ -213,6 +213,7 @@ export function ChipPopup({
         <Popover.Target>{target}</Popover.Target>
       </PopupTooltip>
       <Popover.Dropdown
+        data-popup-outside={trap}
         {...layer}
         aria-labelledby=""
         maw="calc(100vw - 24px)"

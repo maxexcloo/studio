@@ -1,6 +1,56 @@
 import { expect, test } from "@playwright/test";
 
-import { create, fixtures, image, openTheme, promptMenu, promptTool, stamp } from "./fixtures";
+import {
+  create,
+  fixtures,
+  image,
+  openLoraChoices,
+  openTheme,
+  promptMenu,
+  promptTool,
+  stamp,
+} from "./fixtures";
+
+test("Nested pickers consume outside presses one layer at a time", async ({ page, isMobile }) => {
+  // Keep native popovers on touch projects too, rather than their full-screen phone sheets.
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await fixtures(page);
+  await create(page);
+  await openLoraChoices(page);
+  const parent = page.getByRole("dialog", { name: "LoRAs", exact: true });
+  const filters = page.getByRole("dialog", { name: "Filters", exact: true });
+  const filter = parent.getByRole("button", { name: "Filter LoRAs", exact: true });
+  const sort = parent.getByRole("button", { name: "Sort", exact: true });
+  const videos = page.getByRole("link", { name: "Videos", exact: true });
+  const press = (target: typeof videos) => (isMobile ? target.tap() : target.click());
+  await press(filter);
+  await expect(filters).toBeVisible();
+  // Inside the parent is still outside the child, and cannot activate the parent's control.
+  await press(sort);
+  await expect(filters).toBeHidden();
+  await expect(parent).toBeVisible();
+  await expect(sort).toHaveAttribute("aria-expanded", "false");
+  await press(sort);
+  await expect(sort).toHaveAttribute("aria-expanded", "true");
+  await press(videos);
+  await expect(sort).toHaveAttribute("aria-expanded", "false");
+  await expect(parent).toBeVisible();
+  await expect(page).toHaveURL(/\/images$/);
+  await press(filter);
+  await page.keyboard.press("Escape");
+  await expect(filters).toBeHidden();
+  await expect(parent).toBeVisible();
+  await press(filter);
+  await press(videos);
+  await expect(filters).toBeHidden();
+  await expect(parent).toBeVisible();
+  await expect(page).toHaveURL(/\/images$/);
+  await press(videos);
+  await expect(parent).toBeHidden();
+  await expect(page).toHaveURL(/\/images$/);
+  await press(videos);
+  await expect(page).toHaveURL(/\/video$/);
+});
 
 test("A click outside an open popup only closes it", async ({ page }) => {
   await fixtures(page);

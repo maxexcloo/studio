@@ -131,6 +131,7 @@ export function StatusAction() {
             <Popover.Target>{trigger}</Popover.Target>
           </PopupTooltip>
           <Popover.Dropdown
+            data-popup-outside={false}
             ref={dropdown}
             aria-label={title}
             aria-labelledby=""
