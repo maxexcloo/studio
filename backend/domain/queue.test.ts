@@ -223,6 +223,109 @@ test("a worker with two slots runs two jobs at once, the third waiting for one t
   }
 });
 
+test("accepted observations persist changes without rewriting unchanged provider state", async (t) => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "studio-observe-"));
+  const filename = path.join(dir, "studio.sqlite");
+  const { store, queue, adapter, submitted, observations } = fixture(filename);
+  try {
+    const session = store.createSession("alice");
+    const job = store.enqueue("alice", session.id, {}, "image", undefined, "worker:primary");
+    await queue.tick();
+    const save = store.save.bind(store);
+    let writes = 0;
+    store.save = (next) => {
+      writes++;
+      return save(next);
+    };
+    const running: JobObservation = {
+      status: "running",
+      backend: "primary",
+      providerJobId: "recorded-provider-id",
+      progress: { value: 1, max: 8, phase: "sampling" },
+      items: [{ url: "/media/preview.png" }],
+      outputs: [],
+    };
+    const counts: number[] = [];
+    const beforeChanges = Number(store.db.prepare("SELECT total_changes() AS count").get()!.count);
+    for (const state of ["running", "recovering", "error"]) {
+      adapter.observe = async () => {
+        if (state === "error") throw new Error("Worker unavailable");
+        // Each poll returns freshly decoded objects, as real adapters do.
+        return state === "running" ? structuredClone(running) : undefined;
+      };
+      const before = writes;
+      for (let tick = 0; tick < 100; tick++) await queue.tick();
+      counts.push(writes - before);
+    }
+    t.diagnostic(`300 observations: ${counts.join(" + ")} = ${writes} queue record writes`);
+    assert.equal(
+      Number(store.db.prepare("SELECT total_changes() AS count").get()!.count) - beforeChanges,
+      writes,
+    );
+    assert.deepEqual(counts, [1, 1, 1]);
+    const persisted = new Store(openDatabase(filename));
+    try {
+      const latest = persisted.job("alice", job.id)!;
+      assert.equal(latest.reason, "Waiting for the recorded generation: Worker unavailable");
+      assert.equal(latest.providerJobId, running.providerJobId);
+      assert.deepEqual(latest.progress, running.progress);
+      const unchanged = latest.updatedAt;
+      await queue.tick();
+      assert.equal(store.job("alice", job.id)?.updatedAt, unchanged);
+    } finally {
+      persisted.close();
+    }
+    adapter.observe = async () => {
+      throw new Error("Worker restarting");
+    };
+    await queue.tick();
+    assert.equal(writes, 4);
+    assert.match(store.job("alice", job.id)!.reason, /Worker restarting/);
+    adapter.observe = async () => structuredClone(running);
+    await queue.tick();
+    assert.equal(writes, 5);
+    assert.equal(store.job("alice", job.id)?.reason, "");
+    const changed: JobObservation = {
+      ...running,
+      backend: "secondary",
+      providerJobId: "recovered-provider-id",
+      progress: { phase: "sampling", max: 8, value: 2 },
+      items: [{ url: "/media/new-preview.png" }],
+      outputs: [{ url: "/media/partial.png" }],
+    };
+    adapter.observe = async () => structuredClone(changed);
+    await queue.tick();
+    assert.equal(writes, 6);
+    for (const [key, value] of Object.entries(changed))
+      assert.deepEqual(store.job("alice", job.id)![key as keyof JobObservation], value);
+    adapter.observe = async () => ({
+      ...changed,
+      progress: { value: 2, max: 8, phase: "sampling" },
+    });
+    await queue.tick();
+    assert.equal(writes, 6);
+    adapter.observe = async () => ({ ...changed, progress: undefined, items: [], outputs: [] });
+    await queue.tick();
+    await queue.tick();
+    assert.equal(writes, 7);
+    assert.equal(store.job("alice", job.id)?.progress, undefined);
+    assert.deepEqual(store.job("alice", job.id)?.items, []);
+    adapter.observe = async () => {
+      await queue.cancel("alice", job.id);
+      return { ...changed, status: "running" as const };
+    };
+    await queue.tick();
+    assert.equal(store.job("alice", job.id)?.cancelRequested, true);
+    adapter.observe = async () => observations.get(job.id);
+    await queue.tick();
+    assert.equal(store.job("alice", job.id)?.status, "cancelled");
+    assert.deepEqual(submitted, [job.id]);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("a run without progress for 10 minutes is stopped, failed and queued once on a free worker", async () => {
   const { store, adapter, submitted, observations, events } = fixture();
   const queue = new GenerationQueue(store, {
@@ -250,7 +353,12 @@ test("a run without progress for 10 minutes is stopped, failed and queued once o
     at = 9 * 60_000;
     await queue.tick();
     assert.equal(store.job("alice", hung)?.status, "running");
+    observations.set(hung, { ...stuck, progress: { value: 8, max: 8 } });
+    await queue.tick();
     at = 10 * 60_000;
+    await queue.tick();
+    assert.equal(store.job("alice", hung)?.status, "running");
+    at = 19 * 60_000;
     await queue.tick();
     assert.equal(store.job("alice", hung)?.status, "failed");
     assert.equal(store.job("alice", hung)?.reason, "Stopped: no progress for 10 min.");
@@ -265,7 +373,7 @@ test("a run without progress for 10 minutes is stopped, failed and queued once o
     // A retry that stalls too only fails.
     observations.set(retry.id, stuck);
     await queue.tick();
-    at = 21 * 60_000;
+    at = 30 * 60_000;
     await queue.tick();
     assert.equal(store.job("alice", retry.id)?.status, "failed");
     assert.equal(store.jobs("alice").length, 2);
