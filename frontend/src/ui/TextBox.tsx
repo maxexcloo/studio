@@ -105,6 +105,7 @@ export function TextBox({
   const mobile = usePhone();
   const phone = mobile && !inline;
   const [editing, setEditing] = useState(false);
+  const namedTool = phone && editing && tools?.length === 1 ? toolLabel : undefined;
   const content = useRef<HTMLDivElement>(null);
   const more = useRef<HTMLButtonElement>(null);
   const [menuOpened, setMenuOpened] = useState(false);
@@ -222,7 +223,7 @@ export function TextBox({
         })
       }
     >
-      <PopupTooltip label={busy || toolLabel || "More Actions"}>
+      <PopupTooltip label={busy || namedTool || "More Actions"}>
         <Menu.Target>
           {mobile ? (
             <Button
@@ -231,14 +232,14 @@ export function TextBox({
               variant="subtle"
               color="gray"
               size="compact-xs"
-              aria-label={toolLabel || `More ${title} Actions`}
+              aria-label={namedTool || `More ${title} Actions`}
               disabled={tools.length === 0 && (mobile || edits.length === 0)}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
-              rightSection={toolLabel ? <ChevronDown size={12} /> : undefined}
+              rightSection={namedTool ? <ChevronDown size={12} /> : undefined}
               leftSection={busy ? <Loader size={16} /> : undefined}
             >
-              {toolLabel || "More"}
+              {namedTool || "More"}
             </Button>
           ) : (
             <ActionIcon
@@ -246,7 +247,7 @@ export function TextBox({
               onMouseDown={keepFocus}
               variant="subtle"
               color="gray"
-              aria-label={toolLabel || `More ${title} Actions`}
+              aria-label={`More ${title} Actions`}
               disabled={tools.length === 0 && (mobile || edits.length === 0)}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
