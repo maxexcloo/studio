@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 
 import { type Locator, type Page, expect } from "@playwright/test";
 
-import { dreamDefaults, dreamSettingKeys } from "../../shared/dream";
+import { dreamDefaults, dreamOverrideKeys } from "../../shared/dream";
 
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
 const familyLabels = { flux1: "FLUX.1", sdxl: "SDXL" };
@@ -188,7 +188,7 @@ export async function fixtures(page: Page) {
     canChangePassword: true,
   };
 
-  const deploymentDream = dreamDefaultsFixture();
+  const deploymentDream = dreamOverridesFixture();
   const administration = {
     accounts: [
       {
@@ -1236,6 +1236,8 @@ export async function serveDream(
     discarded?: any[];
     history?: import("../../shared/taste").DreamActivity[];
     spicyAvailable?: boolean;
+    /** The settings an administrator forces, which the account can't change. */
+    locked?: (keyof typeof dreamDefaults)[];
     /** Older gallery images offered for calibration until judged. */
     calibration?: any[];
     /** Why Dream can't run, which makes it unavailable. */
@@ -1293,6 +1295,7 @@ export async function serveDream(
     since: options.since ?? null,
     today: { images: 12, videos: 1 },
     spicyAvailable: state.spicyAvailable,
+    locked: options.locked ?? [],
     status: !state.settings.enabled
       ? "off"
       : state.settings.paused
@@ -1504,15 +1507,11 @@ export function videoClip() {
   }
 }
 
-export const dreamDefaultsFixture = () =>
+/** Settings › Dream with no overrides: every account chooses for itself. */
+export const dreamOverridesFixture = () =>
   Object.fromEntries(
-    Object.entries(dreamDefaults).map(([name, value]) => [
+    Object.entries(dreamOverrideKeys).map(([name, key]) => [
       name,
-      {
-        key: dreamSettingKeys[name as keyof typeof dreamDefaults],
-        value,
-        source: "default",
-        locked: false,
-      },
+      { key, value: null as unknown, source: "default", locked: false },
     ]),
   );
