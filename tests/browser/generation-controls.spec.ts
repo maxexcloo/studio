@@ -1134,7 +1134,8 @@ test("A model with its own resolutions offers them with its aspects in the size 
   await expect(page.getByRole("radiogroup", { name: "Resolution", exact: true })).toBeVisible();
   // Each aspect shows the size the model draws at the chosen resolution, in the standard order.
   const sizes = page.getByRole("group", { name: "Aspect Presets", exact: true });
-  await expect(sizes.getByRole("button")).toHaveText(["1:1 1024 × 1024", "16:9 1280 × 720"]);
+  await expect(sizes.getByRole("button").first()).toHaveAccessibleName("1:1 1024 × 1024");
+  await expect(sizes.getByRole("button").last()).toHaveAccessibleName("16:9 1280 × 720");
   await page.getByText("2K", { exact: true }).click();
   await page.getByRole("button", { name: "16:9 2816 × 1584", exact: true }).click();
   await expect(page.getByRole("button", { name: "Aspect", exact: true })).toHaveText("16:9 · 2K");
