@@ -111,8 +111,8 @@ recur across features.
   in its menu, not a separate dialog. An option whose label alone is ambiguous
   carries a one-line `description`, except in item action menus.
 - Media categories use Images, Videos, Text. Other unordered peers sort
-  alphabetically, except settings first, Like before Dislike, Refresh and
-  Custom… last and Delete last.
+  alphabetically, except settings first, Like before Dislike, Name A–Z and
+  Name Z–A last in sort menus, Refresh and Custom… last and Delete last.
 - Labels name the verb alone where the menu or box already says what it acts
   on (Upscale, Share, Clear; not Clear Prompt), adding a word only where the
   verb alone is ambiguous (Stop Upscale, Edit in Composer). One action keeps
