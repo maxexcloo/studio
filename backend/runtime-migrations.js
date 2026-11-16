@@ -8,6 +8,7 @@ import { legacyShapes } from "./legacy-shapes.js";
 import { loraStacks } from "./lora-stacks.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
 import { migrateRadianceQueue } from "./radiance-queue-migration.js";
+import { spicyPrompts } from "./spicy-prompts.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -52,6 +53,12 @@ const steps = [
   {
     name: "loraStacks",
     run: loraStacks,
+    changes: (plan) => plan.accounts,
+    online: true,
+  },
+  {
+    name: "spicyPrompts",
+    run: spicyPrompts,
     changes: (plan) => plan.accounts,
     online: true,
   },
