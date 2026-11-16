@@ -1,8 +1,8 @@
-// More Like This Set: the queue's writing stage writes one new variation for an MCP result set
-// (prompt-stage.js), anchored to its selected source with earlier variations for variety.
+// The queue's writing stage writes a variation of the selected image or set source.
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { replyTitle } from "../shared/titles.ts";
 import { AssistantError, cleanPrompt } from "./assistant.js";
+import { userContent } from "./domain/model-content.ts";
 import { writerGuide } from "./domain/writing-standard.ts";
 
 // The newest prompts are enough to steer away from; older ones only lengthen the request.
@@ -17,14 +17,19 @@ export async function writeSetPrompt({
   profile,
   guide,
   title,
+  scope,
   source,
   prompts,
   writer,
+  frame = async () => null,
+  caption = () => "",
   signal,
   onThinking,
   onDelta,
 }) {
   const model = await engine.model("rewrite", false, writer);
+  const image = scope === "image" && (await engine.supportsVision(writer)) ? await frame() : null;
+  const shown = scope === "image" && !image ? String((await caption()) || "").trim() : "";
   const reply = await engine.chat({
     call: "rewrite",
     model,
@@ -32,8 +37,12 @@ export async function writeSetPrompt({
       {
         role: "system",
         content: [
-          `You write one new prompt for ${profile.label || profile.id}, a variation in the set "${title}".`,
-          "The source prompt defines the subject and intended set theme. Preserve its species, breed, identity and defining appearance, and keep its theme and style. Vary the pose, scene, composition or camera angle within that theme; never switch animal species or replace the subject.",
+          scope === "image"
+            ? `You write one new prompt for ${profile.label || profile.id}, a variation of the selected image. Keep that image's subject and its source prompt's intent; do not broaden it to the surrounding set.`
+            : `You write one new prompt for ${profile.label || profile.id}, a variation in the set "${title}".`,
+          scope === "image" && (image || shown)
+            ? "The selected image defines the subject and visible appearance. Preserve its species, breed, identity, markings and defining appearance. Its source prompt supplies the intended theme, style and requested details, not permission to substitute another subject. Vary the pose, scene, composition or camera angle within that theme; never switch animal species or replace the subject."
+            : "The source prompt defines the subject and intended set theme. Preserve its species, breed, identity and defining appearance, and keep its theme and style. Vary the pose, scene, composition or camera angle within that theme; never switch animal species or replace the subject.",
           "The set title is only a label and may be incomplete. Previous variations are only for avoiding repetition: ignore any that drift away from the source; they must never redefine the subject or theme.",
           `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
           'Reply with JSON only: {"title": "a concise two to four word Title Case label naming the content, without request wording", "prompt": "the finished prompt"}.',
@@ -43,10 +52,20 @@ export async function writeSetPrompt({
       },
       {
         role: "user",
-        content: `Source prompt (authoritative subject and theme):\n${source}\n\nPrevious variations (avoid repetition, not subject guidance):\n${prompts
-          .slice(-shownPrompts)
-          .map((prompt) => `- ${prompt.replace(/\s+/g, " ").slice(0, 1000)}`)
-          .join("\n")}`,
+        content: userContent(
+          [
+            `Source prompt (authoritative subject and theme):\n${source}`,
+            shown ? `What the selected image shows: ${shown}` : "",
+            `Previous variations (avoid repetition, not subject guidance):\n${prompts
+              .slice(-shownPrompts)
+              .map((prompt) => `- ${prompt.replace(/\s+/g, " ").slice(0, 1000)}`)
+              .join("\n")}`,
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+          image ? [image] : [],
+          Boolean(image),
+        ),
       },
     ],
     temperature: 1,

@@ -642,6 +642,11 @@ const generationRoutes = createGenerationSubmission({
   prompting: assistant.guide,
 });
 
+const resultItem = (ownerId, id) => {
+  const item = galleryItem(id);
+  return item && (item.ownerId || "") === ownerId && !isGalleryHidden(item) ? item : undefined;
+};
+
 // The queue's writing stage (prompt-stage.js): prompts the assistant writes for a generation.
 const promptStage = createPromptStage({
   engine: assistantEngine,
@@ -654,7 +659,7 @@ const promptStage = createPromptStage({
   dream: () => dream,
   frame: assistant.image,
   caption: assistant.caption,
-  setPrompts: (job) => setPrompts(store, job),
+  setPrompts: (job) => setPrompts(store, job, resultItem),
 });
 // The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
 const { generationQueue, queueResourceFor, validateGenerationInput, waitingWorkloads } =
@@ -732,10 +737,7 @@ registerMaintenanceRoutes(app, { store, queue: generationQueue, adminRefusal });
 registerResultSetRoutes(app, {
   store,
   admit: admitGeneration,
-  item: (ownerId, id) => {
-    const item = galleryItem(id);
-    return item && (item.ownerId || "") === ownerId && !isGalleryHidden(item) ? item : undefined;
-  },
+  item: resultItem,
 });
 registerMigrationRoutes(app, {
   dataDir,

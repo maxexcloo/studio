@@ -971,25 +971,25 @@ export async function compareUpscale(page: Page) {
 
 /** Chooses a text box's tool from its ⋯ menu, such as Recent Prompts from the Prompt's. */
 export async function promptTool(scope: Page | Locator, box: string, label: string) {
-  await scope.getByRole("button", { name: `More ${box} Actions`, exact: true }).click();
+  await scope.getByRole("button", { name: new RegExp(`^(AI|More) ${box} Actions$`) }).click();
   const page = "page" in scope ? scope.page() : scope;
   await page.getByRole("menuitem", { name: label, exact: true }).click();
 }
 
 /** Opens a text box's ⋯ menu, which lists each tool's options under its name, one level deep. */
 export async function promptMenu(scope: Page | Locator, box: string) {
-  await scope.getByRole("button", { name: `More ${box} Actions`, exact: true }).click();
+  await scope.getByRole("button", { name: new RegExp(`^(AI|More) ${box} Actions$`) }).click();
   const page = "page" in scope ? scope.page() : scope;
   return page.getByRole("menu");
 }
 
-/** Opens the viewer's named Suggestions control without entering its prompt editor. */
+/** Opens the viewer's AI menu without entering its prompt editor. */
 export async function viewerPromptMenu(page: Page) {
   await page
     .getByRole("dialog", { name: "Generation", exact: true })
-    .getByRole("button", { name: "Suggestions", exact: true })
+    .getByRole("button", { name: "AI Prompt Actions", exact: true })
     .click();
-  return page.getByRole("menu", { name: "Suggestions", exact: true });
+  return page.getByRole("menu");
 }
 
 /** Returns from the shared phone text editor when a test continues on its parent surface. */
@@ -1005,7 +1005,7 @@ export async function editorMenu(scope: Page | Locator, box: string, tool: strin
   const page = "page" in scope ? scope.page() : scope;
   await page
     .getByRole("dialog", { name: box, exact: true })
-    .getByRole("button", { name: `More ${box} Actions`, exact: true })
+    .getByRole("button", { name: new RegExp(`^(AI|More) ${box} Actions$`) })
     .click();
   const menu = page.getByRole("menu");
   await expect(menu.getByText(tool, { exact: true })).toBeVisible();
