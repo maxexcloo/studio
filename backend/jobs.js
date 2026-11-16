@@ -502,9 +502,10 @@ function showReconnecting(id, run, on) {
  * upscale (run-upscale.js) returns the graph with its upscale and which save
  * node each upscale belongs to, or `{ skipped }` saying why there is none.
  */
-async function runJob(id, body, { prepare = null } = {}) {
+async function runJob(id, body, { prepare = null, store } = {}) {
   const worker = body.comfyBackend;
-  if (isRadianceWorker(workerById(worker))) return runRadianceJob(id, body, workerById(worker));
+  if (isRadianceWorker(workerById(worker)))
+    return runRadianceJob(id, body, workerById(worker), { store });
   jobBodies.set(id, body);
   const timing = { timer: null, estimate: generationEstimate(body), warm: false };
   runTimings.set(id, timing);

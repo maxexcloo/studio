@@ -24,6 +24,7 @@ import { withPngText } from "./png-text.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { writingIssue, writingRequest } from "./prompt-stage.js";
 import { providerMediaWriter } from "./providers/media.ts";
+import { recoverRadianceJob } from "./radiance-jobs.js";
 import { runUpscaleJob } from "./upscale-jobs.js";
 import { resultSource } from "./version-sources.js";
 import {
@@ -123,19 +124,8 @@ export function createGenerationQueue({
     cancelPrompt: ({ promptId, backend }) =>
       isRadianceWorker(workerById(backend)) ? "" : cancelPrompt(promptId, comfyOn(backend)),
     recover: async (job) => {
-      // Studio waits on a Radiance run itself, so one a restart interrupted has nothing to recover.
       if (isRadianceWorker(workerById(job.backend)) && !jobs.has(job.id)) {
-        jobs.set(job.id, {
-          ownerId: job.ownerId || undefined,
-          comfyBackend: job.backend,
-          ...(job.cancelRequested
-            ? { status: "cancelled" }
-            : {
-                status: "failed",
-                error: "Studio restarted while Radiance ran this. Retry runs it again.",
-              }),
-          terminalAt: Date.now(),
-        });
+        recoverRadianceJob(job, store);
         return;
       }
       if ((job.providerJobId || job.cancelRequested) && !jobs.has(job.id))

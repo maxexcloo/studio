@@ -132,8 +132,9 @@ def map_transformer(source, destination, stopped):
     metadata = tensors.pop("__metadata__", None)
     mapped = {}
     for key, value in tensors.items():
-        name = to_diffusers(key)
-        if name == key or name in mapped:
+        native = key.removeprefix("model.diffusion_model.")
+        name = to_diffusers(native)
+        if name == native or name in mapped:
             raise ValueError(f"'{key}' is not a Krea 2 DiT tensor.")
         value = dict(value)
         if name.endswith(".scale_shift_table") and len(value["shape"]) == 1:

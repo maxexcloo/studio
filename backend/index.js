@@ -664,6 +664,7 @@ registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed(
 registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels });
 
 const generationRoutes = createGenerationSubmission({
+  store,
   loadComfyContext,
   mediaModels,
   comfyDownMessage,
@@ -767,6 +768,7 @@ registerResultSetRoutes(app, {
 });
 registerMigrationRoutes(app, {
   dataDir,
+  store,
   adminRefusal,
 });
 registerCompareRoutes(app, {
