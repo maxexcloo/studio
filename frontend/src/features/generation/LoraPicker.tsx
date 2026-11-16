@@ -515,7 +515,6 @@ function StackActions(props: LoraPickerProps) {
       </Button>
       <SaveButton
         noun="Preset"
-        label="Save"
         naming={props.picker.naming}
         current={current}
         edited={edited}

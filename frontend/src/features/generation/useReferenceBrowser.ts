@@ -4,7 +4,7 @@ import { type GalleryFilterValues, emptyGalleryFilters } from "../gallery/Galler
 import type { ReferenceTarget } from "./references";
 
 interface ReferenceBrowserState {
-  tab: "gallery" | "liked" | "uploads" | "characters" | "outfits" | "scenes";
+  tab: "gallery" | "uploads" | "characters" | "outfits" | "scenes";
   target: ReferenceTarget | null;
   query: string;
   filters: GalleryFilterValues;
