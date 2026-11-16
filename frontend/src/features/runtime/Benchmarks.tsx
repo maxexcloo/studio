@@ -9,6 +9,7 @@ import { DataTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SettingGroup } from "../../ui/SettingRows";
+import { LogDialog, PodLog, useRequester } from "./RuntimeLogs";
 
 export const benchmarksQuery = queryOptions({
   queryKey: ["runtime-benchmarks"],
@@ -67,6 +68,8 @@ export function BenchmarkResults() {
   const client = useQueryClient();
   const status = useQuery(benchmarksQuery).data;
   const [stopping, setStopping] = useState("");
+  const [logId, setLogId] = useState("");
+  const who = useRequester();
   const stop = useMutation({
     mutationFn: (id: string) => post<BenchmarkRun>(`/api/runtime/benchmarks/${id}/stop`, {}),
     meta: { inlineError: true },
@@ -95,17 +98,22 @@ export function BenchmarkResults() {
         rowKey={(run) => run.id}
         rowName={(run) => run.label}
         empty="No Benchmarks"
-        rowActions={(run) =>
-          run.status === "running" && (
-            <Menu.Item
-              color="red"
-              leftSection={<icons.stop size={16} />}
-              onClick={() => setStopping(run.id)}
-            >
-              Stop
+        rowActions={(run) => (
+          <>
+            <Menu.Item leftSection={<icons.log size={16} />} onClick={() => setLogId(run.id)}>
+              View Log
             </Menu.Item>
-          )
-        }
+            {run.status === "running" && (
+              <Menu.Item
+                color="red"
+                leftSection={<icons.stop size={16} />}
+                onClick={() => setStopping(run.id)}
+              >
+                Stop
+              </Menu.Item>
+            )}
+          </>
+        )}
         columns={[
           {
             key: "time",
@@ -127,7 +135,7 @@ export function BenchmarkResults() {
                   {run.label}
                 </Text>
                 <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
-                  {run.model} · Requested by {run.requestedBy}
+                  {run.model} · Requested by {who(run.requestedBy)}
                 </Text>
                 {run.error && (
                   <Text size="xs" c="red">
@@ -198,6 +206,18 @@ export function BenchmarkResults() {
                 {statusLabel(run.status)}
               </Badge>
             ),
+          },
+        ]}
+      />
+      <LogDialog
+        title={`${status.runs.find((run) => run.id === logId)?.label ?? ""} Benchmark Log`}
+        opened={Boolean(logId)}
+        onClose={() => setLogId("")}
+        parts={[
+          {
+            value: "pod",
+            label: "Pod",
+            content: <PodLog path={`/api/runtime/benchmarks/${encodeURIComponent(logId)}/logs`} />,
           },
         ]}
       />
