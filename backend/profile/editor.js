@@ -80,8 +80,7 @@ export function profileIdTaken(id) {
 }
 
 /**
- * Adds a new profile file (an AI draft from a checkpoint import), checked like any edit. It becomes
- * the profile's first version with its origin and AI-Drafted marker.
+ * Adds a new profile, checked like any edit, as its first version with its origin and draft marker.
  */
 export function createEditableProfile(
   id,
@@ -93,8 +92,10 @@ export function createEditableProfile(
       new Error("Choose a profile id: lowercase letters, digits, dots, dashes or underscores."),
       { status: 400 },
     );
-  if (fs.existsSync(fileFor(id)))
-    throw Object.assign(new Error("A profile with that id already exists."), { status: 409 });
+  if (profileIdTaken(id))
+    throw Object.assign(new Error("That profile id is already in use or was used before."), {
+      status: 409,
+    });
   const checked = validateProfileText(id, text, { info });
   if (!checked.ok) throw Object.assign(new Error(checked.errors[0]), { status: 400, checked });
   const next = String(text).endsWith("\n") ? String(text) : `${text}\n`;
@@ -351,23 +352,28 @@ export function registerProfileEditorRoutes(
     });
     return { check: checked };
   });
-  route("PUT", "/api/profiles/editable/:id", async (account, { params, body }) => {
-    let kind = "image";
-    try {
-      kind = metaOf(JSON.parse(String(body?.text || "")))?.kind || "image";
-    } catch {
-      /* the check reports it */
-    }
-    // From chat (MCP's admin tools) the version's origin is chat; a draft stays AI-Drafted until approved.
-    const chat = fromChat(account);
-    const saved = saveEditableProfile(params.id, body?.text, {
-      baseHash: String(body?.baseHash || ""),
-      by: accountName(account),
-      info: await info(kind),
-      origin: chat ? "chat" : "studio",
-      aiDrafted: chat && body?.draft === true,
+  for (const [method, path, create] of [
+    ["POST", "/api/profiles/editable", true],
+    ["PUT", "/api/profiles/editable/:id", false],
+  ])
+    route(method, path, async (account, { params, body }) => {
+      const id = create ? String(body?.id || "") : params.id;
+      let kind = "image";
+      try {
+        kind = metaOf(JSON.parse(String(body?.text || "")))?.kind || "image";
+      } catch {
+        /* the check reports it */
+      }
+      // From chat (MCP's admin tools) the version's origin is chat; a draft stays AI-Drafted until approved.
+      const chat = fromChat(account);
+      const saved = (create ? createEditableProfile : saveEditableProfile)(id, body?.text, {
+        baseHash: String(body?.baseHash || ""),
+        by: accountName(account),
+        info: await info(kind),
+        origin: chat ? "chat" : "studio",
+        aiDrafted: chat && body?.draft === true,
+      });
+      await onSaved(id);
+      return saved;
     });
-    await onSaved(params.id);
-    return saved;
-  });
 }
