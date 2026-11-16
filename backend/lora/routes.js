@@ -5,19 +5,9 @@ import { accountMayUseLoras, loraAllowed } from "../model/catalogue.js";
 import { requireLocal } from "../route-access.js";
 import { defaultWorkerId } from "../workers.js";
 import { loraInfos } from "./info.js";
-import {
-  applyLoraOps,
-  clearLoraState,
-  loadLoraLibrary,
-  loadLoraStack,
-  saveLoraLibrary,
-  saveLoraStack,
-} from "./stacks.js";
+import { applyLoraOps, clearLoraState, loadLoraLibrary } from "./stacks.js";
 
-/**
- * An account's LoRA library and per-workflow stacks, and what each installed LoRA was trained for.
- * Registered after the gallery's /api/loras/previews, which /api/loras/:workflowId would match.
- */
+/** An account's LoRA ratings, and what each installed LoRA was trained for. */
 export function registerLoraRoutes(app, { comfyDownMessage, latestComfyContext }) {
   app.delete("/api/loras", (req, res) => {
     if (!requireLocal(req, res)) return;
@@ -27,24 +17,12 @@ export function registerLoraRoutes(app, { comfyDownMessage, latestComfyContext }
 
   directRoute(app, "GET", "/api/loras/library", (account) => {
     if (!accountMayUseLoras({ studioAccount: account }))
-      return { status: 200, payload: { found: false, library: { strengths: {} } } };
+      return { status: 200, payload: { found: false, library: { ratings: {} } } };
     const library = loadLoraLibrary(account?.userId || "");
     return {
       status: 200,
-      payload: { found: library !== null, library: library || { strengths: {} } },
+      payload: { found: library !== null, library: library || { ratings: {} } },
     };
-  });
-
-  app.put("/api/loras/library", (req, res) => {
-    if (!accountMayUseLoras(req))
-      return res.status(403).json({ ok: false, error: "LoRAs are off for this account." });
-    try {
-      res.json({ ok: true, library: saveLoraLibrary(req.body?.library, ownerIdForRequest(req)) });
-    } catch (error) {
-      res
-        .status(500)
-        .json({ ok: false, error: `Couldn't save the LoRA library: ${error.message}` });
-    }
   });
 
   // Clients send edits, not whole copies, so two devices never overwrite each other.
@@ -85,20 +63,5 @@ export function registerLoraRoutes(app, { comfyDownMessage, latestComfyContext }
         },
       };
     }
-  });
-
-  app.get("/api/loras/:workflowId", (req, res) => {
-    if (!accountMayUseLoras(req)) return res.json({ found: false, loras: [] });
-    const loras = loadLoraStack(req.params.workflowId, ownerIdForRequest(req));
-    res.json({ found: loras !== null, loras: loras || [] });
-  });
-
-  app.put("/api/loras/:workflowId", (req, res) => {
-    if (!accountMayUseLoras(req))
-      return res.status(403).json({ ok: false, error: "LoRAs are off for this account." });
-    res.json({
-      ok: true,
-      loras: saveLoraStack(req.params.workflowId, req.body?.loras, ownerIdForRequest(req)),
-    });
   });
 }

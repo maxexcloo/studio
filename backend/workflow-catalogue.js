@@ -1,7 +1,6 @@
 import path from "node:path";
 
 import { catalogueDownloadsForFile } from "./catalogue-downloads.js";
-import { repointedPreferences } from "./combined-profiles.js";
 import {
   allCustomWorkflowRecords,
   detectWorkflowFormat,
@@ -62,11 +61,14 @@ export function flushWorkflowPreferences() {
   if (preferencesSaveTimer) saveWorkflowPreferences(preferencesCache, { immediate: true });
 }
 
-/** Moves last use to the id `canonical` gives each (merged profiles), saved at once. */
+/** Moves last use to the id `canonical` gives each (merged profiles), the latest winning, saved at once. */
 export function repointWorkflowPreferences(canonical) {
-  saveWorkflowPreferences(repointedPreferences(loadWorkflowPreferences(), canonical), {
-    immediate: true,
-  });
+  const lastUsed = {};
+  for (const [id, when] of Object.entries(loadWorkflowPreferences().lastUsed)) {
+    const kept = canonical(id);
+    if (!lastUsed[kept] || String(when) > String(lastUsed[kept])) lastUsed[kept] = when;
+  }
+  saveWorkflowPreferences({ lastUsed }, { immediate: true });
 }
 
 function updateWorkflowPreferencePatch(patch = {}) {
