@@ -599,7 +599,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
   await expect(page.getByRole("combobox", { name: "Count", exact: true })).toHaveCount(0);
   // Length sits on the rail; Settings shows the same value.
   await page.getByRole("combobox", { name: "Length", exact: true }).click();
-  await page.getByRole("option", { name: "8 s", exact: true }).click();
+  await page.getByRole("option", { name: "8s", exact: true }).click();
   await withSettings(page, async () => {
     await expect(
       page.getByRole("textbox", { name: "Duration (Seconds)", exact: true }),
