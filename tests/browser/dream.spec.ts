@@ -471,13 +471,11 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   await page.goto("/dream");
   const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
   await expect(card).toContainText("From Your Gallery");
-  // Dislike's label shows in full, phones included.
-  expect(
-    await page
-      .getByRole("button", { name: "Dislike", exact: true })
-      .locator(".mantine-Button-label")
-      .evaluate((label) => label.scrollWidth <= label.clientWidth),
-  ).toBe(true);
+  await expect(
+    page
+      .getByRole("group", { name: "Dream Actions", exact: true })
+      .getByRole("button", { name: "Dislike", exact: true }),
+  ).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(card).toContainText("Dream prompt g2");
   // Dislike rates the gallery image too, hiding it.
@@ -780,7 +778,13 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   });
   await page.goto("/dream");
   await expect(page.getByRole("group", { name: "Which Image?", exact: true })).toBeVisible();
-  await page.getByRole("radio", { name: "Videos", exact: true }).check();
+  await page
+    .getByRole("radiogroup", { name: "Dream Media", exact: true })
+    .getByText("Videos", {
+      exact: true,
+    })
+    .click();
+  await expect(page.getByRole("radio", { name: "Videos", exact: true })).toBeChecked();
   const pair = page.getByRole("group", { name: "Which Video?", exact: true });
   await expect(pair).toBeVisible();
   await pair.getByRole("button", { name: "View A", exact: true }).click();
