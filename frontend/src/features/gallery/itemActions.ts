@@ -22,10 +22,8 @@ const menus: ItemActionId[] = ["animate", "edit", "recreate", "upscale"];
 const assist: ItemActionId[] = ["ai", "share"];
 const rating: ItemActionId[] = ["like", "dislike"];
 const others: ItemActionId[] = ["report", "delete"];
-/** Bars: Animate, Edit, Recreate, Upscale | AI, Share | Like, Dislike | Report, Delete. */
-const barSections: ItemActionId[][] = [["retry", "stop", ...menus], assist, rating, others];
-/** Menus: AI, Share | Like, Dislike | the four menus | Report, Delete. */
-const menuSections: ItemActionId[][] = [["retry", "stop"], assist, rating, menus, others];
+/** Bars and menus: Animate, Edit, Recreate, Upscale | AI, Share | Like, Dislike | Report, Delete. */
+const sections: ItemActionId[][] = [["retry", "stop", ...menus], assist, rating, others];
 /** Bars name Retry, Stop and the four menus; the rest are icons. */
 export const namedItemActions: string[] = ["retry", "stop", ...menus];
 
@@ -42,12 +40,9 @@ export const itemAction = (id: ItemActionId, action: Partial<Action> = {}): Acti
   label: (action.pressed && pressedLabels[id]) || definitions[id].label,
   ...action,
 });
-/** Places actions in a bar's or a menu's sections and order; absent ones are left out. */
-export const itemActionGroups = (
-  actions: (Action | null | false | undefined)[],
-  layout: "bar" | "menu" = "bar",
-): ActionGroups =>
-  (layout === "bar" ? barSections : menuSections).map((ids) =>
+/** Places actions in the bar's and menus' sections and order; absent ones are left out. */
+export const itemActionGroups = (actions: (Action | null | false | undefined)[]): ActionGroups =>
+  sections.map((ids) =>
     ids.flatMap((id) => actions.filter((action): action is Action => !!action && action.id === id)),
   );
 

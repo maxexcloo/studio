@@ -118,8 +118,8 @@ recur across features.
   verb alone is ambiguous (Stop Upscale, Edit in Composer). One action keeps
   one label everywhere. Clear and Reset turn into Undo until the text next
   changes.
-- Item actions are the same on tiles, context menus, the viewer and the
-  selection bar. `MediaActions.tsx` owns their availability and
+- Item actions are the same, in the same groups and order, on tiles, context
+  menus, the viewer and the selection bar. `MediaActions.tsx` owns their availability and
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
   Submenus match in bar and menu, and assistant menus share `assistMenu`.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
