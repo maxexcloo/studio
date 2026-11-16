@@ -276,6 +276,7 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
               <Button
                 variant="subtle"
                 color="red"
+                leftSection={<icons.clear size={16} />}
                 disabled={
                   !data ||
                   (!data.summary &&

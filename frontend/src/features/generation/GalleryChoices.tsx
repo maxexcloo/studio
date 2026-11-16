@@ -25,10 +25,9 @@ import type { ReferenceBrowser } from "./useReferenceBrowser";
 
 type Tab = ReferenceBrowser["state"]["tab"];
 
-/** The gallery's images, all, liked or uploaded. */
+/** The gallery's images, all or uploaded. */
 export const galleryTabs: { value: Tab; label: string }[] = [
   { value: "gallery", label: "Gallery" },
-  { value: "liked", label: "Liked" },
   { value: "uploads", label: "Uploads" },
 ];
 
@@ -43,7 +42,6 @@ export const galleryTabs: { value: Tab; label: string }[] = [
 export function GalleryChoices({
   label,
   more = [],
-  galleryViews = galleryTabs,
   uploadTile,
   browser,
   enabled,
@@ -55,7 +53,6 @@ export function GalleryChoices({
   /** Names the picker and its grid, such as "References". */
   label: string;
   more?: { value: Tab; label: string }[][];
-  galleryViews?: typeof galleryTabs;
   uploadTile?: ReactNode;
   browser: ReferenceBrowser;
   enabled: boolean;
@@ -68,7 +65,7 @@ export function GalleryChoices({
   onDeleted: (id: string) => void;
   onLayer?: (open: boolean) => void;
 }) {
-  const tabs = [galleryViews, ...more];
+  const tabs = [galleryTabs, ...more];
   const { query, filters } = browser.state;
   const tab = tabs.flat().some((item) => item.value === browser.state.tab)
     ? browser.state.tab
@@ -85,12 +82,8 @@ export function GalleryChoices({
     onChange: (filters) => browse({ filters }),
   });
   const [search] = useDebouncedValue(query, 250);
-  // Liked and Uploads are the gallery's own filters, set by the tab.
-  const { listing, items } = useGalleryImages(
-    search,
-    { ...filters, rating: tab === "liked" ? "liked" : "", uploads },
-    enabled,
-  );
+  // Uploads is the gallery's own filter, set by the tab.
+  const { listing, items } = useGalleryImages(search, { ...filters, rating: "", uploads }, enabled);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const client = useQueryClient();
   const deletion = useMutation({
