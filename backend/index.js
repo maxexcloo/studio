@@ -309,8 +309,13 @@ const recoverRunningJobs = createJobRecovery({
     setTerminalJob(id, patch);
   },
   gallery: {
+    // Every pending tile, but failed and cancelled ones only from the last day: older runs are past
+    // the 500 entries of worker history recovery reads, and re-reading them every pass adds up.
     tiles: () =>
-      galleryItems({ status: ["pending", "failed", "cancelled"] }).filter((item) => !item.url),
+      galleryItems({
+        status: ["pending", "failed", "cancelled"],
+        since: Date.now() - 86_400_000,
+      }).filter((item) => !item.url),
     job: (id) => galleryItems({ jobId: id }),
     save: putGalleryItems,
     replace: (id, outputs) => {
