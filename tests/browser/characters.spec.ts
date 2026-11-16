@@ -1,6 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
 
-import { outfitPart, scenePart, withCharacter } from "../../shared/characters";
+import { maxCharacterTrait, outfitPart, scenePart, withCharacter } from "../../shared/characters";
 import {
   closeReferences,
   closeTextEditor,
@@ -231,7 +231,8 @@ test("New Character saves a name, description and gallery images from the Refere
   if (await done.isVisible()) await done.click();
   await editor.getByLabel("Likes", { exact: true }).fill("Tea, Earl Grey");
   await editor.getByLabel("Likes", { exact: true }).press("Enter");
-  await editor.getByLabel("Likes", { exact: true }).fill("Gardens");
+  const boundaryTag = "G".repeat(maxCharacterTrait - "Tea, Earl Grey".length - 1);
+  await editor.getByLabel("Likes", { exact: true }).fill(boundaryTag);
   await editor.getByLabel("Likes", { exact: true }).press("Enter");
   await editor.getByLabel("Dislikes", { exact: true }).fill("Noise");
   await editor.getByLabel("Dislikes", { exact: true }).press("Enter");
@@ -263,6 +264,24 @@ test("New Character saves a name, description and gallery images from the Refere
   await expect(
     editor.getByRole("button", { name: "Reference 1 · Images", exact: true }),
   ).toBeVisible();
+  const likes = editor.getByLabel("Likes", { exact: true });
+  await expect(likes).toHaveAttribute("maxlength", "0");
+  // TagsInput handles pasted phrases directly, so they also need whole-field validation.
+  await likes.evaluate((input) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "One More, Whole Phrase");
+    input.dispatchEvent(
+      new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }),
+    );
+  });
+  await expect(
+    editor.getByText(`Keep the likes within ${maxCharacterTrait} characters.`, { exact: true }),
+  ).toBeVisible();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  expect(state.characters).toHaveLength(0);
+  // Removing only the extra phrase makes the unchanged 500-character field saveable again.
+  await likes.press("Backspace");
+  await expect(likes).not.toHaveAttribute("aria-invalid", "true");
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(
@@ -274,7 +293,7 @@ test("New Character saves a name, description and gallery images from the Refere
       dislikes,
     ]),
   ).toEqual([
-    ["Mara", "red-haired ranger", ["asset-portrait"], "Tea, Earl Grey\nGardens", "Noise"],
+    ["Mara", "red-haired ranger", ["asset-portrait"], `Tea, Earl Grey\n${boundaryTag}`, "Noise"],
   ]);
   await expect(
     references.getByRole("button", { name: "Use character: Mara", exact: true }),

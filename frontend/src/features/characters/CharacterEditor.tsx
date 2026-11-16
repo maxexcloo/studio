@@ -261,18 +261,27 @@ function CharacterStory({ story, onStory }: { story: Story; onStory: (story: Sto
       </Group>
       <TextBox label="Backstory" autosize minRows={2} {...text("backstory")} />
       <Group grow align="flex-start">
-        {(["likes", "dislikes"] as const).map((key) => (
-          <TagsInput
-            key={key}
-            label={key === "likes" ? "Likes" : "Dislikes"}
-            maxLength={maxCharacterTrait}
-            // Keep comma-containing phrases intact in the stored newline-separated text.
-            splitChars={[]}
-            value={story[key] ? story[key].split("\n") : []}
-            onChange={(values) => onStory({ ...story, [key]: values.join("\n") })}
-            comboboxProps={{ withinPortal: false }}
-          />
-        ))}
+        {(["likes", "dislikes"] as const).map((key) => {
+          const value = story[key] || "";
+          const error =
+            value.length > maxCharacterTrait
+              ? `Keep the ${key} within ${maxCharacterTrait} characters.`
+              : "";
+          return (
+            <TagsInput
+              key={key}
+              label={key === "likes" ? "Likes" : "Dislikes"}
+              maxLength={Math.max(0, maxCharacterTrait - value.length - Number(Boolean(value)))}
+              error={error}
+              ref={(input) => input?.setCustomValidity(error)}
+              // Keep comma-containing phrases intact in the stored newline-separated text.
+              splitChars={[]}
+              value={value ? value.split("\n") : []}
+              onChange={(values) => onStory({ ...story, [key]: values.join("\n") })}
+              comboboxProps={{ withinPortal: false }}
+            />
+          );
+        })}
       </Group>
     </>
   );
