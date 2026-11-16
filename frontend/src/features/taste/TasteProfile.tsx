@@ -52,7 +52,12 @@ const learnt = (taste: Taste) =>
     .join(" · ");
 const top = <T extends Weighted>(entries: T[]) =>
   entries.filter((entry) => entry.score > 0).slice(0, 3);
-const wordLabels = { likes: "Likes", styles: "Styles", avoid: "Avoids", note: "Summary" } as const;
+const wordLabels = {
+  likes: "Likes",
+  avoid: "Dislikes",
+  styles: "Styles",
+  note: "Summary",
+} as const;
 const wordKeys = Object.keys(wordLabels) as (keyof TasteWords)[];
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -189,10 +194,7 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
   });
   const data = taste.data;
   const error = refresh.error || taste.error;
-  const modelName = (id: string) => {
-    const profile = models.data?.profiles.find((entry) => isProfile(entry, id));
-    return profile ? profileName(profile) : "Unavailable Model";
-  };
+  const profileOf = (id: string) => models.data?.profiles.find((entry) => isProfile(entry, id));
   const description = (text: string) => (
     <Text span size="sm" c="text" style={{ overflowWrap: "anywhere" }}>
       {text || "None"}
@@ -234,12 +236,13 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
                 <SettingRow
                   label="Models"
                   description={description(
+                    // Models no longer offered drop out rather than read "Unavailable".
                     top(
-                      [...data.profiles.image, ...data.profiles.video].sort(
-                        (a, b) => b.score - a.score,
-                      ),
+                      [...data.profiles.image, ...data.profiles.video]
+                        .filter((entry) => profileOf(entry.id))
+                        .sort((a, b) => b.score - a.score),
                     )
-                      .map((entry) => modelName(entry.id))
+                      .map((entry) => profileName(profileOf(entry.id)!))
                       .join("; "),
                   )}
                 />
