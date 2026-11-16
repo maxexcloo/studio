@@ -19,6 +19,7 @@ export async function writeSetPrompt({
   title,
   scope,
   source,
+  intent,
   prompts,
   writer,
   frame = async () => null,
@@ -43,6 +44,9 @@ export async function writeSetPrompt({
           scope === "image" && (image || shown)
             ? "The selected image defines the subject and visible appearance. Preserve its species, breed, identity, markings and defining appearance. Its source prompt supplies the intended theme, style and requested details, not permission to substitute another subject. Vary the pose, scene, composition or camera angle within that theme; never switch animal species or replace the subject."
             : "The source prompt defines the subject and intended set theme. Preserve its species, breed, identity and defining appearance, and keep its theme and style. Vary the pose, scene, composition or camera angle within that theme; never switch animal species or replace the subject.",
+          scope === "image" && intent
+            ? "The typed source prompt records the user's intent before trigger words. Where it differs from the recorded source prompt or image, keep the selected image's identity and species authoritative; do not substitute the typed prompt's subject."
+            : "",
           "The set title is only a label and may be incomplete. Previous variations are only for avoiding repetition: ignore any that drift away from the source; they must never redefine the subject or theme.",
           `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
           'Reply with JSON only: {"title": "a concise two to four word Title Case label naming the content, without request wording", "prompt": "the finished prompt"}.',
@@ -56,6 +60,7 @@ export async function writeSetPrompt({
           [
             `Source prompt (authoritative subject and theme):\n${source}`,
             shown ? `What the selected image shows: ${shown}` : "",
+            intent ? `Typed source prompt (user intent): ${intent}` : "",
             `Previous variations (avoid repetition, not subject guidance):\n${prompts
               .slice(-shownPrompts)
               .map((prompt) => `- ${prompt.replace(/\s+/g, " ").slice(0, 1000)}`)

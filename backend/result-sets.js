@@ -3,9 +3,7 @@ import { directRoute } from "./domain/direct-route.ts";
 
 const variations = 2;
 const imagePrompt = (selected, source) =>
-  typeof selected.settings?.typedPrompt === "string"
-    ? selected.settings.typedPrompt
-    : selected.prompt || source.input.prompt;
+  selected.prompt || source.input.prompt || selected.settings?.typedPrompt;
 
 /** The exact selected image, or a set's source lineage, with earlier variations for variety. */
 export function setPrompts(store, job, item) {
@@ -23,6 +21,10 @@ export function setPrompts(store, job, item) {
     if (!prompt?.trim()) throw new Error("That image has no source prompt.");
     return {
       source: prompt,
+      ...(typeof selected.settings?.typedPrompt === "string" &&
+      selected.settings.typedPrompt !== prompt
+        ? { intent: selected.settings.typedPrompt }
+        : {}),
       prompts: store
         .jobs(job.ownerId, job.sessionId)
         .filter(

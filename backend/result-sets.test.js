@@ -215,9 +215,16 @@ test("image scope anchors the exact selected output rather than its set ancestor
   });
   const queued = { ...current, ...first.scope, id: "new-1", input: first.input };
   assert.deepEqual(setPrompts(currentStore, queued, item), {
-    source: selected.settings.typedPrompt,
+    source: selected.prompt,
+    intent: selected.settings.typedPrompt,
     prompts: [],
   });
+  const staleTyped = { ...selected, settings: { typedPrompt: jobs[0].input.prompt } };
+  assert.equal(
+    setPrompts(currentStore, queued, () => staleTyped).source,
+    selected.prompt,
+    "an old typed prompt must not replace the selected output's recorded species or identity",
+  );
   assert.equal(
     setPrompts(
       currentStore,

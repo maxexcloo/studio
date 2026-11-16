@@ -357,7 +357,7 @@ export function useMediaActions(
   const moreLike: Action[] =
     ready && !item.uploaded && item.jobId && assisted
       ? [
-          ...(image && typedPrompt(item).trim()
+          ...(image && (item.prompt?.trim() || typedPrompt(item).trim())
             ? [
                 {
                   id: "more-like-image",
