@@ -437,6 +437,9 @@ const tickMs = 45_000;
 const maxBackoffMs = 600_000;
 /** Dream explores the profile an account ran fewest jobs on over this many days. */
 const recentDays = 30;
+/** Dream sets a profile aside once its last three Dream jobs within six hours all failed. */
+const failStreak = 3;
+const failWindowMs = 6 * 3_600_000;
 /** Calibration shows gallery images at least this old, so it doesn't repeat what was just made. */
 const calibrationAgeMs = 86_400_000;
 const judgedLimit = 2000;
@@ -864,6 +867,28 @@ export function createDream(options: {
         used.set(key, (used.get(key) || 0) + 1);
     return (key: string) =>
       Math.max(diversity.floor, 1 - (used.get(key) || 0) / Math.max(jobs.length, 1));
+  }
+  /**
+   * Profiles whose last `failStreak` Dream jobs within `failWindowMs` all failed on their worker, so
+   * Dream stops spending ideas on them until those failures age out.
+   */
+  function failingProfiles(ownerId: string) {
+    const outcomes = new Map<string, string[]>();
+    for (const job of store.jobsSince(ownerId, new Date(now() - failWindowMs).toISOString())) {
+      if (!dreamJob(job) || !["completed", "failed"].includes(job.status)) continue;
+      // An idea the text model never finished says nothing about the profile.
+      if (job.status === "failed" && awaitsWriting(job.input)) continue;
+      const id = String(job.input.profileId || "");
+      outcomes.set(id, [...(outcomes.get(id) || []), job.status]);
+    }
+    return new Set(
+      [...outcomes]
+        .filter(([, statuses]) => {
+          const last = statuses.slice(-failStreak);
+          return last.length === failStreak && last.every((status) => status === "failed");
+        })
+        .map(([id]) => id),
+    );
   }
   /** The kinds Dream may still make today, the one it is behind on first. */
   function kinds(settings: DreamSettings, counts: { images: number; videos: number }) {
@@ -1737,10 +1762,12 @@ export function createDream(options: {
         continue;
       }
       const available = await options.catalogue(ownerId, access.account);
+      const failing = failingProfiles(ownerId);
       const catalogue = {
         ...available,
         profiles: available.profiles.filter(
-          (profile) => isCloudProfile(profile) === (backend === "cloud"),
+          (profile) =>
+            isCloudProfile(profile) === (backend === "cloud") && !failing.has(profile.id),
         ),
       };
       const steer = kind === "image" && record.steer?.remaining ? record.steer : undefined;
