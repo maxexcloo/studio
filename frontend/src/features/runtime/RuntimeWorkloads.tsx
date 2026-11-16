@@ -555,19 +555,19 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
       />
       <Group justify="space-between" gap="xs">
         {shown && line ? (
-          <Group gap="xs" role="status" miw={0}>
+          <Group gap="xs" wrap="nowrap" role="status" miw={0}>
             {operation && <Loader size="xs" />}
-            <Text
-              size="sm"
-              c={operation ? undefined : "red"}
-              flex="1 1 12rem"
-              style={{ overflowWrap: "anywhere" }}
-            >
+            <Text size="sm" c={operation ? undefined : "red"} style={{ overflowWrap: "anywhere" }}>
               {operation
                 ? `${line.doing} ${names(line.ids)}…`
                 : `Couldn't ${line.verb} ${names(line.ids)}: ${shown.error || shown.progress}`}
             </Text>
-            <Button variant="subtle" size="compact-sm" onClick={() => setLogId(shown.id)}>
+            <Button
+              variant="subtle"
+              size="compact-sm"
+              flex="none"
+              onClick={() => setLogId(shown.id)}
+            >
               View Log
             </Button>
             {operation && (
@@ -575,6 +575,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
                 variant="subtle"
                 color="red"
                 size="compact-sm"
+                flex="none"
                 onClick={() => setCancelling(operation.id)}
               >
                 Stop Change
