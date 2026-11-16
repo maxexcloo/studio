@@ -57,7 +57,14 @@ window.addEventListener(
     pressed = { event, layers };
     const top = layers.at(-1);
     const context = top && popups.get(top);
-    if (event.key === "Escape" && !event.isComposing && top && context?.closeOnEscape) {
+    // Inside the dropdown, Mantine's native handler also returns focus synchronously.
+    if (
+      event.key === "Escape" &&
+      !event.isComposing &&
+      top &&
+      context?.closeOnEscape &&
+      !top.contains(event.target as Node)
+    ) {
       dismiss(context);
       event.preventDefault();
       event.stopPropagation();

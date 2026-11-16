@@ -69,6 +69,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     textBusy: false,
     slots: 1,
     prompts: 0,
+    replies: [] as { prompt: string; title?: string }[],
     calls: [] as { model: string; system: string; user: string }[],
     logs: [] as string[],
     loras: {} as Record<string, DreamLoraLibrary>,
@@ -150,6 +151,7 @@ function fixture(t: TestContext, catalogue = profiles) {
             prompt: `dream ${state.prompts}`,
             why: "You like foxes.",
             title: `Fox Dream ${state.prompts}`,
+            ...state.replies.shift(),
           }),
         };
       },
@@ -502,7 +504,7 @@ test("Dream stops at today's cap per kind, however much waits unseen, and animat
   assert.equal(live().length, 0);
 });
 
-test("Dream draws a ready profile by its taste, explores one axis at a time and keeps Spicy to accounts with Uncensored Models", async (t) => {
+test("Dream draws a ready profile by its taste, explores concepts alongside profiles and LoRAs and keeps Spicy to accounts with Uncensored Models", async (t) => {
   const { dream, state, taste, dreamOnce, generated } = fixture(t);
   const liked = (id: string, profileId: string) => {
     generated({
@@ -525,7 +527,7 @@ test("Dream draws a ready profile by its taste, explores one axis at a time and 
   assert.equal(job?.dream?.arm, "exploit");
   assert.match(state.calls[0].user, /- liked [ab]/);
   // An exploited idea features something they like.
-  assert.match(state.calls[0].system, /feature this, which they like: fox\./);
+  assert.match(state.calls[0].system, /Keep this taste they like: fox\./);
   // No uncensored grant: Spicy never applies, whatever the setting says.
   assert.equal(state.calls[0].model, "writer");
   assert.match(state.calls[0].system, /safe for work/);
@@ -542,13 +544,15 @@ test("Dream draws a ready profile by its taste, explores one axis at a time and 
     onDelta() {},
   });
   assert.match(state.calls[2].system, /safe for work/);
-  // A share of ideas explores one axis; the first tries the profile used least, here one never used.
+  // New concepts also try the profile used least, here one never used.
   state.rolls = [99];
   const explored = await dreamOnce();
   assert.equal(explored?.input.profileId, "flux");
   assert.equal(explored?.dream?.arm, "explore:profile");
+  assert.match(state.calls.at(-1)!.system, /Change at least three/);
+  assert.equal((explored?.input.writing as { explore?: boolean })?.explore, true);
   assert.equal(explored?.dream?.why, "Trying FLUX for the first time · You like foxes.");
-  // The next explores the prompt: half from a Library import, on its profile with its LoRAs, for
+  // The next explores a concept from a Library import, on its profile with its LoRAs, for
   // Uncensored Models only, since imports carry no content rating.
   state.access.alice!.uncensored = true;
   state.loras.alice = {
@@ -590,6 +594,112 @@ test("Dream draws a ready profile by its taste, explores one axis at a time and 
   assert.deepEqual([beyond?.input.profileId, beyond?.dream?.arm], ["qwen", "explore:prompt"]);
   assert.doesNotMatch(state.calls.at(-1)!.user, /Inspiration/);
   assert.match(state.calls.at(-1)!.system, /Explore this time: go beyond their taste profile/);
+});
+
+test("Fresh concepts rotate anchors and inspirations without overriding a model experiment", async (t) => {
+  const { dream, state, dreamOnce } = fixture(t);
+  state.access.alice!.uncensored = true;
+  state.inspiration = [
+    { prompt: "a lighthouse in a storm", profileId: "flux", loras: [] },
+    { prompt: "a clockmaker repairing a mechanical bird", profileId: "flux", loras: [] },
+    { prompt: "a lighthouse in a storm", profileId: "flux", loras: [] },
+  ];
+  await dream.save("alice", { enabled: true });
+  const seen: string[] = [];
+  const anchors: string[][] = [];
+  for (let index = 0; index < 13; index++) {
+    state.rolls = [99, 0];
+    const job = await dreamOnce();
+    assert.ok(job);
+    assert.equal((job.input.writing as { explore?: boolean }).explore, true);
+    seen.push((job.input.writing as { inspiration: string }).inspiration);
+    anchors.push(dream.read("alice").anchors!.slice(0, 8));
+    assert.match(state.calls.at(-1)!.system, /Change at least three/);
+    assert.match(
+      state.calls.at(-1)!.system,
+      /Do not copy its complete concept or merely paraphrase it/,
+    );
+    if (index === 0) {
+      assert.equal(job.dream?.arm, "explore:profile");
+      assert.equal(job.input.profileId, "qwen");
+    }
+  }
+  assert.notEqual(seen[0], seen[1], "Duplicate catalogue entries do not repeat an inspiration");
+  assert.equal(seen[0], seen[2], "Exhausted inspirations return oldest first");
+  for (const axis of ["subject", "action", "setting", "camera or composition"]) {
+    const choices = anchors
+      .slice(0, axis === "camera or composition" ? 10 : 12)
+      .map((draw) => draw.find((value) => value.startsWith(`${axis}:`)));
+    assert.equal(
+      new Set(choices).size,
+      choices.length,
+      `${axis} rotates independently of prompt wording`,
+    );
+  }
+  assert.equal(anchors[0][0], anchors[12][0], "An exhausted axis returns to its oldest choice");
+  assert.equal(dream.read("bob").anchors, undefined);
+  assert.equal(dream.read("bob").inspirations, undefined);
+  state.inspiration = [{ prompt: "a newly saved concept", loras: [] }];
+  state.rolls = [99, 0];
+  const next = await dreamOnce();
+  assert.ok(next);
+  assert.equal(
+    (next.input.writing as { inspiration: string }).inspiration,
+    "a newly saved concept",
+  );
+});
+
+test("Fresh concept retries reject liked prompt copies and show the rejected concept", async (t) => {
+  const { dream, state, generated, dreamOnce } = fixture(t);
+  const prompt = "A red fox repairing a clockwork boat in a sunlit workshop, viewed from above";
+  generated({
+    id: "liked",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    rating: "liked",
+    prompt,
+  });
+  state.replies = [
+    {
+      prompt: "Viewed from above, a red fox repairing a clockwork boat in a sunlit workshop",
+      title: "Clockwork Boat",
+    },
+    {
+      prompt: "An octopus conducting a coral orchestra in a wide underwater amphitheatre",
+      title: "Coral Orchestra",
+    },
+  ];
+  await dream.save("alice", { enabled: true });
+  state.rolls = [99];
+  const job = await dreamOnce();
+  assert.equal(
+    job?.input.prompt,
+    "An octopus conducting a coral orchestra in a wide underwater amphitheatre",
+  );
+  assert.equal(state.calls.length, 2);
+  assert.match(state.calls[1].user, /Rejected prompt: Viewed from above/);
+  assert.match(state.calls[1].user, /too close to a recent or liked prompt/);
+  assert.match(state.calls[1].user, /do not paraphrase the rejected idea/);
+  assert.deepEqual(dream.read("alice").subjects, ["Coral Orchestra"]);
+});
+
+test("More Like This permits close iterations while keeping species and source identity", async (t) => {
+  const { dream, state, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  const original = "An adult golden retriever carrying a red ball across a grassy field";
+  state.replies = [{ prompt: original, title: "Golden Retriever" }];
+  const first = await dreamOnce();
+  assert.ok(first);
+  const item = state.items.find((item) => item.jobId === first.id)!;
+  dream.more("alice", String(item.id));
+  const iteration = "An adult golden retriever carrying a blue ball across a grassy field";
+  state.replies = [{ prompt: iteration, title: "Golden Retriever" }];
+  const next = await dreamOnce();
+  assert.equal(next?.input.prompt, iteration);
+  assert.match(state.calls.at(-1)!.system, /including species and breed/);
+  assert.doesNotMatch(state.calls.at(-1)!.system, /Change at least three/);
+  assert.doesNotMatch(state.calls.at(-1)!.user, /Recent Dream ideas to avoid/);
 });
 
 test("Dream skips unavailable accounts and offline services, logging each reason once", async (t) => {
@@ -1094,12 +1204,14 @@ test("Dream-off video comparisons rate videos without queueing work", async (t) 
   assert.deepEqual(dreamJobs("alice"), []);
 });
 
-test("The explore share starts at a fifth and follows how often explored results are kept against the rest", async (t) => {
+test("Fresh concepts start at three quarters and stay the majority as verdicts adapt the share", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
-  // At a fifth, a roll of 70 of 100 exploits.
-  state.rolls = [70];
+  // A quarter remains available for familiar work.
+  state.rolls = [20];
   assert.equal((await dreamOnce())?.dream?.arm, "exploit");
+  state.rolls = [25];
+  assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
   let made = 0;
   const decided = (count: number, arm: string, verdict: "kept" | "discarded", pair = false) => {
     for (let index = 0; index < count; index++)
@@ -1129,20 +1241,20 @@ test("The explore share starts at a fifth and follows how often explored results
         },
       });
   };
-  // Explored results kept and the rest passed: at most half explore.
+  // Positive verdicts raise fresh concepts to nine tenths.
   decided(10, "explore:prompt", "kept");
   decided(10, "exploit", "discarded");
-  state.rolls = [70];
+  state.rolls = [10];
   assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
-  state.rolls = [40];
+  state.rolls = [5];
   assert.equal((await dreamOnce())?.dream?.arm, "exploit");
-  // The other way round, a tenth still explores; comparisons ask something else and count for neither.
+  // Poor verdicts still leave a majority of fresh concepts; comparisons do not count.
   decided(20, "explore:lora", "discarded");
   decided(60, "continue:pose", "kept");
   decided(30, "explore:steps", "kept", true);
-  state.rolls = [85];
+  state.rolls = [35];
   assert.equal((await dreamOnce())?.dream?.arm, "exploit");
-  state.rolls = [92];
+  state.rolls = [40];
   assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
 });
 
@@ -1360,6 +1472,8 @@ test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and ex
   const tried = (await dreamOnce())!;
   assert.deepEqual(loras(tried), [["ink.safetensors", 1]]);
   assert.equal(tried.dream?.arm, "explore:lora");
+  assert.match(state.calls.at(-1)!.system, /Change at least three/);
+  assert.equal((tried.input.writing as { explore?: boolean }).explore, true);
   assert.match(String(tried.dream?.why), /^Testing ink · /);
   // Without LoRA access nothing is added.
   state.loras = {};
