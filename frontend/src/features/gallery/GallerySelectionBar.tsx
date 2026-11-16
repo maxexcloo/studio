@@ -432,6 +432,7 @@ export function GallerySelectionBar({
             </Button>
           ))}
         </div>
+        {!phone && <Divider orientation="vertical" className={classes.divider} />}
         <div role="group" aria-label="Selected Item Actions" className={classes.actions}>
           {bar}
         </div>
