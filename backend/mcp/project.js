@@ -76,7 +76,11 @@ export function keptChoices(choices, input) {
 
 /** The brief as one line for generate's reply, so the chat keeps writing to it; "" without one. */
 export function briefLine({ name, brief }) {
-  const summary = [briefSummary(brief), brief.avoid && `avoid ${brief.avoid}`]
+  const summary = [
+    briefSummary(brief),
+    brief.loras?.length && `LoRAs ${brief.loras.join(", ")}`,
+    brief.avoid && `avoid ${brief.avoid}`,
+  ]
     .filter(Boolean)
     .join("; ");
   return summary ? `Project ${name}: ${summary}. Keep prompts to it. ` : "";
@@ -110,7 +114,7 @@ export function projectArgs({ name, constraints }, args) {
  * Refuses prompts that name something the brief avoids, before any queues: an image model draws
  * what a prompt names, even after "no".
  */
-export function assertAvoided({ name, brief }, prompts) {
+export function assertAvoided({ name, brief }, prompts, list = "that avoid list") {
   const terms = brief.avoid
     .split(/[,;\n]+/)
     .map((term) => term.trim().replace(/^(?:no|without)\s+/i, ""))
@@ -119,9 +123,17 @@ export function assertAvoided({ name, brief }, prompts) {
     for (const term of terms)
       if (new RegExp(`(?<![\\p{L}\\p{N}])${escape(term)}(?![\\p{L}\\p{N}])`, "iu").test(prompt))
         throw new Error(
-          `Prompt ${index + 1} names "${term}", which ${name} avoids; models draw what a prompt names, even after "no". Leave it out and call generate again, or change that avoid list if the user wants it.`,
+          `Prompt ${index + 1} names "${term}", which ${name} avoids; models draw what a prompt names, even after "no". Leave it out and call generate again, or change ${list} if the user wants it.`,
         );
 }
+
+/** Refuses prompts that name any of the account's taste Dislikes, learnt or set. */
+export const assertNotDisliked = ({ avoid }, prompts) =>
+  assertAvoided(
+    { name: "the user's taste", brief: { avoid: avoid.join("\n") } },
+    prompts,
+    "their Dislikes in Dream › Taste",
+  );
 
 /**
  * The chosen models under the project's: where it lists profiles of the targets' kind, only those
@@ -155,20 +167,31 @@ export function projectTargets({ name, constraints }, targets, known, { referenc
 }
 
 /**
- * The account's chat brief and its own taste Dislikes, for generate; taste may be unavailable to the account.
+ * The account's chat brief and its taste profile's Dislikes, Models and LoRAs (the person's where
+ * they set them, else what Studio learnt), for generate; taste may be unavailable to the account.
  */
 export async function accountBrief(media, owner, signal) {
   const [brief, taste] = await Promise.all([
     media.request("GET", "/api/chat-brief", undefined, owner, { signal }),
     media.request("GET", "/api/taste", undefined, owner, { signal }).catch(() => null),
   ]);
-  return { brief: brief?.brief || {}, avoid: taste?.preferences?.avoid || [] };
+  return {
+    brief: brief?.brief || {},
+    avoid: taste?.avoid || [],
+    models: taste?.models || [],
+    loras: taste?.loras || [],
+  };
 }
 
-/** The account's brief as generate's reply gives it, profiles by label; "" when there is none. */
-export function accountBriefLine({ brief, avoid }, profiles = []) {
+/** The account's brief and favourites as generate's reply gives them, models by label; "" when there is none. */
+export function accountBriefLine({ brief, avoid, models, loras }, profiles = []) {
   const label = (id) => profiles.find((profile) => profile.id === id)?.label || id;
-  const summary = [briefSummary(brief, label), avoid.length && `avoid ${avoid.join(", ")}`]
+  const summary = [
+    briefSummary(brief),
+    models.length && `favourite models ${models.map(label).join(", ")}`,
+    loras.length && `favourite LoRAs ${loras.join(", ")}`,
+    avoid.length && `avoid ${avoid.join(", ")}`,
+  ]
     .filter(Boolean)
     .join("; ");
   return summary ? `The user's brief: ${summary}. Keep every prompt to it. ` : "";
@@ -213,39 +236,38 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
   };
   /**
    * The project tool's brief action: the user's own brief for all chats, from the fields it shares
-   * with a project's (subjects, styles, avoid as their own taste Dislikes, profiles as favourites), with
-   * ethnicity, age, body and favourite lora_names; only what is given changes.
+   * with a project's (subjects, styles), with ethnicity, age and body. avoid, profiles and
+   * lora_names set the taste profile's own Dislikes, Models and LoRAs ("" or [] hands one back to
+   * what Studio learns). Only what is given changes.
    */
-  const accountBriefAction = async ({ avoid, profiles, lora_names, ...fields }, signal) => {
+  const accountBriefAction = async ({ avoid, profiles, lora_names, ...change }, signal) => {
     const all = await media.profiles("all", owner).catch(() => []);
-    const change = {
-      ...fields,
-      ...(profiles ? { profiles: await profileIds(profiles) } : {}),
-      ...(lora_names ? { loras: lora_names } : {}),
-    };
     const listed = avoid
       ?.split(/[,;\n]+/)
       .map((term) => term.trim())
       .filter(Boolean);
+    const own = (list) => (list.length ? list : null);
+    const preferences = {
+      ...(listed ? { avoid: own(listed) } : {}),
+      ...(profiles ? { models: own(await profileIds(profiles)) } : {}),
+      ...(lora_names ? { loras: own(lora_names) } : {}),
+    };
     const [{ brief }, taste] = await Promise.all([
       Object.keys(change).length
         ? api("PATCH", "/api/chat-brief", change, signal)
         : api("GET", "/api/chat-brief", undefined, signal),
-      listed
-        ? api(
-            "PUT",
-            "/api/taste",
-            { preferences: { avoid: listed.length ? listed : null } },
-            signal,
-          )
-        : null,
+      Object.keys(preferences).length ? api("PUT", "/api/taste", { preferences }, signal) : null,
     ]);
     const label = (id) => all.find((profile) => profile.id === id)?.label || id;
     return mcpJson({
-      user_brief: { ...brief, ...(brief.profiles ? { profiles: brief.profiles.map(label) } : {}) },
-      ...(taste ? { avoid: taste.preferences.avoid || [] } : {}),
-      ...(Object.keys(change).length || listed
-        ? { note: "Tell the user it holds for every chat; Settings › Preferences edits it." }
+      user_brief: brief,
+      ...(taste
+        ? { avoid: taste.avoid, profiles: taste.models.map(label), lora_names: taste.loras }
+        : {}),
+      ...(Object.keys(change).length || taste
+        ? {
+            note: "Tell the user it holds for every chat; Settings › Preferences and Dream › Taste edit it.",
+          }
         : {}),
     });
   };
@@ -253,7 +275,7 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
     server,
     "project",
     "project",
-    `The chat's project and constraints. show lists projects and the user's brief; attach (project), create, update (only changes) or detach. brief saves lasting rules for all chats ("" clears); profiles are favourites, lora_names favourites.`,
+    `The chat's project and constraints. show lists projects and the user's brief; attach (project), create, update (only changes) or detach. brief saves lasting rules for all chats ("" clears); avoid, profiles, lora_names set taste Dislikes and favourites.`,
     {
       action: z.enum(["show", "attach", "create", "update", "detach", "brief"]).optional(),
       project: z.string().optional(),
