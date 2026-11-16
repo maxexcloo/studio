@@ -107,21 +107,22 @@ export function createJobRecovery({
     [...jobs]
       .filter(([, job]) => job.recovered && job.status === "cancelling" && !job.terminalAt)
       .map(([id]) => id);
+  const unfinished = (item) =>
+    ["pending", "failed"].includes(item.status) ||
+    (item.status === "cancelled" && jobs.get(item.jobId)?.recovered);
   const candidateIds = () =>
     new Set([
       ...cancellations(),
-      ...visible(
-        gallery
-          .tiles()
-          .filter(
-            (item) =>
-              ["pending", "failed"].includes(item.status) ||
-              (item.status === "cancelled" && jobs.get(item.jobId)?.recovered),
-          ),
-      )
+      ...visible(gallery.tiles().filter(unfinished))
         .map((item) => item.jobId)
         .filter(Boolean),
     ]);
+  /** candidateIds().has(id), reading only that job's items rather than every tile. */
+  const isCandidate = (id) => {
+    const current = jobs.get(id);
+    if (current?.recovered && current.status === "cancelling" && !current.terminalAt) return true;
+    return visible(gallery.job(id)).some((item) => !item.url && unfinished(item));
+  };
   /** Saves the job's items `patch` changes; with `all`, its outputs as well as its tiles. */
   function patchJob(id, patch, all = false) {
     const changed = gallery
@@ -147,13 +148,14 @@ export function createJobRecovery({
     );
     // While every unfinished tile belongs to a job its runner follows (any long video), there is nothing to recover:
     // asking each worker for its queue and 500 history entries every few seconds only slows a busy worker down.
-    if (!untracked.size && [...candidateIds()].every(runnerOwned)) return;
+    const candidates = candidateIds();
+    if (!untracked.size && [...candidates].every(runnerOwned)) return;
     const configured = backends();
     let scanned = 0;
     for (const backend of configured) {
       try {
         // Recovered jobs whose prompts are known are looked up one by one; only an unknown prompt needs the history list.
-        const prompts = [...candidateIds()]
+        const prompts = [...candidates]
           .filter(
             (id) =>
               !runnerOwned(id) &&
@@ -192,10 +194,9 @@ export function createJobRecovery({
           const id = generationRecord(entry.prompt?.[3]).jobId;
           if (id) completed.set(id, { entry, promptId });
         }
-        const candidates = candidateIds();
         for (const id of candidates) {
           // An earlier ingest awaits I/O: another runner may have delivered this job since the snapshot.
-          if (!candidateIds().has(id)) continue;
+          if (!isCandidate(id)) continue;
           // Its runner reports its progress and delivers it; a second writer only races it.
           if (runnerOwned(id)) continue;
           const current = jobs.get(id);
