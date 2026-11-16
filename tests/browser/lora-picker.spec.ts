@@ -34,6 +34,9 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
       },
     }),
   );
+  await page.route("**/api/loras/previews", (route) =>
+    route.fulfill({ json: { previews: {}, uses: { "soft-style.safetensors": 2 } } }),
+  );
   await create(page);
   await openLoraChoices(page);
   const controls = page.getByRole("dialog", { name: "LoRAs", exact: true });
@@ -65,6 +68,22 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
     )
     .toEqual(["Detail Slider", "Soft Style"]);
+  // Most Used leads with the LoRA the account ran most.
+  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Most Used",
+    "Rating",
+    "Name A–Z",
+    "Name Z–A",
+  ]);
+  await page.getByRole("menuitem", { name: "Most Used", exact: true }).click();
+  await expect
+    .poll(() =>
+      choices
+        .getByRole("button", { name: /^(Soft Style|Detail Slider)$/ })
+        .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
+    )
+    .toEqual(["Soft Style", "Detail Slider"]);
   await pickerTab(page, "LoRAs", "Liked");
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
   await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toHaveCount(0);

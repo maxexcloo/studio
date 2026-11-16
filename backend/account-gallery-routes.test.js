@@ -232,7 +232,7 @@ test("Clear Failed takes the account's own failed items; administrators may name
   assert.deepEqual(left(), ["b-done"]);
 });
 
-test("LoRA previews use the account's newest finished image made with each LoRA", async () => {
+test("LoRA previews use the account's newest finished image made with each LoRA and count its uses", async () => {
   const made = (ownerId, jobId, createdAt, loras, status = "done") => ({
     ...item(ownerId, jobId),
     status,
@@ -260,9 +260,9 @@ test("LoRA previews use the account's newest finished image made with each LoRA"
     },
     query: {},
   };
-  assert.deepEqual((await call(routes["/api/loras/previews"], request)).previews, {
-    "detail.safetensors": "/thumbs/new.webp",
-  });
+  const found = await call(routes["/api/loras/previews"], request);
+  assert.deepEqual(found.previews, { "detail.safetensors": "/thumbs/new.webp" });
+  assert.deepEqual(found.uses, { "detail.safetensors": 2 });
 });
 
 test("finished outputs keep the pending tiles' owner and never replace another owner's tiles", async () => {
