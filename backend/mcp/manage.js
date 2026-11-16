@@ -38,8 +38,9 @@ export const findCard = (cards, value) => {
 
 /**
  * Registers gallery, queue, dream, cards and taste. `tool` is mcp.js's helper, `media` its McpMedia,
- * `refs` the conversation's result scope, `resolve(value)` resolves a ref into its job id and
- * `referenceAsset(value)` a result's number or letter, or an asset id, into a reference asset id.
+ * `refs` the conversation's result scope, `chat` its conversation id ("" when the client sends
+ * none), `resolve(value)` resolves a ref into its job id and `referenceAsset(value)` a result's
+ * number or letter, or an asset id, into a reference asset id.
  */
 export function registerManageTools({
   tool,
@@ -47,6 +48,7 @@ export function registerManageTools({
   media,
   owner,
   refs,
+  chat,
   resolve,
   resolveOutput,
   referenceAsset,
@@ -140,7 +142,7 @@ export function registerManageTools({
     server,
     "queue",
     "manage queue",
-    "The user's queue, when asked. list: unfinished and failed jobs with refs. pause holds new work, resume, cancel_all, clear_failed. retry or clear one failed job_id; move a waiting job_id to position (0 is next).",
+    "The user's queue, when asked. list: unfinished and failed jobs with refs. pause holds new work, resume, cancel_all (this chat's work; scope \"account\" only if the user asks for all), clear_failed. retry or clear one failed job_id; move a waiting job_id to position (0 is next).",
     {
       action: z.enum([
         "list",
@@ -154,8 +156,9 @@ export function registerManageTools({
       ]),
       job_id: result.optional(),
       position: z.number().int().min(0).max(999).optional(),
+      scope: z.enum(["chat", "account"]).optional(),
     },
-    async ({ action, job_id, position }, signal) => {
+    async ({ action, job_id, position, scope }, signal) => {
       const single = ["retry", "clear", "move"].includes(action);
       if (single !== Boolean(job_id))
         throw new Error(
@@ -163,6 +166,7 @@ export function registerManageTools({
         );
       if ((action === "move") !== (position !== undefined))
         throw new Error(action === "move" ? "Pass position: 0 is next." : "position is for move.");
+      if (scope && action !== "cancel_all") throw new Error("scope is for cancel_all.");
       if (action === "list") {
         const { jobs = [], paused = {} } = await api("GET", "/api/queue", undefined, signal);
         const listed = jobs.filter(
@@ -184,19 +188,32 @@ export function registerManageTools({
           })),
         });
       }
+      if (action === "cancel_all") {
+        const account = scope === "account";
+        if (!account && !chat)
+          throw new Error(
+            'This chat sends no conversation id, so its own work can\'t be told apart. Pass scope "account" only if the user wants all their unfinished work stopped.',
+          );
+        const answer = await api(
+          "POST",
+          "/api/queue/cancel-all",
+          account ? {} : { conversationId: chat },
+          signal,
+        );
+        return mcpJson({
+          scope: account ? "account" : "chat",
+          cancelled: (answer.outcomes || []).filter(
+            (outcome) =>
+              !outcome.error && (outcome.job?.status === "cancelled" || outcome.cancelRequested),
+          ).length,
+          ...(answer.outcomes?.some((outcome) => outcome.error)
+            ? { note: "Some jobs could not confirm their cancel; check queue list." }
+            : {}),
+        });
+      }
       if (!single) {
-        const route = { cancel_all: "cancel-all", clear_failed: "clear-failed" }[action] || action;
+        const route = action === "clear_failed" ? "clear-failed" : action;
         const answer = await api("POST", `/api/queue/${route}`, {}, signal);
-        if (action === "cancel_all")
-          return mcpJson({
-            cancelled: (answer.outcomes || []).filter(
-              (outcome) =>
-                !outcome.error && (outcome.job?.status === "cancelled" || outcome.cancelRequested),
-            ).length,
-            ...(answer.outcomes?.some((outcome) => outcome.error)
-              ? { note: "Some jobs could not confirm their cancel; check queue list." }
-              : {}),
-          });
         return mcpJson({ [action]: true, ...answer });
       }
       const id = await owned(job_id);
