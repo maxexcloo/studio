@@ -5,6 +5,7 @@ import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
+import { ratingLabel } from "./itemActions";
 import { MediaActionMenu, useMediaDialogs } from "./MediaActions";
 import { mediaTitle } from "./mediaLabels";
 import { useMediaTransfer } from "./mediaShare";
@@ -45,11 +46,11 @@ export function MediaTileActions({
         aria-label={`Actions for ${name}`}
       >
         {item.status === "done" && (
-          <Tooltip label={liked ? "Unlike" : "Like"}>
+          <Tooltip label={ratingLabel("like", liked)}>
             <ActionIcon
               className={`${classes.control} ${classes.like}`}
               data-liked={liked || undefined}
-              aria-label={`${liked ? "Unlike" : "Like"} ${name}`}
+              aria-label={`${ratingLabel("like", liked)} ${name}`}
               aria-pressed={liked}
               variant="default"
               onClick={rating.like}
