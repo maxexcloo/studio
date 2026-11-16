@@ -386,12 +386,25 @@ test("an image shown upscaled is used upscaled, at the original's size", async (
 
 test("Radiance reference settings omit unsupported denoise", async () => {
   const { generationSettings } = await import("./records.js");
+  const { useWorkloadWorkers } = await import("../workers.js");
+  useWorkloadWorkers([
+    {
+      id: "radiance",
+      label: "Radiance",
+      url: "http://radiance:8000",
+      kind: "image",
+      backend: "radiance",
+      gpus: 2,
+    },
+    { id: "comfyui", label: "ComfyUI", url: "http://comfyui:8188", kind: "image" },
+  ]);
   const reference = {
     kind: "image",
-    modelName: "qwen-image.rad",
+    comfyBackend: "radiance",
     referenceAssets: [{ assetId: "reference" }],
     denoise: 0.7,
   };
   assert.equal(generationSettings(reference).denoise, undefined);
-  assert.equal(generationSettings({ ...reference, modelName: "qwen.safetensors" }).denoise, 0.7);
+  assert.equal(generationSettings({ ...reference, comfyBackend: "comfyui" }).denoise, 0.7);
+  useWorkloadWorkers([]);
 });

@@ -64,19 +64,19 @@ def native(file, dtype="F8_E4M3"):
     )
 
 
-class RecipeTests(unittest.TestCase):
-    def test_recipe_follows_the_weights(self):
+class CheckTests(unittest.TestCase):
+    def test_only_plain_weights_convert(self):
         with tempfile.TemporaryDirectory() as directory:
             file = Path(directory) / "model.safetensors"
             native(file)
-            self.assertEqual(convert.recipe(file), "krea-2-fp8-unscaled.recipe")
+            convert.check(file)
             native(file, "BF16")
-            self.assertEqual(convert.recipe(file), "krea-2-fp8.recipe")
+            convert.check(file)
             safetensors(
                 file, {"blocks.0.attn.wq.weight_scale": {"dtype": "F32", "shape": [1]}}
             )
             with self.assertRaisesRegex(ValueError, "scaled or quantised"):
-                convert.recipe(file)
+                convert.check(file)
 
     def test_mapping_renames_tensors_and_keeps_their_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -94,6 +94,129 @@ class RecipeTests(unittest.TestCase):
             safetensors(source, {"unknown.weight": {"dtype": "BF16", "shape": [1]}})
             with self.assertRaisesRegex(ValueError, "not a Krea 2 DiT tensor"):
                 convert.map_transformer(source, target, lambda: False)
+
+    def test_prefixed_native_checkpoint_maps_without_changing_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, target = Path(directory) / "in", Path(directory) / "out"
+            native(source, "BF16")
+            size, tensors = convert.header(source)
+            payload = source.read_bytes()[8 + size :]
+            safetensors(
+                source,
+                {
+                    "model.diffusion_model." + key: value
+                    for key, value in tensors.items()
+                },
+                payload,
+            )
+            convert.map_transformer(source, target, lambda: False)
+            _, mapped = convert.header(target)
+            self.assertIn("transformer_blocks.0.attn.to_q.weight", mapped)
+            self.assertEqual(
+                mapped["transformer_blocks.0.scale_shift_table"]["shape"], [6, 2]
+            )
+            self.assertTrue(target.read_bytes().endswith(payload))
+            safetensors(
+                source,
+                {"model.diffusion_model.unknown": {"dtype": "BF16", "shape": [1]}},
+            )
+            with self.assertRaisesRegex(ValueError, "not a Krea 2 DiT tensor"):
+                convert.map_transformer(source, target, lambda: False)
+
+    def test_prefix_normalisation_rejects_colliding_tensor_names(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, target = Path(directory) / "in", Path(directory) / "out"
+            tensor = {"dtype": "BF16", "shape": [2, 2], "data_offsets": [0, 8]}
+            safetensors(
+                source,
+                {
+                    "blocks.0.attn.wq.weight": tensor,
+                    "model.diffusion_model.blocks.0.attn.wq.weight": tensor,
+                },
+                b"12345678",
+            )
+            with self.assertRaisesRegex(ValueError, "not a Krea 2 DiT tensor"):
+                convert.map_transformer(source, target, lambda: False)
+
+    def test_plan_matches_reference_headers_and_refuses_missing_tensors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, reference, destination = (
+                Path(directory) / name
+                for name in ("source", "reference", "destination")
+            )
+            native(source, "BF16")
+            convert.map_transformer(source, reference, lambda: False)
+            argv = [
+                "convert",
+                "--source",
+                str(source),
+                "--destination",
+                str(destination),
+                "--reference",
+                str(reference),
+                "--plan",
+            ]
+            with patch.object(sys, "argv", argv), patch("builtins.print") as printed:
+                convert.main()
+            self.assertEqual(
+                json.loads(printed.call_args.args[0]),
+                {"planned": True, "tensors": 2, "referenceMatched": True},
+            )
+            self.assertFalse(destination.exists())
+            size, tensors = convert.header(source)
+            payload = source.read_bytes()[8 + size :]
+            tensors.pop("blocks.0.mod.lin")
+            safetensors(source, tensors, payload)
+            with (
+                patch.object(sys, "argv", argv),
+                self.assertRaisesRegex(ValueError, "differ from the reference"),
+            ):
+                convert.main()
+
+    def test_plan_accepts_supported_mixed_float_precisions_without_casting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, reference, destination = (
+                Path(directory) / name
+                for name in ("source", "reference", "destination")
+            )
+            native(source, "BF16")
+            convert.map_transformer(source, reference, lambda: False)
+            tensors = {
+                "blocks.0.attn.wq.weight": {
+                    "dtype": "F16",
+                    "shape": [2, 2],
+                    "data_offsets": [0, 8],
+                },
+                "blocks.0.mod.lin": {
+                    "dtype": "F32",
+                    "shape": [12],
+                    "data_offsets": [8, 56],
+                },
+            }
+            payload = bytes(range(56))
+            safetensors(source, tensors, payload)
+            argv = [
+                "convert",
+                "--source",
+                str(source),
+                "--destination",
+                str(destination),
+                "--reference",
+                str(reference),
+                "--plan",
+            ]
+            with patch.object(sys, "argv", argv), patch("builtins.print"):
+                convert.main()
+            self.assertFalse(destination.exists())
+            convert.map_transformer(source, destination, lambda: False)
+            size, mapped = convert.header(destination)
+            self.assertEqual(
+                mapped["transformer_blocks.0.attn.to_q.weight"]["dtype"], "F16"
+            )
+            self.assertEqual(
+                mapped["transformer_blocks.0.scale_shift_table"]["dtype"], "F32"
+            )
+            self.assertEqual(destination.read_bytes()[8 + size :], payload)
 
 
 class ConversionTests(unittest.TestCase):
@@ -132,7 +255,7 @@ class ConversionTests(unittest.TestCase):
     def start(self, sha256=None):
         data = self.fixture.read_bytes()
         return convert.start(
-            "fine-tune-fp8",
+            "fine-tune-iq8r",
             "https://civitai.com/api/download/models/1?fileId=2",
             len(data),
             sha256 or hashlib.sha256(data).hexdigest(),
@@ -152,7 +275,11 @@ class ConversionTests(unittest.TestCase):
         conversion = self.finish()
         self.assertEqual(conversion["status"], "done", conversion)
         self.assertEqual(conversion["note"], {"profile": "image-fine-tune"})
-        self.assertEqual((self.models / "fine-tune-fp8.rad").read_bytes(), b"rad")
+        self.assertEqual((self.models / "fine-tune-iq8r.rad").read_bytes(), b"rad")
+        self.assertEqual(
+            (self.models / "fine-tunes.yaml").read_text(),
+            "  fine-tune-iq8r:\n    model: /models/radiance/fine-tune-iq8r.rad\n    tp: 1\n",
+        )
         calls = [json.loads(line) for line in self.log.read_text().splitlines()]
         self.assertEqual(len(calls), len(convert.BASE_FILES) + 1)
         self.assertTrue(
@@ -165,12 +292,12 @@ class ConversionTests(unittest.TestCase):
         work = self.models / ".convert"
         self.assertEqual(
             sorted(path.name for path in work.iterdir()),
-            ["fine-tune-fp8.log", "krea-2-turbo", "sources"],
+            ["fine-tune-iq8r.log", "krea-2-turbo", "sources"],
         )
         self.assertEqual(list((work / "sources").iterdir()), [])
         with self.assertRaisesRegex(ValueError, "already exists"):
             self.start()
-        convert.clear("fine-tune-fp8")
+        convert.clear("fine-tune-iq8r")
         self.assertIsNone(convert.status()["conversion"])
 
     def test_a_mismatched_download_fails_and_is_removed(self):
@@ -179,7 +306,7 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(conversion["status"], "failed")
         self.assertIn("checksum", conversion["error"])
         self.assertEqual(list((self.models / ".convert/sources").iterdir()), [])
-        self.assertFalse((self.models / "fine-tune-fp8.rad").exists())
+        self.assertFalse((self.models / "fine-tune-iq8r.rad").exists())
 
     def test_cancel_stops_the_download_and_keeps_its_partial(self):
         with patch.dict(os.environ, {"CURL_SLEEP": "1"}):

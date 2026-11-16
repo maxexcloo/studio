@@ -232,20 +232,30 @@ test("readiness follows the selected backend, with the reason, and never falls b
     noteWorkerProfiles("second", [comfyOnly]);
     noteWorkerProfiles("primary", [everything]);
     assert.equal(
-      routeJob("image", { profileId: "custom:combined@comfyui" })?.id,
+      routeJob("image", { profileId: "custom:combined", backend: "comfyui" })?.id,
       "primary",
       "both workers can run ComfyUI; the first wins",
     );
     // A worker that just failed to answer is passed over, and tried again a minute later.
     noteWorkerReachable("primary", false);
-    assert.equal(routeJob("image", { profileId: "custom:combined@comfyui" })?.id, "second");
+    assert.equal(
+      routeJob("image", { profileId: "custom:combined", backend: "comfyui" })?.id,
+      "second",
+    );
     noteWorkerReachable("primary", false, undefined, Date.now() - 61_000);
-    assert.equal(routeJob("image", { profileId: "custom:combined@comfyui" })?.id, "primary");
+    assert.equal(
+      routeJob("image", { profileId: "custom:combined", backend: "comfyui" })?.id,
+      "primary",
+    );
     noteWorkerProfiles("primary", []);
-    assert.equal(routeJob("image", { profileId: "custom:combined@comfyui" })?.id, "second");
+    assert.equal(
+      routeJob("image", { profileId: "custom:combined", backend: "comfyui" })?.id,
+      "second",
+    );
     // Queued work never moves to a worker Studio scales until it answers, so it can't bounce
     // between a busy worker and a stopped one due a retry; one Studio doesn't scale stays a choice.
-    const targets = (scaled) => moveTargets("image", "", () => scaled).map((worker) => worker.id);
+    const targets = (scaled) =>
+      moveTargets("image", "", "", () => scaled).map((worker) => worker.id);
     assert.deepEqual(targets(true), []);
     assert.deepEqual(targets(false), ["primary", "second"]);
     noteWorkerReachable("primary", true);

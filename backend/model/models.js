@@ -10,6 +10,7 @@ import {
 import { families } from "../family-catalogue.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
 import { canonicalProfileId } from "../profile/store.js";
+import { radianceImageLimits, radianceImageNode } from "../providers/radiance.ts";
 import { classifyModel } from "./families.js";
 
 function modelBasename(name = "") {
@@ -261,7 +262,8 @@ export function inferModels(
     "VAEDecode",
     "SaveImage",
   ]);
-  if (!configuredOnly && missingCoreImageNodes.length) {
+  // A Radiance worker runs only Radiance nodes (providers/radiance.ts).
+  if (!configuredOnly && missingCoreImageNodes.length && !info?.[radianceImageNode]) {
     return emptyModelResult({
       reason: `ComfyUI is missing required image nodes: ${missingCoreImageNodes.join(", ")}`,
     });
@@ -283,6 +285,9 @@ export function inferModels(
 
   // Why a workflow can't run on this worker, in words; "" when it can.
   const unready = (workflow) => {
+    const model = String(workflow.defaults?.model || "");
+    if (stats.radiance?.some((item) => item.id === model && item.state === "failed"))
+      return `Radiance failed to load ${model}`;
     const missing = missingNodes(info, workflow.requiredNodes);
     return missing.length
       ? `missing ${missing.join(", ")} on this worker`
@@ -314,6 +319,11 @@ export function inferModels(
           familyStep,
         )
       : {};
+    if (Object.values(workflow.graph || {}).some((node) => node.class_type === radianceImageNode)) {
+      const { maxSide } = radianceImageLimits(String(defaults.model || ""));
+      widthRange.max = Math.min(widthRange.max ?? maxSide, maxSide);
+      heightRange.max = Math.min(heightRange.max ?? maxSide, maxSide);
+    }
     const countRange = controls.count
       ? nodeRange(info, workflow.graph?.[controls.count.node]?.class_type, controls.count.input, {
           default: Number(defaults.count || 1),
@@ -456,12 +466,13 @@ export function inferModels(
       mediaInputs: workflow.mediaInputs || [],
       aspectPolicy: workflow.aspectPolicy,
       maxLoras: workflow.loraStack?.max,
+      loraAdapter: workflow.loraStack?.adapter,
       backend: workflow.backend,
       // Radiance composes the stack into a rank-limited adapter.
-      ...(workflow.kind === "video" && workflow.loraStack?.adapter === "radiance-tags-v1"
+      ...(workflow.loraStack?.adapter === "radiance-tags-v1"
         ? {
             loraNote:
-              "Radiance approximates combined LoRAs above rank 64. Use ComfyUI for exact application.",
+              "Radiance combines adapters at rank 64. Larger combinations can be approximate.",
           }
         : {}),
     });

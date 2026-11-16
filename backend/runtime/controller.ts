@@ -33,6 +33,8 @@ export interface Workload {
   /** A media workload's worker id and what it runs (workers.js), for workers derived from workloads. */
   worker?: string;
   capabilities?: string[];
+  /** A media workload's backend (workers.js): comfyui unless it says radiance. */
+  backend?: string;
 }
 
 interface RuntimeEngine {
