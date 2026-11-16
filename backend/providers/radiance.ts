@@ -1,4 +1,4 @@
-import { Agent, fetch as undiciFetch } from "undici";
+import { Agent, FormData, fetch as undiciFetch } from "undici";
 /**
  * Radiance as a worker: Studio calls its OpenAI-style media API directly. A profile's Radiance
  * backend stays a one-node graph (RadianceImageGenerate or RadianceVideoGenerate beside its save
@@ -283,7 +283,7 @@ export class RadianceClient {
       redirect: "error",
       signal: signal || AbortSignal.timeout(30_000),
       ...(body && !multipart ? { headers: { "content-type": "application/json" } } : {}),
-      ...(body ? { body: multipart ? body : JSON.stringify(body) } : {}),
+      ...(body ? { body: multipart ? (body as unknown as BodyInit) : JSON.stringify(body) } : {}),
     });
     if (!response.ok) {
       const text = await response.text().catch(() => "");
