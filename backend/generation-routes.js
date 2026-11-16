@@ -36,6 +36,7 @@ import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {
   capabilityForProfile,
   defaultWorkerId,
+  isRadianceWorker,
   listWorkers,
   noWorkerMessage,
   workerById,
@@ -52,6 +53,7 @@ export function createGenerationSubmission({
   mediaModels,
   comfyDownMessage,
   prompting,
+  store,
 }) {
   /**
    * Which worker runs this generation (workers.js): one that has the
@@ -352,7 +354,12 @@ export function createGenerationSubmission({
         body.prompt = prompt;
       }
     }
-    if (body.referenceAssets?.length && !body.referenceAssets.every((item) => item.comfyName)) {
+    // Radiance uploads references with its request rather than staging them in ComfyUI.
+    if (
+      !isRadianceWorker(workerById(backend)) &&
+      body.referenceAssets?.length &&
+      !body.referenceAssets.every((item) => item.comfyName)
+    ) {
       try {
         body.referenceAssets = await stageReferenceAssetsForAccount(
           backend,
@@ -458,6 +465,7 @@ export function createGenerationSubmission({
     setTimeout(
       () =>
         runJob(id, body, {
+          store,
           prepare: body.autoUpscale ? (graph) => smartUpscalePrepare(graph, body) : null,
         }).catch(() => null),
       0,

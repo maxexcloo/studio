@@ -404,6 +404,8 @@ const loaderOptionKeys = {
   CLIPLoader: ["clip_name"],
   VAELoader: ["vae_name"],
   UpscaleModelLoader: ["model_name"],
+  RadianceImageGenerate: ["model"],
+  RadianceVideoGenerate: ["model"],
 };
 
 /** What each loader reads, in words, and the models subfolder ComfyUI reads it from. */
@@ -413,6 +415,8 @@ const loaderKinds = {
   CLIPLoader: ["text encoder", "text_encoders"],
   VAELoader: ["VAE", "vae"],
   UpscaleModelLoader: ["upscale model", "upscale_models"],
+  RadianceImageGenerate: ["Radiance model", ""],
+  RadianceVideoGenerate: ["Radiance model", ""],
 };
 
 function schemaOptions(info, classType, input) {
@@ -447,9 +451,10 @@ export function workflowMissingFiles(workflow, info = {}) {
 
 export function workflowOptionIssues(workflow, info = {}) {
   // Said as the file and where it goes; node ids mean nothing outside the graph editor.
-  return workflowMissingFiles(workflow, info).map(
-    ({ file, kind, folder }) =>
-      `Missing ${kind}: ${file}. Put it in ComfyUI's models/${folder} folder.`,
+  return workflowMissingFiles(workflow, info).map(({ file, kind, folder }) =>
+    folder
+      ? `Missing ${kind}: ${file}. Put it in ComfyUI's models/${folder} folder.`
+      : `Radiance doesn't serve ${file}.`,
   );
 }
 

@@ -56,6 +56,7 @@ import { StrengthControl } from "./StrengthControl";
 import classes from "./LoraPicker.module.css";
 export interface LoraInfo {
   title?: string;
+  unavailableReason?: string;
   sourceUrl?: string;
   families?: string[];
   type?: string;
@@ -97,8 +98,13 @@ const fitsFamily = (families: string[], family: string) =>
 /** The profile's LoRAs that submitting accepts. */
 export const compatibleLoras = (profile: Profile | undefined, metadata: Record<string, LoraInfo>) =>
   (profile?.options?.loras || []).filter(
-    (file) => loraCompatibility(metadata[file], profile) !== "other",
+    (file) =>
+      loraCompatibility(metadata[file], profile) !== "other" &&
+      !unavailableFor(profile, metadata[file]),
   );
+/** Why a LoRA can't run on this profile: its deferral covers only Radiance's composed adapter. */
+export const unavailableFor = (profile: Profile | undefined, info?: LoraInfo) =>
+  profile?.loraAdapter === "radiance-tags-v1" ? info?.unavailableReason : undefined;
 
 const ratingOrder = (rating?: Rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);
 /** The LoRA choices' orders: by rating (the default every LoRA list shares), or by name. */
@@ -396,6 +402,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
           label={title(file)}
           title={title(file)}
           detail={
+            unavailableFor(profile, metadata[file]) ||
             [
               familiesOf(file)
                 .map((key) => modelFamilyLabel(key))
@@ -403,10 +410,12 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
               typeNames[typeOf(file)] || typeOf(file),
             ]
               .filter(Boolean)
-              .join(" · ") || undefined
+              .join(" · ") ||
+            undefined
           }
           image={previews.data?.previews[file]}
           placeholder={icons.loras}
+          disabled={Boolean(unavailableFor(profile, metadata[file])) && !selected.has(file)}
           selected={selected.has(file)}
           row
           onToggle={() => toggle(file)}
@@ -618,6 +627,7 @@ function LoraStack(props: LoraPickerProps) {
                   title={title(lora.name)}
                   info={metadata[lora.name]}
                   compatible={compatible.includes(lora.name)}
+                  unavailable={unavailableFor(profile, metadata[lora.name])}
                   onChange={(patch) =>
                     update(
                       input.loras.map((item) =>
@@ -641,6 +651,7 @@ function StackEntry({
   title,
   info,
   compatible,
+  unavailable,
   onChange,
   onRemove,
 }: {
@@ -648,6 +659,7 @@ function StackEntry({
   title: string;
   info?: LoraInfo;
   compatible: boolean;
+  unavailable?: string;
   onChange: (patch: Partial<Lora>) => void;
   onRemove: () => void;
 }) {
@@ -701,7 +713,7 @@ function StackEntry({
         )}
         {!compatible && (
           <Text size="xs" c="yellow">
-            This profile can't use this LoRA. Disable or remove it.
+            {unavailable || "This profile can't use this LoRA. Disable or remove it."}
           </Text>
         )}
         {info?.sourceUrl && (

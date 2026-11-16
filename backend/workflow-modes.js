@@ -8,7 +8,9 @@ export function resolveImageMode(workflow, body) {
 }
 
 export function selectImageMode(workflow, body) {
-  const references = (body.referenceAssets || []).filter((item) => item?.comfyName);
+  const references = (body.referenceAssets || []).filter(
+    (item) => item?.assetId || item?.comfyName,
+  );
   const hasImage = hasReferenceImage(body);
   const mode = resolveImageMode(workflow, body);
   if (mode === workflow && workflow.kind !== "video") return workflow;
