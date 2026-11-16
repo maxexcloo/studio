@@ -428,7 +428,7 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   });
 });
 
-test("Viewer prompt keeps edit actions with no assistant tools and restores its original text", async ({
+test("Viewer prompt offers Reset once edited, without a menu, and restores its original text", async ({
   page,
 }, testInfo) => {
   const { viewer } = await seed(page, {}, async (page) => {
@@ -442,17 +442,17 @@ test("Viewer prompt keeps edit actions with no assistant tools and restores its 
   const surface = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
   const more = surface.getByRole("button", { name: "More Prompt Actions", exact: true });
-  await expect(more).toBeDisabled();
+  if (phone) await expect(more).toBeDisabled();
+  else await expect(more).toHaveCount(0);
+  const edit = (name: string) => surface.getByRole("button", { name, exact: true });
+  await expect(edit("Reset")).toHaveCount(0);
   await field.fill("A bird at night");
-  const edit = async (name: string) => {
-    if (phone) return surface.getByRole("button", { name, exact: true }).click();
-    await more.click();
-    await page.getByRole("menuitem", { name, exact: true }).click();
-  };
   if (phone) await expect(surface.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
-  await edit("Reset");
+  await edit("Reset").click();
   await expect(field).toHaveValue("An amber bird");
-  await edit("Undo");
+  // Desktop edits keep the prompt focused, so the bar stays open.
+  if (!phone) await expect(field).toBeFocused();
+  await edit("Undo").click();
   await expect(field).toHaveValue("A bird at night");
 });
 
@@ -1783,9 +1783,9 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       "Recreate",
       "Upscale",
       "AI",
+      "Share",
       "Like",
       "Dislike",
-      "Share",
       "Delete",
     ].map((name) => bar.getByRole("button", { name, exact: true }));
     const tops = await Promise.all(

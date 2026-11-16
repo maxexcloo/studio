@@ -8,6 +8,7 @@ import {
   type ModalProps,
   Textarea,
   type TextareaProps,
+  Tooltip,
   VisuallyHidden,
   getDefaultZIndex,
   useProps,
@@ -201,102 +202,120 @@ export function TextBox({
   // Keep every option under its tool's name, including its later action groups.
   const listed = tools?.filter((action) => action.menu) || [];
   const others = tools?.filter((action) => !action.menu) || [];
-  const menu = tools !== undefined && (
-    <Menu
-      position="top-end"
-      width={menuWidth}
-      // A long list scrolls within the room the page leaves it.
-      middlewares={{ size: true }}
-      // Above any dialog holding the box: a card's sits over the popovers it opens from.
-      zIndex={getDefaultZIndex("max")}
-      opened={menuOpened}
-      onChange={setMenuOpened}
-      onOpen={() => {
-        openedFrom.current = document.activeElement;
-        tools.forEach((tool) => tool.onOpen?.());
-      }}
-      // An item that moves focus itself keeps it; otherwise it returns.
-      returnFocus={false}
-      onClose={() =>
-        setTimeout(() => {
-          const active = document.activeElement;
-          if (
-            !active ||
-            active === document.body ||
-            (ai &&
-              !editing &&
-              openedFrom.current?.tagName !== "TEXTAREA" &&
-              active === openedFrom.current)
-          )
-            more.current?.focus({ preventScroll: true });
-        })
-      }
-    >
-      <PopupTooltip label={busy || (ai ? "AI Actions" : "More Actions")}>
-        <Menu.Target>
-          {mobile && !ai ? (
-            <Button
-              ref={more}
-              onMouseDown={focusTool}
-              variant="subtle"
-              color="gray"
-              size="compact-xs"
-              aria-label={`More ${title} Actions`}
-              disabled={tools.length === 0 && (mobile || edits.length === 0)}
-              aria-busy={Boolean(busy) || undefined}
-              aria-description={busy}
-              leftSection={busy ? <Loader size={16} /> : undefined}
-            >
-              More
-            </Button>
-          ) : (
-            <ActionIcon
-              ref={more}
-              onMouseDown={focusTool}
-              variant="subtle"
-              color="gray"
-              aria-label={`${ai ? "AI" : "More"} ${title} Actions`}
-              disabled={tools.length === 0 && (mobile || edits.length === 0)}
-              aria-busy={Boolean(busy) || undefined}
-              aria-description={busy}
-            >
-              {busy ? (
-                <Loader size={16} />
-              ) : ai ? (
-                <icons.assistant size={18} />
+  // With no tools or Copy, a desktop box's Clear, Reset or Undo stands alone, shown while it can act.
+  const lone = !mobile && tools?.length === 0 && !copy;
+  const edit = edits.find((action) => !action.disabled);
+  const menu = lone
+    ? (busy || edit) && (
+        <Tooltip label={busy || edit!.label}>
+          <ActionIcon
+            onMouseDown={keepFocus}
+            variant="subtle"
+            color="gray"
+            aria-label={edit?.label ?? busy}
+            loading={Boolean(busy)}
+            onClick={edit?.onClick}
+          >
+            {edit?.icon && <edit.icon size={16} />}
+          </ActionIcon>
+        </Tooltip>
+      )
+    : tools !== undefined && (
+        <Menu
+          position="top-end"
+          width={menuWidth}
+          // A long list scrolls within the room the page leaves it.
+          middlewares={{ size: true }}
+          // Above any dialog holding the box: a card's sits over the popovers it opens from.
+          zIndex={getDefaultZIndex("max")}
+          opened={menuOpened}
+          onChange={setMenuOpened}
+          onOpen={() => {
+            openedFrom.current = document.activeElement;
+            tools.forEach((tool) => tool.onOpen?.());
+          }}
+          // An item that moves focus itself keeps it; otherwise it returns.
+          returnFocus={false}
+          onClose={() =>
+            setTimeout(() => {
+              const active = document.activeElement;
+              if (
+                !active ||
+                active === document.body ||
+                (ai &&
+                  !editing &&
+                  openedFrom.current?.tagName !== "TEXTAREA" &&
+                  active === openedFrom.current)
+              )
+                more.current?.focus({ preventScroll: true });
+            })
+          }
+        >
+          <PopupTooltip label={busy || (ai ? "AI Actions" : "More Actions")}>
+            <Menu.Target>
+              {mobile && !ai ? (
+                <Button
+                  ref={more}
+                  onMouseDown={focusTool}
+                  variant="subtle"
+                  color="gray"
+                  size="compact-xs"
+                  aria-label={`More ${title} Actions`}
+                  disabled={tools.length === 0 && (mobile || edits.length === 0)}
+                  aria-busy={Boolean(busy) || undefined}
+                  aria-description={busy}
+                  leftSection={busy ? <Loader size={16} /> : undefined}
+                >
+                  More
+                </Button>
               ) : (
-                <icons.more size={18} />
+                <ActionIcon
+                  ref={more}
+                  onMouseDown={focusTool}
+                  variant="subtle"
+                  color="gray"
+                  aria-label={`${ai ? "AI" : "More"} ${title} Actions`}
+                  disabled={tools.length === 0 && (mobile || edits.length === 0)}
+                  aria-busy={Boolean(busy) || undefined}
+                  aria-description={busy}
+                >
+                  {busy ? (
+                    <Loader size={16} />
+                  ) : ai ? (
+                    <icons.assistant size={18} />
+                  ) : (
+                    <icons.more size={18} />
+                  )}
+                </ActionIcon>
               )}
-            </ActionIcon>
-          )}
-        </Menu.Target>
-      </PopupTooltip>
-      <Menu.Dropdown style={{ overflowY: "auto" }}>
-        {!mobile && <ActionMenuItems groups={[edits]} />}
-        {!mobile && edits.length > 0 && (listed.length > 0 || others.length > 0) && (
-          <Menu.Divider />
-        )}
-        {listed.map((tool, index) => (
-          <Fragment key={tool.id}>
-            {index > 0 && <Menu.Divider />}
-            {!tool.menu!.flat().some((option) => option.heading) && (
-              <Menu.Label>{tool.label}</Menu.Label>
+            </Menu.Target>
+          </PopupTooltip>
+          <Menu.Dropdown style={{ overflowY: "auto" }}>
+            {!mobile && <ActionMenuItems groups={[edits]} />}
+            {!mobile && edits.length > 0 && (listed.length > 0 || others.length > 0) && (
+              <Menu.Divider />
             )}
-            <ActionMenuItems
-              groups={tool.menu!.map((group) =>
-                group.map((option) => ({
-                  ...option,
-                  disabled: option.disabled || tool.disabled,
-                })),
-              )}
-            />
-          </Fragment>
-        ))}
-        {listed.length > 0 && others.length > 0 && <Menu.Divider />}
-        <ActionMenuItems groups={[others]} />
-      </Menu.Dropdown>
-    </Menu>
-  );
+            {listed.map((tool, index) => (
+              <Fragment key={tool.id}>
+                {index > 0 && <Menu.Divider />}
+                {!tool.menu!.flat().some((option) => option.heading) && (
+                  <Menu.Label>{tool.label}</Menu.Label>
+                )}
+                <ActionMenuItems
+                  groups={tool.menu!.map((group) =>
+                    group.map((option) => ({
+                      ...option,
+                      disabled: option.disabled || tool.disabled,
+                    })),
+                  )}
+                />
+              </Fragment>
+            ))}
+            {listed.length > 0 && others.length > 0 && <Menu.Divider />}
+            <ActionMenuItems groups={[others]} />
+          </Menu.Dropdown>
+        </Menu>
+      );
   // A labelled box keeps its tools inside the text's corner, sharing its edge with the form's fields.
   const inside = Boolean(!mobile && !send && !hideTools && props.label && tools);
   const boxTools = (

@@ -4,6 +4,7 @@ import {
   Collapse,
   Divider,
   type FloatingPosition,
+  Loader,
   Menu,
   Paper,
   type PaperProps,
@@ -236,7 +237,14 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
           <Menu.Item
             key={id}
             color={color}
-            leftSection={Icon && <Icon size={16} fill={pressed ? "currentColor" : "none"} />}
+            leftSection={
+              action.loading ? (
+                <Loader size={14} />
+              ) : (
+                Icon && <Icon size={16} fill={pressed ? "currentColor" : "none"} />
+              )
+            }
+            aria-busy={action.loading || undefined}
             rightSection={
               isSetting(action) ? (
                 // The row is the control; the switch only shows its state.

@@ -138,18 +138,18 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // Select, then AI, Report, Like, Dislike | Animate, Edit, Recreate, Upscale | Share, Delete.
+  // Select, then AI, Share | Like, Dislike | Animate, Edit, Recreate, Upscale | Report, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Select",
     "AI",
-    "Report",
+    "Share",
     "Like",
     "Dislike",
     "Animate",
     "Edit",
     "Recreate",
     "Upscale",
-    "Share",
+    "Report",
     "Delete",
   ]);
   await page.keyboard.press("Escape");

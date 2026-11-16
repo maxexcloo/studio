@@ -146,10 +146,31 @@ export function SendButton({
 }
 
 /**
+ * Suggested options then Refresh…, which reads Loading… in their place while they load, and with
+ * none one No Suggestions line.
+ */
+export function suggested(
+  loading: boolean,
+  list: Action[],
+  refresh: Pick<Action, "disabled" | "onClick">,
+): { options: Action[]; again: Action } {
+  return {
+    options: loading
+      ? []
+      : list.length
+        ? list
+        : [{ id: "none", label: "No Suggestions", disabled: true }],
+    // Never disabled while it works, only inert: a disabled item drops focus out of the open menu.
+    again: loading
+      ? { id: "refresh", label: "Loading…", icon: icons.refresh, loading: true, keepOpen: true }
+      : { id: "refresh", label: "Refresh…", icon: icons.refresh, keepOpen: true, ...refresh },
+  };
+}
+
+/**
  * Suggestions: short changes that fit the image or draft (`query`), asked for as soon as one is
  * picked, as an action whose options are the changes, then Refresh… to ask for different ones
- * (`fresh`) in their place. They load once `enabled` and stay cached per item or prompt. While they
- * load one Loading… row stands in for them, and with none one No Suggestions line.
+ * (`fresh`) in their place. They load once `enabled` and stay cached per item or prompt.
  */
 export function useChangeSuggestions<K extends QueryKey>({
   query,
@@ -174,24 +195,15 @@ export function useChangeSuggestions<K extends QueryKey>({
     .slice(0, maxSuggestions)
     .sort((a, b) => a.label.localeCompare(b.label));
   const loading = refresh.isPending || (steps.isFetching && !list.length);
-  const again: Action = {
-    id: "refresh",
-    label: "Refresh…",
-    icon: icons.refresh,
-    // Never disabled while it works: a disabled item drops focus out of the open menu.
-    disabled,
-    keepOpen: true,
-    onClick: () => refresh.mutate(),
-  };
-  const options: Action[] = loading
-    ? [{ id: "thinking", label: "Loading…", disabled: true }]
-    : list.length
-      ? list.map((step) => ({
-          id: `step:${step.label}`,
-          label: step.label,
-          onClick: () => onPick(step.request),
-        }))
-      : [{ id: "none", label: "No Suggestions", disabled: true }];
+  const { options, again } = suggested(
+    loading,
+    list.map((step) => ({
+      id: `step:${step.label}`,
+      label: step.label,
+      onClick: () => onPick(step.request),
+    })),
+    { disabled, onClick: () => refresh.mutate() },
+  );
   const action: Action = {
     id: "suggestions",
     label: "Suggestions",

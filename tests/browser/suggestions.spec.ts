@@ -141,8 +141,10 @@ test("The viewer directly offers Suggested and Templates without styles or item 
   await page.keyboard.press("Escape");
   await expect(viewer.getByRole("button", { name: "AI", exact: true })).toBeFocused();
   await viewerPromptMenu(page);
+  // Refresh… reads Loading… while they load, with no placeholder row.
   const thinking = menu.getByRole("menuitem", { name: "Loading…", exact: true });
-  await expect(thinking).toBeDisabled();
+  await expect(thinking).toHaveAttribute("aria-busy", "true");
+  await expect(menu.getByRole("menuitem", { name: "Refresh…", exact: true })).toHaveCount(0);
   release[0]();
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
@@ -357,11 +359,7 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   };
   const edited = "An amber bird over a misty harbour";
   const surface = await editPrompt("An amber bird in bright sunlight");
-  if (phone) await surface.getByRole("button", { name: "Reset", exact: true }).click();
-  else {
-    const tools = await promptMenu(viewer, "Prompt");
-    await tools.getByRole("menuitem", { name: "Reset", exact: true }).click();
-  }
+  await surface.getByRole("button", { name: "Reset", exact: true }).click();
   await closeTextEditor(page, "Prompt");
   let menu = await viewerPromptMenu(page);
   const review = () => menu.getByRole("menuitem", { name: "Review Prompt", exact: true });

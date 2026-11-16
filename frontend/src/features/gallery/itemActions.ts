@@ -19,12 +19,13 @@ type ItemActionId = keyof typeof definitions;
 const menus: ItemActionId[] = ["animate", "edit", "recreate", "upscale"];
 // Retry and Stop lead for unfinished work and running upscales; Like comes before Dislike and
 // Delete last.
-const middle: ItemActionId[] = ["ai", "report", "like", "dislike"];
-const others: ItemActionId[] = ["share", "delete"];
-/** Bars: Animate, Edit, Recreate, Upscale | AI, Report, Like, Dislike | Share, Delete. */
-const barSections: ItemActionId[][] = [["retry", "stop", ...menus], middle, others];
-/** Menus put AI and the rating first: AI, Report, Like, Dislike ── the four menus ── Share, Delete. */
-const menuSections: ItemActionId[][] = [["retry", "stop"], middle, menus, others];
+const assist: ItemActionId[] = ["ai", "share"];
+const rating: ItemActionId[] = ["like", "dislike"];
+const others: ItemActionId[] = ["report", "delete"];
+/** Bars: Animate, Edit, Recreate, Upscale | AI, Share | Like, Dislike | Report, Delete. */
+const barSections: ItemActionId[][] = [["retry", "stop", ...menus], assist, rating, others];
+/** Menus: AI, Share | Like, Dislike | the four menus | Report, Delete. */
+const menuSections: ItemActionId[][] = [["retry", "stop"], assist, rating, menus, others];
 /** Bars name Retry, Stop and the four menus; the rest are icons. */
 export const namedItemActions: string[] = ["retry", "stop", ...menus];
 
