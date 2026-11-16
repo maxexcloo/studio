@@ -143,7 +143,7 @@ test("The viewer directly offers Suggested and Templates without styles or item 
   await viewerPromptMenu(page);
   // Refresh… reads Loading… while they load, with no placeholder row.
   const thinking = menu.getByRole("menuitem", { name: "Loading…", exact: true });
-  await expect(thinking).toHaveAttribute("aria-busy", "true");
+  await expect(thinking).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Refresh…", exact: true })).toHaveCount(0);
   release[0]();
   await expect(menu.getByRole("menuitem")).toHaveText([

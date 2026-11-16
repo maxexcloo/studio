@@ -244,7 +244,6 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                 Icon && <Icon size={16} fill={pressed ? "currentColor" : "none"} />
               )
             }
-            aria-busy={action.loading || undefined}
             rightSection={
               isSetting(action) ? (
                 // The row is the control; the switch only shows its state.
