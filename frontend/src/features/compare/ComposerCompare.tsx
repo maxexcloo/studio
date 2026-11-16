@@ -55,7 +55,7 @@ import {
 const noChoices: string[] = [];
 const defaultStrengths = [0, 0.6, 0.8, 1];
 const strengthOptions = [0, 0.4, 0.6, 0.8, 1, 1.2];
-const axes = ["Models", "LoRAs", "LoRA Strengths", "Resolutions", "Seeds", "Prompts"];
+const axes = ["Model", "LoRA", "LoRA Strength", "Resolution", "Seed", "Prompt"];
 
 const modelName = (name: string) =>
   name
@@ -69,7 +69,8 @@ export function CompareMenu() {
   const metadata = useQuery(loraInfoQuery);
   const info = metadata.data?.loras ?? {};
   const [opened, setOpened] = useState(false);
-  const [axis, setAxis] = useRemembered("compare-axis", "Models");
+  const [remembered, setAxis] = useRemembered("compare-axis", "Model");
+  const axis = axes.includes(remembered) ? remembered : "Model";
   const [models, setModels] = useRemembered("compare-models", noChoices);
   const [loras, setLoras] = useRemembered("compare-loras", noChoices);
   const [withoutLora, setWithoutLora] = useRemembered("compare-without-lora", true);
@@ -103,24 +104,24 @@ export function CompareMenu() {
   );
   const text = prompts ?? input.prompt;
   const count =
-    axis === "Models"
+    axis === "Model"
       ? chosen.length + 1
-      : axis === "LoRAs"
+      : axis === "LoRA"
         ? selectedLoras.length + Number(withoutLora)
-        : axis === "LoRA Strengths"
+        : axis === "LoRA Strength"
           ? compatible.includes(loraFile)
             ? strengths.length
             : 0
-          : axis === "Resolutions"
+          : axis === "Resolution"
             ? selectedSizes.length
-            : axis === "Seeds"
+            : axis === "Seed"
               ? Number(seeds)
               : promptLines(text).length;
   const close = () => setOpened(false);
   const stage = () => {
     let inputs: GenerationInput[];
-    if (axis === "Models") inputs = modelInputs(input, chosen);
-    else if (axis === "LoRAs")
+    if (axis === "Model") inputs = modelInputs(input, chosen);
+    else if (axis === "LoRA")
       inputs = loraInputs(
         input,
         selectedLoras.map((name) => ({
@@ -131,14 +132,14 @@ export function CompareMenu() {
         })),
         withoutLora,
       );
-    else if (axis === "LoRA Strengths") inputs = strengthInputs(input, loraFile, strengths);
-    else if (axis === "Resolutions")
+    else if (axis === "LoRA Strength") inputs = strengthInputs(input, loraFile, strengths);
+    else if (axis === "Resolution")
       inputs = selectedSizes.map((size) =>
         native.length
           ? { ...input, resolution: size }
           : withResolution({ ...input, resolutionTier: size as Resolution }, effective),
       );
-    else if (axis === "Seeds") inputs = seedInputs(input, Number(seeds));
+    else if (axis === "Seed") inputs = seedInputs(input, Number(seeds));
     else inputs = promptInputs({ ...input, prompt: text });
     setDraft((previous) => compareInputs(previous, inputs));
     close();
@@ -181,7 +182,7 @@ export function CompareMenu() {
           comboboxProps={{ withinPortal: false }}
           onChange={(value) => setAxis(value!)}
         />
-        {axis === "Models" && (
+        {axis === "Model" && (
           <>
             <MultiSelect
               {...selection}
@@ -198,7 +199,7 @@ export function CompareMenu() {
             </Text>
           </>
         )}
-        {axis === "LoRAs" && (
+        {axis === "LoRA" && (
           <>
             <MultiSelect
               {...selection}
@@ -217,7 +218,7 @@ export function CompareMenu() {
             />
           </>
         )}
-        {axis === "LoRA Strengths" && (
+        {axis === "LoRA Strength" && (
           <>
             <Select
               {...selection}
@@ -241,7 +242,7 @@ export function CompareMenu() {
             />
           </>
         )}
-        {axis === "Resolutions" && (
+        {axis === "Resolution" && (
           <MultiSelect
             label="Resolutions"
             data={sizeOptions}
@@ -251,7 +252,7 @@ export function CompareMenu() {
             nothingFoundMessage="No native resolutions available"
           />
         )}
-        {axis === "Seeds" && (
+        {axis === "Seed" && (
           <NumberInput
             label="Seeds"
             min={compareVariants.min}
@@ -260,7 +261,7 @@ export function CompareMenu() {
             onChange={(value) => setSeeds(String(value))}
           />
         )}
-        {axis === "Prompts" && (
+        {axis === "Prompt" && (
           <TextBox
             label="Prompts"
             description="One variant per line."

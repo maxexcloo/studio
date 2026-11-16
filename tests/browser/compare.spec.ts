@@ -138,7 +138,7 @@ test("Compare ▾ builds several variants at once from prompt lines and seeds", 
   const state = await fixtures(page);
   await create(page);
   await prompt(page).fill("A copper fox\nA silver fox\nA golden fox");
-  await axis(page, "Prompts");
+  await axis(page, "Prompt");
   await start(page);
   await expect(variants(page).getByRole("radio")).toHaveCount(3);
   await expect(prompt(page)).toHaveValue("A copper fox");
@@ -150,7 +150,7 @@ test("Compare ▾ builds several variants at once from prompt lines and seeds", 
   await expect(prompt(page)).toHaveValue("A silver fox");
 
   // Seeds start over from the variant being edited, each run with its own seed.
-  const setup = await axis(page, "Seeds");
+  const setup = await axis(page, "Seed");
   await setup.getByRole("textbox", { name: "Seeds", exact: true }).fill("3");
   await start(page);
   await expect(variants(page).getByRole("radio")).toHaveCount(3);
@@ -175,7 +175,7 @@ test("Compare ▾ builds variants across a LoRA's strengths and across models", 
     .click();
   await closeLoras(page);
 
-  const strengths = await axis(page, "LoRA Strengths");
+  const strengths = await axis(page, "LoRA Strength");
   await strengths.getByRole("combobox", { name: "LoRA", exact: true }).click();
   await page.getByRole("option", { name: "Detail Slider", exact: true }).click();
   const values = strengths.getByRole("combobox", { name: "Strengths", exact: true });
@@ -187,7 +187,7 @@ test("Compare ▾ builds variants across a LoRA's strengths and across models", 
   await expect(variants(page).getByRole("radio")).toHaveCount(4);
 
   // Models start over from the variant being edited (A, without the LoRA), keeping its seed.
-  const models = await axis(page, "Models");
+  const models = await axis(page, "Model");
   await expect(models.getByRole("button", { name: "Start Comparing", exact: true })).toBeDisabled();
   const search = models.getByRole("combobox", { name: "Models", exact: true });
   await search.fill("Fast");
@@ -226,7 +226,7 @@ test("Compare searches a long model list, reaches its last choice and retains th
   ]);
   await create(page);
   await prompt(page).fill("A copper fox");
-  const setup = await axis(page, "Models");
+  const setup = await axis(page, "Model");
   const search = setup.getByRole("combobox", { name: "Models", exact: true });
   if (testInfo.project.use.isMobile) await expect(search).not.toBeFocused();
   await search.click();
@@ -270,7 +270,7 @@ test("Compare stages compatible LoRAs from an empty stack and only the model's n
   ]);
   await create(page);
   await prompt(page).fill("A copper fox");
-  const loras = await axis(page, "LoRAs");
+  const loras = await axis(page, "LoRA");
   const choices = loras.getByRole("combobox", { name: "LoRAs", exact: true });
   await choices.fill("Detail");
   await page.getByRole("option", { name: "Detail Slider", exact: true }).click();
@@ -280,7 +280,7 @@ test("Compare stages compatible LoRAs from an empty stack and only the model's n
   await start(page);
   await expect(variants(page).getByRole("radio")).toHaveCount(3);
   await variants(page).getByText("B", { exact: true }).click();
-  const resolutions = await axis(page, "Resolutions");
+  const resolutions = await axis(page, "Resolution");
   const sizes = resolutions.getByRole("combobox", { name: "Resolutions", exact: true });
   await resolutions.locator(".mantine-MultiSelect-input").click();
   await expect(page.getByRole("option")).toHaveText(["1K", "2K"]);
@@ -310,7 +310,7 @@ test("Compare preserves provider resolution enum values without converting them 
   ]);
   await create(page);
   await prompt(page).fill("A copper fox");
-  const setup = await axis(page, "Resolutions");
+  const setup = await axis(page, "Resolution");
   const choices = setup.getByRole("combobox", { name: "Resolutions", exact: true });
   await setup.locator(".mantine-MultiSelect-input").click();
   await expect(page.getByRole("option")).toHaveText(["1K", "2K"]);
