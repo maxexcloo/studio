@@ -66,7 +66,7 @@ export interface Profile {
   encoderSlots?: { slot: string; label: string; options: string[]; default: string }[];
   encoderBuiltIn?: boolean;
   aspectPolicy?: "manual" | "reference";
-  constraints?: Record<string, { min?: number; max?: number; step?: number }>;
+  constraints?: Record<string, { min?: number; max?: number; step?: number; offset?: number }>;
   aspectPresets?: { label: string; w: number; h: number }[];
   /** Output sizes the model draws itself: "yes" or "maybe" per 2K/4K. */
   native?: Partial<Record<"2k" | "4k", "yes" | "maybe">>;
