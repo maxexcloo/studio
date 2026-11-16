@@ -1159,13 +1159,6 @@ export async function loadSaved(page: Page, name: string) {
   if (await replace.isVisible()) await replace.click();
 }
 
-/** Loads one of the Library's imported images from the Presets popup. */
-export async function loadFromLibrary(page: Page, name: string) {
-  await page.getByRole("button", { name: `Load: ${name}`, exact: true }).click();
-  const replace = page.getByRole("button", { name: "Replace", exact: true });
-  if (await replace.isVisible()) await replace.click();
-}
-
 /** Renames the current preset from the open popup's menu. */
 export async function renamePreset(page: Page, name: string) {
   await page.getByRole("button", { name: "Preset Actions", exact: true }).click();
