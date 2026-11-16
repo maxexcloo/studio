@@ -23,19 +23,10 @@ test("The Library separates Personal and Administration and opens on personal ca
   await fixtures(page);
   await page.goto("/library");
   const groups = {
-    Personal: ["Characters", "Outfits", "Presets", "Scenes"],
-    Administration: [
-      "Downloads",
-      "Guides",
-      "Imports",
-      "LoRAs",
-      "Models",
-      "Profiles",
-      "Prompt Styles",
-      "Unused",
-    ],
+    Personal: ["Characters", "Outfits", "Scenes", "Presets"],
+    Administration: ["Guides", "LoRAs", "Models", "Profiles", "Prompt Styles", "Unused"],
   };
-  const order = Object.values(groups).flat();
+  const order = [...Object.values(groups).flat(), "Downloads", "Imports"];
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
     await expect(select).toHaveValue("Characters");
@@ -51,6 +42,7 @@ test("The Library separates Personal and Administration and opens on personal ca
       await expect(
         nav.getByRole("group", { name: group, exact: true }).getByRole("link"),
       ).toHaveText(links);
+    await expect(nav.getByRole("link")).toHaveText(order);
   }
 });
 
@@ -342,18 +334,20 @@ test("Update All applies every free update in one request", async ({ page }) => 
   await openNav(page, "Library");
   await section(page, "Library", "LoRAs");
   const loras = page.getByRole("region", { name: "Library: LoRAs", exact: true });
-  // LoRAs filter by family alone, from one dropdown beside the search.
-  await expect(loras.getByRole("button", { name: "Filter LoRAs", exact: true })).toHaveCount(0);
+  await loras.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   const family = loras.getByRole("combobox", { name: "Family", exact: true });
-  await expect(family).toHaveValue("All Families");
+  await expect(family).toHaveValue("");
   await family.click();
   await page.getByRole("option", { name: "SDXL", exact: true }).click();
   const table = loras.getByRole("table", { name: "Library LoRAs", exact: true });
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("Detail");
-  await family.click();
-  await page.getByRole("option", { name: "All Families", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Filter LoRAs", exact: true })
+    .getByRole("button", { name: "Clear", exact: true })
+    .click();
   await expect(table.getByRole("row")).toHaveCount(3);
+  await loras.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   await loras.getByRole("button", { name: "Update All", exact: true }).click();
   await expect(loras.getByText("2 updates queued.", { exact: true })).toBeVisible();
   await expect(loras.getByRole("button", { name: "Update All", exact: true })).toBeHidden();

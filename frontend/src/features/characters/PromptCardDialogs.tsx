@@ -187,10 +187,10 @@ export function PromptCardMenu({
         <ActionMenuItems
           groups={[
             [
+              { id: "edit", label: `Edit ${noun}`, icon: icons.edit, onClick: onEdit },
               ...(onUse
                 ? [{ id: "use", label: "Use in Composer", icon: icons.prompt, onClick: onUse }]
                 : []),
-              { id: "edit", label: `Edit ${noun}`, icon: icons.edit, onClick: onEdit },
             ],
             [
               {

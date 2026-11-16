@@ -1,6 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
 
-import { outfitPart, scenePart, withCharacter } from "../../shared/characters";
+import { maxCharacterTrait, outfitPart, scenePart, withCharacter } from "../../shared/characters";
 import {
   closeReferences,
   closeTextEditor,
@@ -185,8 +185,7 @@ test("Use in Composer stages Library cards in the composer, moving to a model th
   await serveProfiles(page, [...profiles, keeper]);
   await page.goto("/library#characters");
   await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
-  // The usual action leads the card's menu.
-  await expect(page.getByRole("menuitem").first()).toHaveText("Use in Composer");
+  await expect(page.getByRole("menuitem").first()).toHaveText("Edit Character");
   await page.getByRole("menuitem", { name: "Use in Composer", exact: true }).click();
   await expect(page).toHaveURL(/\/images\?.*compose=1/);
   await expect(
@@ -230,6 +229,13 @@ test("New Character saves a name, description and gallery images from the Refere
   await description.fill("red-haired ranger");
   const done = page.getByRole("button", { name: "Close Description", exact: true });
   if (await done.isVisible()) await done.click();
+  await editor.getByLabel("Likes", { exact: true }).fill("Tea, Earl Grey");
+  await editor.getByLabel("Likes", { exact: true }).press("Enter");
+  const boundaryTag = "G".repeat(maxCharacterTrait - "Tea, Earl Grey".length - 1);
+  await editor.getByLabel("Likes", { exact: true }).fill(boundaryTag);
+  await editor.getByLabel("Likes", { exact: true }).press("Enter");
+  await editor.getByLabel("Dislikes", { exact: true }).fill("Noise");
+  await editor.getByLabel("Dislikes", { exact: true }).press("Enter");
   // Add Images opens the gallery choices in a popup of their own.
   await editor.getByRole("button", { name: "Add Images", exact: true }).click();
   const picker = page.getByRole("dialog", { name: "Add Images", exact: true });
@@ -258,15 +264,37 @@ test("New Character saves a name, description and gallery images from the Refere
   await expect(
     editor.getByRole("button", { name: "Reference 1 · Images", exact: true }),
   ).toBeVisible();
+  const likes = editor.getByLabel("Likes", { exact: true });
+  await expect(likes).toHaveAttribute("maxlength", "0");
+  // TagsInput handles pasted phrases directly, so they also need whole-field validation.
+  await likes.evaluate((input) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "One More, Whole Phrase");
+    input.dispatchEvent(
+      new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }),
+    );
+  });
+  await expect(
+    editor.getByText(`Keep the likes within ${maxCharacterTrait} characters.`, { exact: true }),
+  ).toBeVisible();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  expect(state.characters).toHaveLength(0);
+  // Removing only the extra phrase makes the unchanged 500-character field saveable again.
+  await likes.press("Backspace");
+  await expect(likes).not.toHaveAttribute("aria-invalid", "true");
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(
-    state.characters.map(({ name, description, referenceIds }) => [
+    state.characters.map(({ name, description, referenceIds, likes, dislikes }) => [
       name,
       description,
       referenceIds,
+      likes,
+      dislikes,
     ]),
-  ).toEqual([["Mara", "red-haired ranger", ["asset-portrait"]]]);
+  ).toEqual([
+    ["Mara", "red-haired ranger", ["asset-portrait"], `Tea, Earl Grey\n${boundaryTag}`, "Noise"],
+  ]);
   await expect(
     references.getByRole("button", { name: "Use character: Mara", exact: true }),
   ).toBeVisible();
@@ -465,7 +493,7 @@ test("A member sees only their cards and Presets in the Library, and a group wit
   const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
   await expect(select.or(nav)).toBeVisible();
   if (await nav.isVisible())
-    await expect(nav.getByRole("link")).toHaveText(["Characters", "Outfits", "Presets", "Scenes"]);
+    await expect(nav.getByRole("link")).toHaveText(["Characters", "Outfits", "Scenes", "Presets"]);
   else await expect(select).toHaveValue("Characters");
   await signIn(page, { id: "member", role: "user", features: { characters: false } });
   await page.goto("/library#imports");

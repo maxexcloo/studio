@@ -155,43 +155,41 @@ export function GalleryToolbar({
       ) : (
         search
       )}
-      {phone && (
-        <ChipPopup
-          title="Filters"
-          opened={filtering}
-          onOpenedChange={setFiltering}
-          width={340}
-          position="bottom-start"
-          headerEnd={
-            <>
-              {results && (
-                <Text size="sm" c="dimmed">
-                  {results}
-                </Text>
-              )}
-              <Button size="compact-sm" variant="subtle" disabled={!chips.length} onClick={clear}>
-                Clear
-              </Button>
-            </>
-          }
-          target={
-            <FilterButton
-              label="Gallery Filters"
-              count={chips.length}
-              opened={filtering}
-              onClick={() => setFiltering(!filtering)}
-            />
-          }
-        >
-          <GalleryFilterPanel
-            kind={kind}
-            value={value}
-            onChange={onChange}
-            view={view}
-            toggles={toggles}
+      <ChipPopup
+        title="Filters"
+        opened={filtering}
+        onOpenedChange={setFiltering}
+        width={340}
+        position="bottom-start"
+        headerEnd={
+          <>
+            {results && (
+              <Text size="sm" c="dimmed">
+                {results}
+              </Text>
+            )}
+            <Button size="compact-sm" variant="subtle" disabled={!chips.length} onClick={clear}>
+              Clear
+            </Button>
+          </>
+        }
+        target={
+          <FilterButton
+            label="Gallery Filters"
+            count={chips.length}
+            opened={filtering}
+            onClick={() => setFiltering(!filtering)}
           />
-        </ChipPopup>
-      )}
+        }
+      >
+        <GalleryFilterPanel
+          kind={kind}
+          value={value}
+          onChange={onChange}
+          view={view}
+          toggles={toggles}
+        />
+      </ChipPopup>
       <FilterToggle
         label="Liked"
         icon={icons.like}
@@ -234,16 +232,6 @@ export function GalleryToolbar({
   return (
     <>
       {row}
-      {!phone && (
-        <GalleryFilterPanel
-          inline
-          kind={kind}
-          value={value}
-          onChange={onChange}
-          view={view}
-          toggles={toggles}
-        />
-      )}
       {chips.length > 0 && filterChips}
     </>
   );
