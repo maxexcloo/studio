@@ -1404,10 +1404,11 @@ test("Details fold only a long caption, keep its tags in sight and copy the prom
     details = page.getByRole("dialog", { name: "my favourite bird", exact: true });
   }
   await expect(details.getByText("my favourite bird", { exact: true })).toBeVisible();
-  await expect(details.getByText(`${formatDateTime(stamp)} · #866`, { exact: true })).toBeVisible();
+  // The title's line holds when and how big; the result number closes Output.
   await expect(
-    details.getByText("Retired Image · Quality · Image · 1024 × 1024", { exact: true }),
+    details.getByText(`${formatDateTime(stamp)} · 1024 × 1024`, { exact: true }),
   ).toBeVisible();
+  await expect(details.getByRole("row", { name: "Result #866", exact: true })).toBeVisible();
   // A long caption folds with Expand on its last line and folds again on Collapse; its tags stay
   // in sight.
   const tags = details.getByLabel("Caption Tags", { exact: true });
