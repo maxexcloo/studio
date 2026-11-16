@@ -227,7 +227,6 @@ export function ViewerPrompt({
         onChange={setPrompt}
         onKeyDown={keys}
         tools={[]}
-        copy={false}
         reset={original}
         send={send}
         busy={ask.pending ? "Asking for a Change…" : undefined}

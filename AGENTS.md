@@ -109,7 +109,7 @@ recur across features.
   or leaves it. Menus group related actions with the usual action first and
   Delete last, and share their sizing and item style. An action's settings sit
   in its menu, not a separate dialog. An option whose label alone is ambiguous
-  carries a one-line `description`, except in item action menus.
+  carries a one-line `description`, except in item action and assistant menus.
 - Media categories use Images, Videos, Text. Other unordered peers sort
   alphabetically, except settings first, Like before Dislike, Name A–Z and
   Name Z–A last in sort menus, Refresh and Custom… last and Delete last.
@@ -164,12 +164,13 @@ recur across features.
   waits for a tap.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`.
-- Use the shared `TextBox`. Desktop fields expose one menu button, with Copy
-  and Clear/Reset/Undo alongside the tools in one flat menu, each tool's
-  options under its name. The button is ⋯, or the AI icon when the box has
-  an AI tool; the AI icon (`icons.assistant`) marks everything AI does. The
-  viewer's prompt keeps its AI tools in the bar's AI menu instead; a box with
-  neither tools nor Copy shows Clear/Reset/Undo as one icon while it can act.
+- Use the shared `TextBox`. Desktop fields with tools expose one menu button
+  holding them in one flat menu, each tool's options under its name; Copy and
+  Clear are left to the browser, and a box starting from its own text shows
+  Reset, then Undo, as one icon beside it while it can act. The button is ⋯,
+  or the AI icon when the box has an AI tool; the AI icon (`icons.assistant`)
+  marks everything AI does. The viewer's prompt keeps its AI tools in the
+  bar's AI menu instead.
   Composer fields edit in place; other phone text boxes open the shared
   full-screen editor, and AI tools stay beside the text before it opens.
   Phone controls show Copy, Clear/Reset/Undo and More above the keyboard,

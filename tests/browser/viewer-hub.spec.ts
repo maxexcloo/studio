@@ -378,26 +378,23 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   }
   await field.fill("The bird unfolds its wings.");
   const more = surface.getByRole("button", { name: "AI Instruction Actions", exact: true });
-  const edit = async (name: string) => {
-    if (phone) return surface.getByRole("button", { name, exact: true }).click();
-    await more.click();
-    await page.getByRole("menuitem", { name, exact: true }).click();
-  };
-  await edit("Copy");
-  await expect
-    .poll(() => page.evaluate(() => (window as any).copied))
-    .toBe("The bird unfolds its wings.");
-  await edit("Clear");
-  await expect(field).toHaveValue("");
-  await expect(surface.getByRole("button", { name: "Animate", exact: true })).toBeDisabled();
-  await edit("Undo");
-  await expect(field).toHaveValue("The bird unfolds its wings.");
+  // Phones copy and clear above the keyboard; desktop leaves both to the browser.
+  if (phone) {
+    const edit = (name: string) => surface.getByRole("button", { name, exact: true }).click();
+    await edit("Copy");
+    await expect
+      .poll(() => page.evaluate(() => (window as any).copied))
+      .toBe("The bird unfolds its wings.");
+    await edit("Clear");
+    await expect(field).toHaveValue("");
+    await expect(surface.getByRole("button", { name: "Animate", exact: true })).toBeDisabled();
+    await edit("Undo");
+    await expect(field).toHaveValue("The bird unfolds its wings.");
+  }
   await more.click();
   await expect(page.getByRole("menu").getByText("Suggestions", { exact: true })).toBeVisible();
-  if (phone) {
-    await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
-  }
+  await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
   await expect(surface).toBeVisible();

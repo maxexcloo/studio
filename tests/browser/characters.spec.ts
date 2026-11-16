@@ -303,7 +303,7 @@ test("New Character saves a name, description and gallery images from the Refere
 
 test("Use as Character starts a card from a gallery image in Library › Characters, named and described by the assistant", async ({
   page,
-}, testInfo) => {
+}) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "ranger",
@@ -383,7 +383,6 @@ test("Use as Character starts a card from a gallery image in Library › Charact
     await editorMenu(editor, "Description", "Suggested");
   else await promptMenu(editor, "Description");
   await expect(page.getByRole("menuitem")).toHaveText([
-    ...(testInfo.project.use.isMobile ? [] : ["Copy", "Clear"]),
     "freckled redhead, slim build",
     "green-eyed ranger",
     "red-haired ranger, green cloak",
