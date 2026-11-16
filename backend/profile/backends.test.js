@@ -548,7 +548,7 @@ test("MCP reruns an old result on the backend it ran on and sends the backend wi
   assert.equal(sent.at(-1).profileBackend, "comfyui");
 });
 
-test("a run with references leaves a default backend that takes none", () => {
+test("a run with references or LoRAs leaves a default backend that takes none", () => {
   const backends = [
     { id: "comfyui", references: 1 },
     { id: "radiance", references: 0 },
@@ -558,4 +558,6 @@ test("a run with references leaves a default backend that takes none", () => {
   // One asked for still runs; one the profile lacks falls back to the rule.
   assert.equal(runBackend(backends, "radiance", "radiance", true), "radiance");
   assert.equal(runBackend(backends, "radiance", "cloud", true), "comfyui");
+  // So does a run with LoRAs, which Radiance's IQ8R models refuse.
+  assert.equal(runBackend(backends, "radiance", undefined, false, true), "comfyui");
 });

@@ -570,6 +570,7 @@ export class McpMedia {
           profile.backend,
           request.profile_backend,
           Boolean(request.reference_asset_ids?.length),
+          Boolean(request.loras?.length),
         ),
       );
     const cloud = isCloudVideo(profile);

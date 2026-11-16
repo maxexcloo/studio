@@ -13,14 +13,18 @@ export const profileBackendLabels: Readonly<Record<string, string>> = Object.fre
 /**
  * The backend a combined profile's run uses: the one asked for while the profile has it, else its
  * default, unless the run has references the default takes none of; then the first backend that does.
+ * A run with LoRAs leaves Radiance for ComfyUI: Radiance 2's IQ8R models take no adapters.
  */
 export function runBackend(
   backends: readonly { id: string; references: number }[],
   fallback: string,
   wanted: unknown,
   references: boolean,
+  loras = false,
 ): string {
   if (backends.some((option) => option.id === wanted)) return wanted as string;
+  if (loras && fallback === "radiance" && backends.some((option) => option.id === "comfyui"))
+    return "comfyui";
   if (!references || backends.find((option) => option.id === fallback)?.references !== 0)
     return fallback;
   return backends.find((option) => option.references)?.id || fallback;
