@@ -486,7 +486,9 @@ export function MediaViewer({
             !deleting &&
             !layerAbove(stage.current, event) &&
             event.currentTarget.contains(target) &&
-            !target.closest('input:not([type="radio"]),textarea,select,[aria-haspopup]')
+            !target.closest(
+              'input:not([type="radio"]),textarea,select,[aria-haspopup][aria-expanded="true"]',
+            )
           ) {
             event.preventDefault();
             escape();
