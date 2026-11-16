@@ -47,6 +47,13 @@ const maxVideoBytes = 2 * 1024 ** 3;
 const distilled = (model: string) => model.toLowerCase().includes("fasth3");
 const turbo = (model: string) => model.includes("turbo");
 
+/** The one-GPU Qwen deployment's conditioning/cache limits, shared by its profiles and requests. */
+export function radianceImageLimits(model: string) {
+  return /^(qwen-image-2\.1-|noctq-)/.test(model)
+    ? { maxSide: 1344, maxReferences: 4 }
+    : { maxSide: 2048, maxReferences: maxImageReferences };
+}
+
 /**
  * What the two nodes take, in ComfyUI's node-list shape, so a Radiance worker's catalogue reads
  * like any worker's: their `model` lists every model the process serves.
@@ -141,10 +148,13 @@ function form(fields: Values, files: RadianceFile[]) {
 /** A RadianceImageGenerate node's request; references (PNG or JPEG bytes, in order) make it an edit. */
 export function imageRequest(values: Values, references: Uint8Array[] = []) {
   const model = String(values.model || "");
+  const limits = radianceImageLimits(model);
   const width = Number(values.width);
   const height = Number(values.height);
   if (!String(values.prompt || "").trim()) throw new Error("Enter an image prompt.");
   if (width % 32 || height % 32) throw new Error("Image dimensions must be multiples of 32.");
+  if (width > limits.maxSide || height > limits.maxSide)
+    throw new Error(`This Radiance model supports dimensions up to ${limits.maxSide} pixels.`);
   const body: Values = {
     model,
     prompt: values.prompt,
@@ -170,8 +180,8 @@ export function imageRequest(values: Values, references: Uint8Array[] = []) {
     if (negative) body.negative_prompt = values.negative_prompt;
   }
   if (!references.length) return { route: "/v1/images/generations", body };
-  if (references.length > maxImageReferences)
-    throw new Error(`Radiance takes up to ${maxImageReferences} reference images.`);
+  if (references.length > limits.maxReferences)
+    throw new Error(`This Radiance model takes up to ${limits.maxReferences} reference images.`);
   return {
     route: "/v1/images/edits",
     body: form(
@@ -340,9 +350,7 @@ export class RadianceClient {
 
   /** Frees a video job: after download, failure or cancellation. */
   async deleteVideo(id: string) {
-    await this.call("DELETE", `/v1/videos/${id}`, undefined, AbortSignal.timeout(5000)).catch(
-      () => null,
-    );
+    await this.call("DELETE", `/v1/videos/${id}`, undefined, AbortSignal.timeout(5000));
   }
 }
 

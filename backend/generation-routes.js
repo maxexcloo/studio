@@ -53,6 +53,7 @@ export function createGenerationSubmission({
   mediaModels,
   comfyDownMessage,
   prompting,
+  store,
 }) {
   /**
    * Which worker runs this generation (workers.js): one that has the
@@ -464,6 +465,7 @@ export function createGenerationSubmission({
     setTimeout(
       () =>
         runJob(id, body, {
+          store,
           prepare: body.autoUpscale ? (graph) => smartUpscalePrepare(graph, body) : null,
         }).catch(() => null),
       0,

@@ -139,6 +139,8 @@ node backend/commands/migrate-runtime.mjs --data-dir /path/to/studio-data --appl
 
 The dry run reports mappings, counts and conflicts; a conflict stops the apply and the command exits non-zero. A step is removed once the live data folder has applied it, so an older folder needs `migrate-runtime` from each release that still had its pending steps; Git history keeps them. `backend/runtime-migrations.js` lists the pending steps; each step's module says what it changes.
 
+For the Radiance 2 cutover, version profiles through the administrator editor first. With dispatch held for every account and accepted work finished, `POST /api/maintenance/radiance-queue` previews the exact waiting-job model and worker changes. Apply with `{ "apply": true, "baseHash": "<preview hash>" }`; conflicts or a changed queue refuse the entire apply, and the response confirms that other fields and queue order were preserved. Keep the hold until the profiles, workers and waiting jobs have been checked together.
+
 `--dream-owner <account id>` removes Dream answers and taste signals about other accounts' results; supply it only for the one account that used Dream.
 
 ### Runtime Control

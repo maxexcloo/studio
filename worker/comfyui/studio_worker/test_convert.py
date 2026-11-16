@@ -95,6 +95,49 @@ class CheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "not a Krea 2 DiT tensor"):
                 convert.map_transformer(source, target, lambda: False)
 
+    def test_prefixed_native_checkpoint_maps_without_changing_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, target = Path(directory) / "in", Path(directory) / "out"
+            native(source, "BF16")
+            size, tensors = convert.header(source)
+            payload = source.read_bytes()[8 + size :]
+            safetensors(
+                source,
+                {
+                    "model.diffusion_model." + key: value
+                    for key, value in tensors.items()
+                },
+                payload,
+            )
+            convert.map_transformer(source, target, lambda: False)
+            _, mapped = convert.header(target)
+            self.assertIn("transformer_blocks.0.attn.to_q.weight", mapped)
+            self.assertEqual(
+                mapped["transformer_blocks.0.scale_shift_table"]["shape"], [6, 2]
+            )
+            self.assertTrue(target.read_bytes().endswith(payload))
+            safetensors(
+                source,
+                {"model.diffusion_model.unknown": {"dtype": "BF16", "shape": [1]}},
+            )
+            with self.assertRaisesRegex(ValueError, "not a Krea 2 DiT tensor"):
+                convert.map_transformer(source, target, lambda: False)
+
+    def test_prefix_normalisation_rejects_colliding_tensor_names(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, target = Path(directory) / "in", Path(directory) / "out"
+            tensor = {"dtype": "BF16", "shape": [2, 2], "data_offsets": [0, 8]}
+            safetensors(
+                source,
+                {
+                    "blocks.0.attn.wq.weight": tensor,
+                    "model.diffusion_model.blocks.0.attn.wq.weight": tensor,
+                },
+                b"12345678",
+            )
+            with self.assertRaisesRegex(ValueError, "not a Krea 2 DiT tensor"):
+                convert.map_transformer(source, target, lambda: False)
+
 
 class ConversionTests(unittest.TestCase):
     def setUp(self):
