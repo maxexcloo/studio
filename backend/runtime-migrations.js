@@ -1,4 +1,6 @@
+import { reloadAccountPreferences } from "./account-preferences.js";
 import { characterGenerated } from "./character-generated.js";
+import { chatBriefFavourites } from "./chat-brief-favourites.js";
 import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
@@ -10,6 +12,7 @@ import { loraStacks } from "./lora-stacks.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
 import { migrateRadianceQueue } from "./radiance-queue-migration.js";
 import { runtimeSettings } from "./runtime-settings.js";
+import { spicyPrompts } from "./spicy-prompts.js";
 import { tasteDislikes } from "./taste-dislikes.js";
 
 /**
@@ -69,6 +72,19 @@ const steps = [
     run: tasteDislikes,
     changes: (plan) => plan.accounts,
     online: true,
+  },
+  {
+    name: "spicyPrompts",
+    run: spicyPrompts,
+    changes: (plan) => plan.accounts,
+    online: true,
+  },
+  {
+    name: "chatBriefFavourites",
+    run: chatBriefFavourites,
+    changes: (plan) => plan.accounts,
+    online: true,
+    reload: reloadAccountPreferences,
   },
   {
     name: "runtimeSettings",

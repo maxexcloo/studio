@@ -12,9 +12,10 @@ import {
  * Each account's own preferences, the `preferences:<account id>` document in studio.sqlite
  * (`preferences:` in single-user mode). Cloud Models, LoRAs and Uncensored Models only narrow
  * what the account's group grants (account-policy.js); they start on wherever the group grants
- * them. Spicy Prompts starts off and counts only with Uncensored Models (`explicitWording`).
+ * them. Uncensored Models also lets prompt writing word what it offers explicitly.
  * `images` says where images run by default, Cloud or Local, and `videos` where videos and Animate
- * do (Cloud, or the local Fast or Quality tier); unsaved, each is local. The side that can't run
+ * do (Cloud, or the local Fast or Quality tier); unsaved, each is local, and a saved Cloud reads as
+ * unsaved while Cloud Models is off. The side that can't run
  * gives way to the other, saying so; a model the person picks always wins (model/catalogue.js,
  * animate-profile.js). `writingModel` is the text model prompt writing asks for (assistant.js
  * `writerModel`). `galleryWork` is which unfinished work the gallery shows: none (unsaved), work
@@ -25,7 +26,6 @@ import {
 const preferenceDefaults = Object.freeze({
   cloudModels: true,
   loras: true,
-  spicyPrompts: false,
   tileCaptions: false,
   uncensoredModels: true,
 });
@@ -53,7 +53,13 @@ function saved(ownerId = "") {
   return cache.get(ownerId);
 }
 
-export const accountPreferences = (ownerId = "") => ({ ...preferenceDefaults, ...saved(ownerId) });
+export function accountPreferences(ownerId = "") {
+  const preferences = { ...preferenceDefaults, ...saved(ownerId) };
+  if (!preferences.cloudModels)
+    for (const key of ["images", "videos"])
+      if (preferences[key] === "cloud") delete preferences[key];
+  return preferences;
+}
 
 /** Which preferences the account has saved, so a value carried over from a device never replaces one. */
 export const savedPreferenceKeys = (ownerId = "") => Object.keys(saved(ownerId));
@@ -97,6 +103,9 @@ export function saveAccountPreferences(ownerId, patch) {
   cache.set(ownerId, next);
   return accountPreferences(ownerId);
 }
+
+/** Reads every account's preferences afresh, after a migration rewrote them. */
+export const reloadAccountPreferences = () => cache.clear();
 
 /** A deleted account's preferences go with it. */
 export function forgetAccountPreferences(ownerId) {

@@ -560,4 +560,7 @@ test("a run with references or LoRAs leaves a default backend that takes none", 
   assert.equal(runBackend(backends, "radiance", "cloud", true), "comfyui");
   // So does a run with LoRAs, which Radiance's IQ8R models refuse.
   assert.equal(runBackend(backends, "radiance", undefined, false, true), "comfyui");
+  // Unless its Radiance backend has a model for LoRA runs.
+  const bf16 = [backends[0], { ...backends[1], loras: true }];
+  assert.equal(runBackend(bf16, "radiance", undefined, false, true), "radiance");
 });

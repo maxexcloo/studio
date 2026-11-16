@@ -17,14 +17,13 @@ export type GalleryWorkPreference = "none" | "running" | "queued";
 export interface Preferences {
   cloudModels: boolean;
   loras: boolean;
-  spicyPrompts: boolean;
   tileCaptions: boolean;
   uncensoredModels: boolean;
   /** The standing brief every chat writes its prompts to; unsaved, none. */
   chatBrief?: ChatBrief;
   /** Which unfinished work the gallery shows; unsaved, none. */
   galleryWork?: GalleryWorkPreference;
-  /** Where images run by default; unsaved, Local. */
+  /** Where images run by default; unsaved (and Cloud while Cloud Models is off), Local. */
   images?: SidePreference;
   /** The text model prompt writing asks for; unsaved, the assistant's default (`/api/assistant`). */
   writingModel?: string;
@@ -37,11 +36,8 @@ export interface PreferencesStatus {
   preferences: Preferences;
   /** The preferences the account has saved itself. */
   saved: (keyof Preferences)[];
-  /**
-   * What the account's role or group grants, which it may turn off for itself, and whether it may
-   * turn Spicy Prompts on (Uncensored Models in its effective access).
-   */
-  grants: Pick<Preferences, "cloudModels" | "loras" | "spicyPrompts" | "uncensoredModels">;
+  /** What the account's role or group grants, which it may turn off for itself. */
+  grants: Pick<Preferences, "cloudModels" | "loras" | "uncensoredModels">;
 }
 export const preferencesQuery = queryOptions({
   queryKey: ["preferences"],
@@ -65,9 +61,10 @@ export function useSavePreferences() {
       if ("cloudModels" in patch || "loras" in patch || "uncensoredModels" in patch)
         for (const queryKey of [accountQuery.queryKey, modelsQuery.queryKey])
           void client.invalidateQueries({ queryKey });
-      // Explicit wording (Spicy Prompts with Uncensored Models) changes what suggestions say.
-      if ("spicyPrompts" in patch || "uncensoredModels" in patch)
-        void client.invalidateQueries({ queryKey: ["suggestions"] });
+      // Cloud Models decides whether a saved Cloud counts.
+      if ("cloudModels" in patch) void client.invalidateQueries({ queryKey: ["animate-profile"] });
+      // Uncensored Models decides whether suggestions may be worded explicitly.
+      if ("uncensoredModels" in patch) void client.invalidateQueries({ queryKey: ["suggestions"] });
       // The gallery shows the unfinished work the account chose.
       if ("galleryWork" in patch) void client.invalidateQueries({ queryKey: galleryKey });
       // Default models follow where the account prefers each area to run.

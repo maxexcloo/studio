@@ -516,7 +516,7 @@ export function createAssistant(
   }
 
   /**
-   * The model an account's prompt writing asks for (Settings › Preferences › Where Work Runs):
+   * The model an account's prompt writing asks for (Settings › Preferences › Prompt Assistant):
    * `picked`, otherwise the cloud model's uncensored alias where the account may use uncensored
    * models (`uncensored`), else the cloud model. An uncensored pick the account may not use gives
    * way to the cloud model.

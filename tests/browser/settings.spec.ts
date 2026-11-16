@@ -280,33 +280,33 @@ test("Tile Captions in Settings › Preferences pin phone tile captions", async 
   expect(state.preferences.preferences.tileCaptions).toBe(true);
 });
 
-test("An administrator turns Cloud Models, LoRAs and Uncensored Models off for itself in Settings › Preferences", async ({
+test("An administrator turns LoRAs and Uncensored off for itself in Settings › Preferences", async ({
   page,
 }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
-  state.preferences.grants = {
-    cloudModels: true,
-    loras: true,
-    spicyPrompts: true,
-    uncensoredModels: true,
-  };
+  state.preferences.grants = { cloudModels: true, loras: true, uncensoredModels: true };
   await page.goto("/settings#preferences");
   const models = page.getByRole("region", { name: "Models", exact: true });
-  await expect(models.getByRole("switch")).toHaveCount(3);
+  await expect(models.getByRole("switch")).toHaveCount(2);
   const loras = models.getByRole("switch", { name: "LoRAs", exact: true });
   await expect(loras).toBeChecked();
   await loras.click({ force: true });
   await expect(loras).not.toBeChecked();
   await expect.poll(() => state.preferences.preferences.loras).toBe(false);
-  const uncensored = models.getByRole("switch", { name: "Uncensored Models", exact: true });
+  const uncensored = models.getByRole("switch", { name: "Uncensored", exact: true });
   await expect(uncensored).toBeChecked();
   await uncensored.click({ force: true });
   await expect(uncensored).not.toBeChecked();
   await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
+  await expect(
+    page
+      .getByRole("region", { name: "Where Work Runs", exact: true })
+      .getByRole("switch", { name: "Cloud Models", exact: true }),
+  ).toBeChecked();
 });
 
-test("Where Work Runs in Settings › Preferences saves where each area runs and the Text model", async ({
+test("Settings › Preferences saves the Prompt Assistant and where each area runs", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -323,25 +323,9 @@ test("Where Work Runs in Settings › Preferences saves where each area runs and
     }),
   );
   await page.goto("/settings#preferences");
-  const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
-  const area = (name: string) => where.getByRole("radiogroup", { name, exact: true });
-  const choose = (name: string, choice: string) =>
-    area(name).locator("label").filter({ hasText: choice }).click();
-  await expect(where.getByRole("radiogroup")).toHaveCount(2);
-  expect(
-    await where
-      .getByRole("radiogroup")
-      .or(where.getByRole("combobox"))
-      .evaluateAll((controls) => controls.map((control) => control.getAttribute("aria-label"))),
-  ).toEqual(["Images", "Videos", "Text"]);
-  await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();
-  // Videos offers Animate's three choices, its saved tier showing.
-  await expect(area("Videos").getByRole("radio")).toHaveCount(3);
-  await expect(area("Videos").getByRole("radio", { name: "Quality" })).toBeChecked();
-  await choose("Images", "Cloud");
-  await expect.poll(() => state.preferences.preferences.images).toBe("cloud");
-  // Text picks the gateway text model, unsaved the account's default.
-  const writing = where.getByRole("combobox", { name: "Text", exact: true });
+  // Prompts leads with the Prompt Assistant, unsaved the account's default.
+  const prompts = page.getByRole("region", { name: "Prompts", exact: true });
+  const writing = prompts.getByRole("combobox", { name: "Prompt Assistant", exact: true });
   await expect(writing).toHaveValue("Uncensored · Cloud");
   await writing.click();
   await expect(page.getByRole("option")).toHaveText([
@@ -352,36 +336,25 @@ test("Where Work Runs in Settings › Preferences saves where each area runs and
   await page.getByRole("option", { name: "Auto · Local", exact: true }).click();
   await expect.poll(() => state.preferences.preferences.writingModel).toBe("local/auto");
   await expect(writing).toHaveValue("Auto · Local");
+  await expect(prompts.getByRole("switch", { name: "Keep Recent Prompts" })).toBeVisible();
+
+  const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
+  const area = (name: string) => where.getByRole("radiogroup", { name, exact: true });
+  const choose = (name: string, choice: string) =>
+    area(name).locator("label").filter({ hasText: choice }).click();
+  // Without a grant there is no Cloud Models switch, and Cloud stays a choice.
+  await expect(where.getByRole("switch")).toHaveCount(0);
+  await expect(where.getByRole("radiogroup")).toHaveCount(2);
+  await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();
+  // Videos offers Animate's three choices, its saved tier showing.
+  await expect(area("Videos").getByRole("radio")).toHaveCount(3);
+  await expect(area("Videos").getByRole("radio", { name: "Quality" })).toBeChecked();
+  await choose("Images", "Cloud");
+  await expect.poll(() => state.preferences.preferences.images).toBe("cloud");
   await choose("Videos", "Cloud");
   await expect.poll(() => state.preferences.preferences.videos).toBe("cloud");
   await choose("Videos", "Fast");
   await expect.poll(() => state.preferences.preferences.videos).toBe("fast");
-});
-
-test("Spicy Prompts shows in Settings › Preferences only with Uncensored Models", async ({
-  page,
-}) => {
-  const state = await fixtures(page);
-  await signIn(page, { id: "member", role: "user" });
-  await page.goto("/settings#preferences");
-  const prompts = page.getByRole("region", { name: "Prompts", exact: true });
-  await expect(prompts.getByRole("switch", { name: "Keep Recent Prompts" })).toBeVisible();
-  await expect(prompts.getByRole("switch", { name: "Spicy Prompts" })).toHaveCount(0);
-  state.preferences.grants = {
-    cloudModels: false,
-    loras: false,
-    spicyPrompts: true,
-    uncensoredModels: true,
-  };
-  await page.reload();
-  const spicy = prompts.getByRole("switch", { name: "Spicy Prompts", exact: true });
-  await expect(spicy).not.toBeChecked();
-  await expect(
-    prompts.getByText("Let prompt ideas, suggestions and proposed changes use explicit wording."),
-  ).toBeVisible();
-  await spicy.click({ force: true });
-  await expect(spicy).toBeChecked();
-  await expect.poll(() => state.preferences.preferences.spicyPrompts).toBe(true);
 });
 
 test("Finish Liked Images in Settings › Preferences saves its switch, quality and face detail", async ({

@@ -40,6 +40,8 @@ test("the migrations route answers administrators with every step's plan, and lo
     loraStacks: { applied, accounts: 0 },
     dreamDefaultChoices: { applied, settings: 0, accounts: 0 },
     tasteDislikes: { applied, accounts: 0 },
+    spicyPrompts: { applied, accounts: 0 },
+    chatBriefFavourites: { applied, accounts: 0, dropped: 0 },
     // Needs Studio stopped, so the running server only plans it.
     runtimeSettings: { applied: false, settings: 0 },
   });
@@ -52,7 +54,7 @@ test("the migrations route answers administrators with every step's plan, and lo
     body: { ok: true, apply: true, steps: steps(true) },
   });
   assert.deepEqual(lines, [
-    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do; runtimeSettings: 0 nothing to do",
-    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do; runtimeSettings: 0 nothing to do",
+    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do; spicyPrompts: 0 nothing to do; chatBriefFavourites: 0 nothing to do; runtimeSettings: 0 nothing to do",
+    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do; spicyPrompts: 0 nothing to do; chatBriefFavourites: 0 nothing to do; runtimeSettings: 0 nothing to do",
   ]);
 });

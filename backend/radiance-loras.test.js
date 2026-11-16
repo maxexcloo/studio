@@ -123,3 +123,20 @@ test("LoRAs the profile names stay ahead of the request stack", async () => {
     { name: "a.safetensors", strength: 0.5 },
   ]);
 });
+
+test("a run with LoRAs moves to the stack's model, with the adapters that model needs first", async () => {
+  const lightning = { name: "speed/lightning.safetensors", strength: 1 };
+  const stack = { adapter: "radiance-tags-v1", node: "1", model: "noctq-bf16", loras: [lightning] };
+  saveImportedWorkflow(raw(stack, "radiance-bf16"));
+  const run = (loras) =>
+    customWorkflowGraph({ workflow: "custom:radiance-bf16", prompt, seed: 1, loras });
+  const plain = await run([]);
+  assert.equal(plain[1].inputs.model, "krea-2-turbo-iq8r");
+  assert.equal(plain[1].inputs.loras, "[]");
+  const styled = await run([{ name: "a.safetensors", strength: 0.5 }]);
+  assert.equal(styled[1].inputs.model, "noctq-bf16");
+  assert.deepEqual(JSON.parse(styled[1].inputs.loras), [
+    lightning,
+    { name: "a.safetensors", strength: 0.5 },
+  ]);
+});
