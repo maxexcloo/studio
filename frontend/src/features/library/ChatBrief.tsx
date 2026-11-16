@@ -1,7 +1,7 @@
-import { Alert, Button, MultiSelect, TextInput } from "@mantine/core";
+import { Alert, Button, MultiSelect, Stack, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
   type ChatBrief as Brief,
@@ -13,11 +13,12 @@ import {
 import { loraName } from "../../../../shared/profiles";
 import { api } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
+import { SectionHeader } from "../../ui/SectionToolbar";
 import { SettingRow } from "../../ui/SettingRows";
 import { CardDialog, CardForm } from "../characters/CardImages";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
-import { type PreferencesStatus, preferencesQuery } from "./accountPreferences";
+import { type PreferencesStatus, preferencesQuery } from "../settings/accountPreferences";
 
 const labels: Record<(typeof briefTexts)[number], string> = {
   subjects: "Subjects",
@@ -107,31 +108,34 @@ function BriefForm({ brief, close }: { brief: Brief; close: () => void }) {
   );
 }
 
-/** Settings › Preferences › Prompts: the standing brief every chat writes its prompts to. */
-export function ChatBrief() {
+/** Library › Chat Brief: the standing brief every chat writes its prompts to. */
+export function LibraryChatBrief({ heading }: { heading: ReactNode }) {
   const status = useQuery(preferencesQuery).data;
   const models = useQuery(modelsQuery).data;
   const [editing, setEditing] = useState(false);
-  if (!status) return null;
+  if (!status) return <SectionHeader heading={heading}>{null}</SectionHeader>;
   const brief = status.preferences.chatBrief ?? {};
   const name = (id: string) => {
     const profile = models?.profiles.find((entry) => entry.id === id);
     return profile?.displayName || profile?.label || id;
   };
   return (
-    <SettingRow
-      label="Chat Brief"
-      description={
-        briefSummary(brief, name) ||
-        "Standing rules every chat keeps to, so you needn't repeat them."
-      }
-    >
-      <Button size="compact-sm" variant="default" onClick={() => setEditing(true)}>
-        Edit
-      </Button>
-      <CardDialog opened={editing} onClose={() => setEditing(false)} title="Chat Brief">
-        {editing && <BriefForm brief={brief} close={() => setEditing(false)} />}
-      </CardDialog>
-    </SettingRow>
+    <Stack gap="md">
+      <SectionHeader heading={heading}>{null}</SectionHeader>
+      <SettingRow
+        label="Brief"
+        description={
+          briefSummary(brief, name) ||
+          "Standing rules every chat keeps to, so you needn't repeat them."
+        }
+      >
+        <Button size="compact-sm" variant="default" onClick={() => setEditing(true)}>
+          Edit
+        </Button>
+        <CardDialog opened={editing} onClose={() => setEditing(false)} title="Chat Brief">
+          {editing && <BriefForm brief={brief} close={() => setEditing(false)} />}
+        </CardDialog>
+      </SettingRow>
+    </Stack>
   );
 }

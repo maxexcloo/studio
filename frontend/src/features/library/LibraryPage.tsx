@@ -9,6 +9,7 @@ import { LibraryPromptCards } from "../characters/LibraryPromptCards";
 import { useStageComparison } from "../compare/variants";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { CatalogueEditor } from "./CatalogueEditor";
+import { LibraryChatBrief } from "./ChatBrief";
 import {
   LibraryCatalogueTable,
   type LibraryItem,
@@ -139,6 +140,7 @@ export function LibraryPage() {
           guides: (heading) => <GuideDefinitions heading={heading} />,
           loras: catalogueSection("loras"),
           models: catalogueSection("models"),
+          chatBrief: (heading) => <LibraryChatBrief heading={heading} />,
           presets: (heading) => <LibraryPresets heading={heading} />,
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
           promptStyles: (heading) => <PromptStyles heading={heading} />,
