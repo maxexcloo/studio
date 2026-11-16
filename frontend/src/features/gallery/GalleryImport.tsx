@@ -1,13 +1,13 @@
 import { Alert, Button, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, FolderUp, Import } from "lucide-react";
+import { ChevronDown, FolderUp } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { api, post } from "../../api";
+import { api, failure, post } from "../../api";
 import { menuWidth } from "../../theme";
-import type { MediaKind } from "../../types";
 import { ActionMenuItems } from "../../ui/ActionBar";
+import { canReadClipboard, readClipboard } from "../../ui/clipboard";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
@@ -49,7 +49,8 @@ async function entryFiles(entry: FileSystemEntry): Promise<File[]> {
 
 /**
  * Uploads each supported image and video in turn, with its progress and then any file that failed
- * or was skipped as one notification. `onUploaded` hears when at least one arrived.
+ * or was skipped as one notification, and imports links (`/api/gallery/import/link`). `onUploaded`
+ * hears when at least one upload arrived.
  */
 export function useGalleryUpload(onUploaded: () => void) {
   const client = useQueryClient();
@@ -58,19 +59,31 @@ export function useGalleryUpload(onUploaded: () => void) {
     void client.invalidateQueries({ queryKey: galleryKey });
     onUploaded();
   };
-  const reddit = useMutation({
+  // A Civitai or Hugging Face link becomes a Library import; anything else, uploads.
+  const link = useMutation({
     meta: { inlineError: true },
     mutationFn: (url: string) =>
-      post<{ imported: number; failed: { image: number; error: string }[] }>(
-        "/api/gallery/import/reddit",
-        { url: url.trim() },
-      ),
+      post<{
+        import?: { title?: string; state: string };
+        imported?: number;
+        failed?: { image: number; error: string }[];
+      }>("/api/gallery/import/link", { url: url.trim() }),
     onSuccess: (result) => {
+      if (result.import) {
+        notifications.show({
+          color: result.import.state === "failed" ? "red" : undefined,
+          message:
+            result.import.state === "failed"
+              ? "The import failed. Library › Imports says why."
+              : `${result.import.title || "The link"} is in Library › Imports.`,
+        });
+        return;
+      }
       added();
-      if (result.failed.length)
+      if (result.failed?.length)
         notifications.show({
           color: "red",
-          message: `${plural(result.imported, "image")} added to Uploads. ${result.failed.map((entry) => `Image ${entry.image}: ${entry.error}`).join(" ")}`,
+          message: `${plural(result.imported || 0, "image")} added to Uploads. ${result.failed.map((entry) => `Image ${entry.image}: ${entry.error}`).join(" ")}`,
         });
     },
   });
@@ -140,24 +153,20 @@ export function useGalleryUpload(onUploaded: () => void) {
     if (!uploaded) return;
     added();
   }
-  return { upload, uploading, reddit };
+  return { upload, uploading, link };
 }
 
 /**
- * The gallery toolbar's Upload ▾: files, folders and Reddit images saved as the account's uploads.
+ * The gallery toolbar's Import ▾: files and folders uploaded, a link (a Reddit post, an image or
+ * video, or for administrators a Civitai or Hugging Face model) or the clipboard's images or link,
+ * saved as the account's private uploads.
  */
-export function GalleryUpload({
-  kind,
-  upload,
-}: {
-  kind: MediaKind;
-  upload: ReturnType<typeof useGalleryUpload>;
-}) {
+export function GalleryImport({ upload }: { upload: ReturnType<typeof useGalleryUpload> }) {
   const phone = usePhone();
   const [importing, setImporting] = useState(false);
   const [url, setUrl] = useState("");
   const closeImport = () => {
-    if (!upload.reddit.isPending) setImporting(false);
+    if (!upload.link.isPending) setImporting(false);
   };
   const filesInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
@@ -167,19 +176,25 @@ export function GalleryUpload({
     input.value = "";
     if (files.length) void upload.upload(files);
   };
+  const paste = () =>
+    void readClipboard().then(({ files, text }) => {
+      if (files.length) void upload.upload(files);
+      else if (/^https?:\/\/\S+$/i.test(text)) upload.link.mutate(text, { onError: failure });
+      else notifications.show({ message: "The clipboard has no image or link." });
+    }, failure);
   return (
     <>
       <Menu position="bottom-end" width={menuWidth}>
-        <PopupTooltip label="Upload" disabled={!phone}>
+        <PopupTooltip label="Import" disabled={!phone}>
           <Menu.Target>
             <Button
               {...(phone ? iconChipProps : chipProps)}
-              aria-label="Upload"
-              loading={upload.uploading}
-              leftSection={phone ? undefined : <icons.upload size={15} />}
+              aria-label="Import"
+              loading={upload.uploading || (upload.link.isPending && !importing)}
+              leftSection={phone ? undefined : <icons.import size={15} />}
               rightSection={phone ? undefined : <ChevronDown size={14} />}
             >
-              {phone ? <icons.upload size={16} /> : "Upload"}
+              {phone ? <icons.import size={16} /> : "Import"}
             </Button>
           </Menu.Target>
         </PopupTooltip>
@@ -200,21 +215,27 @@ export function GalleryUpload({
                   onClick: () => folderInput.current?.click(),
                 },
               ],
-              ...(kind === "image"
-                ? [
-                    [
+              [
+                {
+                  id: "from-url",
+                  label: "From URL…",
+                  icon: icons.link,
+                  onClick: () => {
+                    upload.link.reset();
+                    setImporting(true);
+                  },
+                },
+                ...(canReadClipboard()
+                  ? [
                       {
-                        id: "import-reddit",
-                        label: "Import From Reddit…",
-                        icon: Import,
-                        onClick: () => {
-                          upload.reddit.reset();
-                          setImporting(true);
-                        },
+                        id: "from-clipboard",
+                        label: "From Clipboard",
+                        icon: icons.paste,
+                        onClick: paste,
                       },
-                    ],
-                  ]
-                : []),
+                    ]
+                  : []),
+              ],
             ]}
           />
         </Menu.Dropdown>
@@ -222,17 +243,17 @@ export function GalleryUpload({
       <Modal
         opened={importing}
         onClose={closeImport}
-        title="Import From Reddit"
+        title="Import From URL"
         size="md"
         fullScreen={phone}
-        closeOnClickOutside={!upload.reddit.isPending}
-        closeOnEscape={!upload.reddit.isPending}
-        closeButtonProps={{ disabled: upload.reddit.isPending }}
+        closeOnClickOutside={!upload.link.isPending}
+        closeOnEscape={!upload.link.isPending}
+        closeButtonProps={{ disabled: upload.link.isPending }}
       >
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            upload.reddit.mutate(url, {
+            upload.link.mutate(url, {
               onSuccess: () => {
                 setImporting(false);
                 setUrl("");
@@ -242,19 +263,21 @@ export function GalleryUpload({
         >
           <Stack>
             <Text size="sm" c="dimmed">
-              Save the post's images to your private Uploads.
+              Save an image, a video or a Reddit post's images to your private Uploads.
+              Administrators can also import Civitai and Hugging Face links into the Library.
             </Text>
             <TextInput
-              label="Reddit Link"
-              placeholder="https://www.reddit.com/r/…/comments/…"
+              label="Link"
+              placeholder="https://…"
               type="url"
               required
+              data-autofocus
               value={url}
               onChange={(event) => setUrl(event.currentTarget.value)}
             />
-            {upload.reddit.error && <Alert color="red">{upload.reddit.error.message}</Alert>}
-            <DialogFooter onCancel={closeImport} pending={upload.reddit.isPending}>
-              <Button type="submit" loading={upload.reddit.isPending} disabled={!url.trim()}>
+            {upload.link.error && <Alert color="red">{upload.link.error.message}</Alert>}
+            <DialogFooter onCancel={closeImport} pending={upload.link.isPending}>
+              <Button type="submit" loading={upload.link.isPending} disabled={!url.trim()}>
                 Import
               </Button>
             </DialogFooter>

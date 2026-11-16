@@ -13,7 +13,7 @@ import { findSubstitute } from "./substitutes.js";
 
 /*
  * Dropped image files through the import engine: metadata becomes a graded preset, files match
- * by hash first, then by name, missing ones get a marked substitute with Use Exact File, an image
+ * by hash first, then by name, missing ones get a marked substitute to accept or reject, an image
  * without metadata is described by the vision model, and offers download only when chosen.
  */
 
@@ -135,6 +135,7 @@ function harness(t, { vision = true, resolveCivitai = null, preset = null } = {}
         { role: resource.role, family: resource.baseModel === "SD 1.5" ? "sd15" : "", profiles },
       ),
     profileFor: async (file) => profiles.find((item) => item.model === file)?.id || "",
+    versionSpec: async (versionId) => ({ id: `civitai:${versionId}:1` }),
     pictures: {
       save: async (id, data) => {
         pictures.set(id, data);
@@ -233,7 +234,7 @@ test("a dropped A1111 PNG becomes a graded preset; files match by hash, then Civ
   assert.equal(h.started.length, 0, "nothing downloads on its own");
 });
 
-test("a substitute lowers the grade to Close; Use Exact File appears once the exact file is installed", async (t) => {
+test("a substitute lowers the grade to Close until accepted; rejecting it needs the exact file", async (t) => {
   const h = harness(t);
   h.installed.loras.push("detail-tweaker.safetensors");
   const record = await h.engine.createFromImage({ data: fixture("a1111.png"), name: "fox.png" });
@@ -243,22 +244,34 @@ test("a substitute lowers the grade to Close; Use Exact File appears once the ex
     "detail-tweaker matched by filename only",
   ]);
   assert.equal(record.state, "ready", "a stand-in counts as there");
-  await assert.rejects(h.engine.useExact(record.id, 0), /isn't installed yet/);
+  assert.equal(publicImport(record).audit, "substitute", "until someone accepts it");
   // Download Missing skips the stand-in; choosing its row downloads the exact file.
   await assert.rejects(h.engine.downloadMissing(record.id), /Nothing is missing/);
-  const queued = await h.engine.downloadMissing(record.id, { indices: [0] });
-  assert.deepEqual([queued.queued, h.started], [1, ["civitai:128713:1"]]);
+  const accepted = await h.engine.chooseSubstitute(record.id, 0, true);
+  assert.deepEqual(
+    [accepted.resources[0].status, accepted.resources[0].accepted, publicImport(accepted).audit],
+    ["substitute", true, "ready"],
+  );
+  const rejected = await h.engine.chooseSubstitute(record.id, 0, false);
+  assert.deepEqual(
+    [rejected.resources[0].status, rejected.resources[0].substitute, rejected.state],
+    ["missing", undefined, "needs-files"],
+    "a rejected stand-in stays gone",
+  );
+  assert.deepEqual(
+    [publicImport(rejected).resources[0].downloadable, publicImport(rejected).stale],
+    [true, false],
+  );
+  assert.deepEqual(
+    [(await h.engine.downloadAllMissing()).queued, h.started],
+    [1, ["civitai:128713:1"]],
+  );
   h.state.queued = [];
   h.installed.checkpoints.push("dreamshaper_8.safetensors");
-  const opened = await h.engine.open(record.id);
+  const exact = await h.engine.open(record.id);
   assert.deepEqual(
-    [opened.resources[0].status, opened.resources[0].exactInstalled],
-    ["substitute", true],
-  );
-  const exact = await h.engine.useExact(record.id, 0);
-  assert.deepEqual(
-    [exact.resources[0].status, exact.resources[0].substitute, exact.resources[0].profileId],
-    ["installed", undefined, ""],
+    [exact.resources[0].status, exact.resources[0].profileId, exact.state],
+    ["installed", "", "ready"],
   );
   assert.ok(
     exact.grade.reasons.includes("No profile runs the base model"),
@@ -284,6 +297,7 @@ test("a Civitai image link gets the same stand-ins, and the exact file replaces 
         sha256: full("0123456789"),
         status: "missing",
         supported: true,
+        versionId: 128713,
       },
       {
         name: "Watercolour Style",
@@ -307,6 +321,14 @@ test("a Civitai image link gets the same stand-ins, and the exact file replaces 
   assert.ok(record.grade.reasons.includes("DreamShaper uses a substitute: Version 9 instead of 8"));
   assert.equal(record.state, "ready", "a stand-in counts as there");
   assert.equal(record.preset.prompt, "a watercolour fox", "Use Prompt and Use Settings apply it");
+  // Rejecting the stand-in downloads the exact file through its Civitai version.
+  await h.engine.chooseSubstitute(record.id, 0, false);
+  const queued = await h.engine.downloadMissing(record.id);
+  assert.deepEqual(
+    [queued.queued, h.started, queued.record.resources[0].status],
+    [1, ["civitai:128713:1"], "downloading"],
+  );
+  h.state.queued = [];
 
   preset.resources[0] = {
     ...preset.resources[0],

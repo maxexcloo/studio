@@ -6552,7 +6552,7 @@ test("admin tools go through the Library and profile routes with the administrat
     });
     next();
   });
-  f.app.post("/api/library/imports", (_req, res) => res.json({ ok: true, import: record }));
+  f.app.post("/api/gallery/import/link", (_req, res) => res.json({ ok: true, import: record }));
   f.app.get("/api/library/imports", (_req, res) => res.json({ ok: true, imports: [record] }));
   f.app.get("/api/library/imports/:id", (_req, res) => res.json({ ok: true, import: record }));
   const imageRecord = {
@@ -6695,10 +6695,10 @@ test("admin tools go through the Library and profile routes with the administrat
     ["chat", "partial", ["glow.safetensors"]],
   );
   assert.deepEqual(
-    seen.find((item) => item.path === "/library/imports" && item.method === "POST"),
+    seen.find((item) => item.path === "/gallery/import/link"),
     {
       method: "POST",
-      path: "/library/imports",
+      path: "/gallery/import/link",
       body: { url: "https://civitai.com/models/1" },
       authorization: `Bearer ${adminToken}`,
     },
@@ -7519,15 +7519,18 @@ test("admin tools chain a Library search, a one-call install and a named update 
     ],
   };
   f.app.post("/api/library/lookup", record({ ok: true, lookup: { query: "glow", results: [] } }));
-  f.app.post("/api/library/imports", record({ ok: true, import: imported }));
   f.app.post(
     "/api/library/imports/:id/download",
     record({ ok: true, import: { ...imported, state: "downloading" }, queued: 1 }),
   );
   f.app.delete("/api/library/imports/:id", record({ ok: true }));
   f.app.post(
-    "/api/gallery/import/reddit",
-    record({ ok: true, title: "A post", imported: 2, failed: [] }),
+    "/api/gallery/import/link",
+    record((req) =>
+      req.body.url.includes("reddit")
+        ? { ok: true, title: "A post", imported: 2, failed: [] }
+        : { ok: true, import: imported },
+    ),
   );
   f.app.get("/api/library/items", (_req, res) =>
     res.json({
@@ -7591,20 +7594,20 @@ test("admin tools chain a Library search, a one-call install and a named update 
   assert.equal(installed.queued, 1);
   assert.deepEqual(
     seen.slice(-2).map((entry) => entry.path),
-    ["/api/library/imports", "/api/library/imports/imp-glow/download"],
+    ["/api/gallery/import/link", "/api/library/imports/imp-glow/download"],
   );
   const updates = data(await call(admin, "updates", { action: "check", query: "glow" }));
   assert.deepEqual(seen.at(-1).body, { keys: ["loras/glow.safetensors"] });
   assert.deepEqual(updates.updates, [{ key: "loras/glow.safetensors", state: "current" }]);
   await failure(admin, "updates", { action: "check", query: "nothing like it" });
-  // A Reddit post becomes uploads, as Library › Import does; one import record goes.
+  // A Reddit post becomes uploads, as the gallery's Import › From URL does; one import record goes.
   assert.equal(
     data(
       await call(admin, "import", { url: "https://www.reddit.com/r/pics/comments/abc123/a_post/" }),
     ).imported,
     2,
   );
-  assert.equal(seen.at(-1).path, "/api/gallery/import/reddit");
+  assert.equal(seen.at(-1).path, "/api/gallery/import/link");
   await call(admin, "imports", { action: "remove", id: "imp-glow" });
   assert.deepEqual(
     [seen.at(-1).method, seen.at(-1).path],

@@ -74,13 +74,13 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
   const faceAvailable =
     item.type === "image" && Boolean(detector?.nodesInstalled && detector.detectors.length);
   const faceDetail = face && faceAvailable;
-  // An administrator can fetch the catalogue's face detector from here; Library › Downloads shows it.
+  // An administrator can fetch the catalogue's face detector from here; Library › Imports shows it.
   const admin = useIsAdmin();
   const faceDownload = useMutation({
     mutationFn: (id: string) => post("/api/models/downloads", { id }),
     onSuccess: () => {
       notifications.show({
-        message: "Downloading the face detector in Library › Downloads.",
+        message: "Downloading the face detector in Library › Imports.",
       });
       void cache.invalidateQueries({ queryKey: downloadsQuery.queryKey });
     },

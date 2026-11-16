@@ -19,7 +19,6 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { z } from "zod";
 
-import { redditPostPath } from "../gallery/reddit.js";
 import { lineDiff } from "../line-diff.js";
 import { imageMimes } from "../reference-names.js";
 import { mcpJson } from "./media.js";
@@ -83,6 +82,14 @@ function importView(record) {
           note: resource.unavailable.note || resource.note || "",
         }
       : {}),
+    ...(resource.substitute
+      ? {
+          substitute: resource.substitute.file,
+          substitute_reason: resource.substitute.reason,
+          accepted: Boolean(resource.accepted),
+        }
+      : {}),
+    ...(resource.downloadable ? { downloadable: true } : {}),
     ...(resource.downloadId ? { download_id: resource.downloadId } : {}),
     ...(resource.progress ? { progress: resource.progress } : {}),
     ...(resource.downloadError ? { error: resource.downloadError } : {}),
@@ -97,6 +104,8 @@ function importView(record) {
     kind: record.input?.kind,
     origin: record.origin || "ui",
     state: record.state,
+    ...(record.audit ? { status: record.audit } : {}),
+    ...(record.stale ? { stale: true } : {}),
     created_at: record.createdAt,
     ...(record.input?.url ? { url: record.input.url } : {}),
     grade: record.grade?.value || "partial",
@@ -145,6 +154,7 @@ const importRow = (record) => {
     kind: view.kind,
     origin: view.origin,
     state: view.state,
+    ...(view.status ? { status: view.status } : {}),
     grade: view.grade,
     missing: view.missing.length,
     created_at: view.created_at,
@@ -292,11 +302,25 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     { readOnlyHint: true },
   );
 
+  /** One import read again, waiting at most `seconds` once while it resolves or downloads. */
+  const readImport = async (wanted, seconds, signal) => {
+    const read = async () =>
+      (await api("GET", `/api/library/imports/${encodeURIComponent(wanted)}`, undefined, signal))
+        .import;
+    const deadline = Date.now() + seconds * 1000;
+    let record = await read();
+    while (busyImport.has(record?.state) && Date.now() < deadline && !signal?.aborted) {
+      await delay(Math.min(2000, deadline - Date.now()), undefined, { signal }).catch(() => {});
+      record = await read();
+    }
+    return record;
+  };
+
   tool(
     server,
     "import",
-    "import to library",
-    "Import into the Library, as Library › Import does, when the user asks: a Civitai image or model link or a Hugging Face link (url), an image from upload (upload_id) or a result (job_id). Returns the import's grade (exact, close, partial) with reasons and its missing files; it appears in Library › Import as from chat. install: true also queues its missing files, as Downloads start does, when the user asks to install or download it; otherwise nothing downloads. describe has the vision model describe an image without settings. A Reddit post link saves the post's images as the user's uploads instead.",
+    "import from a link",
+    `Import from a link or an image when the user asks, as the gallery's Import › From URL and Library › Imports do. url: a Civitai image or model link or a Hugging Face link starts a Library import and returns its status (ready, substitute, needs-files, failed or busy), grade with reasons and missing files; a Reddit post or a direct image or video link saves to the user's uploads instead. upload_id or job_id imports an image's recipe. install: true also queues the import's missing files when the user asks to install or download it; otherwise nothing downloads. wait_seconds (at most ${maxWaitSeconds}) waits once for it to resolve or download; never poll. describe has the vision model describe an image without settings.`,
     {
       url: z.string().trim().url().max(2000).optional(),
       upload_id: id.optional(),
@@ -304,32 +328,25 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
       output_index: z.number().int().min(0).max(999).default(0),
       describe: z.boolean().default(false),
       install: z.boolean().default(false),
+      wait_seconds: z.number().int().min(0).max(maxWaitSeconds).default(0),
     },
-    async ({ url, upload_id, job_id, output_index, describe, install }, signal) => {
+    async ({ url, upload_id, job_id, output_index, describe, install, wait_seconds }, signal) => {
       if ([url, upload_id, job_id].filter(Boolean).length !== 1)
         throw new Error("Pass one of url, upload_id or job_id.");
       if (url && describe) throw new Error("describe is for images: pass upload_id or job_id.");
       if (install && !url) throw new Error("install is for a Civitai or Hugging Face url.");
-      let reddit = Boolean(url);
-      try {
-        if (url) redditPostPath(url);
-      } catch {
-        reddit = false;
-      }
-      // Library › Import sends a Reddit post's images to the gallery as uploads, not to an import.
-      if (reddit) {
-        if (install) throw new Error("A Reddit post has nothing to install.");
-        const saved = await api("POST", "/api/gallery/import/reddit", { url }, signal);
-        return mcpJson({
-          title: saved.title,
-          imported: saved.imported,
-          ...(saved.failed?.length ? { failed: saved.failed } : {}),
-          note: "Saved as uploads; call search with uploads to find them.",
-        });
-      }
       let record;
-      if (url) ({ import: record } = await api("POST", "/api/library/imports", { url }, signal));
-      else {
+      if (url) {
+        const saved = await api("POST", "/api/gallery/import/link", { url }, signal);
+        if (!saved.import)
+          return mcpJson({
+            ...(saved.title ? { title: saved.title } : {}),
+            imported: saved.imported,
+            ...(saved.failed?.length ? { failed: saved.failed } : {}),
+            note: `Saved as uploads${install ? ", with no model files to install" : ""}; call search with uploads to find them.`,
+          });
+        record = saved.import;
+      } else {
         let image;
         let name;
         if (upload_id) {
@@ -364,6 +381,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
             signal,
           ).catch(later("Described imports")));
       }
+      let queued;
       if (install && record?.id) {
         const result = await api(
           "POST",
@@ -371,16 +389,17 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
           {},
           signal,
         );
-        return mcpJson({
-          import: importView(result.import),
-          queued: result.queued,
-          ...(result.failures?.length ? { failures: result.failures } : {}),
-          note: "Shown in Library › Import; downloads status with this import_id follows the files.",
-        });
+        record = result.import;
+        queued = { queued: result.queued, failures: result.failures };
       }
+      if (wait_seconds && record?.id) record = await readImport(record.id, wait_seconds, signal);
       return mcpJson({
         import: importView(record),
-        note: "Shown in Library › Import. Call downloads start with this import_id to fetch the missing files when the user asks.",
+        ...(queued ? { queued: queued.queued } : {}),
+        ...(queued?.failures?.length ? { failures: queued.failures } : {}),
+        note: queued
+          ? "Shown in Library › Imports; imports with this id, or downloads status with this import_id, follows the files."
+          : "Shown in Library › Imports. Call downloads start with this import_id to fetch the missing files when the user asks.",
       });
     },
   );
@@ -389,15 +408,44 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "imports",
     "library imports",
-    `Read Library › Import history (newest first, with grade and missing count), or one import by id with its files checked. wait_seconds (at most ${maxWaitSeconds}) waits once for a resolving or downloading import; never poll. clear_failed removes every failed import record and remove one import record (id), when the user asks; downloaded files stay.`,
+    `Library › Imports, when the user asks: read the history (newest first, with status, grade and missing count) or one import by id with its files checked; wait_seconds (at most ${maxWaitSeconds}) waits once for a resolving or downloading import, never poll. download_missing queues every import's missing files, or one import's with id. accept keeps a file's substitute (id and index, from its files) and reject drops it for the exact file, which then needs downloading. clear_stale removes every failed import and every one waiting on a file no provider gives; remove removes one import record (id). Downloaded files stay.`,
     {
-      action: z.enum(["read", "clear_failed", "remove"]).default("read"),
+      action: z
+        .enum(["read", "download_missing", "accept", "reject", "clear_stale", "remove"])
+        .default("read"),
       id: id.optional(),
+      index: z.number().int().min(0).max(999).optional(),
       wait_seconds: z.number().int().min(0).max(maxWaitSeconds).default(0),
     },
-    async ({ action, id: wanted, wait_seconds }, signal) => {
-      if (action === "clear_failed")
-        return mcpJson(await api("POST", "/api/library/imports/clear-failed", {}, signal));
+    async ({ action, id: wanted, index, wait_seconds }, signal) => {
+      if (action === "clear_stale")
+        return mcpJson(await api("POST", "/api/library/imports/clear-stale", {}, signal));
+      if (action === "download_missing") {
+        if (!wanted)
+          return mcpJson(await api("POST", "/api/library/imports/download-missing", {}, signal));
+        const result = await api(
+          "POST",
+          `/api/library/imports/${encodeURIComponent(wanted)}/download`,
+          {},
+          signal,
+        );
+        return mcpJson({
+          queued: result.queued,
+          ...(result.failures?.length ? { failures: result.failures } : {}),
+          import: importView(result.import),
+        });
+      }
+      if (action === "accept" || action === "reject") {
+        if (!wanted || index === undefined)
+          throw new Error("Pass id and index: the import and its substituted file.");
+        const { import: record } = await api(
+          "POST",
+          `/api/library/imports/${encodeURIComponent(wanted)}/substitute`,
+          { index, accept: action === "accept" },
+          signal,
+        );
+        return mcpJson({ import: importView(record) });
+      }
       if (action === "remove") {
         if (!wanted) throw new Error("Pass id: the import to remove.");
         await api(
@@ -415,23 +463,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
           imports: imports.slice(0, maxImportsListed).map(importRow),
         });
       }
-      const deadline = Date.now() + wait_seconds * 1000;
-      let { import: record } = await api(
-        "GET",
-        `/api/library/imports/${encodeURIComponent(wanted)}`,
-        undefined,
-        signal,
-      );
-      while (busyImport.has(record?.state) && Date.now() < deadline && !signal?.aborted) {
-        await delay(Math.min(2000, deadline - Date.now()), undefined, { signal }).catch(() => {});
-        ({ import: record } = await api(
-          "GET",
-          `/api/library/imports/${encodeURIComponent(wanted)}`,
-          undefined,
-          signal,
-        ));
-      }
-      return mcpJson({ import: importView(record) });
+      return mcpJson({ import: importView(await readImport(wanted, wait_seconds, signal)) });
     },
   );
 

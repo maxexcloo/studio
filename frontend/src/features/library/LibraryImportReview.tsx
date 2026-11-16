@@ -36,6 +36,10 @@ export interface ImportRecord {
   title?: string;
   name?: string;
   state: string;
+  /** Where it stands in Library › Imports. */
+  audit: "busy" | "failed" | "needs-files" | "ready" | "substitute";
+  /** Failed, or waiting on a file no provider gives: Clear Stale removes it. */
+  stale?: boolean;
   input?: { url?: string; kind?: string; fileName?: string };
   grade?: { value: string; reasons: string[] };
   error?: string;
@@ -64,6 +68,10 @@ export interface ImportRecord {
     profileId?: string;
     folderGuessed?: boolean;
     exactInstalled?: boolean;
+    /** The substitute was accepted for good. */
+    accepted?: boolean;
+    /** Download Missing can fetch it. */
+    downloadable?: boolean;
     localName?: string;
     substitute?: { file: string; folder?: string; reason: string; profileId?: string };
     want?: { file: string; folder: string; source?: { url?: string } };
@@ -108,6 +116,38 @@ export const stateLabel = (state: string) =>
 export const importBusy = (record: ImportRecord) =>
   ["resolving", "downloading"].includes(record.state);
 const folders = ["checkpoints", "clip_vision", "diffusion_models", "loras", "text_encoders", "vae"];
+
+/** Accept keeps a substitute for good; Reject drops it for the exact file, to download. */
+function SubstituteChoice({
+  accepted,
+  disabled,
+  onChoose,
+}: {
+  accepted?: boolean;
+  disabled: boolean;
+  onChoose: (accept: boolean) => void;
+}) {
+  return (
+    <>
+      <Button
+        size="compact-sm"
+        variant="default"
+        disabled={disabled || accepted}
+        onClick={() => onChoose(true)}
+      >
+        {accepted ? "Accepted" : "Accept"}
+      </Button>
+      <Button
+        size="compact-sm"
+        variant="default"
+        disabled={disabled}
+        onClick={() => onChoose(false)}
+      >
+        Reject
+      </Button>
+    </>
+  );
+}
 
 export function LibraryImportReview({
   id,
@@ -171,14 +211,7 @@ export function LibraryImportReview({
       (resource) =>
         ["checkpoint", "diffusion_model"].includes(resource.role || "") && !resource.optional,
     ).length === 1;
-  const missing = resources.some(
-    (resource) =>
-      !resource.optional &&
-      resource.status === "missing" &&
-      resource.supported !== false &&
-      !resource.unavailable &&
-      !resource.unsourced,
-  );
+  const missing = resources.some((resource) => !resource.optional && resource.downloadable);
   const preset: LibraryPreset | undefined = record?.preset
     ? {
         id: record.id,
@@ -424,29 +457,22 @@ export function LibraryImportReview({
                         />
                       )}
                       {resource.status === "substitute" && (
+                        <SubstituteChoice
+                          accepted={resource.accepted}
+                          disabled={action.isPending}
+                          onChoose={(accept) => run("substitute", { index, accept })}
+                        />
+                      )}
+                      {resource.downloadable && (
                         <Button
                           size="compact-sm"
                           variant="default"
-                          disabled={!resource.exactInstalled || action.isPending}
-                          onClick={() => run("exact", { index })}
+                          disabled={action.isPending}
+                          onClick={() => run("download", { indices: [index] })}
                         >
-                          Use Exact File
+                          Download Exact File
                         </Button>
                       )}
-                      {(resource.status === "missing" ||
-                        (resource.status === "substitute" && !resource.exactInstalled)) &&
-                        !resource.unavailable &&
-                        !resource.unsourced &&
-                        resource.supported !== false && (
-                          <Button
-                            size="compact-sm"
-                            variant="default"
-                            disabled={action.isPending}
-                            onClick={() => run("download", { indices: [index] })}
-                          >
-                            Download Exact File
-                          </Button>
-                        )}
                     </Group>
                   </Stack>
                 ))}

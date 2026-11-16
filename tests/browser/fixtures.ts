@@ -784,8 +784,11 @@ export async function fixtures(page: Page) {
                 id: "import-1",
                 name: "Watercolour Inspiration",
                 state: "needs-files",
+                audit: "needs-files",
                 grade: { value: "partial", reasons: ["Watercolour LoRA is missing"] },
-                resources: [{ name: "watercolour.safetensors", status: "missing" }],
+                resources: [
+                  { name: "watercolour.safetensors", status: "missing", downloadable: true },
+                ],
               },
             ],
           })

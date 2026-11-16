@@ -1,8 +1,5 @@
-import { logWarning } from "../crash-log.js";
-import { directRoute } from "../domain/direct-route.ts";
 import { imageMimes } from "../reference-names.js";
 import { maxUploadBytes, saveUpload } from "../references.js";
-import { localRefusal } from "../route-access.js";
 
 /**
  * Import from Reddit: a post's images saved as the caller's uploads, each recording the post's link
@@ -28,20 +25,28 @@ const postHosts = new Set([
 const maxPageBytes = 5 * 1024 * 1024;
 const redirects = 3;
 
-/** The Redlib path for a pasted Reddit post or gallery link. */
-export function redditPostPath(link) {
+/** Whether a link is on Reddit or the owner's Redlib, before Redlib is required. */
+export function isRedditLink(link) {
   let url;
   try {
     url = new URL(String(link || "").trim());
   } catch {
-    throw new Error("Paste a link to a Reddit post.");
+    return false;
   }
   const host = url.hostname.toLowerCase();
-  if (
-    !["http:", "https:"].includes(url.protocol) ||
-    !(postHosts.has(host) || host === new URL(redlib()).hostname)
-  )
-    throw new Error("Only Reddit post links can be imported.");
+  const own = process.env.STUDIO_REDLIB_URL;
+  return (
+    ["http:", "https:"].includes(url.protocol) &&
+    (postHosts.has(host) || Boolean(own && host === new URL(own).hostname))
+  );
+}
+
+/** The Redlib path for a pasted Reddit post or gallery link. */
+export function redditPostPath(link) {
+  if (!isRedditLink(link)) throw new Error("Only Reddit post links can be imported.");
+  redlib();
+  const url = new URL(String(link).trim());
+  const host = url.hostname.toLowerCase();
   const id =
     host === "redd.it"
       ? url.pathname.match(/^\/(\w+)\/?$/)?.[1]
@@ -153,43 +158,4 @@ export async function importRedditPost(link, ownerId = "", { fetch: fetcher = fe
     }
   }
   return { title, items, failed };
-}
-
-/** `uploaded(item)` hears of each saved image, for image search. */
-export function registerRedditImportRoute(
-  app,
-  { uploaded = () => {}, fetch: fetcher = fetch } = {},
-) {
-  directRoute(app, "POST", "/api/gallery/import/reddit", async (account, { body }) => {
-    const refused = account ? null : localRefusal(account);
-    if (refused) return refused;
-    try {
-      const result = await importRedditPost(body?.url, account?.userId || "", {
-        fetch: fetcher,
-      });
-      for (const item of result.items) uploaded(item);
-      if (result.failed.length)
-        logWarning("Reddit import failed", {
-          account: account?.userId,
-          imported: result.items.length,
-          failed: result.failed.length,
-          reason: result.failed[0].error,
-        });
-      return {
-        status: result.items.length ? 201 : 422,
-        payload: {
-          ok: result.items.length > 0,
-          title: result.title,
-          imported: result.items.length,
-          failed: result.failed,
-          ...(result.items.length
-            ? {}
-            : { error: `None of that post's images could be saved: ${result.failed[0].error}` }),
-        },
-      };
-    } catch (error) {
-      logWarning("Reddit import failed", { account: account?.userId, reason: error.message });
-      return { status: 400, payload: { ok: false, error: error.message } };
-    }
-  });
 }
