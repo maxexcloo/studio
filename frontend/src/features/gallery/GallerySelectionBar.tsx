@@ -20,7 +20,7 @@ import { prepareMediaShare } from "./mediaShare";
 import { finished } from "./MediaTile";
 import { useUpscaleMany } from "./UpscaleControls";
 import type { GallerySelection } from "./useGallerySelection";
-import { useAnimateTemplates, useIterate } from "./useMediaAction";
+import { useAnimateLengthSetting, useAnimateTemplates, useIterate } from "./useMediaAction";
 import { showDisliked, useRatings } from "./useMediaRating";
 import { useRecreateMany } from "./useRecreateMany";
 import type { useTryAgain } from "./useTryAgain";
@@ -93,6 +93,7 @@ export function GallerySelectionBar({
   const upscale = useUpscaleMany(finishedImages);
   const iterate = useIterate();
   const templates = useAnimateTemplates();
+  const length = useAnimateLengthSetting(finishedImages[0]);
   const client = useQueryClient();
   const animate = useMutation({
     mutationFn: async (theme: string) => {
@@ -194,13 +195,14 @@ export function GallerySelectionBar({
       itemAction("animate", {
         loading: animate.isPending,
         menu: assistMenu({
+          settings: [length],
           templates: templates
             .filter((template) => template.id !== "custom")
             .map((template) => ({
               id: `animate-${template.id}`,
               label: template.label,
               icon: icons.animate,
-              disabled: animate.isPending,
+              disabled: animate.isPending || length.loading,
               onClick: () => animate.mutate(template.id),
             })),
           last: [],

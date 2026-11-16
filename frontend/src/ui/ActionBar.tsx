@@ -64,6 +64,7 @@ export interface Action {
   menu?: ActionGroups;
   /** A setting between a few values (Cloud, Fast or Quality), a segmented control in menus. */
   choice?: {
+    label?: string;
     value: string;
     options: { value: string; label: string }[];
     onChange: (value: string) => void;
@@ -156,6 +157,7 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
         if (action.choice)
           return (
             <div key={id} className={classes.choice}>
+              {action.choice.label && <Menu.Label>{action.choice.label}</Menu.Label>}
               <SegmentedControl
                 size="xs"
                 fullWidth
