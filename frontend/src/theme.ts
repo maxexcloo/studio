@@ -32,9 +32,10 @@ import {
   rem,
 } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
-import { createElement } from "react";
+import { type ComponentPropsWithRef, createElement } from "react";
 
 import type { Appearance } from "../../shared/appearance";
+import { PopupRoot } from "./ui/PopupRoot";
 
 import classes from "./theme.module.css";
 
@@ -360,7 +361,10 @@ export function studioTheme({
       // Every popover, menu and combobox dropdown renders PopoverDropdown; `data-popup` marks them
       // for the shared outside-click rule (ui/popupClicks.ts) and their transform origin.
       PopoverDropdown: Popover.Dropdown.extend({
-        defaultProps: { "data-popup": true } as Record<string, unknown>,
+        defaultProps: {
+          "data-popup": true,
+          renderRoot: (props: ComponentPropsWithRef<"div">) => createElement(PopupRoot, props),
+        } as Record<string, unknown>,
       }),
       ScrollArea: ScrollArea.extend({
         defaultProps: { type: "never" },
