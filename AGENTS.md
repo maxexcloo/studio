@@ -168,7 +168,8 @@ recur across features.
   and Clear/Reset/Undo alongside the tools in one flat menu, each tool's
   options under its name. The button is ⋯, or the AI icon when the box has
   an AI tool; the AI icon (`icons.assistant`) marks everything AI does. The
-  viewer's prompt keeps its AI tools in the bar's AI menu instead.
+  viewer's prompt keeps its AI tools in the bar's AI menu instead; a box with
+  neither tools nor Copy shows Clear/Reset/Undo as one icon while it can act.
   Composer fields edit in place; other phone text boxes open the shared
   full-screen editor, and AI tools stay beside the text before it opens.
   Phone controls show Copy, Clear/Reset/Undo and More above the keyboard,
