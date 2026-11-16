@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-import { fixtures, image, openTheme, section, signIn, stamp } from "./fixtures";
+import {
+  dreamDefaultsFixture,
+  fixtures,
+  image,
+  openTheme,
+  section,
+  signIn,
+  stamp,
+} from "./fixtures";
 
 test("Chat Brief edits and restores the account's standing rules", async ({ page }) => {
   const state = await fixtures(page);
@@ -946,6 +954,7 @@ test("Settings › Generation switches follow at once and settle back after a fa
           video: setting("STUDIO_DEFAULT_VIDEO_PROFILE"),
           profiles: [],
         },
+        dream: dreamDefaultsFixture(),
         catalogue: [
           {
             key: "STUDIO_GALLERY_CAPTIONS",
@@ -976,4 +985,28 @@ test("Settings › Generation switches follow at once and settle back after a fa
   release();
   await expect(page.getByText("The setting could not be saved")).toBeVisible();
   await expect(toggle).toBeChecked();
+});
+
+test("Dream administration saves separate image and video defaults without changing the other controls", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  await page.goto("/settings#generation");
+  const dream = page.getByRole("region", { name: "Dream", exact: true });
+  const images = dream.getByRole("radiogroup", { name: "Default Dream Images Run On" });
+  const videos = dream.getByRole("radiogroup", { name: "Default Dream Videos Run On" });
+  await images.getByRole("radio", { name: "Cloud", exact: true }).check();
+  await expect(videos.getByRole("radio", { name: "Local", exact: true })).toBeChecked();
+  const cap = dream.getByRole("textbox", { name: "Default Dream Images per Day", exact: true });
+  await cap.fill("0");
+  await cap.press("Tab");
+  await expect(cap).toHaveValue("0");
+  await page.reload();
+  await expect(images.getByRole("radio", { name: "Cloud", exact: true })).toBeChecked();
+  await expect(videos.getByRole("radio", { name: "Local", exact: true })).toBeChecked();
+  await expect(cap).toHaveValue("0");
+  await expect(
+    dream.getByRole("switch", { name: "Default Dream Enabled", exact: true }),
+  ).not.toBeChecked();
 });
