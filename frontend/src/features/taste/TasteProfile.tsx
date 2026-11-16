@@ -1,15 +1,26 @@
-import { Alert, Button, Group, Modal, ScrollArea, Stack, TagsInput, Text } from "@mantine/core";
+import {
+  Alert,
+  Button,
+  Group,
+  Modal,
+  MultiSelect,
+  ScrollArea,
+  Stack,
+  TagsInput,
+  Text,
+} from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { loraName } from "../../../../shared/profiles";
 import {
+  type TasteFields,
   type TastePreferenceChanges,
   type TastePreferences,
-  type TasteWords,
-  maxAvoid,
-  maxAvoids,
-  tasteWordLimits,
+  commonShapes,
+  maxTastePhrase,
+  shapeName,
+  tasteLimits,
 } from "../../../../shared/taste";
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
@@ -24,16 +35,12 @@ import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { isProfile, profileName } from "../generation/payload";
 
-interface Weighted {
-  score: number;
-}
-export interface Taste extends TasteWords {
+/** Each field as it stands, what Studio learnt, and the fields the person set. */
+export interface Taste extends TasteFields {
   summary: string;
-  addedAvoid: string[];
-  learnt: TasteWords;
+  learnt: TasteFields;
   preferences: TastePreferences;
-  profiles: Record<"image" | "video", ({ id: string } & Weighted)[]>;
-  loras: ({ name: string; strength?: number } & Weighted)[];
+  loraScores: { name: string; strength?: number; score: number }[];
   updatedAt: string;
   signals: number;
   writer: boolean;
@@ -50,16 +57,50 @@ const learnt = (taste: Taste) =>
   ]
     .filter(Boolean)
     .join(" · ");
-const top = <T extends Weighted>(entries: T[]) =>
-  entries.filter((entry) => entry.score > 0).slice(0, 3);
-const wordLabels = {
+const fieldLabels: Record<keyof TasteFields, string> = {
   likes: "Likes",
   avoid: "Dislikes",
   styles: "Styles",
   note: "Summary",
-} as const;
-const wordKeys = Object.keys(wordLabels) as (keyof TasteWords)[];
+  models: "Models",
+  loras: "LoRAs",
+  shapes: "Shapes",
+  tags: "Tags",
+};
+const fieldKeys = Object.keys(fieldLabels) as (keyof TasteFields)[];
+/** How many of the favourites Studio learnt the profile shows; the person's own show whole. */
+const learntShown: Partial<Record<keyof TasteFields, number>> = {
+  models: 3,
+  loras: 3,
+  shapes: 3,
+  tags: 5,
+};
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * The fields as the profile shows them: models no longer offered drop out rather than read
+ * "Unavailable", and learnt favourites keep to the best few.
+ */
+function useTasteFields() {
+  const models = useQuery(modelsQuery);
+  const profileOf = (id: string) => models.data?.profiles.find((entry) => isProfile(entry, id));
+  const shown = (key: keyof TasteFields, value: TasteFields[keyof TasteFields], own: boolean) => {
+    if (typeof value === "string") return value;
+    const listed = key === "models" ? value.flatMap((id) => profileOf(id)?.id ?? []) : value;
+    return own ? listed : listed.slice(0, learntShown[key]);
+  };
+  return {
+    ready: Boolean(models.data),
+    profiles: models.data?.profiles || [],
+    profileOf,
+    /** The field as it stands. */
+    current: <Key extends keyof TasteFields>(taste: Taste, key: Key) =>
+      shown(key, taste[key], Object.hasOwn(taste.preferences, key)) as TasteFields[Key],
+    /** What Studio learnt for the field. */
+    learnt: <Key extends keyof TasteFields>(taste: Taste, key: Key) =>
+      shown(key, taste.learnt[key], false) as TasteFields[Key],
+  };
+}
 
 function TasteEditor({
   data,
@@ -70,34 +111,107 @@ function TasteEditor({
   onClose: () => void;
   saved: (next: Taste) => void;
 }) {
-  const [draft, setDraft] = useState<TasteWords>({
-    likes: data.likes,
-    styles: data.styles,
-    avoid: data.avoid,
-    note: data.note,
-  });
-  const [resets, setResets] = useState(new Set<keyof TasteWords>());
-  const [addedAvoid, setAddedAvoid] = useState(data.addedAvoid);
+  const fields = useTasteFields();
+  const loraInfo = useQuery(loraInfoQuery);
+  const initial = Object.fromEntries(
+    fieldKeys.map((key) => [key, fields.current(data, key)]),
+  ) as unknown as TasteFields;
+  const [draft, setDraft] = useState(initial);
+  const [resets, setResets] = useState(new Set<keyof TasteFields>());
   const changes: TastePreferenceChanges = Object.fromEntries(
-    wordKeys
-      .filter((key) => resets.has(key) || !same(draft[key], data[key]))
-      .map((key) => [key, same(draft[key], data.learnt[key]) ? null : draft[key]]),
+    fieldKeys
+      .filter((key) => resets.has(key) || !same(draft[key], initial[key]))
+      .map((key) => [key, same(draft[key], fields.learnt(data, key)) ? null : draft[key]]),
   );
   const save = useMutation({
     meta: { inlineError: true },
     mutationFn: () =>
       api<Taste>("/api/taste", {
         method: "PUT",
-        body: JSON.stringify({
-          ...(!same(addedAvoid, data.addedAvoid) && { avoid: addedAvoid }),
-          ...(Object.keys(changes).length && { preferences: changes }),
-        }),
+        body: JSON.stringify({ preferences: changes }),
       }),
     onSuccess: (next) => {
       saved(next);
       onClose();
     },
   });
+  const set = (key: keyof TasteFields) => (value: string | string[]) =>
+    setDraft({ ...draft, [key]: value });
+  // Chosen favourites stay choices even when they are no longer listed.
+  const choices = (values: { value: string; label: string }[], kept: string[]) => [
+    ...values,
+    ...kept
+      .filter((value) => !values.some((entry) => entry.value === value))
+      .map((value) => ({ value, label: value })),
+  ];
+  const input = (key: keyof TasteFields) => {
+    const label = fieldLabels[key];
+    if (key === "note")
+      return (
+        <TextBox
+          label={label}
+          value={draft.note}
+          onChange={set("note")}
+          autosize
+          minRows={3}
+          maxLength={tasteLimits.note}
+        />
+      );
+    const select = { label, value: draft[key], onChange: set(key), maxValues: tasteLimits[key] };
+    if (key === "models")
+      return (
+        <MultiSelect
+          {...select}
+          searchable
+          nothingFoundMessage="No Matches"
+          data={fields.profiles.map((profile) => ({
+            value: profile.id,
+            label: profileName(profile),
+          }))}
+        />
+      );
+    if (key === "loras")
+      return (
+        <MultiSelect
+          {...select}
+          searchable
+          nothingFoundMessage="No Matches"
+          data={choices(
+            Object.entries(loraInfo.data?.loras || {}).map(([name, info]) => ({
+              value: name,
+              label: loraName(name, info),
+            })),
+            draft.loras,
+          )}
+        />
+      );
+    if (key === "shapes")
+      return (
+        <MultiSelect
+          {...select}
+          // A learnt shape stands in for the common one it reads as, such as 0.68 for 2:3.
+          data={[
+            ...new Map(
+              [...commonShapes, ...data.learnt.shapes, ...draft.shapes].map((shape) => [
+                shapeName(shape),
+                shape,
+              ]),
+            ).values(),
+          ]
+            .sort((a, b) => Number(a) - Number(b))
+            .map((shape) => ({ value: shape, label: shapeName(shape) }))}
+        />
+      );
+    return (
+      <TagsInput
+        label={label}
+        value={draft[key]}
+        onChange={set(key)}
+        maxTags={tasteLimits[key]}
+        maxLength={maxTastePhrase}
+      />
+    );
+  };
   return (
     <form
       onSubmit={(event) => {
@@ -107,60 +221,31 @@ function TasteEditor({
     >
       <Stack>
         <Text size="sm" c="dimmed">
-          Your edits stay when Studio refreshes what it learnt. Remove entries with their ×, or
-          return a field to what Studio learnt.
+          A field you change stays yours; Studio keeps learning the others. Use Learnt hands a field
+          back.
         </Text>
-        {wordKeys.map((key) => (
+        {fieldKeys.map((key) => (
           <Stack key={key} gap={4}>
-            {key === "note" ? (
-              <TextBox
-                label={wordLabels[key]}
-                value={draft.note}
-                onChange={(note) => setDraft({ ...draft, note })}
-                autosize
-                minRows={3}
-                maxLength={tasteWordLimits.note}
-              />
-            ) : (
-              <TagsInput
-                label={wordLabels[key]}
-                value={draft[key]}
-                onChange={(value) => setDraft({ ...draft, [key]: value })}
-                maxTags={tasteWordLimits[key]}
-                maxLength={maxAvoid}
-              />
-            )}
+            {input(key)}
             {((Object.hasOwn(data.preferences, key) && !resets.has(key)) ||
-              !same(draft[key], data.learnt[key])) && (
+              !same(draft[key], fields.learnt(data, key))) && (
               <Button
                 size="compact-sm"
                 variant="subtle"
                 w="fit-content"
                 onClick={() => {
-                  setDraft({ ...draft, [key]: data.learnt[key] });
+                  setDraft({ ...draft, [key]: fields.learnt(data, key) });
                   setResets(new Set([...resets, key]));
                 }}
               >
-                Use Learnt {wordLabels[key]}
+                Use Learnt {fieldLabels[key]}
               </Button>
             )}
           </Stack>
         ))}
-        <TagsInput
-          label="Always Avoid"
-          description="Your explicit avoids, kept separately from learnt preferences."
-          value={addedAvoid}
-          onChange={setAddedAvoid}
-          maxTags={maxAvoids}
-          maxLength={maxAvoid}
-        />
         {save.error && <Alert color="red">{save.error.message}</Alert>}
         <DialogFooter pending={save.isPending} onCancel={onClose}>
-          <Button
-            type="submit"
-            loading={save.isPending}
-            disabled={!Object.keys(changes).length && same(addedAvoid, data.addedAvoid)}
-          >
+          <Button type="submit" loading={save.isPending} disabled={!Object.keys(changes).length}>
             Save
           </Button>
         </DialogFooter>
@@ -169,12 +254,12 @@ function TasteEditor({
   );
 }
 
-/** Taste words and explicit preferences, with model scores still learnt from feedback. */
+/** The taste profile: each field learnt from feedback until the person sets it. */
 export function TasteProfile({ fill = false }: { fill?: boolean }) {
   const phone = usePhone();
   const client = useQueryClient();
   const taste = useQuery(tasteQuery);
-  const models = useQuery(modelsQuery);
+  const fields = useTasteFields();
   const loraInfo = useQuery(loraInfoQuery);
   const [clearing, setClearing] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -194,12 +279,19 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
   });
   const data = taste.data;
   const error = refresh.error || taste.error;
-  const profileOf = (id: string) => models.data?.profiles.find((entry) => isProfile(entry, id));
-  const description = (text: string) => (
-    <Text span size="sm" c="text" style={{ overflowWrap: "anywhere" }}>
-      {text || "None"}
-    </Text>
-  );
+  const text = (data: Taste, key: keyof TasteFields) => {
+    const value = fields.current(data, key);
+    if (typeof value === "string") return value;
+    const named = {
+      models: (id: string) => profileName(fields.profileOf(id)!),
+      loras: (name: string) => {
+        const strength = data.loraScores.find((lora) => lora.name === name)?.strength;
+        return `${loraName(name, loraInfo.data?.loras[name])}${strength === undefined ? "" : ` ${strength}`}`;
+      },
+      shapes: shapeName,
+    }[key as "models" | "loras" | "shapes"];
+    return (named ? value.map(named) : value).join("; ");
+  };
   return (
     <>
       <SettingGroup
@@ -210,7 +302,7 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
             size="compact-sm"
             variant="default"
             leftSection={<icons.edit size={16} />}
-            disabled={!data}
+            disabled={!data || !fields.ready}
             onClick={() => setEditing(true)}
           >
             Edit
@@ -226,41 +318,17 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
                   {learnt(data) ||
                     "Nothing learnt yet. Like, compare or iterate on results and Studio picks up your taste."}
                 </Text>
-                {wordKeys.map((key) => (
+                {fieldKeys.map((key) => (
                   <SettingRow
                     key={key}
-                    label={`${wordLabels[key]}${Object.hasOwn(data.preferences, key) ? " · Your Edit" : ""}`}
-                    description={description(key === "note" ? data.note : data[key].join("; "))}
+                    label={`${fieldLabels[key]}${Object.hasOwn(data.preferences, key) ? " · Your Edit" : ""}`}
+                    description={
+                      <Text span size="sm" c="text" style={{ overflowWrap: "anywhere" }}>
+                        {text(data, key) || "None"}
+                      </Text>
+                    }
                   />
                 ))}
-                <SettingRow
-                  label="Models"
-                  description={description(
-                    // Models no longer offered drop out rather than read "Unavailable".
-                    top(
-                      [...data.profiles.image, ...data.profiles.video]
-                        .filter((entry) => profileOf(entry.id))
-                        .sort((a, b) => b.score - a.score),
-                    )
-                      .map((entry) => profileName(profileOf(entry.id)!))
-                      .join("; "),
-                  )}
-                />
-                <SettingRow
-                  label="LoRAs"
-                  description={description(
-                    top(data.loras)
-                      .map(
-                        (lora) =>
-                          `${loraName(lora.name, loraInfo.data?.loras[lora.name])}${lora.strength === undefined ? "" : ` ${lora.strength}`}`,
-                      )
-                      .join("; "),
-                  )}
-                />
-                <SettingRow
-                  label="Always Avoid"
-                  description={description(data.addedAvoid.join("; "))}
-                />
               </>
             )}
             {error && <Alert color="red">{error.message}</Alert>}
@@ -281,11 +349,7 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
                 color="red"
                 leftSection={<icons.clear size={16} />}
                 disabled={
-                  !data ||
-                  (!data.summary &&
-                    !data.signals &&
-                    !data.addedAvoid.length &&
-                    !Object.keys(data.preferences).length)
+                  !data || (!data.summary && !data.signals && !Object.keys(data.preferences).length)
                 }
                 onClick={() => setClearing(true)}
               >
@@ -319,8 +383,7 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
           clear.reset();
         }}
       >
-        Studio forgets what it learnt and your edits, including what you asked it to avoid. Your
-        gallery and likes stay.
+        Studio forgets what it learnt and your edits. Your gallery and likes stay.
       </ConfirmDialog>
     </>
   );
