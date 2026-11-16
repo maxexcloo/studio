@@ -53,6 +53,8 @@ export class RuntimeRequestError extends Error {
 export interface RuntimeRecord {
   /** The placement last applied in Studio; a deployment stopped outside Studio is drift from it. */
   desired?: string[];
+  /** The administrator's placement while an automatic swap for ComfyUI work replaces `desired`. */
+  home?: string[];
   operations: RuntimeOperation[];
 }
 export interface RuntimeStore {
@@ -86,6 +88,14 @@ const historyLimit = 100;
 /** Why work for a parked workload waits, in the words every surface uses. */
 const parkedReason = (label: string) =>
   `${label} is stopped: an administrator can start it in Settings › Workers.`;
+/** How long a swap for ComfyUI work outlasts its last waiting or running job. */
+const swapIdleMs = 2 * 60_000;
+/** Waiting work asks for its workload every second; an older ask has moved or gone. */
+const wantedMs = 30_000;
+const isRadiance = (workload: Workload) => workload.backend === "radiance";
+const isComfy = (workload: Workload) => workload.kind !== "text" && !isRadiance(workload);
+const sameSet = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((id) => b.includes(id));
 /** A store for a runtime document that lasts only as long as the process. */
 export const memoryStore = <T>() => {
   let stored: T | undefined;
@@ -106,6 +116,10 @@ export class RuntimeController {
   /** Settles when the running operation finishes; for tests and shutdown. */
   settled: Promise<void> = Promise.resolve();
   private active = new Map<string, number>();
+  /** When waiting work last asked for each unplaced ComfyUI workload, in first-asked order. */
+  private wanted = new Map<string, number>();
+  /** When ComfyUI work last waited or finished; a swap outlasts it by swapIdleMs. */
+  private comfyUsedAt: number;
   private stopping = new Set<string>();
   private stopListeners = new Set<(id: string) => void>();
   private current?: RuntimeOperation;
@@ -157,7 +171,27 @@ export class RuntimeController {
         });
         interrupted = true;
       }
+    this.settleHome();
     if (interrupted) this.save();
+    this.comfyUsedAt = this.now();
+  }
+
+  /**
+   * Radiance holds the GPUs while an administrator's placement includes it, and waiting ComfyUI
+   * work swaps in on demand (swapOnDemand). A placement without Radiance pauses swapping until
+   * Radiance is placed again. Undefined without a Radiance workload or a placement.
+   */
+  get swaps(): "automatic" | "paused" | undefined {
+    const placed = this.record.home ?? this.record.desired;
+    if (!placed || !this.workloads.some(isRadiance)) return undefined;
+    return placed.some((id) => this.workloads.some((item) => item.id === id && isRadiance(item)))
+      ? "automatic"
+      : "paused";
+  }
+  /** A swap has ended once the placement is the administrator's again. */
+  private settleHome() {
+    const { home, desired } = this.record;
+    if (home && desired && sameSet(home, desired)) delete this.record.home;
   }
 
   private timestamp() {
@@ -247,7 +281,9 @@ export class RuntimeController {
     for (const entry of observed)
       if ("state" in entry && holds(entry.state))
         used[entry.workload.pool] = (used[entry.workload.pool] ?? 0) + entry.workload.gpus;
+    const swaps = this.swaps;
     return {
+      ...(swaps ? { swaps } : {}),
       pools: Object.entries(this.pools).map(([id, capacity]) => ({
         id,
         capacity,
@@ -346,6 +382,8 @@ export class RuntimeController {
       const plan = this.plan(target, await this.states());
       if (plan.signature !== signature)
         throw new RuntimeConflict("The workloads changed since this preview; preview again.");
+      // A placement by hand ends any automatic swap and decides whether swapping continues.
+      delete this.record.home;
       return this.begin("apply", plan, requestedBy);
     } finally {
       this.claimed = false;
@@ -498,6 +536,7 @@ export class RuntimeController {
         (!scaled || this.cancelledBy)
       )
         this.record.desired = operation.after ?? plan.holders;
+      this.settleHome();
       this.cancelledBy = undefined;
       this.current = undefined;
       this.save();
@@ -531,6 +570,23 @@ export class RuntimeController {
       );
     }
     const [workload] = choices;
+    if (
+      this.swaps === "automatic" &&
+      choices.every((item, index) => this.isParked(item, states[index]))
+    ) {
+      if (choices.every(isComfy)) {
+        this.wanted.set(workload.id, this.now());
+        this.comfyUsedAt = this.now();
+        void this.swapOnDemand().catch(() => {});
+        throw new RuntimeUnavailable(
+          `Waiting for ${workload.label} — Studio is switching the GPUs.`,
+        );
+      }
+      if (this.record.home)
+        throw new RuntimeUnavailable(
+          `Waiting for ${workload.label} — Studio switches the GPUs back once the ComfyUI work finishes.`,
+        );
+    }
     throw new RuntimeUnavailable(
       choices.every((item, index) => this.isParked(item, states[index]))
         ? parkedReason(workload.label)
@@ -623,6 +679,55 @@ export class RuntimeController {
     }
   }
 
+  /**
+   * While swaps are automatic, called by waiting ComfyUI work and every 30 seconds: place the
+   * ComfyUI workloads waiting work asks for, in the order it first asked, as many as fit, keeping
+   * placed ones that have work or are still asked for; what no longer fits, Radiance included,
+   * stops once its accepted work finishes, as in any change. Once no ComfyUI work has waited or
+   * run for swapIdleMs, the administrator's placement returns.
+   */
+  async swapOnDemand() {
+    if (this.swaps !== "automatic" || this.current || this.claimed) return;
+    this.claim();
+    try {
+      const now = this.now();
+      for (const [id, at] of this.wanted) if (now - at > wantedMs) this.wanted.delete(id);
+      const desired = this.record.desired ?? [];
+      const home = this.record.home ?? desired;
+      const comfy = this.workloads.filter(isComfy).map((item) => item.id);
+      let target: string[];
+      if (this.wanted.size) {
+        const fits = (ids: string[]) =>
+          Object.entries(this.pools).every(([pool, capacity]) => this.usage(ids, pool) <= capacity);
+        const placedFirst = [...this.wanted.keys()].sort(
+          (a, b) => Number(!desired.includes(a)) - Number(!desired.includes(b)),
+        );
+        target = desired.filter((id) => comfy.includes(id) && this.active.get(id));
+        for (const id of [...placedFirst, ...desired])
+          if (!target.includes(id) && fits([...target, id])) target.push(id);
+      } else if (
+        this.record.home &&
+        !comfy.some((id) => this.active.get(id)) &&
+        now - this.comfyUsedAt >= swapIdleMs
+      )
+        target = home;
+      else return;
+      if (sameSet(target, desired)) return;
+      const states = await this.states();
+      this.record.home = home;
+      const names = (ids: string[]) => ids.map((id) => this.workload(id).label).join(", ");
+      this.begin(
+        "apply",
+        this.plan(target, states),
+        target === home
+          ? `automatic: back to ${names(home)} after ${minutes(swapIdleMs)} without ComfyUI work`
+          : `automatic: switching to ${names(target)} for waiting ComfyUI work`,
+      );
+    } finally {
+      this.claimed = false;
+    }
+  }
+
   /** Stop the running change at its next check; what it already stopped or started stays so. */
   cancel(id: string, requestedBy: string) {
     if (this.current?.id !== id) throw new RuntimeConflict("That change is no longer running.");
@@ -651,6 +756,7 @@ export class RuntimeController {
       release: () => {
         if (released) return;
         released = true;
+        if (held.some(isComfy)) this.comfyUsedAt = this.now();
         for (const { id } of held) {
           const remaining = (this.active.get(id) ?? 1) - 1;
           if (remaining) this.active.set(id, remaining);

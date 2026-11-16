@@ -58,6 +58,8 @@ export function useWorkloadStart(enabled: boolean) {
   async function start(candidates: string[], name: string, onReady: () => void) {
     apply.reset();
     setOperationId("");
+    // Queued work swaps the GPUs itself; a placement by hand here would pause that.
+    if (status.data?.swaps === "automatic") return;
     // A refused preview shows as the standard action notification.
     const plan = await preview.mutateAsync(candidates).catch(() => undefined);
     if (!plan) return;
