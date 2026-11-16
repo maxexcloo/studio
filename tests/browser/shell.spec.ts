@@ -16,6 +16,7 @@ test("Nested pickers consume outside presses one layer at a time", async ({ page
   await page.setViewportSize({ width: 1200, height: 900 });
   await fixtures(page);
   await create(page);
+  const composerUrl = page.url();
   await openLoraChoices(page);
   const parent = page.getByRole("dialog", { name: "LoRAs", exact: true });
   const family = parent.getByRole("combobox", { name: "Family", exact: true });
@@ -35,7 +36,7 @@ test("Nested pickers consume outside presses one layer at a time", async ({ page
   await press(videos);
   await expect(sort).toHaveAttribute("aria-expanded", "false");
   await expect(parent).toBeVisible();
-  await expect(page).toHaveURL(/\/images$/);
+  await expect(page).toHaveURL(composerUrl);
   await press(family);
   await page.keyboard.press("Escape");
   await expect(families).toBeHidden();
@@ -44,10 +45,10 @@ test("Nested pickers consume outside presses one layer at a time", async ({ page
   await press(videos);
   await expect(families).toBeHidden();
   await expect(parent).toBeVisible();
-  await expect(page).toHaveURL(/\/images$/);
+  await expect(page).toHaveURL(composerUrl);
   await press(videos);
   await expect(parent).toBeHidden();
-  await expect(page).toHaveURL(/\/images$/);
+  await expect(page).toHaveURL(composerUrl);
   await press(videos);
   await expect(page).toHaveURL(/\/video$/);
 });
