@@ -47,7 +47,7 @@ test("Length uses the selected profile's seconds or offset frame grid without ch
   assert.equal(next.steps, 8);
   const choices = lengthChoices(next, local)!;
   assert.equal(choices.value, "243");
-  assert.ok(choices.data.some((option) => option.value === "243" && option.label === "10.13 s"));
+  assert.ok(choices.data.some((option) => option.value === "243" && option.label === "10s"));
   assert.ok(choices.data.every((option) => (Number(option.value) - 5) % 17 === 0));
   assert.ok(
     choices.data.every((option) => Number(option.value) >= 124 && Number(option.value) <= 362),
