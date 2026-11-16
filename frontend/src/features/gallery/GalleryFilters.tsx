@@ -388,7 +388,7 @@ export function FilterToggle({
       <Button
         {...(iconOnly ? iconChipProps : chipProps)}
         aria-label={Icon ? label : undefined}
-        data-icon-toggle={Icon ? true : undefined}
+        data-icon-toggle={Icon && !iconOnly ? true : undefined}
         aria-pressed={on}
         title={title}
         variant={on ? "light" : "default"}

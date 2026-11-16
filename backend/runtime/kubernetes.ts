@@ -220,13 +220,33 @@ export class KubernetesEngine {
    */
   async logs(target: Deployment, lines: number): Promise<RuntimePodLog[]> {
     const { pods } = await this.pods(target);
+    return this.podLogs(target.namespace, pods, lines);
+  }
+
+  /** The same for a Job's pods, such as a benchmark's. */
+  async jobLogs(namespace: string, job: string, lines: number): Promise<RuntimePodLog[]> {
+    const selector = encodeURIComponent(`batch.kubernetes.io/job-name=${job}`);
+    let response: Awaited<ReturnType<KubernetesRequest>>;
+    try {
+      response = await this.request(
+        "GET",
+        `/api/v1/namespaces/${encodeURIComponent(namespace)}/pods?labelSelector=${selector}`,
+      );
+    } catch {
+      throw new RuntimeUnavailable("The Kubernetes API is unavailable.");
+    }
+    const pods = ((response.body as Record<string, any>)?.items ?? []) as Pod[];
+    return this.podLogs(namespace, response.status === 200 ? pods : [], lines);
+  }
+
+  private podLogs(namespace: string, pods: Pod[], lines: number): Promise<RuntimePodLog[]> {
     return Promise.all(
       pods.map(async (pod) => {
         const name = pod.metadata?.name ?? "";
         const container = pod.spec?.containers?.[0]?.name ?? "";
         const restarts =
           pod.status?.containerStatuses?.find((item) => item.name === container)?.restartCount ?? 0;
-        const read = (previous: boolean) => this.log(target, name, container, lines, previous);
+        const read = (previous: boolean) => this.log(namespace, name, container, lines, previous);
         let text = await read(false);
         const previous = !text && restarts > 0;
         if (previous) text = await read(true);
@@ -243,7 +263,7 @@ export class KubernetesEngine {
   }
 
   private async log(
-    target: Deployment,
+    namespace: string,
     pod: string,
     container: string,
     lines: number,
@@ -259,7 +279,7 @@ export class KubernetesEngine {
     try {
       response = await this.request(
         "GET",
-        `/api/v1/namespaces/${encodeURIComponent(target.namespace)}/pods/${encodeURIComponent(pod)}/log?${query}`,
+        `/api/v1/namespaces/${encodeURIComponent(namespace)}/pods/${encodeURIComponent(pod)}/log?${query}`,
       );
     } catch {
       throw new RuntimeUnavailable("The Kubernetes API is unavailable.");
@@ -268,7 +288,7 @@ export class KubernetesEngine {
       throw new RuntimeUnavailable("Kubernetes refused Studio's service account token.");
     if (response.status === 403)
       throw new RuntimeUnavailable(
-        `Pod logs aren't permitted yet: Studio's runtime role in ${target.namespace} needs pods/log get.`,
+        `Pod logs aren't permitted yet: Studio's runtime role in ${namespace} needs pods/log get.`,
       );
     // A container waiting to start, or without a previous run, answers 400 and has no log.
     return response.status === 200 && typeof response.body === "string" ? response.body : "";
