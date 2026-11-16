@@ -51,6 +51,7 @@ export function enrichLocalLoraInfo(info, name, catalogue, familiesFromMetadata,
       ? { guidance: entry.guidance.trim().slice(0, 1000) }
       : {}),
     ...loraPromptMetadata(entry),
+    ...(entry.unavailableReason ? { unavailableReason: entry.unavailableReason } : {}),
   };
 }
 
@@ -180,6 +181,11 @@ function loraPolicyMetadata(entry) {
 
 /** Applies only to user-added effects, with the server's resolved profile context. */
 export function optionalLoraPolicyIssue(item, info, profile) {
+  // Deferrals cover Radiance's composed adapter; ComfyUI loads the same file exactly.
+  const unavailable =
+    (profile?.loraStack?.adapter ?? profile?.loraAdapter) === "radiance-tags-v1" &&
+    info?.unavailableReason;
+  if (unavailable) return `${info?.title || item.name}: ${unavailable}`;
   if (loraCompatibility(info, profile) === "other") {
     // Another family entirely, or a variant the publisher excludes within this family.
     const family =

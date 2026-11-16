@@ -6,6 +6,7 @@ import { dreamOwnership } from "./dream-ownership.js";
 import { galleryRatings } from "./gallery-ratings.js";
 import { legacyShapes } from "./legacy-shapes.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
+import { migrateRadianceQueue } from "./radiance-queue-migration.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -111,7 +112,17 @@ function summary(results, apply) {
  * it returns every step's plan; with it, it applies the online-safe steps against Studio's data
  * folder and refuses the others that have work. `{ ok, apply, steps: { <name>: result } }`.
  */
-export function registerMigrationRoutes(app, { dataDir, adminRefusal, log = logger }) {
+export function registerMigrationRoutes(app, { dataDir, store, adminRefusal, log = logger }) {
+  if (store)
+    directRoute(app, "POST", "/api/maintenance/radiance-queue", (account, { body }) => {
+      const refused = adminRefusal(account);
+      if (refused) return refused;
+      const result = migrateRadianceQueue(store, {
+        apply: body?.apply === true,
+        baseHash: body?.baseHash,
+      });
+      return { status: result.conflicts.length ? 409 : 200, payload: result };
+    });
   directRoute(app, "POST", "/api/maintenance/migrations", async (account, { body }) => {
     const refused = adminRefusal(account);
     if (refused) return refused;
