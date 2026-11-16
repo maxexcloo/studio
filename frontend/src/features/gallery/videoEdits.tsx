@@ -1,6 +1,6 @@
 import { Alert, Button, Modal, RangeSlider, Stack, Text } from "@mantine/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
@@ -10,6 +10,8 @@ import { queueQuery } from "../generation/Queue";
 import { playbackUrl } from "./mediaSource";
 import { galleryKey } from "./queries";
 import { useItemMutation } from "./useItemMutation";
+import { useVideoSound } from "./useVideoSound";
+import { videoLifecycle } from "./videoPlayback";
 
 /** A video edit backend/gallery/video-edits.js saves as a new version of the clip. */
 export type VideoEdit =
@@ -36,6 +38,11 @@ const time = (ms: number) => `${(ms / 1000).toFixed(2)} s`;
 export function TrimVideoDialog({ item, onClose }: { item: MediaItem; onClose: () => void }) {
   const phone = usePhone();
   const player = useRef<HTMLVideoElement>(null);
+  const sound = useVideoSound();
+  const attachPlayer = useCallback((video: HTMLVideoElement | null) => {
+    player.current = video;
+    return video ? videoLifecycle(video) : undefined;
+  }, []);
   const [duration, setDuration] = useState(0);
   const [range, setRange] = useState<[number, number]>([0, 0]);
   const save = useVideoEdit(item, { inlineError: true });
@@ -50,10 +57,10 @@ export function TrimVideoDialog({ item, onClose }: { item: MediaItem; onClose: (
       >
         <Stack>
           <video
-            ref={player}
+            ref={attachPlayer}
+            {...sound}
             src={playbackUrl(item.url)}
             controls
-            muted
             playsInline
             preload="metadata"
             style={{ width: "100%", maxHeight: "50vh", borderRadius: "var(--mantine-radius-md)" }}
