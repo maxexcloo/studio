@@ -13,7 +13,7 @@ import {
 test("Chat Brief edits and restores the account's standing rules", async ({ page }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "member", role: "user" });
-  await page.goto("/settings#preferences");
+  await page.goto("/library#chatBrief");
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "Chat Brief", exact: true });
   await editor.getByRole("textbox", { name: "Subjects", exact: true }).fill("Portraits");

@@ -270,7 +270,9 @@ test("Model classification saves and reads back while definition administration 
   // covers the cards a member gets with it).
   await signIn(page, { id: "account-a", role: "user", features: { characters: false } });
   await serveProfiles(page, profiles);
-  await page.goto("/library");
+  await page.goto("/library#presets");
+  // A hash-only navigation keeps the previous account in memory; load the new one's grants.
+  await page.reload();
   await expect(page.getByText("No Presets", { exact: true })).toBeVisible();
   await page.goto("/library#models");
   await expect(page.getByRole("table", { name: "Library Models", exact: true })).toHaveCount(0);

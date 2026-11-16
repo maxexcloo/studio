@@ -20,7 +20,6 @@ import {
   useSavePreferences,
   useTileCaptions,
 } from "./accountPreferences";
-import { ChatBrief } from "./ChatBrief";
 import { FinishLikedImages } from "./FinishLikedImages";
 
 /**
@@ -309,7 +308,6 @@ export function Preferences() {
       </SettingGroup>
       <ModelChoices />
       <SettingGroup title="Prompts">
-        <ChatBrief />
         <SettingRow
           label="Keep Recent Prompts"
           description="Offer your recent prompts in the composer's history. Pinned prompts stay either way."
