@@ -23,13 +23,13 @@ const handle =
     }
   };
 
-/** Mount behind the existing administrator middleware. Apply and restart answer at once; poll the operation. */
 /** The last `lines` (1–1000, else 200) of each pod's log. */
 function logLines(request: Request) {
   const lines = Math.trunc(Number(request.query.lines));
   return Number.isFinite(lines) ? Math.min(Math.max(lines, 1), 1000) : 200;
 }
 
+/** Mount behind the existing administrator middleware. Apply and restart answer at once; poll the operation. */
 export function createRuntimeRouter(
   controller: RuntimeController,
   benchmarks: Benchmarks,

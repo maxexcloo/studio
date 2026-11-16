@@ -79,14 +79,6 @@ export function BenchmarkResults() {
     },
   });
   if (!status?.configured) return null;
-  if (!status.runs.length)
-    return (
-      <SettingGroup title="Benchmarks">
-        <Text size="sm" c="dimmed">
-          No benchmarks.
-        </Text>
-      </SettingGroup>
-    );
   return (
     <SettingGroup title="Benchmarks">
       <Text size="sm" c="dimmed">

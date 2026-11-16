@@ -75,7 +75,7 @@ test("a run creates its Job, reads the summary once it succeeds and refuses a se
     if (method === "POST") return { status: 201, body };
     if (path.includes("/jobs/")) return { status: 200, body: job };
     if (path.endsWith("/log?tailLines=20")) return { status: 200, body: `done\n${summaryLine}\n` };
-    if (path.endsWith("/log?tailLines=50&timestamps=true"))
+    if (path.includes("tailLines=50"))
       return { status: 200, body: "2026-11-16T10:00:00Z warming up\n2026-11-16T10:00:01Z done\n" };
     return {
       status: 200,
