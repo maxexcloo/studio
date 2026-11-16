@@ -171,20 +171,25 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     });
   });
 
-  // The newest finished image the account made with each LoRA, shown as its picker preview.
+  // Per LoRA, the newest finished image the account made with it (its picker preview) and how
+  // many of its finished images enabled it (the picker's Most Used order).
   app.get("/api/loras/previews", (req, res) => {
-    const previews = ownedSummary(req, "lora-previews", { status: "done" }, (items) => {
+    const found = ownedSummary(req, "lora-previews", { status: "done" }, (items) => {
       const newest = {};
+      const uses = {};
       for (const item of items) {
-        if (!item.thumbnailUrl) continue;
         const time = Date.parse(item.createdAt || "") || 0;
-        for (const lora of Array.isArray(item.settings?.loras) ? item.settings.loras : [])
-          if (lora?.name && lora.enabled !== false && !(newest[lora.name]?.time >= time))
+        for (const lora of Array.isArray(item.settings?.loras) ? item.settings.loras : []) {
+          if (!lora?.name || lora.enabled === false) continue;
+          uses[lora.name] = (uses[lora.name] || 0) + 1;
+          if (item.thumbnailUrl && !(newest[lora.name]?.time >= time))
             newest[lora.name] = { time, url: item.thumbnailUrl };
+        }
       }
-      return Object.fromEntries(Object.entries(newest).map(([name, { url }]) => [name, url]));
+      const previews = Object.entries(newest).map(([name, { url }]) => [name, url]);
+      return { previews: Object.fromEntries(previews), uses };
     });
-    res.json({ previews });
+    res.json(found);
   });
 
   directRoute(app, "GET", "/api/gallery", async (account, { query }) => {
