@@ -117,12 +117,8 @@ export function useAnimateLengthSetting(item?: MediaItem): Action {
     disabled:
       switching || !item || !options || options.data.length < 2 || (!retained && choice.isLoading),
     choice: {
-      label: "Length (Seconds)",
       value: options?.value || "fixed",
-      options: options?.data.map((option) => ({
-        ...option,
-        label: option.label.replace(" s", ""),
-      })) || [{ value: "fixed", label: "Fixed Length" }],
+      options: options?.data || [{ value: "fixed", label: "Fixed Length" }],
       onChange: (value) => setSeconds(Number(value) / fps!),
     },
   };

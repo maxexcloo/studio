@@ -30,7 +30,8 @@ export function lengthChoices(input: GenerationInput, profile?: Profile) {
       .sort((a, b) => a - b)
       .map((value) => ({
         value: String(value),
-        label: `${Number((value / fps).toFixed(2))} s`,
+        // Whole seconds, as lengths are named (5s, 8s); a frame grid lands just off them.
+        label: `${Math.round(value / fps)}s`,
       })),
   };
 }
