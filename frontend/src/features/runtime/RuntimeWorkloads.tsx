@@ -454,6 +454,10 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
               </Button>
             )}
           </Group>
+        ) : status.data.swaps === "paused" ? (
+          <Text size="sm" c="dimmed">
+            Placed by hand: automatic swaps paused until Radiance is placed.
+          </Text>
         ) : (
           <span />
         )}

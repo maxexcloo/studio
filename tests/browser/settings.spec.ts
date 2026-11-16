@@ -479,7 +479,8 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
         services: {},
         runtime: {
           configured: true,
-          reason: "Studio switches GPU workloads only when an administrator applies a placement.",
+          reason:
+            "Studio switches GPU workloads when an administrator applies a placement, and swaps ComfyUI in for waiting work while Radiance is placed.",
         },
       },
     }),

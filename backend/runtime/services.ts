@@ -343,7 +343,7 @@ export function createServicesObserver({
       runtime: {
         configured: Boolean(controller),
         reason: controller
-          ? "Studio switches GPU workloads only when an administrator applies a placement."
+          ? "Studio switches GPU workloads when an administrator applies a placement, and swaps ComfyUI in for waiting work while Radiance is placed."
           : "Studio runtime control is not configured; GPU workloads are neither observed nor switched.",
       },
     };
