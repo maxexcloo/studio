@@ -98,7 +98,7 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
     "unknown",
   );
   assert.equal(admin.runtime.configured, true);
-  assert.match(admin.runtime.reason, /only when an administrator applies a placement/);
+  assert.match(admin.runtime.reason, /swaps ComfyUI in for waiting work while Radiance is placed/);
   assert.doesNotMatch(JSON.stringify(admin), /never-return|foreign-job|private details/);
   assert.equal(
     calls.some((url) => /gateway|models|containers/.test(url)),
