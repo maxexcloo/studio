@@ -403,7 +403,7 @@ export function FilterToggle({
 
 /**
  * The filters, shared by the gallery's Filter popup and the reference picker: the gallery's `view`
- * (Grid or Runs) with the view's own `toggles` (such as All Versions) under it, then the date and
+ * (Grid or Runs) with the view's own `toggles` (such as Originals Only) under it, then the date and
  * each facet. Liked and Uploads sit outside it, the gallery's toggles, and Uploads the picker's tab.
  * Choices apply at once.
  */
