@@ -10,6 +10,7 @@ import {
   lockedNote,
   useDeploymentSetting,
 } from "./deployment";
+import { DreamAdministration } from "./DreamAdministration";
 import { GalleryPass } from "./GalleryPass";
 import { UnfinishedItems } from "./UnfinishedItems";
 
@@ -74,6 +75,10 @@ export function GenerationSettings() {
         {profileSelect("image", defaults.image)}
         {profileSelect("video", defaults.video)}
       </SettingGroup>
+      <DreamAdministration
+        settings={deployment.data.dream}
+        save={(change) => save.mutate(change)}
+      />
       <SettingGroup title="Gallery">
         <GalleryPass
           route="/api/gallery/captions"

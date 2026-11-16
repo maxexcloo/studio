@@ -9,7 +9,13 @@ import test, { type TestContext } from "node:test";
 import express from "express";
 
 import type { CardKind, Character } from "../../shared/characters.ts";
-import { closeRuntimeDatabase, openDatabase } from "../persistence/runtime.ts";
+import { type DreamSettings, dreamDefaults } from "../../shared/dream.ts";
+import {
+  closeRuntimeDatabase,
+  openDatabase,
+  readRuntimeDocument,
+  writeRuntimeDocument,
+} from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import { registerDreamRoutes } from "./dream-routes.ts";
 import {
@@ -56,6 +62,7 @@ function fixture(t: TestContext, catalogue = profiles) {
   const taste = createTaste({ dataDir, writer: () => null });
   const projects = createProjects({ dataDir, now: () => state.clock });
   const state = {
+    defaults: { ...dreamDefaults } as DreamSettings,
     clock: Date.now(),
     items: [] as DreamItem[],
     reads: [] as Record<string, unknown>[],
@@ -65,7 +72,11 @@ function fixture(t: TestContext, catalogue = profiles) {
         { ...everything, account: { userId, role: "user" } },
       ]),
     ) as Record<string, DreamAccess | null>,
-    online: { text: true, image: true, video: true } as Record<string, boolean | "parked">,
+    onlineCalls: [] as { kind: string; backend: string }[],
+    online: { cloud: true, text: true, image: true, video: true } as Record<
+      string,
+      boolean | "parked"
+    >,
     textBusy: false,
     slots: 1,
     prompts: 0,
@@ -94,7 +105,10 @@ function fixture(t: TestContext, catalogue = profiles) {
     store,
     queue: { tick: async () => undefined } as unknown as GenerationQueue,
     validate: async () => ({ status: 200, payload: { ok: true } }),
-    resourceFor: async (input) => `worker:${input.kind === "video" ? "video" : "image"}`,
+    resourceFor: async (input) =>
+      catalogue.find((profile) => profile.id === input.profileId)?.provider === "cliproxyapi"
+        ? "provider:cliproxyapi"
+        : `worker:${input.kind === "video" ? "video" : "image"}`,
     pendingItems: (id, input) => [
       { id: `${id}-0`, jobId: id, status: "pending", prompt: input.prompt },
     ],
@@ -122,6 +136,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       .slice(0, query.sample ?? query.limit);
   const dream = createDream({
     dataDir,
+    defaults: () => state.defaults,
     store,
     taste,
     projects: (ownerId) => projects.list(ownerId),
@@ -132,10 +147,14 @@ function fixture(t: TestContext, catalogue = profiles) {
       profiles: catalogue,
       defaults: { imageModel: "flux", videoModel: "wan" },
     }),
-    online: async (kind) => {
+    online: async (kind, backend) => {
+      state.onlineCalls.push({ kind, backend });
       const reach = (value: boolean | "parked") =>
         value === "parked" ? value : value ? "online" : "offline";
-      return { text: reach(state.online.text), media: reach(state.online[kind]) };
+      return {
+        text: reach(state.online.text),
+        media: reach(state.online[backend === "cloud" ? "cloud" : kind]),
+      };
     },
     textBusy: () => state.textBusy,
     slots: () => state.slots,
@@ -304,6 +323,8 @@ test("Dream is off until turned on, queues one hidden job per account only while
     images: true,
     videos: false,
     spicy: false,
+    imageBackend: "local",
+    videoBackend: "local",
   });
   await dream.tick();
   assert.equal(dreamJobs().length, 0);
@@ -1985,4 +2006,142 @@ test("A Dream video skips a source that left the gallery and animates the next",
   finish("alice", live("alice")[0].id);
   assert.equal(await dreamOnce(), undefined);
   assert.match(dream.status("alice").reason!, /^Dream videos animate a kept, liked/);
+});
+
+test("administrator defaults stay inherited through visits, generation and partial account saves", async (t) => {
+  const { dream, state, dataDir, dreamOnce } = fixture(t);
+  state.defaults.enabled = true;
+  state.defaults.dailyImages = 12;
+  state.defaults.spicy = true;
+  assert.equal(dream.read("alice").settings.dailyImages, 12);
+  dream.visit("alice");
+  await dream.save("alice", { videos: false, dailyVideos: 0 });
+  const inherited = await dreamOnce();
+  assert.equal(inherited?.dream?.spicy, undefined);
+  assert.match(state.calls[0].system, /safe for work/);
+  assert.deepEqual(
+    (readRuntimeDocument(dataDir, "dream:alice") as { settings: Partial<DreamSettings> }).settings,
+    {
+      videos: false,
+      dailyVideos: 0,
+    },
+  );
+  state.defaults.dailyImages = 18;
+  state.defaults.videos = true;
+  state.defaults.dailyVideos = 8;
+  const resolved = dream.read("alice").settings;
+  assert.equal(resolved.dailyImages, 18);
+  assert.equal(resolved.videos, false);
+  assert.equal(resolved.dailyVideos, 0);
+  assert.equal(resolved.enabled, true);
+
+  const existing = { ...dreamDefaults, enabled: false, dailyImages: 0, spicy: false };
+  writeRuntimeDocument(dataDir, "dream:bob", { settings: existing });
+  dream.visit("bob");
+  assert.deepEqual(dream.read("bob").settings, existing);
+  assert.deepEqual(
+    (readRuntimeDocument(dataDir, "dream:bob") as { settings: Partial<DreamSettings> }).settings,
+    existing,
+  );
+  const request = await serve(t, fixture(t));
+  assert.equal((await request("/settings", { imageBackend: "auto" }, "PUT")).status, 400);
+});
+
+test("Dream routes images to the selected allowed backend and never substitutes a local model for Cloud", async (t) => {
+  const cloud = {
+    id: "custom:cloud-image",
+    provider: "cliproxyapi",
+    kind: "image",
+    label: "Cloud Image",
+  };
+  const fx = fixture(t, [...profiles, cloud]);
+  fx.state.defaults.enabled = true;
+  fx.state.defaults.imageBackend = "cloud";
+  fx.state.online.image = "parked";
+  const job = await fx.dreamOnce();
+  assert.equal(job?.input.profileId, cloud.id);
+  assert.equal(fx.state.onlineCalls.find((call) => call.backend === "cloud")?.kind, "image");
+  await fx.dream.save("alice", { imageBackend: "local" });
+  assert.equal(await fx.dreamOnce(), undefined);
+  assert.match(fx.dream.status("alice").reason!, /stopped/);
+
+  const denied = fixture(t);
+  denied.state.defaults.enabled = true;
+  denied.state.defaults.imageBackend = "cloud";
+  assert.equal(await denied.dreamOnce(), undefined);
+  assert.match(
+    denied.dream.status("alice").reason!,
+    /No ready cloud image model available to this account/,
+  );
+  denied.state.online.cloud = false;
+  await denied.dream.tick();
+  assert.match(denied.dream.status("alice").reason!, /cloud image service is offline/);
+  denied.state.access.alice = null;
+  const request = await serve(t, denied);
+  assert.equal((await request("/settings", { imageBackend: "local" }, "PUT")).status, 403);
+});
+
+test("More Like This waits for its exact source profile when the Dream backend changes", async (t) => {
+  const fx = fixture(t, [
+    ...profiles,
+    { id: "custom:cloud-image", provider: "cliproxyapi", kind: "image" },
+  ]);
+  await fx.dream.save("alice", { enabled: true });
+  const source = (await fx.dreamOnce())!;
+  fx.dream.more("alice", `${source.id}-0`);
+  await fx.dream.save("alice", { imageBackend: "cloud" });
+  assert.equal(await fx.dreamOnce(), undefined);
+  assert.match(fx.dream.status("alice").reason!, /source image's model/);
+  await fx.dream.save("alice", { imageBackend: "local" });
+  const continued = await fx.dreamOnce();
+  assert.equal(continued?.input.profileId, source.input.profileId);
+});
+
+test("Dream videos honour a separate Cloud preference and retain source lineage", async (t) => {
+  const cloud = {
+    id: "custom:cloud-video",
+    provider: "cliproxyapi",
+    kind: "video",
+    mediaInputs: [{ id: "start", required: true }],
+  };
+  const fx = fixture(t, [...profiles, cloud]);
+  fx.state.defaults = {
+    ...dreamDefaults,
+    enabled: true,
+    images: false,
+    videos: true,
+    videoBackend: "cloud",
+  };
+  fx.state.video = cloud.id;
+  fx.state.online.video = "parked";
+  fx.generated({
+    id: "kept",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    rating: "liked",
+    prompt: "A fox",
+  });
+  const job = await fx.dreamOnce();
+  assert.equal(job?.input.profileId, cloud.id);
+  assert.equal(
+    (job?.input.referenceAssets as { assetId: string }[] | undefined)?.[0]?.assetId,
+    "asset-kept",
+  );
+  assert.ok(fx.state.onlineCalls.some((call) => call.kind === "video" && call.backend === "cloud"));
+  fx.generated({
+    id: "clip",
+    ownerId: "alice",
+    type: "video",
+    status: "done",
+    rating: "liked",
+    settings: { profileId: "wan" },
+  });
+  assert.equal(await fx.dreamOnce(), undefined);
+  assert.match(fx.dream.status("alice").reason!, /selected Dream backend/);
+  await fx.dream.save("alice", { videoBackend: "local" });
+  fx.state.online.video = true;
+  const extension = await fx.dreamOnce();
+  assert.equal(extension?.input.profileId, "wan");
+  assert.equal(extension?.dream?.arm, "extend");
 });

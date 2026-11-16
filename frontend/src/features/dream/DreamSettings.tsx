@@ -1,4 +1,14 @@
-import { ActionIcon, Alert, Drawer, Popover, Stack, Switch, Text, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Alert,
+  Drawer,
+  Popover,
+  SegmentedControl,
+  Stack,
+  Switch,
+  Text,
+  Tooltip,
+} from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -65,6 +75,23 @@ function SettingsForm({ dream }: { dream: Dream }) {
       />
     </SettingRow>
   );
+  const backend = (key: "imageBackend" | "videoBackend", label: string) => (
+    <SettingRow
+      label={`${label} Run On`}
+      description="Uses ready models allowed for your account. Waits if unavailable."
+    >
+      <SegmentedControl
+        role="radiogroup"
+        aria-label={`Dream ${label} Run On`}
+        value={settings[key]}
+        data={[
+          { value: "local", label: "Local" },
+          { value: "cloud", label: "Cloud" },
+        ]}
+        onChange={(value) => save.mutate({ [key]: value })}
+      />
+    </SettingRow>
+  );
   return (
     <Stack gap="xs">
       <Text size="xs" c="dimmed">
@@ -76,8 +103,10 @@ function SettingsForm({ dream }: { dream: Dream }) {
         {dream.spicyAvailable && toggle("spicy", "Spicy", "Allow explicit themes.")}
         {toggle("images", "Images", "Make new images.")}
         {number("dailyImages", "Images per Day", 500, "The most images Dream makes a day.")}
+        {backend("imageBackend", "Images")}
         {toggle("videos", "Videos", "Animate kept or liked images too.")}
         {number("dailyVideos", "Videos per Day", 100, "The most videos Dream makes a day.")}
+        {backend("videoBackend", "Videos")}
       </div>
       {save.error && (
         <Alert color="red" title="Couldn't Save Dream Settings">

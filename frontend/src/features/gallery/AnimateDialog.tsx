@@ -79,7 +79,7 @@ export function AnimateDialog({
       kind: "animate",
       theme,
       instruction: instruction.trim() || undefined,
-      written: { prompt: prompt.trim(), model: written.model, thinking: written.thinking },
+      written: { ...written, prompt: prompt.trim() },
     });
     onClose();
   };
