@@ -184,7 +184,10 @@ export function GalleryPage() {
             item.jobId && item.index !== undefined ? [`${item.jobId}-${item.index}`] : [],
           ),
         );
-        const keep = (item: MediaItem) => !ids.has(item.id) && !replaced.has(item.id);
+        // The fresh head holds every surviving tile of its jobs; the rest were dropped.
+        const jobs = new Set(first.items.flatMap((item) => (item.jobId ? [item.jobId] : [])));
+        const keep = (item: MediaItem) =>
+          !ids.has(item.id) && !replaced.has(item.id) && !(item.jobId && jobs.has(item.jobId));
         return {
           ...data,
           pages: data.pages.map((page, index) => ({

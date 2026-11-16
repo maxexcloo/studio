@@ -53,7 +53,6 @@ export function TextBox({
   popups,
   hideTools = false,
   reset,
-  overlay,
   below,
   inline = false,
   oneLine = false,
@@ -77,8 +76,6 @@ export function TextBox({
   busy?: string;
   /** Leaves the tools out beside the text (a collapsed composer), keeping the text mounted. */
   hideTools?: boolean;
-  /** Floats over the text, such as prompt ideas; the phone editor shows it under its text. */
-  overlay?: ReactNode;
   /** Content under the box, such as assistant suggestions, that the phone editor shows too. */
   below?: ReactNode;
   /** Edits in place on phones, for a surface that is itself full screen (the Generate sheet). */
@@ -373,7 +370,6 @@ export function TextBox({
   const editor = (field: ReactNode) => (
     <div className={classes.editor} data-text-editor>
       {field}
-      {overlay && <div className={classes.overlay}>{overlay}</div>}
       {below && <div className={classes.below}>{below}</div>}
       {/* Tools and form sends share the pinned row above the keyboard. */}
       {(tools || send || submit || rightSection) && (
@@ -438,7 +434,6 @@ export function TextBox({
       ) : (
         textarea
       )}
-      {!editing && !(mobile && inline) && overlay}
       {!editing && !(mobile && inline) && below}
       {phone && (
         <Modal.Root

@@ -353,7 +353,6 @@ export const ComposerDock = memo(function ComposerDock({
               sheet.current = panel?.closest<HTMLElement>(".mantine-Drawer-content") ?? null;
             }}
             className={classes.panel}
-            data-generate-drawer
             data-typing={typing || undefined}
             onPointerDown={(event) => {
               tapping.current = sheetField(event.currentTarget, event.target);

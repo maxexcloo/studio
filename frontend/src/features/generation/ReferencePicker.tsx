@@ -179,10 +179,10 @@ export function ReferencePicker({
   function dropData(data: DataTransfer, into: ReferenceTarget | null = chosen) {
     const cell = data.getData(referenceCellType);
     const gallery = data.getData(galleryReferenceType);
+    if (data.files.length && !cell && !gallery) return uploadFiles([...data.files], into);
     if (cell) {
       if (into) moveReference(cell, into);
     } else if (gallery) placement.addGalleryItem(JSON.parse(gallery), into);
-    else if (data.files.length) void placement.uploadFiles([...data.files], into);
     settle();
   }
   const uploadTile = (

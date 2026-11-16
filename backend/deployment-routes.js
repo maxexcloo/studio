@@ -1,4 +1,4 @@
-import { dreamSettingError, dreamSettingKeys } from "../shared/dream.ts";
+import { dreamDefaults, dreamSettingError, dreamSettingKeys } from "../shared/dream.ts";
 import { assistantIntegration } from "./assistant-routes.js";
 import { civitaiTokenStatus } from "./civitai/access.js";
 import {
@@ -66,7 +66,16 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
     if (dreamKey) {
       const error = dreamSettingError(dreamKey, value);
       if (error) return res.status(400).json({ ok: false, error });
-      saveDeploymentSetting(key, typeof value === "boolean" ? (value ? "1" : "0") : String(value));
+      saveDeploymentSetting(
+        key,
+        value === dreamDefaults[dreamKey]
+          ? ""
+          : typeof value === "boolean"
+            ? value
+              ? "1"
+              : "0"
+            : String(value),
+      );
       res.json({ ok: true, dream: describeDreamDefaults() });
       return;
     }
