@@ -17,17 +17,17 @@ import {
   toolbarSearch,
 } from "./fixtures";
 
-test("The Library groups Personal, Cards and Administration and opens on the Chat Brief", async ({
+test("The Library groups AI, Cards and Generation, sets Files and Imports apart and opens on the Chat Brief", async ({
   page,
 }) => {
   await fixtures(page);
   await page.goto("/library");
   const groups = {
-    Personal: ["Chat Brief", "Presets"],
+    AI: ["Chat Brief", "Presets"],
     Cards: ["Characters", "Outfits", "Scenes"],
-    Administration: ["Guides", "LoRAs", "Models", "Profiles", "Prompt Styles", "Unused"],
+    Generation: ["Guides", "LoRAs", "Profiles", "Prompt Styles"],
   };
-  const order = [...Object.values(groups).flat(), "Downloads", "Imports"];
+  const order = [...Object.values(groups).flat(), "Files", "Imports"];
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
     await expect(select).toHaveValue("Chat Brief");
@@ -146,7 +146,7 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
   await page.goto("/images");
   await openNav(page, "Library");
   const readsBeforeDownloads = modelReads;
-  await section(page, "Library", "Downloads");
+  await section(page, "Library", "Imports");
   const table = page.getByRole("table", { name: "Model Downloads" });
   await expect(table.getByRole("row").filter({ hasText: active.file })).toContainText(
     "Downloading",
@@ -265,8 +265,8 @@ test("Catalogue checks updates and queues only the explicitly chosen available o
   });
   await page.goto("/images");
   await openNav(page, "Library");
-  await section(page, "Library", "Models");
-  const table = page.getByRole("table", { name: "Library Models", exact: true });
+  await section(page, "Library", "Files");
+  const table = page.getByRole("table", { name: "Library Files", exact: true });
   await expect(table.getByText("Base Model", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Check Updates", exact: true }).click();
   await expect(table.getByRole("row").filter({ hasText: "Base Model" })).toContainText(
@@ -364,6 +364,7 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
     id: "checkpoint",
     title: "Imported Checkpoint",
     state: "ready",
+    audit: "ready",
     input: { kind: "hf-file" },
     grade: { value: "Ready", reasons: [] },
     resources: [
@@ -417,22 +418,69 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   expect(attempts).toBe(2);
 });
 
-test("Clear Failed removes failed imports and says how many; Remove takes one", async ({
+test("Imports group by what they need: Download All Missing, substitutes to accept or reject, Clear Stale and Delete", async ({
   page,
 }) => {
   await fixtures(page);
+  const requests: { path: string; body: unknown }[] = [];
   let records = [
-    { id: "imp-failed", name: "Blocked Model", state: "failed", resources: [] },
-    { id: "imp-ready", name: "Kept Model", state: "ready", resources: [] },
+    {
+      id: "imp-missing",
+      name: "Missing Model",
+      state: "needs-files",
+      audit: "needs-files",
+      resources: [
+        {
+          name: "missing.safetensors",
+          want: { file: "missing.safetensors", folder: "loras" },
+          status: "missing",
+          downloadable: true,
+        },
+      ],
+    },
+    {
+      id: "imp-close",
+      name: "Close Recipe",
+      state: "ready",
+      audit: "substitute",
+      resources: [
+        {
+          name: "DreamShaper",
+          want: { file: "dreamshaper_8.safetensors", folder: "checkpoints" },
+          status: "substitute",
+          substitute: { file: "dreamshaper_9.safetensors", reason: "Version 9 instead of 8" },
+        },
+      ],
+    },
+    {
+      id: "imp-failed",
+      name: "Blocked Model",
+      state: "failed",
+      audit: "failed",
+      stale: true,
+      error: "HTTP 451",
+      resources: [],
+    },
+    { id: "imp-ready", name: "Kept Model", state: "ready", audit: "ready", resources: [] },
   ];
   await page.route("**/api/library/imports**", (route) => {
     const { pathname } = new URL(route.request().url());
-    if (pathname.endsWith("/clear-failed")) {
+    const method = route.request().method();
+    if (method === "POST") requests.push({ path: pathname, body: route.request().postDataJSON() });
+    if (pathname.endsWith("/clear-stale")) {
       const before = records.length;
-      records = records.filter((record) => record.state !== "failed");
+      records = records.filter((record) => !record.stale);
       return route.fulfill({ json: { ok: true, cleared: before - records.length } });
     }
-    if (route.request().method() === "DELETE") {
+    if (pathname.endsWith("/download-missing"))
+      return route.fulfill({ json: { ok: true, queued: 1, imports: 1, failures: [] } });
+    if (pathname.endsWith("/substitute")) {
+      records = records.map((record) =>
+        record.id === "imp-close" ? { ...record, audit: "ready" } : record,
+      );
+      return route.fulfill({ json: { ok: true, import: records[1] } });
+    }
+    if (method === "DELETE") {
       records = records.filter((record) => !pathname.endsWith(`/${record.id}`));
       return route.fulfill({ json: { ok: true } });
     }
@@ -441,21 +489,40 @@ test("Clear Failed removes failed imports and says how many; Remove takes one", 
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Imports");
-  await page.getByRole("button", { name: "Clear Failed", exact: true }).click();
+  const needs = page.getByRole("region", { name: "Needs Files · 1", exact: true });
+  await expect(needs).toContainText("missing.safetensors: Not downloaded yet");
+  await needs.getByRole("button", { name: "Download All Missing", exact: true }).click();
+  // A substitute shows beside the file it stands in for.
+  const substitutes = page.getByRole("table", { name: "Substitutes", exact: true });
+  await expect(substitutes).toContainText("dreamshaper_8.safetensors");
+  await expect(substitutes).toContainText("dreamshaper_9.safetensors");
+  await substitutes
+    .getByRole("button", {
+      name: "Actions for Close Recipe: dreamshaper_8.safetensors",
+      exact: true,
+    })
+    .click();
+  await page.getByRole("menuitem", { name: "Accept", exact: true }).click();
+  await expect(substitutes).toBeHidden();
+  expect(requests).toEqual([
+    { path: "/api/library/imports/download-missing", body: {} },
+    { path: "/api/library/imports/imp-close/substitute", body: { index: 0, accept: true } },
+  ]);
+  await page.getByRole("button", { name: "Clear Stale", exact: true }).click();
   await page
-    .getByRole("dialog", { name: "Clear Failed Imports" })
-    .getByRole("button", { name: "Clear Failed", exact: true })
+    .getByRole("dialog", { name: "Clear Stale Imports" })
+    .getByRole("button", { name: "Clear Stale", exact: true })
     .click();
   await expect(page.getByText("1 cleared", { exact: true })).toBeVisible();
   await expect(page.getByText("Blocked Model", { exact: true })).toBeHidden();
-  await expect(page.getByRole("button", { name: "Clear Failed", exact: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Clear Stale", exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Actions for Kept Model", exact: true }).click();
   await page.getByRole("menuitem", { name: "Delete Import", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Delete Import", exact: true })
     .getByRole("button", { name: "Delete", exact: true })
     .click();
-  await expect(page.getByText("No Imports", { exact: true })).toBeVisible();
+  await expect(page.getByText("Kept Model", { exact: true })).toBeHidden();
 });
 
 test("Catalogue views, sorting, search and filters order and narrow the list", async ({ page }) => {
@@ -480,8 +547,8 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
       },
     }),
   );
-  await page.goto("/library#models");
-  const table = page.getByRole("table", { name: "Library Models", exact: true });
+  await page.goto("/library#files");
+  const table = page.getByRole("table", { name: "Library Files", exact: true });
   await expect(table.getByRole("row")).toHaveCount(3);
   const names = table.getByRole("row").locator("td:first-child p:first-child");
   await expect(names).toHaveText(["Flux Base", "XL Base"]);
@@ -502,17 +569,17 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(table.getByRole("row")).toHaveCount(3);
   await page.getByRole("button", { name: "Filter Models", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Filter Models", exact: true })).toBeHidden();
-  await (await toolbarSearch(page, "Models")).fill("flux");
+  await (await toolbarSearch(page, "Files")).fill("flux");
   await expect(table.getByRole("row")).toHaveCount(2);
   // Escape leaves search, keeping the query and the Library open.
   await page.keyboard.press("Escape");
   await expect(table).toContainText("Flux Base");
   await expect(table).not.toContainText("XL Base");
-  await (await toolbarSearch(page, "Models")).fill("nothing");
+  await (await toolbarSearch(page, "Files")).fill("nothing");
   await expect(page.getByText("No Matches", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Clear Search", exact: true }).click();
   await page.keyboard.press("Escape");
-  await chooseView(page, "Models", "Available");
+  await chooseView(page, "Files", "Available");
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("Later Model");
 });
@@ -549,7 +616,9 @@ test("Library shows import grades, and the Presets chip loads inspiration settin
   await openNav(page, "Library");
   await section(page, "Library", "Imports");
   await expect(page.getByText("Watercolour Inspiration", { exact: true })).toBeVisible();
-  await expect(page.getByText("Watercolour LoRA is missing", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("watercolour.safetensors: Not downloaded yet", { exact: true }),
+  ).toBeVisible();
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await openLoraChoices(page);
@@ -568,46 +637,6 @@ test("Library shows import grades, and the Presets chip loads inspiration settin
   expect(state.jobs[0].input.profileId).toBe("image:test");
   expect(state.jobs[0].input.steps).toBe(24);
   expect(state.jobs[0].input.loras).toEqual([]);
-});
-
-test("Unused lists idle models and LoRAs by size and removes one through the catalogue", async ({
-  page,
-}) => {
-  await fixtures(page);
-  let items = [
-    {
-      key: "loras/idle.safetensors",
-      title: "Idle Style",
-      bytes: 150_000_000,
-      reason: "No run in 90 days",
-    },
-    {
-      key: "checkpoints/spare.safetensors",
-      title: "Spare Model",
-      bytes: 6_500_000_000,
-      reason: "No profile uses it",
-    },
-  ];
-  const removed: unknown[] = [];
-  await page.route("**/api/library/unused", (route) => route.fulfill({ json: { items } }));
-  await page.route("**/api/library/catalogue/remove", (route) => {
-    const body = route.request().postDataJSON();
-    removed.push(body);
-    items = items.filter((item) => item.key !== body.key);
-    return route.fulfill({ json: { ok: true, key: body.key, fileRemoved: true } });
-  });
-  await page.goto("/library");
-  await section(page, "Library", "Unused");
-  const table = page.getByRole("table", { name: "Unused Models", exact: true });
-  await expect(table.getByRole("row").nth(1)).toContainText("Spare Model");
-  await expect(table.getByRole("row").nth(1)).toContainText("6.5 GB");
-  await table.getByRole("button", { name: "Actions for Idle Style", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Remove", exact: true }).click();
-  const confirm = page.getByRole("dialog", { name: "Remove", exact: true });
-  await confirm.getByRole("button", { name: "Remove", exact: true }).click();
-  await expect(confirm).toBeHidden();
-  await expect(table.getByRole("row", { name: "Idle Style", exact: true })).toHaveCount(0);
-  expect(removed).toEqual([{ key: "loras/idle.safetensors" }]);
 });
 
 test("Library › Presets lists what each preset holds, renames with unique names, edits in the composer and deletes after asking", async ({

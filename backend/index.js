@@ -85,9 +85,9 @@ import {
 import { createTitler } from "./domain/titles.ts";
 import { routeLabel, track, tracked, watchEventLoop } from "./event-loop.js";
 import { registerGalleryImportRoute } from "./gallery/import.js";
+import { registerLinkImportRoute } from "./gallery/links.js";
 import { makePendingItems } from "./gallery/records.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
-import { registerRedditImportRoute } from "./gallery/reddit.js";
 import {
   registerGalleryDeleteRoute,
   registerGalleryErrorRoutes,
@@ -106,7 +106,6 @@ import {
   galleryItem,
   galleryItems,
   galleryJobItems,
-  galleryLoraNames,
   galleryRevisionValue,
   hasGalleryItems,
   hasGalleryMedia,
@@ -456,7 +455,7 @@ const installedFiles = (info) => ({
   vae: optionsFor(info, "VAELoader", "vae_name"),
   clip_vision: optionsFor(info, "CLIPVisionLoader", "clip_name"),
 });
-registerLibraryRoutes(app, {
+const libraryRoutes = registerLibraryRoutes(app, {
   presets: presetRoutes,
   catalogue: loraCatalogue,
   draftProfile: (record, options) =>
@@ -492,7 +491,6 @@ registerLibraryRoutes(app, {
   assistant: () => assistantEngine,
   repoint: async (from, to) => repointProfiles(from.file, to.file),
   references: (model, options) => modelFileReferences(model, presetModels, options),
-  recentLoras: () => galleryLoraNames(Date.now() - 90 * 86_400_000),
   profileDefinitions,
 });
 
@@ -672,7 +670,10 @@ registerCardRoutes(app);
 registerVideoEditRoutes(app, { store });
 registerRecreateRoute(app, { store });
 registerGalleryImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
-registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
+registerLinkImportRoute(app, {
+  importLink: libraryRoutes.importLink,
+  uploaded: (item) => void imageSearch.completed([item]),
+});
 
 registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels });
 

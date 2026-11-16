@@ -23,9 +23,11 @@ import {
   Heart,
   ImageUp,
   ImageUpscale,
+  Import,
   Info,
   Layers,
   LayoutDashboard,
+  Link,
   ListFilter,
   ListX,
   type LucideIcon,
@@ -101,8 +103,12 @@ export const icons = {
   filter: ListFilter,
   /** Hiding a revealed secret again, such as the MCP token. */
   hide: EyeOff,
+  /** Bringing something in from elsewhere: Library › Imports and the gallery's Import ▾. */
+  import: Import,
   keep: Heart,
   like: ThumbsUp,
+  /** A pasted web link, such as Import › From URL. */
+  link: Link,
   /** A record's timestamped lines: a runtime change's steps or a workload's log. */
   log: ScrollText,
   loras: Puzzle,

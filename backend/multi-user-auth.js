@@ -145,9 +145,12 @@ const mcpAdminRoutes = [
   ["GET", /^\/api\/library\/imports$/],
   ["POST", /^\/api\/library\/imports$/],
   ["POST", /^\/api\/library\/imports\/image$/],
-  ["POST", /^\/api\/library\/imports\/clear-failed$/],
+  ["POST", /^\/api\/library\/imports\/(?:clear-stale|download-missing)$/],
   ["GET", new RegExp(`^/api/library/imports/${routeId}$`)],
-  ["POST", new RegExp(`^/api/library/imports/${routeId}/(?:download|describe|draft-profile)$`)],
+  [
+    "POST",
+    new RegExp(`^/api/library/imports/${routeId}/(?:download|describe|draft-profile|substitute)$`),
+  ],
   ["POST", /^\/api\/library\/lookup$/],
   ["GET", /^\/api\/library\/placement$/],
   ["PATCH", /^\/api\/library\/catalogue$/],
@@ -178,9 +181,9 @@ const mcpAdminRoutes = [
   ["DELETE", new RegExp(`^/api/accounts/profiles/${routeId}$`)],
   ["PATCH", new RegExp(`^/api/accounts/users/${routeId}$`)],
   ["DELETE", new RegExp(`^/api/accounts/users/${routeId}$`)],
-  // Removing one import record (its files stay) and Library › Import's Reddit posts.
+  // Removing one import record (its files stay) and the gallery's Import › From URL.
   ["DELETE", new RegExp(`^/api/library/imports/${routeId}$`)],
-  ["POST", /^\/api\/gallery\/import\/reddit$/],
+  ["POST", /^\/api\/gallery\/import\/link$/],
   // The Maintenance tool: migrations, unfinished jobs, the global pause and Merge Duplicate
   // Profiles.
   ["POST", /^\/api\/maintenance\/migrations$/],

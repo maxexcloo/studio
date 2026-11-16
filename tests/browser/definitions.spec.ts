@@ -249,7 +249,7 @@ test("Model classification saves and reads back while definition administration 
   });
   await page.goto("/images");
   await openNav(page, "Library");
-  await section(page, "Library", "Models");
+  await section(page, "Library", "Files");
   const edit = async () => {
     await page.getByRole("button", { name: "Actions for Base Model", exact: true }).click();
     await page.getByRole("menuitem", { name: "Edit Catalogue Entry", exact: true }).click();
@@ -272,8 +272,8 @@ test("Model classification saves and reads back while definition administration 
   await serveProfiles(page, profiles);
   await page.goto("/library#presets");
   await expect(page.getByText("No Presets", { exact: true })).toBeVisible();
-  await page.goto("/library#models");
-  await expect(page.getByRole("table", { name: "Library Models", exact: true })).toHaveCount(0);
+  await page.goto("/library#files");
+  await expect(page.getByRole("table", { name: "Library Files", exact: true })).toHaveCount(0);
   expect(writes).toHaveLength(1);
 });
 

@@ -39,7 +39,7 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/(gallery(\/export|\/filters|\/jobs\/[\w-]+|\/items\/[^/]+)?|results\/\d+)$/],
   [
     "POST",
-    /^\/api\/gallery\/(delete|export|favorite|frame|import\/reddit|errors\/clear|recreate|video-edit)$/,
+    /^\/api\/gallery\/(delete|export|favorite|frame|import\/link|errors\/clear|recreate|video-edit)$/,
   ],
   ["DELETE", /^\/api\/gallery\/[^/]+$/],
   ["GET", /^\/api\/prompts$/],

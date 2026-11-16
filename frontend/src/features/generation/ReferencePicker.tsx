@@ -7,7 +7,7 @@ import { startImageSlot } from "../../../../shared/characters";
 import { slotCapacity } from "../../../../shared/profiles";
 import { failure } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
-import { canReadClipboard, readClipboardImages } from "../../ui/clipboard";
+import { canReadClipboard, readClipboard } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
@@ -215,7 +215,7 @@ export function ReferencePicker({
         disabled={!target || placement.uploading}
         leftSection={phone ? undefined : <icons.paste size={15} />}
         onClick={() =>
-          void readClipboardImages().then((files) => {
+          void readClipboard().then(({ files }) => {
             if (files.length) uploadFiles(files);
             else notifications.show({ message: "There is no image to paste." });
           }, failure)

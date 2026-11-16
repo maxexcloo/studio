@@ -102,7 +102,7 @@ The prompt assistant uses an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSIST
 
 ### Downloads & Imports
 
-Library › Imports downloads to the `models` worker. `CIVITAI_API_TOKEN` and `HF_TOKEN` open restricted files and stay on the server; `HF_ENDPOINT` points Hugging Face downloads at a mirror; with `NODE_USE_ENV_PROXY=1`, Node sends Studio's requests through `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY`.
+Library › Imports downloads to the `models` worker. `CIVITAI_API_TOKEN` and `HF_TOKEN` open restricted files and stay on the server; `HF_ENDPOINT` points Hugging Face downloads at a mirror; with `NODE_USE_ENV_PROXY=1`, Node sends Studio's requests through `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY`, except the image and video links Import › From URL fetches, which connect directly so Studio can refuse private addresses.
 
 ### Profiles, Guides & Catalogue
 

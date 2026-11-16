@@ -33,9 +33,9 @@ import type { OpenComposerState } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import { useTileCaptions } from "../settings/accountPreferences";
 import { emptyGalleryFilters } from "./GalleryFilters";
+import { GalleryImport, droppedFiles, useGalleryUpload } from "./GalleryImport";
 import { GallerySelectionBar } from "./GallerySelectionBar";
 import { GalleryToolbar } from "./GalleryToolbar";
-import { GalleryUpload, droppedFiles, useGalleryUpload } from "./GalleryUpload";
 import { MediaGrid } from "./MediaGrid";
 import { mediaDetail, mediaTitle } from "./mediaLabels";
 import { currentMedia, mediaIdentity, reconcileViewerItems } from "./mediaSource";
@@ -627,7 +627,7 @@ export function GalleryPage() {
           }
           actions={
             <>
-              <GalleryUpload kind={kind} upload={upload} />
+              <GalleryImport upload={upload} />
               {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
               <Tooltip label="Select Items" disabled={!phone}>
                 <Button
