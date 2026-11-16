@@ -53,6 +53,7 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["POST", "/api/gallery/delete"],
     ["POST", "/api/gallery/recreate"],
     ["POST", "/api/gallery/video-edit"],
+    ["POST", "/api/gallery/import/reddit"],
     ["POST", "/api/sessions"],
     ["GET", "/api/sessions/abc-1"],
     ["POST", "/api/sessions/abc-1/generations"],
@@ -77,6 +78,9 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
   ])
     assert.equal(call(path, user, method).continued, true, `${method} ${path}`);
   for (const [method, path] of [
+    ["POST", "/api/library/imports"],
+    ["POST", "/api/library/imports/image"],
+    ["GET", "/api/library/imports"],
     ["POST", "/api/presets"],
     ["POST", "/api/presets/import"],
     ["DELETE", "/api/presets/123"],

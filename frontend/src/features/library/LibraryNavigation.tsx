@@ -5,91 +5,90 @@ import { icons } from "../../ui/icons";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
-// Groups run from the most used; Cards and Prompting list A–Z, Models & LoRAs lead with their
-// names and Add Models follows an import to its downloads. The Library opens on Models.
 export const librarySections = {
   characters: {
     label: "Characters",
-    description:
-      "Your character cards: an image and lasting looks that picking one leads a prompt with.",
+    description: "Your character cards: reference images and descriptions to reuse in Composer.",
     icon: icons.character,
-    group: "Cards",
+    group: "Personal",
   },
   outfits: {
     label: "Outfits",
-    description: "Outfits to dress a character in, the same across a series of shots.",
+    description: "Your reusable outfit descriptions. Images help you recognise each card.",
     icon: icons.outfit,
-    group: "Cards",
-  },
-  scenes: {
-    label: "Scenes",
-    description: "Places, light and time of day to reuse across a series of shots.",
-    icon: icons.scene,
-    group: "Cards",
-  },
-  models: {
-    label: "Models",
-    description: "Checkpoints, diffusion models, text encoders and VAEs, with their families.",
-    icon: Boxes,
-    group: "Models & LoRAs",
-    initial: true,
-  },
-  loras: {
-    label: "LoRAs",
-    description: "Style and subject adapters for compatible models.",
-    icon: icons.loras,
-    group: "Models & LoRAs",
-  },
-  unused: {
-    label: "Unused",
-    description: "Models no profile uses and LoRAs no run used in 90 days, with their sizes.",
-    icon: ArchiveX,
-    admin: true,
-    group: "Models & LoRAs",
-  },
-  guides: {
-    label: "Guides",
-    description: "Prompting guides for profiles and families. Every saved version is kept.",
-    icon: BookOpen,
-    admin: true,
-    group: "Prompting",
+    group: "Personal",
   },
   presets: {
     label: "Presets",
     description:
       "Your saved presets: a prompt, model, settings or LoRAs to start from, or any mix of them.",
     icon: icons.preset,
-    group: "Prompting",
+    group: "Personal",
   },
-  profiles: {
-    label: "Profiles",
-    description: "Generation profiles and their workflows. Every saved version is kept.",
-    icon: FileCog,
-    admin: true,
-    group: "Prompting",
+  scenes: {
+    label: "Scenes",
+    description: "Your reusable scene descriptions. Images help you recognise each card.",
+    icon: icons.scene,
+    group: "Personal",
   },
-  promptStyles: {
-    label: "Prompt Styles",
-    description:
-      "The assistant's fixed options: Improve Prompt's styles and Animate's and Edit's templates. Every saved version is kept.",
-    icon: icons.assistant,
+  downloads: {
+    label: "Downloads",
+    description: "Shared model downloads. Stopping keeps partial files to resume.",
+    icon: HardDriveDownload,
     admin: true,
-    group: "Prompting",
+    group: "Administration",
+  },
+  guides: {
+    label: "Guides",
+    description: "Shared prompting guides for profiles and families. Every saved version is kept.",
+    icon: BookOpen,
+    admin: true,
+    group: "Administration",
   },
   imports: {
     label: "Imports",
     description:
-      "Import a Civitai or Hugging Face link, or an image, and review its compatibility. Reddit posts' images go to Uploads.",
+      "Shared models and recipes from Civitai, Hugging Face or recipe images. Use Images › Upload for private images and Reddit posts.",
     icon: Import,
     admin: true,
-    group: "Add Models",
+    group: "Administration",
   },
-  downloads: {
-    label: "Downloads",
-    description: "Current and recent model downloads. Stopping keeps partial files to resume.",
-    icon: HardDriveDownload,
+  loras: {
+    label: "LoRAs",
+    description: "Manage shared style and subject adapters. Choose them in Composer to generate.",
+    icon: icons.loras,
     admin: true,
-    group: "Add Models",
+    group: "Administration",
+  },
+  models: {
+    label: "Models",
+    description:
+      "Manage shared checkpoints, diffusion models, text encoders and VAEs. Choose a profile in Composer to generate.",
+    icon: Boxes,
+    admin: true,
+    group: "Administration",
+  },
+  profiles: {
+    label: "Profiles",
+    description: "Shared generation profiles and workflows. Every saved version is kept.",
+    icon: FileCog,
+    admin: true,
+    group: "Administration",
+  },
+  promptStyles: {
+    label: "Prompt Styles",
+    description:
+      "Shared assistant styles and templates for Improve Prompt, Animate and Edit. Every saved version is kept.",
+    icon: icons.assistant,
+    admin: true,
+    group: "Administration",
+  },
+  unused: {
+    label: "Unused",
+    description: "Models no profile uses and LoRAs no run used in 90 days, with their sizes.",
+    icon: ArchiveX,
+    admin: true,
+    group: "Administration",
   },
 };
 /** Administrators see the whole Library; other accounts only their cards and Presets. */
@@ -98,8 +97,10 @@ export function useLibraryNavigation() {
   const characters = useGroupFeature("characters");
   return {
     admin,
-    options: visibleSections(librarySections, admin, (key) =>
-      Object.hasOwn(cardKinds, key) ? characters : key === "presets" || admin,
+    options: visibleSections(
+      librarySections,
+      admin,
+      (key) => !Object.hasOwn(cardKinds, key) || characters,
     ),
   };
 }
