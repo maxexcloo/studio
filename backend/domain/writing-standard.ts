@@ -44,7 +44,7 @@ const adults = (who: string) =>
 
 /**
  * The one content rule: `explicit` where the account may have explicit wording (Uncensored
- * Models, or account-policy.js `explicitWording` where the surface honours the preference).
+ * Models).
  */
 export function contentRule(explicit: boolean) {
   return explicit
