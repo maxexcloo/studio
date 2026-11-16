@@ -466,6 +466,7 @@ export function inferModels(
       mediaInputs: workflow.mediaInputs || [],
       aspectPolicy: workflow.aspectPolicy,
       maxLoras: workflow.loraStack?.max,
+      loraAdapter: workflow.loraStack?.adapter,
       backend: workflow.backend,
       // Radiance composes the stack into a rank-limited adapter.
       ...(workflow.loraStack?.adapter === "radiance-tags-v1"

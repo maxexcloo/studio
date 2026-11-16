@@ -61,7 +61,13 @@ function ensureOption(info, node, key, value, label) {
   }
 }
 
-function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", limit = maxLoras) {
+function sanitizeLoras(
+  input = {},
+  info = {},
+  profile = null,
+  kind = "image",
+  { limit = maxLoras, adapter } = {},
+) {
   if (!profile?.capabilities?.lora) return [];
   const raw = Array.isArray(input.loras) ? input.loras : [];
   const installed = optionsFor(info, "LoraLoader", "lora_name");
@@ -85,7 +91,10 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", li
     if (!name) continue;
     if (!installed.includes(name)) throw new Error(`LoRA “${name}” isn't available in ComfyUI.`);
     const strength = snapNumber(item.strength, strengthRange.default ?? 0.7, strengthRange);
-    const issue = optionalLoraPolicyIssue({ name, strength }, catalogueLoraInfo(name), profile);
+    const issue = optionalLoraPolicyIssue({ name, strength }, catalogueLoraInfo(name), {
+      ...profile,
+      loraAdapter: adapter,
+    });
     if (issue) throw new Error(issue);
     const words =
       Array.isArray(item.triggers) && item.triggers.every((word) => typeof word === "string");
@@ -268,7 +277,10 @@ export function sanitizeGenerateBody(
     : "";
   if (profile.capabilities.resolution && !resolutions.includes(resolution))
     throw new Error("Choose a supported resolution for this model.");
-  const loras = sanitizeLoras(input, info, profile, kind, customWorkflow?.loraStack?.max);
+  const loras = sanitizeLoras(input, info, profile, kind, {
+    limit: customWorkflow?.loraStack?.max,
+    adapter: customWorkflow?.loraStack?.adapter,
+  });
   const cfg =
     profile.capabilities?.cfg === false
       ? undefined

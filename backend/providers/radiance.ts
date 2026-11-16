@@ -1,3 +1,4 @@
+import { Agent, fetch as undiciFetch } from "undici";
 /**
  * Radiance as a worker: Studio calls its OpenAI-style media API directly. A profile's Radiance
  * backend stays a one-node graph (RadianceImageGenerate or RadianceVideoGenerate beside its save
@@ -252,11 +253,19 @@ export function videoRequest(values: Values, images: Uint8Array[] = []) {
 }
 
 /** Radiance's media API at one address. Errors keep Radiance's own words. */
+// Radiance answers a generation only once its model has loaded (up to its 600 s load timeout) and
+// the work has run, so Node fetch's 300 s header and body timeouts would drop finished work.
+const patient = new Agent({ headersTimeout: 0, bodyTimeout: 0 });
+const longFetch = ((url: string, init: object) =>
+  undiciFetch(url, { ...init, dispatcher: patient })) as unknown as typeof fetch;
+/** Covers a cold model load plus queueing and generation. */
+export const radianceWorkMs = 30 * 60_000;
+
 export class RadianceClient {
   private base: string;
   private fetchImpl: typeof fetch;
 
-  constructor(base: string, fetchImpl: typeof fetch = fetch) {
+  constructor(base: string, fetchImpl: typeof fetch = longFetch) {
     this.base = base.replace(/\/$/, "");
     this.fetchImpl = fetchImpl;
   }
@@ -314,7 +323,10 @@ export class RadianceClient {
   }
 
   async createVideo(body: object | FormData, signal?: AbortSignal): Promise<RadianceVideo> {
-    const video = await (await this.call("POST", "/v1/videos", body, signal)).json();
+    // The POST returns the video's id only after a cold model has loaded.
+    const video = await (
+      await this.call("POST", "/v1/videos", body, signal || AbortSignal.timeout(radianceWorkMs))
+    ).json();
     if (!/^[\w-]+$/.test(String(video?.id || "")))
       throw new Error("Radiance returned an invalid video job identifier.");
     return video;
