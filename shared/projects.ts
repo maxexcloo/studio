@@ -2,10 +2,12 @@ import type { ChatBrief } from "./chat-brief.ts";
 import type { Resolution } from "./resolution.ts";
 
 /** What a project's work shows, how it looks and what it leaves out. */
-export interface ProjectBrief extends Omit<ChatBrief, "profiles"> {
+export interface ProjectBrief extends ChatBrief {
   subjects: string;
   styles: string;
   avoid: string;
+  /** Favourite LoRA names, best first. */
+  loras?: string[];
 }
 /** What every generate from an attached chat keeps to. */
 export interface ProjectConstraints {
@@ -33,6 +35,7 @@ export const projectAspects = ["square", "portrait", "landscape", "16:9", "9:16"
 export const maxProjectName = 80;
 export const maxProjectBrief = 600;
 export const maxProjectProfiles = 20;
+export const maxProjectLoras = 8;
 
 /** How a Dream result fits its project's brief, from 1 to 10 (backend/domain/review.ts). */
 export interface Review {
