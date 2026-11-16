@@ -209,7 +209,7 @@ export function useChangeSuggestions<K extends QueryKey>({
 }
 
 /**
- * An assistant menu (Animate, the viewer's Edit): its settings, the suggestions written for this
+ * An assistant menu (Animate, Edit, AI): its settings, the suggestions written for this
  * item with Refresh…, Library's templates under their heading with Custom… last, then any other
  * actions, then its own run. While what decides its options is `loading`, one row stands in for
  * them all.
