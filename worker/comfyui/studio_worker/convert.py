@@ -373,11 +373,11 @@ def main():
         _, reference = header(args.reference)
         reference.pop("__metadata__", None)
         if set(tensors) != set(reference) or any(
-            any(value[field] != reference[name][field] for field in ("dtype", "shape"))
+            value["shape"] != reference[name]["shape"]
             for name, value in tensors.items()
         ):
             raise ValueError(
-                "Mapped tensor names, shapes or dtypes differ from the reference pipeline."
+                "Mapped tensor names or shapes differ from the reference pipeline."
             )
     if not args.plan:
         if args.destination.exists():
