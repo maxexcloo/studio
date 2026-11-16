@@ -17,24 +17,25 @@ import {
   toolbarSearch,
 } from "./fixtures";
 
-test("The Library separates Personal and Administration and opens on personal cards", async ({
+test("The Library groups Personal, Cards and Administration and opens on the Chat Brief", async ({
   page,
 }) => {
   await fixtures(page);
   await page.goto("/library");
   const groups = {
-    Personal: ["Characters", "Outfits", "Scenes", "Presets"],
+    Personal: ["Chat Brief", "Presets"],
+    Cards: ["Characters", "Outfits", "Scenes"],
     Administration: ["Guides", "LoRAs", "Models", "Profiles", "Prompt Styles", "Unused"],
   };
   const order = [...Object.values(groups).flat(), "Downloads", "Imports"];
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
-    await expect(select).toHaveValue("Characters");
+    await expect(select).toHaveValue("Chat Brief");
     await select.click();
     await expect(page.getByRole("option")).toHaveText(order);
   } else {
     const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
-    await expect(nav.getByRole("link", { name: "Characters", exact: true })).toHaveAttribute(
+    await expect(nav.getByRole("link", { name: "Chat Brief", exact: true })).toHaveAttribute(
       "aria-current",
       "page",
     );
