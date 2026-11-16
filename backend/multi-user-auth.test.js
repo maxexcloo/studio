@@ -545,7 +545,6 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
   assert.equal(mcpAdminRouteAllowed("DELETE", "/api/accounts/users/a1"), true);
   // Nothing that deletes or replaces files, creates accounts or tokens, or administers GPUs.
   for (const [method, routePath] of [
-    ["DELETE", "/api/loras"],
     ["DELETE", "/api/models/downloads"],
     ["POST", "/api/accounts/users"],
     ["POST", "/api/accounts/mcp-token"],

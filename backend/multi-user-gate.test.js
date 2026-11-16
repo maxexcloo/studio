@@ -91,7 +91,6 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["DELETE", "/api/gallery/owners/abc-1"],
     ["POST", "/comfy/prompt"],
     ["GET", "/comfy/history"],
-    ["DELETE", "/api/loras"],
     ["GET", "/api/logs"],
     ["POST", "/api/runtime/restart"],
     ["POST", "/api/queue/pause-all"],

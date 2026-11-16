@@ -646,7 +646,6 @@ export function useMediaActions(
     upscale,
     ready &&
       itemAction("like", {
-        label: item.rating === "liked" ? "Unlike" : "Like",
         pressed: item.rating === "liked",
         disabled: rating.isPending,
         onClick: rating.like,
@@ -654,7 +653,6 @@ export function useMediaActions(
     // In the Disliked view, a disliked item's Dislike restores it.
     ready &&
       itemAction("dislike", {
-        label: item.rating === "disliked" ? "Restore" : "Dislike",
         pressed: item.rating === "disliked",
         disabled: rating.isPending,
         onClick: rating.dislike,

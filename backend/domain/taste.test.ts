@@ -84,13 +84,13 @@ test("signals snapshot the whole result, newest first, capped per account", (t) 
   for (let index = 0; index < 205; index++)
     taste.record("alice", [tasteSignal("like", `job-${index}`)]);
   taste.record("bob", [tasteSignal("unlike", "theirs")]);
-  // A bulk star adds at most 20 signals.
+  // A bulk like adds at most 20 signals.
   taste.record(
     "carol",
     Array.from({ length: 30 }, (_, index) => tasteSignal("like", `bulk-${index}`)),
   );
   assert.equal(taste.read("carol").signals.length, 20);
-  // A run of comparison answers fills at most half, leaving the stars before it.
+  // A run of comparison answers fills at most half, leaving the likes before it.
   for (let index = 0; index < 150; index++)
     taste.record("carol", [tasteSignal("preferred", `answer-${index}`)]);
   const kinds = taste.read("carol").signals.map((signal) => signal.kind);
@@ -214,7 +214,7 @@ test("every tenth signal summarises the words in the background, at most every t
     now: () => clock,
   });
   const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
-  const star = (ownerId: string, count: number) => {
+  const like = (ownerId: string, count: number) => {
     for (let index = 0; index < count; index++)
       taste.record(ownerId, [
         tasteSignal("like", `job-${index}`, {
@@ -226,11 +226,11 @@ test("every tenth signal summarises the words in the background, at most every t
       ]);
   };
   taste.edit("alice", { addedAvoid: ["clowns"] });
-  star("alice", 9);
+  like("alice", 9);
   await settle();
   assert.equal(calls.length, 0);
   const scores = taste.read("alice").scores;
-  star("alice", 1);
+  like("alice", 1);
   await settle();
   assert.equal(calls.length, 1);
   assert.equal(calls[0].model, "fixture-text");
@@ -254,11 +254,11 @@ test("every tenth signal summarises the words in the background, at most every t
   assert.equal(scores.get("profile:flux-2")!.score, 13.5);
 
   // Within ten minutes more signals wait; after that the next one summarises again.
-  star("alice", 10);
+  like("alice", 10);
   await settle();
   assert.equal(calls.length, 1);
   clock += 10 * 60_000;
-  star("alice", 1);
+  like("alice", 1);
   await settle();
   assert.equal(calls.length, 2);
   assert.match(calls[1].messages[1].content, /^Likes: misty harbours$/m);
@@ -266,8 +266,8 @@ test("every tenth signal summarises the words in the background, at most every t
   // Offline text and accounts without the prompt assistant are skipped silently.
   offline = true;
   clock += 10 * 60_000;
-  star("bob", 10);
-  star("no-assistant", 10);
+  like("bob", 10);
+  like("no-assistant", 10);
   await settle();
   assert.equal(calls.length, 2);
   assert.equal(taste.read("bob").since, 10);
