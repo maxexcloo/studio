@@ -273,6 +273,8 @@ export function MediaViewer({
   const containStage = useCallback((view: HTMLDivElement | null) => {
     stage.current = view;
     if (!view) return;
+    // Keys reach the viewer from the start, before the dialog's own focus lands on its control.
+    view.focus({ preventScroll: true });
     // Safari can take an edge swipe for history navigation despite touch-action on the media.
     const containEdge = (event: TouchEvent) => {
       if (event.touches.length !== 1 || layerAbove(view)) return;
