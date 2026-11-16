@@ -6,10 +6,22 @@ import { DataTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
-import { draftForInput, useGeneration } from "../generation/GenerationProvider";
+import {
+  defaultProfile,
+  draftForInput,
+  initialInput,
+  inputForProfile,
+  useGeneration,
+} from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import { generationInput } from "../generation/payload";
-import { type Preset, presetHolds, usePresets } from "../generation/PresetPicker";
+import { usePresets } from "../generation/PresetPicker";
+import {
+  type Preset,
+  loadPresetInput,
+  presetHolds,
+  presetReplacesUnsaved,
+} from "../generation/presets";
 
 const savedDate = dateFormat({ dateStyle: "medium" });
 const savedOn = (preset: Preset) =>
@@ -21,7 +33,7 @@ const savedOn = (preset: Preset) =>
  */
 export function LibraryPresets({ heading }: { heading: ReactNode }) {
   const presets = usePresets();
-  const { setDraft, draftForKind, profiles } = useGeneration();
+  const { setDraft, draftForKind, profiles, models } = useGeneration();
   const openComposer = useOpenComposer();
   const [query, setQuery] = useState("");
   const [renaming, setRenaming] = useState<Preset | null>(null);
@@ -37,20 +49,26 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
     if (!renaming || !name.trim() || taken) return;
     void presets.rename(renaming, name.trim()).then(() => setRenaming(null));
   };
-  const edit = (preset: Preset) => {
+  const loading = (preset: Preset) => {
     const kind = preset.input.kind || "image";
     const previous = draftForKind(kind);
-    const input = preset.parts
-      ? {
-          ...generationInput(
-            previous.input,
-            profiles.find((profile) => profile.id === previous.input.profileId),
-            previous.references,
-          ),
-          ...(preset.parts.includes("prompt") ? { cardParts: undefined } : {}),
-          ...preset.input,
-        }
-      : preset.input;
+    const current = generationInput(
+      previous.input,
+      profiles.find((profile) => profile.id === previous.input.profileId),
+      previous.references,
+    );
+    const preferred = defaultProfile(models.data, kind);
+    const defaults = generationInput(
+      preferred ? inputForProfile(initialInput, preferred) : { ...initialInput, kind },
+      preferred,
+      [],
+    );
+    const input = { ...initialInput, ...loadPresetInput(preset, current) };
+    const selected = presets.records.find((record) => record.id === previous.presetId);
+    return { kind, input, replaces: presetReplacesUnsaved(current, input, defaults, selected) };
+  };
+  const edit = (preset: Preset) => {
+    const { kind, input } = loading(preset);
     setDraft(
       draftForInput(input, {
         presetId: preset.id,
@@ -120,14 +138,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
               <Menu.Item
                 leftSection={<icons.edit size={16} />}
                 onClick={() => {
-                  const previous = draftForKind(preset.input.kind || "image");
-                  if (
-                    previous.input.prompt.trim() ||
-                    previous.input.negative.trim() ||
-                    previous.references.length ||
-                    previous.input.loras.length
-                  )
-                    setReplacing(preset);
+                  if (loading(preset).replaces) setReplacing(preset);
                   else edit(preset);
                 }}
               >
