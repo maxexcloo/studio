@@ -66,6 +66,7 @@ import {
   type EditAsk,
   type Iteration,
   animateProfileQuery,
+  useAnimateLengthSetting,
   useAnimateReview,
   useAnimateTemplates,
   useEditReview,
@@ -366,6 +367,7 @@ export function useMediaActions(
   // Animate says why no model can run before anything queues.
   const [videos, setVideos] = useVideosPreference();
   const [review, setReview] = useAnimateReview();
+  const length = useAnimateLengthSetting(item);
   // The menu keeps its choice while a switch loads.
   const animation = useQuery({
     ...animateProfileQuery(item),
@@ -402,7 +404,7 @@ export function useMediaActions(
   const refusal = animation.error?.message;
   // A video's templates continue the clip from its last frame at once; it keeps the clip's own
   // model unless videos run on Cloud.
-  const animateDisabled = video ? action.isPending : !animation.data;
+  const animateDisabled = action.isPending || length.loading || (!video && !animation.data);
   const templates = useAnimateTemplates();
   const templateItem = (template: AssistantOption): Action => ({
     id: `animate-${template.id}`,
@@ -420,7 +422,7 @@ export function useMediaActions(
     query: motionIdeasQuery(item.jobId ?? "", item.id),
     fresh: () => askMotionIdeas(item.jobId!, true, item.id),
     enabled: motionsFor === item.id,
-    disabled: !animation.data,
+    disabled: animateDisabled,
     onPick: (instruction) =>
       review
         ? onAnimate({ theme: "custom", instruction })
@@ -476,7 +478,7 @@ export function useMediaActions(
         onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
         menu: assistMenu({
           loading: optionsLoading,
-          settings: [...modelChoice, ...reviewItems],
+          settings: [...modelChoice, length, ...reviewItems],
           suggestions: motionsOffered ? motions.group : [],
           templates: templates.filter((template) => template.id !== "custom").map(templateItem),
           custom: templates.filter((template) => template.id === "custom").map(templateItem),
