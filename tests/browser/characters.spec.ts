@@ -494,10 +494,16 @@ test("A member sees only their cards and Presets in the Library, and a group wit
   const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
   await expect(select.or(nav)).toBeVisible();
   if (await nav.isVisible())
-    await expect(nav.getByRole("link")).toHaveText(["Characters", "Outfits", "Scenes", "Presets"]);
+    await expect(nav.getByRole("link")).toHaveText([
+      "Chat Brief",
+      "Presets",
+      "Characters",
+      "Outfits",
+      "Scenes",
+    ]);
   else await expect(select).toHaveValue("Characters");
   await signIn(page, { id: "member", role: "user", features: { characters: false } });
-  await page.goto("/library#imports");
+  await page.goto("/library#presets");
   // A hash-only navigation keeps the previous account in memory; load the new group's grants.
   await page.reload();
   await expect(page.getByText("No Presets", { exact: true })).toBeVisible();

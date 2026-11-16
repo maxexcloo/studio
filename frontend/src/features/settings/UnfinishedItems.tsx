@@ -42,7 +42,7 @@ const bulk = {
 type Bulk = keyof typeof bulk;
 
 /**
- * Settings › Generation › Unfinished Items, for administrators: every account's generations that
+ * Settings › Gallery › Unfinished Items, for administrators: every account's generations that
  * have not finished, to retry, stop or clear one that is stuck, or every listed one at once.
  */
 export function UnfinishedItems() {

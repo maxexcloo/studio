@@ -2,6 +2,7 @@ import type { Action, ActionGroups } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 
 const definitions = {
+  ai: { label: "AI", icon: icons.assistant },
   animate: { label: "Animate", icon: icons.animate },
   delete: { label: "Delete", icon: icons.delete, color: "red" as const },
   dislike: { label: "Dislike", icon: icons.dislike },
@@ -11,20 +12,19 @@ const definitions = {
   report: { label: "Report", icon: icons.report },
   retry: { label: "Retry", icon: icons.retry },
   share: { label: "Share", icon: icons.share },
-  similar: { label: "Similar", icon: icons.similar },
   stop: { label: "Stop", icon: icons.stop },
   upscale: { label: "Upscale", icon: icons.upscale },
 };
 type ItemActionId = keyof typeof definitions;
 const menus: ItemActionId[] = ["animate", "edit", "recreate", "upscale"];
-// Alphabetical but for Like before Dislike and Delete last. Retry and Stop lead for unfinished
-// work and running upscales.
-const ratings: ItemActionId[] = ["like", "dislike", "report", "share"];
-const others: ItemActionId[] = ["similar", "delete"];
-/** Bars: Animate, Edit, Recreate, Upscale | Like, Dislike, Report, Share | Similar, Delete. */
-const barSections: ItemActionId[][] = [["retry", "stop", ...menus], ratings, others];
-/** Menus put the rating first: Like, Dislike, Report, Share ── the four menus ── Similar, Delete. */
-const menuSections: ItemActionId[][] = [["retry", "stop"], ratings, menus, others];
+// Retry and Stop lead for unfinished work and running upscales; Like comes before Dislike and
+// Delete last.
+const middle: ItemActionId[] = ["ai", "report", "like", "dislike"];
+const others: ItemActionId[] = ["share", "delete"];
+/** Bars: Animate, Edit, Recreate, Upscale | AI, Report, Like, Dislike | Share, Delete. */
+const barSections: ItemActionId[][] = [["retry", "stop", ...menus], middle, others];
+/** Menus put AI and the rating first: AI, Report, Like, Dislike ── the four menus ── Share, Delete. */
+const menuSections: ItemActionId[][] = [["retry", "stop"], middle, menus, others];
 /** Bars name Retry, Stop and the four menus; the rest are icons. */
 export const namedItemActions: string[] = ["retry", "stop", ...menus];
 
@@ -50,13 +50,10 @@ export const itemActionGroups = (
     ids.flatMap((id) => actions.filter((action): action is Action => !!action && action.id === id)),
   );
 
-/** Phone viewers keep correction under Edit and discovery under Recreate. */
+/** Phone viewers keep correction under Edit. */
 export function compactViewerActions(groups: ActionGroups): ActionGroups {
   const actions = groups.flat();
-  const destinations = new Map([
-    ["report", "edit"],
-    ["similar", "recreate"],
-  ]);
+  const destinations = new Map([["report", "edit"]]);
   const nested = actions.filter((action) =>
     actions.some((owner) => owner.id === destinations.get(action.id) && owner.menu),
   );
