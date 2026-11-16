@@ -1,9 +1,10 @@
 """Converts a Krea 2 fine-tune (one DiT .safetensors) to a Radiance image model, one at a time.
 
 Downloads the release's other pipeline parts and the fine-tune with curl, renames the fine-tune's
-tensors to diffusers' (the bytes are copied, never decoded), runs rad-convert and installs the .rad
-in the Radiance image folder. Studio starts it, polls `status` and may `cancel`; a stopped download
-resumes on the next start. Provider credentials reach curl only through a header file in the container's temporary folder.
+tensors to diffusers' (the bytes are copied, never decoded), runs rad-convert, installs the .rad
+in the Radiance image folder and adds its entry to the folder's fine-tunes.yaml, which the Radiance
+deployment merges into its config when it starts. Studio starts it, polls `status` and may `cancel`;
+a stopped download resumes on the next start. Provider credentials reach curl only through a header file in the container's temporary folder.
 """
 
 import hashlib
@@ -31,9 +32,11 @@ BASE_FILES = [
     "vae/config.json",
     "vae/diffusion_pytorch_model.safetensors",
 ]
-# The unscaled recipe takes plain E4M3 weights; a scaled or ComfyUI-quantised file has these.
+# A scaled or ComfyUI-quantised file has these; the recipe takes plain weights.
 QUANTISED = (".weight_scale", ".comfy_quant", ".scale_weight", ".input_scale")
 HOSTS = {"civitai.com": "civitai", "huggingface.co": "hf"}
+# Where the Radiance deployment mounts this folder (kubelab apps/base/radiance).
+SERVED = "/models/radiance"
 
 # Krea's reference names (krea-ai/krea-2 mmdit.py) to diffusers' Krea2Transformer2DModel names.
 RULES = [
@@ -92,8 +95,8 @@ def header(file):
         return size, json.loads(stream.read(size))
 
 
-def recipe(file):
-    """The rad-convert recipe for a plain fp8 or bf16 Krea 2 DiT; anything else is refused."""
+def check(file):
+    """Refuses anything but a plain fp8 or bf16 Krea 2 DiT."""
     _, tensors = header(file)
     quantised = [key for key in tensors if key.endswith(QUANTISED)]
     dtypes = {value["dtype"] for key, value in tensors.items() if key != "__metadata__"}
@@ -101,11 +104,20 @@ def recipe(file):
         raise ValueError(
             "The fine-tune is scaled or quantised; choose its plain fp8 or bf16 file."
         )
-    if "F8_E4M3" in dtypes:
-        return "krea-2-fp8-unscaled.recipe"
-    if dtypes <= {"BF16", "F16", "F32"}:
-        return "krea-2-fp8.recipe"
-    raise ValueError(f"The fine-tune holds unsupported weights: {sorted(dtypes)}.")
+    if not dtypes <= {"F8_E4M3", "BF16", "F16", "F32"}:
+        raise ValueError(f"The fine-tune holds unsupported weights: {sorted(dtypes)}.")
+
+
+def serve(folder, name):
+    """Adds the model's entry to fine-tunes.yaml, indented to sit under the config's `models:`."""
+    fragment = folder / "fine-tunes.yaml"
+    text = fragment.read_text() if fragment.is_file() else ""
+    if re.search(rf"^  {re.escape(name)}:$", text, re.MULTILINE):
+        return
+    partial = Path(str(fragment) + ".part")
+    partial.write_text(f"{text}  {name}:\n    model: {SERVED}/{name}.rad\n    tp: 1\n")
+    partial.chmod(0o644)
+    os.replace(partial, fragment)
 
 
 def to_diffusers(key):
@@ -231,7 +243,7 @@ def convert(job, url, sha256, tokens):
             source.unlink()
             raise ValueError("The download did not match its published checksum.")
         job["stage"] = "check"
-        chosen = recipe(source)
+        check(source)
         job["stage"] = "map"
         shutil.rmtree(pipeline, ignore_errors=True)
         (pipeline / "transformer").mkdir(parents=True)
@@ -251,13 +263,19 @@ def convert(job, url, sha256, tokens):
         )
         job["stage"] = "convert"
         home = RADIANCE / "share/radiance"
-        options = ["--home", str(home), "--recipe", str(home / "recipes" / chosen)]
+        options = [
+            "--home",
+            str(home),
+            "--recipe",
+            str(home / "recipes/krea-2-iq8r.recipe"),
+        ]
         run(rad("rad-convert", str(pipeline), "-o", str(output), *options), log, job)
         run(rad("rad-info", str(output)), log, job)
         job["stage"] = "install"
         output.chmod(0o644)
         # link() refuses an existing model, so a file installed meanwhile survives.
         os.link(output, target)
+        serve(folder, job["name"])
         output.unlink()
         source.unlink()
     except Stopped:

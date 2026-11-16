@@ -2,7 +2,7 @@ import { runBackend } from "../shared/profiles.ts";
 import { activeStatuses } from "../shared/queue.ts";
 import { withResolution } from "../shared/resolution.ts";
 import { accountAccessForId } from "./account-store.js";
-import { moveTargets, onWorkerOffline, profileOnBackendKey, routeJob } from "./comfy/backends.js";
+import { moveTargets, onWorkerOffline, routeJob } from "./comfy/backends.js";
 import { comfyOn } from "./comfy/comfy.js";
 import { cancelPrompt, isTransientComfyError } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
@@ -26,7 +26,13 @@ import { writingIssue, writingRequest } from "./prompt-stage.js";
 import { providerMediaWriter } from "./providers/media.ts";
 import { runUpscaleJob } from "./upscale-jobs.js";
 import { resultSource } from "./version-sources.js";
-import { capabilityForProfile, defaultWorkerId, listWorkers, workerById } from "./workers.js";
+import {
+  capabilityForProfile,
+  defaultWorkerId,
+  isRadianceWorker,
+  listWorkers,
+  workerById,
+} from "./workers.js";
 
 /**
  * Studio's generation queue (domain/queue.ts) and its adapters: local workers, with their GPU
@@ -65,7 +71,8 @@ export function createGenerationQueue({
         ? "video"
         : "image";
     const worker = routeJob(capability, {
-      profileId: profileOnBackendKey(input.profileId, input.profileBackend),
+      profileId: input.profileId,
+      backend: input.profileBackend,
       loads: generationQueue.loads(),
       model: modelOf(input),
       last: priority > queuePriority.manual,
@@ -112,8 +119,25 @@ export function createGenerationQueue({
           await forgetComfyRun(job.backend, { promptIds: [job.providerJobId] }).catch(() => false);
       }
     },
-    cancelPrompt: ({ promptId, backend }) => cancelPrompt(promptId, comfyOn(backend)),
+    // A Radiance run watches its own job's status and stops itself (radiance-jobs.js).
+    cancelPrompt: ({ promptId, backend }) =>
+      isRadianceWorker(workerById(backend)) ? "" : cancelPrompt(promptId, comfyOn(backend)),
     recover: async (job) => {
+      // Studio waits on a Radiance run itself, so one a restart interrupted has nothing to recover.
+      if (isRadianceWorker(workerById(job.backend)) && !jobs.has(job.id)) {
+        jobs.set(job.id, {
+          ownerId: job.ownerId || undefined,
+          comfyBackend: job.backend,
+          ...(job.cancelRequested
+            ? { status: "cancelled" }
+            : {
+                status: "failed",
+                error: "Studio restarted while Radiance ran this. Retry runs it again.",
+              }),
+          terminalAt: Date.now(),
+        });
+        return;
+      }
       if ((job.providerJobId || job.cancelRequested) && !jobs.has(job.id))
         jobs.set(job.id, {
           status: job.cancelRequested ? "cancelling" : "running",
@@ -255,7 +279,8 @@ export function createGenerationQueue({
         return job.resource.startsWith("worker:") && job.operation !== "upscale"
           ? moveTargets(
               capability,
-              profileOnBackendKey(job.input.profileId, job.input.profileBackend),
+              job.input.profileId,
+              job.input.profileBackend,
               (worker) => workerWorkloads(worker).length > 0,
             ).map((worker) => `worker:${worker.id}`)
           : [];

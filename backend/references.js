@@ -553,6 +553,24 @@ export async function uploadBufferToComfy(worker, { buffer, mime, name }, { uniq
   return { comfyName: uploaded.name || filename, name: safeName(name), mime };
 }
 
+/** A reference's image as a run takes it: sized for `generation` unless it keeps its original. */
+export async function preparedReference(
+  account,
+  assetId,
+  generation,
+  { keepOriginal = false } = {},
+) {
+  const family = generation && families[generation.family];
+  const pixels =
+    generation && generation.autoResizeInputs !== false && !keepOriginal
+      ? Number(generation.width) * Number(generation.height)
+      : 0;
+  const step = family?.img2img && !family.references ? family.sizeStep || 8 : 1;
+  const original = await bytesForReferenceAccount(account, assetId);
+  const inspected = await inspectImage(original.buffer, original.mime);
+  return prepareInputImage({ ...original, ...inspected }, { pixels, step });
+}
+
 /** Stages an account's references on `worker` for a run. */
 export async function stageReferenceAssetsForAccount(
   worker,
@@ -565,18 +583,11 @@ export async function stageReferenceAssetsForAccount(
     const assetId = String(reference?.assetId || "");
     const slot = String(reference?.slot || "reference");
     if (!assetId) continue;
-    const family = generation && families[generation.family];
     // Inpaint stitches the crop back onto the full original. Its existing crop pipeline
     // already limits sampling pixels and keeps the painted mask aligned.
-    const keepOriginal = generation?.inpaint && staged.length === 0;
-    const pixels =
-      generation && generation.autoResizeInputs !== false && !keepOriginal
-        ? Number(generation.width) * Number(generation.height)
-        : 0;
-    const step = family?.img2img && !family.references ? family.sizeStep || 8 : 1;
-    const original = await bytesForReferenceAccount(account, assetId);
-    const inspected = await inspectImage(original.buffer, original.mime);
-    const bytes = await prepareInputImage({ ...original, ...inspected }, { pixels, step });
+    const bytes = await preparedReference(account, assetId, generation, {
+      keepOriginal: generation?.inpaint && staged.length === 0,
+    });
     // Content names are reused, so a resized file is not uploaded again on every run; a unique
     // copy is the run's own and goes when it ends (media-store.js temporaryInputFiles).
     const uploaded = await uploadBufferToComfy(worker, bytes, { unique });

@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 
 /**
- * Studio's ComfyUI workers: none, one or many, each with a stable id, a name,
- * an address, what it runs and how many jobs at once (`slots`). Every request
- * to one names it (comfy/comfy.js).
+ * Studio's workers: none, one or many, each with a stable id, a name, an address, what it runs,
+ * how many jobs at once (`slots`) and its backend: ComfyUI (every request to one names it,
+ * comfy/comfy.js) or Radiance, which Studio calls directly (providers/radiance.ts).
  *
  * The deployment defines them: `STUDIO_WORKERS` (a JSON list), else the media
  * workloads Studio found in Kubernetes (runtime/workloads.ts).
@@ -110,13 +110,21 @@ export function normalizeWorker(raw, { taken = new Set(), where = "Worker" } = {
     while (taken.has(id) || !validId(id))
       id = `${base.slice(0, 33)}-${crypto.randomBytes(3).toString("hex")}`;
   }
+  const backend = String(raw.backend || "comfyui");
+  if (!workerBackends.includes(backend))
+    throw new WorkerConfigError(
+      `${where} has an unknown backend: ${backend}. Use ${workerBackends.join(" or ")}.`,
+    );
   // How many jobs it runs at once: one, or one per GPU where each serves its own model.
   const slots = raw.slots ?? 1;
   if (!Number.isInteger(slots) || slots < 1)
     throw new WorkerConfigError(`${where} needs a whole number of slots, 1 or more.`);
   taken.add(id);
-  return { id, name: name || defaultName(capabilities), url, capabilities, slots };
+  return { id, name: name || defaultName(capabilities), url, capabilities, slots, backend };
 }
+
+const workerBackends = ["comfyui", "radiance"];
+export const isRadianceWorker = (worker) => worker?.backend === "radiance";
 
 function defaultName(capabilities) {
   if (capabilities.includes("image") && capabilities.includes("video")) return "Worker";
@@ -167,6 +175,7 @@ function workloadWorkers(kubernetes) {
       name: workload.label,
       id: "",
       capabilities: [],
+      backend: workload.backend,
     };
     if (workload.worker && group.id && workload.worker !== group.id)
       throw new WorkerConfigError(
@@ -174,12 +183,21 @@ function workloadWorkers(kubernetes) {
       );
     group.id ||= workload.worker || "";
     group.capabilities.push(...(workload.capabilities || [workload.kind]));
+    // Radiance serves one model per GPU side by side, so it runs a job on each at once.
+    if (workload.backend === "radiance") group.slots = Math.max(group.slots ?? 1, workload.gpus);
     groups.set(url, group);
   }
   const taken = new Set();
   return [...groups].map(([url, group]) =>
     normalizeWorker(
-      { id: group.id || group.first, name: group.name, url, capabilities: group.capabilities },
+      {
+        id: group.id || group.first,
+        name: group.name,
+        url,
+        capabilities: group.capabilities,
+        backend: group.backend,
+        slots: group.slots,
+      },
       { taken, where: `Deployment ${group.first}` },
     ),
   );
@@ -199,12 +217,12 @@ const workersWith = (capability) =>
   listWorkers().filter((worker) => worker.capabilities.includes(capability));
 
 /**
- * The default worker: the first that runs images, else the first of any kind. Its node list
- * stands for the catalogue where no particular worker is asked (presets, the Library, LoRA
- * metadata) and it answers for the studio in diagnostics.
+ * The default worker: the first ComfyUI worker that runs images, else the first ComfyUI worker. Its
+ * node list stands for the catalogue where no particular worker is asked (presets, the Library,
+ * LoRA metadata) and it answers for the studio in diagnostics.
  */
 export function defaultWorker() {
-  const workers = listWorkers();
+  const workers = listWorkers().filter((worker) => !isRadianceWorker(worker));
   return workers.find((worker) => worker.capabilities.includes("image")) || workers[0] || null;
 }
 export const defaultWorkerId = () => defaultWorker()?.id || "";

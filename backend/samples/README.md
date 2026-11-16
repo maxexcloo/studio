@@ -166,4 +166,5 @@ string instead of loader slots:
 
 Studio sets the node's `loras` input to the enabled LoRAs in stack order, such
 as `[{"name":"style.safetensors","strength":0.8}]`, or `[]` when none are
-chosen. The prompt text is left as written; Radiance adds the LoRA tags itself.
+chosen. The prompt text is left as written; Studio sends the LoRAs in the
+Radiance request's `loras` field, named without `.safetensors`.

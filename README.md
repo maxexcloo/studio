@@ -41,7 +41,7 @@ STUDIO_DATA_DIR=./data
 
 ### Workers
 
-Studio runs on zero, one or many ComfyUI workers. Studio never reads ComfyUI's folders: it fetches each output into `STUDIO_MEDIA_DIR` (`<STUDIO_DATA_DIR>/media` by default, a folder per account) and the [Studio worker node](worker/comfyui/studio_worker/README.md) then removes ComfyUI's copy, so workers need no shared storage. Set the same nonempty `STUDIO_WORKER_TOKEN` in Studio and every worker.
+Studio runs on zero, one or many ComfyUI workers, and on Radiance workers it calls directly for profiles whose graphs use Radiance nodes. Studio never reads ComfyUI's folders: it fetches each output into `STUDIO_MEDIA_DIR` (`<STUDIO_DATA_DIR>/media` by default, a folder per account) and the [Studio worker node](worker/comfyui/studio_worker/README.md) then removes ComfyUI's copy, so workers need no shared storage. Set the same nonempty `STUDIO_WORKER_TOKEN` in Studio and every worker.
 
 On Kubernetes, leave `STUDIO_WORKERS` unset: the image and video workloads Studio finds are its workers (see [Runtime Control](#runtime-control)). Elsewhere, `STUDIO_WORKERS` lists them; `[]` runs Studio with no workers, and a malformed value stops it at start:
 
@@ -52,7 +52,7 @@ STUDIO_WORKERS='[
 ]'
 ```
 
-Keep each `id` stable (it defaults to the lower-case name): jobs, previews, cancellation and recovery follow a job's worker by id. Capabilities are `image`, `video`, `upscale` and `models`; the `models` worker holds the model library and receives downloads, so mount its models read-write.
+Keep each `id` stable (it defaults to the lower-case name): jobs, previews, cancellation and recovery follow a job's worker by id. Capabilities are `image`, `video`, `upscale` and `models`; the `models` worker holds the model library and receives downloads, so mount its models read-write. `"backend": "radiance"` marks a Radiance worker (the default is `comfyui`).
 
 `<STUDIO_DATA_DIR>/config/models.json` pins the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }`, each `path` relative to ComfyUI's model folder. `STUDIO_MODEL_MANIFEST_PREFIX` strips a deployment folder (such as `models/comfyui/`) from those paths.
 
@@ -151,7 +151,7 @@ STUDIO_KUBERNETES_NAMESPACES=comfyui-image,comfyui-video,text
 STUDIO_LOCAL_TEXT_MODEL=local/auto
 ```
 
-Each deployment's name is its workload id, its node selector names its pool, its resource claim templates give its GPUs, and the one Service selecting its pods gives its address. Optional `studio.excloo.dev/` annotations add `label`, `vision: "true"` for text workloads that read images, and `worker` and `capabilities` for media. Text workloads serve `STUDIO_LOCAL_TEXT_MODEL` and take `STUDIO_TEXT_KEY` for their health check. Anything missing or ambiguous stops Studio at start with the deployment's name; restart Studio after changing a workload. Its service account needs, in each namespace, to list deployments, Services and `resourceclaimtemplates`, read pods and their logs, and update `deployments/scale`. `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
+Each deployment's name is its workload id, its node selector names its pool, its resource claim templates give its GPUs, and the one Service selecting its pods gives its address. Optional `studio.excloo.dev/` annotations add `label`, `vision: "true"` for text workloads that read images, and `worker`, `capabilities` and `backend` (`radiance` for a Radiance worker) for media. Text workloads serve `STUDIO_LOCAL_TEXT_MODEL` and take `STUDIO_TEXT_KEY` for their health check. Anything missing or ambiguous stops Studio at start with the deployment's name; restart Studio after changing a workload. Its service account needs, in each namespace, to list deployments, Services and `resourceclaimtemplates`, read pods and their logs, and update `deployments/scale`. `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
 
 With `STUDIO_BENCHMARK_IMAGE` (a [BetterBench](https://github.com/GGZ14/BetterBench) image), administrators can benchmark a running text workload from Settings › Workers: Studio runs a Job in the workload's namespace whose pods are labelled `app.kubernetes.io/name: betterbench`, so the model's network policy must admit them. `STUDIO_BENCHMARK_SECRET` names the Secret there whose `API_KEY` is the model's key. The service account also needs to create, get and delete Jobs and list pods in that namespace.
 

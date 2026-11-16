@@ -7,7 +7,6 @@ import test from "node:test";
 import { startFakeComfy } from "../fixtures/fake-comfy.js";
 import { writeTestWorkflows } from "../fixtures/test-workflows.js";
 import { reloadWorkers } from "../workers.js";
-import { mergeWorkerModels, workerUrl } from "./backends.js";
 
 const primaryFiles = new Map();
 const videoFiles = new Map();
@@ -23,6 +22,7 @@ const bothWorkers = JSON.stringify([
 process.env.STUDIO_WORKERS = bothWorkers;
 process.env.STUDIO_DATA_DIR = temporary;
 writeTestWorkflows(temporary);
+const { mergeWorkerModels, workerUrl } = await import("./backends.js");
 const { jobs, runJob } = await import("../jobs.js");
 const { comfy } = await import("./comfy.js");
 const store = await import("../gallery/store.js");

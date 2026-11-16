@@ -1,6 +1,7 @@
 import { comfy } from "../comfy/comfy.js";
 import { families as modelFamilies } from "../family-catalogue.js";
 import { catalogueStore } from "../library/catalogue.js";
+import { defaultWorkerId, isRadianceWorker, workerById } from "../workers.js";
 import { enrichLocalLoraInfo, enrichLoraInfo, withFamilyRefinements } from "./catalogue.js";
 
 // Imported-only model families still need precise adapter compatibility labels.
@@ -176,6 +177,8 @@ export function loraInfo(name) {
  * `remote: false` keeps to remembered metadata and the live catalogue definitions.
  */
 export async function loraInfos(worker, names = [], { concurrency = 6, remote: ask = true } = {}) {
+  // Radiance reads the LoRA folder ComfyUI does, but only ComfyUI hands out its metadata.
+  if (isRadianceWorker(workerById(worker))) worker = defaultWorkerId();
   const result = {};
   const remote = [];
   for (const name of names) {
