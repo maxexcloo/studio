@@ -225,19 +225,10 @@ export function GenerationSettings({
           </Box>
         ))}
       </SimpleGrid>
-      {(profile?.provider || profile?.encoderBuiltIn) && (
-        <Stack gap={2}>
-          {profile?.provider && (
-            <Text size="xs" c="dimmed">
-              Provider: {profile.provider === "cliproxyapi" ? "CLIProxyAPI" : profile.provider}
-            </Text>
-          )}
-          {profile?.encoderBuiltIn && (
-            <Text size="xs" c="dimmed">
-              Text encoder built into the checkpoint.
-            </Text>
-          )}
-        </Stack>
+      {profile?.encoderBuiltIn && (
+        <Text size="xs" c="dimmed">
+          Text encoder built into the checkpoint.
+        </Text>
       )}
     </Stack>
   );
