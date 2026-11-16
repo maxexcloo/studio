@@ -13,7 +13,7 @@ import {
   useProps,
 } from "@mantine/core";
 import { useMergedRef } from "@mantine/hooks";
-import { ArrowUp, Check, ChevronDown, type LucideIcon } from "lucide-react";
+import { ArrowUp, Check, type LucideIcon } from "lucide-react";
 import {
   type CSSProperties,
   Fragment,
@@ -38,7 +38,7 @@ import { usePhone } from "./usePhone";
 
 import classes from "./TextBox.module.css";
 
-// Pressing ⋯ or a phone editor tool keeps focus (and the keyboard) in the text, so nothing that
+// Pressing the tools control or a phone editor tool keeps focus (and the keyboard) in the text, so nothing that
 // follows the focus (a sheet's header) moves the control from under the press.
 const keepFocus = (event: MouseEvent) => event.preventDefault();
 
@@ -48,7 +48,6 @@ export function TextBox({
   onChange,
   tools,
   copy = true,
-  toolLabel,
   send,
   busy,
   popups,
@@ -66,10 +65,8 @@ export function TextBox({
   ref?: Ref<HTMLTextAreaElement>;
   value: string;
   onChange: (value: string) => void;
-  /** The box's own tools, in its ⋯ menu; with them (even none) come Copy and Clear. */
+  /** The box's tools menu; AI uses the magic icon, other tools More, alongside Copy and Clear. */
   tools?: Action[];
-  /** Names a single tool directly on the phone editor, such as Suggestions. */
-  toolLabel?: string;
   /** Omits duplicate Copy where the page offers it; the full-screen editor always offers it. */
   copy?: boolean;
   /** The send, and a proposal's Undo, which stay beside the text. */
@@ -105,10 +102,14 @@ export function TextBox({
   const mobile = usePhone();
   const phone = mobile && !inline;
   const [editing, setEditing] = useState(false);
-  const namedTool = phone && editing && tools?.length === 1 ? toolLabel : undefined;
+  const ai = tools?.some((tool) => tool.id === "assistant" || tool.icon === icons.assistant);
+  const focusTool = (event: MouseEvent) => {
+    if (!ai || editing || document.activeElement?.tagName === "TEXTAREA") keepFocus(event);
+  };
   const content = useRef<HTMLDivElement>(null);
   const more = useRef<HTMLButtonElement>(null);
   const [menuOpened, setMenuOpened] = useState(false);
+  const openedFrom = useRef<Element | null>(null);
   const keyboard = useKeyboard(editing, content);
   const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
@@ -165,7 +166,7 @@ export function TextBox({
       <span className={classes.editText}>{action.label}</span>
     </Button>
   ));
-  const spins = tools !== undefined && (!phone || editing) && !hideTools;
+  const spins = tools !== undefined && (!phone || editing || ai) && !hideTools;
   const description =
     busy && !spins ? (
       <span className={classes.busy} role="status">
@@ -213,46 +214,62 @@ export function TextBox({
       zIndex={getDefaultZIndex("max")}
       opened={menuOpened}
       onChange={setMenuOpened}
-      onOpen={() => tools.forEach((tool) => tool.onOpen?.())}
+      onOpen={() => {
+        openedFrom.current = document.activeElement;
+        tools.forEach((tool) => tool.onOpen?.());
+      }}
       // An item that moves focus itself keeps it; otherwise it returns.
       returnFocus={false}
       onClose={() =>
         setTimeout(() => {
-          if (!document.activeElement || document.activeElement === document.body)
+          const active = document.activeElement;
+          if (
+            !active ||
+            active === document.body ||
+            (ai &&
+              !editing &&
+              openedFrom.current?.tagName !== "TEXTAREA" &&
+              active === openedFrom.current)
+          )
             more.current?.focus({ preventScroll: true });
         })
       }
     >
-      <PopupTooltip label={busy || namedTool || "More Actions"}>
+      <PopupTooltip label={busy || (ai ? "AI Actions" : "More Actions")}>
         <Menu.Target>
-          {mobile ? (
+          {mobile && !ai ? (
             <Button
               ref={more}
-              onMouseDown={keepFocus}
+              onMouseDown={focusTool}
               variant="subtle"
               color="gray"
               size="compact-xs"
-              aria-label={namedTool || `More ${title} Actions`}
-              disabled={tools.length === 0 && (mobile || edits.length === 0)}
-              aria-busy={Boolean(busy) || undefined}
-              aria-description={busy}
-              rightSection={namedTool ? <ChevronDown size={12} /> : undefined}
-              leftSection={busy ? <Loader size={16} /> : undefined}
-            >
-              {namedTool || "More"}
-            </Button>
-          ) : (
-            <ActionIcon
-              ref={more}
-              onMouseDown={keepFocus}
-              variant="subtle"
-              color="gray"
               aria-label={`More ${title} Actions`}
               disabled={tools.length === 0 && (mobile || edits.length === 0)}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
+              leftSection={busy ? <Loader size={16} /> : undefined}
             >
-              {busy ? <Loader size={16} /> : <icons.more size={18} />}
+              More
+            </Button>
+          ) : (
+            <ActionIcon
+              ref={more}
+              onMouseDown={focusTool}
+              variant="subtle"
+              color="gray"
+              aria-label={`${ai ? "AI" : "More"} ${title} Actions`}
+              disabled={tools.length === 0 && (mobile || edits.length === 0)}
+              aria-busy={Boolean(busy) || undefined}
+              aria-description={busy}
+            >
+              {busy ? (
+                <Loader size={16} />
+              ) : ai ? (
+                <icons.assistant size={18} />
+              ) : (
+                <icons.more size={18} />
+              )}
             </ActionIcon>
           )}
         </Menu.Target>
@@ -287,7 +304,7 @@ export function TextBox({
   const inside = Boolean(!mobile && !send && !hideTools && props.label && tools);
   const boxTools = (
     <div className={classes.tools}>
-      {mobile && editButtons}
+      {mobile && (!phone || editing) && editButtons}
       {menu}
     </div>
   );
@@ -404,15 +421,15 @@ export function TextBox({
   return (
     <>
       {busy && spins && <VisuallyHidden role="status">{busy}</VisuallyHidden>}
-      {/* A phone box opens its editor, which shows the tools, so only the send stands beside it. */}
+      {/* AI tools remain available beside the summary before its phone editor opens. */}
       {mobile && inline ? (
         editor(textarea)
-      ) : (!phone && tools && !inside) || send ? (
+      ) : ((!phone || ai) && tools && !inside) || send ? (
         <div className={classes.columned}>
           {textarea}
           {!editing && !hideTools && (
             <div className={classes.tools}>
-              {!phone && boxTools}
+              {(!phone || ai) && boxTools}
               {send}
             </div>
           )}

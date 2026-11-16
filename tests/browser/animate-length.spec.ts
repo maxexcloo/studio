@@ -55,7 +55,9 @@ for (const review of [false, true]) {
     await expect(
       menu.getByRole("menuitem", { name: "Review Prompt", exact: true }),
     ).toHaveAttribute("aria-checked", "false");
-    await menu.getByRole("radio", { name: review ? "10.13" : "10", exact: true }).check();
+    const length = review ? "10.13" : "10";
+    await menu.getByText(length, { exact: true }).click();
+    await expect(menu.getByRole("radio", { name: length, exact: true })).toBeChecked();
     if (review) await menu.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
     await menu.getByRole("menuitem", { name: "Action", exact: true }).click();
     if (review) {

@@ -377,7 +377,7 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
     ).toBeVisible();
   }
   await field.fill("The bird unfolds its wings.");
-  const more = surface.getByRole("button", { name: "More Instruction Actions", exact: true });
+  const more = surface.getByRole("button", { name: "AI Instruction Actions", exact: true });
   const edit = async (name: string) => {
     if (phone) return surface.getByRole("button", { name, exact: true }).click();
     await more.click();
@@ -639,7 +639,23 @@ test("Recreate › More Like This Set asks for new variations of a result's set"
     }),
   );
   await viewerAction(page, "Recreate", "More Like This Set");
-  await expect.poll(() => asked).toEqual([{ itemId: "hub" }]);
+  await expect.poll(() => asked).toEqual([{ itemId: "hub", scope: "set" }]);
+});
+
+test("Recreate › More Like This explicitly selects only the current image", async ({ page }) => {
+  const asked: unknown[] = [];
+  await seed(page, { resultSet: { id: "set-a", title: "Variety Test", index: 0 } }, (page) =>
+    page.route("**/api/result-sets/more", (route) => {
+      asked.push(route.request().postDataJSON());
+      return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
+    }),
+  );
+  await viewerAction(page, "Recreate");
+  await expect(
+    page.getByRole("menuitem", { name: "More Like This Set", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("menuitem", { name: "More Like This", exact: true }).click();
+  await expect.poll(() => asked).toEqual([{ itemId: "hub", scope: "image" }]);
 });
 
 test("More Like This Set is offered only for a result in a set", async ({ page }) => {
@@ -2067,7 +2083,7 @@ test("Phone viewer keeps Report under Edit and Similar under Recreate", async ({
   test.skip(!testInfo.project.use.isMobile, "Phone action grouping");
   const { viewer } = await seed(page);
   const bar = viewer.getByRole("group", { name: "Generation Actions", exact: true });
-  await expect(bar.getByRole("button", { name: "Suggestions", exact: true })).toBeVisible();
+  await expect(bar.getByRole("button", { name: "AI Prompt Actions", exact: true })).toBeVisible();
   await expect(bar.getByRole("button", { name: "Report", exact: true })).toHaveCount(0);
   await expect(bar.getByRole("button", { name: "Similar", exact: true })).toHaveCount(0);
   const edit = bar.getByRole("button", { name: "Edit", exact: true });
