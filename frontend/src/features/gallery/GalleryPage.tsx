@@ -77,7 +77,7 @@ export function GalleryPage() {
   const phone = usePhone();
   const [captions] = useTileCaptions();
   const [view, setView] = useRemembered<"grid" | "runs">("gallery-view", "grid");
-  const [allVersions, setAllVersions] = useRemembered("gallery-all-versions", true);
+  const [originalsOnly, setOriginalsOnly] = useRemembered("gallery-originals-only", false);
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const [focusItem, setFocusItem] = useState<string | null>(null);
   // The run (a job or result set, `runKey`) whose results the viewer flips through; unset, it
@@ -290,11 +290,11 @@ export function GalleryPage() {
       { replace: true, state: location.state },
     );
   }, [shown, itemId, setParams, location.state]);
-  // Every generation shows by default; turning All Versions off collapses each version chain into
-  // one Grid tile showing its original. Runs always shows all.
+  // Every generation shows by default; Originals Only collapses each version chain into one Grid
+  // tile showing its original. Runs always shows all.
   const queue = useQuery(queueQuery).data?.jobs;
   const groups = useMemo(() => versionGroups(loaded, queue || []), [loaded, queue]);
-  const grouped = view === "grid" && !allVersions;
+  const grouped = view === "grid" && originalsOnly;
   const versions = useMemo(
     () => (grouped ? new Map(groups.map((group) => [group[0].id, group])) : undefined),
     [grouped, groups],
@@ -367,7 +367,7 @@ export function GalleryPage() {
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped || Boolean(similar);
   const clearFilters = () => {
     setFilters(emptyGalleryFilters);
-    setAllVersions(true);
+    setOriginalsOnly(false);
     removeSimilar();
   };
   // The image ranks first, being most like itself, unless the filters leave it out.
@@ -564,7 +564,13 @@ export function GalleryPage() {
                 ]
               : []),
             ...(grouped
-              ? [{ key: "versions", label: "Grouped Versions", remove: () => setAllVersions(true) }]
+              ? [
+                  {
+                    key: "versions",
+                    label: "Originals Only",
+                    remove: () => setOriginalsOnly(false),
+                  },
+                ]
               : []),
           ]}
           view={
@@ -587,10 +593,10 @@ export function GalleryPage() {
             <>
               {view === "grid" && (
                 <Switch
-                  label="All Versions"
+                  label="Originals Only"
                   labelPosition="left"
-                  checked={allVersions}
-                  onChange={(event) => setAllVersions(event.currentTarget.checked)}
+                  checked={originalsOnly}
+                  onChange={(event) => setOriginalsOnly(event.currentTarget.checked)}
                 />
               )}
               {phone && (
