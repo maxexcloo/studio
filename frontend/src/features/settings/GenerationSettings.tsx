@@ -1,26 +1,17 @@
-import { Alert, Select, Stack, Switch } from "@mantine/core";
+import { Alert, Select, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import {
-  type Flag,
-  type Setting,
-  deploymentQuery,
-  lockedNote,
-  useDeploymentSetting,
-} from "./deployment";
-import { DreamAdministration } from "./DreamAdministration";
-import { GalleryPass } from "./GalleryPass";
-import { UnfinishedItems } from "./UnfinishedItems";
+import { type Setting, deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
 
-/** Settings › Generation: default profiles, Background AI switches and gallery passes. */
+/** Settings › Generation: the default profiles. */
 export function GenerationSettings() {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
   if (deployment.isPending) return <LoadingState label="Loading Generation" fill />;
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
-  const { defaults, catalogue } = deployment.data;
+  const { defaults } = deployment.data;
   const profileSelect = (kind: "image" | "video", setting: Setting) => {
     const label = kind === "image" ? "Default Image Profile" : "Default Video Profile";
     const options = defaults.profiles.filter((profile) => profile.kind === kind);
@@ -48,62 +39,11 @@ export function GenerationSettings() {
       </SettingRow>
     );
   };
-  const flagRow = (flag: Flag) => (
-    <SettingRow
-      key={flag.key}
-      label={flag.label}
-      description={`${flag.description}${lockedNote(flag)}`}
-    >
-      <Switch
-        aria-label={flag.label}
-        checked={flag.value}
-        disabled={flag.locked}
-        onChange={(event) => save.mutate({ key: flag.key, value: event.currentTarget.checked })}
-      />
-    </SettingRow>
-  );
-  // The gallery passes' switch sits with them under Gallery, whose rows run A–Z by label.
-  const whileBusy = catalogue.find((flag) => flag.key === "STUDIO_GALLERY_WHILE_BUSY");
-  // The rest are Background AI, A–Z as deployment-settings.js lists them.
-  const background = catalogue.filter((flag) => flag !== whileBusy);
   return (
     <Stack gap="lg">
-      {background.length > 0 && (
-        <SettingGroup title="Background AI">{background.map(flagRow)}</SettingGroup>
-      )}
       <SettingGroup title="Defaults">
         {profileSelect("image", defaults.image)}
         {profileSelect("video", defaults.video)}
-      </SettingGroup>
-      <DreamAdministration
-        settings={deployment.data.dream}
-        save={(change) => save.mutate(change)}
-      />
-      <SettingGroup title="Gallery">
-        <GalleryPass
-          route="/api/gallery/captions"
-          label="Caption Gallery"
-          description="Describe and tag images for search while Studio is idle. Out of Date covers missing captions and those from older rules."
-          remaining="to caption"
-          progressLabel="Caption Progress"
-          scopeLabel="Images to Caption"
-        />
-        <GalleryPass
-          route="/api/gallery/faces"
-          label="Check Faces"
-          description="Compare images made with a character with the character's image by face, on the CPU while Studio is idle. The first run downloads the models."
-          remaining="to check"
-          progressLabel="Face Check Progress"
-        />
-        <GalleryPass
-          route="/api/gallery/embeddings"
-          label="Index Gallery"
-          description="Index every image for Image Search on the CPU while Studio is idle. The first run downloads the model."
-          remaining="to index"
-          progressLabel="Index Progress"
-        />
-        {whileBusy && flagRow(whileBusy)}
-        <UnfinishedItems />
       </SettingGroup>
     </Stack>
   );

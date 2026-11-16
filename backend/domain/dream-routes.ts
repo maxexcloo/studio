@@ -49,6 +49,7 @@ export function registerDreamRoutes(
       since: record.visit?.since || null,
       today: dream.today(ownerId),
       spicyAvailable: Boolean(access?.uncensored),
+      locked: dream.locked(),
       ...dream.status(ownerId),
     };
   };
@@ -110,7 +111,11 @@ export function registerDreamRoutes(
         status: 403,
         payload: { ok: false, error: "Spicy needs Uncensored Models for this account." },
       };
-    await dream.save(owner(account), patch);
+    try {
+      await dream.save(owner(account), patch);
+    } catch (error) {
+      return refuse(error);
+    }
     return { status: 200, payload: show(owner(account)) };
   });
   /** A project route's answer, or its refusal. */

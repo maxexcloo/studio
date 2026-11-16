@@ -1,88 +1,67 @@
-import { SegmentedControl, Switch, Text } from "@mantine/core";
+import { Alert, SegmentedControl, Stack } from "@mantine/core";
+import { useQuery } from "@tanstack/react-query";
 
-import type { DreamSettings } from "../../../../shared/dream";
-import { NumberSetting } from "../../ui/NumberSetting";
+import type { DreamOverride } from "../../../../shared/dream";
+import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { type Deployment, lockedNote } from "./deployment";
+import { deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
 
-export function DreamAdministration({
-  settings,
-  save,
-}: {
-  settings: Deployment["dream"];
-  save(change: { key: string; value: string | boolean | number }): void;
-}) {
-  const toggle = (name: keyof DreamSettings, label: string, description: string) => {
-    const setting = settings[name];
+const onOff = [
+  { value: "true", label: "On" },
+  { value: "false", label: "Off" },
+];
+const backends = [
+  { value: "local", label: "Local" },
+  { value: "cloud", label: "Cloud" },
+];
+const backendNote =
+  "Uses ready models allowed for the account; waits if this backend is unavailable. Cloud needs access to a ready cloud model.";
+
+/** Settings › Dream: the settings an administrator forces on every account. */
+export function DreamAdministration() {
+  const deployment = useQuery(deploymentQuery);
+  const save = useDeploymentSetting();
+  if (deployment.isPending) return <LoadingState label="Loading Dream" fill />;
+  if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
+  const row = (
+    name: DreamOverride,
+    label: string,
+    description: string,
+    choices: { value: string; label: string }[],
+  ) => {
+    const setting = deployment.data.dream[name];
     return (
       <SettingRow label={label} description={description + lockedNote(setting)}>
-        <Switch
-          aria-label={`Default Dream ${label}`}
-          checked={Boolean(setting.value)}
+        <SegmentedControl
+          role="radiogroup"
+          aria-label={`Dream ${label}`}
+          value={setting.value === null ? "account" : String(setting.value)}
           disabled={setting.locked}
-          onChange={(event) => save({ key: setting.key, value: event.currentTarget.checked })}
+          data={[{ value: "account", label: "Account's Choice" }, ...choices]}
+          onChange={(value) =>
+            save.mutate({
+              key: setting.key,
+              value: value === "account" ? null : choices === onOff ? value === "true" : value,
+            })
+          }
         />
       </SettingRow>
     );
   };
-  const media = (kind: "image" | "video", label: string) => {
-    const cap = settings[kind === "image" ? "dailyImages" : "dailyVideos"];
-    const backend = settings[kind === "image" ? "imageBackend" : "videoBackend"];
-    return (
-      <>
-        {toggle(
-          kind === "image" ? "images" : "videos",
-          label,
-          `Make ${label.toLowerCase()} while Studio is idle.`,
-        )}
-        <SettingRow
-          label={`${label} per Day`}
-          description={`Daily default per account.${lockedNote(cap)}`}
-        >
-          <NumberSetting
-            key={`${cap.key}:${cap.value}`}
-            label={`Default Dream ${label} per Day`}
-            value={cap.value}
-            min={0}
-            max={kind === "image" ? 500 : 100}
-            disabled={cap.locked}
-            onSave={(value) => save({ key: cap.key, value })}
-          />
-        </SettingRow>
-        <SettingRow
-          label={`${label} Run On`}
-          description={`Uses ready models allowed for the account; waits if this backend is unavailable.${lockedNote(backend)}`}
-        >
-          <SegmentedControl
-            role="radiogroup"
-            aria-label={`Default Dream ${label} Run On`}
-            value={backend.value}
-            disabled={backend.locked}
-            data={[
-              { value: "local", label: "Local" },
-              { value: "cloud", label: "Cloud" },
-            ]}
-            onChange={(value) => save({ key: backend.key, value })}
-          />
-        </SettingRow>
-      </>
-    );
-  };
   return (
-    <SettingGroup title="Dream">
-      <Text size="sm" c="dimmed">
-        Defaults for accounts without a saved choice. Existing account settings take precedence.
-        Cloud needs access to a ready cloud model.
-      </Text>
-      {toggle("enabled", "Enabled", "Make new media from each account's taste.")}
-      {media("image", "Images")}
-      {toggle("paused", "Paused", "Pause idle generation by default.")}
-      {toggle(
-        "spicy",
-        "Spicy",
-        "Allow explicit themes only for accounts with Uncensored Models access.",
-      )}
-      {media("video", "Videos")}
-    </SettingGroup>
+    <Stack gap="lg">
+      <SettingGroup title="Overrides">
+        {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
+        {row("imageBackend", "Images Run On", backendNote, backends)}
+        {row("paused", "Paused", "Hold idle generation.", onOff)}
+        {row(
+          "spicy",
+          "Spicy",
+          "Allow explicit themes, only for accounts with Uncensored Models access.",
+          onOff,
+        )}
+        {row("videoBackend", "Videos Run On", backendNote, backends)}
+      </SettingGroup>
+    </Stack>
   );
 }

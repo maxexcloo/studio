@@ -1,10 +1,10 @@
-import { dreamDefaults, dreamSettingError, dreamSettingKeys } from "../shared/dream.ts";
+import { dreamOverrideKeys, dreamSettingError } from "../shared/dream.ts";
 import { assistantIntegration } from "./assistant-routes.js";
 import { civitaiTokenStatus } from "./civitai/access.js";
 import {
   catalogueFlags,
   defaultProfileKeys,
-  describeDreamDefaults,
+  describeDreamOverrides,
   describeFlag,
   isCatalogueFlag,
   saveDeploymentSetting,
@@ -49,7 +49,7 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
         profiles,
       },
       catalogue: catalogueFlags.map(describeFlag),
-      dream: describeDreamDefaults(),
+      dream: describeDreamOverrides(),
       integrations: {
         civitai: { token: civitaiTokenStatus() },
         huggingFace: { token: { set: Boolean(hfTokenValue()) } },
@@ -62,21 +62,13 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
     if (!requireAdmin(req, res)) return;
     const key = String(req.body?.key || "");
     const value = req.body?.value;
-    const dreamKey = Object.keys(dreamSettingKeys).find((name) => dreamSettingKeys[name] === key);
+    const dreamKey = Object.keys(dreamOverrideKeys).find((name) => dreamOverrideKeys[name] === key);
     if (dreamKey) {
-      const error = dreamSettingError(dreamKey, value);
+      // null leaves the setting to each account.
+      const error = value === null ? "" : dreamSettingError(dreamKey, value);
       if (error) return res.status(400).json({ ok: false, error });
-      saveDeploymentSetting(
-        key,
-        value === dreamDefaults[dreamKey]
-          ? ""
-          : typeof value === "boolean"
-            ? value
-              ? "1"
-              : "0"
-            : String(value),
-      );
-      res.json({ ok: true, dream: describeDreamDefaults() });
+      saveDeploymentSetting(key, typeof value === "boolean" ? (value ? "1" : "0") : value);
+      res.json({ ok: true, dream: describeDreamOverrides() });
       return;
     }
     if (isCatalogueFlag(key)) {

@@ -666,7 +666,8 @@ export function suggestionsFrom(
  */
 export function createDream(options: {
   dataDir: string;
-  defaults?(): DreamSettings;
+  /** The settings an administrator forces on every account, over its own choice. */
+  overrides?(): Partial<DreamSettings>;
   store: Store;
   taste: Taste;
   owners(): string[];
@@ -764,15 +765,16 @@ export function createDream(options: {
     const saved = readRuntimeDocument(options.dataDir, name(ownerId)) as
       | Partial<DreamRecord>
       | undefined;
+    const overrides = options.overrides?.() ?? {};
     return {
       recent: [],
       ...saved,
       settings: Object.fromEntries(
-        Object.entries(options.defaults?.() ?? dreamDefaults).map(([key, value]) => [
+        (Object.keys(dreamDefaults) as (keyof DreamSettings)[]).map((key) => [
           key,
-          saved?.settings?.[key as keyof DreamSettings] ?? value,
+          overrides[key] ?? saved?.settings?.[key] ?? dreamDefaults[key],
         ]),
-      ) as unknown as DreamSettings,
+      ) as DreamSettings,
     };
   }
   const write = (ownerId: string, record: DreamRecord, patch?: Partial<DreamSettings>) => {
@@ -2645,6 +2647,8 @@ export function createDream(options: {
 
   return {
     read,
+    /** The settings an administrator forces, which accounts can't change. */
+    locked: () => Object.keys(options.overrides?.() ?? {}) as (keyof DreamSettings)[],
     history(ownerId: string): DreamActivity[] {
       const labels = {
         "calibrate-like": "Chose Gallery Image",
@@ -2837,6 +2841,12 @@ export function createDream(options: {
       write(ownerId, settle(ownerId, suggestionId).record);
     },
     async save(ownerId: string, patch: Partial<DreamSettings>) {
+      const overrides = options.overrides?.() ?? {};
+      const forced = (Object.keys(patch) as (keyof DreamSettings)[]).find(
+        (key) => key in overrides && patch[key] !== overrides[key],
+      );
+      if (forced)
+        throw failure(`An administrator set ${forced} for every account in Settings › Dream.`, 409);
       const record = read(ownerId);
       // Turning Dream on resumes it too.
       record.settings = { ...record.settings, ...(patch.enabled && { paused: false }), ...patch };

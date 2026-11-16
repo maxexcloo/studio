@@ -2,6 +2,7 @@ import { characterGenerated } from "./character-generated.js";
 import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
+import { dreamDefaultChoices } from "./dream-default-choices.js";
 import { dreamOwnership } from "./dream-ownership.js";
 import { galleryRatings } from "./gallery-ratings.js";
 import { legacyShapes } from "./legacy-shapes.js";
@@ -53,6 +54,12 @@ const steps = [
     name: "loraStacks",
     run: loraStacks,
     changes: (plan) => plan.accounts,
+    online: true,
+  },
+  {
+    name: "dreamDefaultChoices",
+    run: dreamDefaultChoices,
+    changes: (plan) => plan.settings + plan.accounts,
     online: true,
   },
 ];
