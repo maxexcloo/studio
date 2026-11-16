@@ -752,3 +752,160 @@ test("Library preset loading confirms replacement and restores saved references 
       videoPrompt: "Keep my video draft",
     });
 });
+
+test("Library and Composer protect promptless settings and references only when the loaded preset overwrites them", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.presets.push(
+    {
+      id: "full-replacement",
+      title: "Full Replacement",
+      input: {
+        kind: "image",
+        profileId: profiles[0].id,
+        prompt: "A saved bird",
+        steps: 20,
+        seed: "7",
+        referenceAssets: [],
+        referenceDetails: [],
+      },
+    },
+    {
+      id: "prompt-only",
+      title: "Prompt Only",
+      parts: ["prompt"],
+      input: { prompt: "A saved bird" },
+    },
+  );
+  await page.goto("/images");
+  for (const surface of ["Library", "Composer"]) {
+    for (const dirty of ["settings", "references"]) {
+      const references =
+        dirty === "references"
+          ? [
+              {
+                id: "manual",
+                slot: "image",
+                name: "Manual",
+                url: image,
+                thumbnailUrl: image,
+                width: 1024,
+                height: 1024,
+              },
+            ]
+          : [];
+      const seed = dirty === "settings" ? "42" : "";
+      await page.evaluate(
+        ({ references, seed, profileId }) => {
+          localStorage.setItem(
+            "studio-composer-draft:local",
+            JSON.stringify({
+              image: {
+                input: {
+                  kind: "image",
+                  profileId,
+                  prompt: "",
+                  negative: "",
+                  steps: seed ? 37 : 20,
+                  seed,
+                  loras: [],
+                  referenceAssets: references.map((asset) => ({
+                    assetId: asset.id,
+                    slot: asset.slot,
+                  })),
+                },
+                references,
+                operation: "image",
+                sessionId: "",
+              },
+            }),
+          );
+        },
+        { references, seed, profileId: profiles[0].id },
+      );
+      if (surface === "Library") {
+        await page.goto("/library#presets");
+        await page
+          .getByRole("button", { name: "Actions for Full Replacement", exact: true })
+          .click();
+        await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
+        const confirmation = page.getByRole("dialog", { name: "Load Preset", exact: true });
+        await expect(confirmation).toBeVisible();
+        await confirmation.getByRole("button", { name: "Cancel", exact: true }).click();
+        await page.getByRole("button", { name: "Actions for Prompt Only", exact: true }).click();
+        await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
+      } else {
+        await create(page);
+        await openPresets(page);
+        await page.getByRole("combobox", { name: "Preset Name", exact: true }).click();
+        await page.getByRole("option", { name: "Full Replacement", exact: true }).click();
+        await expect(
+          page.getByText("Replace the current prompt and settings with this preset?", {
+            exact: true,
+          }),
+        ).toBeVisible();
+        await page.getByRole("button", { name: "Cancel", exact: true }).click();
+        await page.getByRole("combobox", { name: "Preset Name", exact: true }).click();
+        await page.getByRole("option", { name: "Prompt Only", exact: true }).click();
+      }
+      await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+        "A saved bird",
+      );
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const draft = JSON.parse(localStorage.getItem("studio-composer-draft:local")!).image;
+            return {
+              seed: draft.input.seed,
+              references: draft.references.map((asset: { id: string }) => asset.id),
+            };
+          }),
+        )
+        .toEqual({ seed, references: references.map((asset) => asset.id) });
+    }
+  }
+});
+
+test("Composer preset confirmation checks the output draft that will be overwritten", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.presets.push({
+    id: "video-preset",
+    title: "Video Preset",
+    input: { kind: "video", profileId: profiles[1].id, prompt: "A saved video", seed: "7" },
+  });
+  await page.goto("/images");
+  await page.evaluate(
+    ({ imageProfile, videoProfile }) => {
+      const draft = (kind: string, profileId: string, seed: string) => ({
+        input: { kind, profileId, prompt: "", seed },
+        references: [],
+        sessionId: "",
+        operation: kind === "image" ? "image" : "animate",
+      });
+      localStorage.setItem(
+        "studio-composer-draft:local",
+        JSON.stringify({
+          image: draft("image", imageProfile, ""),
+          video: draft("video", videoProfile, "42"),
+        }),
+      );
+    },
+    { imageProfile: profiles[0].id, videoProfile: profiles[1].id },
+  );
+  await create(page);
+  await openPresets(page);
+  await page.getByRole("combobox", { name: "Preset Name", exact: true }).click();
+  await page.getByRole("option", { name: "Video Preset", exact: true }).click();
+  await expect(
+    page.getByText("Replace the current prompt and settings with this preset?", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem("studio-composer-draft:local")!).video.input.seed,
+    ),
+  ).toBe("42");
+});

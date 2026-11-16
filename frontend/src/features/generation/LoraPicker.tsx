@@ -49,7 +49,8 @@ import {
   SortMenu,
   useNaming,
 } from "./Picker";
-import { type Preset, usePresets } from "./PresetPicker";
+import { usePresets } from "./PresetPicker";
+import type { Preset } from "./presets";
 import { StrengthControl } from "./StrengthControl";
 
 import classes from "./LoraPicker.module.css";
