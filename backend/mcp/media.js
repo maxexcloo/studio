@@ -724,8 +724,8 @@ export class McpMedia {
     const liked = vary
       ? Object.fromEntries(
           (
-            (await this.request("GET", "/api/taste", undefined, owner).catch(() => ({}))).loras ||
-            []
+            (await this.request("GET", "/api/taste", undefined, owner).catch(() => ({})))
+              .loraScores || []
           )
             .filter((lora) => Number.isFinite(lora.strength))
             .map((lora) => [lora.name, lora.strength]),
