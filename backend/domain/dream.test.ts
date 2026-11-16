@@ -2089,6 +2089,23 @@ test("Dream routes images to the selected allowed backend and never substitutes 
   assert.equal((await request("/settings", { imageBackend: "local" }, "PUT")).status, 403);
 });
 
+test("Dream sets aside a profile whose last three jobs failed until the failures age out", async (t) => {
+  const fx = fixture(t, [profiles[0]]);
+  fx.state.defaults.enabled = true;
+  const fail = async () => {
+    await fx.dream.tick();
+    const [job] = fx.live("alice");
+    assert.equal(job?.input.profileId, "flux");
+    fx.store.save({ ...fx.store.job("alice", job.id)!, status: "failed" });
+  };
+  for (let run = 0; run < 3; run++) await fail();
+  await fx.dream.tick();
+  assert.equal(fx.live("alice").length, 0);
+  fx.state.clock += 6 * 3_600_000 + 60_000;
+  await fx.dream.tick();
+  assert.equal(fx.live("alice")[0]?.input.profileId, "flux");
+});
+
 test("More Like This waits for its exact source profile when the Dream backend changes", async (t) => {
   const fx = fixture(t, [
     ...profiles,
