@@ -1,8 +1,10 @@
-import { Alert, Badge, Button, Group, Stack, Text, TextInput } from "@mantine/core";
+import { Alert, Badge, Button, Group, Menu, Stack, Text } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { api, post } from "../../api";
+import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { CopyButton } from "../../ui/CopyButton";
 import { formatDateTime } from "../../ui/dates";
@@ -32,6 +34,7 @@ export function PersonalMcpToken() {
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<"rotate" | "revoke" | null>(null);
   const [error, setError] = useState("");
+  const { copied, copy } = useCopy();
   const status = useQuery({ ...ownAccountQuery, select: (data) => data.mcp });
   const viewable = visible && Boolean(status.data?.viewable);
   // The token stays in this mounted view, never in a query or mutation cache, and leaves with it.
@@ -71,14 +74,18 @@ export function PersonalMcpToken() {
     }
   };
   const endpoint = status.data?.endpoint || "";
+  // For clients that only take a URL (such as Grok).
+  const withToken = endpoint && token ? `${endpoint.replace(/\/+$/, "")}/${token}` : "";
   return (
     <>
       <SettingGroup
         title="MCP Token"
         toolbar={
-          <Badge color={status.data?.enabled ? "green" : "gray"} miw="max-content">
-            {status.data?.enabled ? "Token Active" : "No Token Issued"}
-          </Badge>
+          <Group justify="flex-end">
+            <Badge color={status.data?.enabled ? "green" : "gray"} miw="max-content">
+              {status.data?.enabled ? "Token Active" : "No Token Issued"}
+            </Badge>
+          </Group>
         }
       >
         {status.error && <Alert color="red">{status.error.message}</Alert>}
@@ -101,41 +108,36 @@ export function PersonalMcpToken() {
               Create Token
             </Button>
           )}
-          {status.data?.enabled &&
-            (status.data.viewable ? (
-              <Stack gap="xs">
-                <TextInput
-                  aria-label="MCP Token"
-                  value={shown ? token : "•".repeat(24)}
-                  readOnly
-                  autoComplete="off"
-                  onFocus={(event) => shown && event.currentTarget.select()}
-                />
-                <Group gap="xs">
-                  <Button
-                    size="compact-sm"
-                    variant="default"
-                    leftSection={shown ? <icons.hide size={16} /> : <icons.show size={16} />}
-                    disabled={!token}
-                    onClick={() => setShown(!shown)}
-                  >
-                    {shown ? "Hide" : "Show"}
-                  </Button>
-                  <CopyButton size="compact-sm" text={token} label="Copy Token" />
-                  <CopyButton
-                    size="compact-sm"
-                    text={endpoint && token && `${endpoint.replace(/\/+$/, "")}/${token}`}
-                    label="Copy URL with Token"
-                  />
-                </Group>
-              </Stack>
-            ) : (
-              <Text size="sm" c="dimmed" py="sm">
-                Rotate it in the Danger Zone to view. This token was created before Studio kept
-                tokens to show again.
-              </Text>
-            ))}
+          {status.data?.enabled && !status.data.viewable && (
+            <Text size="sm" c="dimmed" py="sm">
+              Rotate it in the Danger Zone to view. This token was created before Studio kept tokens
+              to show again.
+            </Text>
+          )}
         </Stack>
+        {status.data?.enabled && status.data.viewable && (
+          <SettingRow
+            label="Token"
+            description={
+              <Text span size="xs" ff="monospace" style={{ wordBreak: "break-all" }}>
+                {shown ? token : "•".repeat(24)}
+              </Text>
+            }
+          >
+            <Group gap="xs" wrap="nowrap">
+              <Button
+                size="compact-sm"
+                variant="default"
+                leftSection={shown ? <icons.hide size={16} /> : <icons.show size={16} />}
+                disabled={!token}
+                onClick={() => setShown(!shown)}
+              >
+                {shown ? "Hide" : "Show"}
+              </Button>
+              <CopyButton size="compact-sm" text={token} label="Copy Token" />
+            </Group>
+          </SettingRow>
+        )}
         <SettingRow
           label="MCP Endpoint"
           description={
@@ -144,7 +146,25 @@ export function PersonalMcpToken() {
             </Text>
           }
         >
-          <CopyButton size="compact-sm" text={endpoint} label="Copy URL" />
+          <Menu position="bottom-end">
+            <Menu.Target>
+              <Button
+                size="compact-sm"
+                variant="default"
+                leftSection={copied ? <Check size={16} /> : <icons.copy size={16} />}
+                rightSection={<ChevronDown size={14} />}
+                disabled={!endpoint}
+              >
+                {copied ? "Copied" : "Copy URL"}
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item onClick={() => copy(endpoint)}>URL</Menu.Item>
+              <Menu.Item disabled={!withToken} onClick={() => copy(withToken)}>
+                URL with Token
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         </SettingRow>
       </SettingGroup>
       {status.data?.enabled && (

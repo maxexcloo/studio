@@ -1302,33 +1302,34 @@ export async function serveDream(
           : "waiting",
     reason: options.reason,
   });
+  const fields = {
+    likes: [],
+    avoid: [],
+    styles: [],
+    note: "",
+    models: [],
+    loras: [],
+    shapes: [],
+    tags: [],
+  };
   const taste = {
     summary: "",
-    likes: [],
-    styles: [],
-    avoid: [],
-    addedAvoid: [],
-    note: "",
-    profiles: { image: [], video: [] },
-    loras: [],
+    ...fields,
+    loraScores: [],
     updatedAt: "",
     signals: 0,
     writer: false,
     ...options.taste,
     preferences: {},
-    learnt: {
-      likes: options.taste?.likes || [],
-      styles: options.taste?.styles || [],
-      avoid: options.taste?.avoid || [],
-      note: options.taste?.note || "",
-    },
+    learnt: Object.fromEntries(
+      Object.entries(fields).map(([key, none]) => [key, options.taste?.[key] ?? none]),
+    ),
   };
   await page.route(/\/api\/taste$/, (route) => {
     const request = route.request();
     if (request.method() === "PUT") {
       state.requests.push({ method: "PUT", path: "/api/taste", body: request.postDataJSON() });
       const body = request.postDataJSON();
-      if (body.avoid) taste.addedAvoid = body.avoid;
       for (const [key, value] of Object.entries(body.preferences || {})) {
         if (value === null) delete (taste.preferences as Record<string, unknown>)[key];
         else (taste.preferences as Record<string, unknown>)[key] = value;
