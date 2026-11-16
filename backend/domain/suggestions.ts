@@ -28,7 +28,7 @@ type SuggestionSurface = "composer" | "viewer" | "animate" | "change" | "draft";
 // The viewer's next steps and Animate's motion ideas may send the image along.
 type Writer = TasteWriter<ReturnType<typeof userContent>>;
 // `count` records the requested count so older saved menus refresh once, even if a reply is short.
-// `spicy` marks steps worded explicitly, so a change of explicitWording writes them again.
+// `spicy` marks steps worded explicitly, so a change of Uncensored Models writes them again.
 type SavedSteps = {
   steps: NextStep[];
   at: string;
@@ -258,7 +258,7 @@ export function createSuggestions({
   /** Null where the account may not send prompts to the text model. */
   writer: (ownerId: string) => Writer | null;
   online: () => Promise<boolean>;
-  /** Whether what the owner is offered may be worded explicitly (account-policy.js `explicitWording`). */
+  /** Whether what the owner is offered may be worded explicitly (Uncensored Models). */
   explicit: (ownerId: string) => boolean;
   /** The owner's finished gallery item for a job, if it is theirs and visible. */
   item: (ownerId: string, jobId: string, itemId?: string) => SuggestionItem | undefined;

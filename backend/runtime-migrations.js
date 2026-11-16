@@ -9,6 +9,7 @@ import { legacyShapes } from "./legacy-shapes.js";
 import { loraStacks } from "./lora-stacks.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
 import { migrateRadianceQueue } from "./radiance-queue-migration.js";
+import { spicyPrompts } from "./spicy-prompts.js";
 import { tasteDislikes } from "./taste-dislikes.js";
 
 /**
@@ -66,6 +67,12 @@ const steps = [
   {
     name: "tasteDislikes",
     run: tasteDislikes,
+    changes: (plan) => plan.accounts,
+    online: true,
+  },
+  {
+    name: "spicyPrompts",
+    run: spicyPrompts,
     changes: (plan) => plan.accounts,
     online: true,
   },

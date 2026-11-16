@@ -105,11 +105,9 @@ test(
     assert.deepEqual(shown.body.grants, {
       cloudModels: true,
       loras: true,
-      spicyPrompts: true,
       uncensoredModels: true,
     });
     assert.deepEqual(shown.body.saved, []);
-    assert.equal(shown.body.preferences.spicyPrompts, false);
     assert.equal((await features()).cloudModels, true);
     const off = await call("/api/preferences", {
       method: "PATCH",
@@ -121,26 +119,19 @@ test(
     assert.equal((await features()).cloudModels, false);
     assert.equal((await features()).loras, false);
     assert.equal((await features()).uncensoredModels, true);
-    const spicy = await call("/api/preferences", {
+    // A saved Cloud reads as unsaved while Cloud Models is off, and counts again once it is on.
+    const cloud = await call("/api/preferences", {
       method: "PATCH",
       cookie,
-      body: { spicyPrompts: true },
+      body: { images: "cloud" },
     });
-    assert.equal(spicy.status, 200, spicy.body.error);
-    assert.equal(spicy.body.preferences.spicyPrompts, true);
-    // Without Uncensored Models, Spicy Prompts can't be turned on.
-    const optedOut = await call("/api/preferences", {
+    assert.equal(cloud.body.preferences.images, undefined);
+    const back = await call("/api/preferences", {
       method: "PATCH",
       cookie,
-      body: { uncensoredModels: false },
+      body: { cloudModels: true },
     });
-    assert.equal(optedOut.body.grants.spicyPrompts, false);
-    const refused = await call("/api/preferences", {
-      method: "PATCH",
-      cookie,
-      body: { spicyPrompts: true },
-    });
-    assert.equal(refused.status, 400);
+    assert.equal(back.body.preferences.images, "cloud");
     // Where videos run is one of its choices, not on or off.
     const videos = await call("/api/preferences", {
       method: "PATCH",
@@ -182,7 +173,6 @@ test(
     assert.deepEqual((await call("/api/preferences", { cookie: admin })).body.grants, {
       cloudModels: true,
       loras: true,
-      spicyPrompts: true,
       uncensoredModels: true,
     });
     assert.equal((await own()).uncensoredModels, true);
