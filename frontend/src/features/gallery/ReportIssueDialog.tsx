@@ -8,7 +8,7 @@ import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { askChange } from "../taste/suggestions";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
-import { useRatings } from "./useMediaRating";
+import { showDisliked, useRatings } from "./useMediaRating";
 
 const issues = ["Hands", "Face", "Anatomy", "Text", "Artefacts", "Wrong Subject", "Other"];
 
@@ -54,7 +54,9 @@ export function ReportIssueDialog({
       };
       if (iterate) iterate(next);
       else await iteration.mutateAsync(next);
+      const was = item.rating ?? null;
       await ratings.mutateAsync({ ids: [item.id], rating: "disliked", issue });
+      showDisliked(1, () => ratings.mutate({ ids: [item.id], rating: was }));
     },
     onSuccess: onClose,
   });

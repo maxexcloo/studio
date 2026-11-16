@@ -51,13 +51,22 @@ export const noteWorkerReachable = (id, up, error, at = Date.now()) => {
     const reason = error?.cause?.code || error?.code || error?.message || String(error ?? "");
     void parkedCheck(id)
       .catch(() => false)
-      .then((parked) => parked || logWarning("Worker stopped answering", { worker: id, reason }));
-  } else if (up && last?.up === false)
+      .then((parked) => {
+        const now = reachable.get(id);
+        if (now && !now.up) now.parked = parked;
+        if (!parked) logWarning("Worker stopped answering", { worker: id, reason });
+      });
+  } else if (up && last?.up === false && !last.parked)
     logWarning("Worker answering again", {
       worker: id,
       downForS: Math.round((at - last.since) / 1000),
     });
-  reachable.set(id, { up: Boolean(up), at, since: up || last?.up !== false ? at : last.since });
+  reachable.set(id, {
+    up: Boolean(up),
+    at,
+    since: up || last?.up !== false ? at : last.since,
+    ...(!up && last?.up === false ? { parked: last.parked } : {}),
+  });
   if (!up) for (const listener of offlineListeners) listener(id);
 };
 /** Hears the id of each worker found offline. */
