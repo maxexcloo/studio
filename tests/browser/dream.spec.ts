@@ -1,6 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
 
-import { dreamItem, fixtures, profiles, serveDream, stamp } from "./fixtures";
+import { dreamItem, fixtures, profiles, section, serveDream, stamp } from "./fixtures";
 
 /** Opens a route-backed Dream view from its menu. */
 async function showView(page: Page, name: string) {
@@ -175,7 +175,7 @@ test("While You Were Away shows a series as one set, in its order", async ({ pag
   await expect(views).toHaveCount(1);
 });
 
-test("Library › Characters offers Dream's suggested cards: Accept makes the card, Dismiss turns one down", async ({
+test("Library offers Dream's suggested cards in their sections: Accept makes the card, Dismiss turns one down", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -202,14 +202,16 @@ test("Library › Characters offers Dream's suggested cards: Accept makes the ca
   await page.goto("/library#characters");
   const suggestions = page.getByRole("list", { name: "Suggestions" });
   const mara = suggestions.getByRole("listitem", { name: "Mara" });
-  await expect(mara.getByText("Character", { exact: true })).toBeVisible();
+  await expect(suggestions.getByRole("listitem")).toHaveCount(1);
   await expect(mara.getByText("In 2 liked results", { exact: true })).toBeVisible();
   await expect(mara.getByRole("group", { name: "Mara's Results" }).getByRole("button")).toHaveCount(
     2,
   );
+  await section(page, "Library", "Scenes");
   const rooftop = suggestions.getByRole("listitem", { name: "Rooftop" });
   await rooftop.getByRole("button", { name: "Dismiss", exact: true }).click();
   await expect(rooftop).toHaveCount(0);
+  await section(page, "Library", "Characters");
   await mara.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(suggestions).toHaveCount(0);
   await expect(

@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { fixtures, image, selectionMenuItem, showOnly, stamp } from "./fixtures";
+import { fixtures, image, selectionMenuItem, showOnly, signIn, stamp } from "./fixtures";
 
 const png = (name: string) => ({ name, mimeType: "image/png", buffer: Buffer.from(name) });
 
@@ -23,8 +23,11 @@ test("Upload takes many files or a folder, lists each failure and shows the new 
   await page.goto("/images");
 
   await page.getByRole("button", { name: "Upload", exact: true }).click();
-  // Reddit posts import from Library › Import, not this menu.
-  await expect(page.getByRole("menuitem")).toHaveText(["Upload Files…", "Upload Folder…"]);
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Upload Files…",
+    "Upload Folder…",
+    "Import From Reddit…",
+  ]);
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("menuitem", { name: "Upload Files…", exact: true }).click();
   await (await chooser).setFiles([png("one.png"), png("broken.png"), png("two.png")]);
@@ -105,4 +108,66 @@ test("Recreate › Run Suggested Prompts on several uploads queues each suggeste
     ["/api/sessions/session-a/generations", "A red barn at noon", "job-a", "a"],
     ["/api/sessions/session-b/generations", "A lighthouse at dusk", "job-b", "b"],
   ]);
+});
+
+test("An ordinary account imports Reddit images in Gallery with retry and partial failure feedback", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await signIn(page, { id: "member", role: "user" });
+  const requests: unknown[] = [];
+  await page.route("**/api/gallery/import/reddit", (route) => {
+    requests.push(route.request().postDataJSON());
+    if (requests.length === 1)
+      return route.fulfill({
+        status: 400,
+        json: { ok: false, error: "Reddit is unavailable. Try again." },
+      });
+    state.gallery.push({
+      id: "reddit-bird",
+      title: "Birds",
+      uploaded: true,
+      type: "image",
+      status: "done",
+      prompt: "",
+      url: image,
+      thumbnailUrl: image,
+      width: 1024,
+      height: 1024,
+      createdAt: stamp,
+    });
+    return route.fulfill({
+      status: 201,
+      json: { imported: 1, failed: [{ image: 2, error: "The image is unavailable." }] },
+    });
+  });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Import From Reddit…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Import From Reddit", exact: true });
+  const link = dialog.getByRole("textbox", { name: "Reddit Link", exact: true });
+  const url = "https://www.reddit.com/r/birds/comments/abc/birds/";
+  await link.fill(url);
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(requests).toEqual([]);
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Import From Reddit…", exact: true }).click();
+  await expect(link).toHaveValue(url);
+  await dialog.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(
+    dialog.getByText("Reddit is unavailable. Try again.", { exact: true }),
+  ).toBeVisible();
+  await expect(link).toHaveValue(url);
+  await dialog.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("button", { name: "Uploads", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator('[data-media-id="reddit-bird"]')).toBeVisible();
+  await expect(
+    page.getByText("1 image added to Uploads. Image 2: The image is unavailable.", { exact: true }),
+  ).toBeVisible();
+  expect(requests).toEqual([{ url }, { url }]);
 });
