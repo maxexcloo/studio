@@ -358,6 +358,7 @@ export async function fixtures(page: Page) {
             )
             .reverse(),
         ),
+        uses: {},
       });
     if (path === "/api/loras/info")
       return respond({

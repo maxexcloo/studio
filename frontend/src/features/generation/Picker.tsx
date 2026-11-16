@@ -597,10 +597,10 @@ export function ChipContent({
 
 export type SavedSort = "name-asc" | "name-desc" | "newest" | "oldest";
 export const savedSortLabels: Record<SavedSort, string> = {
-  "name-asc": "Name A–Z",
-  "name-desc": "Name Z–A",
   newest: "Newest First",
   oldest: "Oldest First",
+  "name-asc": "Name A–Z",
+  "name-desc": "Name Z–A",
 };
 interface SavedItem {
   id: string;
