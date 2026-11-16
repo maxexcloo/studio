@@ -79,15 +79,16 @@ import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
 import { TrimVideoDialog, type VideoEdit, useVideoEdit } from "./videoEdits";
 import { viewerItemId } from "./viewerLink";
-import type { ViewerAsk } from "./ViewerPrompt";
+import type { PromptAssist, ViewerAsk } from "./ViewerPrompt";
 
 /**
  * An action whose options come to one runs that option itself, so no submenu holds just one.
- * Animate stays a menu, as its templates load after it shows.
+ * Animate stays a menu, as its templates load after it shows, and so does AI, which names no
+ * action.
  */
 function withoutLoneOption(action: Action): Action {
   const options = action.menu?.flat() ?? [];
-  if (options.length !== 1 || action.note || action.id === "animate") return action;
+  if (options.length !== 1 || action.note || ["ai", "animate"].includes(action.id)) return action;
   const [option] = options;
   return {
     ...action,
@@ -249,6 +250,8 @@ interface MediaActionOptions {
   compare?: boolean;
   /** How Edit asks for a change: the viewer's prompt. Without it, Edit's choices open the viewer. */
   edit?: EditAsk;
+  /** The viewer prompt's assistance, leading the AI menu. */
+  assist?: PromptAssist | null;
   /** Queues a new run; the viewer's joins its strip. Defaults to queueing it directly. */
   iterate?: (iteration: Iteration) => void;
   onApplied?: () => void;
@@ -273,6 +276,7 @@ export function useMediaActions(
     transfer,
     compare,
     edit,
+    assist,
     iterate,
     onApplied = () => {},
     onCompare,
@@ -485,6 +489,23 @@ export function useMediaActions(
   });
   // The assistant and the animate offers decide every option, so they show together.
   const optionsLoading = assistant.isPending || animation.isPending;
+  // More Like This, and the gallery ranked by likeness to this image (GalleryPage reads `similar`).
+  const discovery: Action[] = [
+    ...moreLike,
+    ...(image
+      ? [
+          {
+            id: "similar",
+            label: "Similar",
+            icon: icons.similar,
+            onClick: () => {
+              onApplied();
+              navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
+            },
+          },
+        ]
+      : []),
+  ];
   const actions = [
     retry,
     (image || video) &&
@@ -585,8 +606,8 @@ export function useMediaActions(
             : [],
         }),
       }),
-    // Recreate runs the item again from here, compares it or makes more of its set, then opens it
-    // in the composer. An upload has only its suggested prompt; unfinished work opens its prompt.
+    // Recreate runs the item again from here or compares it, then opens it in the composer. An
+    // upload has only its suggested prompt; unfinished work opens its prompt.
     itemAction("recreate", {
       disabled: !ready && action.isPending,
       loading: running === "regenerate" || running === "repeat" || variants.isPending,
@@ -610,7 +631,6 @@ export function useMediaActions(
                   },
                 ],
             [
-              ...moreLike,
               ...(image && comparison
                 ? [
                     {
@@ -644,6 +664,19 @@ export function useMediaActions(
         : undefined,
     }),
     upscale,
+    // The viewer prompt's assistance, then discovery from this item.
+    (assist || discovery.length > 0) &&
+      itemAction("ai", {
+        onOpen: assist?.onOpen,
+        menu: assistMenu({
+          loading: assistant.isPending,
+          settings: assist?.settings,
+          suggestions: assist?.suggestions,
+          templates: assist?.templates ?? [],
+          custom: assist?.custom,
+          last: discovery,
+        }),
+      }),
     ready &&
       itemAction("like", {
         pressed: item.rating === "liked",
@@ -724,14 +757,6 @@ export function useMediaActions(
         ],
       ],
     }),
-    // The gallery ranked by likeness to this image (GalleryPage reads `similar`).
-    image &&
-      itemAction("similar", {
-        onClick: () => {
-          onApplied();
-          navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
-        },
-      }),
     itemAction("delete", { onClick: onDelete }),
   ];
   return itemActionGroups(

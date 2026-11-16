@@ -628,9 +628,7 @@ test("The strip shows iterations of iterations as a tree, newest first and the o
   await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
 
-test("Recreate › More Like This Set asks for new variations of a result's set", async ({
-  page,
-}) => {
+test("AI › More Like This Set asks for new variations of a result's set", async ({ page }) => {
   const asked: unknown[] = [];
   await seed(page, { resultSet: { id: "set-a", title: "Variety Test", index: 0 } }, (page) =>
     page.route("**/api/result-sets/more", (route) => {
@@ -638,11 +636,11 @@ test("Recreate › More Like This Set asks for new variations of a result's set"
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "Recreate", "More Like This Set");
+  await viewerAction(page, "AI", "More Like This Set");
   await expect.poll(() => asked).toEqual([{ itemId: "hub", scope: "set" }]);
 });
 
-test("Recreate › More Like This explicitly selects only the current image", async ({ page }) => {
+test("AI › More Like This explicitly selects only the current image", async ({ page }) => {
   const asked: unknown[] = [];
   await seed(page, { resultSet: { id: "set-a", title: "Variety Test", index: 0 } }, (page) =>
     page.route("**/api/result-sets/more", (route) => {
@@ -650,7 +648,7 @@ test("Recreate › More Like This explicitly selects only the current image", as
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "Recreate");
+  await viewerAction(page, "AI");
   await expect(
     page.getByRole("menuitem", { name: "More Like This Set", exact: true }),
   ).toBeVisible();
@@ -660,8 +658,8 @@ test("Recreate › More Like This explicitly selects only the current image", as
 
 test("More Like This Set is offered only for a result in a set", async ({ page }) => {
   await seed(page);
-  await viewerAction(page, "Recreate");
-  await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeVisible();
+  await viewerAction(page, "AI");
+  await expect(page.getByRole("menuitem", { name: "More Like This", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
     0,
   );
@@ -1784,6 +1782,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       "Edit",
       "Recreate",
       "Upscale",
+      "AI",
       "Like",
       "Dislike",
       "Share",
@@ -2077,15 +2076,11 @@ test("The desktop viewer bar keeps its actions on one row in a narrow window", a
   await expect.poll(() => middle("Delete")).toBe(await middle("Animate"));
 });
 
-test("Phone viewer keeps Report under Edit and Similar under Recreate", async ({
-  page,
-}, testInfo) => {
+test("Phone viewer keeps Report under Edit and Similar under AI", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Phone action grouping");
   const { viewer } = await seed(page);
   const bar = viewer.getByRole("group", { name: "Generation Actions", exact: true });
-  await expect(bar.getByRole("button", { name: "AI Prompt Actions", exact: true })).toBeVisible();
   await expect(bar.getByRole("button", { name: "Report", exact: true })).toHaveCount(0);
-  await expect(bar.getByRole("button", { name: "Similar", exact: true })).toHaveCount(0);
   const edit = bar.getByRole("button", { name: "Edit", exact: true });
   await edit.click();
   await expect(page.getByRole("menuitem", { name: "Report", exact: true })).toBeVisible();
@@ -2095,7 +2090,7 @@ test("Phone viewer keeps Report under Edit and Similar under Recreate", async ({
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   await expect(report).toBeVisible();
   await report.getByRole("button", { name: "Cancel", exact: true }).click();
-  await viewerAction(page, "Recreate", "Similar");
+  await viewerAction(page, "AI", "Similar");
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/similar=hub/);
 });

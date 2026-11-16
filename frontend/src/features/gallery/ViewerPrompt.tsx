@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router";
 
 import type { Change } from "../../../../shared/suggestions";
 import type { MediaItem } from "../../types";
-import { type Action, type ActionGroups } from "../../ui/ActionBar";
+import type { Action, ActionGroups } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
@@ -12,7 +12,6 @@ import {
   ProposalLabel,
   SendButton,
   UndoButton,
-  assistMenu,
   proposalText,
   proposedClass,
   useChangeSuggestions,
@@ -25,13 +24,22 @@ import { type EditAsk, type Iteration, typedPrompt, useEditReview } from "./useM
 
 import classes from "./MediaViewer.module.css";
 
+/** The prompt's assistance, shown in the viewer bar's AI menu. */
+export interface PromptAssist {
+  onOpen: () => void;
+  settings: Action[];
+  suggestions: Action[];
+  templates: Action[];
+  custom: Action[];
+}
+
 /** A change asked for from a tile's Edit menu, which opens the viewer to ask it there. */
 export type ViewerAsk = { request: string } | { custom: true };
 
 /**
  * The viewer's prompt and its assistance. The field holds the item's prompt: editing it and
- * pressing Enter or Generate runs it with the item's settings as a new version. Suggestions asks
- * for a suggestion, template or Custom… change through `useItemChange`; tile Edit choices use
+ * pressing Enter or Generate runs it with the item's settings as a new version. The bar's AI menu
+ * asks for a suggestion, template or Custom… change through `useItemChange`; tile Edit choices use
  * the same request path. Review Prompt is off until chosen: when on, a proposal fills the field
  * until Run runs it or Undo restores what was typed; otherwise, the proposal runs at once.
  */
@@ -92,7 +100,7 @@ export function useViewerPrompt(
     pick,
     custom: () => setCustomOpen(true),
   };
-  // Capture the current draft when either menu opens, without asking on every keystroke.
+  // Capture the current draft when the AI menu opens, without asking on every keystroke.
   const [suggestionSource, setSuggestionSource] = useState<{ item: string; prompt: string }>();
   const suggestionPrompt = suggestionSource?.item === item.id ? suggestionSource.prompt : original;
   const suggestions = useChangeSuggestions({
@@ -102,45 +110,40 @@ export function useViewerPrompt(
     disabled: ask.pending,
     onPick: pick,
   });
-  const suggestionsTool: Action | null = ask.available
+  // The viewer bar's AI menu holds these ahead of the item's own (MediaActions).
+  const assist: PromptAssist | null = ask.available
     ? {
-        id: "suggestions",
-        label: "Suggestions",
-        icon: icons.assistant,
         onOpen: () => setSuggestionSource({ item: item.id, prompt: ask.typed ?? prompt }),
-        menu: assistMenu({
-          settings: [
-            {
-              id: "review",
-              label: "Review Prompt",
-              icon: icons.review,
-              checked: review,
-              keepOpen: true,
-              onClick: () => setReview(!review),
-            },
-          ],
-          suggestions: item.type === "image" ? suggestions.group : [],
-          templates: (assistant?.changes ?? []).map((change) => ({
-            id: `change:${change.id}`,
-            label: change.label,
-            icon: icons.assistant,
+        settings: [
+          {
+            id: "review",
+            label: "Review Prompt",
+            icon: icons.review,
+            checked: review,
+            keepOpen: true,
+            onClick: () => setReview(!review),
+          },
+        ],
+        suggestions: item.type === "image" ? suggestions.group : [],
+        templates: (assistant?.changes ?? []).map((change) => ({
+          id: `change:${change.id}`,
+          label: change.label,
+          icon: icons.assistant,
+          disabled: ask.pending,
+          onClick: () => pick(change.instruction),
+        })),
+        custom: [
+          {
+            id: "custom",
+            label: "Custom…",
+            icon: icons.custom,
             disabled: ask.pending,
-            onClick: () => pick(change.instruction),
-          })),
-          custom: [
-            {
-              id: "custom",
-              label: "Custom…",
-              icon: icons.custom,
-              disabled: ask.pending,
-              onClick: () => setCustomOpen(true),
-            },
-          ],
-          last: [],
-        }),
+            onClick: () => setCustomOpen(true),
+          },
+        ],
       }
     : null;
-  return { item, original, prompt, setPrompt, field, ask, custom, edit, suggestionsTool };
+  return { item, original, prompt, setPrompt, field, ask, custom, edit, assist };
 }
 
 export type ViewerPromptState = ReturnType<typeof useViewerPrompt>;
@@ -156,7 +159,7 @@ export function ViewerPrompt({
   pending?: Iteration;
 }) {
   const phone = usePhone();
-  const { item, original, prompt, setPrompt, field, ask, custom, suggestionsTool } = state;
+  const { item, original, prompt, setPrompt, field, ask, custom } = state;
   const change = ask.proposal;
   const video = item.type === "video";
   const running = pending?.kind === "prompt";
@@ -223,7 +226,7 @@ export function ViewerPrompt({
         readOnly={change?.action === "upscale"}
         onChange={setPrompt}
         onKeyDown={keys}
-        tools={suggestionsTool ? [suggestionsTool] : []}
+        tools={[]}
         copy={false}
         reset={original}
         send={send}

@@ -983,11 +983,11 @@ export async function promptMenu(scope: Page | Locator, box: string) {
   return page.getByRole("menu");
 }
 
-/** Opens the viewer's AI menu without entering its prompt editor. */
+/** Opens the viewer bar's AI menu, which holds its prompt's assistance. */
 export async function viewerPromptMenu(page: Page) {
   await page
     .getByRole("dialog", { name: "Generation", exact: true })
-    .getByRole("button", { name: "AI Prompt Actions", exact: true })
+    .getByRole("button", { name: "AI", exact: true })
     .click();
   return page.getByRole("menu");
 }
@@ -1018,7 +1018,7 @@ export async function editorMenu(scope: Page | Locator, box: string, tool: strin
  */
 export async function viewerAction(page: Page, label: string, ...options: string[]) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  const nested = ({ Report: "Edit", Similar: "Recreate" } as Record<string, string>)[label];
+  const nested = ({ Report: "Edit" } as Record<string, string>)[label];
   if (nested && (await viewer.getByRole("button", { name: label, exact: true }).count()) === 0)
     return viewerAction(page, nested, label, ...options);
   await viewer
