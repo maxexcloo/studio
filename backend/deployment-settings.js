@@ -1,3 +1,4 @@
+import { dreamDefaults, dreamSettingKeys } from "../shared/dream.ts";
 import { dataDir } from "./data-dir.js";
 import { savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
@@ -87,7 +88,11 @@ export const catalogueFlags = [
 
 /** The default profiles Settings › Generation › Defaults saves. */
 export const defaultProfileKeys = ["STUDIO_DEFAULT_IMAGE_PROFILE", "STUDIO_DEFAULT_VIDEO_PROFILE"];
-const known = new Set([...defaultProfileKeys, ...catalogueFlags.map((item) => item.key)]);
+const known = new Set([
+  ...defaultProfileKeys,
+  ...Object.values(dreamSettingKeys),
+  ...catalogueFlags.map((item) => item.key),
+]);
 
 // Keys Studio no longer saves are dropped as the document is read. Reading alone never creates a
 // database (tests import this without a data folder).
@@ -141,4 +146,33 @@ export function saveDeploymentSetting(key, value) {
 
 export function isCatalogueFlag(key) {
   return catalogueFlags.some((item) => item.key === key);
+}
+
+/** Global defaults only; Dream resolves account choices without writing inherited values back. */
+export function dreamDefaultSettings() {
+  return Object.fromEntries(
+    Object.entries(dreamDefaults).map(([name, fallback]) => {
+      const value = process.env[dreamSettingKeys[name]];
+      return [
+        name,
+        value === undefined || value === ""
+          ? fallback
+          : typeof fallback === "boolean"
+            ? value === "1"
+            : typeof fallback === "number"
+              ? Number(value)
+              : value,
+      ];
+    }),
+  );
+}
+
+export function describeDreamDefaults() {
+  const defaults = dreamDefaultSettings();
+  return Object.fromEntries(
+    Object.entries(dreamSettingKeys).map(([name, key]) => [
+      name,
+      { key, value: defaults[name], ...settingSource(key) },
+    ]),
+  );
 }

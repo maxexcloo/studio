@@ -1,5 +1,6 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 
+import type { DreamSettings } from "../../../../shared/dream";
 import { api, post } from "../../api";
 import { modelsQuery } from "../generation/GenerationProvider";
 
@@ -16,6 +17,7 @@ export interface Deployment {
     profiles: { id: string; label: string; kind: string; ready: boolean }[];
   };
   catalogue: Flag[];
+  dream: { [K in keyof DreamSettings]: Source & { key: string; value: DreamSettings[K] } };
   integrations: {
     civitai: { token: { set: boolean } };
     huggingFace: { token: { set: boolean } };
@@ -30,7 +32,7 @@ export const deploymentQuery = queryOptions({
 /** A locked setting's description ends saying so; others need no note. */
 export const lockedNote = (setting: Source) => (setting.locked ? " Set by the deployment." : "");
 
-type Change = { key: string; value: string | boolean };
+type Change = { key: string; value: string | boolean | number };
 const applied = (data: Deployment, { key, value }: Change): Deployment => {
   const setting = (entry: Setting) =>
     entry.key === key ? { ...entry, configured: String(value), source: "studio" as const } : entry;
@@ -41,6 +43,12 @@ const applied = (data: Deployment, { key, value }: Change): Deployment => {
       image: setting(data.defaults.image),
       video: setting(data.defaults.video),
     },
+    dream: Object.fromEntries(
+      Object.entries(data.dream).map(([name, entry]) => [
+        name,
+        entry.key === key ? { ...entry, value, source: "studio" } : entry,
+      ]),
+    ) as Deployment["dream"],
     catalogue: data.catalogue.map((flag) =>
       flag.key === key ? { ...flag, value: Boolean(value), source: "studio" } : flag,
     ),
@@ -62,6 +70,7 @@ export function useDeploymentSetting() {
     onSettled: () => {
       void client.invalidateQueries({ queryKey: deploymentQuery.queryKey });
       void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
+      void client.invalidateQueries({ queryKey: ["dream"] });
     },
   });
 }
