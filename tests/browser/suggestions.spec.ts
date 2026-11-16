@@ -251,6 +251,8 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
     "Refresh…",
     "Softer Shadows",
     "Custom…",
+    "More Like This",
+    "Similar",
   ]);
   await menu.getByRole("menuitem", { name: "Softer Shadows", exact: true }).click();
   await expect
