@@ -61,9 +61,18 @@ export function registerDreamRoutes(
       dream.access(owner(account)) ? run(account, input) : refused,
     );
   route("GET", "/api/dream", (account) => ({ status: 200, payload: show(owner(account)) }));
-  route("GET", "/api/dream/history", (account) => ({
+  route("GET", "/api/dream/history", (account, { query }) => ({
     status: 200,
-    payload: { items: dream.history(owner(account)) },
+    payload: {
+      items: dream
+        .history(owner(account))
+        .filter(
+          (entry) =>
+            !query?.media ||
+            (entry.item.media === query.media &&
+              (!entry.other || entry.other.media === query.media)),
+        ),
+    },
   }));
   // The header's badge: results waiting for a verdict, a comparison counting once, and whether
   // Dream is running, so the count can change.
@@ -182,7 +191,16 @@ export function registerDreamRoutes(
       1,
       Math.min(24, Number.parseInt(String(query?.limit || "12"), 10) || 12),
     );
-    return { status: 200, payload: { items: dream.calibration(owner(account), limit) } };
+    return {
+      status: 200,
+      payload: {
+        items: dream.calibration(
+          owner(account),
+          limit,
+          query?.media === "video" ? "video" : "image",
+        ),
+      },
+    };
   });
   route("POST", "/api/dream/calibration", (account, { body }) => {
     const { liked = [], passed = [] } = body || {};
@@ -207,7 +225,9 @@ export function registerDreamRoutes(
     }
   });
   route("GET", "/api/dream/discarded", (account, { query }) => {
-    const all = dream.discarded(owner(account));
+    const all = dream
+      .discarded(owner(account))
+      .filter((item) => !query?.media || item.type === query.media);
     const start = Math.max(0, Number.parseInt(String(query?.cursor || "0"), 10) || 0);
     const limit = Math.max(
       1,

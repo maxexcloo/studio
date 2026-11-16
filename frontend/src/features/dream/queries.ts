@@ -6,6 +6,8 @@ import type { DreamActivity } from "../../../../shared/taste";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
 
+export type DreamMedia = "image" | "video";
+
 /** One account's Dream settings (backend/domain/dream.ts). */
 export interface DreamSettings {
   enabled: boolean;
@@ -63,23 +65,24 @@ export const dreamCountQuery = queryOptions({
   refetchInterval: (query) => (query.state.data?.active ? 15_000 : false),
   refetchOnWindowFocus: "always",
 });
-export const discardedQuery = infiniteQueryOptions({
-  queryKey: ["dream", "discarded"],
-  queryFn: ({ pageParam }) =>
-    api<{ items: DreamItem[]; nextCursor: string }>(
-      `/api/dream/discarded?limit=40&cursor=${encodeURIComponent(pageParam)}`,
-    ),
-  initialPageParam: "",
-  getNextPageParam: (page) => page.nextCursor || undefined,
-});
+export const discardedQuery = (media: DreamMedia) =>
+  infiniteQueryOptions({
+    queryKey: ["dream", "discarded", media],
+    queryFn: ({ pageParam }) =>
+      api<{ items: DreamItem[]; nextCursor: string }>(
+        `/api/dream/discarded?media=${media}&limit=40&cursor=${encodeURIComponent(pageParam)}`,
+      ),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.nextCursor || undefined,
+  });
 /**
  * Older gallery images to calibrate the taste profile with, unjudged first. Each round is a new
  * random draw, kept apart from `["dream"]` so judging a card never reshuffles the deck.
  */
-export const calibrationQuery = (round: number) =>
+export const calibrationQuery = (round: number, media: DreamMedia) =>
   queryOptions({
-    queryKey: ["dream-calibration", round],
-    queryFn: () => api<{ items: MediaItem[] }>("/api/dream/calibration?limit=12"),
+    queryKey: ["dream-calibration", media, round],
+    queryFn: () => api<{ items: MediaItem[] }>(`/api/dream/calibration?media=${media}&limit=12`),
     staleTime: Infinity,
     // A later visit draws afresh rather than replaying images already judged.
     gcTime: 0,
@@ -132,7 +135,8 @@ export const suggestionsQuery = queryOptions({
 export const suggestionPath = (suggestion: { id: string }, action: "accept" | "dismiss") =>
   `/api/dream/suggestions/${encodeURIComponent(suggestion.id)}/${action}`;
 
-export const historyQuery = queryOptions({
-  queryKey: ["dream", "history"],
-  queryFn: () => api<{ items: DreamActivity[] }>("/api/dream/history"),
-});
+export const historyQuery = (media: DreamMedia) =>
+  queryOptions({
+    queryKey: ["dream", "history", media],
+    queryFn: () => api<{ items: DreamActivity[] }>(`/api/dream/history?media=${media}`),
+  });

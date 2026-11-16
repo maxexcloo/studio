@@ -5,6 +5,7 @@ import {
   Group,
   Menu,
   ScrollArea,
+  SegmentedControl,
   Stack,
   Text,
   Tooltip,
@@ -20,6 +21,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
+import { useRemembered } from "../auth/useRemembered";
 import { TasteProfile } from "../taste/TasteProfile";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamDeck } from "./DreamDeck";
@@ -27,7 +29,7 @@ import { DreamDigest } from "./DreamDigest";
 import { DreamHistory } from "./DreamHistory";
 import { DreamProjects } from "./DreamProjects";
 import { DreamSettingsButton, useDreamSettings } from "./DreamSettings";
-import { type Dream, dreamQuery, dreamWhen } from "./queries";
+import { type Dream, type DreamMedia, dreamQuery, dreamWhen } from "./queries";
 
 import classes from "./DreamPage.module.css";
 
@@ -91,6 +93,7 @@ const views = ["deck", "overview", "projects", "taste", "discarded", "history"] 
  */
 export function DreamPage() {
   const phone = usePhone();
+  const [media, setMedia] = useRemembered<DreamMedia>("dream-media", "image");
   const [undoTarget, setUndoTarget] = useState<HTMLDivElement | null>(null);
   const client = useQueryClient();
   const dream = useQuery(dreamQuery);
@@ -116,6 +119,24 @@ export function DreamPage() {
     history: "History",
   };
   const data = dream.data;
+  const groups = (data?.digest ?? [])
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.type === media),
+      misses: group.misses.filter((item) => item.type === media),
+    }))
+    .filter((group) => group.items.length || group.misses.length);
+  const selector = ["deck", "overview", "discarded", "history"].includes(view) && (
+    <SegmentedControl
+      aria-label="Dream Media"
+      value={media}
+      onChange={(value) => setMedia(value as DreamMedia)}
+      data={[
+        { value: "image", label: "Images" },
+        { value: "video", label: "Videos" },
+      ]}
+    />
+  );
   return (
     <div className={classes.page}>
       <Group className={classes.toolbar} gap="sm" wrap="nowrap">
@@ -147,6 +168,7 @@ export function DreamPage() {
             ))}
           </Menu.Dropdown>
         </Menu>
+        {!phone && selector}
         <div ref={setUndoTarget} style={{ display: "contents" }} />
         <Group gap={4} wrap="nowrap" ml="auto">
           {data?.settings.enabled && (
@@ -165,15 +187,16 @@ export function DreamPage() {
           {data && <DreamSettingsButton dream={data} />}
         </Group>
       </Group>
+      {phone && selector}
       {data?.reason && (
         <Text size="sm" c="dimmed" ta="center" role="status" aria-label="Dream Status">
           {data.status === "unavailable" ? `Can't Run: ${data.reason}` : data.reason}
         </Text>
       )}
       {view === "discarded" ? (
-        <DiscardedDreams />
+        <DiscardedDreams key={media} media={media} />
       ) : view === "history" ? (
-        <DreamHistory />
+        <DreamHistory media={media} />
       ) : view === "projects" ? (
         <DreamProjects />
       ) : view === "taste" ? (
@@ -198,14 +221,16 @@ export function DreamPage() {
           {dream.error.message}
         </Alert>
       ) : view === "overview" ? (
-        data!.digest.length ? (
-          <DreamDigest groups={data!.digest} since={data!.since} />
+        groups.length ? (
+          <DreamDigest key={media} groups={groups} since={data!.since} />
         ) : (
           <Empty dream={data!} />
         )
       ) : (
         <DreamDeck
-          items={data!.settings.enabled ? data!.unseen : []}
+          key={media}
+          media={media}
+          items={data!.settings.enabled ? data!.unseen.filter((item) => item.type === media) : []}
           pairsOnly={!data!.settings.enabled}
           undoTarget={undoTarget}
           empty={<Empty dream={data!} />}
