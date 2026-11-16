@@ -97,3 +97,27 @@ test("a cold Radiance profile retains installed LoRAs and catalogue triggers wit
     /no LoRA inventory/,
   );
 });
+
+test("explicit LoKr deferral survives catalogue metadata and rejects enabled stacks without disabling plain adapters", async () => {
+  const { optionalLoraPolicyIssue } = await import("./lora/catalogue.js");
+  const file = "snofs_krea_v1_6.safetensors";
+  const reason = "Deferred pending exact LoKr path verification";
+  loraCatalogue().edit(`loras/${file}`, { families: ["krea2"], unavailableReason: reason });
+  const info = (await loraInfos("radiance", [file]))[file];
+  assert.equal(info.unavailableReason, reason);
+  for (const backend of ["comfyui", "radiance"])
+    assert.match(
+      optionalLoraPolicyIssue({ name: file, strength: 1 }, info, { family: "krea2", backend }),
+      /Deferred pending exact LoKr/,
+    );
+  assert.equal(
+    optionalLoraPolicyIssue(
+      { name: "plain", strength: 1 },
+      { families: ["krea2"] },
+      { family: "krea2" },
+    ),
+    "",
+  );
+  loraCatalogue().edit(`loras/${file}`, { unavailableReason: null });
+  assert.equal((await loraInfos("radiance", [file]))[file].unavailableReason, undefined);
+});

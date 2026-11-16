@@ -56,6 +56,7 @@ import { StrengthControl } from "./StrengthControl";
 import classes from "./LoraPicker.module.css";
 export interface LoraInfo {
   title?: string;
+  unavailableReason?: string;
   sourceUrl?: string;
   families?: string[];
   type?: string;
@@ -97,7 +98,8 @@ const fitsFamily = (families: string[], family: string) =>
 /** The profile's LoRAs that submitting accepts. */
 export const compatibleLoras = (profile: Profile | undefined, metadata: Record<string, LoraInfo>) =>
   (profile?.options?.loras || []).filter(
-    (file) => loraCompatibility(metadata[file], profile) !== "other",
+    (file) =>
+      loraCompatibility(metadata[file], profile) !== "other" && !metadata[file]?.unavailableReason,
   );
 
 const ratingOrder = (rating?: Rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);
@@ -396,6 +398,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
           label={title(file)}
           title={title(file)}
           detail={
+            metadata[file]?.unavailableReason ||
             [
               familiesOf(file)
                 .map((key) => modelFamilyLabel(key))
@@ -403,10 +406,12 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
               typeNames[typeOf(file)] || typeOf(file),
             ]
               .filter(Boolean)
-              .join(" · ") || undefined
+              .join(" · ") ||
+            undefined
           }
           image={previews.data?.previews[file]}
           placeholder={icons.loras}
+          disabled={Boolean(metadata[file]?.unavailableReason) && !selected.has(file)}
           selected={selected.has(file)}
           row
           onToggle={() => toggle(file)}
@@ -619,6 +624,7 @@ function LoraStack(props: LoraPickerProps) {
                   title={title(lora.name)}
                   info={metadata[lora.name]}
                   compatible={compatible.includes(lora.name)}
+                  unavailable={metadata[lora.name]?.unavailableReason}
                   onChange={(patch) =>
                     update(
                       input.loras.map((item) =>
@@ -642,6 +648,7 @@ function StackEntry({
   title,
   info,
   compatible,
+  unavailable,
   onChange,
   onRemove,
 }: {
@@ -649,6 +656,7 @@ function StackEntry({
   title: string;
   info?: LoraInfo;
   compatible: boolean;
+  unavailable?: string;
   onChange: (patch: Partial<Lora>) => void;
   onRemove: () => void;
 }) {
@@ -702,7 +710,7 @@ function StackEntry({
         )}
         {!compatible && (
           <Text size="xs" c="yellow">
-            This profile can't use this LoRA. Disable or remove it.
+            {unavailable || "This profile can't use this LoRA. Disable or remove it."}
           </Text>
         )}
         {info?.sourceUrl && (

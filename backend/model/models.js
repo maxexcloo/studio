@@ -10,7 +10,7 @@ import {
 import { families } from "../family-catalogue.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
 import { canonicalProfileId } from "../profile/store.js";
-import { radianceImageNode } from "../providers/radiance.ts";
+import { radianceImageLimits, radianceImageNode } from "../providers/radiance.ts";
 import { classifyModel } from "./families.js";
 
 function modelBasename(name = "") {
@@ -316,6 +316,11 @@ export function inferModels(
           familyStep,
         )
       : {};
+    if (Object.values(workflow.graph || {}).some((node) => node.class_type === radianceImageNode)) {
+      const { maxSide } = radianceImageLimits(String(defaults.model || ""));
+      widthRange.max = Math.min(widthRange.max ?? maxSide, maxSide);
+      heightRange.max = Math.min(heightRange.max ?? maxSide, maxSide);
+    }
     const countRange = controls.count
       ? nodeRange(info, workflow.graph?.[controls.count.node]?.class_type, controls.count.input, {
           default: Number(defaults.count || 1),
@@ -461,13 +466,11 @@ export function inferModels(
       backend: workflow.backend,
       // Radiance composes the stack into a rank-limited adapter.
       ...(workflow.kind === "video" && workflow.loraStack?.adapter === "radiance-tags-v1"
-
         ? {
             loraNote:
               "Radiance approximates combined LoRAs above rank 64. Use ComfyUI for exact application.",
           }
         : {}),
-
     });
     const reason = configuredOnly ? "" : unready(workflow);
     if (reason)
