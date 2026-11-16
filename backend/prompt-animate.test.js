@@ -32,8 +32,8 @@ test("each profile shape gets its guide's format, with sound for H3 and Grok", (
     assert.ok(system.includes(guide.mode.rules[0]), profile.id);
     assert.match(system, /makes sound with the picture/, profile.id);
     assert.match(system, /only 8 seconds long: write for exactly that time/, profile.id);
-    assert.match(system, /awake and able to speak, give them a short spoken line/, profile.id);
-    assert.match(system, /speech to about 20 words/, profile.id);
+    assert.match(system, /Preserve requested dialogue/, profile.id);
+    assert.match(system, /speech to at most about 20 words/, profile.id);
   }
   const silent = animateInstructions({
     profile: { id: "video:wan", family: "wan22" },
@@ -46,8 +46,8 @@ test("each profile shape gets its guide's format, with sound for H3 and Grok", (
   assert.match(silent, /At 16 fps fast motion judders/);
   assert.match(silent, /never add subjects or objects/);
   assert.match(silent, /Don't make it any more sexual/);
-  assert.match(silent, /Let the light or mood shift/);
-  assert.match(silent, /Animate what that prompt was going for/);
+  assert.match(silent, /Keep the source lighting and mood consistent/);
+  assert.match(silent, /Where it and the frame disagree, the frame wins/);
   const extend = animateInstructions({ ...shapes.grok, writing: { ...writing, extend: true } });
   assert.match(extend, /Don't replay its action: escalate it or turn it/);
   assert.match(extend, /two or three beats/);
@@ -66,6 +66,45 @@ test("each theme asks for its own motion and camera", () => {
   assert.match(theme("custom"), /instruction decides what happens.*with what is in the frame/);
 });
 
+test("quiet source motion and explicit dialogue keep their own scope within a short clip", async () => {
+  const requests = [];
+  const instruction =
+    'Track her step towards her friend, then she says "Ready?" and waits for his nod.';
+  for (const writing of [
+    { theme: "living", source: "A person holding a cup by a window" },
+    { theme: "dialogue", source: "Two people beside a window" },
+    { theme: "custom", source: "Two people beside a window", instruction },
+    { theme: "action", source: "A skater poised at a ramp" },
+  ]) {
+    await writeAnimatePrompt({
+      engine: {
+        ...engine,
+        chat: async (request) => {
+          requests.push(request.messages);
+          return { text: "A motion prompt." };
+        },
+      },
+      ...shapes.grok,
+      writing,
+      clip: { seconds: 5 },
+    });
+  }
+  for (const [system] of requests) {
+    assert.match(system.content, /one achievable sequence/);
+    assert.match(system.content, /A held pose or quiet reaction can be a beat/);
+    assert.match(system.content, /or a static camera where that best serves/);
+    assert.match(system.content, /without making every person speak/);
+    assert.match(system.content, /Assign each line to one established speaker/);
+    assert.match(system.content, /shortening it for physical action and pauses/);
+    assert.match(system.content, /only 5 seconds long/);
+  }
+  assert.match(requests[0][0].content, /No big action or new events/);
+  assert.match(requests[1][0].content, /one or two short spoken lines/);
+  assert.match(requests[2][0].content, /Preserve requested filmmaking and camera moves/);
+  assert.ok(requests[2][1].content.includes(`Instruction: ${instruction}`));
+  assert.match(requests[3][0].content, /energetic action that this frame sets up/);
+});
+
 test("the beats and their pacing scale with the clip's length", () => {
   const pace = (seconds) =>
     animateInstructions({ ...shapes.grok, writing: { theme: "action" }, clip: { seconds } });
@@ -75,7 +114,7 @@ test("the beats and their pacing scale with the clip's length", () => {
   assert.match(pace(10), /three beats of about 3\.3 seconds each/);
   assert.match(pace(10), /land by about 6 seconds/);
   assert.match(pace(10), /needs more than 10 seconds/);
-  assert.match(pace(10), /one main action/);
+  assert.match(pace(10), /same main action or its reaction/);
 });
 
 test("the clip's length and frame rate come from the control the profile runs on", () => {
