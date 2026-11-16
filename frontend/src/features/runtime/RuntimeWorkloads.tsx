@@ -178,7 +178,11 @@ function OperationLog({
                     <Text size="sm" c="dimmed">
                       {changeSummary(entry, change, who)}
                     </Text>
-                    <LogText text={logText(entry)} empty="No steps recorded." label="Steps" />
+                    <LogText
+                      text={logText(entry)}
+                      empty="No steps recorded."
+                      label="Change Steps"
+                    />
                   </Stack>
                 ),
               },
