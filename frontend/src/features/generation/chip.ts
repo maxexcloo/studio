@@ -12,9 +12,9 @@ export const chipProps = {
   className: classes.chip,
   classNames: { section: classes.chipSection },
   // A tapped combobox chip is focused by Mantine without preventScroll, which jumps an iOS page;
-  // focusing it first without scrolling makes that call a no-op.
+  // focusing it first without scrolling makes that call a no-op. A pointer shows no focus ring.
   onPointerDown: (event: PointerEvent<HTMLElement>) =>
-    event.currentTarget.focus({ preventScroll: true }),
+    event.currentTarget.focus({ preventScroll: true, focusVisible: false }),
 } as const;
 
 /** A chip that shows only its icon; callers give it an accessible name and a tooltip. */
