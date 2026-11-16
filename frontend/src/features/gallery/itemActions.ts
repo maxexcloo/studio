@@ -46,6 +46,12 @@ export const itemActionGroups = (actions: (Action | null | false | undefined)[])
     ids.flatMap((id) => actions.filter((action): action is Action => !!action && action.id === id)),
   );
 
+/** Context menus list Share's options in its place, beside AI, rather than as a submenu. */
+export const contextMenuActions = (groups: ActionGroups): ActionGroups =>
+  groups.map((group) =>
+    group.flatMap((action) => (action.id === "share" && action.menu ? action.menu.flat() : action)),
+  );
+
 /** Phone viewers keep correction under Edit. */
 export function compactViewerActions(groups: ActionGroups): ActionGroups {
   const actions = groups.flat();

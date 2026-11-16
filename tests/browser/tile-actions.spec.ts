@@ -138,8 +138,8 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // Select, then the bar's order: Animate, Edit, Recreate, Upscale | AI, Share | Like, Dislike |
-  // Report, Delete.
+  // Select, then the bar's order with Share's options in its place: Animate, Edit, Recreate,
+  // Upscale | AI, Copy Details, Copy Prompt, Download | Like, Dislike | Report, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Select",
     "Animate",
@@ -147,7 +147,9 @@ test("The same tile menu opens by context click and More, with keyboard navigati
     "Recreate",
     "Upscale",
     "AI",
-    "Share",
+    "Copy Details",
+    "Copy Prompt",
+    "Download",
     "Like",
     "Dislike",
     "Report",
@@ -438,8 +440,8 @@ test("On a phone held sideways, the tile menu fits the screen and expands option
     return box.y + box.height;
   };
   await expect.poll(bottom).toBeLessThanOrEqual(390);
-  await page.getByRole("menuitem", { name: "Share", exact: true }).click();
-  await expect(page.getByRole("group", { name: "Share", exact: true })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  await expect(page.getByRole("group", { name: "Recreate", exact: true })).toBeVisible();
   // Delete, last, is reachable by scrolling inside the menu.
   const remove = page.getByRole("menuitem", { name: "Delete", exact: true });
   await remove.scrollIntoViewIfNeeded();

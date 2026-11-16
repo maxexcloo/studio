@@ -53,7 +53,7 @@ import {
 } from "../taste/suggestions";
 import { AnimateDialog } from "./AnimateDialog";
 import { videoExport } from "./download";
-import { itemAction, itemActionGroups } from "./itemActions";
+import { contextMenuActions, itemAction, itemActionGroups } from "./itemActions";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
 import { galleryKey } from "./queries";
@@ -805,7 +805,7 @@ export function MediaActionMenu({
   onSelect,
   ...options
 }: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
-  const groups = useMediaActions(item, options);
+  const groups = contextMenuActions(useMediaActions(item, options));
   return (
     <ActionMenuItems
       groups={
