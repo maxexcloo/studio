@@ -1547,10 +1547,16 @@ test("Returning after more than a page of incoming results leaves no gap before 
   const original = results(10);
   let incoming: typeof original = [];
   const cursors: string[] = [];
-  await page.route("**/api/gallery?**", (route) => {
+  let release!: () => void;
+  const initialRefresh = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/gallery?**", async (route) => {
     const cursor = new URL(route.request().url()).searchParams.get("cursor") || "";
     cursors.push(cursor);
     const matches = [...incoming, ...original];
+    // Return while the startup head refresh still holds the old results.
+    if (cursors.length === 2) await initialRefresh;
     const start = Number(cursor);
     return route.fulfill({
       json: {
@@ -1564,6 +1570,7 @@ test("Returning after more than a page of incoming results leaves no gap before 
   await page.goto("/images?item=browse-0");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
+  await expect.poll(() => cursors.length).toBe(2);
   const visibility = (hidden: boolean) =>
     page.evaluate((hidden) => {
       Object.defineProperty(document, "visibilityState", {
@@ -1580,7 +1587,11 @@ test("Returning after more than a page of incoming results leaves no gap before 
     prompt: `Away ${index}`,
   }));
   const previousReads = cursors.length;
-  await visibility(false);
+  try {
+    await visibility(false);
+  } finally {
+    release();
+  }
   await expect.poll(() => cursors.length).toBe(previousReads + 2);
   await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
   expect(cursors.slice(previousReads)).toEqual(["", "60"]);
@@ -1589,6 +1600,9 @@ test("Returning after more than a page of incoming results leaves no gap before 
   await page.keyboard.press("ArrowRight");
   await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+  ).toBeFocused();
   await page
     .locator("[data-gallery-view]")
     .evaluate((host) =>

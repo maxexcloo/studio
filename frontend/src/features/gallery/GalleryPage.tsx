@@ -152,8 +152,12 @@ export function GalleryPage() {
   });
   // Query ownership deduplicates overlapping signals and cancels reads on account changes or
   // optimistic media mutations. Refreshes keep loaded pages and their continuation cursors.
+  const refreshKey = useMemo(
+    () => [...galleryKey, "refresh", ...listingKey.slice(1)],
+    [listingKey],
+  );
   const refresh = useQuery({
-    queryKey: [...galleryKey, "refresh", ...listingKey.slice(1)],
+    queryKey: refreshKey,
     enabled: false,
     retry: false,
     queryFn: async ({ signal }) => {
@@ -199,23 +203,36 @@ export function GalleryPage() {
   const { refetch: readFirst } = refresh;
   const pendingFirst = useRef<typeof listingKey | null>(null);
   const refreshFirst = useCallback(() => {
-    if (client.isFetching({ queryKey: listingKey, exact: true })) {
+    if (
+      client.isFetching({ queryKey: listingKey, exact: true }) ||
+      client.isFetching({ queryKey: refreshKey, exact: true })
+    ) {
       pendingFirst.current = listingKey;
       return;
     }
     pendingFirst.current = null;
     if (client.getQueryData(listingKey)) void readFirst({ cancelRefetch: false });
-  }, [client, listingKey, readFirst]);
+  }, [client, listingKey, readFirst, refreshKey]);
   useEffect(
     () => () => {
       pendingFirst.current = null;
     },
     [listingKey],
   );
-  // A final job can finish during pagination: once it settles there may be no active poll left.
+  // A return or final completion during a read still needs a fresh head once that read settles.
   useEffect(() => {
-    if (!gallery.isFetching && pendingFirst.current === listingKey) refreshFirst();
-  }, [gallery.isFetching, gallery.dataUpdatedAt, gallery.errorUpdatedAt, listingKey, refreshFirst]);
+    if (!gallery.isFetching && !refresh.isFetching && pendingFirst.current === listingKey)
+      refreshFirst();
+  }, [
+    gallery.isFetching,
+    gallery.dataUpdatedAt,
+    gallery.errorUpdatedAt,
+    listingKey,
+    refresh.isFetching,
+    refresh.dataUpdatedAt,
+    refresh.errorUpdatedAt,
+    refreshFirst,
+  ]);
   // Active work's tiles are the newest, on the first page: only it polls, for live previews.
   // Starting or finishing work uses the same first-page read, never a full pagination refetch.
   useEffect(() => {
