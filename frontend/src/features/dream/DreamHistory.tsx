@@ -47,7 +47,15 @@ export function DreamHistory({ media }: { media: DreamMedia }) {
         loading={history.isPending && "Loading History"}
         empty="No Retained Activity"
         columns={[
-          { key: "action", header: "Action", cell: (item) => <Text size="sm">{item.action}</Text> },
+          {
+            key: "action",
+            header: "Action",
+            cell: (item) => (
+              <Text size="sm" style={{ whiteSpace: "nowrap" }}>
+                {item.action}
+              </Text>
+            ),
+          },
           {
             key: "result",
             header: "Result",
@@ -73,7 +81,7 @@ export function DreamHistory({ media }: { media: DreamMedia }) {
             key: "at",
             header: "Time",
             cell: (item) => (
-              <Text size="xs" c="dimmed">
+              <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
                 {formatDateTime(item.at)}
               </Text>
             ),
