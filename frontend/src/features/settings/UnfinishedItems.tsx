@@ -1,4 +1,4 @@
-import { Badge, Button, Menu, Modal, Stack, Text } from "@mantine/core";
+import { ActionIcon, Badge, Button, Group, Menu, Modal, Stack, Text, Tooltip } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ListRestart } from "lucide-react";
 import { useState } from "react";
@@ -10,8 +10,9 @@ import { DataTable } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
-import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import { ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingRow } from "../../ui/SettingRows";
+import { usePhone } from "../../ui/usePhone";
 import { useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
 import { queueQuery, statusLabels } from "../generation/Queue";
@@ -46,6 +47,7 @@ type Bulk = keyof typeof bulk;
  */
 export function UnfinishedItems() {
   const client = useQueryClient();
+  const phone = usePhone();
   const [opened, setOpened] = useState(false);
   const [deleting, setDeleting] = useState<UnfinishedJob | null>(null);
   const [confirming, setConfirming] = useState<Exclude<Bulk, "retry-all">>();
@@ -96,98 +98,118 @@ export function UnfinishedItems() {
       >
         Review
       </Button>
-      <Modal
+      <Modal.Root
         id="unfinished"
         opened={opened}
         onClose={closeWhenTop("unfinished", () => setOpened(false))}
-        title="Unfinished Items"
         size="xl"
       >
-        {jobs.length > 0 && (
-          <SectionToolbar
-            label="Unfinished Items"
-            actions={(Object.keys(bulk) as Bulk[]).map((key) => (
-              <ToolbarAction
-                key={key}
-                label={bulk[key].label}
-                icon={bulk[key].icon}
-                variant="subtle"
-                color={key === "delete-all" ? "red" : "gray"}
-                loading={key === "retry-all" && actAll.isPending}
-                disabled={actAll.isPending}
-                onClick={() => (key === "retry-all" ? actAll.mutate(key) : setConfirming(key))}
-              />
-            ))}
-          />
-        )}
-        <DataTable
-          label="Unfinished Items"
-          rows={jobs}
-          rowKey={(job) => `${job.ownerId}/${job.id}`}
-          rowName={title}
-          loading={unfinished.isPending && "Loading Unfinished Items"}
-          empty="No Unfinished Items"
-          columns={[
-            {
-              key: "item",
-              header: "Item",
-              main: true,
-              sortValue: title,
-              cell: (job) => (
-                <Stack gap={0} miw={0}>
-                  <Text size="sm" truncate>
-                    {title(job)}
-                  </Text>
-                  <Text size="xs" c="dimmed" truncate>
-                    {[job.dream && "Dream", job.reason, multiUser && ownerName(job)]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </Text>
-                </Stack>
-              ),
-            },
-            {
-              key: "status",
-              header: "Status",
-              sortValue: (job) => statusLabels[job.status],
-              cell: (job) => (
-                <Badge color="gray" miw="max-content">
-                  {statusLabels[job.status]}
-                </Badge>
-              ),
-            },
-            {
-              key: "updated",
-              header: "Updated",
-              hideOnPhone: true,
-              sortValue: (job) => job.updatedAt,
-              cell: (job) => (
-                <Text size="xs" style={{ whiteSpace: "nowrap" }}>
-                  {formatDateTime(job.updatedAt)}
-                </Text>
-              ),
-            },
-          ]}
-          rowActions={(job) => (
-            <>
-              <Menu.Item
-                leftSection={<icons.retry size={16} />}
-                onClick={() => act.mutate({ action: "retry", job })}
-              >
-                Retry
-              </Menu.Item>
-              <Menu.Divider />
-              <Menu.Item
-                leftSection={<icons.clear size={16} />}
-                color="red"
-                onClick={() => setDeleting(job)}
-              >
-                Clear
-              </Menu.Item>
-            </>
-          )}
-        />
-      </Modal>
+        <Modal.Overlay />
+        <Modal.Content>
+          {/* The list's bulk actions sit in its heading, beside Close. */}
+          <Modal.Header>
+            <Modal.Title>Unfinished Items</Modal.Title>
+            <Group gap={4} wrap="nowrap" ml="auto" mr="xs">
+              {jobs.length > 0 &&
+                (Object.keys(bulk) as Bulk[]).map((key) => {
+                  const shared = {
+                    variant: "subtle",
+                    color: key === "delete-all" ? "red" : "gray",
+                    loading: key === "retry-all" && actAll.isPending,
+                    disabled: actAll.isPending,
+                    onClick: () => (key === "retry-all" ? actAll.mutate(key) : setConfirming(key)),
+                  } as const;
+                  const Icon = bulk[key].icon;
+                  // Phones keep the heading to one row with icons alone.
+                  return phone ? (
+                    <Tooltip key={key} label={bulk[key].label}>
+                      <ActionIcon aria-label={bulk[key].label} {...shared}>
+                        <Icon size={18} />
+                      </ActionIcon>
+                    </Tooltip>
+                  ) : (
+                    <ToolbarAction
+                      key={key}
+                      label={bulk[key].label}
+                      icon={bulk[key].icon}
+                      {...shared}
+                    />
+                  );
+                })}
+            </Group>
+            <Modal.CloseButton />
+          </Modal.Header>
+          <Modal.Body>
+            <DataTable
+              label="Unfinished Items"
+              rows={jobs}
+              rowKey={(job) => `${job.ownerId}/${job.id}`}
+              rowName={title}
+              loading={unfinished.isPending && "Loading Unfinished Items"}
+              empty="No Unfinished Items"
+              columns={[
+                {
+                  key: "item",
+                  header: "Item",
+                  main: true,
+                  sortValue: title,
+                  cell: (job) => (
+                    <Stack gap={0} miw={0}>
+                      <Text size="sm" truncate>
+                        {title(job)}
+                      </Text>
+                      <Text size="xs" c="dimmed" truncate>
+                        {[job.dream && "Dream", job.reason, multiUser && ownerName(job)]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </Text>
+                    </Stack>
+                  ),
+                },
+                {
+                  key: "status",
+                  header: "Status",
+                  sortValue: (job) => statusLabels[job.status],
+                  cell: (job) => (
+                    <Badge color="gray" miw="max-content">
+                      {statusLabels[job.status]}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: "updated",
+                  header: "Updated",
+                  hideOnPhone: true,
+                  sortValue: (job) => job.updatedAt,
+                  cell: (job) => (
+                    <Text size="xs" style={{ whiteSpace: "nowrap" }}>
+                      {formatDateTime(job.updatedAt)}
+                    </Text>
+                  ),
+                },
+              ]}
+              rowActions={(job) => (
+                <>
+                  <Menu.Item
+                    leftSection={<icons.retry size={16} />}
+                    onClick={() => act.mutate({ action: "retry", job })}
+                  >
+                    Retry
+                  </Menu.Item>
+                  <Menu.Divider />
+                  <Menu.Item
+                    leftSection={<icons.clear size={16} />}
+                    color="red"
+                    onClick={() => setDeleting(job)}
+                  >
+                    Clear
+                  </Menu.Item>
+                </>
+              )}
+            />
+          </Modal.Body>
+        </Modal.Content>
+      </Modal.Root>
       <ConfirmDialog
         opened={Boolean(deleting)}
         title="Clear Unfinished Item"

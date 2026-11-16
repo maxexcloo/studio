@@ -52,15 +52,18 @@
     color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
-/* Phone item actions stay together; verdict bars opt into equal widths below. */
+/* Phone item actions spread over a bounded, centred width, clear of the edges; verdict bars opt
+   into equal widths below. */
 .actions[data-stacked] {
   width: 100%;
-  justify-content: center;
+  max-width: 20rem;
+  margin-inline: auto;
+  justify-content: space-between;
   gap: 0;
 }
 
 .actions[data-stacked] .divider {
-  margin-inline: 0;
+  margin-inline: 2px;
 }
 
 /* Narrow sides leave room for touch screens' wider minimum targets. */
@@ -90,7 +93,7 @@
 /* A phone bar's unnamed controls are narrow, keeping their touch height, so every action and the
    leading names fit one row; the theme's touch minimum width is an inline style. */
 .actions[data-stacked] .action:not(.stacked) {
-  width: 28px;
+  width: 32px;
   min-width: 0 !important;
   padding-inline: 0;
 }

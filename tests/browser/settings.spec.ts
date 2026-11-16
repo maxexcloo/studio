@@ -627,7 +627,9 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
     .click();
   await page.getByRole("menuitem", { name: "View Log", exact: true }).click();
   const log = page.getByRole("dialog", { name: "Runtime Log", exact: true });
-  await expect(log.getByLabel("Steps", { exact: true })).toContainText(/Stopping Text\.\n.*Done\./);
+  await expect(log.getByLabel("Change Steps", { exact: true })).toContainText(
+    /Stopping Text\.\n.*Done\./,
+  );
   await page.keyboard.press("Escape");
   await expect(log).toBeHidden();
   await expect(page.getByRole("dialog", { name: /^Settings/ })).toBeVisible();
@@ -847,7 +849,7 @@ test("Workers benchmark a running local text model and list each run's figures",
     await expect(results.getByRole("row", { name: "Gemma" })).toContainText("290 tok/s · 8×");
   await expect(results.getByRole("row", { name: "Gemma" })).toContainText("Completed");
   await expect(results.getByRole("row", { name: "Gemma" })).toContainText(
-    "Requested by account:admin",
+    "Requested by admin@example.test",
   );
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
   const menu = async (label: string) => {
