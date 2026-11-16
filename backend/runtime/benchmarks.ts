@@ -1,6 +1,11 @@
 import { randomBytes } from "node:crypto";
 
-import type { BenchmarkRun, BenchmarkStatus, BenchmarkSummary } from "../../shared/runtime.ts";
+import type {
+  BenchmarkRun,
+  BenchmarkStatus,
+  BenchmarkSummary,
+  RuntimePodLog,
+} from "../../shared/runtime.ts";
 import {
   RuntimeConflict,
   RuntimeRequestError,
@@ -8,7 +13,7 @@ import {
   type Workload,
   memoryStore,
 } from "./controller.ts";
-import type { KubernetesRequest } from "./kubernetes.ts";
+import { KubernetesEngine, type KubernetesRequest } from "./kubernetes.ts";
 
 type Environment = Record<string, string | undefined>;
 interface BenchmarkStore {
@@ -331,6 +336,16 @@ export class Benchmarks {
           "BetterBench gave no result.",
       ),
     });
+  }
+
+  /** The last `lines` of the run's Job pod, as Settings › Workers shows a workload's. */
+  async logs(id: string, lines: number): Promise<{ pods: RuntimePodLog[] }> {
+    const run = this.runs.find((item) => item.id === id);
+    if (!run) throw new RuntimeConflict("That benchmark is gone.");
+    const workload = this.options.workloads.find((item) => item.id === run.workload);
+    if (!workload) return { pods: [] };
+    const engine = new KubernetesEngine(this.options.request);
+    return { pods: await engine.jobLogs(workload.namespace, this.jobFor(run)!.name, lines) };
   }
 
   /** The Job's pod log tail, whose last line is the summary, and whether it ran out of memory. */

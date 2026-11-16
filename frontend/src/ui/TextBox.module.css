@@ -164,7 +164,8 @@
   gap: 6px;
 }
 
-:global([data-phone]) .columned:has(.tools) {
+/* A phone box with several tools puts them under its text; a lone one stays beside it. */
+:global([data-phone]) .columned:has(.tools > :nth-child(2)) {
   flex-direction: column;
 }
 
