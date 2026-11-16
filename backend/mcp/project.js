@@ -266,7 +266,7 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
         : {}),
       ...(Object.keys(change).length || taste
         ? {
-            note: "Tell the user it holds for every chat; Settings › Preferences and Dream › Taste edit it.",
+            note: "Tell the user it holds for every chat; Library › Chat Brief and Dream › Taste edit it.",
           }
         : {}),
     });
@@ -275,7 +275,7 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
     server,
     "project",
     "project",
-    `The chat's project and constraints. show lists projects and the user's brief; attach (project), create, update (only changes) or detach. brief saves lasting rules for all chats ("" clears); avoid, profiles, lora_names set taste Dislikes and favourites.`,
+    `The chat's project and constraints. show lists projects and the user's brief; attach (project), create, update (only changes) or detach. brief saves lasting rules for all chats ("" clears) and taste (avoid, profiles, lora_names).`,
     {
       action: z.enum(["show", "attach", "create", "update", "detach", "brief"]).optional(),
       project: z.string().optional(),
