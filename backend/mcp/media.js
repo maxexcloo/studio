@@ -336,11 +336,13 @@ export class McpMedia {
       typeof answer.payload?.error === "string"
         ? answer.payload.error.replace(/\s+/g, " ").trim().slice(0, 400)
         : "";
-    throw new Error(
-      reason
-        ? `Studio refused the request: ${reason}`
-        : `Studio refused the request (HTTP ${answer.status}). Check the selected profile and studio availability.`,
-    );
+    const fallback =
+      answer.status === 401
+        ? "Studio didn't accept this chat's connection (HTTP 401). Tell the user to reconnect Studio in the chat's MCP settings."
+        : answer.status >= 502
+          ? `Studio is restarting or unavailable (HTTP ${answer.status}). Wait a minute and try again.`
+          : `Studio refused the request (HTTP ${answer.status}).`;
+    throw new Error(reason ? `Studio refused the request: ${reason}` : fallback);
   }
   /** A route's JSON answer, the caller's own copy. */
   async request(method, route, body, owner = "", options = {}) {
