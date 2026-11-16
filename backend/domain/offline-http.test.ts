@@ -14,21 +14,15 @@ import sharp from "sharp";
 import type { QueueJob } from "../../shared/queue.ts";
 import { recordedObjectInfo } from "../fixtures/fake-comfy.js";
 import { clusterDns, fakeKubernetes, serviceUrl } from "../fixtures/fake-kubernetes.ts";
-import { closeRuntimeDatabase, writeRuntimeDocument } from "../persistence/runtime.ts";
 const { startFakeComfy } = await import(new URL("../fixtures/fake-comfy.js", import.meta.url).href);
 
 test(
-  "cold configured models queue across restart and start only their selected offline worker",
+  "cold configured models wait for their parked worker across restart and run once it is placed",
   { timeout: 30_000 },
   async () => {
     const temporary = mkdtempSync(path.join(os.tmpdir(), "studio-offline-"));
     const dataDir = path.join(temporary, "runtime");
     mkdirSync(path.join(dataDir, "workflows"), { recursive: true });
-    writeRuntimeDocument(dataDir, "runtime-operations", {
-      operations: [],
-      settings: { automatic: true, parkIdleMinutes: 0 },
-    });
-    closeRuntimeDatabase(dataDir);
     const raw = {
       studio: {
         id: "cold",
@@ -208,7 +202,7 @@ test(
       const profile = cold.profiles.find((item: any) => item.id === "custom:cold");
       assert.ok(profile);
       assert.equal(profile.ready, undefined);
-      assert.equal(profile.availability, "offline");
+      assert.equal(profile.availability, "parked");
       assert.equal(profile.defaults.width, 64);
       assert.equal(
         cold.workers.every((worker: any) => !worker.available),
@@ -293,9 +287,17 @@ test(
       );
       cookie = adminCookie;
       const accepted = await api("/api/generate", input);
-      const waiting = await waitFor(accepted.jobId, (job) => job.status === "waiting");
+      const waiting = await waitFor(
+        accepted.jobId,
+        (job) => job.status === "waiting" && /is stopped/.test(job.reason || ""),
+      );
       assert.equal(waiting.backend, "chosen");
       assert.deepEqual([waiting.input.width, waiting.input.height], [64, 64]);
+      assert.equal(starts(), 0);
+      // Work starts nothing itself; an administrator places the worker.
+      const placement = await api("/api/runtime/preview", { workloads: ["chosen"] });
+      await api("/api/runtime/apply", { workloads: ["chosen"], signature: placement.signature });
+      while (!starts()) await new Promise((resolve) => setTimeout(resolve, 50));
       await stop();
       await start();
       const restored = await waitFor(

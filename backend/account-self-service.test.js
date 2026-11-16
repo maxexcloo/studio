@@ -141,7 +141,6 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
     ["POST", "/api/assistant/cards/ideas"],
     ["POST", "/api/assistant/cards/rate"],
     ["GET", "/api/queue/job-1"],
-    ["POST", "/api/queue/job-1/swap"],
     ["POST", "/api/queue/sets/set-1/move"],
   ])
     assert.equal(ordinaryRouteAllowed(method, route), true, `${method} ${route}`);

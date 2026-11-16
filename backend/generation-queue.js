@@ -145,7 +145,7 @@ export function createGenerationQueue({
       let started = false;
       try {
         if (workloads.length && !mediaLeases.has(job.id))
-          mediaLeases.set(job.id, await runtime.controller.acquire(workloads, `job ${job.id}`));
+          mediaLeases.set(job.id, await runtime.controller.acquire(workloads));
         started = true;
         await loadComfyContext(job.backend);
       } catch (error) {
@@ -385,10 +385,5 @@ export function createGenerationQueue({
     }
     return generationRoutes.validateInput(input, account);
   }
-  /** A waiting job's deployments, for a swap; none for running work or another account's. */
-  function waitingWorkloads(ownerId, id) {
-    const job = store.job(ownerId, id);
-    return job?.status === "waiting" ? managedWorkloads(job) : [];
-  }
-  return { generationQueue, queueResourceFor, validateGenerationInput, waitingWorkloads };
+  return { generationQueue, queueResourceFor, validateGenerationInput };
 }

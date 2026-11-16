@@ -5,11 +5,8 @@ import {
   type RuntimeOperation,
   type RuntimePodLog,
   type RuntimePreview,
-  type RuntimeSettings,
   type RuntimeStatus,
-  type RuntimeSwap,
   type WorkloadPhase,
-  textHoldsGpus,
 } from "../../shared/runtime.ts";
 import type { ServiceKind } from "../../shared/services.ts";
 import type { DeploymentState } from "./kubernetes.ts";
@@ -57,7 +54,6 @@ export interface RuntimeRecord {
   /** The placement last applied in Studio; a deployment stopped outside Studio is drift from it. */
   desired?: string[];
   operations: RuntimeOperation[];
-  settings?: RuntimeSettings;
 }
 export interface RuntimeStore {
   read(): RuntimeRecord | undefined;
@@ -110,8 +106,6 @@ export class RuntimeController {
   /** Settles when the running operation finishes; for tests and shutdown. */
   settled: Promise<void> = Promise.resolve();
   private active = new Map<string, number>();
-  /** When each workload last finished or took work, for parking idle ones. */
-  private lastUsed = new Map<string, number>();
   private stopping = new Set<string>();
   private stopListeners = new Set<(id: string) => void>();
   private current?: RuntimeOperation;
@@ -164,45 +158,6 @@ export class RuntimeController {
         interrupted = true;
       }
     if (interrupted) this.save();
-  }
-
-  /** Set by an administrator in Settings › Workers; off until then. */
-  get settings(): RuntimeSettings {
-    return this.record.settings ?? { automatic: false, parkIdleMinutes: 0 };
-  }
-  get automaticLifecycle() {
-    return this.settings.automatic;
-  }
-  /** With automatic control, park a media workload after this long without work; 0 never. */
-  get parkIdleAfterMs() {
-    return this.settings.parkIdleMinutes * 60_000;
-  }
-  /** The workload to run while its pool is idle, if it is still configured. */
-  private get idleWorkload() {
-    return this.workloads.find((item) => item.id === this.settings.idleWorkload);
-  }
-  /** `idleWorkload` "" or absent is None. */
-  configure({ automatic, parkIdleMinutes, idleWorkload, everyoneSwaps }: RuntimeSettings) {
-    if (typeof automatic !== "boolean")
-      throw new RuntimeRequestError("automatic must be true or false.");
-    if (!Number.isInteger(parkIdleMinutes) || parkIdleMinutes < 0 || parkIdleMinutes > 1440)
-      throw new RuntimeRequestError("parkIdleMinutes must be a whole number from 0 to 1440.");
-    if (idleWorkload !== undefined && typeof idleWorkload !== "string")
-      throw new RuntimeRequestError("idleWorkload must be a workload id or empty.");
-    if (idleWorkload) this.workload(idleWorkload);
-    if (everyoneSwaps !== undefined && typeof everyoneSwaps !== "boolean")
-      throw new RuntimeRequestError("everyoneSwaps must be true or false.");
-    this.record.settings = {
-      automatic,
-      parkIdleMinutes,
-      ...(idleWorkload ? { idleWorkload } : {}),
-      ...(everyoneSwaps ? { everyoneSwaps } : {}),
-    };
-    // Idle time counts from the change, not from before automatic control was on.
-    this.lastUsed.clear();
-    this.parkedCache = undefined;
-    this.save();
-    return this.settings;
   }
 
   private timestamp() {
@@ -293,7 +248,6 @@ export class RuntimeController {
       if ("state" in entry && holds(entry.state))
         used[entry.workload.pool] = (used[entry.workload.pool] ?? 0) + entry.workload.gpus;
     return {
-      settings: this.settings,
       pools: Object.entries(this.pools).map(([id, capacity]) => ({
         id,
         capacity,
@@ -554,7 +508,7 @@ export class RuntimeController {
    * Admit work on the first ready candidate. Several deployments can serve one worker address (a
    * one- and a two-GPU video deployment behind one Service); the first is the one to start.
    */
-  async acquire(candidates: string | string[], work = "queued work"): Promise<RuntimeLease> {
+  async acquire(candidates: string | string[]): Promise<RuntimeLease> {
     const choices = this.workloads.filter((item) => [candidates].flat().includes(item.id));
     if (!choices.length) throw new RuntimeUnavailable("The selected workload is not configured.");
     const states = await Promise.all(choices.map((workload) => this.engine.state(workload)));
@@ -576,25 +530,12 @@ export class RuntimeController {
         `Waiting for ${choices[index].label} to start.${reason && !["Loading.", "Starting."].includes(reason) ? ` ${reason}` : ""}`,
       );
     }
-    // Queued work waiting for these keeps their pool from counting as idle.
-    for (const item of choices) this.lastUsed.set(item.id, this.now());
     const [workload] = choices;
-    if (!this.automaticLifecycle)
-      throw new RuntimeUnavailable(
-        choices.every((item, index) => this.isParked(item, states[index]))
-          ? parkedReason(workload.label)
-          : `${workload.label} is down; automatic lifecycle control is disabled.`,
-      );
-    if (workload.kind === "text")
-      throw new RuntimeUnavailable(
-        `${workload.label} is stopped; automatic control doesn't start text for queued work. Start it in Settings › Workers.`,
-      );
-    if (this.current || this.claimed)
-      throw new RuntimeUnavailable(
-        `Waiting for ${workload.label} to start after the current runtime change.`,
-      );
-    await this.switchTo(workload, work);
-    throw new RuntimeUnavailable(`Waiting for ${workload.label} to start.`);
+    throw new RuntimeUnavailable(
+      choices.every((item, index) => this.isParked(item, states[index]))
+        ? parkedReason(workload.label)
+        : `${workload.label} stopped outside Studio; Studio restores it once its GPUs are free.`,
+    );
   }
 
   /** GPUs the given workloads claim in one pool. */
@@ -605,7 +546,7 @@ export class RuntimeController {
       .reduce((sum, item) => sum + item.gpus, 0);
   }
 
-  /** Running text workloads. Automatic control never stops them: callers outside Studio use them. */
+  /** Running text workloads, which a restore keeps: callers outside Studio use them. */
   private runningText(states: Map<string, DeploymentState>) {
     return this.workloads
       .filter((item) => item.kind === "text" && states.get(item.id)!.replicas > 0)
@@ -614,14 +555,9 @@ export class RuntimeController {
 
   /**
    * The running workloads, those stopped outside Studio (restored with it) and `workload`, stopping
-   * others in its pool to make room: media before text, idle ones first. Workloads in `keep` never
-   * stop.
+   * others in its pool to make room: media before text, idle ones first.
    */
-  private placementWith(
-    workload: Workload,
-    states: Map<string, DeploymentState>,
-    keep: string[] = [],
-  ) {
+  private placementWith(workload: Workload, states: Map<string, DeploymentState>) {
     const target = this.workloads
       .filter((item) => item.id === workload.id || !this.isParked(item, states.get(item.id)!))
       .map((item) => item.id);
@@ -630,10 +566,7 @@ export class RuntimeController {
       this.active.get(id) ?? 0,
     ];
     const candidates = target
-      .filter(
-        (id) =>
-          id !== workload.id && !keep.includes(id) && this.workload(id).pool === workload.pool,
-      )
+      .filter((id) => id !== workload.id && this.workload(id).pool === workload.pool)
       .sort((a, b) => {
         const [kindA, busyA] = rank(a),
           [kindB, busyB] = rank(b);
@@ -661,86 +594,10 @@ export class RuntimeController {
     return preview;
   }
 
-  /** Running text in `workload`'s pool that leaves it too few GPUs; empty when it fits. */
-  private textBlocking(workload: Workload, states: Map<string, DeploymentState>) {
-    const blocking = this.runningText(states).filter(
-      (id) => this.workload(id).pool === workload.pool,
-    );
-    return this.usage([...blocking, workload.id], workload.pool) > this.pools[workload.pool]
-      ? blocking
-      : [];
-  }
-
-  /**
-   * Automatic lifecycle: start a media workload in place of media in its pool, idle ones first. If
-   * running text holds the GPUs it needs, nothing changes and the work waits.
-   */
-  private async switchTo(workload: Workload, work: string) {
-    this.claim();
-    try {
-      const states = await this.states();
-      const blocking = this.textBlocking(workload, states);
-      if (blocking.length)
-        throw new RuntimeUnavailable(
-          textHoldsGpus(
-            blocking.map(
-              (id) =>
-                `${this.workload(id).label}${id === this.idleWorkload?.id ? " (Run When Idle)" : ""}`,
-            ),
-          ),
-        );
-      const plan = this.placementWith(workload, states, this.runningText(states));
-      this.begin("apply", plan, `automatic: starting ${workload.label} for ${work}`);
-    } finally {
-      this.claimed = false;
-    }
-  }
-
-  /**
-   * The swap for waiting media work: stop the running text that holds the GPUs its first candidate
-   * needs, and start it. Someone chooses this; automatic control never stops text on its own.
-   */
-  private swapPlan(candidates: string[], states: Map<string, DeploymentState>) {
-    const choices = candidates.map((id) => this.workload(id));
-    if (!choices.length) throw new RuntimeRequestError("Name a workload to start.");
-    if (choices.some((item) => states.get(item.id)!.replicas > 0))
-      throw new RuntimeConflict(`${choices[0].label} is already starting.`);
-    if (!this.textBlocking(choices[0], states).length)
-      throw new RuntimeConflict(`No text workload holds the GPUs ${choices[0].label} needs.`);
-    return this.placementWith(choices[0], states);
-  }
-  async previewSwap(candidates: string[]): Promise<RuntimeSwap> {
-    const { holders: _holders, ...preview } = this.swapPlan(candidates, await this.states());
-    const idle = this.idleWorkload;
-    return {
-      ...preview,
-      labels: Object.fromEntries(
-        [...preview.stop, ...preview.start, ...preview.keep].map((id) => [
-          id,
-          this.workload(id).label,
-        ]),
-      ),
-      ...(idle && preview.stop.includes(idle.id) ? { runWhenIdle: idle.label } : {}),
-    };
-  }
-  /** Apply a previewed swap, recorded as `<requestedBy>: swap to images` (or videos). */
-  async swap(candidates: string[], signature: string, requestedBy: string) {
-    this.claim();
-    try {
-      const plan = this.swapPlan(candidates, await this.states());
-      if (plan.signature !== signature)
-        throw new RuntimeConflict("The workloads changed since this preview; preview again.");
-      const kind = this.workload(plan.start[0]).kind === "video" ? "videos" : "images";
-      return this.begin("apply", plan, `${requestedBy}: swap to ${kind}`);
-    } finally {
-      this.claimed = false;
-    }
-  }
-
   /**
    * Restore Studio's last placement after something else stopped a workload, such as a Flux upgrade
-   * (which resets GPU deployments to 0), with or without automatic control. Running text stays; a
-   * restore that needs its GPUs is skipped until it is stopped in Studio.
+   * (which resets GPU deployments to 0). Running text stays; a restore that needs its GPUs is
+   * skipped until it is stopped in Studio.
    */
   async reconcile() {
     const desired = this.record.desired?.filter((id) =>
@@ -760,54 +617,6 @@ export class RuntimeController {
         "apply",
         this.plan(target, states),
         "restoring the last placement after an outside stop",
-      );
-    } finally {
-      this.claimed = false;
-    }
-  }
-
-  /**
-   * Automatic lifecycle, every 30 seconds: park running media workloads that have had no work for
-   * `parkIdleAfterMs`, so idle GPUs can rest, and start the Run When Idle workload once nothing is
-   * queued or running in its pool for as long, if it fits beside running text. Queued work starts
-   * what it needs as usual, stopping a media idle choice like any idle media. Automatic control
-   * stops no text workload (callers outside Studio use them) and starts only the one chosen here.
-   * A workload first seen running counts as used then.
-   */
-  async settleIdle() {
-    if (!this.automaticLifecycle || !this.parkIdleAfterMs || this.current || this.claimed) return;
-    this.claim();
-    try {
-      const states = await this.states();
-      const now = this.now();
-      const chosen = this.idleWorkload;
-      const unused = (id: string) => {
-        const last = this.lastUsed.get(id);
-        return !this.active.has(id) && (last === undefined || now - last >= this.parkIdleAfterMs);
-      };
-      const running = this.workloads.filter((item) => states.get(item.id)!.replicas > 0);
-      const idle = running.filter((item) => {
-        if (item.kind === "text" || item === chosen || this.active.has(item.id)) return false;
-        if (!this.lastUsed.has(item.id)) this.lastUsed.set(item.id, now);
-        return unused(item.id);
-      });
-      const target = running.filter((item) => !idle.includes(item)).map((item) => item.id);
-      // An idle pool's media is all parked above, so only running text can leave it too full.
-      const start =
-        chosen &&
-        !target.includes(chosen.id) &&
-        this.workloads.every((item) => item.pool !== chosen.pool || unused(item.id)) &&
-        this.usage([...target, chosen.id], chosen.pool) <= this.pools[chosen.pool];
-      if (start) target.push(chosen.id);
-      if (!idle.length && !start) return;
-      const changes = [
-        ...(idle.length ? [`parking ${idle.map((item) => item.label).join(", ")}`] : []),
-        ...(start ? [`starting ${chosen.label} (Run When Idle)`] : []),
-      ];
-      this.begin(
-        "apply",
-        this.plan(target, states),
-        `automatic: ${changes.join(" and ")} after ${minutes(this.parkIdleAfterMs)} without work`,
       );
     } finally {
       this.claimed = false;
@@ -835,10 +644,7 @@ export class RuntimeController {
     const held = this.workloads.filter((item) => [candidates].flat().includes(item.id));
     if (!held.length)
       throw new RuntimeUnavailable("The recorded workload is no longer configured.");
-    for (const { id } of held) {
-      this.active.set(id, (this.active.get(id) ?? 0) + 1);
-      this.lastUsed.set(id, this.now());
-    }
+    for (const { id } of held) this.active.set(id, (this.active.get(id) ?? 0) + 1);
     let released = false;
     return {
       workload: held[0],
@@ -846,7 +652,6 @@ export class RuntimeController {
         if (released) return;
         released = true;
         for (const { id } of held) {
-          this.lastUsed.set(id, this.now());
           const remaining = (this.active.get(id) ?? 1) - 1;
           if (remaining) this.active.set(id, remaining);
           else this.active.delete(id);

@@ -13,7 +13,7 @@
 ## Delivery
 
 - The container image on GHCR, built and verified by CI, is the only delivery. There is no `docs/` website, desktop launcher, packaged download, self-updater or release signing; do not add them.
-- Studio builds the app and `studio-worker` GPU images. Deployment configuration belongs to kubelab (`apps/base/studio`); Studio controls configured GPU workloads. Automatic lifecycle control stays off by default.
+- Studio builds the app and `studio-worker` GPU images. Deployment configuration belongs to kubelab (`apps/base/studio`); Studio controls configured GPU workloads only through an administrator's placement in Settings › Workers: Radiance on both GPUs is the default and switches its own models, and queued work never starts or swaps a workload.
 - Every green `main` commit publishes images and deploys through kubelab. CI owns versioning and releases. After a release, tick the manual-run box on kubelab's Dependency Dashboard (issue 23) so the hosted Renovate app deploys it promptly; kubelab requires an up-to-date branch, so update its deploy PR and merge once Check passes.
 - Open a pull request for large changes. Merge only what is ready for production, including any real-model verification it needs.
 - Single-user mode keeps working for local development.

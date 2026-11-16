@@ -238,8 +238,6 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
         result: settled[index].status === "fulfilled" ? settled[index].value : null,
       }))
       .filter((entry) => entry.result);
-    // With automatic lifecycle control, queued work starts what it needs, so nothing waits as parked.
-    const parked = runtime?.controller.automaticLifecycle ? new Set() : stopped;
     const configured = inferred(none, none, { configuredOnly: true });
     const catalogues = workers
       .map((worker) => {
@@ -257,7 +255,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
           .map((profile) => ({
             ...profile,
             ready: undefined,
-            availability: parked.has(worker.id) ? "parked" : "offline",
+            availability: stopped.has(worker.id) ? "parked" : "offline",
             readiness: "unknown",
           }));
         return { worker, result: { models: { ...(cached || configured), profiles } } };
@@ -270,7 +268,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     const backends = workerAvailability(
       new Set(answered.map(({ worker }) => worker.id)),
       workers,
-      parked,
+      stopped,
     );
     const primary = answered.find(({ worker }) => isDefaultBackend(worker.id))?.result ||
       answered[0]?.result ||
@@ -327,7 +325,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
       video: models.profiles.some((profile) => profile.kind === "video"),
     };
     if (!answered.length && workers.length)
-      models.reason = workers.every((worker) => parked.has(worker.id))
+      models.reason = workers.every((worker) => stopped.has(worker.id))
         ? "Configured workers are stopped: an administrator can start them in Settings › Workers."
         : "Configured workers are offline. Selected jobs wait until their worker is available.";
     models.workers = workers.map((worker) => {
@@ -338,7 +336,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
         name: worker.name,
         capabilities: worker.capabilities,
         available,
-        ...(!available && parked.has(worker.id) ? { parked: true } : {}),
+        ...(!available && stopped.has(worker.id) ? { parked: true } : {}),
         // The deployments an administrator can start for it (Settings › Workers).
         ...(workloads.length ? { workloads } : {}),
       };
