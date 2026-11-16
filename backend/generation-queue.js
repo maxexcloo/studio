@@ -360,6 +360,7 @@ export function createGenerationQueue({
         combined.backend,
         input.profileBackend || named,
         Boolean(input.referenceAssets?.length),
+        input.loras?.some((lora) => lora?.enabled !== false) ?? false,
       );
     else delete input.profileBackend;
     // Every path (composer, Compare, Dream, MCP) applies an explicitly selected native tier.
