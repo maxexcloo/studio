@@ -5,6 +5,7 @@ import { dreamAnimationStars } from "./dream-animation-stars.js";
 import { dreamOwnership } from "./dream-ownership.js";
 import { galleryRatings } from "./gallery-ratings.js";
 import { legacyShapes } from "./legacy-shapes.js";
+import { loraStacks } from "./lora-stacks.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
 import { migrateRadianceQueue } from "./radiance-queue-migration.js";
 
@@ -46,6 +47,12 @@ const steps = [
     name: "legacyShapes",
     run: legacyShapes,
     changes: (plan) => plan.arms + plan.notes + (plan.editsFile ? 1 : 0),
+    online: true,
+  },
+  {
+    name: "loraStacks",
+    run: loraStacks,
+    changes: (plan) => plan.accounts,
     online: true,
   },
 ];

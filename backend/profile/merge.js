@@ -12,16 +12,14 @@
  *
  * Applying records each removed id as an alias of the kept one (profile/store.js), then removes the
  * removed files. Version history stays, so a seed never brings
- * a merged id back. Workflow preferences and LoRA stacks move to the kept id and the removed ids'
+ * a merged id back. Workflow preferences move to the kept id and the removed ids'
  * guide bindings go (the kept one has the same); gallery records, presets, jobs and taste
  * signals keep the ids they hold, and readers resolve them through the aliases.
  */
 import fs from "node:fs";
 import path from "node:path";
 
-import { repointLoraStacks } from "../combined-profiles.js";
 import { graphFromJson, userWorkflowsDir } from "../custom-workflows.js";
-import { dataDir } from "../data-dir.js";
 import { isObject } from "../values.js";
 import { repointWorkflowPreferences } from "../workflow-catalogue.js";
 import { listEditableProfiles, readEditableProfile } from "./editor.js";
@@ -170,7 +168,6 @@ export function mergeDuplicateProfiles({ hash, by = "" } = {}) {
   );
   for (const { from } of plan.merges) fs.rmSync(path.join(userWorkflowsDir, `${from}.json`));
   repointWorkflowPreferences((id) => store.canonical(id));
-  repointLoraStacks(dataDir, (id) => store.canonical(id));
   guideStore().moveProfileBindings(
     { remove: plan.merges.map(({ from }) => `custom:${from}`) },
     { by, note: "Merged duplicate profiles" },

@@ -167,16 +167,17 @@ export interface DreamProfile {
   /** The LoRA files this profile can load. */
   options?: { loras?: string[] };
 }
-/** The account's LoRA library: liked or disliked per LoRA and saved strengths per workflow. */
+/** The account's LoRA library: liked or disliked per LoRA. */
 export interface DreamLoraLibrary {
   ratings: Record<string, "liked" | "disliked">;
-  strengths: Record<string, Record<string, number>>;
 }
 interface DreamLora {
   name: string;
   strength: number;
   enabled: true;
 }
+/** A LoRA to load, without a strength where Dream has learnt none. */
+type DreamLoraPick = Omit<DreamLora, "strength"> & { strength?: number };
 /** A Library import or Inspiration image to seed an idea from, with its profile and LoRAs where known. */
 export interface DreamInspiration {
   prompt: string;
@@ -700,8 +701,11 @@ export function createDream(options: {
   remove(ownerId: string, itemIds: string[]): void;
   /** The account's LoRA library, or null where it may not use LoRAs. */
   loraLibrary(ownerId: string): DreamLoraLibrary | null;
-  /** The LoRAs that can run on the profile (its model family), strengths within published ranges. */
-  fitLoras(profile: DreamProfile, loras: DreamLora[]): DreamLora[];
+  /**
+   * The LoRAs that can run on the profile (its model family), strengths within published ranges;
+   * one without a strength starts at its recommended one.
+   */
+  fitLoras(profile: DreamProfile, loras: DreamLoraPick[]): DreamLora[];
   /** A LoRA's readable name, as the Library shows it. */
   loraName(name: string): string;
   /** The Library's imports and Inspiration images the account may see, none where it may not. */
@@ -1203,7 +1207,7 @@ export function createDream(options: {
    * Models access) that suit its model family. A LoRA for another family is left out rather than
    * failing the run. None on a profile that does best without LoRAs.
    */
-  const fit = (profile: DreamProfile, loras: DreamLora[]) => {
+  const fit = (profile: DreamProfile, loras: DreamLoraPick[]) => {
     if (profile.capabilities?.defaultLoras === false) return [];
     const available = new Set(profile.options?.loras || []);
     return options.fitLoras(
@@ -1213,7 +1217,7 @@ export function createDream(options: {
   };
   /**
    * The account's liked LoRAs for the profile, or with `unrated` those it has not rated yet
-   * (never disliked ones), in random order at their saved strength; none without LoRA access.
+   * (never disliked ones), in random order at their recommended strength; none without LoRA access.
    */
   function libraryLoras(ownerId: string, profile: DreamProfile, unrated = false) {
     const library = options.loraLibrary(ownerId);
@@ -1223,17 +1227,13 @@ export function createDream(options: {
     );
     return fit(
       profile,
-      shuffled(names).map((name) => ({
-        name,
-        strength: library.strengths[profile.workflow || ""]?.[name] ?? 1,
-        enabled: true as const,
-      })),
+      shuffled(names).map((name) => ({ name, enabled: true as const })),
     );
   }
   /**
    * For a share of exploited ideas, one LoRA the profile can load drawn by its taste score (a
    * a like adds one) less its recent share (`spread`), at the strength that scored best, else
-   * its saved strength; never a disliked one, and none without LoRA access.
+   * its recommended strength; never a disliked one, and none without LoRA access.
    */
   function exploitLoras(
     ownerId: string,
@@ -1248,12 +1248,7 @@ export function createDream(options: {
       profile,
       (profile.options?.loras || [])
         .filter((name) => library.ratings[name] !== "disliked")
-        .map((name) => ({
-          name,
-          strength:
-            learnt.get(name)?.strength ?? library.strengths[profile.workflow || ""]?.[name] ?? 1,
-          enabled: true as const,
-        })),
+        .map((name) => ({ name, strength: learnt.get(name)?.strength, enabled: true as const })),
     );
     const lora = drawn(
       candidates.map((lora): [DreamLora, number] => [
