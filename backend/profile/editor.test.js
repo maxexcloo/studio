@@ -6,6 +6,7 @@ import test from "node:test";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-profile-editor-"));
 process.env.STUDIO_DATA_DIR = temporary;
+process.env.STUDIO_MULTI_USER = "1";
 process.env.STUDIO_WORKERS = JSON.stringify([
   {
     id: "primary",
@@ -15,6 +16,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 ]);
 const editor = await import("./editor.js");
 const { userWorkflowsDir } = await import("../custom-workflows.js");
+const { findDirectRoute } = await import("../domain/direct-route.ts");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 const profile = (overrides = {}) => ({
@@ -147,4 +149,53 @@ test("an updated model file moves the profiles that named it, each as a new vers
   assert.match(after.text, /"unet_name": "model-v2.safetensors"/);
   assert.equal(after.version.version, before.version.version + 1);
   assert.deepEqual(editor.repointProfiles("model.safetensors", "model-v2.safetensors"), []);
+});
+
+test("administrator creation validates, records a version and refreshes profiles without overwriting ids", async () => {
+  const app = { use() {} };
+  const changed = [];
+  editor.registerProfileEditorRoutes(app, {
+    objectInfo: async () => info,
+    onSaved: (id) => changed.push(id),
+    accountName: (account) => account.userId,
+  });
+  const route = findDirectRoute(app, "POST", "/api/profiles/editable");
+  const admin = { userId: "admin", role: "administrator" };
+  const id = "image-created";
+  const text = JSON.stringify(profile({ id }));
+  const create = (body, account = admin) => route.run(account, { params: {}, query: {}, body });
+  for (const account of [null, { role: "user" }, { ...admin, credential: "mcp-token" }])
+    assert.equal((await create({ id, text }, account)).status, 403);
+  assert.equal((await create({ id: "image-invalid", text: "{" })).status, 400);
+  assert.equal((await create({ id: "image-mismatch", text })).status, 400);
+  assert.equal((await create({ id: "../invalid", text })).status, 400);
+  assert.equal((await create({ id, text })).status, 200);
+  const saved = editor.readEditableProfile(id);
+  assert.equal(saved.text, `${text}\n`);
+  assert.equal(saved.version.version, 1);
+  assert.equal(saved.version.by, "admin");
+  assert.equal(saved.version.origin, "studio");
+  assert.equal(saved.version.aiDrafted, false);
+  assert.deepEqual(changed, [id]);
+  assert.equal((await create({ id, text })).status, 409);
+  fs.unlinkSync(path.join(userWorkflowsDir, `${id}.json`));
+  assert.equal((await create({ id, text })).status, 409);
+  assert.equal(fs.existsSync(path.join(userWorkflowsDir, `${id}.json`)), false);
+  assert.deepEqual(changed, [id]);
+});
+
+test("administrator chat creation retains the draft marker and attribution", async () => {
+  const app = { use() {} };
+  editor.registerProfileEditorRoutes(app, { accountName: (account) => account.userId });
+  const route = findDirectRoute(app, "POST", "/api/profiles/editable");
+  const id = "image-chat-created";
+  const result = await route.run(
+    { userId: "chat-admin", role: "administrator", credential: "mcp-admin" },
+    { params: {}, query: {}, body: { id, text: JSON.stringify(profile({ id })), draft: true } },
+  );
+  assert.equal(result.status, 200);
+  const saved = editor.readEditableProfile(id);
+  assert.equal(saved.version.origin, "chat");
+  assert.equal(saved.version.by, "chat-admin");
+  assert.equal(saved.version.aiDrafted, true);
 });

@@ -20,7 +20,6 @@ import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { useFlash } from "../../ui/useFlash";
-import { galleryKey } from "../gallery/queries";
 import { inspirationQuery } from "../generation/inspiration";
 import {
   type ImportRecord,
@@ -36,29 +35,12 @@ function gradeRank(grade: string) {
   const rank = Object.keys(gradeColours).indexOf(grade);
   return rank < 0 ? Infinity : rank;
 }
-interface RedditImport {
-  title: string;
-  imported: number;
-  failed: { image: number; error: string }[];
-}
-// A Redlib front end's links keep Reddit's post paths, whatever its host.
-const isRedditLink = (url: string) => {
-  try {
-    const { hostname, pathname } = new URL(url.trim());
-    return (
-      /(^|\.)(reddit\.com|redd\.it)$/.test(hostname) ||
-      /^(\/r\/\w+)?\/(comments|gallery)\/\w+/.test(pathname)
-    );
-  } catch {
-    return false;
-  }
-};
 const views = [
   { value: "all", label: "All" },
   { value: "attention", label: "Needs Files" },
 ];
 
-/** Library › Imports: a link or an image becomes a graded import that can be reviewed. */
+/** Shared model and recipe imports, curated by administrators. */
 export function LibraryImports({
   heading,
   active,
@@ -102,16 +84,6 @@ export function LibraryImports({
       opened(result);
     },
   });
-  // A Reddit post's images become the account's uploads (backend/gallery/reddit.js), not an import.
-  const reddit = useMutation({
-    meta: { inlineError: true },
-    mutationFn: () => post<RedditImport>("/api/gallery/import/reddit", { url: url.trim() }),
-    onSuccess: () => {
-      setUrl("");
-      void client.invalidateQueries({ queryKey: galleryKey });
-    },
-  });
-  const redditLink = isRedditLink(url);
   const uploading = useMutation({
     meta: { inlineError: true },
     mutationFn: async (file: File) => {
@@ -154,8 +126,7 @@ export function LibraryImports({
     record.title || record.name || record.image?.name || record.input?.url || record.id;
   const rows =
     view === "attention" ? records.filter((record) => record.state === "needs-files") : records;
-  const failed = importing.error || uploading.error || reddit.error;
-  const added = reddit.data;
+  const failed = importing.error || uploading.error;
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
@@ -185,12 +156,12 @@ export function LibraryImports({
                 accept="image/png,image/jpeg,image/webp"
               >
                 {(props) => (
-                  <Tooltip label="Upload Image">
+                  <Tooltip label="Import Recipe Image">
                     <ActionIcon
                       {...props}
                       variant="subtle"
                       color="gray"
-                      aria-label="Upload Image"
+                      aria-label="Import Recipe Image"
                       loading={uploading.isPending}
                     >
                       <icons.upload size={18} />
@@ -205,15 +176,13 @@ export function LibraryImports({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          reddit.reset();
-          if (redditLink) reddit.mutate();
-          else importing.mutate();
+          importing.mutate();
         }}
       >
         <Group gap="xs" wrap="nowrap" align="start">
           <TextInput
-            aria-label="Civitai, Hugging Face or Reddit Link"
-            placeholder="Civitai, Hugging Face or Reddit link"
+            aria-label="Civitai or Hugging Face Link"
+            placeholder="Civitai or Hugging Face link"
             value={url}
             onChange={(event) => setUrl(event.currentTarget.value)}
             required
@@ -221,20 +190,12 @@ export function LibraryImports({
             flex={1}
             miw={0}
           />
-          <Button type="submit" loading={importing.isPending || reddit.isPending}>
+          <Button type="submit" loading={importing.isPending}>
             Import
           </Button>
         </Group>
       </form>
       {failed && <Alert color="red">{failed.message}</Alert>}
-      {added && (
-        <Text size="sm" c={added.failed.length ? "red" : "dimmed"}>
-          {added.imported} {added.imported === 1 ? "image" : "images"} added to Uploads
-          {added.failed.length > 0 &&
-            `; ${added.failed.length} couldn't be saved: ${added.failed.map((entry) => entry.error).join(" ")}`}
-          .
-        </Text>
-      )}
       {cleared !== undefined && (
         <Text c="dimmed" size="xs">
           {cleared} cleared

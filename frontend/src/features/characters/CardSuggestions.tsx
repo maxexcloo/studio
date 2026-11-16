@@ -1,19 +1,18 @@
-import { Badge, Button, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Button, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import type { CardKind } from "../../../../shared/characters";
 import { post } from "../../api";
 import { SettingGroup } from "../../ui/SettingRows";
 import { useGroupFeature } from "../auth/AccountGate";
 import { type CardSuggestion, suggestionPath, suggestionsQuery } from "../dream/queries";
 import { CardThumbnails } from "./CardImages";
 
-const kindLabels = { characters: "Character", outfits: "Outfit", scenes: "Scene" } as const;
-
 /**
  * Characters, outfits and scenes Dream noticed recurring in liked results: Accept makes the card
  * from them, Dismiss turns it down. Nothing shows without Dream or a suggestion.
  */
-export function CardSuggestions() {
+export function CardSuggestions({ kind }: { kind: CardKind }) {
   const client = useQueryClient();
   const suggestions = useQuery({ ...suggestionsQuery, enabled: useGroupFeature("dream") });
   const settle = useMutation({
@@ -29,11 +28,12 @@ export function CardSuggestions() {
       if (action === "accept") void client.invalidateQueries({ queryKey: [suggestion.kind] });
     },
   });
-  if (!suggestions.data?.length) return null;
+  const matching = suggestions.data?.filter((suggestion) => suggestion.kind === kind) || [];
+  if (!matching.length) return null;
   return (
     <SettingGroup title="Suggestions">
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} role="list" aria-label="Suggestions">
-        {suggestions.data.map((suggestion) => {
+        {matching.map((suggestion) => {
           const busy = settle.isPending && settle.variables?.suggestion.id === suggestion.id;
           return (
             <Paper
@@ -54,14 +54,9 @@ export function CardSuggestions() {
                   }))}
                 />
                 <div>
-                  <Group gap={6} wrap="nowrap">
-                    <Text size="sm" fw={500}>
-                      {suggestion.name}
-                    </Text>
-                    <Badge size="sm" variant="default">
-                      {kindLabels[suggestion.kind]}
-                    </Badge>
-                  </Group>
+                  <Text size="sm" fw={500}>
+                    {suggestion.name}
+                  </Text>
                   <Text size="sm" c="dimmed" lineClamp={3}>
                     {suggestion.description}
                   </Text>

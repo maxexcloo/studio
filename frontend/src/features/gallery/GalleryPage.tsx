@@ -601,7 +601,7 @@ export function GalleryPage() {
           }
           actions={
             <>
-              <GalleryUpload upload={upload} />
+              <GalleryUpload kind={kind} upload={upload} />
               {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
               <Tooltip label="Select Items" disabled={!phone}>
                 <Button

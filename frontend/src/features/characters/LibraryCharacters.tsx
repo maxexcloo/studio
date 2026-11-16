@@ -45,7 +45,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
         />
       </SectionHeader>
       {start.error && <Alert color="red">{start.error.message}</Alert>}
-      {!words && <CardSuggestions />}
+      {!words && <CardSuggestions kind="characters" />}
       {characters.isPending ? (
         <LoadingState fill label="Loading Characters" />
       ) : characters.error ? (
