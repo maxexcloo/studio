@@ -23,6 +23,12 @@ const handle =
     }
   };
 
+/** The last `lines` (1–1000, else 200) of each pod's log. */
+function logLines(request: Request) {
+  const lines = Math.trunc(Number(request.query.lines));
+  return Number.isFinite(lines) ? Math.min(Math.max(lines, 1), 1000) : 200;
+}
+
 /** Mount behind the existing administrator middleware. Apply and restart answer at once; poll the operation. */
 export function createRuntimeRouter(
   controller: RuntimeController,
@@ -75,14 +81,7 @@ export function createRuntimeRouter(
   );
   router.get(
     "/workloads/:id/logs",
-    // The last `lines` (1–1000, else 200) of each pod's log.
-    handle((request) => {
-      const lines = Math.trunc(Number(request.query.lines));
-      return controller.logs(
-        String(request.params.id),
-        Number.isFinite(lines) ? Math.min(Math.max(lines, 1), 1000) : 200,
-      );
-    }),
+    handle((request) => controller.logs(String(request.params.id), logLines(request))),
   );
   router.get(
     "/benchmarks",
@@ -94,6 +93,10 @@ export function createRuntimeRouter(
       (request) => benchmarks.start(String(request.body?.workload ?? ""), requestedBy(request)),
       202,
     ),
+  );
+  router.get(
+    "/benchmarks/:id/logs",
+    handle((request) => benchmarks.logs(String(request.params.id), logLines(request))),
   );
   router.post(
     "/benchmarks/:id/stop",

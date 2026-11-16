@@ -75,7 +75,20 @@ test("a run creates its Job, reads the summary once it succeeds and refuses a se
     if (method === "POST") return { status: 201, body };
     if (path.includes("/jobs/")) return { status: 200, body: job };
     if (path.endsWith("/log?tailLines=20")) return { status: 200, body: `done\n${summaryLine}\n` };
-    return { status: 200, body: { items: [{ metadata: { name: "bench-pod" } }] } };
+    if (path.includes("tailLines=50"))
+      return { status: 200, body: "2026-11-16T10:00:00Z warming up\n2026-11-16T10:00:01Z done\n" };
+    return {
+      status: 200,
+      body: {
+        items: [
+          {
+            metadata: { name: "bench-pod" },
+            spec: { containers: [{ name: "bench" }] },
+            status: { phase: "Succeeded" },
+          },
+        ],
+      },
+    };
   };
   const fetchImpl = (async (url: string, init: RequestInit) => {
     assert.equal(url, "http://gemma.text.svc.cluster.local:8000/v1/models");
@@ -114,6 +127,19 @@ test("a run creates its Job, reads the summary once it succeeds and refuses a se
   assert.equal(done.status, "completed");
   assert.equal(done.summary?.decode, 61.2);
   assert.ok(calls.includes("GET /api/v1/namespaces/text/pods/bench-pod/log"));
+  // Its log shows the Job pod's tail, as a workload's log does.
+  assert.deepEqual(await benchmarks.logs(run.id, 50), {
+    pods: [
+      {
+        name: "bench-pod",
+        container: "bench",
+        phase: "Succeeded",
+        restarts: 0,
+        lines: ["2026-11-16T10:00:00Z warming up", "2026-11-16T10:00:01Z done"],
+      },
+    ],
+  });
+  await assert.rejects(benchmarks.logs("gone", 50), /gone/);
 });
 
 test("a failed Job reports why, and Stop deletes a Job still running", async () => {

@@ -221,6 +221,7 @@ function generationDetails(
       ["FPS", video ? settings.fps : ""],
       ["File", item.outputName || item.filename],
       ["File Size", size === null ? pendingValue : formatBytes(size)],
+      ["Time", time(item.createdAt)],
     ]),
     // The stages in the order they ran, then their totals.
     timing: rows([
@@ -620,7 +621,7 @@ function Related({
 
 /**
  * Details › Caption (with its tags), From, Prompt, Negative Prompt, Set, the chat's Character,
- * Outfit, Scene and Series, Source, Derived, LoRAs,
+ * Outfit, Scene and Series, Source, Derived, Model, LoRAs,
  * References, Settings, Output and Timing for one result; From and Derived look among the `loaded`
  * items too, and `open` shows a related result in the
  * viewer.
@@ -661,6 +662,11 @@ export function MediaDetails({
         </DetailSection>
       )}
       <Related title="Derived" items={related.derived} open={open} />
+      {details.profile && (
+        <DetailSection title="Model">
+          <Text size="sm">{details.profile}</Text>
+        </DetailSection>
+      )}
       {!!details.loras.length && (
         <DetailSection title="LoRAs">
           {details.loras.map((lora) => (
