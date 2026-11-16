@@ -85,7 +85,13 @@ export function DiscardedDreams({ media }: { media: DreamMedia }) {
         <Text size="sm" c="dimmed">
           Disliked results stay hidden until you delete them.
         </Text>
-        <Button variant="subtle" color="red" size="sm" onClick={() => setConfirming(true)}>
+        <Button
+          variant="subtle"
+          color="red"
+          size="sm"
+          leftSection={<icons.delete size={16} />}
+          onClick={() => setConfirming(true)}
+        >
           Delete All
         </Button>
       </Group>

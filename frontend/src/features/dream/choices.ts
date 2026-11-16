@@ -90,7 +90,7 @@ export function dreamChoices(card: DeckCard): Choice[][] {
               id: "variations",
               label: "Variations",
               tip: "Keep & Variations",
-              icon: icons.variations,
+              icon: icons.assistant,
               hint: "↑",
             },
             {

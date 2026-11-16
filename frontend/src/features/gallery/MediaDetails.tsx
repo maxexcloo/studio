@@ -54,8 +54,11 @@ const time = (value?: string) => {
   const date = value ? new Date(value) : null;
   return date && !Number.isNaN(date.getTime()) ? formatDateTime(date) : "";
 };
-const recordedModel = (item: MediaItem) => {
+/** The recorded profile's readable name, then the current profile's, then the model file's. */
+const recordedModel = (item: MediaItem, profiles: Profile[]) => {
   const settings = item.settings || {};
+  const recorded = profiles.find((profile) => isProfile(profile, settings.profileId));
+  if (!settings.profileName && recorded) return profileName(recorded);
   return shownProfileName(
     String(
       settings.profileName ||
@@ -70,13 +73,14 @@ const recordedModel = (item: MediaItem) => {
 
 /** Recorded creation and model metadata, shared by the desktop panel and phone sheet. */
 export function MediaDetailsMetadata({ item }: { item: MediaItem }) {
+  const { profiles } = useGenerationActions();
   const source = mediaSource(item);
   const created = time(item.createdAt);
   const when = [created && `${item.uploaded ? "Uploaded " : ""}${created}`, mediaNumber(item)]
     .filter(Boolean)
     .join(" · ");
   const model = [
-    recordedModel(item),
+    recordedModel(item, profiles),
     item.type === "video" ? "Video" : "Image",
     source.width ? `${source.width} × ${source.height}` : "",
   ]
@@ -164,7 +168,7 @@ function generationDetails(
     return { id, role: "Edit Source", strength: denoise > 0 ? `Denoise ${denoise}` : "" };
   });
   return {
-    profile: recordedModel(item) || (recorded ? profileName(recorded) : ""),
+    profile: recordedModel(item, profiles),
     loras: (Array.isArray(settings.loras) ? settings.loras : [])
       .filter((lora) => lora?.name && lora.enabled !== false)
       .map((lora) => ({

@@ -76,10 +76,19 @@ export function registerDreamRoutes(
   route("GET", "/api/dream/count", (account) => {
     const { enabled, paused } = dream.read(owner(account)).settings;
     const unseen = dream.unseen(owner(account));
+    // A pair counts once, like a single card.
+    const cards = (type?: string) =>
+      new Set(
+        unseen
+          .filter((item) => !type || item.type === type)
+          .map((item) => item.dream?.pair?.id ?? item.id),
+      ).size;
     return {
       status: 200,
       payload: {
-        unseen: new Set(unseen.map((item) => item.dream?.pair?.id ?? item.id)).size,
+        unseen: cards(),
+        images: cards("image"),
+        videos: cards("video"),
         active: enabled && !paused,
       },
     };

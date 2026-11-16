@@ -106,7 +106,7 @@ export function useViewerPrompt(
     ? {
         id: "suggestions",
         label: "Suggestions",
-        icon: icons.suggestions,
+        icon: icons.assistant,
         onOpen: () => setSuggestionSource({ item: item.id, prompt: ask.typed ?? prompt }),
         menu: assistMenu({
           settings: [
@@ -123,7 +123,7 @@ export function useViewerPrompt(
           templates: (assistant?.changes ?? []).map((change) => ({
             id: `change:${change.id}`,
             label: change.label,
-            icon: icons.suggestions,
+            icon: icons.assistant,
             disabled: ask.pending,
             onClick: () => pick(change.instruction),
           })),

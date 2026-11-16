@@ -373,7 +373,7 @@ export function useMediaActions(
                 {
                   id: "more-like-set",
                   label: "More Like This Set",
-                  icon: icons.suggestions,
+                  icon: icons.assistant,
                   disabled: more.isPending,
                   onClick: () => more.mutate("set"),
                 },
@@ -544,7 +544,7 @@ export function useMediaActions(
             ? (assistant.data?.changes ?? []).map((change) => ({
                 id: `change:${change.id}`,
                 label: change.label,
-                icon: icons.suggestions,
+                icon: icons.assistant,
                 disabled: editAsk.pending,
                 onClick: () => editAsk.pick(change.instruction),
               }))

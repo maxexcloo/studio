@@ -776,7 +776,6 @@ const ignore = () => {};
  */
 export function SaveButton<T extends SavedItem>({
   noun,
-  label,
   naming,
   current,
   edited,
@@ -789,14 +788,11 @@ export function SaveButton<T extends SavedItem>({
   edited: boolean;
   disabled: boolean;
   onUpdate: (record: T) => Promise<unknown>;
-  label?: string;
 }) {
-  const phone = usePhone();
   return (
     <Button
       size="compact-sm"
       variant="subtle"
-      // A phone sheet's footer is one tight row, beside the record's name above.
       aria-label={`Save ${noun}`}
       disabled={disabled || (!!current && !edited)}
       onClick={() =>
@@ -805,7 +801,7 @@ export function SaveButton<T extends SavedItem>({
           : naming.name("save")
       }
     >
-      {label ?? (phone ? "Save" : `Save ${noun}`)}
+      Save
     </Button>
   );
 }

@@ -71,6 +71,7 @@ export function ChipSelect({
     onDropdownClose: () => {
       onDropdownClose?.();
       combobox.resetSelectedOption();
+      setSearch("");
     },
   });
   const options = defaultOptionsFilter({
@@ -134,7 +135,7 @@ export function ChipSelect({
         {searchable && (
           <Combobox.Search
             aria-label={`Search ${name}`}
-            placeholder="Search..."
+            placeholder="Search"
             value={search}
             onChange={(event) => {
               setSearch(event.currentTarget.value);

@@ -35,8 +35,6 @@ import { type ReferenceBrowser, useReferenceBrowser } from "./useReferenceBrowse
 
 import classes from "./ReferencePicker.module.css";
 
-const referenceGalleryTabs = galleryTabs.filter((tab) => tab.value !== "liked");
-
 /** The Library's cards, after the gallery's tabs, with Characters. */
 const cardTabs: typeof galleryTabs = [
   { value: "characters", label: "Characters" },
@@ -132,11 +130,11 @@ export function ReferencePicker({
   const localBrowser = useReferenceBrowser();
   const browser = controlledBrowser || localBrowser;
   const chosen = browser.state.target;
-  const referenceTabs = charactersOn ? [referenceGalleryTabs, cardTabs] : [referenceGalleryTabs];
+  const referenceTabs = charactersOn ? [galleryTabs, cardTabs] : [galleryTabs];
   const tab = referenceTabs.flat().some((item) => item.value === browser.state.tab)
     ? browser.state.tab
     : "gallery";
-  const galleryTab = referenceGalleryTabs.some((item) => item.value === tab);
+  const galleryTab = galleryTabs.some((item) => item.value === tab);
   const target = nextReferenceTarget(references, profile, chosen);
   function browse(patch: Partial<ReferenceBrowser["state"]>) {
     if (!("target" in patch)) browser.scroll.current = 0;
@@ -179,10 +177,10 @@ export function ReferencePicker({
   function dropData(data: DataTransfer, into: ReferenceTarget | null = chosen) {
     const cell = data.getData(referenceCellType);
     const gallery = data.getData(galleryReferenceType);
+    if (data.files.length && !cell && !gallery) return uploadFiles([...data.files], into);
     if (cell) {
       if (into) moveReference(cell, into);
     } else if (gallery) placement.addGalleryItem(JSON.parse(gallery), into);
-    else if (data.files.length) void placement.uploadFiles([...data.files], into);
     settle();
   }
   const uploadTile = (
@@ -344,7 +342,6 @@ export function ReferencePicker({
           more={charactersOn ? [cardTabs] : []}
           browser={browser}
           enabled={opened}
-          galleryViews={referenceGalleryTabs}
           actions={pasteButton}
           uploadTile={uploadTile}
           tile={(item, name) => {

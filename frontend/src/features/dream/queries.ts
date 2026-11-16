@@ -53,7 +53,8 @@ export const dreamQuery = queryOptions({
 /** The header's count of results waiting for a verdict, a comparison counting once. */
 export const dreamCountQuery = queryOptions({
   queryKey: ["dream", "count"],
-  queryFn: () => api<{ unseen: number; active: boolean }>("/api/dream/count"),
+  queryFn: () =>
+    api<{ unseen: number; images: number; videos: number; active: boolean }>("/api/dream/count"),
   refetchInterval: (query) => (query.state.data?.active ? 15_000 : false),
   refetchOnWindowFocus: "always",
 });

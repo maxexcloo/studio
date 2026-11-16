@@ -113,9 +113,9 @@ export function useAnimateLengthSetting(item?: MediaItem): Action {
   return {
     id: "animate-length",
     label: "Length",
-    loading: switching || models.isPending || (!retained && choice.isFetching),
+    loading: switching || models.isPending || (!retained && choice.isLoading),
     disabled:
-      switching || !item || !options || options.data.length < 2 || (!retained && choice.isFetching),
+      switching || !item || !options || options.data.length < 2 || (!retained && choice.isLoading),
     choice: {
       label: "Length (Seconds)",
       value: options?.value || "fixed",

@@ -693,11 +693,13 @@ export class GenerationQueue {
       )
       .sort((a, b) => tier(a.job) - tier(b.job));
     for (const { job } of movable) {
-      const members = job.queueBatch ? batches.get(job.queueBatch)! : [job];
-      // One prompt's split Count moves as a unit until it starts, then keeps its reservation.
+      const batch = job.queueBatch ? batches.get(job.queueBatch)! : [job];
+      const members = batch.filter(pending);
+      // One prompt's split Count moves its waiting jobs as a unit. Once part of it starts, the rest
+      // keep that worker unless it can't take them.
       if (
         job.queueBatch &&
-        (job.id !== job.queueBatch || members.some((member) => !pending(member)))
+        (job.id !== members[0].id || (members.length < batch.length && !stranded(job)))
       )
         continue;
       const targets = this.adapter
