@@ -487,7 +487,7 @@ test("A member sees only their cards and Presets in the Library, and a group wit
 }) => {
   await fixtures(page);
   await signIn(page, { id: "member", role: "user", features: {} });
-  await page.goto("/library");
+  await page.goto("/library#characters");
   await expect(page.getByText("No Characters", { exact: true })).toBeVisible();
   // The administration sections stay hidden.
   const select = page.getByRole("combobox", { name: "Library Section", exact: true });
@@ -664,7 +664,7 @@ test("Dream suggestions are reviewed and accepted in their matching Library sect
     outfits: state.outfits,
     scenes: state.scenes,
   });
-  await page.goto("/library");
+  await page.goto("/library#characters");
   const suggestions = page.getByRole("list", { name: "Suggestions", exact: true });
   await expect(suggestions.getByRole("listitem")).toHaveCount(1);
   await expect(suggestions.getByRole("listitem", { name: "Ranger", exact: true })).toBeVisible();
