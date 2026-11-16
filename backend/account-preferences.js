@@ -104,6 +104,9 @@ export function saveAccountPreferences(ownerId, patch) {
   return accountPreferences(ownerId);
 }
 
+/** Reads every account's preferences afresh, after a migration rewrote them. */
+export const reloadAccountPreferences = () => cache.clear();
+
 /** A deleted account's preferences go with it. */
 export function forgetAccountPreferences(ownerId) {
   deleteRuntimeDocument(dataDir, documentName(ownerId));

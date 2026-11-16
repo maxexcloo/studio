@@ -1,4 +1,6 @@
+import { reloadAccountPreferences } from "./account-preferences.js";
 import { characterGenerated } from "./character-generated.js";
+import { chatBriefFavourites } from "./chat-brief-favourites.js";
 import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
@@ -75,6 +77,13 @@ const steps = [
     run: spicyPrompts,
     changes: (plan) => plan.accounts,
     online: true,
+  },
+  {
+    name: "chatBriefFavourites",
+    run: chatBriefFavourites,
+    changes: (plan) => plan.accounts,
+    online: true,
+    reload: reloadAccountPreferences,
   },
 ];
 

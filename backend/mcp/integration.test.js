@@ -7382,6 +7382,9 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
     record("taste", (req) => ({
       summary: "Moody light",
       preferences: req.body.preferences,
+      avoid: req.body.preferences.avoid,
+      models: [],
+      loras: [],
       signals: 3,
     })),
   );
@@ -7871,16 +7874,22 @@ test("axis varies one thing at one seed, one image each, as a lettered side-by-s
   assert.equal(f.submitted.length, 0);
 });
 
-test("the account's brief comes back with a chat's first generate, picks its favourite model and refuses what it avoids", async (t) => {
+test("the account's brief comes back with a chat's first generate, picks its taste's favourite model and refuses its Dislikes", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
-  // Learnt Dislikes guide the writer; only the user's own refuse a prompt.
-  const taste = { avoid: ["coat"], preferences: {} };
+  // Each field is the user's where they set it, else what Studio learnt; learnt Dislikes refuse too.
+  const learnt = { avoid: ["coat"], models: [], loras: ["film"] };
+  const taste = { ...learnt, preferences: {} };
   f.app.get("/api/taste", (_req, res) => res.json(taste));
   f.app.put("/api/taste", (req, res) => {
-    Object.assign(taste.preferences, req.body.preferences);
+    for (const [key, value] of Object.entries(req.body.preferences)) {
+      if (value === null) delete taste.preferences[key];
+      else taste.preferences[key] = value;
+      taste[key] = value ?? learnt[key];
+    }
     res.json(taste);
   });
+  await failure(client, "generate", { prompts: ["A red coat"] });
   const saved = data(
     await call(client, "project", {
       action: "brief",
@@ -7889,11 +7898,16 @@ test("the account's brief comes back with a chat's first generate, picks its fav
       avoid: "buttons",
     }),
   );
+  assert.deepEqual(taste.preferences, { avoid: ["buttons"], models: [imageProfile.id] });
   assert.equal(saved.user_brief.subjects, "a woman in her 30s");
   assert.deepEqual(saved.avoid, ["buttons"]);
+  assert.deepEqual(saved.lora_names, ["film"]);
   await failure(client, "generate", { prompts: ["A coat with buttons"] });
   const reply = await call(client, "generate", { prompts: ["A woollen coat"] });
-  assert.match(texts(reply), /The user's brief: subjects a woman in her 30s; models /);
+  assert.match(
+    texts(reply),
+    /The user's brief: subjects a woman in her 30s; favourite models .+; favourite LoRAs film; avoid buttons\./,
+  );
   assert.match(texts(reply), /the user's favourite/);
   assert.equal(f.submitted.at(-1).profileId, imageProfile.id);
   assert.doesNotMatch(
