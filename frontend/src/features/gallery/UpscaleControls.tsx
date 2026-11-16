@@ -139,35 +139,10 @@ export function useUpscaleMany(items: MediaItem[]) {
   });
   return { ...mutation, settings: upscaleSettings(quick, true) };
 }
-/** Upscale's remembered settings as menu options: Face Detail (images), Quality and Size. */
+/** Upscale's remembered settings as menu options: Quality, Size and Face Detail (images). */
 function upscaleSettings(quick: ReturnType<typeof useQuickUpscale>, image: boolean): Action[] {
   const status = quick.status.data;
   return [
-    // Face Detail joins every run from here once checked; disabled where the worker can't.
-    ...(image
-      ? [
-          {
-            id: "upscale-face",
-            label: "Face Detail",
-            icon: ScanFace,
-            checked: quick.faceDetail,
-            disabled: !quick.faceAvailable,
-            keepOpen: true,
-            onClick: () => quick.setFaceDetail(!quick.faceDetail),
-          },
-          ...(quick.downloadFaceDetector
-            ? [
-                {
-                  id: "upscale-face-download",
-                  label: "Download Face Detector",
-                  icon: icons.download,
-                  disabled: quick.downloadFaceDetector.pending,
-                  onClick: quick.downloadFaceDetector.run,
-                },
-              ]
-            : []),
-        ]
-      : []),
     {
       id: "upscale-quality",
       label: "Upscale Quality",
@@ -199,6 +174,31 @@ function upscaleSettings(quick: ReturnType<typeof useQuickUpscale>, image: boole
               onChange: (value: string) => quick.setTarget(Number(value) as typeof quick.target),
             },
           },
+        ]
+      : []),
+    // Face Detail joins every run from here once checked; disabled where the worker can't.
+    ...(image
+      ? [
+          {
+            id: "upscale-face",
+            label: "Face Detail",
+            icon: ScanFace,
+            checked: quick.faceDetail,
+            disabled: !quick.faceAvailable,
+            keepOpen: true,
+            onClick: () => quick.setFaceDetail(!quick.faceDetail),
+          },
+          ...(quick.downloadFaceDetector
+            ? [
+                {
+                  id: "upscale-face-download",
+                  label: "Download Face Detector",
+                  icon: icons.download,
+                  disabled: quick.downloadFaceDetector.pending,
+                  onClick: quick.downloadFaceDetector.run,
+                },
+              ]
+            : []),
         ]
       : []),
   ];
