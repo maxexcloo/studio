@@ -353,10 +353,14 @@ export function createGenerationQueue({
         : null;
     if (combined?.backendIds?.length)
       input.profileBackend = runBackend(
-        combined.backendIds.map((id) => ({
-          id,
-          references: workflowOnBackend(combined, id).mediaInputs?.length || 0,
-        })),
+        combined.backendIds.map((id) => {
+          const own = workflowOnBackend(combined, id);
+          return {
+            id,
+            references: own.mediaInputs?.length || 0,
+            loras: Boolean(own.loraStack?.model),
+          };
+        }),
         combined.backend,
         input.profileBackend || named,
         Boolean(input.referenceAssets?.length),
