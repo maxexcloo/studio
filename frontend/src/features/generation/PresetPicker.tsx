@@ -8,24 +8,11 @@ import { api } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { iconChipProps } from "./chip";
 import { defaultProfile, initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
-import { inspirationInput, inspirationQuery } from "./inspiration";
 import { generationInput } from "./payload";
-import {
-  ChipPopup,
-  PickerHeader,
-  SaveButton,
-  SavedList,
-  SavedName,
-  type SavedSort,
-  SortMenu,
-  savedItems,
-  savedSortLabels,
-  useNaming,
-} from "./Picker";
+import { ChipPopup, SaveButton, SavedName, useNaming } from "./Picker";
 import {
   type Preset,
   type PresetPart,
@@ -39,7 +26,6 @@ import {
   replaceMessage,
 } from "./presets";
 
-import classes from "./Picker.module.css";
 /** The account's saved presets, newest first. */
 export const presetsQuery = queryOptions({
   queryKey: ["user-presets"],
@@ -103,10 +89,8 @@ export function usePresets(enabled = true) {
 
 /**
  * The Presets chip and its popup for any generation editor: the preset's name, which loads, saves
- * and renames presets, with what a new one saves in its menu; then the Library's imported images,
- * which load their settings where the editor's profile fits them and otherwise their prompt (they
- * are edited in Library › Imports). `onLoad` replaces that editor's input and preset selection,
- * then the popup closes.
+ * and renames presets, with what a new one saves in its menu. `onLoad` replaces that editor's
+ * input and preset selection, then the popup closes.
  */
 export function PresetPicker({
   input,
@@ -124,7 +108,6 @@ export function PresetPicker({
   onLoad: (input: GenerationInput, selection: PresetSelection) => void;
 }) {
   const [opened, setOpened] = useState(false);
-  const phone = usePhone();
   const { draftForKind, models, profiles } = useGeneration();
   const preferred = defaultProfile(models.data, input.kind);
   const defaults = generationInput(
@@ -133,10 +116,7 @@ export function PresetPicker({
     [],
   );
   const presets = usePresets(opened);
-  const inspiration = useQuery({ ...inspirationQuery, enabled: opened });
   const naming = useNaming();
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<SavedSort>("name-asc");
   const [parts, setParts] = useRemembered("preset-parts", defaultParts);
   // A preset of every part holds them all, as one saved before parts.
   const savedParts = parts.length < presetParts.length ? parts : undefined;
@@ -177,10 +157,6 @@ export function PresetPicker({
             ? !!input.loras.length
             : true,
   );
-  const ideas = (inspiration.data?.presets || []).map((preset) => ({
-    ...preset,
-    detail: preset.prompt,
-  }));
   const select = (preset?: Preset) =>
     onSelectionChange({ presetId: preset?.id, presetTitle: preset?.title });
   return (
@@ -297,55 +273,6 @@ export function PresetPicker({
             {presets.error.message}
           </Text>
         )}
-        <Stack gap={4}>
-          <Text fw={500}>From Library</Text>
-          <Text size="xs" c="dimmed">
-            Images imported into the Library: start from their prompt and settings.
-          </Text>
-        </Stack>
-        <PickerHeader
-          label="From Library"
-          query={query}
-          onQueryChange={setQuery}
-          actions={<SortMenu labels={savedSortLabels} value={sort} onChange={setSort} />}
-        />
-        {inspiration.error && (
-          <Text c="red" size="sm">
-            {inspiration.error.message}
-          </Text>
-        )}
-        {/* Desktop keeps the list at one height, so loading never resizes the popup; the phone
-            sheet's body scrolls it, between its header and footer. */}
-        <Stack
-          gap={0}
-          h={phone ? undefined : "min(35dvh, 280px)"}
-          flex={phone ? 1 : undefined}
-          mih={0}
-          className={classes.list}
-        >
-          {inspiration.isPending ? (
-            <LoadingState fill label="Loading Images" />
-          ) : (
-            <SavedList
-              label="From Library"
-              items={savedItems(ideas, query, sort)}
-              empty={ideas.length ? "No Matches" : "No Imported Images"}
-              replaces={(preset) =>
-                presetReplacesUnsaved(
-                  current(),
-                  { ...initialInput, ...inspirationInput(preset, current(), profile) },
-                  defaults,
-                  selected,
-                )
-              }
-              replaceMessage="Replace the current prompt with this image's, and its settings where they fit?"
-              onLoad={(preset) => {
-                onLoad(inspirationInput(preset, current(), profile), {});
-                setOpened(false);
-              }}
-            />
-          )}
-        </Stack>
       </Stack>
     </ChipPopup>
   );
