@@ -1,11 +1,26 @@
+import type { PopoverContextValue } from "@mantine/core";
+
 // A click outside an open popup (popover, menu or dropdown, marked `data-popup` by the theme) only
-// closes it. Mantine closes popups on mousedown/touchstart; the press keeps focus where it is and
-// the click that follows never reaches what lies beneath. Pressing a popup's own trigger still
-// toggles it.
+// closes the topmost layer through its Mantine state owner. The press keeps focus where it is,
+// and its release and click never reach what lies beneath. A popup's own trigger still toggles it.
 
 /** Matches every popup dropdown, including kept-mounted hidden and closing ones. */
 export const popupLayer = "[data-popup]";
 let closing = false;
+let managedPress = false;
+const popups = new WeakMap<HTMLElement, PopoverContextValue>();
+
+/** The dropdown keeps Mantine's state owner, including controlled menus and comboboxes. */
+export const registerPopup = (root: HTMLElement, context: PopoverContextValue) => {
+  popups.set(root, context);
+  return () => {
+    if (popups.get(root) === context) popups.delete(root);
+  };
+};
+const dismiss = (context: PopoverContextValue) => {
+  context.onClose?.();
+  context.onDismiss?.();
+};
 
 /** Whether the current press is dismissing a popup, so outside-click handlers can ignore it. */
 export const closingPopup = () => closing;
@@ -18,12 +33,13 @@ export const closingPopup = () => closing;
 const seenOpen = new WeakSet<HTMLElement>();
 const shown = (layer: HTMLElement) => {
   if (!layer.getClientRects().length) return false;
+  const context = popups.get(layer);
+  if (context) return context.opened;
   const expanded = document.getElementById(layer.id.replace(/-dropdown$/, ""))?.ariaExpanded;
   if (expanded) return expanded === "true";
   if (layer.style.opacity !== "0") seenOpen.add(layer);
   return layer.style.opacity !== "0" || !seenOpen.has(layer);
 };
-const popupOpen = () => [...document.querySelectorAll<HTMLElement>(popupLayer)].some(shown);
 const openLayers = () =>
   [
     ...document.querySelectorAll<HTMLElement>(
@@ -34,7 +50,21 @@ const openLayers = () =>
 // The layers open as each key went down: a layer its own Escape closes still owns that Escape
 // once it has closed, so handlers beneath that see it later leave it alone.
 let pressed: { event: Event; layers: HTMLElement[] } | undefined;
-window.addEventListener("keydown", (event) => (pressed = { event, layers: openLayers() }), true);
+window.addEventListener(
+  "keydown",
+  (event) => {
+    const layers = openLayers();
+    pressed = { event, layers };
+    const top = layers.at(-1);
+    const context = top && popups.get(top);
+    if (event.key === "Escape" && !event.isComposing && top && context?.closeOnEscape) {
+      dismiss(context);
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  },
+  true,
+);
 
 /**
  * Whether an open popup, dialog or drawer is stacked over `owner` (over the page without one). A
@@ -76,40 +106,67 @@ window.addEventListener(
     const target = event.target as Element;
     if (target.closest(".mantine-Notification-root")) {
       closing = false;
+      managedPress = false;
       return;
     }
-    // Sees open dialogs before a press closes one, so its fade-out is not taken for a fade-in.
-    const top = openLayers().at(-1);
-    const phone = document.documentElement.hasAttribute("data-phone");
-    if (phone && top?.matches(popupLayer)) {
-      // Comboboxes control a listbox inside the dropdown rather than the dropdown itself.
-      const trigger =
-        document.getElementById(top.id.replace(/-dropdown$/, "")) ||
-        [...document.querySelectorAll<HTMLElement>('[aria-expanded="true"][aria-controls]')].find(
-          (control) =>
-            control
-              .getAttribute("aria-controls")!
-              .split(" ")
-              .some((id) => {
-                const list = document.getElementById(id);
-                return list && top.contains(list);
-              }),
-        );
-      const control = trigger?.closest(".mantine-Input-wrapper") || trigger;
-      closing = !top.contains(target) && !control?.contains(target);
+    // Sees dialogs before a press closes one, and excludes native popups as soon as they close.
+    const layers = openLayers();
+    const top = layers.at(-1);
+    const context = top && popups.get(top);
+    managedPress = layers.some((layer) => popups.has(layer));
+    if (!top || !context) {
+      closing = false;
+      return;
+    }
+    // Comboboxes control a listbox inside the dropdown rather than the dropdown itself.
+    const trigger =
+      document.getElementById(context.getTargetId()) ||
+      [...document.querySelectorAll<HTMLElement>('[aria-expanded="true"][aria-controls]')].find(
+        (control) =>
+          control
+            .getAttribute("aria-controls")!
+            .split(" ")
+            .some((id) => {
+              const list = document.getElementById(id);
+              return list && top.contains(list);
+            }),
+      );
+    const control = trigger?.closest(".mantine-Input-wrapper") || trigger;
+    closing = !top.contains(target) && !control?.contains(target);
+    if (closing && top.dataset.popupOutside !== "false") {
+      dismiss(context);
       // The same press must not arm a hold or another action beneath the popup.
-      if (closing) event.stopPropagation();
-    } else {
-      // A dialog opened from a popup owns its own clicks.
-      closing =
-        !target.closest(`${popupLayer}, [aria-expanded="true"], .mantine-Modal-root`) &&
-        popupOpen();
+      event.stopPropagation();
     }
   },
   true,
 );
 window.addEventListener("pointercancel", () => (closing = false), true);
-window.addEventListener("mousedown", (event) => closing && event.preventDefault(), true);
+for (const name of ["mousedown", "touchstart"]) {
+  window.addEventListener(
+    name,
+    (event) => {
+      if (!closing) return;
+      if (name === "mousedown") event.preventDefault();
+      event.stopPropagation();
+    },
+    true,
+  );
+  // Let React and native controls handle presses inside the popup first. Mantine's independent
+  // document listeners must not then dismiss its parents, including parents in other portals.
+  document.addEventListener(name, (event) => {
+    if (managedPress) event.stopImmediatePropagation();
+  });
+}
+for (const name of ["pointerup", "mouseup", "touchend"]) {
+  window.addEventListener(
+    name,
+    (event) => {
+      if (closing) event.stopPropagation();
+    },
+    true,
+  );
+}
 window.addEventListener(
   "click",
   (event) => {
