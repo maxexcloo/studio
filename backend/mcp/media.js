@@ -4,7 +4,13 @@ import path from "node:path";
 
 import sharp from "sharp";
 
-import { isCloudProfile, loraCompatibility, loraName, runBackend } from "../../shared/profiles.ts";
+import {
+  isCloudProfile,
+  loraCompatibility,
+  loraName,
+  profileBackendLabels,
+  runBackend,
+} from "../../shared/profiles.ts";
 import { selectedResolution, withResolution } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { accessFeatures } from "../account-policy.js";
@@ -20,6 +26,7 @@ import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
 import { imageMimes } from "../reference-names.js";
 import {
   assertAdjustable,
+  fitSize,
   maxJobsPerCall,
   mcpControls,
   mcpGenerationCount,
@@ -407,6 +414,17 @@ export class McpMedia {
       readyReason: option.reason,
     });
   }
+  /**
+   * The profile a run uses: a combined profile's backend for a run with or without references and
+   * LoRAs (runBackend), whose own sizes, slots and defaults then apply.
+   */
+  runProfile(profile, { backend, references = false, loras = false } = {}) {
+    if (!profile.backend) return profile;
+    return this.profileForBackend(
+      profile,
+      runBackend(profile.backendOptions, profile.backend, backend, references, loras),
+    );
+  }
 
   /**
    * The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream.
@@ -564,17 +582,11 @@ export class McpMedia {
       (item) => item.id === request.profile_id,
     );
     if (!profile) throw new Error("Choose a ready profile from models.");
-    if (profile.backend)
-      profile = this.profileForBackend(
-        profile,
-        runBackend(
-          profile.backendOptions,
-          profile.backend,
-          request.profile_backend,
-          Boolean(request.reference_asset_ids?.length),
-          Boolean(request.loras?.length),
-        ),
-      );
+    profile = this.runProfile(profile, {
+      backend: request.profile_backend,
+      references: Boolean(request.reference_asset_ids?.length),
+      loras: Boolean(request.loras?.length),
+    });
     const cloud = isCloudVideo(profile);
     if (cloud) await this.checkCloudJobs();
     if (cloud && this.cloudPause())
@@ -622,7 +634,7 @@ export class McpMedia {
     const loraNotes = [];
     const stack = loras.length ? prepareLoras(profile, infos, loras, loraNotes) : [];
     // What the submission changed or left out, said before anything else in the reply.
-    const ignored = [skipped, ...loraNotes].filter(Boolean).join(" ");
+    const changes = [skipped, ...loraNotes];
     // The guide's recommended negative when the caller gave none (only where the profile takes one, above CFG 1).
     if (negative_prompt === undefined && adjustable.negative_prompt) {
       const filled = recommendedNegative(profile.prompting, {
@@ -642,10 +654,11 @@ export class McpMedia {
         ? { strength: reference_strengths[index] }
         : {}),
     }));
-    if (
-      reference_asset_ids.length > slots.length ||
-      slots.some((slot) => slot.required && !placed.some((item) => item.slot === slot.id))
-    )
+    if (reference_asset_ids.length > slots.length)
+      throw new Error(
+        `${profile.label || profile.id}${profile.backend ? ` on ${profileBackendLabels[profile.backend] || profile.backend}` : ""} takes ${slots.length ? `at most ${slots.length}` : "no"} reference${slots.length === 1 ? "" : "s"}; pass ${slots.length ? `${slots.length} or fewer` : "none"}.`,
+      );
+    if (slots.some((slot) => slot.required && !placed.some((item) => item.slot === slot.id)))
       throw new Error("Supply the references required by this profile.");
     for (const id of [
       ...reference_asset_ids,
@@ -712,6 +725,14 @@ export class McpMedia {
       body.resolution = native;
     } else body.resolutionTier = resolution || selectedResolution(body, profile);
     Object.assign(body, withResolution(body, profile));
+    const fitted = profile.kind === "image" && fitSize(profile, body.width, body.height);
+    if (fitted) {
+      changes.push(
+        `${body.width}×${body.height} is past ${profile.label || profile.id}'s limit, so it ran ${fitted.width}×${fitted.height}.`,
+      );
+      Object.assign(body, fitted);
+    }
+    const ignored = changes.filter(Boolean).join(" ");
     // Large draws decode in tiles, matching the browser's generation path.
     if (
       profile.kind === "image" &&

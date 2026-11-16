@@ -20,7 +20,7 @@ import {
   withCharacter,
 } from "../../shared/characters.ts";
 import { compareVariants } from "../../shared/compare.ts";
-import { isCloudProfile } from "../../shared/profiles.ts";
+import { isCloudProfile, profileBackendLabels, runBackend } from "../../shared/profiles.ts";
 import { resolutions } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { upscaleQualities } from "../../shared/upscale.ts";
@@ -813,6 +813,25 @@ export function registerGenerateTools({
             ([key]) => controls[key] || ["frames", "fps", "duration"].includes(key),
           ),
         );
+        // The size a run without aspect draws: the family's default preset, else the profile's own.
+        const size = mcpSize(profile) || profile.defaults;
+        if (controls.aspect && size?.width && size?.height)
+          defaults.size = `${size.width}×${size.height}`;
+        // The backend a run with LoRAs uses, which may not be the default (runBackend).
+        const loraBackend =
+          controls.loras && profile.backend
+            ? profile.backendOptions.find(
+                (option) =>
+                  option.id ===
+                  runBackend(
+                    profile.backendOptions,
+                    listedProfile.backend,
+                    listedProfile.namedBackend,
+                    false,
+                    true,
+                  ),
+              )
+            : null;
         const modes =
           profile.imageModes &&
           Object.fromEntries(
@@ -854,6 +873,11 @@ export function registerGenerateTools({
             ? {
                 backend: profile.namedBackend || profile.backend,
                 backends: profile.backendOptions.map((option) => option.label),
+                ...(loraBackend
+                  ? {
+                      lora_backend: `${loraBackend.label}${loraBackend.ready === false ? " (not ready)" : ""}`,
+                    }
+                  : {}),
               }
             : {}),
           ...(tierNote ? { note: tierNote.trim() } : {}),
@@ -1399,10 +1423,21 @@ export function registerGenerateTools({
       input,
       input.profile_id !== undefined && targets.length === 1 ? targets[0].profile.id : undefined,
     );
-    targets = targets.map((target) => ({
-      ...target,
-      profile: media.profileForBackend(target.profile, target.profile.namedBackend),
-    }));
+    // Each target as the backend its run uses, whose sizes and slots then apply; a combined
+    // profile's reply names it for a run with LoRAs or one that leaves the default backend.
+    targets = targets.map((target) => {
+      const profile = media.runProfile(target.profile, {
+        backend: target.profile.namedBackend,
+        references: references > 0,
+        loras: Boolean(args.loras?.length),
+      });
+      const moved = !target.profile.namedBackend && profile.backend !== target.profile.backend;
+      const backend =
+        target.profile.backend && (args.loras?.length || moved)
+          ? `${profile.label || profile.id} runs on ${profileBackendLabels[profile.backend] || profile.backend}${args.loras?.length ? " with LoRAs" : " with references"}${profile.ready === false ? `, which isn't ready${profile.readyReason ? ` (${profile.readyReason})` : ""}` : ""}. `
+          : "";
+      return { ...target, profile, note: `${target.note || ""}${backend}` };
+    });
     // The model a warning names when the chosen one can't hold a character's (or reference's) face.
     const keeper =
       card?.referenceIds.length || named.length

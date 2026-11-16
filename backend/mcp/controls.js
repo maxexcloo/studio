@@ -49,7 +49,7 @@ export function mcpControls(profile) {
     const presets = profile.aspectPresets || [];
     const fallback = profile.aspectDefault || presets.find((item) => item.default)?.label;
     controls.aspect = {
-      options: presets.map((item) => item.label),
+      options: Object.fromEntries(presets.map((item) => [item.label, `${item.w}×${item.h}`])),
       ...(fallback ? { default: fallback } : {}),
     };
   }
@@ -685,4 +685,17 @@ export function mcpSize(profile, { aspect = profile.aspectDefault } = {}) {
     if (fitted) ({ width, height } = fitted);
   }
   return { width, height };
+}
+
+/**
+ * A size past the profile's width or height limit shrunk to fit on its step grid, keeping its
+ * shape, as Radiance does itself; null when it fits.
+ */
+export function fitSize(profile, width, height) {
+  const { width: across = {}, height: down = {} } = profile.constraints || {};
+  const scale = Math.min(1, (across.max || Infinity) / width, (down.max || Infinity) / height);
+  if (!(scale < 1)) return null;
+  const snap = (side, { min, step = 16 }) =>
+    Math.max(min || step, Math.floor((side * scale) / step) * step);
+  return { width: snap(width, across), height: snap(height, down) };
 }
