@@ -479,7 +479,6 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
         services: {},
         runtime: {
           configured: true,
-          automaticLifecycle: false,
           reason: "Studio switches GPU workloads only when an administrator applies a placement.",
         },
       },
@@ -496,17 +495,9 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
     ready: phase === "running" ? 1 : 0,
     acceptedOperations: 0,
   });
-  let settings = { automatic: false, parkIdleMinutes: 0 };
-  let refuse = false;
-  await page.route("**/api/runtime/settings", (route) => {
-    if (refuse) return route.fulfill({ status: 500, json: { error: "The cluster refused." } });
-    settings = route.request().postDataJSON();
-    return route.fulfill({ json: settings });
-  });
   await page.route("**/api/runtime", (route) =>
     route.fulfill({
       json: {
-        settings,
         pools: [{ id: "gpu", capacity: 2, used: 2 }],
         // Four changes, newest first; only the latest three show until Show All.
         history: ["first", "second", "third", "earlier"].map((id) => ({
@@ -555,40 +546,6 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   // The change history has its own section after the rarely changed controls.
   const history = page.getByRole("region", { name: "History", exact: true });
   await expect(history).toBeVisible();
-  // Idle settling applies only under automatic control, which saves 0 as Never.
-  const park = page.getByRole("combobox", { name: "Idle After", exact: true });
-  const idle = page.getByRole("combobox", { name: "Run When Idle", exact: true });
-  await expect(park).toBeDisabled();
-  await expect(park).toHaveValue("Never");
-  await expect(idle).toBeDisabled();
-  await expect(idle).toHaveValue("None");
-  // The switch turns on at once and stays on once the save is read back.
-  await page.getByRole("switch", { name: "Automatic Control", exact: true }).click({ force: true });
-  await expect(park).toBeEnabled();
-  expect(settings).toEqual({ automatic: true, parkIdleMinutes: 0 });
-  await park.click();
-  await page.getByRole("option", { name: "15 Min", exact: true }).click();
-  await expect(park).toHaveValue("15 Min");
-  expect(settings).toEqual({ automatic: true, parkIdleMinutes: 15 });
-  // Any workload can run when idle; a text choice says administrators swap it out from the queue.
-  await idle.click();
-  await page.getByRole("option", { name: "Text", exact: true }).click();
-  await expect(idle).toHaveValue("Text");
-  expect(settings).toEqual({ automatic: true, parkIdleMinutes: 15, idleWorkload: "text" });
-  await expect(page.getByText(/never stops text; administrators can swap it out/)).toBeVisible();
-  await page
-    .getByRole("switch", { name: "Let Everyone Swap Models", exact: true })
-    .click({ force: true });
-  await expect
-    .poll(() => settings)
-    .toEqual({ automatic: true, parkIdleMinutes: 15, idleWorkload: "text", everyoneSwaps: true });
-  // A refused save turns the switch back and says why.
-  refuse = true;
-  const swaps = page.getByRole("switch", { name: "Let Everyone Swap Models", exact: true });
-  await swaps.click({ force: true });
-  await expect(page.getByText("The cluster refused.", { exact: true })).toBeVisible();
-  await expect(swaps).toBeChecked();
-  refuse = false;
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
   await expect(table.getByRole("checkbox", { name: "Run Image", exact: true })).toBeChecked();
   const changes = history.getByRole("table", { name: "Runtime Changes" });
@@ -682,7 +639,7 @@ test("Workers keep a stopped workload quiet and stop a running change on request
             ],
           },
         },
-        runtime: { configured: true, automaticLifecycle: false, reason: "" },
+        runtime: { configured: true, reason: "" },
       },
     }),
   );
@@ -713,7 +670,6 @@ test("Workers keep a stopped workload quiet and stop a running change on request
   await page.route("**/api/runtime", (route) =>
     route.fulfill({
       json: {
-        settings: { automatic: false, parkIdleMinutes: 0 },
         pools: [{ id: "gpu", capacity: 2, used: 1 }],
         operation,
         history: [operation],
@@ -752,7 +708,7 @@ test("Workers benchmark a running local text model and list each run's figures",
     route.fulfill({
       json: {
         services: {},
-        runtime: { configured: true, automaticLifecycle: false, reason: "" },
+        runtime: { configured: true, reason: "" },
       },
     }),
   );
@@ -770,7 +726,6 @@ test("Workers benchmark a running local text model and list each run's figures",
   await page.route("**/api/runtime", (route) =>
     route.fulfill({
       json: {
-        settings: { automatic: false, parkIdleMinutes: 0 },
         pools: [{ id: "gpu", capacity: 2, used: 1 }],
         history: [],
         workloads: [
@@ -888,7 +843,7 @@ test("Status counts running workers, reads a parked service as Stopped and offer
             ],
           },
         },
-        runtime: { configured: true, automaticLifecycle: false, reason: "" },
+        runtime: { configured: true, reason: "" },
       },
     }),
   );

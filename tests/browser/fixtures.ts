@@ -446,7 +446,6 @@ export async function fixtures(page: Page) {
         ],
         runtime: {
           configured: false,
-          automaticLifecycle: false,
           reason:
             "Studio runtime control is not configured; GPU workloads are neither observed nor switched.",
         },

@@ -29,7 +29,7 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/(sessions\/[\w-]+|queue(\/[\w-]+)?|user-presets)$/],
   [
     "POST",
-    /^\/api\/(sessions(\/[\w-]+\/generations)?|queue\/([\w-]+\/(cancel|clear|move|retry|swap)|sets\/[\w-]+\/move|cancel-all|clear-failed|pause|resume)|user-presets)$/,
+    /^\/api\/(sessions(\/[\w-]+\/generations)?|queue\/([\w-]+\/(cancel|clear|move|retry)|sets\/[\w-]+\/move|cancel-all|clear-failed|pause|resume)|user-presets)$/,
   ],
   ["PATCH", /^\/api\/user-presets\/[\w-]+$/],
   ["DELETE", /^\/api\/user-presets\/[\w-]+$/],

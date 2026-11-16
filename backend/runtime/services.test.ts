@@ -98,7 +98,6 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
     "unknown",
   );
   assert.equal(admin.runtime.configured, true);
-  assert.equal(admin.runtime.automaticLifecycle, false);
   assert.match(admin.runtime.reason, /only when an administrator applies a placement/);
   assert.doesNotMatch(JSON.stringify(admin), /never-return|foreign-job|private details/);
   assert.equal(
@@ -190,11 +189,7 @@ test("workloads stopped on purpose are parked; one Studio's placement should run
     controller.acquire("image"),
     /image is stopped: an administrator can start it/,
   );
-  await assert.rejects(controller.acquire("text"), /text is down/);
-  // With automatic control a stopped worker still reads Stopped, though work may start it.
-  controller.configure({ automatic: true, parkIdleMinutes: 0 });
-  const automatic = await observe({ allowed: ["image"] });
-  assert.equal(automatic.services.image?.endpoints[0].state, "parked");
+  await assert.rejects(controller.acquire("text"), /text stopped outside Studio/);
   assert.deepEqual(
     [...(await parkedWorkers(controller, workers))],
     ["image-worker", "video-worker"],
