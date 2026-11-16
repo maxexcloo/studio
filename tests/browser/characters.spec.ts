@@ -469,6 +469,8 @@ test("A member sees only their cards and Presets in the Library, and a group wit
   else await expect(select).toHaveValue("Characters");
   await signIn(page, { id: "member", role: "user", features: { characters: false } });
   await page.goto("/library#imports");
+  // A hash-only navigation keeps the previous account in memory; load the new group's grants.
+  await page.reload();
   await expect(page.getByText("No Presets", { exact: true })).toBeVisible();
   await page.goto("/images?compose=1");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
