@@ -126,8 +126,8 @@ def to_diffusers(key):
     return key
 
 
-def map_transformer(source, destination, stopped):
-    """Writes the fine-tune under diffusers' tensor names; modulation tables become [6, D]."""
+def mapped_header(source):
+    """Map native names and shapes without reading tensor payloads."""
     size, tensors = header(source)
     metadata = tensors.pop("__metadata__", None)
     mapped = {}
@@ -144,6 +144,12 @@ def map_transformer(source, destination, stopped):
         mapped[name] = value
     if metadata:
         mapped["__metadata__"] = metadata
+    return size, mapped
+
+
+def map_transformer(source, destination, stopped):
+    """Writes the fine-tune under diffusers' tensor names; modulation tables become [6, D]."""
+    size, mapped = mapped_header(source)
     encoded = json.dumps(mapped, separators=(",", ":")).encode()
     encoded += b" " * (-len(encoded) % 8)
     partial = Path(str(destination) + ".part")
@@ -348,3 +354,45 @@ def clear(name):
         if JOB.get("name") == name and JOB.get("status") != "running":
             JOB.clear()
     return status()
+
+
+def main():
+    """Stage a native checkpoint for the supported converter, or inspect headers only."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--destination", type=Path, required=True)
+    parser.add_argument("--reference", type=Path)
+    parser.add_argument("--plan", action="store_true")
+    args = parser.parse_args()
+    check(args.source)
+    _, mapped = mapped_header(args.source)
+    tensors = {name: value for name, value in mapped.items() if name != "__metadata__"}
+    if args.reference:
+        _, reference = header(args.reference)
+        reference.pop("__metadata__", None)
+        if set(tensors) != set(reference) or any(
+            any(value[field] != reference[name][field] for field in ("dtype", "shape"))
+            for name, value in tensors.items()
+        ):
+            raise ValueError(
+                "Mapped tensor names, shapes or dtypes differ from the reference pipeline."
+            )
+    if not args.plan:
+        if args.destination.exists():
+            raise FileExistsError(args.destination)
+        map_transformer(args.source, args.destination, lambda: False)
+    print(
+        json.dumps(
+            {
+                "planned": args.plan,
+                "tensors": len(tensors),
+                "referenceMatched": bool(args.reference),
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

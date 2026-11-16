@@ -16,6 +16,8 @@ the labels and annotations a deployment needs and the service account role.
 Workers without them stay unmanaged. Media output saving retains admission until
 finished, so a switch waits for it.
 
+For operator-controlled native Krea checkpoint staging, run `python worker/comfyui/studio_worker/convert.py --help` from the checkout. Supply `--plan` for a header-only preview and `--reference` to require the tensor names, shapes and dtypes of an existing pipeline. Actual staging refuses an existing destination; the native `rad-convert` recipe validates the complete model before installation.
+
 CPU checks: `node --test backend/runtime/*.test.ts` and `mise run test:python`; no
 GPU is needed. GPU startup and actual inference need separate deployment
 verification.

@@ -118,6 +118,50 @@ test("explicit LoKr deferral survives catalogue metadata and rejects enabled sta
     ),
     "",
   );
+  const input = {
+    workflow: "custom:radiance-inventory",
+    model: "custom:radiance-inventory",
+    prompt: "A lighthouse",
+    loras: [{ name: file, strength: 1 }],
+  };
+  const nodes = radianceInfo([{ id: "krea-2-turbo-iq8r", state: "cold" }], [file]);
+  assert.throws(() => sanitizeGenerateBody(input, nodes), /Deferred pending exact LoKr/);
+  assert.deepEqual(
+    sanitizeGenerateBody({ ...input, loras: [{ name: file, enabled: false, strength: 1 }] }, nodes)
+      .loras,
+    [],
+  );
   loraCatalogue().edit(`loras/${file}`, { unavailableReason: null });
   assert.equal((await loraInfos("radiance", [file]))[file].unavailableReason, undefined);
+});
+
+test("Radiance catalogue distinguishes failed models from cold models and exposes one-GPU Qwen size bounds", async () => {
+  const { inferModels } = await import("./model/models.js");
+  const model = "qwen-image-2.1-iq8r";
+  saveImportedWorkflow({
+    studio: {
+      id: "qwen-bounds",
+      kind: "image",
+      family: "qwen_image_21",
+      defaults: { model, width: 1344, height: 1344 },
+      controls: Object.fromEntries(
+        ["model", "prompt", "width", "height"].map((input) => [input, { node: "1", input }]),
+      ),
+    },
+    graph: {
+      1: { class_type: "RadianceImageGenerate", inputs: { model } },
+      2: { class_type: "SaveImage", inputs: { images: ["1", 0] } },
+    },
+  });
+  const nodes = radianceInfo([{ id: model, state: "cold" }]);
+  const cold = inferModels(nodes, { radiance: [{ id: model, state: "cold" }] }).profiles.find(
+    (item) => item.id === "custom:qwen-bounds",
+  );
+  assert.notEqual(cold.ready, false);
+  assert.equal(cold.constraints.width.max, 1344);
+  assert.equal(cold.constraints.height.max, 1344);
+  const failed = inferModels(nodes, { radiance: [{ id: model, state: "failed" }] }).profiles.find(
+    (item) => item.id === "custom:qwen-bounds",
+  );
+  assert.equal(failed, undefined, "a failed model is not offered as ready");
 });

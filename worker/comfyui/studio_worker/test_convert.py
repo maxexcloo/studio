@@ -138,6 +138,41 @@ class CheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "not a Krea 2 DiT tensor"):
                 convert.map_transformer(source, target, lambda: False)
 
+    def test_plan_matches_reference_headers_and_refuses_missing_tensors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, reference, destination = (
+                Path(directory) / name
+                for name in ("source", "reference", "destination")
+            )
+            native(source, "BF16")
+            convert.map_transformer(source, reference, lambda: False)
+            argv = [
+                "convert",
+                "--source",
+                str(source),
+                "--destination",
+                str(destination),
+                "--reference",
+                str(reference),
+                "--plan",
+            ]
+            with patch.object(sys, "argv", argv), patch("builtins.print") as printed:
+                convert.main()
+            self.assertEqual(
+                json.loads(printed.call_args.args[0]),
+                {"planned": True, "tensors": 2, "referenceMatched": True},
+            )
+            self.assertFalse(destination.exists())
+            size, tensors = convert.header(source)
+            payload = source.read_bytes()[8 + size :]
+            tensors.pop("blocks.0.mod.lin")
+            safetensors(source, tensors, payload)
+            with (
+                patch.object(sys, "argv", argv),
+                self.assertRaisesRegex(ValueError, "differ from the reference"),
+            ):
+                convert.main()
+
 
 class ConversionTests(unittest.TestCase):
     def setUp(self):

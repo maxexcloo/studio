@@ -35,7 +35,7 @@ import { createAssistantContext } from "./assistant-context.js";
 import { promptAssistantOff, registerAssistantRoutes } from "./assistant-routes.js";
 import { refusal as cardRefusal, createCard, listCards, registerCardRoutes } from "./cards.js";
 import { createCharacterSheets } from "./character-sheets.js";
-import { configuredBackends, routeJob, setParkedCheck } from "./comfy/backends.js";
+import { configuredBackends, setParkedCheck } from "./comfy/backends.js";
 import {
   comfy,
   comfyOn,
@@ -499,8 +499,16 @@ const profileObjectInfo = async (kind) => {
   const radiance = listWorkers().find(
     (worker) => isRadianceWorker(worker) && worker.capabilities.includes(capability),
   );
+  const library = defaultWorker();
   const [info, radianceInfo] = await Promise.all([
-    loadComfyContext(routeJob(capability)?.id || defaultWorkerId()).then((context) => context.info),
+    loadComfyContext(library?.id || "").then(
+      (context) => context.info,
+      (error) => {
+        const saved = library && store.workerModels(library.id, library.url)?.info;
+        if (!saved && !radiance) throw error;
+        return saved;
+      },
+    ),
     radiance &&
       loadComfyContext(radiance.id).then(
         (context) => context.info,
