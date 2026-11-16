@@ -484,7 +484,7 @@ test("Viewer runs queue into the strip and Recreate › Recreate in Composer ope
   );
 });
 
-test("A regenerated result shows beside its source until All Versions collapses them", async ({
+test("A regenerated result shows beside its source until Originals Only collapses them", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
@@ -495,7 +495,7 @@ test("A regenerated result shows beside its source until All Versions collapses 
   const tiles = page.getByRole("button", { name: /^Open image: Amber Bird/ });
   await expect(tiles).toHaveCount(2);
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("switch", { name: "All Versions", exact: true }).click();
+  await page.getByRole("switch", { name: "Originals Only", exact: true }).click();
   await expect(tiles).toHaveCount(1);
   await expect(tiles).toHaveAccessibleName("Open image: Amber Bird, Version 1 of 2");
   // Closing on the other version returns to the tile holding it.
