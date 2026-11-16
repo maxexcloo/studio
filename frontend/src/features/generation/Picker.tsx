@@ -679,7 +679,7 @@ export function SavedList<T extends SavedItem>({
   items: T[];
   empty: string;
   /** Whether loading would overwrite the current draft, so it asks first. */
-  replaces: boolean;
+  replaces: boolean | ((item: T) => boolean);
   replaceMessage: string;
   onLoad: (item: T) => void;
 }) {
@@ -693,7 +693,11 @@ export function SavedList<T extends SavedItem>({
             <UnstyledButton
               className={classes.savedName}
               aria-label={`Load: ${item.name}`}
-              onClick={() => (replaces ? setConfirming(item.id) : onLoad(item))}
+              onClick={() =>
+                (typeof replaces === "function" ? replaces(item) : replaces)
+                  ? setConfirming(item.id)
+                  : onLoad(item)
+              }
             >
               <Text size="sm" truncate>
                 {item.name}

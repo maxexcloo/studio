@@ -11,6 +11,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { iconChipProps } from "./chip";
+import { defaultProfile, initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
 import { inspirationInput, inspirationQuery } from "./inspiration";
 import { generationInput } from "./payload";
 import {
@@ -25,80 +26,20 @@ import {
   savedSortLabels,
   useNaming,
 } from "./Picker";
+import {
+  type Preset,
+  type PresetPart,
+  type PresetSelection,
+  loadPresetInput,
+  presetEdited,
+  presetHolds,
+  presetInput,
+  presetParts,
+  presetReplacesUnsaved,
+  replaceMessage,
+} from "./presets";
 
 import classes from "./Picker.module.css";
-export interface Preset {
-  id: string;
-  title: string;
-  input: GenerationInput;
-  savedAt?: string;
-  /** The parts of the draft it holds, when only some; one saved without holds them all. */
-  parts?: PresetPart[];
-  /** The model family its LoRAs were chosen for, which the LoRA picker lists it under. */
-  family?: string;
-}
-/** The parts of a draft a preset may hold, by their input fields; Model & Settings has the rest. */
-const presetParts = [
-  { value: "prompt", label: "Prompt", noun: "prompt", keys: ["prompt", "cardParts"] },
-  { value: "negative", label: "Negative", noun: "negative prompt", keys: ["negative"] },
-  { value: "settings", label: "Model & Settings", noun: "model and settings", keys: [] },
-  {
-    value: "size",
-    label: "Size",
-    noun: "size",
-    keys: ["width", "height", "resolution", "resolutionTier", "tiledDecode"],
-  },
-  { value: "loras", label: "LoRAs", noun: "LoRAs", keys: ["loras"] },
-  {
-    value: "references",
-    label: "References",
-    noun: "references",
-    keys: ["referenceAssets", "referenceDetails"],
-  },
-] as const;
-type PresetPart = (typeof presetParts)[number]["value"];
-const partOf = (key: string): PresetPart =>
-  presetParts.find((part) => (part.keys as readonly string[]).includes(key))?.value ?? "settings";
-/** The input's fields in `parts`, or all of it. */
-const presetInput = (input: GenerationInput, parts?: PresetPart[]) =>
-  (parts
-    ? Object.fromEntries(Object.entries(input).filter(([key]) => parts.includes(partOf(key))))
-    : input) as GenerationInput;
-/** What a preset holds, by its parts' names, or those it leaves out when it holds most. */
-export const presetHolds = ({ parts }: Preset) => {
-  if (!parts) return "Everything";
-  const [held, left] = [true, false].map((holds) =>
-    presetParts.filter((part) => parts.includes(part.value) === holds).map((part) => part.label),
-  );
-  return left.length < held.length ? `All but ${left.join(" · ")}` : held.join(" · ");
-};
-/** Asks before a preset replaces the draft's parts it holds. */
-function replaceMessage(preset: Preset) {
-  if (!preset.parts) return "Replace the current prompt and settings with this preset?";
-  const nouns = presetParts
-    .filter((part) => preset.parts?.includes(part.value))
-    .map((part) => part.noun);
-  const list = nouns.length > 1 ? `${nouns.slice(0, -1).join(", ")} and ${nouns.at(-1)}` : nouns[0];
-  return `Replace the current ${list} with this preset? The rest stays as it is.`;
-}
-/** A value as JSON with its keys sorted, so equal drafts compare equal however they were built. */
-const stable = (value: unknown) =>
-  JSON.stringify(value, (_, item) =>
-    item && typeof item === "object" && !Array.isArray(item)
-      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
-      : item,
-  );
-/** Whether the draft differs from the preset in any part the preset holds. */
-const presetEdited = (preset: Preset, input: GenerationInput) => {
-  const draft = presetInput(input, preset.parts) as Record<string, unknown>;
-  const saved = preset.input as Record<string, unknown>;
-  return Object.keys(saved).some((key) => stable(draft[key]) !== stable(saved[key]));
-};
-/** The preset an editor last loaded or saved. */
-export interface PresetSelection {
-  presetId?: string;
-  presetTitle?: string;
-}
 /** The account's saved presets, newest first. */
 export const presetsQuery = queryOptions({
   queryKey: ["user-presets"],
@@ -184,6 +125,13 @@ export function PresetPicker({
 }) {
   const [opened, setOpened] = useState(false);
   const phone = usePhone();
+  const { draftForKind, models, profiles } = useGeneration();
+  const preferred = defaultProfile(models.data, input.kind);
+  const defaults = generationInput(
+    preferred ? inputForProfile(initialInput, preferred) : { ...initialInput, kind: input.kind },
+    preferred,
+    [],
+  );
   const presets = usePresets(opened);
   const inspiration = useQuery({ ...inspirationQuery, enabled: opened });
   const naming = useNaming();
@@ -195,6 +143,27 @@ export function PresetPicker({
   const current = () => generationInput(input, profile, references);
   const records = presets.records.map((preset) => ({ ...preset, detail: presetHolds(preset) }));
   const selected = records.find((preset) => preset.id === selection.presetId);
+  const loading = (preset: Preset) => {
+    const kind = preset.input.kind || input.kind;
+    const other = kind !== input.kind ? draftForKind(kind) : undefined;
+    const targetProfile = other
+      ? profiles.find((profile) => profile.id === other.input.profileId)
+      : profile;
+    const target = other
+      ? generationInput(other.input, targetProfile, other.references)
+      : current();
+    const preferred = defaultProfile(models.data, kind);
+    const baseline = other
+      ? generationInput(
+          preferred ? inputForProfile(initialInput, preferred) : { ...initialInput, kind },
+          preferred,
+          [],
+        )
+      : defaults;
+    const saved = other ? records.find((record) => record.id === other.presetId) : selected;
+    const loaded = { ...initialInput, ...loadPresetInput(preset, target) };
+    return { input: loaded, replaces: presetReplacesUnsaved(target, loaded, baseline, saved) };
+  };
   const edited = !!selected && presetEdited(selected, current());
   const prompted = !!input.prompt.trim();
   const canSave = (savedParts || presetParts.map((part) => part.value)).some((part) =>
@@ -265,9 +234,7 @@ export function PresetPicker({
             current={selected}
             edited={edited}
             canSave={canSave}
-            replaces={(preset) =>
-              prompted && (!selected || edited) ? replaceMessage(preset) : undefined
-            }
+            replaces={(preset) => (loading(preset).replaces ? replaceMessage(preset) : undefined)}
             menu={
               <>
                 <Menu.Label>New Presets Save</Menu.Label>
@@ -298,20 +265,10 @@ export function PresetPicker({
               </>
             }
             onLoad={(preset) => {
-              // A preset of some parts leaves the rest of the draft as it is.
-              onLoad(
-                preset.parts
-                  ? {
-                      ...current(),
-                      ...(preset.parts.includes("prompt") ? { cardParts: undefined } : {}),
-                      ...preset.input,
-                    }
-                  : preset.input,
-                {
-                  presetId: preset.id,
-                  presetTitle: preset.title,
-                },
-              );
+              onLoad(loading(preset).input, {
+                presetId: preset.id,
+                presetTitle: preset.title,
+              });
               setOpened(false);
             }}
             onSave={(title) =>
@@ -373,10 +330,17 @@ export function PresetPicker({
               label="From Library"
               items={savedItems(ideas, query, sort)}
               empty={ideas.length ? "No Matches" : "No Imported Images"}
-              replaces={prompted}
+              replaces={(preset) =>
+                presetReplacesUnsaved(
+                  current(),
+                  { ...initialInput, ...inspirationInput(preset, current(), profile) },
+                  defaults,
+                  selected,
+                )
+              }
               replaceMessage="Replace the current prompt with this image's, and its settings where they fit?"
               onLoad={(preset) => {
-                onLoad(inspirationInput(preset, input, profile), {});
+                onLoad(inspirationInput(preset, current(), profile), {});
                 setOpened(false);
               }}
             />
