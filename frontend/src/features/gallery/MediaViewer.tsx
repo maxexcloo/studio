@@ -480,7 +480,7 @@ export function MediaViewer({
         withCloseButton={false}
         title={<VisuallyHidden>{bare ? "Preview" : "Generation"}</VisuallyHidden>}
         // Over the popover or dialog a bare viewer opens from.
-        zIndex={bare ? getDefaultZIndex("popover") : undefined}
+        zIndex={bare ? getDefaultZIndex("max") : undefined}
         returnFocus={false}
         removeScrollProps={{ allowPinchZoom: true }}
         fullScreen
