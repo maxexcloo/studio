@@ -4,7 +4,6 @@ import test from "node:test";
 import {
   builtInAccessProfile,
   effectiveAccountAccess,
-  explicitWording,
   hasFullAccess,
   mayUseFeature,
   mayUseGenerationProfile,
@@ -12,7 +11,6 @@ import {
   validAccountKey,
   visibleGenerationProfiles,
 } from "./account-policy.js";
-import { createSuggestions } from "./domain/suggestions.ts";
 
 const available = ["image-fast", "image-quality", "video"];
 
@@ -225,55 +223,4 @@ test("an administrator that turns Cloud Models, LoRAs or Uncensored Models off l
   const noLoras = effectiveAccountAccess(account, {}, null, { loras: false });
   assert.equal(mayUseFeature(noLoras, "loras"), false, "the picker, admission and Dream");
   assert.equal(mayUseFeature(noLoras, "cloudModels"), true);
-});
-
-test("suggestions are worded explicitly only with Spicy Prompts on and Uncensored Models", async () => {
-  const groups = { open: { features: { uncensoredModels: true } }, plain: { features: {} } };
-  const member = (accessProfileId, preferences = {}) =>
-    effectiveAccountAccess(
-      { id: accessProfileId, role: "user", accessProfileId },
-      groups,
-      null,
-      preferences,
-    );
-  const access = { open: member("open"), plain: member("plain") };
-  const preferences = { open: { spicyPrompts: false }, plain: { spicyPrompts: true } };
-  const systems = [];
-  const suggestions = createSuggestions({
-    taste: { read: () => ({ summary: "Portraits.", signals: [] }) },
-    writer: () => ({
-      settings: () => ({}),
-      model: async () => "text",
-      chat: async ({ messages }) => {
-        systems.push(messages[0].content);
-        return { text: '{"steps": [{"label": "Closer", "request": "closer", "prompt": "A"}]}' };
-      },
-    }),
-    online: async () => true,
-    explicit: (owner) => explicitWording(access[owner], preferences[owner]),
-    item: () => undefined,
-    image: async () => null,
-    save: () => {},
-    ideas: () => true,
-    nextSteps: () => true,
-  });
-  const draft = (owner) =>
-    suggestions.suggest(owner, { surface: "draft", kind: "image", prompt: "A sultry portrait" });
-  await draft("open");
-  assert.doesNotMatch(systems[0], /Explicit content is allowed/, "off by default");
-  preferences.open.spicyPrompts = true;
-  await draft("open");
-  assert.match(systems[1], /Explicit content is allowed/);
-  await draft("plain");
-  assert.doesNotMatch(
-    systems[2],
-    /Explicit content is allowed/,
-    "ignored without Uncensored Models",
-  );
-  // Turning Uncensored Models off for itself turns explicit wording off too.
-  const optedOut = member("open", { uncensoredModels: false });
-  assert.equal(explicitWording(optedOut, { spicyPrompts: true }), false);
-  // Single-user mode has every feature, so only the preference counts.
-  assert.equal(explicitWording(undefined, { spicyPrompts: true }), true);
-  assert.equal(explicitWording(undefined, { spicyPrompts: false }), false);
 });

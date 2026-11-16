@@ -419,30 +419,30 @@ test("Administrators change roles, reset passwords and delete galleries, account
   expect(state.administration.accessProfiles.map((group) => group.id)).toEqual(["users"]);
 });
 
-test("A member turns the Cloud and Uncensored Models its group grants off for itself", async ({
+test("A member turns the Cloud Models its group grants off for itself, leaving Cloud no choice", async ({
   page,
 }) => {
   const state = await fixtures(page);
-  await signIn(page, {
-    id: "member",
-    role: "user",
-    features: { cloudModels: true, uncensoredModels: true },
-  });
-  state.preferences.grants = {
-    cloudModels: true,
-    loras: false,
-    spicyPrompts: false,
-    uncensoredModels: false,
-  };
+  await signIn(page, { id: "member", role: "user", features: { cloudModels: true } });
+  state.preferences.grants = { cloudModels: true, loras: false, uncensoredModels: false };
+  state.preferences.preferences.images = "cloud";
   await page.goto("/settings#preferences");
-  const models = page.getByRole("region", { name: "Models", exact: true });
+  const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
+  await expect(where).toBeVisible();
   // Only what the group grants can be turned off.
-  await expect(models.getByRole("switch")).toHaveCount(1);
-  const cloud = models.getByRole("switch", { name: "Cloud Models", exact: true });
+  await expect(page.getByRole("region", { name: "Models", exact: true })).toHaveCount(0);
+  const images = where.getByRole("radiogroup", { name: "Images", exact: true });
+  await expect(images.getByRole("radio", { name: "Cloud" })).toBeChecked();
+  const cloud = where.getByRole("switch", { name: "Cloud Models", exact: true });
   await expect(cloud).toBeChecked();
   await cloud.click({ force: true });
   await expect(cloud).not.toBeChecked();
   await expect.poll(() => state.preferences.preferences.cloudModels).toBe(false);
+  // Images then has nothing to choose, and Videos only the local tiers.
+  await expect(images).toHaveCount(0);
+  const videos = where.getByRole("radiogroup", { name: "Videos", exact: true });
+  await expect(videos.getByRole("radio")).toHaveCount(2);
+  await expect(videos.getByRole("radio", { name: "Cloud" })).toHaveCount(0);
   await page.reload();
   await expect(cloud).not.toBeChecked();
 });

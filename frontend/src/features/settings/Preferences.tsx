@@ -103,59 +103,83 @@ function DeleteFailedItems() {
   );
 }
 
-/** Spicy Prompts, offered only where the account's access has Uncensored Models. */
-function SpicyPrompts() {
+type ModelChoice = "cloudModels" | "loras" | "uncensoredModels";
+/** A switch for a model choice the account turns off for itself, shown only where its role or group grants it. */
+function ModelChoiceRow({
+  choice,
+  label,
+  description,
+}: {
+  choice: ModelChoice;
+  label: string;
+  description: string;
+}) {
   const status = useQuery(preferencesQuery).data;
   const save = useSavePreferences();
-  if (!status?.grants.spicyPrompts) return null;
+  if (!status?.grants[choice]) return null;
   return (
-    <SettingRow
-      label="Spicy Prompts"
-      description="Let prompt ideas, suggestions and proposed changes use explicit wording."
-    >
+    <SettingRow label={label} description={description}>
       <Switch
-        aria-label="Spicy Prompts"
-        checked={status.preferences.spicyPrompts}
-        onChange={(event) => save.mutate({ spicyPrompts: event.currentTarget.checked })}
+        aria-label={label}
+        checked={status.preferences[choice]}
+        onChange={(event) => save.mutate({ [choice]: event.currentTarget.checked })}
       />
     </SettingRow>
   );
 }
 
-const modelChoices = ["cloudModels", "loras", "uncensoredModels"] as const;
-/** Cloud Models, LoRAs and Uncensored Models, which an account turns off for itself where its role or group grants them. */
+/** LoRAs and Uncensored, where the account's role or group grants them. */
 function ModelChoices() {
-  const status = useQuery(preferencesQuery).data;
-  const save = useSavePreferences();
-  if (!status || !modelChoices.some((key) => status.grants[key])) return null;
-  const choice = (key: (typeof modelChoices)[number], label: string, description: string) =>
-    status.grants[key] && (
-      <SettingRow label={label} description={description}>
-        <Switch
-          aria-label={label}
-          checked={status.preferences[key]}
-          onChange={(event) => save.mutate({ [key]: event.currentTarget.checked })}
-        />
-      </SettingRow>
-    );
+  const grants = useQuery(preferencesQuery).data?.grants;
+  if (!grants?.loras && !grants?.uncensoredModels) return null;
   return (
     <SettingGroup title="Models">
-      {choice(
-        "cloudModels",
-        "Cloud Models",
-        "Offer the cloud models you have access to. Off hides them here and over MCP.",
-      )}
-      {choice(
-        "loras",
-        "LoRAs",
-        "Offer the LoRAs you have access to. Off hides them everywhere, Dream included.",
-      )}
-      {choice(
-        "uncensoredModels",
-        "Uncensored Models",
-        "Offer the uncensored models and themes you have access to. Off hides them everywhere.",
-      )}
+      <ModelChoiceRow
+        choice="loras"
+        label="LoRAs"
+        description="Offer the LoRAs you have access to. Off hides them everywhere, Dream included."
+      />
+      <ModelChoiceRow
+        choice="uncensoredModels"
+        label="Uncensored"
+        description="Offer the uncensored models and themes you have access to, and let prompt ideas and suggestions use explicit wording."
+      />
     </SettingGroup>
+  );
+}
+
+/** The gateway text model for prompt writing, whose `cloud/` and `local/` aliases route themselves. */
+function PromptAssistantModel() {
+  const preferences = useQuery(preferencesQuery).data?.preferences;
+  const assistant = useQuery(assistantQuery).data;
+  const save = useSavePreferences();
+  const models = assistant?.models || [];
+  // A saved pick shows at once; one the account may no longer use shows what its writing asks for.
+  const writingModel =
+    preferences?.writingModel && models.includes(preferences.writingModel)
+      ? preferences.writingModel
+      : assistant?.writingModel;
+  if (!preferences || !writingModel) return null;
+  return (
+    <SettingRow
+      wide
+      label="Prompt Assistant"
+      description="The model that writes and improves prompts."
+    >
+      {/* The gateway's and Studio's text workloads' models, keeping the current one a choice. */}
+      <Select
+        aria-label="Prompt Assistant"
+        data={[...new Set([...models, writingModel])].map((value) => ({
+          value,
+          label: textModelName(value),
+        }))}
+        value={writingModel}
+        onChange={(choice) => choice && save.mutate({ writingModel: choice })}
+        allowDeselect={false}
+        searchable
+        nothingFoundMessage="No Matches"
+      />
+    </SettingRow>
   );
 }
 
@@ -170,22 +194,18 @@ const videoChoices: { value: VideosPreference; label: string }[] = [
   { value: "quality", label: "Quality" },
 ];
 /**
- * Where Images and Videos run by default: Cloud or Local, and for Videos Cloud or the local Fast or
- * Quality tier (unsaved, Local and Fast). Text picks the gateway text model for prompt writing,
- * whose `cloud/` and `local/` aliases route themselves.
+ * Cloud Models, then where Images and Videos run by default: Cloud or Local, and for Videos Cloud
+ * or the local Fast or Quality tier (unsaved, Local and Fast). With Cloud Models off, Cloud is no
+ * choice, leaving Images none, and a saved Cloud reads as unsaved, as the backend reads it
+ * (account-preferences.js).
  */
 function WhereWorkRuns() {
   const status = useQuery(preferencesQuery).data;
-  const assistant = useQuery(assistantQuery).data;
   const save = useSavePreferences();
   if (!status) return null;
   const { preferences } = status;
-  const models = assistant?.models || [];
-  // A saved pick shows at once; one the account may no longer use shows what its writing asks for.
-  const writingModel =
-    preferences.writingModel && models.includes(preferences.writingModel)
-      ? preferences.writingModel
-      : assistant?.writingModel;
+  const cloud = preferences.cloudModels;
+  const videos = !cloud && preferences.videos === "cloud" ? undefined : preferences.videos;
   const row = <T extends string>(
     label: string,
     description: string,
@@ -205,36 +225,25 @@ function WhereWorkRuns() {
   );
   return (
     <SettingGroup title="Where Work Runs">
-      {row(
-        "Images",
-        "Where new images run until you pick a model.",
-        sides,
-        preferences.images || "local",
-        (images) => save.mutate({ images }),
-      )}
+      <ModelChoiceRow
+        choice="cloudModels"
+        label="Cloud Models"
+        description="Offer the cloud models you have access to. Off keeps all work local, here and over MCP."
+      />
+      {cloud &&
+        row(
+          "Images",
+          "Where new images run until you pick a model.",
+          sides,
+          preferences.images || "local",
+          (images) => save.mutate({ images }),
+        )}
       {row(
         "Videos",
         "Where new videos run until you pick a model.",
-        videoChoices,
-        preferences.videos || "fast",
-        (videos) => save.mutate({ videos }),
-      )}
-      {assistant && writingModel && (
-        <SettingRow wide label="Text" description="The model that writes and improves prompts.">
-          {/* The gateway's and Studio's text workloads' models, keeping the current one a choice. */}
-          <Select
-            aria-label="Text"
-            data={[...new Set([...models, writingModel])].map((value) => ({
-              value,
-              label: textModelName(value),
-            }))}
-            value={writingModel}
-            onChange={(choice) => choice && save.mutate({ writingModel: choice })}
-            allowDeselect={false}
-            searchable
-            nothingFoundMessage="No Matches"
-          />
-        </SettingRow>
+        cloud ? videoChoices : videoChoices.filter((choice) => choice.value !== "cloud"),
+        videos || "fast",
+        (choice) => save.mutate({ videos: choice }),
       )}
     </SettingGroup>
   );
@@ -308,6 +317,7 @@ export function Preferences() {
       </SettingGroup>
       <ModelChoices />
       <SettingGroup title="Prompts">
+        <PromptAssistantModel />
         <SettingRow
           label="Keep Recent Prompts"
           description="Offer your recent prompts in the composer's history. Pinned prompts stay either way."
@@ -321,7 +331,6 @@ export function Preferences() {
             onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
           />
         </SettingRow>
-        <SpicyPrompts />
       </SettingGroup>
       <WhereWorkRuns />
       <SettingGroup title="Danger Zone" danger>
