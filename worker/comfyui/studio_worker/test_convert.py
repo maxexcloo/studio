@@ -173,6 +173,51 @@ class CheckTests(unittest.TestCase):
             ):
                 convert.main()
 
+    def test_plan_accepts_supported_mixed_float_precisions_without_casting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, reference, destination = (
+                Path(directory) / name
+                for name in ("source", "reference", "destination")
+            )
+            native(source, "BF16")
+            convert.map_transformer(source, reference, lambda: False)
+            tensors = {
+                "blocks.0.attn.wq.weight": {
+                    "dtype": "F16",
+                    "shape": [2, 2],
+                    "data_offsets": [0, 8],
+                },
+                "blocks.0.mod.lin": {
+                    "dtype": "F32",
+                    "shape": [12],
+                    "data_offsets": [8, 56],
+                },
+            }
+            payload = bytes(range(56))
+            safetensors(source, tensors, payload)
+            argv = [
+                "convert",
+                "--source",
+                str(source),
+                "--destination",
+                str(destination),
+                "--reference",
+                str(reference),
+                "--plan",
+            ]
+            with patch.object(sys, "argv", argv), patch("builtins.print"):
+                convert.main()
+            self.assertFalse(destination.exists())
+            convert.map_transformer(source, destination, lambda: False)
+            size, mapped = convert.header(destination)
+            self.assertEqual(
+                mapped["transformer_blocks.0.attn.to_q.weight"]["dtype"], "F16"
+            )
+            self.assertEqual(
+                mapped["transformer_blocks.0.scale_shift_table"]["dtype"], "F32"
+            )
+            self.assertEqual(destination.read_bytes()[8 + size :], payload)
+
 
 class ConversionTests(unittest.TestCase):
     def setUp(self):
