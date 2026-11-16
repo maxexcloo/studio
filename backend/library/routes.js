@@ -5,7 +5,8 @@
  *   POST /api/library/imports {url}           import a Civitai image or model link, or a Hugging Face link
  *   GET  /api/library/imports/:id             one import, its files checked in full
  *   DELETE /api/library/imports/:id           remove one import record (its downloaded files stay)
- *   POST /api/library/imports/clear-failed    remove every failed import record: {cleared}
+ *   POST /api/library/imports/clear-stale     remove every failed import, and every one waiting on a file no provider gives: {cleared}
+ *   POST /api/library/imports/download-missing  Download Missing for every import: {queued, imports, failures}
  *   POST /api/library/imports/:id/download    Download Missing ({indices} for chosen files)
  *   POST /api/library/imports/:id/folder      {index, folder}: where a Hugging Face file goes
  *   POST /api/library/imports/:id/draft-profile  {index?}: draft a checkpoint's profile and guide (again, after a failure)
@@ -17,10 +18,9 @@
  *   POST /api/library/imports/image           {image: data URL, name}: a dropped PNG, WebP or JPEG
  *   GET  /api/library/imports/:id/picture     an image import's own picture
  *   POST /api/library/imports/:id/describe    describe an imported image with the vision model (a new record)
- *   POST /api/library/imports/:id/exact       {index}: Use Exact File instead of its substitute
+ *   POST /api/library/imports/:id/substitute  {index, accept}: keep a stand-in, or reject it for the exact file
  *   POST /api/library/imports/:id/offers      {index}: download one offered version or variant
  *   GET  /api/library/items                   installed and catalogued LoRAs and models, with provenance and updates
- *   GET  /api/library/unused                  installed entries no profile names, and LoRAs no run used in 90 days
  *   GET  /api/library/updates                 update states; POST …/check checks now; POST …/apply {key, alternative?}
  *
  * MCP's admin tools (mcp/admin.js) call these same routes; their imports and edits record chat as
@@ -46,7 +46,7 @@ import { loadSharp } from "../sharp-loader.js";
 import { refreshWorkerModels, workerInventory, workerModelFile } from "../worker-models.js";
 import { catalogueKinds, splitCatalogueKey } from "./catalogue.js";
 import { startLibraryDownload } from "./downloads.js";
-import { createImportEngine, importStore, publicImport } from "./imports.js";
+import { createImportEngine, importStore, publicImport, staleImport } from "./imports.js";
 import { libraryPlacement, lookupLibrary } from "./lookup.js";
 import { detectLink, resolveCivitaiModel, resolveHuggingFace } from "./sources.js";
 import { findSubstitute } from "./substitutes.js";
@@ -371,8 +371,6 @@ export function registerLibraryRoutes(
     repoint = async () => [],
     /** What still uses a model file: ['the Flux Dev profile', …] (update clean-up, Decision 4). */
     references = async () => [],
-    /** The LoRA files a gallery run used in the last 90 days. */
-    recentLoras = () => new Set(),
     removeFile = removeInstalled,
     /** Takes a removed LoRA out of every account's stacks, strengths, ratings, recents and presets (lora/stacks.js). */
     forget = forgetLora,
@@ -486,6 +484,11 @@ export function registerLibraryRoutes(
     pictures,
     describe: describePicture,
     vision: visionNow,
+    versionSpec: async (versionId) => {
+      const { spec, note } = versionResource(await json(`model-versions/${versionId}`));
+      if (!spec) throw new Error(note);
+      return spec;
+    },
   });
   const installedKeys = async () =>
     new Set(
@@ -574,8 +577,12 @@ export function registerLibraryRoutes(
       ),
     }),
   );
-  route("POST", "/api/library/imports/:id/exact", async (_account, { params, body }) =>
-    ok({ import: publicImport(await engine.useExact(params.id, Number(body?.index))) }),
+  route("POST", "/api/library/imports/:id/substitute", async (_account, { params, body }) =>
+    ok({
+      import: publicImport(
+        await engine.chooseSubstitute(params.id, Number(body?.index), body?.accept === true),
+      ),
+    }),
   );
   route("POST", "/api/library/imports/:id/offers", async (account, { params, body }) => {
     const result = await engine.acceptOffer(params.id, Number(body?.index), { by: by(account) });
@@ -585,14 +592,15 @@ export function registerLibraryRoutes(
       failures: result.failures,
     });
   });
-  route("POST", "/api/library/imports", async (account, { body }) => {
-    const record = await engine.create(String(body?.url || ""), {
-      by: by(account),
-      origin: origin(account, "ui"),
-    });
-    // A failed resolve is still a record (with its reason), so it answers like any other.
-    return ok({ import: publicImport(record) });
-  });
+  /** A new import of a Civitai or Hugging Face link, as the browser and MCP see it. */
+  const importLink = async (account, url) =>
+    publicImport(
+      await engine.create(String(url || ""), { by: by(account), origin: origin(account, "ui") }),
+    );
+  // A failed resolve is still a record (with its reason), so it answers like any other.
+  route("POST", "/api/library/imports", async (account, { body }) =>
+    ok({ import: await importLink(account, body?.url) }),
+  );
   /** Forgets a record and its picture; downloaded model files stay. */
   const forgetImport = (id) => {
     if (!store.remove(id)) return false;
@@ -600,10 +608,13 @@ export function registerLibraryRoutes(
     if (picture) fs.rmSync(picture, { force: true });
     return true;
   };
-  route("POST", "/api/library/imports/clear-failed", async () => {
-    const failed = store.list().filter((record) => record.state === "failed");
-    return ok({ cleared: failed.filter((record) => forgetImport(record.id)).length });
+  route("POST", "/api/library/imports/clear-stale", async () => {
+    const stale = (await engine.list()).filter(staleImport);
+    return ok({ cleared: stale.filter((record) => forgetImport(record.id)).length });
   });
+  route("POST", "/api/library/imports/download-missing", async (account) =>
+    ok(await engine.downloadAllMissing({ by: by(account) })),
+  );
   route("DELETE", "/api/library/imports/:id", async (_account, { params }) =>
     forgetImport(params.id)
       ? ok({})
@@ -709,37 +720,6 @@ export function registerLibraryRoutes(
     catalogue().edit(key, { removed: true }, { by: by(account), origin: origin(account, "admin") });
     return ok({ key, fileRemoved: removed });
   });
-  // Unused: installed catalogue entries to consider removing, with their sizes. A model counts when
-  // nothing references it (the removal path's own check); a LoRA when no run used it in 90 days and
-  // no profile names it.
-  route("GET", "/api/library/unused", async () => {
-    const { files } = await latestInstalled().catch(() => ({ files: {} }));
-    const entries = catalogue().entries();
-    const sizes = new Map(workerInventory().files.map((item) => [item.path, item.size]));
-    const definitions = await profileDefinitions().catch(() => []);
-    const ran = recentLoras();
-    const unused = await Promise.all(
-      libraryItems({ installed: files, entries })
-        .filter((item) => item.installed && entries[item.key])
-        .map(async (item) => {
-          const lora = item.folder === "loras";
-          if (lora) {
-            const quoted = JSON.stringify(item.file);
-            if (ran.has(item.file) || definitions.some(({ text }) => text.includes(quoted)))
-              return null;
-          } else if ((await references({ folder: item.folder, file: item.file })).length)
-            return null;
-          return {
-            key: item.key,
-            title: item.title || item.file,
-            kind: item.kind,
-            bytes: Number(sizes.get(item.key) ?? entries[item.key].bytes) || 0,
-            reason: lora ? "No run in 90 days" : "No profile uses it",
-          };
-        }),
-    );
-    return ok({ items: unused.filter(Boolean) });
-  });
   route("GET", "/api/library/updates", async () =>
     ok(await updates.settle().catch(() => updates.summary())),
   );
@@ -758,5 +738,5 @@ export function registerLibraryRoutes(
     // `applied` is this key's record; the summary's map of every applied update would hide it.
     return ok({ ...updates.summary(), applied });
   });
-  return { engine, updates };
+  return { engine, updates, importLink };
 }

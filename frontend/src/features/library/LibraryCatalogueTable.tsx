@@ -132,7 +132,7 @@ export function LibraryCatalogueTable({
   items: LibraryItem[];
   /** The catalogue is still loading: the toolbar shows, the table its loading state. */
   loading?: boolean;
-  label: "Models" | "LoRAs";
+  label: "Files" | "LoRAs";
   onUpdate?: (item: LibraryItem, alternative?: boolean) => void;
   onCheckUpdates?: () => void;
   /** Test LoRA: a strength sweep in Compare. */
@@ -151,7 +151,7 @@ export function LibraryCatalogueTable({
   const [family, setFamily] = useState<string | null>(null);
   const [type, setType] = useState<string | null>(null);
   const [modelType, setModelType] = useState<string | null>(null);
-  const models = label === "Models";
+  const models = label === "Files";
   // Whether a model is an original or a finetune is shown only where the catalogue says so.
   const withModelType = models && items.some((item) => item.modelType);
   // LoRA types are set only by editing an entry; until one is, every row would read Unclassified.

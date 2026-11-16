@@ -13,22 +13,26 @@ export function copyText(text: string, label: string): Promise<void> {
   }, failure);
 }
 
-/** Whether the browser can read images from the clipboard on a tap (`readClipboardImages`). */
+/** Whether the browser can read the clipboard on a tap (`readClipboard`). */
 export const canReadClipboard = () => typeof navigator.clipboard?.read === "function";
 
 /**
- * The images on the clipboard as files, read on a tap: iOS has no paste event outside a text field,
- * so a Paste button reads them here. It asks permission where the browser does (iOS shows Paste).
+ * The clipboard's images as files and its text, read on a tap: iOS has no paste event outside a
+ * text field, so a Paste button reads them here. It asks permission where the browser does (iOS
+ * shows Paste).
  */
-export async function readClipboardImages(): Promise<File[]> {
+export async function readClipboard(): Promise<{ files: File[]; text: string }> {
   const files: File[] = [];
+  let text = "";
   for (const item of await navigator.clipboard.read()) {
     const type = item.types.find((type) => type.startsWith("image/"));
-    if (!type) continue;
-    const blob = await item.getType(type);
-    files.push(new File([blob], `Pasted Image.${type.split("/")[1]}`, { type }));
+    if (type) {
+      const blob = await item.getType(type);
+      files.push(new File([blob], `Pasted Image.${type.split("/")[1]}`, { type }));
+    } else if (!text && item.types.includes("text/plain"))
+      text = (await (await item.getType("text/plain")).text()).trim();
   }
-  return files;
+  return { files, text };
 }
 
 /** A copy button's copy: `copied` names what it copied last for a moment; failures still report. */

@@ -16,11 +16,9 @@ import {
   freeUpdate,
   libraryItemCategory,
 } from "./LibraryCatalogueTable";
-import { LibraryDownloads } from "./LibraryDownloads";
 import { LibraryImports } from "./LibraryImports";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 import { LibraryPresets } from "./LibraryPresets";
-import { LibraryUnused } from "./LibraryUnused";
 import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
 import { PromptStyles } from "./PromptStyles";
 import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
@@ -38,7 +36,7 @@ export function LibraryPage() {
   const [editing, setEditing] = useState<LibraryItem | null>(null);
   const client = useQueryClient();
   const { active: activeSection } = useWorkspaceSection(options);
-  const catalogueActive = ["models", "loras"].includes(activeSection);
+  const catalogueActive = ["files", "loras"].includes(activeSection);
   const catalogue = useQuery({
     ...catalogueQuery,
     enabled: admin && catalogueActive,
@@ -95,7 +93,7 @@ export function LibraryPage() {
       ...items.flatMap((item) => item.families || []),
     ]),
   ].sort();
-  const catalogueSection = (section: "models" | "loras") => (heading: ReactNode) =>
+  const catalogueSection = (section: "files" | "loras") => (heading: ReactNode) =>
     catalogue.error ? (
       <>
         {heading}
@@ -105,7 +103,7 @@ export function LibraryPage() {
       <LibraryCatalogueTable
         heading={heading}
         loading={catalogue.isPending}
-        label={librarySections[section].label as "Models" | "LoRAs"}
+        label={librarySections[section].label as "Files" | "LoRAs"}
         items={items.filter((item) =>
           section === "loras"
             ? libraryItemCategory(item) === "loras"
@@ -139,15 +137,11 @@ export function LibraryPage() {
           ),
           guides: (heading) => <GuideDefinitions heading={heading} />,
           loras: catalogueSection("loras"),
-          models: catalogueSection("models"),
           chatBrief: (heading) => <LibraryChatBrief heading={heading} />,
           presets: (heading) => <LibraryPresets heading={heading} />,
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
           promptStyles: (heading) => <PromptStyles heading={heading} />,
-          unused: (heading) => <LibraryUnused heading={heading} />,
-          downloads: (heading) => (
-            <LibraryDownloads heading={heading} active={activeSection === "downloads"} />
-          ),
+          files: catalogueSection("files"),
         }}
       />
       {editing && (

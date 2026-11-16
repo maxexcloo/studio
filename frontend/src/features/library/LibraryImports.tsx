@@ -11,16 +11,23 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
+import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
+import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
+import { SettingGroup } from "../../ui/SettingRows";
 import { useFlash } from "../../ui/useFlash";
 import { inspirationQuery } from "../generation/inspiration";
+import { ImportDownloads } from "./ImportDownloads";
 import {
   type ImportRecord,
   LibraryImportReview,
@@ -28,19 +35,56 @@ import {
   importBusy,
   stateLabel,
 } from "./LibraryImportReview";
-import { catalogueQuery, importsQuery } from "./queries";
+import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
+
+type Resource = NonNullable<ImportRecord["resources"]>[number];
+
+/** The audit's groups, attention first. */
+const groups: { audit: ImportRecord["audit"]; title: string }[] = [
+  { audit: "needs-files", title: "Needs Files" },
+  { audit: "substitute", title: "Substitutes" },
+  { audit: "failed", title: "Failed" },
+  { audit: "busy", title: "In Progress" },
+  { audit: "ready", title: "Ready" },
+];
 
 /** Sorts the best grade first and unknown grades after the known ones. */
 function gradeRank(grade: string) {
   const rank = Object.keys(gradeColours).indexOf(grade);
   return rank < 0 ? Infinity : rank;
 }
-const views = [
-  { value: "all", label: "All" },
-  { value: "attention", label: "Needs Files" },
-];
+const fileName = (resource: Resource) => resource.want?.file || resource.name;
+const nameOf = (record: ImportRecord) =>
+  record.title || record.name || record.input?.fileName || record.input?.url || record.id;
+const required = (record: ImportRecord) =>
+  (record.resources || []).filter((resource) => !resource.optional);
+/** What an import lacks: each required file it has no copy or stand-in for, and why. */
+const lacking = (record: ImportRecord) =>
+  required(record)
+    .filter((resource) => !["installed", "substitute", "downloading"].includes(resource.status))
+    .map(
+      (resource) =>
+        `${fileName(resource)}: ${
+          resource.downloadError ||
+          resource.unavailable?.note ||
+          resource.unavailable?.reason ||
+          (resource.downloadable ? "Not downloaded yet" : stateLabel(resource.status))
+        }`,
+    );
+const downloadable = (record: ImportRecord) =>
+  required(record).some((resource) => resource.downloadable);
 
-/** Shared model and recipe imports, curated by administrators. */
+/** One stand-in, beside the file it stands in for. */
+interface SubstituteRow {
+  record: ImportRecord;
+  resource: Resource;
+  index: number;
+}
+
+/**
+ * Library › Imports: shared model and recipe imports grouped by what they need, with Download
+ * Missing, substitutes to accept or reject, Clear Stale and the model downloads.
+ */
 export function LibraryImports({
   heading,
   active,
@@ -53,7 +97,6 @@ export function LibraryImports({
   const client = useQueryClient();
   const [url, setUrl] = useState("");
   const [reviewId, setReviewId] = useState<string | null>(null);
-  const [view, setView] = useState("all");
   const [query, setQuery] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState<ImportRecord | null>(null);
@@ -69,6 +112,7 @@ export function LibraryImports({
       importsQuery.queryKey,
       inspirationQuery.queryKey,
       catalogueQuery.queryKey,
+      downloadsQuery.queryKey,
     ])
       void client.invalidateQueries({ queryKey });
   };
@@ -101,11 +145,32 @@ export function LibraryImports({
     onSuccess: opened,
   });
   const download = useMutation({
-    mutationFn: (id: string) => post(`/api/library/imports/${id}/download`),
+    mutationFn: (id?: string) =>
+      post<{ queued: number; failures?: string[] }>(
+        id
+          ? `/api/library/imports/${encodeURIComponent(id)}/download`
+          : "/api/library/imports/download-missing",
+      ),
+    onSuccess: (result) => {
+      refresh();
+      if (result.failures?.length)
+        notifications.show({
+          color: "yellow",
+          title: "Download Needs Attention",
+          message: result.failures.join(" "),
+        });
+    },
+  });
+  const substitute = useMutation({
+    mutationFn: ({ row, accept }: { row: SubstituteRow; accept: boolean }) =>
+      post(`/api/library/imports/${encodeURIComponent(row.record.id)}/substitute`, {
+        index: row.index,
+        accept,
+      }),
     onSuccess: refresh,
   });
-  const clearFailed = useMutation({
-    mutationFn: () => post<{ cleared: number }>("/api/library/imports/clear-failed"),
+  const clearStale = useMutation({
+    mutationFn: () => post<{ cleared: number }>("/api/library/imports/clear-stale"),
     onSuccess: (result) => {
       setConfirming(false);
       flashCleared(result.cleared);
@@ -122,29 +187,110 @@ export function LibraryImports({
     },
   });
   const records = imports.data?.imports || [];
-  const nameOf = (record: ImportRecord) =>
-    record.title || record.name || record.image?.name || record.input?.url || record.id;
-  const rows =
-    view === "attention" ? records.filter((record) => record.state === "needs-files") : records;
+  const stale = records.filter((record) => record.stale).length;
   const failed = importing.error || uploading.error;
+  const substitutes = records
+    .filter((record) => record.audit === "substitute")
+    .flatMap((record) =>
+      (record.resources || []).flatMap((resource, index) =>
+        resource.status === "substitute" && !resource.optional && !resource.accepted
+          ? [{ record, resource, index }]
+          : [],
+      ),
+    );
+  const importActions = (record: ImportRecord) => (
+    <>
+      <Menu.Item leftSection={<icons.details size={16} />} onClick={() => setReviewId(record.id)}>
+        Review Import
+      </Menu.Item>
+      {downloadable(record) && (
+        <Menu.Item
+          leftSection={<icons.download size={16} />}
+          disabled={download.isPending}
+          onClick={() => download.mutate(record.id)}
+        >
+          Download Missing
+        </Menu.Item>
+      )}
+      <Menu.Divider />
+      <Menu.Item
+        color="red"
+        leftSection={<icons.delete size={16} />}
+        onClick={() => setDeleting(record)}
+      >
+        Delete Import
+      </Menu.Item>
+    </>
+  );
+  const importTable = (title: string, rows: ImportRecord[]) => (
+    <DataTable
+      label={`${title} Imports`}
+      rows={rows}
+      rowKey={(record) => record.id}
+      rowName={nameOf}
+      query={query}
+      searchText={(record) => [
+        nameOf(record),
+        record.grade?.value,
+        ...(record.grade?.reasons || []),
+        ...lacking(record),
+      ]}
+      empty="No Matches"
+      compact
+      columns={[
+        {
+          key: "import",
+          header: "Import",
+          main: true,
+          sortValue: nameOf,
+          cell: (record) => (
+            <>
+              <Text size="sm" fw={500} truncate>
+                {nameOf(record)}
+              </Text>
+              {(record.audit === "failed" && record.error
+                ? [record.error]
+                : record.audit === "needs-files"
+                  ? lacking(record)
+                  : record.grade?.reasons || []
+              ).map((line) => (
+                <Text size="xs" c={record.audit === "failed" ? "red" : "dimmed"} key={line}>
+                  {line}
+                </Text>
+              ))}
+            </>
+          ),
+        },
+        {
+          key: "grade",
+          header: "Grade",
+          sortValue: (record) => record.grade && gradeRank(record.grade.value),
+          cell: (record) =>
+            record.grade && (
+              <Badge miw="max-content" color={gradeColours[record.grade.value] || "gray"}>
+                {stateLabel(record.grade.value)}
+              </Badge>
+            ),
+        },
+      ]}
+      rowActions={importActions}
+    />
+  );
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
         <SectionToolbar
           label="Imports"
-          views={records.length ? views : undefined}
-          view={view}
-          onViewChange={setView}
           query={query}
           onQueryChange={records.length ? setQuery : undefined}
           actions={
             <>
-              {records.some((record) => record.state === "failed") && (
-                <Tooltip label="Clear Failed">
+              {stale > 0 && (
+                <Tooltip label="Clear Stale">
                   <ActionIcon
                     variant="subtle"
                     color="gray"
-                    aria-label="Clear Failed"
+                    aria-label="Clear Stale"
                     onClick={() => setConfirming(true)}
                   >
                     <icons.clear size={18} />
@@ -203,86 +349,117 @@ export function LibraryImports({
       )}
       {imports.error ? (
         <Alert color="red">{imports.error.message}</Alert>
+      ) : imports.isPending ? (
+        <LoadingState label="Loading Imports" />
+      ) : !records.length ? (
+        <EmptyState fill>No Imports</EmptyState>
       ) : (
-        <DataTable
-          label="Library Imports"
-          rows={rows}
-          rowKey={(record) => record.id}
-          rowName={nameOf}
-          loading={imports.isPending && "Loading Imports"}
-          query={query}
-          searchText={(record) => [
-            nameOf(record),
-            record.grade?.value,
-            ...(record.grade?.reasons || []),
-          ]}
-          empty={records.length ? "No Matches" : "No Imports"}
-          columns={[
-            {
-              key: "import",
-              header: "Import",
-              main: true,
-              sortValue: nameOf,
-              cell: (record) => (
-                <>
-                  <Text size="sm" fw={500} truncate>
-                    {nameOf(record)}
-                  </Text>
-                  {record.grade?.reasons.map((reason) => (
-                    <Text size="xs" c="dimmed" key={reason}>
-                      {reason}
-                    </Text>
-                  ))}
-                </>
-              ),
-            },
-            {
-              key: "grade",
-              header: "Grade",
-              sortValue: (record) => record.grade && gradeRank(record.grade.value),
-              cell: (record) => (
-                <Stack gap={4} align="start">
-                  {record.grade && (
-                    <Badge miw="max-content" color={gradeColours[record.grade.value] || "gray"}>
-                      {stateLabel(record.grade.value)}
-                    </Badge>
+        groups.map(({ audit, title }) => {
+          const rows = records.filter((record) => record.audit === audit);
+          if (!rows.length) return null;
+          if (audit === "substitute")
+            return (
+              <SettingGroup key={audit} title={`${title} · ${substitutes.length}`}>
+                <DataTable
+                  label="Substitutes"
+                  rows={substitutes}
+                  rowKey={(row) => `${row.record.id}:${row.index}`}
+                  rowName={(row) => `${nameOf(row.record)}: ${fileName(row.resource)}`}
+                  query={query}
+                  searchText={(row) => [
+                    nameOf(row.record),
+                    fileName(row.resource),
+                    row.resource.substitute?.file,
+                  ]}
+                  empty="No Matches"
+                  compact
+                  columns={[
+                    {
+                      key: "original",
+                      header: "Original",
+                      main: true,
+                      sortValue: (row) => fileName(row.resource),
+                      cell: (row) => (
+                        <>
+                          <Text size="sm" fw={500} truncate>
+                            {fileName(row.resource)}
+                          </Text>
+                          <Text size="xs" c="dimmed" truncate>
+                            {nameOf(row.record)}
+                          </Text>
+                        </>
+                      ),
+                    },
+                    {
+                      key: "substitute",
+                      header: "Substitute",
+                      sortValue: (row) => row.resource.substitute?.file,
+                      cell: (row) => (
+                        <>
+                          <Text size="sm" truncate>
+                            {row.resource.substitute?.file}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            {row.resource.substitute?.reason}
+                          </Text>
+                        </>
+                      ),
+                    },
+                  ]}
+                  rowActions={(row) => (
+                    <>
+                      <Menu.Item
+                        leftSection={<Check size={16} />}
+                        disabled={substitute.isPending}
+                        onClick={() => substitute.mutate({ row, accept: true })}
+                      >
+                        Accept
+                      </Menu.Item>
+                      <Menu.Item
+                        leftSection={<X size={16} />}
+                        disabled={substitute.isPending}
+                        onClick={() => substitute.mutate({ row, accept: false })}
+                      >
+                        Reject
+                      </Menu.Item>
+                      <Menu.Divider />
+                      <Menu.Item
+                        leftSection={<icons.details size={16} />}
+                        onClick={() => setReviewId(row.record.id)}
+                      >
+                        Review Import
+                      </Menu.Item>
+                    </>
                   )}
-                  <Text size="xs" c={record.state === "failed" ? "red" : "dimmed"}>
-                    {stateLabel(record.state)}
-                  </Text>
-                </Stack>
-              ),
-            },
-          ]}
-          rowActions={(record) => (
-            <>
-              <Menu.Item
-                leftSection={<icons.details size={16} />}
-                onClick={() => setReviewId(record.id)}
-              >
-                Review Import
-              </Menu.Item>
-              {record.state === "needs-files" && (
-                <Menu.Item
-                  leftSection={<icons.download size={16} />}
-                  disabled={download.isPending}
-                  onClick={() => download.mutate(record.id)}
-                >
-                  Download Missing
-                </Menu.Item>
-              )}
-              <Menu.Divider />
-              <Menu.Item
-                color="red"
-                leftSection={<icons.delete size={16} />}
-                onClick={() => setDeleting(record)}
-              >
-                Delete Import
-              </Menu.Item>
-            </>
-          )}
-        />
+                />
+              </SettingGroup>
+            );
+          return (
+            <SettingGroup
+              key={audit}
+              title={`${title} · ${rows.length}`}
+              toolbar={
+                audit === "needs-files" &&
+                rows.some(downloadable) && (
+                  <Button
+                    size="compact-sm"
+                    variant="default"
+                    leftSection={<icons.download size={16} />}
+                    loading={download.isPending && !download.variables}
+                    disabled={download.isPending}
+                    onClick={() => download.mutate(undefined)}
+                  >
+                    Download All Missing
+                  </Button>
+                )
+              }
+            >
+              {importTable(title, rows)}
+            </SettingGroup>
+          );
+        })
       )}
+      <ImportDownloads active={active} query={query} />
       {reviewId && (
         <LibraryImportReview
           id={reviewId}
@@ -295,13 +472,14 @@ export function LibraryImports({
       )}
       <ConfirmDialog
         opened={confirming}
-        title="Clear Failed Imports"
-        action="Clear Failed"
-        pending={clearFailed.isPending}
-        onConfirm={() => clearFailed.mutate()}
+        title="Clear Stale Imports"
+        action="Clear Stale"
+        pending={clearStale.isPending}
+        onConfirm={() => clearStale.mutate()}
         onClose={() => setConfirming(false)}
       >
-        Failed imports leave Library › Imports. Downloaded files stay.
+        {plural(stale, "import")} that failed or wait on files no provider gives leave Library ›
+        Imports. Downloaded files stay.
       </ConfirmDialog>
       <ConfirmDialog
         opened={Boolean(deleting)}

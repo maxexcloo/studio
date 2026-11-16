@@ -1,4 +1,4 @@
-import { ArchiveX, BookOpen, Boxes, FileCog, HardDriveDownload, Import } from "lucide-react";
+import { BookOpen, Boxes, FileCog } from "lucide-react";
 
 import { cardKinds } from "../../../../shared/characters";
 import { icons } from "../../ui/icons";
@@ -10,14 +10,14 @@ export const librarySections = {
     label: "Chat Brief",
     description: "Standing rules every chat keeps to, so you needn't repeat them.",
     icon: icons.chat,
-    group: "Personal",
+    group: "AI",
   },
   presets: {
     label: "Presets",
     description:
       "Your saved presets: a prompt, model, settings or LoRAs to start from, or any mix of them.",
     icon: icons.preset,
-    group: "Personal",
+    group: "AI",
   },
   characters: {
     label: "Characters",
@@ -42,29 +42,21 @@ export const librarySections = {
     description: "Shared prompting guides for profiles and families. Every saved version is kept.",
     icon: BookOpen,
     admin: true,
-    group: "Administration",
+    group: "Generation",
   },
   loras: {
     label: "LoRAs",
     description: "Manage shared style and subject adapters. Choose them in Composer to generate.",
     icon: icons.loras,
     admin: true,
-    group: "Administration",
-  },
-  models: {
-    label: "Models",
-    description:
-      "Manage shared checkpoints, diffusion models, text encoders and VAEs. Choose a profile in Composer to generate.",
-    icon: Boxes,
-    admin: true,
-    group: "Administration",
+    group: "Generation",
   },
   profiles: {
     label: "Profiles",
     description: "Shared generation profiles and workflows. Every saved version is kept.",
     icon: FileCog,
     admin: true,
-    group: "Administration",
+    group: "Generation",
   },
   promptStyles: {
     label: "Prompt Styles",
@@ -72,27 +64,21 @@ export const librarySections = {
       "Shared assistant styles and templates for Improve Prompt, Animate and Edit. Every saved version is kept.",
     icon: icons.assistant,
     admin: true,
-    group: "Administration",
+    group: "Generation",
   },
-  unused: {
-    label: "Unused",
-    description: "Models no profile uses and LoRAs no run used in 90 days, with their sizes.",
-    icon: ArchiveX,
-    admin: true,
-    group: "Administration",
-  },
-  downloads: {
-    label: "Downloads",
-    description: "Shared model downloads. Stopping keeps partial files to resume.",
-    icon: HardDriveDownload,
+  files: {
+    label: "Files",
+    description:
+      "Shared checkpoints, diffusion models, text encoders and VAEs. Choose a profile in Composer to generate.",
+    icon: Boxes,
     admin: true,
     apart: true,
   },
   imports: {
     label: "Imports",
     description:
-      "Shared models and recipes from Civitai, Hugging Face or recipe images. Use Images › Upload for private images and Reddit posts.",
-    icon: Import,
+      "Shared models and recipes from Civitai, Hugging Face or recipe images, and their downloads. Stopping a download keeps its partial file to resume.",
+    icon: icons.import,
     admin: true,
     apart: true,
   },

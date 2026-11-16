@@ -164,21 +164,25 @@ test("an import from chat goes through the same pipeline, records chat as its or
   assert.deepEqual(
     history.map((item) => item.origin).sort(),
     ["chat", "chat", "ui"],
-    "all show in Library › Import",
+    "all show in Library › Imports",
   );
-  // Clear Failed removes only failed records; Remove takes one.
+  // Clear Stale removes failed records and the picture, whose files no provider gives; Remove takes one.
   store.put({ ...store.get(ui.import.id), state: "failed", error: "HTTP 451" });
-  assert.deepEqual(await call("POST", "/api/library/imports/clear-failed"), {
+  assert.deepEqual(
+    [picture.import.audit, picture.import.stale, record.audit, record.stale],
+    ["needs-files", true, "needs-files", false],
+  );
+  assert.deepEqual(await call("POST", "/api/library/imports/clear-stale"), {
     ok: true,
-    cleared: 1,
+    cleared: 2,
   });
   assert.deepEqual(
-    (await call("GET", "/api/library/imports")).imports.map((item) => item.origin).sort(),
-    ["chat", "chat"],
+    (await call("GET", "/api/library/imports")).imports.map((item) => item.id),
+    [record.id],
   );
   assert.equal(createImportStore({ dataDir, log: {} }).get(ui.import.id), null);
-  assert.equal((await call("DELETE", `/api/library/imports/${picture.import.id}`)).ok, true);
-  assert.equal((await call("GET", "/api/library/imports")).imports.length, 1);
+  assert.equal((await call("DELETE", `/api/library/imports/${record.id}`)).ok, true);
+  assert.equal((await call("GET", "/api/library/imports")).imports.length, 0);
 
   const edited = await call("PATCH", "/api/library/catalogue", {
     key: "loras/watercolour-v2.safetensors",
@@ -331,47 +335,4 @@ test("uncatalogued model files take their family from the profiles naming them, 
     "a name never guesses a component",
   );
   assert.equal(families["loras/unknown.safetensors"], undefined, "LoRAs keep their own metadata");
-});
-
-test("Unused lists installed entries no profile uses and LoRAs no run used in 90 days", async (t) => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-library-unused-"));
-  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
-  const catalogue = createCatalogueStore({ dataDir, log: {} });
-  for (const key of [
-    "checkpoints/spare.safetensors",
-    "checkpoints/in-use.safetensors",
-    "loras/idle.safetensors",
-    "loras/recent.safetensors",
-    "loras/built-in.safetensors",
-    "loras/missing.safetensors",
-  ])
-    catalogue.edit(key, { title: key.split("/")[1] }, { by: "admin", origin: "admin" });
-  const app = express();
-  app.use(express.json());
-  registerLibraryRoutes(app, {
-    presets: {},
-    installed: async () => ({
-      checkpoints: ["spare.safetensors", "in-use.safetensors", "uncatalogued.safetensors"],
-      loras: ["idle.safetensors", "recent.safetensors", "built-in.safetensors"],
-    }),
-    loraInfo: async () => ({}),
-    catalogue: () => catalogue,
-    store: createImportStore({ dataDir, log: {} }),
-    schedule: false,
-    references: async ({ file }) => (file === "in-use.safetensors" ? ["the Fast profile"] : []),
-    recentLoras: () => new Set(["recent.safetensors"]),
-    profileDefinitions: async () => [{ name: "Fast", text: '{"lora": "built-in.safetensors"}' }],
-  });
-  const server = app.listen(0, "127.0.0.1");
-  await new Promise((resolve) => server.once("listening", resolve));
-  t.after(() => server.close());
-  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/library/unused`);
-  const { items } = await response.json();
-  assert.deepEqual(
-    items.map((item) => [item.key, item.reason]),
-    [
-      ["loras/idle.safetensors", "No run in 90 days"],
-      ["checkpoints/spare.safetensors", "No profile uses it"],
-    ],
-  );
 });

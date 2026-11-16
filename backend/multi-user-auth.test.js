@@ -622,7 +622,7 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
     ["POST", "/api/queue/pause-all"],
     ["POST", "/api/profiles/duplicates/merge"],
     ["DELETE", "/api/library/imports/imp-1"],
-    ["POST", "/api/gallery/import/reddit"],
+    ["POST", "/api/gallery/import/link"],
   ]) {
     assert.equal(accountForRequest(bearer(artistToken, method, routePath)), null);
     assert.equal(

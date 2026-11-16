@@ -14,8 +14,8 @@
  * files become the record's preset and resources, matched by hash first, then by name. An image
  * without metadata is described by the assistant's vision model (graded Partial). A missing file
  * gets the nearest installed stand-in (library/substitutes.js), marked and lowering the grade,
- * with Use Exact File once the exact one is installed. Offers (library/offers.js) are other
- * versions and variants that fit; one is downloaded only when chosen.
+ * until an administrator accepts it or rejects it for the exact file. Offers (library/offers.js)
+ * are other versions and variants that fit; one is downloaded only when chosen.
  */
 import crypto from "node:crypto";
 
@@ -141,16 +141,67 @@ export function importStore(options = {}) {
 
 /* ---------------------------------------------------------------- Views */
 
-/** A record as the browser and MCP see it: no download specs. */
+/** Whether Download Missing can fetch a file: missing, with a source it may download. */
+const downloadable = (resource) =>
+  resource.status === "missing" &&
+  Boolean(resource.spec || resource.versionId) &&
+  !resource.unavailable;
+
+/**
+ * Where an import stands in Library › Imports: failed, busy (resolving or downloading),
+ * needs-files, substitute (ready on a stand-in nobody has accepted yet) or ready.
+ */
+function importAudit(record) {
+  if (record.state === "failed" || record.state === "cancelled") return "failed";
+  if (record.state === "resolving" || record.state === "downloading") return "busy";
+  if (record.state === "needs-files") return "needs-files";
+  return (record.resources || []).some(
+    (resource) => !resource.optional && resource.status === "substitute" && !resource.accepted,
+  )
+    ? "substitute"
+    : "ready";
+}
+
+/** Failed, or waiting on a file no provider can give: Clear Stale removes it. */
+export function staleImport(record) {
+  const audit = importAudit(record);
+  return (
+    audit === "failed" ||
+    (audit === "needs-files" &&
+      (record.resources || []).some(
+        (resource) =>
+          !resource.optional &&
+          ["missing", "unavailable", "unsupported"].includes(resource.status) &&
+          !downloadable(resource),
+      ))
+  );
+}
+
+/** A record as the browser and MCP see it: no download specs or substitute choices. */
 export function publicImport(record) {
   if (!record) return null;
-  const { pendingEntries: _pending, entryBase: _entry, sourceText: _source, ...rest } = record;
+  const {
+    pendingEntries: _pending,
+    entryBase: _entry,
+    sourceText: _source,
+    substituteChoices: _choices,
+    ...rest
+  } = record;
   return {
     ...rest,
-    resources: (record.resources || []).map(({ spec, ...resource }) => resource),
+    audit: importAudit(record),
+    stale: staleImport(record),
+    resources: (record.resources || []).map(({ spec: _spec, ...resource }, index) => ({
+      ...resource,
+      ...(downloadable(record.resources[index]) ? { downloadable: true } : {}),
+    })),
     offers: publicOffers(record.offers || []),
   };
 }
+
+/** A file's key in a record's substitute choices, so a rebuilt resource keeps its choice. */
+const choiceKey = (resource) =>
+  `${resource.want?.folder || ""}/${resource.want?.file || resource.name || ""}`;
 
 /** The import's state from its resources. */
 function importState(record) {
@@ -258,6 +309,7 @@ const fileTitle = (name) =>
  *   describe({id})                        the vision model's prompt for the import's picture
  *   vision()                              {available, reason}: whether the assistant can read images
  *   draftProfile(record, {by})            optional: drafts a checkpoint's profile and guide in place
+ *   versionSpec(versionId)                a saved image's file as a download spec (its Civitai version)
  */
 export function createImportEngine({
   store = importStore(),
@@ -283,11 +335,56 @@ export function createImportEngine({
   },
   vision = async () => ({ available: false, reason: "The prompt assistant isn't set up." }),
   draftProfile = null,
+  versionSpec = async () => {
+    throw new Error("Saved images can't download their files here.");
+  },
 }) {
+  /** The download queue's running and finished downloads by id. */
+  function queueState() {
+    const state = downloads();
+    return {
+      running: new Map(
+        [state.active, ...(state.queued || [])].filter(Boolean).map((item) => [item.id, item]),
+      ),
+      recent: new Map((state.recent || []).map((item) => [item.id, item])),
+    };
+  }
+  /** Follows a file's download: true while it runs (with progress); its error once it stopped. */
+  function followDownload(resource, { running, recent }) {
+    const download = resource.downloadId ? running.get(resource.downloadId) : null;
+    if (download) {
+      resource.status = "downloading";
+      resource.progress = {
+        receivedBytes: download.receivedBytes || 0,
+        totalBytes: download.totalBytes || resource.want.bytes || 0,
+      };
+      return true;
+    }
+    delete resource.progress;
+    const finished = resource.downloadId ? recent.get(resource.downloadId) : null;
+    if (finished?.status === "failed")
+      resource.downloadError = finished.error || "The download stopped.";
+    // Downloads live in memory, so one the running Studio has never heard of was cut off by a restart.
+    else if (resource.downloadId && !finished)
+      resource.downloadError =
+        "Studio restarted during this download. Download again to continue from the saved part.";
+    return false;
+  }
+  /** The nearest installed stand-in for a missing file, unless its stand-in was rejected. */
+  async function standIn(resource, record) {
+    if (record.substituteChoices?.[choiceKey(resource)] === "rejected") return null;
+    const stand = await Promise.resolve(substituteFor(resource, record)).catch(() => null);
+    return stand?.file ? stand : null;
+  }
+
   /** Each resource's status from the files and the download queue, then the grade and state. */
   async function refresh(record, { verify = false } = {}) {
     if (record.state === "failed" || record.state === "resolving") return record;
+    const queue = queueState();
     if (record.input.kind === "civitai-image") {
+      const previous = new Map(
+        (record.resources || []).map((resource) => [choiceKey(resource), resource]),
+      );
       const preset = record.input.presetId
         ? await resolvePreset(record.input.presetId, { verify }).catch(() => null)
         : null;
@@ -330,13 +427,23 @@ export function createImportEngine({
             ...(resource.unavailable ? { unavailable: resource.unavailable } : {}),
             ...(resource.unverified ? { unverified: true } : {}),
             ...(resource.nameOnly ? { nameOnly: true } : {}),
+            ...(resource.versionId && resource.supported ? { versionId: resource.versionId } : {}),
             note: resource.note || "",
           };
+          const before = previous.get(choiceKey(item));
+          if (item.status !== "installed" && before?.downloadId) {
+            item.downloadId = before.downloadId;
+            if (followDownload(item, queue)) {
+              record.resources.push(item);
+              continue;
+            }
+          }
           // As for a dropped image: a missing file gets the nearest installed stand-in until the exact one is installed.
           if (item.status !== "installed" && item.status !== "conflict") {
-            const stand = await Promise.resolve(substituteFor(item, record)).catch(() => null);
-            if (stand?.file) {
+            const stand = await standIn(item, record);
+            if (stand) {
               item.substitute = stand;
+              item.accepted = record.substituteChoices?.[choiceKey(item)] === "accepted";
               item.status = "substitute";
               item.profileId =
                 stand.profileId ||
@@ -364,36 +471,16 @@ export function createImportEngine({
       }
       return record;
     }
-    const state = downloads();
-    const running = new Map(
-      [state.active, ...(state.queued || [])].filter(Boolean).map((item) => [item.id, item]),
-    );
-    const recent = new Map((state.recent || []).map((item) => [item.id, item]));
     for (const resource of record.resources) {
-      const download = resource.downloadId ? running.get(resource.downloadId) : null;
-      if (download) {
-        resource.status = "downloading";
-        resource.progress = {
-          receivedBytes: download.receivedBytes || 0,
-          totalBytes: download.totalBytes || resource.want.bytes || 0,
-        };
-        continue;
-      }
-      delete resource.progress;
-      const finished = resource.downloadId ? recent.get(resource.downloadId) : null;
-      if (finished?.status === "failed")
-        resource.downloadError = finished.error || "The download stopped.";
-      // Downloads live in memory, so one the running Studio has never heard of was cut off by a restart.
-      else if (resource.downloadId && !finished)
-        resource.downloadError =
-          "Studio restarted during this download. Download again to continue from the saved part.";
+      if (followDownload(resource, queue)) continue;
       const found = resource.want.file
         ? await inspect(resource.want, { verify }).catch(() => ({ status: "missing" }))
         : { status: "missing" };
-      // A stand-in stays in use until Use Exact File, which appears once the exact file is installed.
+      // A stand-in stays in use until it is rejected for the exact file.
       if (resource.substitute) {
         resource.status = "substitute";
         resource.exactInstalled = found.status === "installed";
+        resource.accepted = record.substituteChoices?.[choiceKey(resource)] === "accepted";
         continue;
       }
       if (found.status === "installed") {
@@ -413,11 +500,12 @@ export function createImportEngine({
         resource.status !== "installed" &&
         resource.status !== "conflict"
       ) {
-        const stand = await Promise.resolve(substituteFor(resource, record)).catch(() => null);
-        if (stand?.file) {
+        const stand = await standIn(resource, record);
+        if (stand) {
           resource.substitute = stand;
           resource.status = "substitute";
           resource.exactInstalled = false;
+          resource.accepted = false;
           if (stand.profileId) resource.profileId = stand.profileId;
           else if (modelRoles.has(resource.role))
             resource.profileId =
@@ -592,20 +680,11 @@ export function createImportEngine({
   async function downloadMissing(id, { indices = null, by = "" } = {}) {
     const record = store.get(id);
     if (!record) throw new Error("That import is gone. Import the link again.");
-    if (record.input.kind === "civitai-image")
-      throw new Error("Saved images download their files from Images.");
     await refresh(record);
     const chosen = record.resources.filter((resource, index) =>
       indices ? indices.includes(index) : !resource.optional,
     );
-    // A stand-in's exact file downloads only when chosen.
-    const queue = chosen.filter(
-      (resource) =>
-        (resource.status === "missing" ||
-          (indices && resource.status === "substitute" && !resource.exactInstalled)) &&
-        resource.spec &&
-        !resource.unavailable,
-    );
+    const queue = chosen.filter(downloadable);
     if (!queue.length)
       throw new Error(
         chosen.some((resource) => resource.unavailable)
@@ -615,8 +694,9 @@ export function createImportEngine({
     const failures = [];
     for (const resource of queue) {
       try {
-        const download = await startDownload(resource.spec);
-        resource.downloadId = download?.id || resource.spec.id;
+        const spec = resource.spec || (await versionSpec(resource.versionId));
+        const download = await startDownload(spec);
+        resource.downloadId = download?.id || spec.id;
         delete resource.downloadError;
         const pending = record.pendingEntries?.[resource.want.file];
         if (pending) {
@@ -637,6 +717,27 @@ export function createImportEngine({
     store.put(record);
     if (failures.length === queue.length) throw new Error(failures[0]);
     return { record, queued: queue.length - failures.length, failures };
+  }
+
+  /** Download Missing for every import waiting on a file it can fetch. */
+  async function downloadAllMissing({ by = "" } = {}) {
+    let queued = 0;
+    let imports = 0;
+    const failures = [];
+    for (const record of store.list()) {
+      await refresh(record).catch(() => record);
+      if (!record.resources.some((resource) => !resource.optional && downloadable(resource)))
+        continue;
+      try {
+        const result = await downloadMissing(record.id, { by });
+        queued += result.queued;
+        imports += 1;
+        failures.push(...result.failures);
+      } catch (error) {
+        failures.push(`${record.title || record.id}: ${error.message}`);
+      }
+    }
+    return { queued, imports, failures };
   }
 
   /** Change where a Hugging Face file goes before it downloads (its folder was only a guess). */
@@ -832,19 +933,25 @@ export function createImportEngine({
     return describeInto(record);
   }
 
-  /** Swap a stand-in back for the exact file, once it is installed. */
-  async function useExact(id, index) {
+  /**
+   * Accept keeps a stand-in for good; Reject drops it for the exact file, which counts as missing
+   * until Download Missing installs it (or at once, when it already is).
+   */
+  async function chooseSubstitute(id, index, accept) {
     const record = store.get(id);
     const resource = record?.resources?.[index];
     if (!resource?.substitute) throw new Error("That file isn't using a substitute.");
-    await refresh(record, { verify: true });
-    if (!resource.exactInstalled)
-      throw new Error(
-        `${resource.want.file || resource.name} isn't installed yet. Download it first.`,
-      );
-    delete resource.substitute;
-    delete resource.exactInstalled;
-    await refresh(record, { verify: true });
+    record.substituteChoices = {
+      ...record.substituteChoices,
+      [choiceKey(resource)]: accept ? "accepted" : "rejected",
+    };
+    if (!accept) {
+      delete resource.substitute;
+      delete resource.exactInstalled;
+      delete resource.accepted;
+      delete resource.profileId;
+    }
+    await refresh(record, { verify: !accept });
     return store.put(record);
   }
 
@@ -906,12 +1013,13 @@ export function createImportEngine({
     create,
     createFromImage,
     describeImport,
-    useExact,
+    chooseSubstitute,
     acceptOffer,
     list,
     open,
     refresh,
     downloadMissing,
+    downloadAllMissing,
     setFolder,
     draft,
   };
