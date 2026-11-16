@@ -168,3 +168,11 @@ Studio sets the node's `loras` input to the enabled LoRAs in stack order, such
 as `[{"name":"style.safetensors","strength":0.8}]`, or `[]` when none are
 chosen. The prompt text is left as written; Studio sends the LoRAs in the
 Radiance request's `loras` field, named without `.safetensors`.
+
+Radiance's IQ8R models take no LoRAs. A stack's `model` names the (bf16) model
+a run with LoRAs uses instead, and its `loras` the adapters that model runs
+ahead of the request's, such as a speed LoRA the default model has baked in:
+`"loraStack": {"adapter": "radiance-tags-v1", "node": "1", "max": 4, "model":
+"noctq-v4-bf16", "loras": [{"name": "lightning.safetensors", "strength": 1}]}`.
+A combined profile whose Radiance stack has a `model` keeps its LoRA runs on
+Radiance instead of sending them to ComfyUI.

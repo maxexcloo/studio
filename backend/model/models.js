@@ -496,11 +496,13 @@ export function inferModels(
     const workflow = workflowOnBackend(listed, profileBackends[listed.profileId]);
     const profile = variants.get(workflow.backend) || profileForWorkflow(workflow);
     const backendOptions = [...variants].map(([id, own]) => {
-      const reason = configuredOnly ? "" : unready(workflowOnBackend(listed, id));
+      const workflow = workflowOnBackend(listed, id);
+      const reason = configuredOnly ? "" : unready(workflow);
       return {
         id,
         label: profileBackendLabels[id] || id,
         references: own.mediaInputs?.length || 0,
+        ...(workflow.loraStack?.model ? { loras: true } : {}),
         ...(configuredOnly ? {} : { ready: own.ready !== false }),
         ...(reason ? { reason } : {}),
         profile: own,
