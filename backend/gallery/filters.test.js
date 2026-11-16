@@ -120,3 +120,29 @@ test("caption tags filter whole, any of them, and the facet lists the most used 
     ],
   );
 });
+
+test("origins use explicit provenance, match any selected origin and narrow pending work", () => {
+  const dream = { ...item, dream: { state: "kept" } };
+  const chat = { ...item, chat: { conversationId: "conversation" } };
+  for (const result of [dream, { ...item, resultSet: { source: "dream" } }])
+    assert.equal(matchesGalleryFilters(result, { origin: "dream" }), true);
+  assert.equal(matchesGalleryFilters(chat, { origin: "chat" }), true);
+  assert.equal(matchesGalleryFilters(chat, { origin: ["chat", "dream"] }), true);
+  assert.equal(matchesGalleryFilters(chat, { origin: "dream" }), false);
+  assert.equal(matchesGalleryFilters(dream, { origin: "chat" }), false);
+  assert.equal(matchesGalleryFilters(dream, { origin: "dream", model: "wan" }), false);
+  assert.equal(
+    matchesGalleryFilters(
+      { ...item, prompt: "a dream in a chat", assistant: { source: "ui" } },
+      { origin: "dream" },
+    ),
+    false,
+    "prompt wording and assistant use do not establish an origin",
+  );
+  assert.equal(matchesGalleryFilters(item, { origin: "manual" }), false);
+  assert.equal(matchesGalleryFilters({ ...chat, status: "pending" }, { origin: "dream" }), false);
+  assert.equal(
+    matchesGalleryFilters({ ...chat, status: "pending" }, { origin: "chat", model: "wan" }),
+    true,
+  );
+});

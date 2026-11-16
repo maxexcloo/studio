@@ -983,7 +983,7 @@ test("Model filters list each clean name once and find it by any part", async ({
     .toEqual(["ideogram-3-fp8.safetensors", "Ideogram_3_ComfyUI.safetensors"]);
 });
 
-test("Gallery filters submit repeated models together with LoRA, size, aspect and date", async ({
+test("Gallery filters submit repeated models and origins together with LoRA, size, aspect and date", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -999,6 +999,8 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
   await pick("Models", "Studio Image");
   await pick("Models", "Motion Quality");
   await pick("LoRAs", "Detail Slider");
+  await pick("Origin", "Dream");
+  await pick("Origin", "Chat");
   if (phone) {
     await page.getByRole("button", { name: "Up to 1K", exact: true }).click();
     await page.getByRole("button", { name: "Square", exact: true }).click();
@@ -1015,9 +1017,9 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
   // The active filters show in the toolbar row as removable chips.
   const chips = page.getByRole("group", { name: "Active Filters", exact: true });
   const removable = chips.getByRole("button", { name: /^Remove / });
-  await expect(removable).toHaveCount(6);
+  await expect(removable).toHaveCount(8);
   await chips.getByRole("button", { name: "Remove Square Filter", exact: true }).click();
-  await expect(removable).toHaveCount(5);
+  await expect(removable).toHaveCount(7);
   // The search narrows within them.
   const search = await toolbarSearch(page);
   await search.fill("bird");
@@ -1026,6 +1028,7 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
       const query = new URLSearchParams(state.galleryRequests.at(-1));
       return {
         model: query.getAll("model"),
+        origin: query.getAll("origin"),
         lora: query.getAll("lora"),
         size: query.getAll("size"),
         aspect: query.getAll("aspect"),
@@ -1035,6 +1038,7 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
     })
     .toEqual({
       model: ["image.safetensors", "video.safetensors"],
+      origin: ["dream", "chat"],
       lora: ["detail.safetensors"],
       size: ["up-to-1k"],
       aspect: [],
@@ -1051,7 +1055,12 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
     .poll(() =>
       state.galleryRequests.some((search) => {
         const query = new URLSearchParams(search);
-        return query.get("q") === expected && !query.has("model") && !query.has("since");
+        return (
+          query.get("q") === expected &&
+          !query.has("model") &&
+          !query.has("origin") &&
+          !query.has("since")
+        );
       }),
     )
     .toBe(true);
