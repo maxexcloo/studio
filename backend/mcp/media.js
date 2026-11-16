@@ -557,7 +557,7 @@ export class McpMedia {
   /**
    * Queues one job per prompt and count. `record` keeps the user's request and exact source result.
    */
-  async queue(owner, request, scope = "", record = {}) {
+  async queue(owner, request, scope = "", record = {}, queueSet = crypto.randomUUID()) {
     let profile = (await this.profiles("all", owner)).find(
       (item) => item.id === request.profile_id,
     );
@@ -744,7 +744,6 @@ export class McpMedia {
     await previous;
     try {
       const queued = [];
-      const queueSet = crypto.randomUUID();
       const batches = prompts.map(() => crypto.randomUUID());
       let images = 0;
       for (const [position, prompt] of prompts.entries())

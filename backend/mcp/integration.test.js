@@ -2151,6 +2151,27 @@ test("behind STUDIO_CARD_IMAGES a shot's outfit and scene images follow the char
     { slot: "pose", assetId: harbour },
   ]);
   assert.doesNotMatch(on.text, /described in words/);
+  const beforeChunks = f.submitted.length;
+  data(
+    await call(client, "generate", {
+      character: "Mara",
+      count: 2,
+      shots: Array.from({ length: 6 }, (_, index) => ({
+        outfit: index === 5 ? "a green gown" : "Raincoat",
+        scene: "Harbour",
+        action: `walking past dock ${index + 1}`,
+      })),
+    }),
+  );
+  const chunks = f.submitted.slice(beforeChunks);
+  assert.equal(chunks.length, 6);
+  assert.equal(new Set(chunks.map((job) => job.queueSet)).size, 1);
+  for (const [index, job] of chunks.entries())
+    assert.deepEqual(job.referenceAssets, [
+      { slot: "face", assetId: face },
+      ...(index === 5 ? [] : [{ slot: "look", assetId: coat }]),
+      { slot: "pose", assetId: harbour },
+    ]);
   // An editing model with one spare slot takes the outfit's image; the scene stays words.
   await f.profiles([
     {
@@ -5223,7 +5244,8 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
     ],
   );
   assert.equal(new Set(batches.map((body) => body.resultSet.id)).size, 1);
-  assert.equal(new Set(batches.map((body) => body.queueSet)).size, 2);
+  assert.equal(new Set(batches.map((body) => body.queueSet)).size, 1);
+  assert.notEqual(batches[0].queueSet, f.submitted[0].queueSet);
   const excess = await call(client, "generate", { kind: "image", prompts, count: 8 });
   assert.equal(excess.isError, true);
   assert.equal(
@@ -5235,6 +5257,73 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
   assert.match(generate.inputSchema.properties.count.description, /default 2 for one image prompt/);
   assert.equal(f.submitted.length, 7);
 });
+
+for (const batch of [true, false])
+  test(`Generate transport chunks retain one request set, prompt batches and owner scope (batch=${batch})`, async (t) => {
+    const f = await fixture(t, {
+      accountMode: true,
+      authenticateGatewayIdentity: (userId) => ({ userId, role: "user", authenticated: true }),
+    });
+    await f.profiles([{ ...imageProfile, capabilities: { variations: batch } }]);
+    const clients = [
+      await chat(t, f, "alice", "first-chat"),
+      await chat(t, f, "alice", "second-chat"),
+      await chat(t, f, "bob", "first-chat"),
+    ];
+    const prompts = Array.from({ length: 6 }, (_, index) => `Plush animal ${index + 1}`);
+    const sets = [];
+    for (const [index, client] of [clients[0], ...clients].entries()) {
+      const before = f.submitted.length;
+      const result = await generate(client, {
+        prompts,
+        count: 2,
+        seed: 10,
+      });
+      const jobs = f.submitted.slice(before);
+      const owner = index === 3 ? "bob" : "alice";
+      assert.equal(jobs.length, batch ? 6 : 12);
+      assert.equal(new Set(jobs.map((job) => job.queueSet)).size, 1);
+      assert.ok(jobs[0].queueSet);
+      sets.push(jobs[0].queueSet);
+      assert.deepEqual(
+        result.jobs.map((job) => job.job_id),
+        jobs.map((job) => job.clientJobId),
+      );
+      assert.equal(new Set(jobs.map((job) => job.resultSet.id)).size, 1);
+      for (const [position, job] of jobs.entries()) {
+        const prompt = batch ? position : Math.floor(position / 2);
+        assert.equal(job.prompt, prompts[prompt]);
+        assert.equal(job.resultSet.index, prompt);
+        assert.equal(job.seed, String(10 + (batch ? position * 2 : position)));
+        assert.equal(job.count, batch ? 2 : 1);
+        assert.equal(job.profileId, imageProfile.id);
+        assert.equal(job.model, imageProfile.model);
+        assert.equal(job.workflow, imageProfile.workflow);
+        assert.equal(job.chat.conversationId, index === 2 ? "second-chat" : "first-chat");
+        assert.equal(ownership(f.dataDir).jobOwner(job.clientJobId), owner);
+        assert.equal(f.jobs.get(job.clientJobId).owner, owner);
+        assert.equal(result.jobs[position].ref, `#${f.jobs.get(job.clientJobId).numbers[0]}`);
+        assert.equal(ownership(f.dataDir).prompt(job.clientJobId).set, job.queueSet);
+        assert.equal(job.queueBatch, batch ? undefined : jobs[prompt * 2].clientJobId);
+      }
+      const foreign = owner === "alice" ? clients[2] : clients[0];
+      const beforeRead = f.requests.length;
+      await failure(foreign, "status", { job_id: result.jobs.at(-1).job_id });
+      assert.equal(f.requests.length, beforeRead);
+      assert.ok(result.jobs.every((job) => job.ref && job.link));
+    }
+    const beforeForgery = f.submitted.length;
+    await failure(clients[2], "generate", {
+      profile_id: imageProfile.id,
+      prompts,
+      count: 2,
+      queueSet: sets[0],
+      owner: "alice",
+    });
+    assert.equal(f.submitted.length, beforeForgery);
+    assert.equal(new Set(sets).size, 4, "requests, conversations and accounts keep separate sets");
+    assert.equal(new Set(f.submitted.map((job) => job.clientJobId)).size, f.submitted.length);
+  });
 
 test("a Generate count is one batched job where the profile batches, else a job per image", async (t) => {
   const f = await fixture(t);
