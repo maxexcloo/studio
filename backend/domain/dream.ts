@@ -827,15 +827,24 @@ export function createDream(options: {
   }
   const pool = (ownerId: string, state: DreamState) =>
     options.gallery(ownerId, { dreamState: state });
+  // A large pool takes long to read, so `consider` reads it at most once.
+  let considering: { ownerId: string; results?: DreamItem[] } | undefined;
+  /** All of Dream's results in gallery order, unseen, kept and discarded. */
+  function allResults(ownerId: string) {
+    const read = () => options.gallery(ownerId, { dreamState: ["unseen", "kept", "discarded"] });
+    if (considering?.ownerId !== ownerId) return read();
+    return (considering.results ??= read());
+  }
   /** Dream's latest image results, leaving out comparisons and series, which are alike by design. */
   const dreamResults = (ownerId: string) =>
-    options
-      .gallery(ownerId, {
-        dreamState: ["unseen", "kept", "discarded"],
-        type: "image",
-        status: "done",
-      })
-      .filter((item) => !item.dream?.pair && item.dream?.arm !== "series")
+    allResults(ownerId)
+      .filter(
+        (item) =>
+          item.type === "image" &&
+          item.status === "done" &&
+          !item.dream?.pair &&
+          item.dream?.arm !== "series",
+      )
       .slice(0, diversity.results);
   /**
    * What a profile (`profile:<id>`) or LoRA (`lora:<name>`) weighs after its share of Dream's
@@ -1189,10 +1198,12 @@ export function createDream(options: {
    */
   function exploring(ownerId: string) {
     const { start, low, high, window } = exploreShare;
-    const decided = options
-      .gallery(ownerId, { dreamState: ["kept", "discarded"] })
+    const decided = allResults(ownerId)
       .filter(
-        (item) => !item.dream?.pair && /^(exploit|explore:|continue:)/.test(item.dream?.arm || ""),
+        (item) =>
+          item.dream?.state !== "unseen" &&
+          !item.dream?.pair &&
+          /^(exploit|explore:|continue:)/.test(item.dream?.arm || ""),
       )
       .slice(0, window);
     const rate = (explored: boolean) => {
@@ -1773,9 +1784,8 @@ export function createDream(options: {
       const otherProfile = exploreProfile(ownerId, kind, catalogue.profiles, profile);
       const open = [...(otherProfile ? ["profile"] : []), ...(fresh ? ["lora"] : []), "prompt"];
       const made = (arm: string) =>
-        options
-          .gallery(ownerId, { dreamState: ["unseen", "kept", "discarded"] })
-          .filter((item) => item.dream?.arm?.startsWith(arm) && !item.dream.pair).length;
+        allResults(ownerId).filter((item) => item.dream?.arm?.startsWith(arm) && !item.dream.pair)
+          .length;
       const share = Math.round(exploring(ownerId) * 100);
       const axis = !steer && !chance(100 - share) ? open[made("explore:") % open.length] : "";
       const { projects, handedOff } = turnProjects(ownerId);
@@ -2501,9 +2511,12 @@ export function createDream(options: {
           if (held(ownerId) >= options.slots()) continue;
           let state: { status: DreamStatus; reason?: string };
           try {
+            considering = { ownerId };
             state = await tracked(`Dream: consider ${index}`, () => consider(ownerId));
           } catch (error) {
             state = { status: "waiting", reason: (error as Error).message };
+          } finally {
+            considering = undefined;
           }
           states.set(ownerId, state);
           note(ownerId, state);
