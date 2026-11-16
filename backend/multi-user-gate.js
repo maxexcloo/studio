@@ -49,7 +49,6 @@ const ordinaryRoutes = [
   ["PATCH", /^\/api\/chat-brief$/],
   ["POST", /^\/api\/prompts\/(clear|enabled|forget|pin)$/],
   ["GET", /^\/api\/loras\/[^/]+$/],
-  ["PUT", /^\/api\/loras\/[^/]+$/],
   ["POST", /^\/api\/loras\/library\/ops$/],
   ["GET", /^\/api\/reference-assets\/[^/]+(\/(media|thumbnail))?$/],
   ["POST", /^\/api\/reference-assets\/(upload|from-gallery)$/],

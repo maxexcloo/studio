@@ -13,14 +13,13 @@
  * it the default backend's guide binding and negatives and drops both old ids' guide entries,
  * records each old id as an alias `{to, backend}` (profile/store.js), so records that name it run
  * again on the backend they ran on, then removes the old files; their version history stays, so a
- * seed never brings them back. Workflow preferences, every account's LoRA stacks and strengths, and
- * run timings (per backend) move to the combined profile. Owner records are left as they are.
+ * seed never brings them back. Workflow preferences and run timings (per backend) move to the
+ * combined profile. Owner records are left as they are.
  */
 import fs from "node:fs";
 import path from "node:path";
 
 import { profileNameParts } from "../../shared/profiles.ts";
-import { repointLoraStacks } from "../combined-profiles.js";
 import {
   backendIdsOf,
   graphFromJson,
@@ -29,7 +28,6 @@ import {
   sharedProfileFields,
   userWorkflowsDir,
 } from "../custom-workflows.js";
-import { dataDir } from "../data-dir.js";
 import { renameTimingKeys } from "../timings.js";
 import { repointWorkflowPreferences } from "../workflow-catalogue.js";
 import { createEditableProfile, listEditableProfiles, readEditableProfile } from "./editor.js";
@@ -271,7 +269,6 @@ export function combineBackends({ hash, selections = [], by = "" } = {}) {
     });
   }
   repointWorkflowPreferences((id) => store.canonical(id));
-  repointLoraStacks(dataDir, (id) => store.canonical(id));
   renameTimingKeys(timingKeys);
   return { combined };
 }
