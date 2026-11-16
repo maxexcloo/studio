@@ -204,19 +204,6 @@ test("in-cluster access needs the mounted service account", async () => {
   );
 });
 
-test("automatic control is off until an administrator turns it on, and stays on", async () => {
-  const request = cluster();
-  const dataDir = mkdtempSync(join(tmpdir(), "studio-runtime-settings-"));
-  const first = (await loadRuntime(environment(), { request, dataDir }))!.controller;
-  assert.equal(first.automaticLifecycle, false);
-  first.configure({ automatic: true, parkIdleMinutes: 15 });
-  const second = (await loadRuntime(environment(), { request, dataDir }))!.controller;
-  assert.deepEqual(second.settings, { automatic: true, parkIdleMinutes: 15 });
-  assert.throws(() => second.configure({ automatic: true, parkIdleMinutes: -1 }), /0 to 1440/);
-  closeRuntimeDatabase(dataDir);
-  rmSync(dataDir, { recursive: true, force: true });
-});
-
 test("runtime changes are recorded in the data folder and outlive the process", async (context) => {
   const dataDir = mkdtempSync(join(tmpdir(), "studio-runtime-history-"));
   context.after(() => {

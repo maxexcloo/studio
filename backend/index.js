@@ -11,7 +11,7 @@ import express from "express";
 
 import { cardKinds, characterImageIds } from "../shared/characters.ts";
 import { isCloudProfile, loraDefaultStrength, loraName } from "../shared/profiles.ts";
-import { canAdmin, clientOf } from "./access.js";
+import { clientOf } from "./access.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import {
   accountRoles,
@@ -194,7 +194,6 @@ import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
 import { adminRefusal, requireAdmin, routeErrors } from "./route-access.js";
 import { registerMigrationRoutes } from "./runtime-migrations.js";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
-import { createSwapRouter } from "./runtime/routes.ts";
 import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
 import { loadSharp } from "./sharp-loader.js";
 import { installShutdown } from "./shutdown.js";
@@ -703,33 +702,24 @@ const promptStage = createPromptStage({
   setPrompts: (job) => setPrompts(store, job, resultItem),
 });
 // The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
-const { generationQueue, queueResourceFor, validateGenerationInput, waitingWorkloads } =
-  createGenerationQueue({
-    assistantEngine,
-    catalogue,
-    cloudProvider,
-    completed: (items) => {
-      void titler.completed(items);
-      void imageSearch.completed(items);
-      void faceCheck.completed(items);
-      void characterSheets.completed(items);
-      if (items.some((item) => item.dream)) dream.finished();
-    },
-    directCloud,
-    generationRoutes,
-    promptStage,
-    recoverRunningJobs,
-    runtime,
-    store,
-  });
-if (runtime)
-  app.use(
-    createSwapRouter(runtime.controller, {
-      admin: (req) => !req.studioAccount || canAdmin(req),
-      workloads: (req, id) => waitingWorkloads(ownerIdForRequest(req), id),
-      requestedBy: runtimeRequester,
-    }),
-  );
+const { generationQueue, queueResourceFor, validateGenerationInput } = createGenerationQueue({
+  assistantEngine,
+  catalogue,
+  cloudProvider,
+  completed: (items) => {
+    void titler.completed(items);
+    void imageSearch.completed(items);
+    void faceCheck.completed(items);
+    void characterSheets.completed(items);
+    if (items.some((item) => item.dream)) dream.finished();
+  },
+  directCloud,
+  generationRoutes,
+  promptStage,
+  recoverRunningJobs,
+  runtime,
+  store,
+});
 registerStatusRoutes(app, { observeServices, queue: generationQueue });
 const admitGeneration = createGenerationAdmission({
   store,

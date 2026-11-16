@@ -1,23 +1,10 @@
-import {
-  Alert,
-  Badge,
-  Button,
-  Checkbox,
-  Group,
-  Loader,
-  Menu,
-  Select,
-  Stack,
-  Switch,
-  Text,
-} from "@mantine/core";
+import { Alert, Badge, Button, Checkbox, Group, Loader, Menu, Stack, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type {
   RuntimeOperation,
   RuntimePreview,
-  RuntimeSettings,
   RuntimeStatus,
   WorkloadPhase,
 } from "../../../../shared/runtime";
@@ -27,7 +14,7 @@ import { DataTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { BenchmarkDialog, benchmarksQuery } from "./Benchmarks";
 import { LogDialog, LogText, PodLog, logTime, useRequester } from "./RuntimeLogs";
@@ -242,123 +229,6 @@ function WorkloadLog({
 }
 const sameSet = (a: string[], b: string[]) =>
   a.length === b.length && a.every((id) => b.includes(id));
-
-const kindLabels = { image: "Images", video: "Videos", text: "Text" } as const;
-
-/**
- * Automatic control starts stopped media workloads for queued work and settles idle pools: it parks
- * their idle media and starts the Run When Idle workload, the only text it ever starts.
- */
-export function AutomaticControl() {
-  const status = useQuery(runtimeStatusQuery).data;
-  if (!status) return null;
-  return <AutomaticControlRows settings={status.settings} workloads={status.workloads} />;
-}
-function AutomaticControlRows({
-  settings,
-  workloads,
-}: {
-  settings: RuntimeSettings;
-  workloads: RuntimeStatus["workloads"];
-}) {
-  const client = useQueryClient();
-  const save = useMutation({
-    meta: { inlineError: true },
-    mutationFn: (patch: Partial<RuntimeSettings>) =>
-      api<RuntimeSettings>("/api/runtime/settings", {
-        method: "PUT",
-        body: JSON.stringify({ ...settings, ...patch }),
-      }),
-    // Controls follow the hand at once; the refetch afterwards settles them, a failure included.
-    onMutate: async (patch) => {
-      await client.cancelQueries({ queryKey: runtimeStatusQuery.queryKey });
-      client.setQueryData(
-        runtimeStatusQuery.queryKey,
-        (status) => status && { ...status, settings: { ...status.settings, ...patch } },
-      );
-    },
-    onSettled: () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey }),
-  });
-  const minutes = [...new Set([0, 10, 15, 30, 60, settings.parkIdleMinutes])].sort((x, y) => x - y);
-  const idleChoice = workloads.find((item) => item.id === settings.idleWorkload);
-  return (
-    <>
-      {/* The main switch leads with the rows it enables; Let Everyone Swap Models stands apart. */}
-      <SettingRow
-        label="Automatic Control"
-        description="Start image and video workers for queued work, and settle the GPUs when Studio is idle."
-      >
-        <Switch
-          aria-label="Automatic Control"
-          checked={settings.automatic}
-          onChange={(event) => save.mutate({ automatic: event.currentTarget.checked })}
-        />
-      </SettingRow>
-      <SettingRow
-        label="Idle After"
-        description="Time without queued or running work before Studio parks a GPU pool's image and video workers."
-      >
-        <Select
-          aria-label="Idle After"
-          w={110}
-          data={minutes.map((value) => ({
-            value: String(value),
-            label: value ? `${value} Min` : "Never",
-          }))}
-          value={String(settings.parkIdleMinutes)}
-          allowDeselect={false}
-          disabled={!settings.automatic}
-          onChange={(value) => value && save.mutate({ parkIdleMinutes: Number(value) })}
-        />
-      </SettingRow>
-      <SettingRow
-        label="Run When Idle"
-        description={
-          idleChoice?.kind === "text"
-            ? "Then start this model. Automatic Control never stops text; administrators can swap it out from the queue."
-            : "Then start this model in its pool. Queued work still starts what it needs."
-        }
-      >
-        <Select
-          aria-label="Run When Idle"
-          w={200}
-          data={[
-            { value: "none", label: "None" },
-            ...(["image", "video", "text"] as const)
-              .map((kind) => ({
-                group: kindLabels[kind],
-                items: workloads
-                  .filter((item) => item.kind === kind)
-                  .map((item) => ({ value: item.id, label: item.label })),
-              }))
-              .filter((group) => group.items.length),
-          ]}
-          value={idleChoice?.id ?? "none"}
-          allowDeselect={false}
-          disabled={!settings.automatic || !settings.parkIdleMinutes}
-          onChange={(value) =>
-            value && save.mutate({ idleWorkload: value === "none" ? "" : value })
-          }
-        />
-      </SettingRow>
-      <SettingRow
-        label="Let Everyone Swap Models"
-        description="Accounts that aren't administrators can also swap text out for their waiting work."
-      >
-        <Switch
-          aria-label="Let Everyone Swap Models"
-          checked={settings.everyoneSwaps === true}
-          onChange={(event) => save.mutate({ everyoneSwaps: event.currentTarget.checked })}
-        />
-      </SettingRow>
-      {save.error && (
-        <Alert color="red" title="Couldn't Save Automatic Control">
-          {save.error.message}
-        </Alert>
-      )}
-    </>
-  );
-}
 
 /** Settings › Workers: which GPU deployments run, a previewed switch and restarts. */
 export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> }) {

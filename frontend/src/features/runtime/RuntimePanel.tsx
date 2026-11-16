@@ -12,9 +12,8 @@ import { api } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
-import { SettingGroup } from "../../ui/SettingRows";
 import { BenchmarkResults } from "./Benchmarks";
-import { AutomaticControl, RuntimeHistory, RuntimeWorkloads } from "./RuntimeWorkloads";
+import { RuntimeHistory, RuntimeWorkloads } from "./RuntimeWorkloads";
 
 const services = [
   { kind: "image", label: "Images" },
@@ -181,7 +180,7 @@ export function ServiceHealthSummary() {
 }
 /**
  * Settings › Workers: each worker's status first, then the GPU workloads Studio controls, then the
- * rarely changed parts: automatic control, benchmarks and the change history.
+ * rarely changed parts: benchmarks and the change history.
  */
 export function RuntimePanel() {
   const status = useQuery(servicesStatusQuery);
@@ -207,9 +206,6 @@ export function RuntimePanel() {
       )}
       {runtime.configured && (
         <>
-          <SettingGroup title="Services & Control">
-            <AutomaticControl />
-          </SettingGroup>
           <BenchmarkResults />
           <RuntimeHistory />
         </>

@@ -23,7 +23,6 @@ import { usePhone } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import { useIsAdmin } from "../auth/AccountGate";
 import { Queue, QueueActions, queueEntries, useQueue } from "../generation/Queue";
-import { SwapNotice } from "../runtime/JobSwap";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
 
 import classes from "./ServiceStatus.module.css";
@@ -113,7 +112,6 @@ export function StatusAction() {
   ) : (
     <ServiceHealthSummary />
   );
-  const notice = <SwapNotice jobs={queue.data?.jobs} />;
   if (!phone)
     return (
       <>
@@ -148,13 +146,11 @@ export function StatusAction() {
             {status}
           </Popover.Dropdown>
         </Popover>
-        {notice}
       </>
     );
   return (
     <>
       <Tooltip label={tooltip}>{trigger}</Tooltip>
-      {notice}
       <Drawer.Root
         id="status"
         opened={opened}

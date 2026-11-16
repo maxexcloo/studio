@@ -98,7 +98,6 @@ test("A parked profile reads as parked, and an administrator choosing it starts 
   await page.route("**/api/runtime", (route) =>
     route.fulfill({
       json: {
-        settings: { automatic: false, parkIdleMinutes: 0 },
         pools: [],
         history: [],
         workloads: [],
