@@ -21,7 +21,13 @@ import { LoadingState } from "../../ui/LoadingState";
 import { mediaSource } from "../gallery/mediaSource";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { galleryKey } from "../gallery/queries";
-import { type DreamItem, discardedQuery, dreamItemPath, dreamQuery } from "./queries";
+import {
+  type DreamItem,
+  type DreamMedia,
+  discardedQuery,
+  dreamItemPath,
+  dreamQuery,
+} from "./queries";
 
 import classes from "./DreamPage.module.css";
 
@@ -43,15 +49,15 @@ export function Thumbnail({ item }: { item: DreamItem }) {
  * Disliked Dream results, newest first; Keep moves one into the gallery after all, on its card or
  * in the viewer. They stay, hidden, until Delete All deletes them.
  */
-export function DiscardedDreams() {
+export function DiscardedDreams({ media }: { media: DreamMedia }) {
   const client = useQueryClient();
-  const discarded = useInfiniteQuery(discardedQuery);
+  const discarded = useInfiniteQuery(discardedQuery(media));
   const [confirming, setConfirming] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
   const deleteAll = useMutation({
     mutationFn: () => api("/api/dream/discarded", { method: "DELETE" }),
     onSuccess: () => setConfirming(false),
-    onSettled: () => client.invalidateQueries({ queryKey: discardedQuery.queryKey }),
+    onSettled: () => client.invalidateQueries({ queryKey: ["dream", "discarded"] }),
   });
   const keep = useMutation({
     mutationFn: (item: DreamItem) => post(dreamItemPath(item, "keep")),
@@ -91,7 +97,7 @@ export function DiscardedDreams() {
         onConfirm={() => deleteAll.mutate()}
         onClose={() => setConfirming(false)}
       >
-        Delete every discarded Dream result and its file? This can't be undone.
+        Delete all discarded Dream images, videos and their files? This can't be undone.
       </ConfirmDialog>
       <SimpleGrid cols={{ base: 2, sm: 3, md: 5, lg: 6 }} spacing="sm" pb="md">
         {items.map((item) => (

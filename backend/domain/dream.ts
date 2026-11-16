@@ -2703,11 +2703,11 @@ export function createDream(options: {
       return record.settings;
     },
     /** Random older gallery images to judge without the GPU, those not judged yet first. */
-    calibration(ownerId: string, limit: number) {
+    calibration(ownerId: string, limit: number, media: "image" | "video" = "image") {
       const judged = read(ownerId).judged || [];
       // Twice as many as asked for, as hidden or missing media drops some.
       const sample = (query: DreamQuery) =>
-        shuffled(calibrationPool(ownerId, { ...query, sample: limit * 2 }));
+        shuffled(calibrationPool(ownerId, { ...query, type: media, sample: limit * 2 }));
       const fresh = sample({ notIds: judged });
       return [...fresh, ...(fresh.length < limit ? sample({ ids: judged }) : [])].slice(0, limit);
     },
@@ -2718,11 +2718,14 @@ export function createDream(options: {
      */
     calibrate(ownerId: string, { liked, passed }: { liked: string[]; passed: string[] }) {
       const pool = new Map(
-        calibrationPool(ownerId, { ids: [...liked, ...passed] }).map((item) => [
+        calibrationPool(ownerId, { type: undefined, ids: [...liked, ...passed] }).map((item) => [
           String(item.id),
           item,
         ]),
       );
+      const media = [...pool.values()].map((item) => item.type);
+      if (media.some((type) => type !== "image" && type !== "video") || new Set(media).size > 1)
+        throw failure("Compare two images or two videos.", 400);
       const signal = (kind: "calibrate-like" | "calibrate-pass") => (id: string) => {
         const item = pool.get(id);
         if (!item) throw failure("That gallery image is unavailable.", 404);

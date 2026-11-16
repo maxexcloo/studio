@@ -1350,7 +1350,16 @@ export async function serveDream(
     if (method !== "GET") state.requests.push({ method, path, body });
     if (path === "/api/dream") return route.fulfill({ json: show() });
     if (path === "/api/dream/history")
-      return route.fulfill({ json: { items: options.history || [] } });
+      return route.fulfill({
+        json: {
+          items: (options.history || []).filter(
+            (entry) =>
+              !url.searchParams.has("media") ||
+              (entry.item.media === url.searchParams.get("media") &&
+                (!entry.other || entry.other.media === url.searchParams.get("media"))),
+          ),
+        },
+      });
     if (path === "/api/dream/count")
       return route.fulfill({
         json: {
@@ -1365,7 +1374,13 @@ export async function serveDream(
     if (path === "/api/dream/calibration") {
       if (method === "GET")
         return route.fulfill({
-          json: { items: state.calibration.filter((item) => !state.judged.has(item.id)) },
+          json: {
+            items: state.calibration.filter(
+              (item) =>
+                !state.judged.has(item.id) &&
+                item.type === (url.searchParams.get("media") || "image"),
+            ),
+          },
         });
       for (const id of [...(body.liked || []), ...(body.passed || [])]) state.judged.add(id);
       return route.fulfill({ json: { ok: true } });
@@ -1376,12 +1391,15 @@ export async function serveDream(
         state.discarded = [];
         return route.fulfill({ json: { deleted } });
       }
+      const filtered = state.discarded.filter(
+        (item) => !url.searchParams.has("media") || item.type === url.searchParams.get("media"),
+      );
       const start = Number(url.searchParams.get("cursor") || 0);
       const limit = Number(url.searchParams.get("limit") || 40);
       return route.fulfill({
         json: {
-          items: state.discarded.slice(start, start + limit),
-          nextCursor: start + limit < state.discarded.length ? String(start + limit) : "",
+          items: filtered.slice(start, start + limit),
+          nextCursor: start + limit < filtered.length ? String(start + limit) : "",
         },
       });
     }

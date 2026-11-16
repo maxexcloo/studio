@@ -37,3 +37,24 @@ test("while Dream is off every card compares two gallery images, and Dream's res
   // A single image left over makes no card.
   assert.deepEqual(keys(deckCards(dream, items("g1"), 0, { pairsOnly: true })), []);
 });
+
+test("media selection filters both pools before pairing, including Dream-off comparisons", () => {
+  const images = items("a", "b");
+  const videos = items("v1", "v2").map((item) => ({ ...item, type: "video" as const }));
+  const mixed = [images[0], videos[0], images[1], videos[1]];
+  assert.deepEqual(keys(deckCards([], mixed, 0, { pairsOnly: true })), ["a+b"]);
+  const cards = deckCards([], mixed, 0, { pairsOnly: true, media: "video" });
+  assert.deepEqual(keys(cards), ["v1+v2"]);
+  assert.equal(cards[0].kind === "pair" && cards[0].question, "Which Video?");
+  const dream = mixed.map((item, side) => ({
+    ...item,
+    dream: {
+      pair: { id: "pair", side: side < 2 ? 0 : 1, question: "Which?", label: item.id },
+    },
+  })) as DreamItem[];
+  for (const media of ["image", "video"] as const) {
+    const [card] = deckCards(dream, [], 0, { media });
+    assert.equal(card.kind, "pair");
+    if (card.kind === "pair") assert.ok(card.items.every((item) => item.type === media));
+  }
+});

@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Button, type ButtonProps, Group, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Button, Group, Text, Tooltip } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -6,23 +6,26 @@ import { createPortal } from "react-dom";
 import { loraName } from "../../../../shared/profiles";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
+import { ActionBarSurface } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone, useTouch } from "../../ui/usePhone";
-import { mediaSource, playbackUrl } from "../gallery/mediaSource";
+import { mediaSource } from "../gallery/mediaSource";
 import { MediaViewer } from "../gallery/MediaViewer";
+import { ViewerActionGroups } from "../gallery/MediaViewerActions";
 import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
-import { type Choice, type Verdict, dreamChoices, viewerChoices } from "./choices";
+import { type Verdict, viewerChoices } from "./choices";
 import { type DeckCard, type PairDeckCard, deckCards } from "./deck";
 import { PairContent, sideLabel } from "./PairCard";
 import {
   type DreamItem,
+  type DreamMedia,
   type PairAnswer,
   calibrationQuery,
   dreamItemPath,
@@ -62,23 +65,11 @@ const keyDirections: Record<string, Direction> = {
 /** Full screen's choices that return to the deck: a verdict or answer, not Like, Edit and others. */
 const closing = new Set<string>(["discard", "keep", "a", "b", "both", "neither"]);
 
-/** The card's media: the top card plays a video; cards beneath show its still. */
-function Media({ item, playing }: { item: MediaItem; playing: boolean }) {
+/** Deck media stays still; opening the shared viewer owns playback and its lifecycle. */
+function Media({ item }: { item: MediaItem }) {
   const source = mediaSource(item);
   const [failed, setFailed] = useState(false);
   if (failed) return null;
-  if (item.type === "video" && playing)
-    return (
-      <video
-        src={playbackUrl(source.url)}
-        poster={source.thumbnailUrl}
-        autoPlay
-        muted
-        loop
-        playsInline
-        aria-label={item.prompt || "Dream video"}
-      />
-    );
   return (
     <img
       src={item.type === "video" ? source.thumbnailUrl || source.url : source.displayUrl}
@@ -105,9 +96,9 @@ function usePrefetch(card?: DeckCard) {
  * Gallery images for calibration, drawn a round at a time; a new round is drawn once fewer than
  * `least` images so far are unjudged, until a round brings nothing new.
  */
-function useCalibration(least: number, decided: Set<string>) {
+function useCalibration(least: number, decided: Set<string>, media: DreamMedia) {
   const [round, setRound] = useState(0);
-  const query = useQuery(calibrationQuery(round));
+  const query = useQuery(calibrationQuery(round, media));
   const known = useRef(new Set<string>());
   const [pool, setPool] = useState<{ items: MediaItem[]; added: number }>({ items: [], added: 0 });
   useEffect(() => {
@@ -261,27 +252,16 @@ const cardLabel = (card: DeckCard, top: boolean) =>
       : "Next Comparison"
     : `${top ? "Current" : "Next"} ${card.kind === "dream" ? "Dream" : "Gallery Image"}`;
 
-/**
- * The Dream deck: the oldest unseen result on top, the next beneath it, the batch's progress above.
- * Swipe or press ← to dislike, → to keep, ↑ to keep and queue variations; the bar offers Dislike,
- * Like and Keep. A comparison asks about two results alike but for one thing: tapping an
- * image chooses it, with Undo in the toolbar for a moment; ← or a left swipe answers A, → B,
- * ↑ Both and ↓ Neither, and Neither and Both sit under the pair. Tapping a single card (or its View
- * action), or holding or pinching any card (or a side's label), opens it in the viewer over the
- * deck, with all the card's choices (Edit, Animate and More Like This too) in its bar; Dislike,
- * Keep or an answer there returns to the deck, and the others move on in the viewer.
- * Older gallery images join in (see `deckCards`) to teach the taste profile and rate images against
- * each other; with `pairsOnly` (Dream is off) the deck only compares them;
- * judging them changes nothing in the gallery beyond an explicit Like or Dislike. `empty` shows
- * once the deck is through, told whether calibration images are available.
- */
+/** The unseen deck and its shared preview; tapping media opens it, actions and swipes judge it. */
 export function DreamDeck({
   items,
+  media,
   pairsOnly,
   empty,
   undoTarget,
 }: {
   items: DreamItem[];
+  media: DreamMedia;
   pairsOnly: boolean;
   empty: ReactNode;
   undoTarget: HTMLDivElement | null;
@@ -303,11 +283,12 @@ export function DreamDeck({
     });
   const judge = useJudge(restore);
   const unseen = items.filter((item) => !decided.has(item.id));
-  const gallery = useCalibration(pairsOnly ? 2 : 1, decided);
-  const cards = deckCards(unseen, gallery.items, counts.judged, { pairsOnly });
+  const gallery = useCalibration(pairsOnly ? 2 : 1, decided, media);
+  const cards = deckCards(unseen, gallery.items, counts.judged, { pairsOnly, media });
   const [top, next] = cards;
   usePrefetch(cards[2]);
   const fly = useRef<Fly | null>(null);
+  const stage = useRef<HTMLDivElement>(null);
   const busy = useRef(false);
   const single = top?.kind === "pair" ? undefined : top;
   const image = single?.item.type === "image";
@@ -329,7 +310,7 @@ export function DreamDeck({
     decide(judgement.card);
     judge.mutate(judgement);
   }
-  // A tapped side, answered once its Undo has stood for a moment or the next choice is made.
+  // A chosen side answers once Undo has stood for a moment or the next choice is made.
   const [chosen, setChosen] = useState<{ card: PairDeckCard; side: 0 | 1 } | null>(null);
   const chosenRef = useRef(chosen);
   chosenRef.current = chosen;
@@ -357,7 +338,7 @@ export function DreamDeck({
       dreamed: previous.dreamed - dreamed(last.card),
     }));
   }
-  /** A tapped side answers once its Undo has gone, unless undone. */
+  /** A chosen side answers once its Undo has gone, unless undone. */
   async function pick(side: 0 | 1) {
     if (top?.kind !== "pair" || busy.current) return;
     busy.current = true;
@@ -435,11 +416,21 @@ export function DreamDeck({
       items={shown}
       navigate={(item) => setViewing(item.id)}
       close={() => setViewing(null)}
+      onReturnFocus={(item) => {
+        const targets = [
+          ...(stage.current?.querySelectorAll<HTMLElement>('[data-depth="0"] [data-preview-id]') ??
+            []),
+        ];
+        (targets.find((target) => target.dataset.previewId === item.id) ?? targets[0])?.focus({
+          preventScroll: true,
+        });
+      }}
       actions={viewerChoices(
         top,
         (choice) => {
           if (closing.has(choice)) setViewing(null);
-          void act(choice);
+          if (choice === "a" || choice === "b") void pick(choice === "a" ? 0 : 1);
+          else void act(choice);
         },
         phone,
       )}
@@ -473,27 +464,13 @@ export function DreamDeck({
         {undo}
       </>
     );
-  const choices = dreamChoices(top).flat();
-  const choice = (id: Choice["choice"]) => choices.find((option) => option.choice === id)!;
-  const button = (
-    { choice, label, icon: Icon, hint, tip, primary }: Choice,
-    props?: ButtonProps,
-  ) => (
-    <Tooltip
-      key={choice}
-      label={hint ? `${tip || label} (${hint})` : tip || label}
-      disabled={phone}
-    >
-      <Button
-        variant={primary ? "filled" : "default"}
-        radius="xl"
-        leftSection={<Icon size={18} />}
-        onClick={() => void act(choice)}
-        {...props}
-      >
-        {label}
-      </Button>
-    </Tooltip>
+  const actions = viewerChoices(
+    top,
+    (choice) => {
+      if (choice === "a" || choice === "b") void pick(choice === "a" ? 0 : 1);
+      else void act(choice);
+    },
+    phone,
   );
   const view = (item: MediaItem) => (
     <Tooltip label="View">
@@ -501,6 +478,7 @@ export function DreamDeck({
         className={classes.view}
         variant="default"
         aria-label="View"
+        data-preview-id={item.id}
         onClick={() => setViewing(item.id)}
       >
         <icons.preview size={16} />
@@ -511,7 +489,7 @@ export function DreamDeck({
   return (
     <>
       <BatchStrip done={counts.dreamed} total={batch} />
-      <div className={classes.stage}>
+      <div ref={stage} className={classes.stage} aria-hidden={!!viewing} inert={!!viewing}>
         {[next, top].map(
           (card) =>
             card && (
@@ -535,7 +513,7 @@ export function DreamDeck({
                 onTap={(target) => {
                   if (card.kind !== "pair") return setViewing(card.item.id);
                   const side = target.closest<HTMLElement>("[data-side]")?.dataset.side;
-                  if (side !== undefined) void pick(Number(side) as 0 | 1);
+                  setViewing(card.items[Number(side ?? 0)].id);
                 }}
                 onHold={(target) => {
                   if (card.kind !== "pair") return setViewing(card.item.id);
@@ -554,13 +532,12 @@ export function DreamDeck({
                     card={card}
                     top={card === top}
                     picked={picked?.key === card.key ? picked.side : undefined}
-                    choose={(side) => void pick(side)}
                     view={(side) => setViewing(card.items[side].id)}
                   />
                 ) : (
                   <>
                     <div className={classes.media}>
-                      <Media item={card.item} playing={card === top} />
+                      <Media item={card.item} />
                       {card.kind === "calibration" && (
                         <Badge className={classes.label} variant="default">
                           From Your Gallery
@@ -583,20 +560,15 @@ export function DreamDeck({
             ),
         )}
       </div>
-      {/* A comparison's images are its A and B, so only Neither and Both stand under it. */}
-      {top.kind !== "pair" ? (
-        <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap">
-          {/* Phones share the row by label length, so no label is cut short. */}
-          {[choice("discard"), choice("like"), choice("keep")].map((option) =>
-            button(option, phone ? { px: "xs", flex: "1 1 auto" } : { size: "lg", miw: "9rem" }),
-          )}
-        </Group>
-      ) : (
-        <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap">
-          {button(choice("neither"), { size: "sm" })}
-          {button(choice("both"), { size: "sm" })}
-        </Group>
-      )}
+      <ActionBarSurface
+        aria-label={actions.label}
+        className={classes.actions}
+        radius="lg"
+        aria-hidden={!!viewing}
+        inert={!!viewing}
+      >
+        <ViewerActionGroups {...actions} />
+      </ActionBarSurface>
       {!phone && !touch && (
         <Text size="xs" c="dimmed" ta="center">
           {top.kind === "pair"

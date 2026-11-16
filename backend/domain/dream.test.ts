@@ -754,7 +754,11 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
       ["keep", job.id, "exploit"],
     ],
   );
-  const discarded = await request("/discarded?limit=1");
+  assert.deepEqual((await request("/discarded?media=video&limit=1")).body, {
+    items: [],
+    nextCursor: "",
+  });
+  const discarded = await request("/discarded?media=image&limit=1");
   assert.equal(discarded.body.items[0].prompt, "dream 2");
   assert.equal(discarded.body.nextCursor, "");
 
@@ -1064,6 +1068,32 @@ test("While Dream is off, gallery comparisons still rate images and queue nothin
   assert.deepEqual(dreamJobs("alice"), []);
 });
 
+test("Dream-off video comparisons rate videos without queueing work", async (t) => {
+  const { dream, state, dreamJobs, generated } = fixture(t);
+  const createdAt = new Date(state.clock - 2 * 86_400_000).toISOString();
+  generated(
+    ...["a", "b"].map((id) => ({
+      id,
+      jobId: `job-${id}`,
+      ownerId: "alice",
+      type: "video",
+      status: "done",
+      createdAt,
+    })),
+  );
+  assert.deepEqual(
+    dream
+      .calibration("alice", 12, "video")
+      .map((item) => item.id)
+      .sort(),
+    ["a", "b"],
+  );
+  dream.calibrate("alice", { liked: ["a"], passed: ["b"] });
+  assert.deepEqual(dream.read("alice").ratings, { a: 1516, b: 1484 });
+  await dream.tick();
+  assert.deepEqual(dreamJobs("alice"), []);
+});
+
 test("The explore share starts at a fifth and follows how often explored results are kept against the rest", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
@@ -1182,6 +1212,37 @@ test("Dream keeps discards disliked and hidden, never deleting them unasked, and
   assert.deepEqual(ids(), ["new", "kept", "bob-old"]);
 });
 
+test("Discard pagination counts only the chosen media and retains owner scope", async (t) => {
+  const fx = fixture(t);
+  const { state } = fx;
+  state.items.push(
+    ...["image", "video", "image", "video"].map((type, index) => ({
+      id: String(index),
+      ownerId: "alice",
+      type,
+      status: "done",
+      dream: { prompt: "p", why: "", at: "", state: "discarded" as const },
+    })),
+    {
+      id: "bob-video",
+      ownerId: "bob",
+      type: "video",
+      status: "done",
+      dream: { prompt: "p", why: "", at: "", state: "discarded" },
+    },
+  );
+  const request = await serve(t, fx);
+  const first = (await request("/discarded?media=video&limit=1")).body;
+  assert.equal(first.items.length, 1);
+  assert.equal(first.items[0].type, "video");
+  assert.equal(first.nextCursor, "1");
+  const second = (await request(`/discarded?media=video&limit=1&cursor=${first.nextCursor}`)).body;
+  assert.equal(second.items[0].type, "video");
+  assert.notEqual(second.items[0].id, first.items[0].id);
+  assert.equal(second.nextCursor, "");
+  assert.ok([...first.items, ...second.items].every((item) => item.ownerId === "alice"));
+});
+
 test("Calibration offers the account's older Studio generations, unjudged first, and only teaches the taste profile", async (t) => {
   const fx = fixture(t);
   const { state, taste, generated } = fx;
@@ -1232,6 +1293,26 @@ test("Calibration offers the account's older Studio generations, unjudged first,
       ["calibrate-pass", "job-b", "prompt b"],
       ["calibrate-like", "job-a", "prompt a"],
     ],
+  );
+  assert.deepEqual(
+    (await request("/calibration?media=video&limit=10")).body.items.map(
+      (item: DreamItem) => item.id,
+    ),
+    ["clip"],
+  );
+  assert.equal((await request("/calibration", { liked: ["clip"], passed: ["a"] })).status, 400);
+  assert.equal((await request("/calibration", { liked: ["clip"] })).status, 200);
+  assert.equal(taste.read("alice").signals[0].media, "video");
+  assert.deepEqual(
+    (await request("/history?media=video")).body.items.map(
+      (item: { item: { media: string } }) => item.item.media,
+    ),
+    ["video"],
+  );
+  assert.ok(
+    (await request("/history?media=image")).body.items.every(
+      (item: { item: { media: string } }) => item.item.media === "image",
+    ),
   );
   // Judged images come after unjudged ones; nothing in the gallery changed.
   generated(image("d"));

@@ -1,5 +1,5 @@
 import type { MediaItem } from "../../types";
-import type { DreamItem } from "./queries";
+import type { DreamItem, DreamMedia } from "./queries";
 
 /**
  * A pair asks its question about two images: a Dream comparison (`pairId`, alike but for the one
@@ -26,7 +26,10 @@ function dreamCards(dream: DreamItem[]): DeckCard[] {
     const pair = item.dream?.pair;
     if (pair && paired.has(pair.id)) continue;
     const other =
-      pair && dream.find((entry) => entry !== item && entry.dream?.pair?.id === pair.id);
+      pair &&
+      dream.find(
+        (entry) => entry !== item && entry.type === item.type && entry.dream?.pair?.id === pair.id,
+      );
     if (!pair || !other) {
       cards.push({ kind: "dream", key: item.id, item });
       continue;
@@ -58,10 +61,14 @@ export function deckCards(
   dream: DreamItem[],
   calibration: MediaItem[],
   judged: number,
-  { depth = 3, pairsOnly = false } = {},
+  {
+    depth = 3,
+    pairsOnly = false,
+    media = "image",
+  }: { depth?: number; pairsOnly?: boolean; media?: DreamMedia } = {},
 ) {
-  const unseen = pairsOnly ? [] : dreamCards(dream);
-  const gallery = [...calibration];
+  const unseen = pairsOnly ? [] : dreamCards(dream.filter((item) => item.type === media));
+  const gallery = calibration.filter((item) => item.type === media);
   const cards: DeckCard[] = [];
   for (let count = judged; cards.length < depth; count++) {
     if ((pairsOnly || count % pairEvery === pairEvery - 1) && gallery.length >= 2) {
@@ -70,7 +77,7 @@ export function deckCards(
         kind: "pair",
         key: `${items[0].id}+${items[1].id}`,
         items,
-        question: "Which Image?",
+        question: media === "video" ? "Which Video?" : "Which Image?",
       });
     } else if (unseen.length) cards.push(unseen.shift()!);
     else if (gallery.length && !pairsOnly) {
