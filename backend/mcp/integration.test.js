@@ -1312,6 +1312,85 @@ test("Models and Generate keep an old per-backend id's controls after the defaul
   assert.equal(f.submitted[0].width, 2048);
 });
 
+test("Models and Generate follow the run's backend: its sizes, reference limit and LoRA backend", async (t) => {
+  const f = await fixture(t);
+  const previous = process.env.STUDIO_DATA_DIR;
+  process.env.STUDIO_DATA_DIR = f.dataDir;
+  t.after(() => {
+    if (previous === undefined) delete process.env.STUDIO_DATA_DIR;
+    else process.env.STUDIO_DATA_DIR = previous;
+  });
+  const workflows = path.join(f.dataDir, "workflows");
+  fs.mkdirSync(workflows, { recursive: true });
+  // A retired profile resolves to the one that replaced it and is never listed.
+  fs.writeFileSync(
+    path.join(workflows, ".studio-aliases.json"),
+    JSON.stringify({ "qwen-retired": { to: "qwen" } }),
+  );
+  const slots = (count) => Array.from({ length: count }, (_, i) => ({ id: `reference-${i + 1}` }));
+  const comfy = {
+    ...imageProfile,
+    id: "custom:qwen",
+    label: "Qwen · Fast",
+    backend: "comfyui",
+    maxLoras: 8,
+    defaults: { ...imageProfile.defaults, width: 1008, height: 1344 },
+    aspectPresets: [{ label: "16:9", w: 2048, h: 1152 }],
+    constraints: { ...imageProfile.constraints, width: { max: 16384 }, height: { max: 16384 } },
+    mediaInputs: slots(10),
+  };
+  const radiance = {
+    ...comfy,
+    backend: "radiance",
+    maxLoras: 4,
+    aspectPresets: [{ label: "16:9", w: 1344, h: 768 }],
+    constraints: {
+      ...comfy.constraints,
+      width: { max: 1344, step: 32 },
+      height: { max: 1344, step: 32 },
+    },
+    mediaInputs: slots(4),
+  };
+  await f.profiles([
+    {
+      ...radiance,
+      backendOptions: [
+        { id: "comfyui", label: "ComfyUI", references: 10, ready: false, profile: comfy },
+        { id: "radiance", label: "Radiance", references: 4, ready: true, profile: radiance },
+      ],
+    },
+  ]);
+  const client = await f.client();
+  assert.deepEqual(data(await call(client, "models", { kind: "image" })).image, [
+    "custom:qwen — Qwen · Fast",
+  ]);
+  const detail = data(await call(client, "models", { profile_id: "custom:qwen-retired" }));
+  assert.equal(detail.id, "custom:qwen");
+  assert.equal(detail.backend, "radiance");
+  assert.equal(detail.lora_backend, "ComfyUI (not ready)");
+  assert.deepEqual(detail.references.by_backend, { ComfyUI: 10, Radiance: 4 });
+  assert.deepEqual(detail.controls.aspect.options, { "16:9": "1344×768" });
+  assert.equal(detail.defaults.size, "1008×1344");
+  // Five references are past Radiance's four slots: refused, naming the limit.
+  const many = await call(client, "generate", {
+    profile_id: "custom:qwen",
+    prompts: ["A fox"],
+    reference_asset_ids: ["asset-1", "asset-2", "asset-3", "asset-4", "asset-5"],
+  });
+  assert.equal(many.isError, true);
+  assert.match(texts(many), /Qwen · Fast on Radiance takes at most 4 references; pass 4 or fewer/);
+  // A LoRA run leaves Radiance for ComfyUI, at ComfyUI's own preset, and says so.
+  const lora = await call(client, "generate", {
+    profile_id: "custom:qwen",
+    prompts: ["A fox"],
+    aspect: "16:9",
+    loras: [{ name: "fixture-effect.safetensors" }],
+  });
+  assert.match(texts(lora), /Qwen · Fast runs on ComfyUI with LoRAs, which isn't ready/);
+  assert.equal(f.submitted.at(-1).profileBackend, "comfyui");
+  assert.deepEqual([f.submitted.at(-1).width, f.submitted.at(-1).height], [2048, 1152]);
+});
+
 test("Generate attaches a compact guide once per account unless it read the selected profile's whole guide, not its gist, discovery or another profile", async (t) => {
   const f = await fixture(t);
   await f.profiles([
@@ -5633,9 +5712,12 @@ test("aspect picks the profile's own preset and resolution its long edge", async
     .inputSchema.properties;
   assert.equal(schema.width, undefined);
   assert.deepEqual(schema.resolution.enum, ["1K", "2K", "4K"]);
-  // Models offers the presets by name, starting on the family's own default preset.
+  // Models offers the presets by name with their sizes, starting on the family's own default preset.
   const detail = data(await call(client, "models", { profile_id: "native" }));
-  assert.deepEqual(detail.controls.aspect, { options: presets.map((item) => item.label) });
+  assert.deepEqual(detail.controls.aspect, {
+    options: Object.fromEntries(presets.map((item) => [item.label, `${item.w}×${item.h}`])),
+  });
+  assert.equal(detail.defaults.size, "864×1152");
   await f.profiles([{ ...native, aspectDefault: "16:9" }], {
     defaults: { image: "native", video: videoProfile.id },
   });
@@ -5644,6 +5726,10 @@ test("aspect picks the profile's own preset and resolution its long edge", async
     "16:9",
   );
   assert.deepEqual(await size({}), [1360, 768], "the family's default preset without aspect");
+  assert.equal(
+    data(await call(client, "models", { profile_id: "native" })).defaults.size,
+    "1360×768",
+  );
 });
 
 test("a vague generate runs two images on its family's fastest profile at the default preset, without LoRAs", async (t) => {
@@ -6855,7 +6941,7 @@ test("a pending Generate stays deduplicated, then expires from its settled reply
       request: async () => ({}),
       addSet: () => 1,
       profiles: async () => [imageProfile],
-      profileForBackend: (profile) => profile,
+      runProfile: (profile) => profile,
       queue: async () => ({
         status: "queued",
         jobs: [
