@@ -10,17 +10,15 @@ import { resolveImageMode } from "./workflow-modes.js";
 // Exact migration values, never runtime aliases. Profiles are versioned separately by administrators.
 const models = {
   "fasth3-8-step-v2-fp8.rad": "fasth3-8-step-v2-i8",
-  "flux-3-klein-base-fp8.rad": "flux-3-klein-base-iq8r",
-  "flux-3-klein-fp8.rad": "flux-3-klein-iq8r",
-  "krea-2-raw-fp8.rad": "krea-2-raw-iq8r",
+  "flux-3-klein-base-fp8.rad": "flux-3-image-klein-base-iq8r",
+  "flux-3-klein-fp8.rad": "flux-3-image-klein-iq8r",
   "krea-2-turbo-fp8.rad": "krea-2-turbo-iq8r",
-  "kroma-0.3.1-turbo-fp8.rad": "kroma-0.3.1-turbo-iq8r",
-  "kromafine-1-turbo-fp8.rad": "kromafine-1-turbo-iq8r",
+  "kroma-0.3.1-turbo-fp8.rad": "kroma-v0.3.1-turbo-iq8r",
+  "kromafine-1-turbo-fp8.rad": "kromafine-turbo-v1.0-iq8r",
   "minimax-h3-fp8.rad": "minimax-h3-i8",
-  "noctq-v4-uncensored-fp8.rad": "noctq-v4-uncensored-iq8r",
+  "noctq-v4-uncensored-fp8.rad": "noctq-v4-iq8r",
   "qwen-image-2.1-fp8.rad": "qwen-image-2.1-iq8r",
   "qwen-image-2.1-turbo-fp8.rad": "qwen-image-2.1-turbo-iq8r",
-  "qwen-image-2.1-turbo-uncensored-fp8.rad": "qwen-image-2.1-turbo-uncensored-iq8r",
 };
 
 const canonical = (value) =>

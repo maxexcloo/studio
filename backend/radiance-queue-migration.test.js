@@ -80,17 +80,14 @@ test("no pause, accepted work, changed snapshots and unknown explicit models blo
   assert.equal(store.job("owner", job.id).providerJobId, "accepted");
 });
 
-test("an explicit uncensored choice cannot silently become a profile's stock model", (t) => {
+test("an explicit model choice cannot silently become a profile's other model", (t) => {
   const { store, job } = setup(t);
   store.setPaused(everyone, true);
   store.save({
     ...job,
-    input: { ...job.input, modelName: "qwen-image-2.1-turbo-uncensored-fp8.rad" },
+    input: { ...job.input, modelName: "noctq-v4-uncensored-fp8.rad" },
   });
   const plan = migrateRadianceQueue(store, { workers, profile });
-  assert.match(
-    plan.conflicts.join(" "),
-    /explicit model qwen-image-2.1-turbo-uncensored-iq8r differs/,
-  );
+  assert.match(plan.conflicts.join(" "), /explicit model noctq-v4-iq8r differs/);
   assert.equal(plan.applied, false);
 });
