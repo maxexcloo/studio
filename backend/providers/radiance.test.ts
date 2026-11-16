@@ -91,9 +91,11 @@ test("the client reads model states and keeps Radiance's own words on failure", 
   });
 });
 
-test("one-GPU Qwen and Noct enforce their actual conditioning limits without constraining FLUX3", () => {
+test("one-GPU Qwen and Noct fit their actual conditioning limits without constraining FLUX3", () => {
   for (const model of ["qwen-image-2.1-iq8r", "noctq-v4-uncensored-iq8r"]) {
-    assert.throws(() => imageRequest({ ...image, model, width: 1376 }), /1344/);
+    // 1792 × 1024 shrinks to 1344 × 768.
+    const wide = imageRequest({ ...image, model, width: 1792 }).body as { size: string };
+    assert.equal(wide.size, "1344x768");
     assert.throws(
       () => imageRequest({ ...image, model }, Array(5).fill(new Uint8Array([1]))),
       /4 reference/,
