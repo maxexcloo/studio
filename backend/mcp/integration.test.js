@@ -6941,7 +6941,7 @@ test("a pending Generate stays deduplicated, then expires from its settled reply
       request: async () => ({}),
       addSet: () => 1,
       profiles: async () => [imageProfile],
-      profileForBackend: (profile) => profile,
+      runProfile: (profile) => profile,
       queue: async () => ({
         status: "queued",
         jobs: [
