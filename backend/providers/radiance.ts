@@ -26,8 +26,6 @@ export interface RadianceFile {
 export const radianceImageNode = "RadianceImageGenerate";
 export const radianceVideoNode = "RadianceVideoGenerate";
 
-// Krea 2 and FLUX.3 guide against an empty negative by default; Qwen-Image needs one.
-const negativeOptional = ["flux-3-", "krea-2-"];
 // H3 makes videos up to the area of 1344 × 768.
 const videoMaxPixels = 1344 * 768;
 const fps = 24;
@@ -45,7 +43,6 @@ const maxVideoReferences = 9;
 const maxVideoBytes = 2 * 1024 ** 3;
 
 const distilled = (model: string) => model.toLowerCase().includes("fasth3");
-const turbo = (model: string) => model.includes("turbo");
 
 /** The one-GPU Qwen deployment's conditioning/cache limits, shared by its profiles and requests. */
 export function radianceImageLimits(model: string) {
@@ -168,17 +165,10 @@ export function imageRequest(values: Values, references: Uint8Array[] = []) {
   if (loras.length) body.loras = loras;
   // Krea 2's text-tap rebalance; Radiance refuses it for other models.
   if (values.rebalance && values.rebalance !== "off") body.rebalance = values.rebalance;
-  // Turbo owns its eight-step, guidance-1 schedule: tuning carried over from another profile is
-  // left out rather than failing an otherwise valid job.
-  const cfg = Number(values.cfg) || 1;
-  if (!turbo(model)) body.num_inference_steps = Number(values.steps);
-  if (!turbo(model) && cfg > 1) {
-    const negative = String(values.negative_prompt || "").trim();
-    if (negativeOptional.some((prefix) => model.startsWith(prefix))) body.guidance_scale = cfg;
-    else if (!negative) throw new Error("Guidance above 1 requires a negative prompt.");
-    else body.true_cfg_scale = cfg;
-    if (negative) body.negative_prompt = values.negative_prompt;
-  }
+  // Send the profile's exact schedule and off value; omission uses the model's own CFG default.
+  body.num_inference_steps = Number(values.steps);
+  body.guidance_scale = Number(values.cfg);
+  body.negative_prompt = String(values.negative_prompt || "");
   if (!references.length) return { route: "/v1/images/generations", body };
   if (references.length > limits.maxReferences)
     throw new Error(`This Radiance model takes up to ${limits.maxReferences} reference images.`);

@@ -16,7 +16,7 @@ const image = {
   loras: JSON.stringify([{ name: "styles/ink.safetensors", strength: 0.6 }]),
 };
 
-test("an image request sends LoRAs in its loras field and leaves turbo's schedule alone", () => {
+test("an image request sends its exact schedule, guidance and LoRAs", () => {
   assert.deepEqual(imageRequest(image), {
     route: "/v1/images/generations",
     body: {
@@ -27,6 +27,9 @@ test("an image request sends LoRAs in its loras field and leaves turbo's schedul
       n: 2,
       output_format: "png",
       response_format: "b64_json",
+      num_inference_steps: 8,
+      guidance_scale: 1,
+      negative_prompt: "",
       loras: [{ name: "styles/ink", weight: 0.6 }],
     },
   });
@@ -81,4 +84,22 @@ test("one-GPU Qwen and Noct enforce their actual conditioning limits without con
     Array(10).fill(new Uint8Array([1])),
   );
   assert.equal((edit.body as FormData).getAll("image[]").length, 10);
+});
+
+test("Noct preserves the guide or explicit negative and CFG1 explicitly overrides native defaults", () => {
+  const request = imageRequest({
+    ...image,
+    model: "noctq-v4-uncensored-iq8r",
+    cfg: 3,
+    steps: 25,
+    negative_prompt: "  exact entered negative  ",
+  }).body as Record<string, unknown>;
+  assert.equal(request.guidance_scale, 3);
+  assert.equal(request.num_inference_steps, 25);
+  assert.equal(request.negative_prompt, "  exact entered negative  ");
+  const off = imageRequest({ ...image, model: "qwen-image-2.1-iq8r", cfg: 1 }).body as Record<
+    string,
+    unknown
+  >;
+  assert.equal(off.guidance_scale, 1);
 });

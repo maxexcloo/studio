@@ -285,6 +285,9 @@ export function inferModels(
 
   // Why a workflow can't run on this worker, in words; "" when it can.
   const unready = (workflow) => {
+    const model = String(workflow.defaults?.model || "");
+    if (stats.radiance?.some((item) => item.id === model && item.state === "failed"))
+      return `Radiance failed to load ${model}`;
     const missing = missingNodes(info, workflow.requiredNodes);
     return missing.length
       ? `missing ${missing.join(", ")} on this worker`
@@ -465,10 +468,10 @@ export function inferModels(
       maxLoras: workflow.loraStack?.max,
       backend: workflow.backend,
       // Radiance composes the stack into a rank-limited adapter.
-      ...(workflow.kind === "video" && workflow.loraStack?.adapter === "radiance-tags-v1"
+      ...(workflow.loraStack?.adapter === "radiance-tags-v1"
         ? {
             loraNote:
-              "Radiance approximates combined LoRAs above rank 64. Use ComfyUI for exact application.",
+              "Radiance combines adapters at rank 64. Larger combinations can be approximate.",
           }
         : {}),
     });
