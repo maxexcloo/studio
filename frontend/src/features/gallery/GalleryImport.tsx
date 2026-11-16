@@ -202,6 +202,27 @@ export function GalleryImport({ upload }: { upload: ReturnType<typeof useGallery
           <ActionMenuItems
             groups={[
               [
+                ...(canReadClipboard()
+                  ? [
+                      {
+                        id: "from-clipboard",
+                        label: "From Clipboard",
+                        icon: icons.paste,
+                        onClick: paste,
+                      },
+                    ]
+                  : []),
+                {
+                  id: "from-url",
+                  label: "From URL…",
+                  icon: icons.link,
+                  onClick: () => {
+                    upload.link.reset();
+                    setImporting(true);
+                  },
+                },
+              ],
+              [
                 {
                   id: "upload-files",
                   label: "Upload Files…",
@@ -214,27 +235,6 @@ export function GalleryImport({ upload }: { upload: ReturnType<typeof useGallery
                   icon: FolderUp,
                   onClick: () => folderInput.current?.click(),
                 },
-              ],
-              [
-                {
-                  id: "from-url",
-                  label: "From URL…",
-                  icon: icons.link,
-                  onClick: () => {
-                    upload.link.reset();
-                    setImporting(true);
-                  },
-                },
-                ...(canReadClipboard()
-                  ? [
-                      {
-                        id: "from-clipboard",
-                        label: "From Clipboard",
-                        icon: icons.paste,
-                        onClick: paste,
-                      },
-                    ]
-                  : []),
               ],
             ]}
           />
