@@ -105,11 +105,21 @@ test("explicit LoKr deferral survives catalogue metadata and rejects enabled sta
   loraCatalogue().edit(`loras/${file}`, { families: ["krea2"], unavailableReason: reason });
   const info = (await loraInfos("radiance", [file]))[file];
   assert.equal(info.unavailableReason, reason);
-  for (const backend of ["comfyui", "radiance"])
-    assert.match(
-      optionalLoraPolicyIssue({ name: file, strength: 1 }, info, { family: "krea2", backend }),
-      /Deferred pending exact LoKr/,
-    );
+  // Only Radiance's composed adapter is deferred; ComfyUI loads the same file exactly.
+  assert.match(
+    optionalLoraPolicyIssue({ name: file, strength: 1 }, info, {
+      family: "krea2",
+      loraStack: { adapter: "radiance-tags-v1" },
+    }),
+    /Deferred pending exact LoKr/,
+  );
+  assert.equal(
+    optionalLoraPolicyIssue({ name: file, strength: 1 }, info, {
+      family: "krea2",
+      loraStack: { adapter: "rgthree-power-v1" },
+    }),
+    "",
+  );
   assert.equal(
     optionalLoraPolicyIssue(
       { name: "plain", strength: 1 },

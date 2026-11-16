@@ -99,8 +99,12 @@ const fitsFamily = (families: string[], family: string) =>
 export const compatibleLoras = (profile: Profile | undefined, metadata: Record<string, LoraInfo>) =>
   (profile?.options?.loras || []).filter(
     (file) =>
-      loraCompatibility(metadata[file], profile) !== "other" && !metadata[file]?.unavailableReason,
+      loraCompatibility(metadata[file], profile) !== "other" &&
+      !unavailableFor(profile, metadata[file]),
   );
+/** Why a LoRA can't run on this profile: its deferral covers only Radiance's composed adapter. */
+export const unavailableFor = (profile: Profile | undefined, info?: LoraInfo) =>
+  profile?.loraAdapter === "radiance-tags-v1" ? info?.unavailableReason : undefined;
 
 const ratingOrder = (rating?: Rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);
 /** The LoRA choices' orders: by rating (the default every LoRA list shares), or by name. */
@@ -398,7 +402,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
           label={title(file)}
           title={title(file)}
           detail={
-            metadata[file]?.unavailableReason ||
+            unavailableFor(profile, metadata[file]) ||
             [
               familiesOf(file)
                 .map((key) => modelFamilyLabel(key))
@@ -411,7 +415,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
           }
           image={previews.data?.previews[file]}
           placeholder={icons.loras}
-          disabled={Boolean(metadata[file]?.unavailableReason) && !selected.has(file)}
+          disabled={Boolean(unavailableFor(profile, metadata[file])) && !selected.has(file)}
           selected={selected.has(file)}
           row
           onToggle={() => toggle(file)}
@@ -623,7 +627,7 @@ function LoraStack(props: LoraPickerProps) {
                   title={title(lora.name)}
                   info={metadata[lora.name]}
                   compatible={compatible.includes(lora.name)}
-                  unavailable={metadata[lora.name]?.unavailableReason}
+                  unavailable={unavailableFor(profile, metadata[lora.name])}
                   onChange={(patch) =>
                     update(
                       input.loras.map((item) =>
