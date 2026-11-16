@@ -60,6 +60,8 @@ export interface RuntimePodLog {
 }
 
 export interface RuntimeStatus {
+  /** Whether waiting ComfyUI work swaps in for Radiance, or a placement by hand paused that. */
+  swaps?: "automatic" | "paused";
   pools: { id: string; capacity: number; used: number }[];
   operation?: RuntimeOperation;
   history: RuntimeOperation[];
