@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
 import test from "node:test";
 
 import { RadianceClient, imageRequest, videoRequest } from "./radiance.ts";
@@ -37,6 +38,25 @@ test("an image request sends its exact schedule, guidance and LoRAs", () => {
   assert.equal(edit.route, "/v1/images/edits");
   assert.equal((edit.body as FormData).getAll("image[]").length, 2);
   assert.equal((edit.body as FormData).get("loras"), '[{"name":"styles/ink","weight":0.6}]');
+});
+
+test("an edit reaches Radiance as multipart fields through the default client", async () => {
+  let received = "";
+  const server = createServer((request, response) => {
+    request.setEncoding("latin1");
+    request.on("data", (chunk) => (received += chunk));
+    request.on("end", () => response.end(JSON.stringify({ data: [{ b64_json: "AQ==" }] })));
+  }).listen(0);
+  const { port } = server.address() as { port: number };
+  const { route, body } = imageRequest(image, [new Uint8Array([1])]);
+  await new RadianceClient(`http://127.0.0.1:${port}`).images(
+    route,
+    body,
+    AbortSignal.timeout(5000),
+  );
+  server.close();
+  assert.match(received, /name="model"\r\n\r\nqwen-image-2\.1-turbo-iq8r\r\n/);
+  assert.match(received, /name="image\[\]"; filename="image\[\]\.png"/);
 });
 
 test("a video sized for another model's area shrinks to H3's on the 32-pixel grid", () => {
