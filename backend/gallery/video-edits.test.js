@@ -103,23 +103,20 @@ test(
   },
   async () => {
     const { file, parent, url } = seed();
-    const denied = await call("bob", { galleryItemId: url, kind: "trim", start: 0, end: 500 });
+    const denied = await call("bob", { galleryItemId: url, kind: "reverse" });
     assert.equal(denied.code, 404);
-    const trimmed = await edited(url, { kind: "trim", start: 500, end: 1500 });
-    const version = galleryRows().find((item) => item.id === trimmed.id);
+    const reversed = await edited(url, { kind: "reverse" });
+    const version = galleryRows().find((item) => item.id === reversed.id);
     assert.deepEqual(
       [version.ownerId, version.prompt, version.rating],
       ["alice", "A wave", undefined],
     );
     const { parentJobId, parentItemId } = store.job("alice", version.jobId);
     assert.deepEqual([parentJobId, parentItemId], [parent.id, url]);
-    near(trimmed.clip.durationMs, 1000);
-    assert.equal(trimmed.clip.audio, true);
+    near(reversed.clip.durationMs, 2000);
+    assert.equal(reversed.clip.audio, true);
     // The original stays.
     assert.ok(fs.existsSync(file));
-    const reversed = (await edited(url, { kind: "reverse" })).clip;
-    near(reversed.durationMs, 2000);
-    assert.equal(reversed.audio, true);
     // Back and Forth repeats no frame at the turn and is silent, like its download.
     const loop = (await edited(url, { kind: "loop" })).clip;
     near(loop.durationMs, 3958);

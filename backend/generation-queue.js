@@ -1,5 +1,4 @@
 import { runBackend } from "../shared/profiles.ts";
-import { activeStatuses } from "../shared/queue.ts";
 import { withResolution } from "../shared/resolution.ts";
 import { accountAccessForId } from "./account-store.js";
 import { moveTargets, onWorkerOffline, routeJob } from "./comfy/backends.js";
@@ -13,9 +12,10 @@ import { createGenerationQueueAdapter } from "./domain/generation-adapter.ts";
 import { GenerationQueue, modelOf, routeAdapters } from "./domain/queue.ts";
 import { queuePriority } from "./domain/store.ts";
 import { createUpscaleQueueAdapter } from "./domain/upscale-adapter.ts";
+import { acceptedWork, workloadQueue } from "./domain/workload-queue.ts";
 import { storedWritingRecord } from "./gallery/records.js";
 import { galleryItem, galleryItems, replaceGalleryJob, updateGalleryJob } from "./gallery/store.js";
-import { jobs } from "./jobs.js";
+import { jobs, setTerminalJob } from "./jobs.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { mediaRoot, mediaSubfolder } from "./media-paths.js";
 import { ingestRunResults, removeComfyFiles } from "./media-store.js";
@@ -56,6 +56,8 @@ export function createGenerationQueue({
   const { loadComfyContext, mediaModels, workerWorkloads } = catalogue;
   // This runtime owns only the IDs persisted in its own SQLite queue and gallery.
   const mediaLeases = new Map();
+  // Jobs whose admission, which takes their lease, is under way.
+  const admitting = new Set();
   // Work goes to a worker picked by load (pickWorker in workers.js); background work (MCP, Dream,
   // finishing) breaks ties towards the last worker, keeping the first free for manual work.
   async function queueResourceFor(input, priority = queuePriority.manual) {
@@ -142,19 +144,28 @@ export function createGenerationQueue({
       if (!job.backend || !workerById(job.backend))
         return "Waiting for its worker to be configured.";
       const workloads = managedWorkloads(job);
+      const release = () => {
+        mediaLeases.get(job.id)?.release();
+        mediaLeases.delete(job.id);
+      };
+      // A job moved to another worker leaves the lease its first worker gave it.
+      const held = mediaLeases.get(job.id);
+      if (held && !workloads.includes(held.workload.id)) release();
       let started = false;
+      admitting.add(job.id);
       try {
         if (workloads.length && !mediaLeases.has(job.id))
           mediaLeases.set(job.id, await runtime.controller.acquire(workloads));
         started = true;
         await loadComfyContext(job.backend);
       } catch (error) {
-        mediaLeases.get(job.id)?.release();
-        mediaLeases.delete(job.id);
+        release();
         // A started worker's timeout or dropped connection reads as it being slow, not a raw error.
         return started && isTransientComfyError(error)
           ? `Waiting for ${workerById(job.backend).name} to answer.`
           : error.message;
+      } finally {
+        admitting.delete(job.id);
       }
     },
     settled: async (job) => {
@@ -166,9 +177,7 @@ export function createGenerationQueue({
     },
   });
   // Reconstruct leases synchronously before the HTTP listener accepts work.
-  for (const job of store
-    .openJobs()
-    .filter((item) => activeStatuses.has(item.status) || item.providerJobId)) {
+  for (const job of store.openJobs().filter(acceptedWork)) {
     const workloads = managedWorkloads(job);
     if (workloads.length) mediaLeases.set(job.id, runtime.controller.retain(workloads));
   }
@@ -316,6 +325,15 @@ export function createGenerationQueue({
     for (const worker of listWorkers())
       if (workerWorkloads(worker).includes(workload)) generationQueue.unload(`worker:${worker.id}`);
   });
+  runtime?.controller.useQueue(
+    workloadQueue({
+      queue: generationQueue,
+      leases: mediaLeases,
+      admitting,
+      workloads: managedWorkloads,
+      endRun: (job, status, reason) => setTerminalJob(job.id, { status, error: reason }),
+    }),
+  );
   async function validateGenerationInput(input, account) {
     const refusal = minorAgeRefusal(input.prompt);
     if (refusal) return { status: 400, payload: { ok: false, error: refusal } };

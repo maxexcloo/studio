@@ -13,7 +13,7 @@ import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import type { Action } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
-import { titleCase } from "../../ui/titleCase";
+import { titleCase } from "../../../../shared/titles";
 import { usePhone } from "../../ui/usePhone";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";

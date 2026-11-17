@@ -69,21 +69,25 @@ test("settings read the gateway, whose model is the cloud model", async () => {
   const environment = gateway();
   let local = null;
   const engine = createAssistant(environment, { localText: async () => local });
+  const onLocal = { side: "local", uncensored: false };
   assert.deepEqual(
-    [await engine.model("title", false, "local"), await engine.supportsVision("local")],
+    [await engine.model("title", false, onLocal), await engine.supportsVision(onLocal)],
     ["cloud/auto", true],
   );
   local = { model: "local/auto", vision: false };
   assert.deepEqual(
-    [await engine.model("title"), await engine.model("title", false, "cloud")],
+    [
+      await engine.model("title"),
+      await engine.model("title", false, { side: "cloud", uncensored: false }),
+    ],
     ["cloud/auto", "cloud/auto"],
   );
   assert.deepEqual(
-    [await engine.model("title", false, "local"), await engine.supportsVision("local")],
+    [await engine.model("title", false, onLocal), await engine.supportsVision(onLocal)],
     ["local/auto", false],
   );
   assert.equal(await engine.supportsVision(), true);
-  assert.equal(await engine.model("caption", true, "local"), "local/uncensored");
+  assert.equal(await engine.model("caption", true, onLocal), "local/uncensored");
   local = null;
   assert.equal(await engine.model("rewrite", true), "cloud/uncensored");
   environment.STUDIO_ASSISTANT_CLOUD_MODEL = "cloud/vision";
@@ -91,25 +95,38 @@ test("settings read the gateway, whose model is the cloud model", async () => {
   assert.equal(createAssistant({}), null);
 });
 
-test("prompt writing asks for the account's model, uncensored only where it may", async () => {
+test("text asks for the default on the account's Text side, uncensored only where it may", async () => {
   const environment = gateway();
-  const local = { model: "local/auto", vision: false };
+  let local = { model: "local/auto", vision: false };
   const engine = createAssistant(environment, { localText: async () => local });
-  const write = (picked, uncensored) => engine.model("rewrite", false, { picked, uncensored });
+  const write = (writer) => engine.model("rewrite", false, { side: "cloud", ...writer });
   assert.deepEqual(
-    [await write(undefined, true), await write(undefined, false)],
+    [await write({ uncensored: true }), await write({ uncensored: false })],
     ["cloud/uncensored", "cloud/auto"],
   );
   assert.deepEqual(
-    [await write("local/auto", false), await write("local/uncensored", true)],
-    ["local/auto", "local/uncensored"],
+    [
+      await write({ cloud: "cloud/vision", uncensored: false }),
+      await write({ side: "local", local: "local/uncensored", uncensored: true }),
+    ],
+    ["cloud/vision", "local/uncensored"],
   );
-  // An uncensored pick the account may no longer use gives way to the cloud model.
-  assert.equal(await write("local/uncensored", false), "cloud/auto");
+  // An uncensored default the account may no longer use gives way.
+  assert.equal(
+    await write({ side: "local", local: "local/uncensored", uncensored: false }),
+    "local/auto",
+  );
+  // Local's default waits for a running local text workload; until then Cloud's is used.
+  local = null;
+  assert.equal(
+    await write({ side: "local", local: "local/auto", cloud: "cloud/vision", uncensored: false }),
+    "cloud/vision",
+  );
+  local = { model: "local/auto", vision: false };
   assert.deepEqual(
     [
-      await engine.supportsVision({ picked: "local/auto", uncensored: false }),
-      await engine.supportsVision({ uncensored: false }),
+      await engine.supportsVision({ side: "local", uncensored: false }),
+      await engine.supportsVision({ side: "cloud", uncensored: false }),
     ],
     [false, true],
   );
@@ -362,7 +379,7 @@ test("references go to a vision model as image parts; a text-only model gets non
     profile,
     prompt: "a cabin",
     references,
-    writer: { picked: "local/auto", uncensored: false },
+    writer: { side: "local", uncensored: false },
   });
   assert.equal(unread.referencesRead, false);
   assert.equal(typeof text.calls[0].body.messages[1].content, "string");

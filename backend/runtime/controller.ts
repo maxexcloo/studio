@@ -2,9 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 
 import {
+  type RuntimeJob,
   type RuntimeOperation,
   type RuntimePodLog,
   type RuntimePreview,
+  type RuntimeQueueCancel,
   type RuntimeStatus,
   type WorkloadPhase,
 } from "../../shared/runtime.ts";
@@ -64,6 +66,18 @@ export interface RuntimeRecord {
 export interface RuntimeStore {
   read(): RuntimeRecord | undefined;
   write(record: RuntimeRecord): void;
+}
+
+/** The generation queue's work on each workload (generation-queue.js). */
+export interface WorkloadQueue {
+  /** A workload's accepted jobs, and how many more wait to start on it. */
+  load(workload: string): { jobs: RuntimeJob[]; queued: number };
+  /** Cancels every queued and running job routed to a workload. */
+  cancel(workload: string): Promise<RuntimeQueueCancel>;
+  /** Releases leases whose work is confirmed absent: jobs ended, gone or not yet accepted. */
+  releaseStale(): void;
+  /** Ends the accepted work of a workload stopped without waiting for it. */
+  end(workload: string): Promise<void>;
 }
 
 interface RuntimeLease {
@@ -130,6 +144,11 @@ export class RuntimeController {
   /** Who cancelled the running change, which stops at its next check. */
   private cancelledBy?: string;
   private claimed = false;
+  private queue?: WorkloadQueue;
+  /** Workloads the running change stops without waiting for their accepted work. */
+  private forced = new Set<string>();
+  /** The running change is waiting for accepted work on the workloads it stops. */
+  private draining = false;
   private record: RuntimeRecord;
   private engine: RuntimeEngine;
   private store: RuntimeStore;
@@ -299,6 +318,7 @@ export class RuntimeController {
       history: structuredClone(this.record.operations.slice(0, 20)),
       workloads: observed.map((entry) => {
         const { workload } = entry;
+        const load = this.queue?.load(workload.id);
         const base = {
           id: workload.id,
           label: workload.label,
@@ -307,6 +327,9 @@ export class RuntimeController {
           pool: workload.pool,
           gpus: workload.gpus,
           acceptedOperations: this.active.get(workload.id) ?? 0,
+          ...(isRadiance(workload) ? { radiance: true as const } : {}),
+          ...(load?.jobs.length ? { jobs: load.jobs } : {}),
+          ...(load?.queued ? { queued: load.queued } : {}),
         };
         if (!("state" in entry))
           return {
@@ -402,9 +425,31 @@ export class RuntimeController {
     this.stopListeners.add(listener);
   }
 
-  /** Stop a running workload and start it again in place: scale to 0, wait for its pod to go, scale to 1. */
-  async restart(id: string, requestedBy: string) {
+  /** The queue whose work Settings › Workers shows and ends. */
+  useQueue(queue: WorkloadQueue) {
+    this.queue = queue;
+  }
+
+  /** Cancel Queue: every queued and running job routed to a workload. */
+  cancelQueue(id: string) {
     const workload = this.workload(id);
+    if (!this.queue) throw new RuntimeUnavailable("Studio's queue isn't running.");
+    return this.queue.cancel(workload.id);
+  }
+
+  /**
+   * Stop a running workload and start it again in place: scale to 0, wait for its pod to go, scale
+   * to 1. `force` doesn't wait for Radiance's accepted work, which ends; a change already waiting
+   * for that work stops waiting for it.
+   */
+  async restart(id: string, requestedBy: string, force = false) {
+    const workload = this.workload(id);
+    if (force && !isRadiance(workload))
+      throw new RuntimeRequestError("Only Radiance restarts without waiting for its work.");
+    if (force && this.draining && this.current?.stop.includes(id)) {
+      this.forced.add(id);
+      return structuredClone(this.current);
+    }
     this.claim();
     try {
       const states = await this.states();
@@ -416,6 +461,7 @@ export class RuntimeController {
         this.workloads.filter((item) => states.get(item.id)!.replicas > 0).map((item) => item.id),
         states,
       );
+      if (force) this.forced.add(id);
       return this.begin("restart", { ...plan, stop: [id], start: [id] }, requestedBy);
     } finally {
       this.claimed = false;
@@ -477,24 +523,33 @@ export class RuntimeController {
     let scaled = false;
     try {
       // New work for a leaving workload waits (acquire refuses it); accepted work finishes and saves first.
+      this.draining = true;
       await this.until(
         operation,
         this.timeouts.drain,
         async () => {
+          this.queue?.releaseStale();
           // Work can't run on a workload without pods, so its leases hold nothing back.
           const states = await this.states();
-          const busy = plan.stop.filter((id) => this.active.get(id) && holds(states.get(id)!));
+          const busy = plan.stop.filter(
+            (id) => !this.forced.has(id) && this.active.get(id) && holds(states.get(id)!),
+          );
           if (!busy.length) return;
           const count = busy.reduce((sum, id) => sum + (this.active.get(id) ?? 0), 0);
           return `Waiting for ${plural(count, "accepted operation")} on ${busy.map(label).join(", ")} to finish.`;
         },
         "; nothing was stopped",
       );
+      this.draining = false;
       scaled = true;
       for (const id of plan.stop) {
         this.step(operation, `Stopping ${label(id)}.`);
         await this.engine.scale(this.workload(id), 0);
         for (const listener of this.stopListeners) listener(id);
+        if (this.forced.has(id)) {
+          this.step(operation, `Ending the accepted work on ${label(id)}.`);
+          await this.queue?.end(id);
+        }
       }
       // A GPU claim is released only when the pod is gone, so nothing starts before that.
       const leaving = [...new Set([...plan.stop, ...plan.start])];
@@ -528,6 +583,8 @@ export class RuntimeController {
       });
     } finally {
       this.stopping.clear();
+      this.forced.clear();
+      this.draining = false;
       operation.finishedAt = this.timestamp();
       operation.after = await this.states().then(
         (states) =>

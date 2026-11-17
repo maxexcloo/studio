@@ -1,5 +1,6 @@
 import { isCloudProfile } from "../../shared/profiles.ts";
 import { mayUseFeature, visibleGenerationProfiles } from "../account-policy.js";
+import { kindDefaults } from "../account-preferences.js";
 import {
   allowedProfile,
   isDefaultBackend,
@@ -392,18 +393,20 @@ export function dreamCatalogue(models) {
 
 /**
  * The account's default image and video profiles on the side its Images and Videos preferences
- * choose (account-preferences.js; Local unless Cloud): the deployment's default where it is on that
- * side and can run, else that side's first that can. A side with none that can run (no cloud
- * profile for the account, or local ones not installed or their workers Offline or Stopped) gives
- * way to the other, and `defaultNotes` says so; with neither, the deployment's default stays and
- * its jobs wait. A profile the person picks always wins over these.
+ * choose (account-preferences.js `kindDefaults`; Local unless Cloud): its own default for that side
+ * where it can run, else the deployment's default where it is on that side and can run, else that
+ * side's first that can. A side with none that can run (no cloud profile for the account, or local
+ * ones not installed or their workers Offline or Stopped) gives way to the other, and
+ * `defaultNotes` says so; with neither, the deployment's default stays and its jobs wait. A profile
+ * the person picks always wins over these.
  */
 export function withPreferredDefaults(models, preferences) {
   const defaults = { ...models.defaults };
   const defaultNotes = {};
   for (const kind of ["image", "video"]) {
     const key = `${kind}Model`;
-    const cloudFirst = preferences[`${kind}s`] === "cloud";
+    const own = kindDefaults(preferences, `${kind}s`);
+    const cloudFirst = own.side === "cloud";
     const runnable = (models.profiles || []).filter(
       (profile) =>
         profile.kind === kind &&
@@ -412,7 +415,12 @@ export function withPreferredDefaults(models, preferences) {
     );
     const pick = (cloud) => {
       const side = runnable.filter((profile) => isCloudProfile(profile) === cloud);
-      return side.find((profile) => profile.id === defaults[key]) || side[0];
+      const chosen = own[cloud ? "cloud" : "local"];
+      return (
+        side.find((profile) => profile.id === chosen) ||
+        side.find((profile) => profile.id === defaults[key]) ||
+        side[0]
+      );
     };
     const preferred = pick(cloudFirst);
     const other = preferred ? undefined : pick(!cloudFirst);

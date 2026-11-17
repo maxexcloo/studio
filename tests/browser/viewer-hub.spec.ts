@@ -136,7 +136,7 @@ test("A video's prompt field runs its edited prompt again as a video", async ({ 
     height: 1024,
     createdAt: stamp,
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
@@ -913,40 +913,6 @@ test("An Animate run stays with the image it started on while the viewer moves b
   await expect(versions.getByRole("listitem")).toHaveCount(2);
 });
 
-test("Animate runs local Fast unless Quality is chosen, and keeps the choice as the account's", async ({
-  page,
-}) => {
-  const asked: unknown[] = [];
-  const { state, viewer } = await seed(page, {}, (page, fixture) =>
-    page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) => {
-      // The account's preference picks the model.
-      const videos = fixture.preferences.preferences.videos;
-      asked.push(videos);
-      return route.fulfill({
-        json: {
-          profileId: "video:test",
-          label: videos === "quality" ? "Motion Quality" : "Motion Fast",
-          cloud: false,
-          // Without Cloud Models there is no Cloud.
-          offers: { cloud: false, fast: true, quality: true },
-        },
-      });
-    }),
-  );
-  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  // Cloud, Fast or Quality is one segmented control at the top of the menu, Fast until chosen.
-  const choice = page.getByRole("radiogroup", { name: "Cloud, Fast or Quality", exact: true });
-  await expect(choice.getByRole("radio", { name: "Fast", exact: true })).toBeChecked();
-  await expect(choice.getByRole("radio", { name: "Cloud", exact: true })).toHaveCount(0);
-  await choice.getByText("Quality", { exact: true }).click();
-  await expect(choice.getByRole("radio", { name: "Quality", exact: true })).toBeChecked();
-  expect(state.preferences.preferences.videos).toBe("quality");
-  await expect.poll(() => asked.at(-1)).toBe("quality");
-  await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
-  await expect.poll(() => state.jobs.length).toBe(2);
-  expect(state.jobs[1].input).toMatchObject({ profileId: "video:test" });
-});
-
 test("Review Prompt writes the motion prompt for editing, and Run queues exactly that prompt", async ({
   page,
 }) => {
@@ -1077,13 +1043,13 @@ async function offline(page: Page) {
         label: grok.label,
         cloud: true,
         size: { width: 960, height: 960 },
-        offers: { cloud: true, fast: true, quality: false },
+        offers: { cloud: true, local: true },
       },
     }),
   );
 }
 
-test("Animate offers Cloud beside the local tiers when the account has both, and runs on the pick", async ({
+test("Animate offers Cloud and Local when the account has both, and runs on the pick", async ({
   page,
 }) => {
   const asked: string[] = [];
@@ -1097,17 +1063,15 @@ test("Animate offers Cloud beside the local tiers when the account has both, and
           profileId: cloud ? grok.id : "video:test",
           label: cloud ? grok.label : "Motion Fast",
           cloud,
-          // One local profile, Fast, so there is no Quality.
-          offers: { cloud: true, fast: true, quality: false },
+          offers: { cloud: true, local: true },
         },
       });
     });
   });
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  const choice = page.getByRole("radiogroup", { name: "Cloud, Fast or Quality", exact: true });
-  // Fast where the account has local video, until another is chosen.
-  await expect(choice.getByRole("radio", { name: "Fast", exact: true })).toBeChecked();
-  await expect(choice.getByRole("radio", { name: "Quality", exact: true })).toHaveCount(0);
+  const choice = page.getByRole("radiogroup", { name: "Cloud or Local", exact: true });
+  // Local where the account has local video, until another is chosen.
+  await expect(choice.getByRole("radio", { name: "Local", exact: true })).toBeChecked();
   expect(asked[0]).toBe("local");
   await choice.getByText("Cloud", { exact: true }).click();
   await expect(choice.getByRole("radio", { name: "Cloud", exact: true })).toBeChecked();
@@ -1156,7 +1120,7 @@ test("A video's Animate template continues it from its last frame, and Edit make
     height: 1024,
     createdAt: stamp,
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
@@ -1188,7 +1152,7 @@ test("With local video stopped, Animate in Composer pre-selects Grok", async ({ 
   const { state, viewer } = await seed(page, {}, offline);
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Animate in Composer", exact: true }).click();
-  await expect(page).toHaveURL(/\/video\?compose=1/);
+  await expect(page).toHaveURL(/\/videos$/);
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toContainText(
     grok.label,
   );
@@ -1297,7 +1261,7 @@ test("An opened video plays with sound and reveals its controls on pointer movem
     height: 720,
     createdAt: stamp,
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).played)).toEqual({ muted: false });
   // Its controls stay hidden until a pointer moves over it.
@@ -1327,7 +1291,7 @@ test("An opened video the browser won't play shows its still and its controls", 
     height: 720,
     createdAt: stamp,
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const video = page.getByRole("dialog", { name: "Generation", exact: true }).locator("video");
   await expect(video).toHaveAttribute("poster", image);
@@ -1356,7 +1320,7 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
     height: 720,
     createdAt: stamp,
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).hover();
   await expect
     .poll(() => page.evaluate(() => (window as any).played))
@@ -1724,7 +1688,7 @@ test("Work still generating and videos take the same swipes as a picture", async
       createdAt: stamp,
     },
   );
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Live Study", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const status = viewer.getByRole("status", { name: "Generation Status", exact: true });
@@ -2104,5 +2068,5 @@ test("Phone viewer shows Report beside Delete and Similar under AI", async ({ pa
   await report.getByRole("button", { name: "Cancel", exact: true }).click();
   await viewerAction(page, "AI", "Similar");
   await expect(viewer).toBeHidden();
-  await expect(page).toHaveURL(/similar=hub/);
+  await expect(page).toHaveURL(/\/images$/);
 });

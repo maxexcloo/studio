@@ -147,22 +147,25 @@ export interface TasteRecord
   /** By attribute: `profile:<id>`, `lora:<name>@<strength>`, `tag:<tag>`, `aspect:<ratio>`, `steps:<profile>:<n>`, `cfg:<profile>:<n>`. */
   scores: Map<string, TasteScore>;
 }
-/** What an account's prompt writing asks for (account-policy.js `promptWriter`). */
+/**
+ * What an account's text work asks for (account-policy.js `promptWriter`): where its Text runs and
+ * its default model on each side.
+ */
 export interface PromptWriter {
-  picked?: string;
+  side: "cloud" | "local";
+  cloud?: string;
+  local?: string;
   uncensored: boolean;
 }
-/** Where an account's other text work runs (account-preferences.js `textSide`). */
-export type TextSide = "cloud" | "local";
 
 /** The assistant gateway's chat (assistant.js), which returns its reply without reasoning. */
 export interface TasteWriter<Content = string> {
   settings(): unknown;
   /**
-   * The Bifrost model for a call type (assistant.js `modelFor`): the model an account's prompt
-   * writing asks for where its `writer` is given, else where it runs text.
+   * The Bifrost model for a call type (assistant.js `modelFor`): where the account's `writer` runs
+   * text, else the cloud model.
    */
-  model(call: string, explicit?: boolean, writer?: PromptWriter | TextSide): Promise<string>;
+  model(call: string, explicit?: boolean, writer?: PromptWriter): Promise<string>;
   chat(request: {
     model: string;
     /** The call type, which sets its `reasoning_effort` (assistant.js `reasoningEfforts`). */
@@ -614,15 +617,15 @@ const phrases = (value: unknown, limit: number, longest = maxTastePhrase) =>
 export function createTaste({
   dataDir,
   writer = () => null,
-  textSide = () => "cloud",
+  promptWriter = () => undefined,
   online = async () => true,
   updates = () => true,
   now = Date.now,
 }: {
   dataDir: string;
   writer?: (ownerId: string) => TasteWriter | null;
-  /** Where the owner runs text (account-preferences.js `textSide`). */
-  textSide?: (ownerId: string) => TextSide;
+  /** The owner's text writer (account-policy.js `promptWriter`). */
+  promptWriter?: (ownerId: string) => PromptWriter | undefined;
   updates?: () => boolean;
   online?: () => Promise<boolean>;
   now?: () => number;
@@ -697,7 +700,7 @@ export function createTaste({
     try {
       ({ text } = await model.chat({
         call: "taste",
-        model: await model.model("taste", false, textSide(ownerId)),
+        model: await model.model("taste", false, promptWriter(ownerId)),
         messages: [
           { role: "system", content: instructions },
           {

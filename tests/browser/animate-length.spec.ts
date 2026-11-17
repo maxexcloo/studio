@@ -28,7 +28,7 @@ for (const review of [false, true]) {
         json: {
           profileId: switched ? cloud.id : local.id,
           cloud: switched,
-          offers: { cloud: true, fast: false, quality: true },
+          offers: { cloud: true, local: true },
         },
       }),
     );

@@ -8,6 +8,7 @@ import { dreamDefaultChoices } from "./dream-default-choices.js";
 import { dreamOwnership } from "./dream-ownership.js";
 import { galleryRatings } from "./gallery-ratings.js";
 import { galleryTitles } from "./gallery-titles.js";
+import { imageSizeDefaults } from "./image-size-defaults.js";
 import { legacyShapes } from "./legacy-shapes.js";
 import { loraStacks } from "./lora-stacks.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
@@ -15,6 +16,7 @@ import { migrateRadianceQueue } from "./radiance-queue-migration.js";
 import { runtimeSettings } from "./runtime-settings.js";
 import { spicyPrompts } from "./spicy-prompts.js";
 import { tasteDislikes } from "./taste-dislikes.js";
+import { whereWorkRuns } from "./where-work-runs.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -92,6 +94,19 @@ const steps = [
     run: galleryTitles,
     changes: (plan) => plan.titles + plan.cleared + plan.setItems,
     online: true,
+  },
+  {
+    name: "imageSizeDefaults",
+    run: imageSizeDefaults,
+    changes: (plan) => plan.profiles.length,
+    online: true,
+  },
+  {
+    name: "whereWorkRuns",
+    run: whereWorkRuns,
+    changes: (plan) => plan.accounts,
+    online: true,
+    reload: reloadAccountPreferences,
   },
   {
     name: "runtimeSettings",

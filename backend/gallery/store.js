@@ -117,7 +117,7 @@ const list = (values) => JSON.stringify([...values].map(String));
  * single-user owner); `unlisted` keeps (or leaves out) what the gallery doesn't list: disliked items
  * and Dream's pool; `rating` is "liked" or "disliked"; `status`, `notStatus` and `dreamState` take
  * one or several; `liked` keeps the owner's liked items and kept Dream results; `conversationIds` match the chats that asked for
- * items; `ids` match items' ids and `notIds` leave them out, `named` their id, URL or gallery key
+ * items and `turnId` one turn of a chat; `ids` match items' ids and `notIds` leave them out, `named` their id, URL or gallery key
  * and `idPrefix` the start of their id; `since` keeps items made from then on (ms) and every
  * pending one, `before` those made by then; `limit` (galleryItems) reads only that many; `prompt` matches the prompt exactly and `titled` keeps
  * items with a title.
@@ -157,6 +157,7 @@ function where(query = {}) {
       "json_extract(value, '$.chat.conversationId') IN (SELECT value FROM json_each(?))",
       list(query.conversationIds),
     );
+  if (query.turnId) add("json_extract(value, '$.chat.turnId') = ?", String(query.turnId));
   // Words found in the row's own JSON (lowercased by SQLite, ASCII only): a cheap first pass a
   // search's filter confirms. Pending rows always pass, as searches never hide work in progress.
   if (query.contains?.length)

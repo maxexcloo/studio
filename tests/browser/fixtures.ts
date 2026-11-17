@@ -332,7 +332,7 @@ export async function fixtures(page: Page) {
         profileId: "video:test",
         label: "Motion Quality",
         cloud: false,
-        offers: { cloud: false, fast: false, quality: true },
+        offers: { cloud: false, local: true },
       });
     if (path === "/api/loras/library") return respond({ found: true, library: loraLibrary });
     if (path === "/api/loras/library/ops" && method === "POST") {
@@ -643,6 +643,9 @@ export async function fixtures(page: Page) {
           (!url.searchParams.has("tag") ||
             url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
           (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")) &&
+          (!url.searchParams.has("chat") ||
+            i.chat?.conversationId === url.searchParams.get("chat")) &&
+          (!url.searchParams.has("turn") || i.chat?.turnId === url.searchParams.get("turn")) &&
           (url.searchParams.get("comparisons") !== "1" ||
             comparisons.some((entry) =>
               entry.itemIds ? entry.itemIds.includes(i.id) : entry.jobIds.includes(i.jobId),

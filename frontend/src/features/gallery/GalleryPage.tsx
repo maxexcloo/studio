@@ -18,7 +18,7 @@ import {
 } from "@tanstack/react-query";
 import { LayoutGrid, Rows3, SquareCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { type Location, Navigate, useLocation, useNavigate, useParams } from "react-router";
 
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem, MediaKind } from "../../types";
@@ -60,16 +60,58 @@ import {
 import { useGallerySelection } from "./useGallerySelection";
 import { useTryAgain } from "./useTryAgain";
 import { versionGroups } from "./versions";
-import { viewerItemId } from "./viewerLink";
+import {
+  type GalleryState,
+  galleryKind,
+  galleryPath,
+  viewerItemId,
+  viewerPath,
+} from "./viewerLink";
 
 import classes from "./GalleryPage.module.css";
 
+type PageState = GalleryState & OpenComposerState & { compose?: boolean; viewer?: boolean };
+
+/**
+ * Links already shared (in chats too) carried the viewer's item and the gallery's state as query
+ * parameters, and Videos once lived at /video; they move to the item's path and history state.
+ * The installed app's share target still arrives as `?compose=1&shared=<id>`.
+ */
+function cleanLocation(location: Location) {
+  const params = new URLSearchParams(location.search);
+  const base = location.pathname === "/video" ? "/videos" : location.pathname;
+  const item = params.get("item");
+  const state: PageState = { ...location.state };
+  for (const name of ["chat", "q", "set", "shared", "show", "similar", "turn"] as const) {
+    const value = params.get(name);
+    if (value) state[name] = value;
+  }
+  if (params.get("compose") === "1") state.compose = true;
+  return {
+    pathname: item
+      ? `${galleryPath(galleryKind(base) || "image")}/${encodeURIComponent(item)}`
+      : base,
+    state,
+  };
+}
+
 export function GalleryPage() {
+  const location = useLocation();
+  if (location.search || location.pathname === "/video") {
+    const { pathname, state } = cleanLocation(location);
+    return <Navigate to={pathname} state={state} replace />;
+  }
+  return <Gallery />;
+}
+
+function Gallery() {
   const [query, setQuery] = useState("");
   const [search] = useDebouncedValue(query, 250);
   const location = useLocation();
   const routerNavigate = useNavigate();
-  const kind = location.pathname === "/video" ? "video" : "image";
+  const kind = galleryKind(location.pathname) || "image";
+  const base = galleryPath(kind);
+  const state = location.state as PageState | null;
   const { changeKind, profiles } = useGenerationActions();
   useEffect(() => {
     changeKind(kind);
@@ -83,40 +125,55 @@ export function GalleryPage() {
   // The run (a job or result set, `runKey`) whose results the viewer flips through; unset, it
   // flips through the whole gallery.
   const [run, setRun] = useState<string>();
-  // A caption tag in Details links here as ?q=<tag>: it becomes the search and closes the viewer.
-  const [params, setParams] = useSearchParams();
-  const linkedQuery = params.get("q");
-  // The viewer's item (?item=<id>): opening one adds a history entry, so Back closes it, and
+  // A caption tag in Details links here with `q`: it becomes the search and closes the viewer.
+  const linkedQuery = state?.q;
+  // The viewer's item (`/images/<id>`): opening one adds a history entry, so Back closes it, and
   // flipping through items replaces it.
-  const itemId = params.get("item") || "";
-  // A set link (?set=<id>) shows that MCP result set alone until its chip is removed.
-  const setId = params.get("set") || "";
-  // Similar links here as ?similar=<item id>: the gallery ranked by likeness to that image,
-  // within the filters, until its chip is removed.
-  const similar = params.get("similar") || "";
+  const itemId = useParams().id || "";
+  // A set link shows that MCP result set alone until its chip is removed.
+  const setId = state?.set || "";
+  // An MCP result link shows that chat's turn, or the whole chat (`show` "chat"), until its chip
+  // is removed.
+  const chat = state?.chat || "";
+  const chatTurn = state?.turn || "";
+  const turn = state?.show === "chat" ? "" : chatTurn;
+  // Similar shows the gallery ranked by likeness to that image, within the filters, until its
+  // chip is removed.
+  const similar = state?.similar || "";
   const [strictness, setStrictness] = useSimilarStrictness();
-  const removeSimilar = useCallback(
-    () =>
-      setParams((next) => {
-        next.delete("similar");
-        return next;
-      }),
-    [setParams],
+  // Stable, so the views' memoised tiles and the composer render only when their own state
+  // changes: the location changes with every step through the viewer.
+  const latest = useRef({ location, state });
+  latest.current = { location, state };
+  const dropState = useCallback(
+    (name: keyof PageState, replace = true) => {
+      // Drops in one commit (the share target's `openComposer` and `shared`) build on each other.
+      latest.current.state = { ...latest.current.state, [name]: undefined };
+      void routerNavigate(latest.current.location.pathname, {
+        replace,
+        state: latest.current.state,
+      });
+    },
+    [routerNavigate],
   );
+  const removeSimilar = useCallback(() => dropState("similar", false), [dropState]);
   useEffect(() => {
     if (similar) window.scrollTo(0, 0);
   }, [similar]);
   useEffect(() => {
-    if (linkedQuery === null) return;
+    if (linkedQuery === undefined) return;
     setQuery(linkedQuery);
-    setParams(
-      (next) => {
-        next.delete("q");
-        return next;
-      },
-      { replace: true },
-    );
-  }, [linkedQuery, setParams]);
+    dropState("q");
+  }, [linkedQuery, dropState]);
+  // `useOpenComposer`'s request to open the composer and focus its prompt is taken once, so a
+  // reload doesn't repeat it; `compose` keeps the composer open through a reload until it closes.
+  const [opening, setOpening] = useState("");
+  const openRequest = state?.openComposer ? location.key : "";
+  useEffect(() => {
+    if (!openRequest) return;
+    setOpening(openRequest);
+    dropState("openComposer");
+  }, [openRequest, dropState]);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const client = useQueryClient();
   // Queue changes (new, finished or failed work) refresh the gallery at once; only active work
@@ -129,8 +186,8 @@ export function GalleryPage() {
     }),
   }).data;
   const listing = useMemo(
-    () => ({ search, kind, filters, similar, strictness, setId }) as const,
-    [search, kind, filters, similar, strictness, setId],
+    () => ({ search, kind, filters, similar, strictness, setId, chat, turn }) as const,
+    [search, kind, filters, similar, strictness, setId, chat, turn],
   );
   // The listing key (as JSON) whose every match a quick select is loading: its later pages,
   // refetches included, then come 500 at a time.
@@ -280,16 +337,12 @@ export function GalleryPage() {
       : null);
   const shown = selected && currentMedia(loaded, selected);
   lastShown.current = selected;
+  // The address names the shown item by its permanent number, in its own kind's gallery.
+  const shownPath = shown && viewerPath(shown);
   useEffect(() => {
-    if (!shown || viewerItemId(shown) === itemId) return;
-    setParams(
-      (next) => {
-        next.set("item", viewerItemId(shown));
-        return next;
-      },
-      { replace: true, state: location.state },
-    );
-  }, [shown, itemId, setParams, location.state]);
+    if (!shownPath || shownPath === location.pathname) return;
+    void routerNavigate(shownPath, { replace: true, state: location.state });
+  }, [shownPath, location.pathname, location.state, routerNavigate]);
   // Every generation shows by default; Originals Only collapses each version chain into one Grid
   // tile showing its original. Runs always shows all.
   const queue = useQuery(queueQuery).data?.jobs;
@@ -357,7 +410,7 @@ export function GalleryPage() {
   }, [listingKey, gallery]);
   const selection = useGallerySelection(
     items,
-    JSON.stringify([kind, search, filters, similar, strictness, setId]),
+    JSON.stringify([kind, search, filters, similar, strictness, setId, chat, turn]),
     {
       complete: !gallery.hasNextPage,
       load: loadEveryMatch,
@@ -373,39 +426,25 @@ export function GalleryPage() {
   // The image ranks first, being most like itself, unless the filters leave it out.
   const similarSource = loaded.find((item) => item.id === similar);
   const tryAgain = useTryAgain(loaded);
-  // Stable, so the views' memoised tiles and the composer render only when their own state
-  // changes: `setParams` and the search change with every step through the viewer.
-  const latest = useRef({ setParams, search: location.search });
-  latest.current = { setParams, search: location.search };
-  const openItem = useCallback((item: MediaItem, run?: string) => {
-    setFocusItem(null);
-    setRun(run);
-    latest.current.setParams(
-      (next) => {
-        next.set("item", viewerItemId(item));
-        return next;
-      },
-      { state: { viewer: true } },
-    );
-  }, []);
-  const dropParam = useCallback(
-    (name: string) =>
-      latest.current.setParams(
-        (next) => {
-          next.delete(name);
-          return next;
-        },
-        { replace: true },
-      ),
-    [],
+  const openItem = useCallback(
+    (item: MediaItem, run?: string) => {
+      setFocusItem(null);
+      setRun(run);
+      const { set, similar } = latest.current.state || {};
+      void routerNavigate(viewerPath(item), {
+        state: { set, similar, viewer: true } satisfies PageState,
+      });
+    },
+    [routerNavigate],
   );
   // The composer's output toggle switches the gallery; the route restores that output's draft.
   const switchKind = useCallback(
-    (next: MediaKind) =>
-      routerNavigate({
-        pathname: next === "video" ? "/video" : "/images",
-        search: latest.current.search,
-      }),
+    (next: MediaKind) => {
+      const { chat, set, show, similar, turn } = latest.current.state || {};
+      void routerNavigate(galleryPath(next), {
+        state: { chat, set, show, similar, turn } satisfies PageState,
+      });
+    },
     [routerNavigate],
   );
   const showCompared = useCallback(
@@ -416,18 +455,12 @@ export function GalleryPage() {
     (item: MediaItem) => {
       // Moving to another set's results flips through that set.
       if (run && runKey(item) !== run) setRun(runKey(item));
-      setParams(
-        (next) => {
-          next.set("item", viewerItemId(item));
-          return next;
-        },
-        { replace: true, state: location.state },
-      );
+      void routerNavigate(viewerPath(item), { replace: true, state: location.state });
     },
-    [run, setParams, location.state],
+    [run, routerNavigate, location.state],
   );
   const closeViewer = useCallback(() => {
-    if (location.state?.viewer) {
+    if (state?.viewer) {
       // Closing goes back to the entry the viewer opened from, unless the action that closed it
       // has already gone elsewhere (Similar, Use as Character, Recreate in Composer).
       const entry = window.history.state?.key;
@@ -436,14 +469,8 @@ export function GalleryPage() {
       });
       return;
     }
-    setParams(
-      (next) => {
-        next.delete("item");
-        return next;
-      },
-      { replace: true, state: location.state },
-    );
-  }, [location.state, routerNavigate, setParams]);
+    void routerNavigate(base, { replace: true, state });
+  }, [state, base, routerNavigate]);
   // Phones leave out the time, keeping a pinned caption to two lines.
   const detail = useCallback(
     (item: MediaItem) => mediaDetail(item, profiles, !phone),
@@ -552,14 +579,40 @@ export function GalleryPage() {
                   {
                     key: "set",
                     label: `Set: ${loaded[0]?.resultSet?.title || "Results"}`,
-                    remove: () =>
-                      setParams(
-                        (next) => {
-                          next.delete("set");
-                          return next;
-                        },
-                        { replace: true },
-                      ),
+                    remove: () => dropState("set"),
+                  },
+                ]
+              : []),
+            ...(chat
+              ? [
+                  {
+                    key: "chat",
+                    label: turn ? "This Turn" : "This Chat",
+                    remove: () => {
+                      dropState("show");
+                      dropState("turn");
+                      dropState("chat");
+                    },
+                    ...(chatTurn
+                      ? {
+                          choice: {
+                            label: "Chat Results",
+                            value: turn ? "turn" : "chat",
+                            options: [
+                              { value: "turn", label: "This Turn" },
+                              { value: "chat", label: "This Chat" },
+                            ],
+                            onChange: (value: string) =>
+                              void routerNavigate(location.pathname, {
+                                replace: true,
+                                state: {
+                                  ...location.state,
+                                  show: value === "chat" ? "chat" : undefined,
+                                } satisfies PageState,
+                              }),
+                          },
+                        }
+                      : {}),
                   },
                 ]
               : []),
@@ -706,10 +759,10 @@ export function GalleryPage() {
       <MorePages listing={gallery} results={JSON.stringify(listingKey)} paused={!!itemId} />
       {!selection.selecting && (
         <ComposerDock
-          compose={params.get("compose")}
-          shared={params.get("shared") || ""}
-          opening={(location.state as OpenComposerState | null)?.openComposer ? location.key : ""}
-          onDropParam={dropParam}
+          compose={!!state?.compose}
+          shared={state?.shared || ""}
+          opening={opening}
+          onDropState={dropState}
           onKindChange={switchKind}
           onCompared={showCompared}
         />
