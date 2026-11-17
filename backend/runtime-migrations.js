@@ -8,6 +8,7 @@ import { dreamDefaultChoices } from "./dream-default-choices.js";
 import { dreamOwnership } from "./dream-ownership.js";
 import { galleryRatings } from "./gallery-ratings.js";
 import { galleryTitles } from "./gallery-titles.js";
+import { imageSizeDefaults } from "./image-size-defaults.js";
 import { legacyShapes } from "./legacy-shapes.js";
 import { loraStacks } from "./lora-stacks.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
@@ -91,6 +92,12 @@ const steps = [
     name: "galleryTitles",
     run: galleryTitles,
     changes: (plan) => plan.titles + plan.cleared + plan.setItems,
+    online: true,
+  },
+  {
+    name: "imageSizeDefaults",
+    run: imageSizeDefaults,
+    changes: (plan) => plan.profiles.length,
     online: true,
   },
   {
