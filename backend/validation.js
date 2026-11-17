@@ -212,7 +212,7 @@ export function sanitizeGenerateBody(
       ),
     },
   };
-  if (!profile) throw new Error("ComfyUI doesn't list this model. Rescan models and try again.");
+  if (!profile) throw new Error("The worker doesn't list this model. Rescan models and try again.");
   if (
     customWorkflow?.controls?.model?.node &&
     customWorkflow?.controls?.model?.input &&

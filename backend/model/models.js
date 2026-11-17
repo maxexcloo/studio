@@ -285,9 +285,6 @@ export function inferModels(
 
   // Why a workflow can't run on this worker, in words; "" when it can.
   const unready = (workflow) => {
-    const model = String(workflow.defaults?.model || "");
-    if (stats.radiance?.some((item) => item.id === model && item.state === "failed"))
-      return `Radiance failed to load ${model}`;
     const missing = missingNodes(info, workflow.requiredNodes);
     return missing.length
       ? `missing ${missing.join(", ")} on this worker`
