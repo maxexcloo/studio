@@ -10,7 +10,12 @@ import path from "node:path";
 import express from "express";
 
 import { cardKinds, characterImageIds } from "../shared/characters.ts";
-import { isCloudProfile, loraDefaultStrength, loraName } from "../shared/profiles.ts";
+import {
+  isCloudProfile,
+  loraDefaultStrength,
+  loraName,
+  loraStrengthRange,
+} from "../shared/profiles.ts";
 import { clientOf } from "./access.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import {
@@ -135,7 +140,6 @@ import { fillVideoSizes } from "./library/library.js";
 import { registerLibraryRoutes } from "./library/routes.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
-import { strengthRange } from "./lora/policy.js";
 import { registerLoraRoutes } from "./lora/routes.js";
 import { loadLoraLibrary } from "./lora/stacks.js";
 import { registerMcpRoutes } from "./mcp/mcp.js";
@@ -919,10 +923,9 @@ const dream = createDream({
   fitLoras: (profile, loras) =>
     loras.flatMap((lora) => {
       const info = catalogueLoraInfo(lora.name);
-      const range = strengthRange(info);
+      const { min, max } = loraStrengthRange(info);
       // The LoRA picker's default for a LoRA added without a strength.
-      const wanted = lora.strength ?? loraDefaultStrength(info, 1);
-      const strength = range ? Math.min(range.max, Math.max(range.min, wanted)) : wanted;
+      const strength = Math.min(max, Math.max(min, lora.strength ?? loraDefaultStrength(info)));
       return info?.hidden || optionalLoraPolicyIssue({ name: lora.name, strength }, info, profile)
         ? []
         : [{ ...lora, strength }];

@@ -189,7 +189,8 @@ function CatalogueForm({
             />
             <TagsInput label="Trigger Words" {...form.getInputProps("triggers")} />
             <Text size="sm" c="dimmed">
-              Suggested Strength guides the controls without limiting expert input.
+              Minimum and Maximum bound every strength control; Studio refuses strengths outside
+              them.
             </Text>
             <SimpleGrid cols={2}>
               {(["default", "min", "max", "step"] as const).map((key) => (

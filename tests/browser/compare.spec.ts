@@ -178,11 +178,14 @@ test("Compare ▾ builds variants across a LoRA's strengths and across models", 
   const strengths = await axis(page, "LoRA Strength");
   await strengths.getByRole("combobox", { name: "LoRA", exact: true }).click();
   await page.getByRole("option", { name: "Detail Slider", exact: true }).click();
-  const values = strengths.getByRole("combobox", { name: "Strengths", exact: true });
-  await strengths.getByText("Strengths", { exact: true }).click();
-  await page.getByRole("option", { name: "0.6", exact: true }).click();
-  await page.getByRole("option", { name: "1.2", exact: true }).click();
-  await values.press("Escape");
+  // Only strengths within the LoRA's range are offered, starting from its default and neighbours.
+  const values = strengths.getByRole("group", { name: "Strengths", exact: true });
+  await expect(strengths.getByText("Supports -3 to 10.", { exact: true })).toBeVisible();
+  const chip = (name: string) => values.getByRole("checkbox", { name, exact: true });
+  for (const name of ["Without LoRA", "-2", "0.8", "2"]) await expect(chip(name)).toBeChecked();
+  await values.getByText("-2", { exact: true }).click();
+  await expect(chip("-2")).not.toBeChecked();
+  await values.getByText("10", { exact: true }).click();
   await start(page);
   await expect(variants(page).getByRole("radio")).toHaveCount(4);
 
@@ -382,9 +385,9 @@ test("Test LoRA in the Library sweeps a LoRA's strength in the composer", async 
     ]),
   ).toEqual([
     ["Detail Slider Off", []],
-    ["Detail Slider 0.6", [["detail.safetensors", 0.6]]],
+    ["Detail Slider -2", [["detail.safetensors", -2]]],
     ["Detail Slider 0.8", [["detail.safetensors", 0.8]]],
-    ["Detail Slider 1", [["detail.safetensors", 1]]],
+    ["Detail Slider 2", [["detail.safetensors", 2]]],
   ]);
 });
 
