@@ -10,7 +10,7 @@ import { replyTitle, titleRule } from "../shared/titles.ts";
  *
  * It uses the gateway credentials (STUDIO_ASSISTANT_URL, _KEY) and asks Bifrost for a model
  * (`model()`): for an account's prompt writing, the text model it picked (`writerModel`); for
- * anything else the local text model while a workload serving it runs, otherwise STUDIO_ASSISTANT_CLOUD_MODEL.
+ * anything else STUDIO_ASSISTANT_CLOUD_MODEL, so background work never evicts local image models.
  * For an account with uncensored access a base `…/auto` alias becomes `…/uncensored`.
  * Structured calls turn reasoning off with `reasoning_effort` (`reasoningEfforts`).
  * Settings are read on every call, so a model picked in Settings applies at once.
@@ -510,9 +510,9 @@ export function createAssistant(
     return resolved;
   };
 
-  /** Local while a workload serving text runs (reading images as it says), else the cloud, which does. */
-  async function route() {
-    return (await localText()) || { model: settings().cloud, vision: true };
+  /** Calls other than an account's prompt writing use the cloud, which reads images. */
+  function route() {
+    return { model: settings().cloud, vision: true };
   }
 
   /**
@@ -532,12 +532,12 @@ export function createAssistant(
    */
   async function modelFor(task, explicit = false, writer) {
     if (writer) return writerModel(writer);
-    return uncensoredAlias((await route()).model, explicit);
+    return uncensoredAlias(route().model, explicit);
   }
 
   /** Whether the model calls take reads images: a local one as its workload says, any other always. */
   async function supportsVision(writer) {
-    if (!writer) return (await route()).vision;
+    if (!writer) return route().vision;
     const local = await localText();
     const model = writerModel(writer);
     return model.startsWith("local/") || model === local?.model ? Boolean(local?.vision) : true;
@@ -1014,15 +1014,13 @@ export function createAssistant(
     const model = await modelFor("describe", explicit);
     const started = now();
     const pictures = images.filter((image) => image?.data);
-    const vision = pictures.length ? await supportsVision() : false;
+    const vision = pictures.length > 0;
     if (!vision && !String(hint).trim())
       return {
         available: false,
         vision: false,
         model,
-        reason: pictures.length
-          ? "The running text model can't read images."
-          : "Add an image to describe.",
+        reason: "Add an image to describe.",
       };
     const system = [
       vision
