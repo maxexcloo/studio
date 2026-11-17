@@ -631,11 +631,11 @@ export function MediaDetails({
   // Where it came from, what it is part of, then what was made from it.
   const lineage = (
     [
-      ["From", related.source && <RelatedLinks items={[related.source]} open={open} />],
+      ["From", related.source && <RelatedLinks key="from" items={[related.source]} open={open} />],
       [
         "Source",
         item.source && (
-          <Anchor href={item.source.url} target="_blank" rel="noreferrer" size="sm">
+          <Anchor key="source" href={item.source.url} target="_blank" rel="noreferrer" size="sm">
             {item.source.title || item.source.url}
           </Anchor>
         ),
@@ -644,14 +644,16 @@ export function MediaDetails({
       [
         "Series",
         context?.series && (
-          <Anchor component={Link} to={gallerySearch(item, context.series)} size="sm">
+          <Anchor key="series" component={Link} to={gallerySearch(item, context.series)} size="sm">
             {context.series}
           </Anchor>
         ),
       ],
       [
         "Derived",
-        related.derived.length > 0 && <RelatedLinks items={related.derived} open={open} />,
+        related.derived.length > 0 && (
+          <RelatedLinks key="derived" items={related.derived} open={open} />
+        ),
       ],
     ] as [string, React.ReactNode][]
   ).filter(([, value]) => Boolean(value));
