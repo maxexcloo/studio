@@ -2,6 +2,7 @@ import {
   Alert,
   Badge,
   Button,
+  Checkbox,
   Menu,
   Modal,
   SegmentedControl,
@@ -162,7 +163,7 @@ function StyleEditor({
             value={draft.instruction}
             onChange={(instruction) => change({ instruction })}
           />
-          <Switch
+          <Checkbox
             label="Uncensored Models Only"
             description="Offered only to accounts with Uncensored Models, and may write explicit prompts."
             checked={draft.uncensored === true}
@@ -352,7 +353,12 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
             {
               key: "kind",
               header: "Type",
-              cell: (style) => kinds.find((kind) => kind.value === style.kind)!.label,
+              // The main column takes the free width, so the type keeps its line instead.
+              cell: (style) => (
+                <Text span inherit style={{ whiteSpace: "nowrap" }}>
+                  {kinds.find((kind) => kind.value === style.kind)!.label}
+                </Text>
+              ),
             },
             {
               key: "enabled",
