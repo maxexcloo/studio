@@ -4,7 +4,7 @@ import { type Ref, type RefObject, useRef } from "react";
 import type { MediaItem } from "../../types";
 import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "../../ui/ActionBar";
 import { usePhone } from "../../ui/usePhone";
-import { compactViewerActions, namedItemActions } from "./itemActions";
+import { namedItemActions } from "./itemActions";
 import { useMediaActions, useMediaDialogs } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import type { Iteration } from "./useMediaAction";
@@ -31,7 +31,7 @@ export function ViewerActionGroups({ groups, labelled, equal }: Omit<ViewerActio
   const phone = usePhone();
   return (
     <ActionBarGroups
-      groups={phone && !equal ? compactViewerActions(groups) : groups}
+      groups={groups}
       labelled={labelled}
       fit={!equal}
       stacked={phone}

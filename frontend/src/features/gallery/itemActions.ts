@@ -51,24 +51,3 @@ export const contextMenuActions = (groups: ActionGroups): ActionGroups =>
   groups.map((group) =>
     group.flatMap((action) => (action.id === "share" && action.menu ? action.menu.flat() : action)),
   );
-
-/** Phone viewers keep correction under Edit. */
-export function compactViewerActions(groups: ActionGroups): ActionGroups {
-  const actions = groups.flat();
-  const destinations = new Map([["report", "edit"]]);
-  const nested = actions.filter((action) =>
-    actions.some((owner) => owner.id === destinations.get(action.id) && owner.menu),
-  );
-  return groups.map((group) =>
-    group
-      .filter((action) => !nested.includes(action))
-      .map((action) => {
-        const extra = nested.filter((child) => destinations.get(child.id) === action.id);
-        if (!extra.length) return action;
-        return {
-          ...action,
-          menu: [...action.menu!.slice(0, -1), extra, ...action.menu!.slice(-1)],
-        };
-      }),
-  );
-}

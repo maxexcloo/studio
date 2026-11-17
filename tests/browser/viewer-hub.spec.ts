@@ -2076,17 +2076,12 @@ test("The desktop viewer bar keeps its actions on one row in a narrow window", a
   await expect.poll(() => middle("Delete")).toBe(await middle("Animate"));
 });
 
-test("Phone viewer keeps Report under Edit and Similar under AI", async ({ page }, testInfo) => {
+test("Phone viewer shows Report beside Delete and Similar under AI", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Phone action grouping");
   const { viewer } = await seed(page);
   const bar = viewer.getByRole("group", { name: "Generation Actions", exact: true });
-  await expect(bar.getByRole("button", { name: "Report", exact: true })).toHaveCount(0);
-  const edit = bar.getByRole("button", { name: "Edit", exact: true });
-  await edit.click();
-  await expect(page.getByRole("menuitem", { name: "Report", exact: true })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(edit).toBeFocused();
-  await viewerAction(page, "Edit", "Report");
+  await expect(bar.getByRole("button", { name: "Report", exact: true })).toBeVisible();
+  await viewerAction(page, "Report");
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   await expect(report).toBeVisible();
   await report.getByRole("button", { name: "Cancel", exact: true }).click();
