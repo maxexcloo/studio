@@ -75,7 +75,7 @@ export function ConfirmDialog({
       zIndex={zIndex}
       closeOnClickOutside={!pending}
       closeOnEscape={!pending}
-      closeButtonProps={{ disabled: pending }}
+      closeButtonProps={{ "aria-label": "Close", disabled: pending }}
       // Where the action took away what had focus as the dialog opened (Clear All empties its
       // list), Mantine can't return focus to it; it goes to the dialog it was in instead, which
       // would otherwise lose Escape. After Mantine's own attempt.

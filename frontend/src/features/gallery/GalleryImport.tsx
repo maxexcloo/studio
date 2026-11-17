@@ -248,7 +248,7 @@ export function GalleryImport({ upload }: { upload: ReturnType<typeof useGallery
         fullScreen={phone}
         closeOnClickOutside={!upload.link.isPending}
         closeOnEscape={!upload.link.isPending}
-        closeButtonProps={{ disabled: upload.link.isPending }}
+        closeButtonProps={{ "aria-label": "Close", disabled: upload.link.isPending }}
       >
         <form
           onSubmit={(event) => {
