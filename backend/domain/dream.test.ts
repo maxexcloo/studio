@@ -88,6 +88,8 @@ function fixture(t: TestContext, catalogue = profiles) {
     /** The local video profile Dream would choose, or why none can. */
     video: "wan",
     videoRefusal: "",
+    /** The negative prompt each profile's guide recommends. */
+    negatives: {} as Record<string, string>,
     /** Gallery items deleted or hidden since Dream listed them, which can't be referenced. */
     gone: new Set<string>(),
     /** How alike two images are, as Image Search's vectors would say. */
@@ -173,6 +175,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       },
     },
     guide: () => ({ summary: "natural language" }),
+    negative: (profile) => state.negatives[profile.id] ?? "",
     count: (ownerId, query) => matching(ownerId, query).length,
     gallery: (ownerId, query) => {
       state.reads.push(query);
@@ -229,7 +232,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     admit: async (input, account, scope, origin) => {
       const result = await admission(input, account, scope, origin);
       let job = store.job(account?.userId || "", String(result.payload.jobId))!;
-      if (job.status === "writing")
+      if (job.status === "writing" && (job.input.writing as { kind?: string }).kind === "dream")
         job = store.save(
           writtenJob(
             job,
@@ -518,7 +521,12 @@ test("Dream stops at today's cap per kind, however much waits unseen, and animat
   assert.deepEqual(video?.input.referenceAssets, [
     { assetId: `asset-${second.id}`, source: "gallery", slot: "start" },
   ]);
-  assert.match(state.calls.at(-1)!.user, /first frame was made from: dream 2/);
+  // Animate's writer sees the frame: Dream asks for one coherent shot of it with natural faces.
+  const writing = video?.input.writing as Record<string, string>;
+  assert.deepEqual([writing.kind, writing.theme, writing.source], ["animate", "custom", "dream 2"]);
+  assert.match(writing.instruction, /One continuous shot of one simple, coherent action/);
+  assert.match(writing.instruction, /no cuts, scene changes/);
+  assert.match(writing.instruction, /natural, relaxed, believable expressions/);
   assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").status, "capped");
   assert.equal(live().length, 0);
@@ -1545,6 +1553,20 @@ test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and ex
   assert.deepEqual(store.job("alice", next.id)!.input.loras, []);
 });
 
+test("Dream asks for natural expressions and adds face terms only to a recommended negative", async (t) => {
+  const { dream, state, dreamOnce } = fixture(t, [profiles[0]]);
+  state.negatives.flux = "blurry";
+  await dream.save("alice", { enabled: true });
+  const job = (await dreamOnce())!;
+  assert.match(state.calls[0].system, /natural, relaxed, believable expressions/);
+  assert.equal(
+    job.input.negative,
+    "blurry, exaggerated expression, grimace, distorted face, tongue out, gaping mouth",
+  );
+  state.negatives.flux = "";
+  assert.equal((await dreamOnce())!.input.negative, undefined);
+});
+
 test("Dream adds no LoRAs on a profile that does best without them", async (t) => {
   const { dream, state, store, dreamOnce } = fixture(t, [
     { ...profiles[0], capabilities: { defaultLoras: false } },
@@ -1571,16 +1593,20 @@ test("an exploited idea draws its steps, guidance and aspect ratio by taste", as
   );
 });
 
-test("Dream compares steps only on a profile with a steps control, and what taste is least sure of", async (t) => {
-  const asked = async (capabilities: DreamProfile["capabilities"], judged = 0) => {
-    const { dream, state, store, taste, live, dreamOnce } = fixture(t, [
-      { id: "flux", kind: "image", label: "FLUX", capabilities },
-    ]);
+test("Dream mostly compares models and LoRAs, rarely steps or guidance, and steps only with a steps control", async (t) => {
+  const asked = async (
+    roll: number,
+    {
+      catalogue = [{ ...profiles[0], capabilities: { steps: true } }, profiles[1]],
+      loras = [{ name: "fox.safetensors", strength: 1, enabled: true }],
+    }: { catalogue?: DreamProfile[]; loras?: unknown[] } = {},
+  ) => {
+    const { dream, state, store, live, dreamOnce } = fixture(t, catalogue);
     const session = store.createSession("alice", "Gallery").id;
     const base = store.enqueue(
       "alice",
       session,
-      { kind: "image", profileId: "flux", prompt: "a fox in snow", steps: 20 },
+      { kind: "image", profileId: "flux", prompt: "a fox in snow", steps: 20, cfg: 3.5, loras },
       "image",
     );
     store.save({ ...base, status: "completed" });
@@ -1594,21 +1620,34 @@ test("Dream compares steps only on a profile with a steps control, and what tast
       prompt: "a fox in snow",
       settings: { profileId: "flux" },
     });
-    for (let index = 0; index < judged; index++)
-      taste.record("alice", [
-        tasteSignal("like", `judged-${index}`, { profileId: "flux", steps: index % 2 ? 10 : 20 }),
-      ]);
+    // Fox is the one LoRA left unrated (klein is for another family).
+    state.loras.alice = {
+      ratings: { "film.safetensors": "disliked", "ink.safetensors": "disliked" },
+    };
     await dream.save("alice", { enabled: true, dailyImages: 10 });
     for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
+    // The comparison's draw, in millionths of the offered kinds' total weight.
+    state.draws[1_000_000] = [roll];
     await dream.tick();
-    return live("alice")[0].dream?.pair?.question;
+    const sides = live("alice").sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side);
+    return [sides[0].dream?.pair?.question, ...sides.map((job) => job.dream?.pair?.label)];
   };
-  // With one profile and no LoRAs, Steps comes first when offered and Wording otherwise.
-  assert.equal(await asked({ steps: true }), "Which Steps?");
-  assert.equal(await asked({ steps: false }), "Which Wording?");
-  assert.equal(await asked(undefined), "Which Wording?");
-  // Once results taught 20 and 10 steps, wording is what taste knows least.
-  assert.equal(await asked({ steps: true }, 2), "Which Wording?");
+  // Model 35, LoRA 30, Strength 25, Wording 5, Steps 3, Guidance 2, of every hundred.
+  assert.deepEqual(await asked(0), ["Which Model?", "FLUX", "Qwen"]);
+  assert.deepEqual(await asked(340_000), ["Which Model?", "FLUX", "Qwen"]);
+  assert.deepEqual(await asked(360_000), ["Which LoRA?", "With fox", "Without fox"]);
+  assert.deepEqual(await asked(700_000), ["Which LoRA Strength?", "fox 1", "fox 0.65"]);
+  assert.deepEqual(await asked(920_000), ["Which Wording?", "Original Wording", "New Wording"]);
+  assert.deepEqual(await asked(960_000), ["Which Steps?", "20 Steps", "10 Steps"]);
+  assert.deepEqual(await asked(990_000), ["Which Guidance?", "Guidance 3.5", "Guidance 5.5"]);
+  // Without a LoRA, it tries one the account has not rated.
+  assert.deepEqual(await asked(600_000, { loras: [] }), ["Which LoRA?", "Without fox", "With fox"]);
+  // A fixed-step profile is never asked about steps: the same draw lands on Wording.
+  assert.deepEqual(await asked(960_000, { catalogue: profiles }), [
+    "Which Wording?",
+    "Original Wording",
+    "New Wording",
+  ]);
 });
 
 test("Every fourth image compares one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
@@ -1741,8 +1780,6 @@ test("A Dream job's writing request keeps its own fields through admission", () 
   assert.deepEqual(request, {
     kind: "dream",
     explore: true,
-    extend: true,
-    source: "a clip",
     note: "Continuing Beach",
     project: "beach",
     seed: "a red kite",
@@ -1943,7 +1980,7 @@ test("A series follows a liked image's character through one night on its profil
   assert.equal(dream.read("alice").series, undefined);
 });
 
-test("Dream videos animate the best-reviewed still and extend kept videos, each once, on local GPUs", async (t) => {
+test("Dream videos animate liked stills for most videos and Dream's keeps for the rest, extend kept videos, each once", async (t) => {
   const { dream, state, generated, dreamOnce, walks } = fixture(t, profiles);
   const frameOf = (job: Awaited<ReturnType<typeof dreamOnce>>) =>
     (job!.input.referenceAssets as { assetId: string; slot: string }[])[0];
@@ -1956,35 +1993,38 @@ test("Dream videos animate the best-reviewed still and extend kept videos, each 
     prompt: "a liked still",
     rating: "liked",
   });
-  const dreamed = (id: string, score: number, miss = "") =>
-    state.items.push({
+  const dreamed = (id: string, score: number, miss = "", kept = true) =>
+    generated({
       id,
       ownerId: "alice",
       type: "image",
       status: "done",
       prompt: `still ${id}`,
-      jobId: `job-${id}`,
-      dream: { prompt: "", why: "", at: "", state: "unseen", projectId: "beach" },
+      dream: { prompt: "", why: "", at: "", state: kept ? "kept" : "unseen", projectId: "beach" },
       review: { score, miss, model: "m", at: "" },
     });
   dreamed("good", 7);
   dreamed("best", 9);
   dreamed("miss", 3, "indoors");
+  dreamed("unseen", 10, "", false);
+  // A roll under 70 starts from the likes.
   const first = await dreamOnce();
-  assert.deepEqual(first?.input.referenceAssets, [
-    { assetId: "asset-best", source: "gallery", slot: "start" },
-  ]);
+  assert.equal(frameOf(first).assetId, "asset-liked");
   assert.equal(first?.dream?.arm, "animate");
-  assert.equal(first?.dream?.projectId, "beach");
-  assert.match(state.calls.at(-1)!.user, /first frame was made from: still best/);
-  assert.equal(frameOf(await dreamOnce()).assetId, "asset-good");
-  assert.equal(frameOf(await dreamOnce()).assetId, "asset-liked");
-  // Each still is animated once; a miss never is.
-  assert.equal(await dreamOnce(), undefined);
-  assert.match(
-    dream.status("alice").reason!,
-    /^Dream videos animate a kept, liked or well-reviewed image/,
+  // Above it, from Dream's keeps, the best reviewed first.
+  state.rolls = [70];
+  const kept = await dreamOnce();
+  assert.equal(frameOf(kept).assetId, "asset-best");
+  assert.equal(kept?.dream?.projectId, "beach");
+  assert.deepEqual(
+    [(kept!.input.writing as { source?: string }).source, kept!.input.prompt],
+    ["still best", ""],
   );
+  // With no likes left, the keeps follow.
+  assert.equal(frameOf(await dreamOnce()).assetId, "asset-good");
+  // Each still is animated once; a miss or an unjudged result never is.
+  assert.equal(await dreamOnce(), undefined);
+  assert.match(dream.status("alice").reason!, /^Dream videos animate a kept or liked image/);
 
   // A kept video is extended from its last frame on its own model, never an extension again.
   generated({
@@ -2001,8 +2041,8 @@ test("Dream videos animate the best-reviewed still and extend kept videos, each 
     { assetId: "last-frame-clip", source: "gallery", slot: "start" },
   ]);
   assert.equal(extension?.dream?.arm, "extend");
-  assert.match(state.calls.at(-1)!.system, /continues one of their clips from its last frame/);
-  assert.match(state.calls.at(-1)!.user, /clip so far was made from: a clip/);
+  const { extend, source } = extension!.input.writing as { extend?: boolean; source?: string };
+  assert.deepEqual([extend, source], [true, "a clip"]);
   assert.equal(await dreamOnce(), undefined);
 
   // Dream's videos wait for the local video worker.
@@ -2018,20 +2058,19 @@ test("Dream videos animate the best-reviewed still and extend kept videos, each 
 });
 
 test("A Dream video skips a source that left the gallery and animates the next", async (t) => {
-  const { dream, state, dreamOnce, finish, live } = fixture(t, profiles);
+  const { dream, state, dreamOnce, finish, live, generated } = fixture(t, profiles);
   await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
   for (const [id, score] of [
     ["gone", 9],
     ["next", 7],
   ] as const)
-    state.items.push({
+    generated({
       id,
       ownerId: "alice",
       type: "image",
       status: "done",
       prompt: `still ${id}`,
-      jobId: `job-${id}`,
-      dream: { prompt: "", why: "", at: "", state: "unseen" },
+      dream: { prompt: "", why: "", at: "", state: "kept" },
       review: { score, miss: "", model: "m", at: "" },
     });
   state.gone.add("gone");
@@ -2042,7 +2081,7 @@ test("A Dream video skips a source that left the gallery and animates the next",
   assert.deepEqual(dream.read("alice").animated, ["next", "gone"]);
   // With images capped, a second image worker's slot waits while Dream's one video runs.
   state.slots = 2;
-  state.items.push({ ...state.items.find((item) => item.id === "next")!, id: "more" });
+  generated({ ...state.items.find((item) => item.id === "next")!, id: "more", jobId: undefined });
   await dream.tick();
   await dream.tick();
   assert.deepEqual(dream.status("alice"), {
@@ -2051,7 +2090,7 @@ test("A Dream video skips a source that left the gallery and animates the next",
   });
   finish("alice", live("alice")[0].id);
   assert.equal(await dreamOnce(), undefined);
-  assert.match(dream.status("alice").reason!, /^Dream videos animate a kept, liked/);
+  assert.match(dream.status("alice").reason!, /^Dream videos animate a kept or liked/);
 });
 
 test("administrator overrides win over account choices, which they leave saved, and lock them", async (t) => {

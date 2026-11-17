@@ -140,6 +140,7 @@ import { fillVideoSizes } from "./library/library.js";
 import { registerLibraryRoutes } from "./library/routes.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
+import { recommendedNegative } from "./lora/prompts.js";
 import { registerLoraRoutes } from "./lora/routes.js";
 import { loadLoraLibrary } from "./lora/stacks.js";
 import { registerMcpRoutes } from "./mcp/mcp.js";
@@ -907,6 +908,16 @@ const dream = createDream({
   writer: assistantEngine,
   text: textSide,
   guide: assistant.guide,
+  // As submit validation (validation.js) recommends it.
+  negative: (profile, input) =>
+    recommendedNegative(assistant.guide(profile), {
+      cfg: profile.capabilities?.cfg === false ? undefined : (input.cfg ?? profile.defaults?.cfg),
+      takesNegative: profile.capabilities?.negativePrompt !== false,
+      stack: input.loras || [],
+      infos: Object.fromEntries(
+        (input.loras || []).map(({ name }) => [name, catalogueLoraInfo(name)]),
+      ),
+    }),
   gallery: (ownerId, query) => galleryItems({ ownerId, ...query }).map(withCanonicalProfile),
   count: (ownerId, query) => countGalleryItems({ ownerId, ...query }),
   items: (ownerId, ids) =>

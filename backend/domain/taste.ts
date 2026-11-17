@@ -290,7 +290,7 @@ function attributes(choice: TasteChoice) {
 }
 
 /** The attributes a comparison on `axis` covers that only side `a` has, and those only `b` has. */
-export function pairAttributes(axis: string, a: TasteChoice, b: TasteChoice) {
+function pairAttributes(axis: string, a: TasteChoice, b: TasteChoice) {
   const prefix = axisAttributes[axis] ?? "";
   const [mine, theirs] = [a, b].map((choice) =>
     [...attributes(choice)].filter((attribute) => attribute.startsWith(prefix)),
