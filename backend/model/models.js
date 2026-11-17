@@ -326,7 +326,14 @@ export function inferModels(
     // Radiance's Qwen-Image 2.1 family (Noct included) repaints a mask and draws transparency itself.
     const radianceQwen = radianceImage && loraFamilyId(workflow.family) === "qwen_image_21";
     if (radianceImage) {
-      const { maxSide } = radianceImageLimits(String(defaults.model || ""));
+      // A model whose worker lists its two-GPU `-refs` twin takes the twin's sizes.
+      const model = String(defaults.model || "");
+      const models = controls.model
+        ? optionsFor(info, workflow.graph?.[controls.model.node]?.class_type, controls.model.input)
+        : [];
+      const { maxSide } = radianceImageLimits(
+        models.includes(`${model}-refs`) ? `${model}-refs` : model,
+      );
       widthRange.max = Math.min(widthRange.max ?? maxSide, maxSide);
       heightRange.max = Math.min(heightRange.max ?? maxSide, maxSide);
     }

@@ -6,7 +6,7 @@ import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { catalogueLoraInfo } from "./lora/info.js";
 import { keptTriggers, recommendedNegative } from "./lora/prompts.js";
 import { inferModels } from "./model/models.js";
-import { radianceImageLimits } from "./providers/radiance.ts";
+import { radianceImageFits } from "./providers/radiance.ts";
 import { hasReferenceImage, resolveImageMode } from "./workflow-modes.js";
 
 function clampNumber(value, fallback, min, max) {
@@ -289,7 +289,7 @@ export function sanitizeGenerateBody(
     adapter: customWorkflow?.loraStack?.adapter,
   });
   // A run with LoRAs moves to the stack's own model, which graphs.js sends and the item records;
-  // otherwise more references than the model holds move to its `-refs` twin where the worker has one.
+  // otherwise a size and references one card can't hold move to its `-refs` twin where the worker has one.
   const model = String(input.modelName || customWorkflow?.defaults?.model || "");
   const control = customWorkflow.controls?.model;
   const models = optionsFor(
@@ -298,7 +298,9 @@ export function sanitizeGenerateBody(
     control?.input,
   );
   const twin = `${model}-refs`;
-  const crowded = referenceAssets.length > radianceImageLimits(model).maxReferences;
+  const width = snapInteger(input.width, fallback("width", widthRange), widthRange);
+  const height = snapInteger(input.height, fallback("height", heightRange), heightRange);
+  const crowded = !radianceImageFits(model, width, height, referenceAssets.length);
   const modelName =
     (loras.length && customWorkflow.loraStack?.model) ||
     (crowded && models.includes(twin) ? twin : model);
@@ -326,8 +328,8 @@ export function sanitizeGenerateBody(
     vae,
     clipType: String(input.clipType || ""),
     weightDtype: String(input.weightDtype || "default"),
-    width: snapInteger(input.width, fallback("width", widthRange), widthRange),
-    height: snapInteger(input.height, fallback("height", heightRange), heightRange),
+    width,
+    height,
     // A fixed-step profile (capabilities.steps false) keeps its graph's own steps, as with CFG.
     steps:
       profile.capabilities?.steps === false
