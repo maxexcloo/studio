@@ -153,3 +153,32 @@ test("a run with LoRAs moves to the stack's model, records it, and takes the ada
     { name: "a.safetensors", strength: 0.5 },
   ]);
 });
+
+test("more references than one card holds move to the model's two-GPU twin where the worker lists one", () => {
+  const profile = raw(undefined, "radiance-refs");
+  profile.studio.controls.model = { node: "1", input: "model" };
+  profile.studio.defaults = { model: "noctq-v4-iq8r" };
+  profile.graph[1].inputs.model = "noctq-v4-iq8r";
+  const slots = [1, 2, 3, 4];
+  profile.studio.mediaInputs = slots.map((n) => ({
+    id: `ref-${n}`,
+    control: { node: "1", input: `images.image_${n}` },
+  }));
+  saveImportedWorkflow(profile);
+  const run = (count, models) =>
+    sanitizeGenerateBody(
+      {
+        workflow: "custom:radiance-refs",
+        model: "custom:radiance-refs",
+        prompt,
+        seed: 1,
+        referenceAssets: slots
+          .slice(0, count)
+          .map((n) => ({ slot: `ref-${n}`, assetId: `asset-${n}` })),
+      },
+      radianceInfo(models.map((id) => ({ id }))),
+    ).modelName;
+  assert.equal(run(3, ["noctq-v4-iq8r", "noctq-v4-iq8r-refs"]), "noctq-v4-iq8r");
+  assert.equal(run(4, ["noctq-v4-iq8r", "noctq-v4-iq8r-refs"]), "noctq-v4-iq8r-refs");
+  assert.equal(run(4, ["noctq-v4-iq8r"]), "noctq-v4-iq8r");
+});
