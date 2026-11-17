@@ -1,7 +1,7 @@
 import type { DigestGroup, Project, ProjectBrief, Review } from "../../shared/projects.ts";
 import { type IdleItem, createIdleWork, pictured } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
-import type { TextSide } from "./taste.ts";
+import type { PromptWriter } from "./taste.ts";
 
 export interface ReviewItem extends IdleItem {
   createdAt?: string;
@@ -10,13 +10,13 @@ export interface ReviewItem extends IdleItem {
 }
 /** The assistant gateway (assistant.js). */
 interface ReviewWriter {
-  supportsVision(text?: TextSide): Promise<boolean>;
+  supportsVision(writer?: PromptWriter): Promise<boolean>;
   review(request: {
     image: ModelImage;
     brief: string;
     explicit: boolean;
     signal?: AbortSignal;
-    side?: TextSide;
+    writer?: PromptWriter;
   }): Promise<{ score: number; miss: string; model: string }>;
 }
 
@@ -100,8 +100,8 @@ export function createReview(options: {
   projects(ownerId: string): Project[];
   /** Whether the owner's results may be read with the uncensored model. */
   explicit(ownerId: string): boolean;
-  /** Where the owner runs text (account-preferences.js `textSide`). */
-  text(ownerId: string): TextSide;
+  /** The owner's text writer (account-policy.js `promptWriter`). */
+  text(ownerId: string): PromptWriter;
   /** A small (≤512 px) copy of the image, or null when there is none. */
   image(item: ReviewItem): Promise<ModelImage | null>;
   save(item: ReviewItem, review: Review): void;
@@ -123,7 +123,7 @@ export function createReview(options: {
     enabled: () => true,
     async unavailable() {
       if (!writer) return "No assistant model is configured.";
-      vision.local = await writer.supportsVision("local");
+      vision.local = await writer.supportsVision({ side: "local", uncensored: false });
       return "";
     },
     wanted: (item) =>
@@ -131,7 +131,7 @@ export function createReview(options: {
       Boolean(item.dream.projectId) &&
       !item.review &&
       pictured(item) &&
-      vision[options.text(item.ownerId || "")] &&
+      vision[options.text(item.ownerId || "").side] &&
       Boolean(brief(item)),
     async run(item, signal) {
       const image = await options.image(item);
@@ -142,7 +142,7 @@ export function createReview(options: {
         brief: brief(item),
         explicit: options.explicit(item.ownerId || ""),
         signal,
-        side: options.text(item.ownerId || ""),
+        writer: options.text(item.ownerId || ""),
       });
       if (signal.aborted) return;
       options.save(item, { ...reply, at: new Date(now()).toISOString() });

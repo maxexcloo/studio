@@ -43,7 +43,7 @@ import { profileForBackend } from "../generation/payload";
 import { type AssistantOption, assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
-import { type VideosPreference, useVideosPreference } from "../settings/accountPreferences";
+import { type SidePreference, useVideosPreference } from "../settings/accountPreferences";
 import {
   askMotionIdeas,
   askNextSteps,
@@ -395,24 +395,23 @@ export function useMediaActions(
   const offers =
     animation.data?.offers ??
     (animation.error?.cause as { offers?: AnimateOffers } | undefined)?.offers;
-  const offered = (["cloud", "fast", "quality"] as const).filter((value) => offers?.[value]);
-  // Where the account prefers videos to run (also in Settings), where there is more than one place.
-  // Unsaved or no longer offered, it shows Fast where the account has local video, else Cloud.
-  const local = offers?.fast ? "fast" : offers?.quality ? "quality" : "cloud";
+  // Where the account prefers videos to run (also in Settings), where it has both. Unsaved or no
+  // longer offered, it shows Local where the account has local video, else Cloud.
+  const local = offers?.local ? "local" : "cloud";
   const modelChoice =
-    offered.length > 1
+    offers?.cloud && offers.local
       ? [
           {
             id: "animate-model",
-            label: "Cloud, Fast or Quality",
+            label: "Cloud or Local",
             icon: icons.animate,
             choice: {
-              value: videos && offers?.[videos] ? videos : local,
-              options: offered.map((value) => ({
-                value,
-                label: { cloud: "Cloud", fast: "Fast", quality: "Quality" }[value],
-              })),
-              onChange: (value: string) => setVideos(value as VideosPreference),
+              value: videos && offers[videos] ? videos : local,
+              options: [
+                { value: "cloud", label: "Cloud" },
+                { value: "local", label: "Local" },
+              ],
+              onChange: (value: string) => setVideos(value as SidePreference),
             },
           },
         ]

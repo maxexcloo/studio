@@ -155,7 +155,6 @@ export function AnimateDialog({
                 />
                 <Text size="sm" c="dimmed">
                   {written.profileLabel}
-                  {written.tier ? ` · ${written.tier === "fast" ? "Fast" : "Quality"}` : ""}
                   {written.cloud ? " · Cloud" : ""}
                 </Text>
               </>

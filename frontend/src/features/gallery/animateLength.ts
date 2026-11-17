@@ -1,13 +1,13 @@
 import type { GenerationInput, MediaItem, Profile } from "../../types";
 import { lengthChoices } from "../generation/length.ts";
 import { isProfile, profileForBackend } from "../generation/payload.ts";
-import type { VideosPreference } from "../settings/accountPreferences";
+import type { SidePreference } from "../settings/accountPreferences";
 
 /** A video continues on its own profile unless Cloud is chosen or its profile cannot run. */
 export function retainedAnimationProfile(
   profiles: Profile[],
   item: Pick<MediaItem, "type" | "settings" | "model">,
-  videos?: VideosPreference,
+  videos?: SidePreference,
 ) {
   if (item.type !== "video" || videos === "cloud") return undefined;
   const priorId = String(item.settings?.profileId || "");

@@ -65,7 +65,7 @@ function fixture(items: CaptionItem[], saved: IdleDocument | null = null) {
       writer,
       idle: () => state.idle,
       allowed: (ownerId) => state.allowed.has(ownerId),
-      text: () => state.text,
+      text: () => ({ side: state.text, uncensored: false }),
       items: () => state.items,
       visible: (item) => !(item as { hidden?: boolean }).hidden,
       image: async (item) => ({ mime: "image/jpeg", data: item.id || "" }),
@@ -334,7 +334,7 @@ test("status counts the gallery again only once it changes", async () => {
     writer: null,
     idle: () => true,
     allowed: () => true,
-    text: () => "cloud",
+    text: () => ({ side: "cloud", uncensored: false }),
     items: () => {
       walks += 1;
       return items;

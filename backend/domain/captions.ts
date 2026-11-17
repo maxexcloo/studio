@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { type IdleDocument, type IdleItem, createIdleWork, pictured } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
-import type { TextSide } from "./taste.ts";
+import type { PromptWriter } from "./taste.ts";
 
 /** What a finished gallery image shows, in the assistant model's words, so search can find it. */
 export interface Caption {
@@ -19,11 +19,11 @@ export interface CaptionItem extends IdleItem {
 /** The assistant gateway (assistant.js). */
 export interface CaptionWriter {
   /** Whether the text model the side asks for reads images. */
-  supportsVision(text?: TextSide): Promise<boolean>;
+  supportsVision(writer?: PromptWriter): Promise<boolean>;
   caption(request: {
     image: ModelImage;
     signal?: AbortSignal;
-    side?: TextSide;
+    writer?: PromptWriter;
   }): Promise<{ text: string; tags: string[]; model: string }>;
 }
 export const captionCharacters = 600;
@@ -48,8 +48,8 @@ export function createCaptioner(options: {
   writer: CaptionWriter | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  /** Where the owner runs text (account-preferences.js `textSide`). */
-  text(ownerId: string): TextSide;
+  /** The owner's text writer (account-policy.js `promptWriter`). */
+  text(ownerId: string): PromptWriter;
   items(since?: number): Iterable<CaptionItem>;
   changes?(): number;
   visible(item: CaptionItem): boolean;
@@ -70,14 +70,14 @@ export function createCaptioner(options: {
     off: "Gallery Captions is off in Settings › Generation.",
     async unavailable() {
       if (!writer) return "No assistant model is configured.";
-      vision.local = await writer.supportsVision("local");
+      vision.local = await writer.supportsVision({ side: "local", uncensored: false });
       return "";
     },
     // The trickle and a Missing pass caption new images; Out of Date also redoes captions from older
     // rules, and All redoes every caption written before the pass began.
     wanted: (item, all, target) =>
       pictured(item) &&
-      vision[options.text(item.ownerId || "")] &&
+      vision[options.text(item.ownerId || "").side] &&
       (!all || target?.scope === "missing"
         ? !item.caption
         : target?.scope === "all"
@@ -90,7 +90,7 @@ export function createCaptioner(options: {
       const reply = await writer!.caption({
         image,
         signal,
-        side: options.text(item.ownerId || ""),
+        writer: options.text(item.ownerId || ""),
       });
       if (signal.aborted) return;
       options.save(item, {

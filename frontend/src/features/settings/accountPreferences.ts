@@ -7,14 +7,21 @@ import { accountQuery, useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
 import { modelsQuery } from "../generation/GenerationProvider";
 
-/** Where the account prefers videos to run: Cloud, or the local Fast or Quality tier. */
-export type VideosPreference = "cloud" | "fast" | "quality";
-/** Where the account prefers images to run; the other side takes over, saying so, when it can't. */
+/** Where the account prefers a kind to run; the other side takes over, saying so, when it can't. */
 export type SidePreference = "cloud" | "local";
+/** The kinds of work whose side and default models the account chooses. */
+export type WorkKind = "images" | "text" | "videos";
+/** Each kind's default model per side, by its preference key (backend/account-preferences.js). */
+export const defaultModelKeys = {
+  images: { cloud: "imageCloud", local: "imageLocal" },
+  text: { cloud: "textCloud", local: "textLocal" },
+  videos: { cloud: "videoCloud", local: "videoLocal" },
+} as const;
+type DefaultModelKey = (typeof defaultModelKeys)[WorkKind][SidePreference];
 /** Which unfinished work the gallery shows: none, work in progress, or queued work too. */
 export type GalleryWorkPreference = "none" | "running" | "queued";
 /** The account's own preferences (backend/account-preferences.js). */
-export interface Preferences {
+interface PreferenceValues {
   cloudModels: boolean;
   loras: boolean;
   tileCaptions: boolean;
@@ -25,15 +32,15 @@ export interface Preferences {
   galleryWork?: GalleryWorkPreference;
   /** Where images run by default; unsaved (and Cloud while Cloud Models is off), Local. */
   images?: SidePreference;
-  /** Where titles, captions, suggestions and Dream's text run; unsaved, Cloud (Local while Cloud Models is off). */
+  /** Where text runs; unsaved, Cloud (Local while Cloud Models is off). */
   text?: SidePreference;
-  /** The text model prompt writing asks for; unsaved, the assistant's default (`/api/assistant`). */
-  writingModel?: string;
-  /** Unsaved, Fast where the account has local video, otherwise Cloud. */
-  videos?: VideosPreference;
+  /** Where videos and Animate run by default; unsaved (and Cloud while Cloud Models is off), Local. */
+  videos?: SidePreference;
   /** The header's Appearance settings; unsaved, the browser's. */
   appearance?: Partial<Appearance>;
 }
+/** Each kind's default model per side (a profile ID or gateway text model); null clears one. */
+export type Preferences = PreferenceValues & Partial<Record<DefaultModelKey, string | null>>;
 export interface PreferencesStatus {
   preferences: Preferences;
   /** The preferences the account has saved itself. */
@@ -69,11 +76,13 @@ export function useSavePreferences() {
       if ("uncensoredModels" in patch) void client.invalidateQueries({ queryKey: ["suggestions"] });
       // The gallery shows the unfinished work the account chose.
       if ("galleryWork" in patch) void client.invalidateQueries({ queryKey: galleryKey });
-      // Default models follow where the account prefers each area to run.
-      if ("images" in patch || "videos" in patch)
+      // Default models follow where the account prefers each kind to run and its chosen defaults.
+      const changed = (kind: WorkKind) =>
+        kind in patch || Object.values(defaultModelKeys[kind]).some((key) => key in patch);
+      if (changed("images") || changed("videos"))
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
-      if ("videos" in patch) void client.invalidateQueries({ queryKey: ["animate-profile"] });
-      if ("writingModel" in patch) void client.invalidateQueries({ queryKey: ["assistant"] });
+      if (changed("videos")) void client.invalidateQueries({ queryKey: ["animate-profile"] });
+      if (changed("text")) void client.invalidateQueries({ queryKey: ["assistant"] });
     },
     onError: () => client.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
   });
@@ -94,7 +103,7 @@ export function useVideosPreference() {
   const save = useSavePreferences();
   return [
     useQuery(preferencesQuery).data?.preferences.videos,
-    (videos: VideosPreference) => save.mutate({ videos }),
+    (videos: SidePreference) => save.mutate({ videos }),
   ] as const;
 }
 

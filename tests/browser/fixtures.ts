@@ -332,7 +332,7 @@ export async function fixtures(page: Page) {
         profileId: "video:test",
         label: "Motion Quality",
         cloud: false,
-        offers: { cloud: false, fast: false, quality: true },
+        offers: { cloud: false, local: true },
       });
     if (path === "/api/loras/library") return respond({ found: true, library: loraLibrary });
     if (path === "/api/loras/library/ops" && method === "POST") {
