@@ -92,10 +92,10 @@ function SettingsForm({ dream }: { dream: Dream }) {
         aria-label={`Dream ${label} Run On`}
         fullWidth
         value={settings[key]}
-        disabled={locked(key)}
+        disabled={locked(key) || !settings[key === "imageBackend" ? "images" : "videos"]}
         data={[
-          { value: "local", label: "Local" },
           { value: "cloud", label: "Cloud" },
+          { value: "local", label: "Local" },
         ]}
         onChange={(value) => save.mutate({ [key]: value })}
       />
