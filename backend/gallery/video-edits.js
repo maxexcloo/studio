@@ -9,23 +9,16 @@ import { editClip, probeVideo, videoEditKinds } from "../video-previews.js";
 import { addGalleryItems, galleryItem } from "./store.js";
 
 /**
- * The Edit menu's video edits (Trim, …): ffmpeg writes the edited clip beside the original, which
+ * The Edit menu's video edits (Reverse, …): ffmpeg writes the edited clip beside the original, which
  * stays, and it is saved as a new version of it, owned by the same account. The version is a
  * finished job made from the original (`store.recordFinished`), in the original's session.
  */
 export function registerVideoEditRoutes(app, { store }) {
   app.post("/api/gallery/video-edit", async (req, res) => {
     if (!req.studioAccount && !requireLocal(req, res)) return;
-    const { galleryItemId, kind, start, end } = req.body || {};
+    const { galleryItemId, kind } = req.body || {};
     if (!videoEditKinds.includes(kind))
       return res.status(400).json({ ok: false, error: "Unknown video edit." });
-    if (
-      kind === "trim" &&
-      !(Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end - start >= 100)
-    )
-      return res
-        .status(400)
-        .json({ ok: false, error: "A trim keeps at least a tenth of a second." });
     const item = recordsForRequest([galleryItem(galleryItemId)].filter(Boolean), req).find(
       (entry) => entry.type === "video" && entry.status === "done",
     );
@@ -36,7 +29,7 @@ export function registerVideoEditRoutes(app, { store }) {
     const name = `${path.parse(media.filename).name}-${kind}-${crypto.randomUUID().slice(0, 8)}.mp4`;
     const output = mediaPath(name, media.subfolder);
     try {
-      await editClip(source, output, { kind, start, end });
+      await editClip(source, output, kind);
     } catch (error) {
       await fs.promises.rm(output, { force: true });
       return res.status(500).json({ ok: false, error: error.message });

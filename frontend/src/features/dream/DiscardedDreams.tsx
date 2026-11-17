@@ -46,7 +46,7 @@ export function Thumbnail({ item }: { item: DreamItem }) {
 }
 
 /**
- * Disliked Dream results, newest first; Keep moves one into the gallery after all, on its card or
+ * Disliked Dream results, newest first; Accept moves one into the gallery after all, on its card or
  * in the viewer. They stay, hidden, until Delete All deletes them.
  */
 export function DiscardedDreams({ media }: { media: DreamMedia }) {
@@ -126,9 +126,9 @@ export function DiscardedDreams({ media }: { media: DreamMedia }) {
               leftSection={<icons.keep size={14} />}
               loading={keep.isPending && keep.variables?.id === item.id}
               onClick={() => keep.mutate(item)}
-              aria-label={`Keep ${item.prompt || "Result"}`}
+              aria-label={`Accept ${item.prompt || "Result"}`}
             >
-              Keep
+              Accept
             </Button>
           </Card>
         ))}
@@ -158,11 +158,11 @@ export function DiscardedDreams({ media }: { media: DreamMedia }) {
               [
                 {
                   id: "keep",
-                  label: "Keep",
+                  label: "Accept",
                   icon: icons.keep,
                   emphasis: "filled",
                   onClick: () => {
-                    // Kept, it leaves the discards, so the viewer moves on to the next.
+                    // Accepted, it leaves the discards, so the viewer moves on to the next.
                     const index = items.indexOf(current);
                     setViewing((items[index + 1] || items[index - 1])?.id ?? null);
                     keep.mutate(current);
