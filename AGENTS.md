@@ -94,8 +94,10 @@ recur across features.
 - Every dialog, sheet and chip popup ends with one right-aligned
   `DialogFooter` of real buttons: any default secondary actions, Cancel, then
   one filled primary, which follows the secondaries alone (Done, Close) where
-  there is nothing to cancel. A primary is its bare verb (Save, Compare,
-  Create), adding a noun only where the verb alone is ambiguous. Clearing a
+  there is nothing to cancel. An anchored chip popup (desktop, or `floating`)
+  whose only button would be Done has no footer and closes on outside click
+  or Escape; phone sheets keep Done. A primary is its bare verb (Save,
+  Compare, Create), adding a noun only where the verb alone is ambiguous. Clearing a
   form or popup is the shared `ClearButton` ✕ immediately before the primary,
   as in the composer's Generate row, never a text action in a heading; no
   other action sits beside or below the primary. Consequential actions sit in
