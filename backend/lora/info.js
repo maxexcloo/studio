@@ -1,3 +1,4 @@
+import { workerReachable } from "../comfy/backends.js";
 import { comfy } from "../comfy/comfy.js";
 import { families as modelFamilies } from "../family-catalogue.js";
 import { catalogueStore } from "../library/catalogue.js";
@@ -177,8 +178,8 @@ export function loraInfo(name) {
  * `remote: false` keeps to remembered metadata and the live catalogue definitions.
  */
 export async function loraInfos(worker, names = [], { concurrency = 6, remote: ask = true } = {}) {
-  // Radiance uses catalogue metadata without waking a ComfyUI worker that has given up its GPUs.
-  if (isRadianceWorker(workerById(worker))) ask = false;
+  // Only a ComfyUI that is answering is asked: Radiance and a parked ComfyUI use catalogue metadata.
+  if (isRadianceWorker(workerById(worker)) || workerReachable(worker) !== true) ask = false;
   const result = {};
   const remote = [];
   for (const name of names) {

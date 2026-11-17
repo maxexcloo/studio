@@ -30,17 +30,15 @@ const {
   withPreferredDefaults,
 } = await import("./catalogue.js");
 
-test("the Library lists a worker's last known files without waiting on it", async () => {
+test("the Library lists the model library's last known files, even from an old address, without waiting on it", () => {
   const info = { LoraLoader: { input: { required: { lora_name: [["kept.safetensors"]] } } } };
   const store = {
-    workerModels: (id, url) => (id === "primary" && url === hungUrl ? { info } : undefined),
+    workerModels: (id, url) => (id === "primary" && url === undefined ? { info } : undefined),
     saveWorkerModels: () => {},
   };
-  const started = Date.now();
-  const latest = await createModelCatalogue({ store }).latestComfyContext("primary");
+  const latest = createModelCatalogue({ store }).libraryInventory({ refresh: true });
   assert.deepEqual(latest.info, info);
   assert.equal(latest.current, false);
-  assert.ok(Date.now() - started < 1000);
 });
 
 test("uncensored LoRAs need Uncensored Models, in discovery and at admission", () => {

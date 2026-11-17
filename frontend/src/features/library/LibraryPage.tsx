@@ -119,6 +119,7 @@ export function LibraryPage() {
         }
         checkingUpdates={update.isPending && !update.variables}
         updateNote={updateNote || undefined}
+        inventoryError={catalogue.data?.inventoryError}
         onEdit={admin ? setEditing : undefined}
         updatePending={update.isPending}
       />
