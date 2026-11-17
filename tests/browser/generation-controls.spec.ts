@@ -840,10 +840,13 @@ test("Phone prompt boxes copy and undoably clear in place; desktop leaves both t
   );
   await page.keyboard.type(" at dusk");
   await expect(prompt).toHaveValue("A lantern in fog at dusk");
-  // The shared editing surface keeps its close action and text tools reachable while typing.
-  await expect(generate.getByRole("button", { name: "Close Generate", exact: true })).toBeVisible();
+  // Typing shows only the text, its tools in its corner, and the action bar.
+  await expect(generate.getByRole("button", { name: "Close Generate", exact: true })).toBeHidden();
   await expect(generate.getByRole("group", { name: "Prompt Tools", exact: true })).toBeVisible();
   await expect(generate.locator("[data-text-editor]", { has: prompt })).toBeVisible();
+  await expect(
+    generate.getByRole("group", { name: "Generation Actions", exact: true }),
+  ).toBeVisible();
   await prompt.blur();
   // Closing returns the page and its dock where they were.
   await generate.getByRole("button", { name: "Close Generate", exact: true }).click();
