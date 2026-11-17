@@ -179,9 +179,6 @@ const targetLines = (target: WritingTarget | null | undefined) =>
     : [];
 const clean = (value: unknown, limit = Infinity) =>
   (typeof value === "string" ? value : "").replace(/\s+/g, " ").trim().slice(0, limit);
-/** Cuts at the last word that fits, so an idea never ends mid-word. */
-const fit = (text: string, limit: number) =>
-  text.length <= limit ? text : text.slice(0, text.lastIndexOf(" ", limit)).replace(/[,;:]$/, "");
 const json = (text: string) => {
   try {
     return JSON.parse(/\{[\s\S]*\}/.exec(text)?.[0] || "");
@@ -404,7 +401,7 @@ export function createSuggestions({
       const ideas = [
         ...new Set(
           (Array.isArray(reply?.ideas) ? reply.ideas : [])
-            .map((idea: unknown) => fit(clean(idea), maxIdea))
+            .map((idea: unknown) => clean(idea, maxPromptCharacters))
             .filter(Boolean),
         ),
       ].slice(0, maxSuggestions) as string[];
