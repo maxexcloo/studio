@@ -1383,6 +1383,41 @@ test("Discard pagination counts only the chosen media and retains owner scope", 
   assert.ok([...first.items, ...second.items].every((item) => item.ownerId === "alice"));
 });
 
+test("Undo returns judged results and gallery images and takes back what they taught", async (t) => {
+  const fx = fixture(t);
+  const { dream, state, taste, dreamOnce, generated } = fx;
+  await dream.save("alice", { enabled: true });
+  await dreamOnce();
+  await dreamOnce();
+  const old = new Date(state.clock - 2 * 86_400_000).toISOString();
+  generated({
+    id: "gallery",
+    jobId: "job-gallery",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    createdAt: old,
+  });
+  const request = await serve(t, fx);
+  const [one, two] = (await request("")).body.unseen.map((item: DreamItem) => String(item.id));
+  await request(`/${encodeURIComponent(one)}/keep`, {});
+  await request(`/${encodeURIComponent(two)}/discard`, {});
+  await request("/calibration", { liked: ["gallery"] });
+  assert.equal(taste.read("alice").signals.length, 3);
+
+  assert.equal((await request("/undo", { ids: [one] }, "POST", "bob")).status, 404);
+  assert.equal((await request("/undo", { ids: [] })).status, 400);
+  for (const ids of [["gallery"], [two], [one]])
+    assert.equal((await request("/undo", { ids })).status, 200);
+  assert.deepEqual(
+    (await request("")).body.unseen.map((item: DreamItem) => item.id).sort(),
+    [one, two].sort(),
+  );
+  assert.equal(state.items.find((item) => item.id === two)?.rating, undefined);
+  assert.deepEqual(taste.read("alice").signals, []);
+  assert.deepEqual(dream.read("alice").judged, []);
+});
+
 test("Calibration offers the account's older Studio generations, unjudged first, and only teaches the taste profile", async (t) => {
   const fx = fixture(t);
   const { state, taste, generated } = fx;

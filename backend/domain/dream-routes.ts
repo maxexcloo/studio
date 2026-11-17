@@ -251,6 +251,22 @@ export function registerDreamRoutes(
       return refuse(error);
     }
   });
+  route("POST", "/api/dream/undo", (account, { body }) => {
+    const ids = body?.ids;
+    if (
+      !Array.isArray(ids) ||
+      !ids.length ||
+      ids.length > 2 ||
+      ids.some((id) => typeof id !== "string")
+    )
+      return { status: 400, payload: { ok: false, error: "Undo one result or one pair." } };
+    try {
+      dream.undo(owner(account), ids);
+      return { status: 200, payload: { ok: true } };
+    } catch (error) {
+      return refuse(error);
+    }
+  });
   for (const verdict of ["keep", "discard", "more"] as const)
     route("POST", `/api/dream/:itemId/${verdict}`, (account, { params }) => {
       try {

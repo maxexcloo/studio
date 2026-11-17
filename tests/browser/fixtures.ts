@@ -1264,6 +1264,8 @@ export async function serveDream(
     spicyAvailable: options.spicyAvailable ?? false,
     calibration: options.calibration ?? [],
     judged: new Set<string>(),
+    /** Every Dream result served, so Undo can bring one back. */
+    known: new Map<string, any>(),
     projects: options.projects ?? [],
     suggestions: options.suggestions ?? [],
     requests: [] as { method: string; path: string; body: any }[],
@@ -1354,6 +1356,19 @@ export async function serveDream(
     if (path === "/api/dream/visit")
       return route.fulfill({ json: { since: options.since ?? null } });
     if (method !== "GET") state.requests.push({ method, path, body });
+    for (const item of [...state.unseen, ...state.discarded]) state.known.set(item.id, item);
+    // As the backend: Undo returns results to unseen and gallery images to unjudged.
+    if (path === "/api/dream/undo") {
+      for (const id of body.ids) {
+        state.judged.delete(id);
+        const item = state.known.get(id);
+        if (!item) continue;
+        state.discarded = state.discarded.filter((entry) => entry !== item);
+        item.dream = { ...item.dream, state: "unseen" };
+        if (!state.unseen.includes(item)) state.unseen.push(item);
+      }
+      return route.fulfill({ json: { ok: true } });
+    }
     if (path === "/api/dream") return route.fulfill({ json: show() });
     if (path === "/api/dream/history")
       return route.fulfill({
@@ -1480,6 +1495,7 @@ export async function serveDream(
   await page.route(/\/api\/gallery\/favorite$/, (route) => {
     const body = route.request().postDataJSON();
     state.requests.push({ method: "POST", path: "/api/gallery/favorite", body });
+    for (const item of state.unseen) state.known.set(item.id, item);
     if (body.rating) state.unseen = state.unseen.filter((item) => !body.ids.includes(item.id));
     return route.fulfill({ json: { ok: true, items: [] } });
   });

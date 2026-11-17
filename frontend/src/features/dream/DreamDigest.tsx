@@ -67,7 +67,7 @@ function DigestCard({
       </Stack>
       {/* The row is shared by label length, so no label is cut short. */}
       <Group gap="xs" p="xs" wrap="nowrap">
-        {/* The ratings; Like is light here, as every card has one. */}
+        {/* The ratings; Accept is light here, as every card has one. */}
         {dreamChoices({ kind: "dream", key: item.id, item })
           .flat()
           .filter((choice) => choice.main)
@@ -113,7 +113,7 @@ function withSets(items: DreamItem[]) {
 
 /**
  * While You Were Away: each project's unseen Dream results, best fit to its brief first, with
- * those that miss it collapsed under Misses, and each series as one set. Dislike, Like and Keep
+ * those that miss it collapsed under Misses, and each series as one set. Dislike, Like and Accept
  * judge a card in place;
  * opening one shows the viewer with every choice, moving on to the next result after each.
  */

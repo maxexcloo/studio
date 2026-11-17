@@ -33,19 +33,25 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
 
   const batch = page.getByRole("progressbar", { name: "Dream Batch", exact: true });
   await expect(batch).toHaveAttribute("aria-valuetext", "1 of 5");
-  // The bar rates the card, with Undo before Superlike.
+  // Round buttons rate the card; Undo stands beside the view menu.
   const bar = page.getByRole("group", { name: "Dream Actions" });
-  await expect(bar.getByRole("button")).toHaveText(["Like", "Dislike", "Undo", "Superlike"]);
-  const undo = bar.getByRole("button", { name: "Undo", exact: true });
+  await expect
+    .poll(() => bar.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)))
+    .toEqual(["Dislike", "Like", "Accept"]);
+  const undo = page.getByRole("button", { name: "Undo", exact: true });
   await expect(undo).toBeDisabled();
   await page.keyboard.press("ArrowRight");
   await expect(current(page)).toContainText("Dream prompt two");
   await expect(batch).toHaveAttribute("aria-valuetext", "2 of 5");
-  // Undo brings the last card back before its verdict is sent.
   await undo.click();
   await expect(current(page)).toContainText("Dream prompt one");
   await expect(batch).toHaveAttribute("aria-valuetext", "1 of 5");
   await expect(undo).toBeDisabled();
+  await page.keyboard.press("ArrowRight");
+  await expect(current(page)).toContainText("Dream prompt two");
+  // U undoes from the keyboard too.
+  await page.keyboard.press("u");
+  await expect(current(page)).toContainText("Dream prompt one");
   await page.keyboard.press("ArrowRight");
   await expect(current(page)).toContainText("Dream prompt two");
   await page.keyboard.press("ArrowLeft");
@@ -67,23 +73,65 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await page.mouse.up();
   await expect(current(page)).toContainText("Dream prompt five");
 
-  // Superlike keeps and likes it, from the deck's bar or the viewer's.
+  // The viewer judges as the deck does.
   await current(page).getByRole("button", { name: "View", exact: true }).click();
   await page
     .getByRole("group", { name: "Dream Actions" })
-    .getByRole("button", { name: "Superlike", exact: true })
+    .getByRole("button", { name: "Accept", exact: true })
     .click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  expect(verdicts(dream)).toEqual([
-    "POST /api/dream/one/keep",
-    "POST /api/dream/two/discard",
-    "POST /api/dream/three/variations",
-    "POST /api/dream/four/discard",
+  // Up likes: it accepts the result and rates it Liked.
+  await expect
+    .poll(() => verdicts(dream))
+    .toEqual([
+      "POST /api/dream/one/keep",
+      "POST /api/dream/undo",
+      "POST /api/dream/one/keep",
+      "POST /api/dream/undo",
+      "POST /api/dream/one/keep",
+      "POST /api/dream/two/discard",
+      "POST /api/gallery/favorite",
+      "POST /api/dream/four/discard",
+      "POST /api/dream/five/keep",
+    ]);
+  expect(dream.requests[1].body).toEqual({ ids: ["one"] });
+  expect(dream.requests[6].body).toEqual({ ids: ["three"], rating: "liked" });
+});
+
+test("Undo steps back through Dislike, Like and Accept, taking back each", async ({ page }) => {
+  await fixtures(page);
+  const dream = await serveDream(page, {
+    unseen: ["one", "two", "three", "four"].map((id) => dreamItem(id)),
+  });
+  await page.goto("/dream");
+  const bar = page.getByRole("group", { name: "Dream Actions" });
+  const undo = page.getByRole("button", { name: "Undo", exact: true });
+  for (const [name, next] of [
+    ["Dislike", "two"],
+    ["Like", "three"],
+    ["Accept", "four"],
+  ]) {
+    await bar.getByRole("button", { name, exact: true }).click();
+    await expect(current(page)).toContainText(`Dream prompt ${next}`);
+  }
+  // Each Undo brings back the card before, newest first, until nothing is left to undo.
+  for (const back of ["three", "two", "one"]) {
+    await undo.click();
+    await expect(current(page)).toContainText(`Dream prompt ${back}`);
+  }
+  await expect(undo).toBeDisabled();
+  const sent = () =>
+    dream.requests.map((request) => `${request.path} ${JSON.stringify(request.body)}`);
+  await expect.poll(sent).toEqual([
+    "/api/dream/one/discard {}",
+    `/api/gallery/favorite {"ids":["two"],"rating":"liked"}`,
+    "/api/dream/three/keep {}",
+    `/api/dream/undo {"ids":["three"]}`,
+    // Undoing a Like takes its rating back first.
+    `/api/gallery/favorite {"ids":["two"],"rating":null}`,
+    `/api/dream/undo {"ids":["two"]}`,
+    `/api/dream/undo {"ids":["one"]}`,
   ]);
-  // The last verdict waits for Undo until the deck is left.
-  await showView(page, "History");
-  await expect.poll(() => verdicts(dream).at(-1)).toBe("POST /api/gallery/favorite");
-  expect(dream.requests.at(-1)?.body).toEqual({ ids: ["five"], rating: "liked" });
 });
 
 test("While You Were Away ranks each project's results, folds its misses and judges them", async ({
@@ -132,13 +180,13 @@ test("While You Were Away ranks each project's results, folds its misses and jud
   await misses.click();
   await expect(beach.getByText("Indoors; the brief asks for the sea.")).toBeVisible();
 
-  // Like, Dislike and Superlike judge in place.
-  await beach.getByRole("button", { name: "Like Dream prompt wave", exact: true }).click();
+  // Dislike, Like and Accept judge in place.
+  await beach.getByRole("button", { name: "Accept Dream prompt wave", exact: true }).click();
   await expect(beach.getByRole("button", { name: "View Dream prompt wave" })).toHaveCount(0);
   await beach.getByRole("button", { name: "Dislike Dream prompt indoors", exact: true }).click();
   await page
     .getByRole("region", { name: "City" })
-    .getByRole("button", { name: "Superlike Dream prompt street", exact: true })
+    .getByRole("button", { name: "Like Dream prompt street", exact: true })
     .click();
 
   // Full screen has every choice and moves on to the next result after a verdict.
@@ -149,7 +197,7 @@ test("While You Were Away ranks each project's results, folds its misses and jud
   if (!isMobile)
     await expect(
       viewer.getByRole("group", { name: "Dream Actions" }).getByRole("button"),
-    ).toHaveText(["Animate", "Edit", "Recreate", "Like", "Dislike", "Superlike"]);
+    ).toHaveText(["Animate", "Edit", "Recreate", "Dislike", "Like", "Accept"]);
   await dreamAction(page, "More Like This");
   await expect(viewer.getByRole("img", { name: "Dream prompt loose" })).toBeVisible();
   await viewer
@@ -184,8 +232,8 @@ test("While You Were Away shows a series as one set, in its order", async ({ pag
   await expect(views.last()).toHaveAccessibleName("View Dream prompt second");
   await expect(page.getByRole("button", { name: "View Dream prompt loose" })).toBeVisible();
   await expect(set.getByRole("button", { name: "View Dream prompt loose" })).toHaveCount(0);
-  // Liking one judges only that result.
-  await set.getByRole("button", { name: "Like Dream prompt first", exact: true }).click();
+  // Accepting one judges only that result.
+  await set.getByRole("button", { name: "Accept Dream prompt first", exact: true }).click();
   await expect(views).toHaveCount(1);
 });
 
@@ -330,11 +378,10 @@ test("While Dream is off, the deck compares gallery images in pairs", async ({ p
   await page.goto("/dream");
   await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
   await page.keyboard.press("ArrowLeft");
-  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
+  await expect.poll(() => dream.requests.length).toBe(1);
   await page.getByRole("button", { name: "Both", exact: true }).click();
   // The image left over makes no card, and Dream's own results wait until it is on.
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
-  await showView(page, "History");
   await expect.poll(() => dream.requests.length).toBe(2);
   expect(dream.requests.map((request) => request.body)).toEqual([
     { liked: ["g1"], passed: ["g2"] },
@@ -530,8 +577,6 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   await page.getByRole("button", { name: "View B", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "B", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
-  await showView(page, "History");
   // Calibration hears of a disliked image before the rating hides it.
   await expect.poll(() => dream.requests.length).toBe(5);
   expect(dream.requests.map((request) => request.body)).toEqual([
@@ -571,15 +616,20 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   const pair = page.getByRole("group", { name: "Which Steps?", exact: true });
   await expect(pair).toContainText("A · 20 Steps");
   await expect(pair).toContainText("B · 40 Steps");
-  await expect(
-    page.getByRole("group", { name: "Comparison Answers" }).getByRole("button"),
-  ).toHaveText(["A", "B", "Neither", "Undo", "Both"]);
+  await expect
+    .poll(() =>
+      page
+        .getByRole("group", { name: "Comparison Answers" })
+        .getByRole("button")
+        .evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
+    )
+    .toEqual(["Neither", "A", "B", "Both"]);
 
   // A side opens in the viewer; closing it returns to the same comparison.
   await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
   const viewer = page.getByRole("dialog");
   const answers = viewer.getByRole("group", { name: "Comparison Answers" });
-  for (const name of ["A", "B", "Neither", "Both"]) {
+  for (const name of ["Neither", "A", "B", "Both"]) {
     const answer = answers.getByRole("button", { name, exact: true });
     await expect(answer).toBeInViewport({ ratio: 1 });
     await expect(answer.locator(".mantine-Button-label")).toHaveText(name);
@@ -597,33 +647,32 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await page.mouse.down();
   await page.mouse.move(centre.x - box.width / 2, centre.y + 10, { steps: 8 });
   await page.mouse.up();
-  // Each answer waits for Undo until the next one.
-  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
-  await page.keyboard.press("ArrowDown");
   await expect.poll(() => dream.requests.length).toBe(1);
+  await page.keyboard.press("ArrowDown");
+  await expect.poll(() => dream.requests.length).toBe(2);
   const third = page.getByRole("group", { name: "Which Steps?", exact: true });
   await expect(third).toContainText("Guidance 3");
   // The preview chooses only after pressing A, then Undo puts the comparison back.
   await third.getByRole("button", { name: "View A · Guidance 3", exact: true }).click();
-  expect(dream.requests.length).toBe(1);
+  expect(dream.requests.length).toBe(2);
   await viewer.getByRole("button", { name: "A", exact: true }).click();
-  await expect.poll(() => dream.requests.length).toBe(2);
-  // With the deck empty, Undo stands in the toolbar.
+  await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
+  // Undo stands in the toolbar, beside the view menu.
   const undo = page.getByRole("button", { name: "Undo", exact: true });
   await expect(undo.locator("xpath=../..")).toHaveClass(/toolbar/);
   await undo.click();
   await expect(third).toContainText("Guidance 3");
   await page.getByRole("button", { name: "Both", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  await showView(page, "History");
-  await expect.poll(() => dream.requests.length).toBe(3);
-  expect(
-    dream.requests.map((request) => `${request.path} ${JSON.stringify(request.body)}`),
-  ).toEqual([
-    '/api/dream/pairs/one/answer {"answer":"a"}',
-    '/api/dream/pairs/two/answer {"answer":"neither"}',
-    '/api/dream/pairs/three/answer {"answer":"both"}',
-  ]);
+  await expect
+    .poll(() => dream.requests.map((request) => `${request.path} ${JSON.stringify(request.body)}`))
+    .toEqual([
+      '/api/dream/pairs/one/answer {"answer":"a"}',
+      '/api/dream/pairs/two/answer {"answer":"neither"}',
+      '/api/dream/pairs/three/answer {"answer":"a"}',
+      '/api/dream/undo {"ids":["p3a","p3b"]}',
+      '/api/dream/pairs/three/answer {"answer":"both"}',
+    ]);
 });
 
 test("Discarded Dream results can be viewed and kept after all, or deleted all at once", async ({
@@ -707,7 +756,6 @@ test("Full screen switches between a comparison's sides and judges from its bar"
   await answers.getByRole("button", { name: "Neither", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  await showView(page, "History");
   await expect.poll(() => dream.requests.length).toBe(1);
   expect(verdicts(dream)).toEqual(["POST /api/dream/pairs/steps/answer"]);
   expect(dream.requests[0].body).toEqual({ answer: "neither" });
@@ -734,9 +782,6 @@ test("The Dream tab counts the results waiting for a verdict, a comparison as on
   await expect(tab).toHaveAccessibleDescription("4 Unseen");
   await tab.click();
   await expect(current(page)).toContainText("Dream prompt one");
-  // A verdict counts once sent, when the next one leaves its Undo behind.
-  await page.keyboard.press("ArrowRight");
-  await expect(current(page)).toContainText("Dream prompt two");
   await page.keyboard.press("ArrowRight");
   await expect(tab).toHaveAccessibleDescription("3 Unseen");
 });
@@ -908,16 +953,22 @@ test("new Dream generations follow the active comparison, survive Undo and prece
   await expect(current(page)).toContainText("Dream prompt latest");
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(original).toBeVisible();
-  expect(dream.requests.filter((request) => request.path.includes("/answer"))).toEqual([]);
+  await expect
+    .poll(() =>
+      dream.requests
+        .map((request) => request.path)
+        .filter((path) => path.includes("/answer") || path.endsWith("/undo")),
+    )
+    .toEqual(["/api/dream/pairs/original/answer", "/api/dream/undo"]);
   await page.getByRole("button", { name: "Both", exact: true }).click();
   await expect(current(page)).toContainText("Dream prompt latest");
-  await page.getByRole("button", { name: "Like", exact: true }).click();
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(page.getByRole("group", { name: "Which arrived?", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Both", exact: true }).click();
   await expect(current(page)).toContainText("Dream prompt middle");
-  await page.getByRole("button", { name: "Like", exact: true }).click();
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(current(page)).toContainText("Dream prompt old");
-  await page.getByRole("button", { name: "Like", exact: true }).click();
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(
     page.getByRole("group", { name: "Current Gallery Image", exact: true }),
   ).toBeVisible();

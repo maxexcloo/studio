@@ -797,6 +797,17 @@ export function createTaste({
         logWarning(`A taste signal was not saved: ${(error as Error).message}`);
       }
     },
+    /** Takes back what an undone judgement taught: the signals about `jobIds` from `since` on. */
+    takeBack(ownerId: string, jobIds: string[], since: string) {
+      const taste = load(ownerId);
+      const about = (signal: TasteSignal) =>
+        [signal.jobId, signal.over?.jobId, signal.also?.jobId].some(
+          (jobId) => jobId && jobIds.includes(jobId),
+        );
+      const signals = taste.signals.filter((signal) => !(signal.at >= since && about(signal)));
+      const dropped = taste.signals.length - signals.length;
+      if (dropped) write(ownerId, { ...taste, signals, since: Math.max(0, taste.since - dropped) });
+    },
     /** Sets the person's fields, which learning then leaves alone; null hands one back to Studio. */
     edit(ownerId: string, changes: TastePreferenceChanges) {
       const current = load(ownerId);
