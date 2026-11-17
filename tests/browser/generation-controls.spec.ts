@@ -591,6 +591,8 @@ test("The chip composer offers supported sizes and settings, follows the output 
     referenceAssets: [],
   });
   expect(state.jobs[0].input.parentJobId).toBeUndefined();
+  // A tap on the bar while the phone's Generate sheet still fades out can be lost.
+  await expect(page.getByRole("dialog", { name: "Generate", exact: true })).toBeHidden();
   await expandComposer(page);
   await page
     .getByRole("radiogroup", { name: "Generation Output", exact: true })
