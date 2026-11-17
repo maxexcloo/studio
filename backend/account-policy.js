@@ -17,6 +17,7 @@
  * Library) does not go through these checks.
  */
 import { isCloudProfile } from "../shared/profiles.ts";
+import { kindDefaults } from "./account-preferences.js";
 import { canonicalProfileId } from "./profile/store.js";
 
 export const accountRoles = Object.freeze({ administrator: "administrator", user: "user" });
@@ -163,12 +164,13 @@ export function mayUseFeature(access, feature) {
 }
 
 /**
- * What an account's prompt writing asks the assistant for (assistant.js `writerModel`): the text
- * model it picked, and whether it may use uncensored ones (Uncensored Models in its effective
- * access). `access` is undefined only in single-user mode, which has every feature.
+ * What an account's text work asks the assistant for (assistant.js `modelFor`): where its Text
+ * runs and its default model on each side (account-preferences.js `kindDefaults`), and whether it
+ * may use uncensored models (Uncensored Models in its effective access). `access` is undefined
+ * only in single-user mode, which has every feature.
  */
 export const promptWriter = (access, preferences) => ({
-  picked: preferences.writingModel,
+  ...kindDefaults(preferences, "text"),
   uncensored: access === undefined || mayUseFeature(access, "uncensoredModels"),
 });
 

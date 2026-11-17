@@ -259,7 +259,7 @@ export function registerAssistantRoutes(
         ok: true,
         available: true,
         vision: await engine.supportsVision(writer),
-        writingModel: engine.writerModel(writer),
+        writingModel: await engine.model("rewrite", false, writer),
         models,
         defaultPreset: promptStyleStore().defaultId(),
         // Library › Prompt Styles' menus: Improve Prompt's styles, Animate's themes and fixed AI edits.

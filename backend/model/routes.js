@@ -1,5 +1,5 @@
 import { ownerIdForRequest } from "../account-ownership.js";
-import { accountPreferences } from "../account-preferences.js";
+import { accountPreferences, kindDefaults } from "../account-preferences.js";
 import { animateProfile } from "../animate-profile.js";
 import { logger } from "../crash-log.js";
 import { directRoute } from "../domain/direct-route.ts";
@@ -55,17 +55,17 @@ export function registerModelRoutes(app, { catalogue }) {
 
   // Every Animate surface asks this before queuing or staging, so it shows the model that will run:
   // Animate's profile for the account (animate-profile.js), from its catalogue, whether a local video
-  // worker answered and where it prefers videos to run (Cloud, or the local Fast or Quality tier).
+  // worker answered, where it prefers videos to run and its default video model on each side.
   app.get("/api/animate/profile", async (req, res) => {
     try {
-      const { videos } = accountPreferences(ownerIdForRequest(req));
+      const videos = kindDefaults(accountPreferences(ownerIdForRequest(req)), "videos");
       const models = modelsForAccount(await catalogue.catalogueModels(), req);
       const { profile, cloud, size, offers, note } = animateProfile(models.profiles || [], {
         defaultId: models.defaults?.videoModel,
         localRunning: models.backends?.video?.available !== false,
         localParked: models.backends?.video?.parked === true,
-        tier: videos === "quality" ? "quality" : "fast",
-        prefer: videos === "cloud" ? "cloud" : "local",
+        prefer: videos.side,
+        preferred: videos,
         width: Number(req.query.width),
         height: Number(req.query.height),
       });

@@ -24,7 +24,7 @@ import {
   mayUseGenerationProfile,
   promptWriter,
 } from "./account-policy.js";
-import { accountPreferences, textSide } from "./account-preferences.js";
+import { accountPreferences, kindDefaults } from "./account-preferences.js";
 import {
   accountAccessForId,
   gatewayAccountAccess,
@@ -599,13 +599,16 @@ registerLoraRoutes(app, { installedLoras });
 // A gone or disabled account's prompts never reach the text model.
 const tasteWriter = (ownerId) =>
   ownerId && !accountAccessForId(ownerId)?.authenticated ? null : assistantEngine;
+/** Where the owner's text runs and on which models (account-policy.js `promptWriter`). */
+const textWriter = (ownerId = "") =>
+  promptWriter(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId));
 // Text takes the cloud route whenever no local text worker runs (assistant.js), so a configured
 // gateway is always reachable; a stopped or parked local worker never makes text unavailable.
 const textOnline = async () => Boolean(assistantEngine);
 const tasteStore = createTaste({
   dataDir,
   writer: tasteWriter,
-  textSide,
+  promptWriter: textWriter,
   online: textOnline,
   updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
 });
@@ -833,7 +836,6 @@ const explicitFor = (ownerId) =>
 const suggestions = createSuggestions({
   taste,
   writer: tasteWriter,
-  textSide,
   online: textOnline,
   explicit: explicitFor,
   item: (ownerId, jobId, itemId) =>
@@ -841,7 +843,7 @@ const suggestions = createSuggestions({
       (item) => !itemId || item.id === itemId,
     ),
   image: async (item) =>
-    (await assistantEngine?.supportsVision(textSide(item.ownerId))) ? smallImage(item) : null,
+    (await assistantEngine?.supportsVision(textWriter(item.ownerId))) ? smallImage(item) : null,
   save: (item, nextSteps) => updateGalleryJob(galleryKey(item), { nextSteps }),
   ideas: () => flagEnabled("STUDIO_PROMPT_IDEAS"),
   nextSteps: () => flagEnabled("STUDIO_NEXT_STEPS"),
@@ -850,8 +852,7 @@ const suggestions = createSuggestions({
       ownerId ? accountAccessForId(ownerId) : undefined,
       item.settings?.profileId || "",
     ),
-  promptWriter: (ownerId) =>
-    promptWriter(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId)),
+  promptWriter: textWriter,
   fixed: (kind) =>
     promptStyleStore()
       .usable(kind)
@@ -882,8 +883,18 @@ const dream = createDream({
     if (ownerId && !mayUseFeature(account, "dream")) return null;
     return { account, uncensored: !account || mayUseFeature(account, "uncensoredModels") };
   },
-  catalogue: async (_ownerId, account) =>
-    dreamCatalogue(modelsForAccount((await mediaModels(false)).models, { studioAccount: account })),
+  catalogue: async (ownerId, account) => {
+    const preferences = accountPreferences(ownerId);
+    return {
+      ...dreamCatalogue(
+        modelsForAccount((await mediaModels(false)).models, { studioAccount: account }),
+      ),
+      preferred: {
+        image: kindDefaults(preferences, "images"),
+        video: kindDefaults(preferences, "videos"),
+      },
+    };
+  },
   online: async (kind, backend) => {
     if (backend === "cloud") {
       const profiles = (await directCloud?.profiles().catch(() => [])) || [];
@@ -905,7 +916,7 @@ const dream = createDream({
   slots: () =>
     Math.max(1, listWorkers().filter((worker) => worker.capabilities.includes("image")).length),
   writer: assistantEngine,
-  text: textSide,
+  text: textWriter,
   guide: assistant.guide,
   gallery: (ownerId, query) => galleryItems({ ownerId, ...query }).map(withCanonicalProfile),
   count: (ownerId, query) => countGalleryItems({ ownerId, ...query }),
@@ -989,13 +1000,14 @@ const dream = createDream({
         : profiles;
       return animateProfile(pool, {
         where: "cloud",
+        preferred: kindDefaults(accountPreferences(ownerId), "videos"),
         defaultId: models.defaults?.videoModel,
         width,
         height,
       });
     }
     return dreamVideoProfile(profiles, {
-      videos: accountPreferences(ownerId).videos,
+      preferred: kindDefaults(accountPreferences(ownerId), "videos"),
       extend: extend && canonicalProfileId(extend),
       defaultId: models.defaults?.videoModel,
       localRunning: models.backends?.video?.available !== false,
@@ -1074,7 +1086,7 @@ const runtimeLoad = (name) => () => readRuntimeDocument(dataDir, name) ?? null;
 const captioner = createCaptioner({
   enabled: () => flagEnabled("STUDIO_GALLERY_CAPTIONS"),
   writer: assistantEngine,
-  text: textSide,
+  text: textWriter,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
   items: idleItems,
@@ -1090,7 +1102,7 @@ registerIdlePassRoutes(app, "/api/gallery/captions", { work: captioner, requireA
 // Dream review (domain/review.ts): each project's unseen results scored against its brief.
 const dreamReview = createReview({
   writer: assistantEngine,
-  text: textSide,
+  text: textWriter,
   idle: galleryIdle,
   allowed: (ownerId) => Boolean(dream.access(ownerId)),
   items: idleItems,
@@ -1161,7 +1173,7 @@ onGalleryFilesDeleted((items) => imageSearch.forget(items));
 const titler = createTitler({
   enabled: () => flagEnabled("STUDIO_GALLERY_TITLES"),
   writer: assistantEngine,
-  text: textSide,
+  text: textWriter,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
   items: idleItems,
@@ -1175,7 +1187,7 @@ const titler = createTitler({
 const suggester = createPromptSuggester({
   enabled: () => flagEnabled("STUDIO_SUGGESTED_PROMPTS"),
   writer: assistantEngine,
-  text: textSide,
+  text: textWriter,
   idle: galleryIdle,
   allowed: promptWriterOwner,
   items: idleItems,
@@ -1190,7 +1202,7 @@ const nextSteps = createNextStepWork({
   enabled: () => flagEnabled("STUDIO_NEXT_STEPS"),
   suggestions,
   writer: assistantEngine,
-  text: textSide,
+  text: textWriter,
   idle: galleryIdle,
   allowed: promptWriterOwner,
   items: idleItems,
