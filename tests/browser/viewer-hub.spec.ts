@@ -400,10 +400,8 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   await expect(surface).toBeVisible();
   await expect(dialog).toBeVisible();
   await more.click();
-  // Dismissing the tools, by their phone sheet's Close or a press on the field, leaves the editor
-  // and its parent intact.
-  if (phone) await page.getByRole("button", { name: "Close AI", exact: true }).click();
-  else await field.click();
+  // Dismissing the tools by a press on the field leaves the editor and its parent intact.
+  await field.click();
   await expect(page.getByRole("menu")).toBeHidden();
   await expect(surface).toBeVisible();
   if (phone) {

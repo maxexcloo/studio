@@ -22,11 +22,14 @@ import {
   type MouseEvent,
   type ReactNode,
   type Ref,
+  createContext,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 
 import { menuWidth } from "../theme";
 import { type Action, ActionMenuItems } from "./ActionBar";
@@ -42,6 +45,12 @@ import classes from "./TextBox.module.css";
 // Pressing the tools control or a phone editor tool keeps focus (and the keyboard) in the text, so nothing that
 // follows the focus (a sheet's header) moves the control from under the press.
 const keepFocus = (event: MouseEvent) => event.preventDefault();
+
+/**
+ * Where an in-place box shows its tools while it has focus: its form's action bar, above the
+ * phone keyboard.
+ */
+export const TextToolsBar = createContext<HTMLElement | null>(null);
 
 /** Shared text editing, with a flat tools menu and a full-screen phone editor. */
 export function TextBox({
@@ -214,12 +223,15 @@ export function TextBox({
       </ActionIcon>
     </Tooltip>
   );
+  const bar = useContext(TextToolsBar);
+  const [active, setActive] = useState(false);
+  const inBar = mobile && inline && bar && active ? bar : null;
   const visible = useVisibleRect(menuOpened);
   const bounds = { padding: 12, rootBoundary: visible ?? ("viewport" as const) };
   const menu = !menuless && tools !== undefined && (
     <Menu
-      // In place, the button stands at the text's top, so the menu drops from it.
-      position={mobile && inline ? "bottom-end" : "top-end"}
+      // In place at rest, the button stands at the text's top, so the menu drops from it.
+      position={mobile && inline && !inBar ? "bottom-end" : "top-end"}
       width={menuWidth}
       // A long list scrolls within the visible room, above a phone's keyboard and toolbar.
       middlewares={{ flip: bounds, shift: bounds, size: bounds }}
@@ -243,6 +255,8 @@ export function TextBox({
           if (
             !active ||
             active === document.body ||
+            // The chosen item keeps focus while the menu fades out.
+            active.closest("[data-menu-dropdown]") ||
             (ai && !editing && from?.tagName !== "TEXTAREA" && active === from)
           )
             (
@@ -313,6 +327,36 @@ export function TextBox({
         <ActionMenuItems groups={[others]} />
       </Menu.Dropdown>
     </Menu>
+  );
+  const toolGroup = (
+    <div
+      className={classes.corner}
+      role="group"
+      aria-label={`${title} Tools`}
+      data-text-tools
+      onMouseDown={keepFocus}
+    >
+      {editButtons}
+      {inBar &&
+        others.map(
+          (tool) =>
+            tool.icon && (
+              <Tooltip key={tool.id} label={tool.label}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label={tool.label}
+                  disabled={tool.disabled}
+                  onClick={tool.onClick}
+                >
+                  <tool.icon size={18} />
+                </ActionIcon>
+              </Tooltip>
+            ),
+        )}
+      {menu}
+      {send}
+    </div>
   );
   // A labelled box keeps its tools inside the text's corner, sharing its edge with the form's fields.
   const inside = Boolean(!mobile && !send && !hideTools && props.label && tools);
@@ -437,22 +481,27 @@ export function TextBox({
       {busy && spins && <VisuallyHidden role="status">{busy}</VisuallyHidden>}
       {/* AI tools remain available beside the summary before its phone editor opens. */}
       {mobile && inline ? (
-        // In place, the text fills the surface with its tools as icons in its corner.
-        <div className={classes.editor} data-text-editor>
+        // In place, the text fills the surface with its tools as icons in its corner, or while it
+        // has focus in its form's action bar, with its menu's plain tools (Recent Prompts) beside.
+        <div
+          className={classes.editor}
+          data-text-editor
+          onFocus={(event) => {
+            if (event.target === (field.current as EventTarget | null)) setActive(true);
+          }}
+          // Its tools and their menu, wherever they stand, keep the text active.
+          onBlur={(event) => {
+            const next = event.relatedTarget as Element | null;
+            if (
+              !next ||
+              !(next === field.current || next.closest(`${popupLayer}, [data-text-tools]`))
+            )
+              setActive(false);
+          }}
+        >
           <div className={classes.columned}>
             {textarea}
-            {(tools || send) && (
-              <div
-                className={classes.corner}
-                role="group"
-                aria-label={`${title} Tools`}
-                onMouseDown={keepFocus}
-              >
-                {editButtons}
-                {menu}
-                {send}
-              </div>
-            )}
+            {(tools || send) && (inBar ? createPortal(toolGroup, inBar) : toolGroup)}
           </div>
           {below && <div className={classes.below}>{below}</div>}
           {popups && <div className={classes.anchor}>{popups}</div>}

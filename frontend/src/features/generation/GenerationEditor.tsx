@@ -16,6 +16,7 @@ import { maxLoras } from "../../../../shared/profiles";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { TextToolsBar } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { GenerationInputControls } from "./GenerationInputControls";
 import { type Draft, defaultProfile, useGeneration } from "./GenerationProvider";
@@ -217,6 +218,7 @@ export function GenerationEditor({
   const lastMask = useRef<{ assetId?: string; mask?: string }>(undefined);
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [toolsBar, setToolsBar] = useState<HTMLDivElement | null>(null);
   const referenceBrowser = useReferenceBrowser();
   const loraPicker = useLoraPicker();
   const prompt = useRef<HTMLTextAreaElement>(null);
@@ -327,19 +329,21 @@ export function GenerationEditor({
           )}
           {models.error && <Alert color="red">{models.error.message}</Alert>}
           {variants}
-          <PromptFields
-            textareaRef={prompt}
-            input={input}
-            profile={profile}
-            references={references}
-            onChange={onChange}
-            assistantScope={assistantScope}
-            negative={usesNegative(profile)}
-            autoFocus={autoFocusPrompt}
-            fill={fill}
-            ideas={offerIdeas}
-            ask={onOperationChange && ask}
-          />
+          <TextToolsBar.Provider value={fill ? toolsBar : null}>
+            <PromptFields
+              textareaRef={prompt}
+              input={input}
+              profile={profile}
+              references={references}
+              onChange={onChange}
+              assistantScope={assistantScope}
+              negative={usesNegative(profile)}
+              autoFocus={autoFocusPrompt}
+              fill={fill}
+              ideas={offerIdeas}
+              ask={onOperationChange && ask}
+            />
+          </TextToolsBar.Provider>
           {!fill && inputs}
           {!!error && (
             <Alert color="red">{error instanceof Error ? error.message : String(error)}</Alert>
@@ -354,7 +358,10 @@ export function GenerationEditor({
             gap="xs"
             wrap="nowrap"
           >
+            {/* A text box being edited puts its tools here, in place of the output and Clear. */}
+            {fill && <div ref={setToolsBar} className={classes.textTools} />}
             <SegmentedControl
+              className={classes.resting}
               aria-label="Generation Output"
               radius="xl"
               style={{ flexShrink: 0 }}
@@ -382,6 +389,7 @@ export function GenerationEditor({
             <Group gap="xs" wrap="nowrap" flex={phone ? 1 : undefined} miw={0} justify="flex-end">
               {phone ? (
                 <ActionIcon
+                  className={classes.resting}
                   variant="subtle"
                   color="gray"
                   size={44}
@@ -401,6 +409,7 @@ export function GenerationEditor({
                 events={{ hover: true, focus: true, touch: true }}
               >
                 <Button
+                  className={fill ? classes.resting : undefined}
                   type="submit"
                   radius="xl"
                   rightSection={phone ? undefined : <ArrowUp size={18} />}
@@ -412,6 +421,24 @@ export function GenerationEditor({
                   {label}
                 </Button>
               </Tooltip>
+              {fill && (
+                <Tooltip
+                  label={blockedReason || label}
+                  events={{ hover: true, focus: true, touch: true }}
+                >
+                  <ActionIcon
+                    className={classes.send}
+                    type="submit"
+                    radius="xl"
+                    size={44}
+                    aria-label={label}
+                    loading={pending}
+                    {...blockedProps(blockedReason)}
+                  >
+                    <ArrowUp size={20} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
             </Group>
           </Group>
         </div>

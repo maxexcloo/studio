@@ -71,7 +71,7 @@ test("A click outside an open popup only closes it", async ({ page }) => {
   await expect(page).toHaveURL(/\/images$/);
 });
 
-test("A phone text menu fills the screen and its Close returns to the composer unsent", async ({
+test("A phone text menu stays a menu and a tap outside returns to the composer unsent", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Phone pointer handling");
@@ -80,11 +80,10 @@ test("A phone text menu fills the screen and its Close returns to the composer u
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper fox");
   const menu = await promptMenu(page, "Prompt");
   const generate = page.getByRole("button", { name: "Generate Image", exact: true });
-  // Once its opening transition ends, the sheet spans the screen.
-  await expect
-    .poll(async () => Math.round((await menu.boundingBox())!.width))
-    .toBe(page.viewportSize()!.width);
-  await menu.getByRole("button", { name: "Close AI", exact: true }).tap();
+  await expect(menu).toBeVisible();
+  expect((await menu.boundingBox())!.width).toBeLessThan(page.viewportSize()!.width);
+  // The first tap outside only closes the menu.
+  await generate.tap();
   await expect(page.getByRole("menu")).toBeHidden();
   expect(state.jobs).toHaveLength(0);
   await generate.tap();
