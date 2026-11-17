@@ -62,13 +62,7 @@ const action =
     id: choice.id,
     label: choice.label,
     icon: choice.icon,
-    emphasis: !emphasis
-      ? undefined
-      : choice.primary
-        ? "filled"
-        : choice.main
-          ? "default"
-          : undefined,
+    emphasis: emphasis && choice.main ? (choice.primary ? "filled" : "default") : undefined,
     onClick: () => act(choice.choice),
   });
 
