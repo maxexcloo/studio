@@ -975,7 +975,7 @@ const loading =
       origin,
     ).id;
 
-test("queued work reusing the loaded model and LoRAs runs first within its tier", async () => {
+test("queued work reusing the loaded model and LoRAs runs first within its tier, then its model alone", async () => {
   const queue = fixture();
   const { store } = queue;
   try {
@@ -986,7 +986,23 @@ test("queued work reusing the loaded model and LoRAs runs first within its tier"
     const withLora = enqueue("a", {}, [{ name: "ink", strength: 1 }]);
     const reuse = enqueue("a");
     await drain(queue);
-    assert.deepEqual(queue.submitted, [first, reuse, other, withLora]);
+    assert.deepEqual(queue.submitted, [first, reuse, withLora, other]);
+  } finally {
+    store.close();
+  }
+});
+
+test("a worker with two slots fills them with one model before loading another", async () => {
+  const { store, adapter, submitted, observations } = fixture();
+  const queue = new GenerationQueue(store, { ...adapter, slots: () => 2 });
+  try {
+    const enqueue = loading(store, store.createSession("alice").id);
+    const [first, other, same] = [enqueue("a"), enqueue("b"), enqueue("a")];
+    await queue.tick();
+    assert.deepEqual(submitted, [first, same]);
+    observations.set(first, { status: "completed", outputs: [] });
+    await queue.tick();
+    assert.deepEqual(submitted, [first, same, other]);
   } finally {
     store.close();
   }
