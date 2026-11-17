@@ -14,9 +14,8 @@ import {
   emptyGalleryFilters,
   useActiveFilters,
 } from "../gallery/GalleryFilters";
-import { useImagePreview } from "../gallery/ImagePreview";
 import { useWindowSpan } from "../gallery/MediaGrid";
-import { mediaTitle } from "../gallery/mediaLabels";
+import { useMediaPreview } from "../gallery/MediaPreview";
 import { MorePages } from "../gallery/MorePages";
 import { galleryKey } from "../gallery/queries";
 import { PickerGrid, PickerHeader, PickerTile } from "./Picker";
@@ -134,17 +133,11 @@ export function GalleryChoices({
       restoreScroll.current = false;
     }
   }, [viewport, items.length, pitch, browser.scroll]);
-  const preview = useImagePreview();
+  const preview = useMediaPreview();
   const layered = deleteId !== null || preview.opened;
   useEffect(() => onLayer?.(layered), [layered, onLayer]);
   const name = (item: MediaItem, index: number) =>
     item.uploaded ? `Upload ${index + 1}` : item.prompt || "Result";
-  const image = (item: MediaItem, index: number) => ({
-    src: item.url,
-    thumbnailUrl: item.thumbnailUrl,
-    alt: name(item, index),
-    title: item.uploaded ? name(item, index) : mediaTitle(item),
-  });
   const morePages = (
     <MorePages
       listing={listing}
@@ -223,8 +216,8 @@ export function GalleryChoices({
                   preview={{
                     // A result's prompt names its tile already.
                     label: item.uploaded ? `Preview ${title}` : "Preview",
-                    image: image(item, index),
-                    open: () => preview.open(items.map(image), index),
+                    image: { src: item.url, alt: title },
+                    open: () => preview.open(items, index),
                   }}
                   action={
                     item.uploaded && (

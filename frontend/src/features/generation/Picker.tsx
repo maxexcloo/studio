@@ -44,7 +44,6 @@ import { useFlash } from "../../ui/useFlash";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import { FilterButton } from "../gallery/GalleryFilters";
-import type { PreviewImage } from "../gallery/ImagePreview";
 import { escapePanel, fittedPopup } from "./chip";
 
 import classes from "./Picker.module.css";
@@ -415,7 +414,7 @@ export function PickerTile({
   /** A corner control such as a LoRA's rating or Delete. */
   action?: ReactNode;
   drag?: [type: string, data: string];
-  preview?: { label: string; open: () => void; image?: PreviewImage };
+  preview?: { label: string; open: () => void; image?: { src: string; alt: string } };
   row?: boolean;
 }) {
   // Mantine omits target IDs withRoles=false; outside presses still need the preview's target.
@@ -424,6 +423,7 @@ export function PickerTile({
   const peekable = !useTouch() && Boolean(preview?.image);
   const [peek, setPeek] = useState(false);
   const peekTimer = useRef(0);
+  const openedAt = useRef("");
   const hover = (on: boolean) => {
     window.clearTimeout(peekTimer.current);
     if (on) peekTimer.current = window.setTimeout(() => setPeek(true), 400);
@@ -522,9 +522,15 @@ export function PickerTile({
                     aria-label={preview.label}
                     // Expanded, a press on it opens the preview rather than only closing the image.
                     aria-expanded={peekable ? peek : undefined}
-                    onMouseEnter={() => peekable && hover(true)}
+                    // The pointer still resting where it opened the preview does not peek as it closes.
+                    onMouseEnter={(event) =>
+                      peekable &&
+                      `${event.clientX},${event.clientY}` !== openedAt.current &&
+                      hover(true)
+                    }
                     onMouseLeave={() => hover(false)}
-                    onClick={() => {
+                    onClick={(event) => {
+                      openedAt.current = `${event.clientX},${event.clientY}`;
                       hover(false);
                       preview.open();
                     }}

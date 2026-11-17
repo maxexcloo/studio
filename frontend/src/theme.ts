@@ -29,6 +29,7 @@ import {
   Tooltip,
   alpha,
   createTheme,
+  getDefaultZIndex,
   rem,
 } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
@@ -434,7 +435,8 @@ export function studioTheme({
       Table: Table.extend({ classNames: touch ? { th: classes.touchHeader } : {} }),
       // A tapped tooltip lingers on touch, so touch screens show none unless a call enables its own.
       Tooltip: Tooltip.extend({
-        defaultProps: { transitionProps, disabled: touch },
+        // Above every layer, the bare viewer over dialogs included.
+        defaultProps: { transitionProps, disabled: touch, zIndex: getDefaultZIndex("max") },
         styles: {
           tooltip: {
             ...glass,
