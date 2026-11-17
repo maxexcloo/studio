@@ -78,14 +78,14 @@ test("The viewer loads the next page as it nears the last loaded result and coun
     });
   });
   const nextPage = page.waitForResponse((response) => response.url().includes("cursor=next"));
-  await page.goto("/images?item=browse-59");
+  await page.goto("/images/browse-59");
   const viewer = page.getByRole("dialog");
   await expect(viewer.getByText("60 / 61", { exact: true })).toBeVisible();
   // Navigation stops at the last loaded result, so the step waits for the page it loaded to show.
   await nextPage;
   await expect(async () => {
     await page.keyboard.press("ArrowRight");
-    await expect(page).toHaveURL(/item=browse-60/, { timeout: 500 });
+    await expect(page).toHaveURL(/\/images\/browse-60/, { timeout: 500 });
   }).toPass();
   await expect(viewer.getByText("61 / 61", { exact: true })).toBeVisible();
 });
@@ -186,6 +186,7 @@ test("Removing the Set filter clears selected items while keeping selection mode
     })),
   );
   await page.goto("/images?set=set-a");
+  await expect(page).toHaveURL(/\/images$/);
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toBeVisible();
@@ -204,6 +205,36 @@ test("Removing the Set filter clears selected items while keeping selection mode
   ).toBeVisible();
   await expect(status).toHaveText("0 Selected");
   await expect(select).toHaveAttribute("aria-pressed", "true");
+});
+
+test("An MCP result link shows its turn, then the whole chat, then every result", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(
+    ...results(3).map((item, index) => ({
+      ...item,
+      ...(index < 2
+        ? { chat: { conversationId: "chat-a", turnId: index ? "turn-2" : "turn-1" } }
+        : {}),
+    })),
+  );
+  const tile = (index: number) =>
+    page.getByRole("button", { name: `Open image: Browse Result ${index}`, exact: true });
+  await page.goto("/images?chat=chat-a&turn=turn-1");
+  await expect(tile(0)).toBeVisible();
+  await expect(tile(1)).toHaveCount(0);
+  await page.getByRole("button", { name: "This Turn", exact: true }).click();
+  await page
+    .getByRole("radiogroup", { name: "Chat Results", exact: true })
+    .getByText("This Chat", { exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  await expect(tile(1)).toBeVisible();
+  await expect(tile(2)).toHaveCount(0);
+  await page.getByRole("button", { name: "Remove This Chat Filter", exact: true }).click();
+  await expect(page).toHaveURL(/\/images$/);
+  await expect(tile(2)).toBeVisible();
 });
 
 test("Ctrl+scroll zooms the grid around the tile under the pointer and is remembered", async ({
@@ -623,16 +654,23 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
       status: "failed",
     },
   );
+  // The newest result, so the retry has a place below it to keep.
+  state.gallery.unshift({ ...results(1)[0], id: "newest", prompt: "Newest study" });
   await page.route("**/api/queue/failed-job/retry", async (route) => {
-    const retried = job("retried-job", "queued");
+    const retried = job("retried-job", "queued", { galleryAt: stamp });
     state.jobs.push(retried);
-    state.gallery.unshift({
-      ...results(1)[0],
-      id: "retried",
-      jobId: "retried-job",
-      prompt: "Failed study",
-      status: "pending",
-    });
+    // The retry's tile lists where the failed one did, not first.
+    state.gallery.splice(
+      state.gallery.findIndex((item) => item.id === "failed"),
+      0,
+      {
+        ...results(1)[0],
+        id: "retried",
+        jobId: "retried-job",
+        prompt: "Failed study",
+        status: "pending",
+      },
+    );
     await route.fulfill({ json: { job: retried } });
   });
   await page.goto("/images");
@@ -646,6 +684,62 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
   await expect(page.locator('[data-media-id="failed"]')).toHaveCount(0);
   await expect(page.locator('[data-media-id="retried"]')).toBeVisible();
   expect(state.gallery.map((item) => item.id)).not.toContain("failed");
+  const tiles = await page
+    .locator("[data-media-id]")
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-id")));
+  expect(tiles.indexOf("retried")).toBeGreaterThan(tiles.indexOf("newest"));
+});
+
+test("One notification shows at a time: a second dislike replaces the first, with its own Undo", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(2));
+  await page.goto("/images");
+  for (const index of [0, 1]) {
+    await page.getByRole("button", { name: "Select Items", exact: true }).click();
+    await page
+      .getByRole("button", { name: `Select image: Browse Result ${index}`, exact: true })
+      .click();
+    await selectionAction(page, "Dislike").click();
+    await expect.poll(() => state.gallery[index].rating).toBe("disliked");
+  }
+  const banner = page.getByRole("alert").filter({ hasText: "Disliked and hidden" });
+  await expect(banner).toHaveCount(1);
+  await banner.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(() => state.gallery[1].rating).toBeUndefined();
+  expect(state.gallery[0].rating).toBe("disliked");
+  await expect(banner).toHaveCount(0);
+});
+
+test("New results wait behind a pill while the gallery is scrolled, keeping the tiles in view", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(60));
+  await page.goto("/images");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("[data-gallery-view]")
+    .evaluate((host) =>
+      window.scrollTo(0, host.getBoundingClientRect().top + window.scrollY + 1500),
+    );
+  const scrolled = await page.evaluate(() => window.scrollY);
+  state.gallery.unshift({ ...results(1)[0], id: "fresh", prompt: "Fresh Result" });
+  // Returning to the tab reads the newest results.
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event("visibilitychange", { bubbles: true })),
+  );
+  const pill = page.getByRole("button", { name: "1 New Result", exact: true });
+  await expect(pill).toBeVisible();
+  const fresh = page.getByRole("button", { name: "Open image: Fresh Result", exact: true });
+  await expect(fresh).toHaveCount(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+  await pill.click();
+  await expect(fresh).toBeVisible();
+  await expect(pill).toBeHidden();
 });
 
 test("Selection extends with Shift, picks in-progress or failed work and acts from keys and menus", async ({
@@ -1285,10 +1379,10 @@ test("The open item is in the URL: Back closes the viewer and a link opens it", 
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await expect(page).toHaveURL(/\/images\?item=41$/);
+  await expect(page).toHaveURL(/\/images\/41$/);
   await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
   await page.keyboard.press("ArrowRight");
-  await expect(page).toHaveURL(/\/images\?item=42$/);
+  await expect(page).toHaveURL(/\/images\/42$/);
   await page.goBack();
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/images$/);
@@ -1296,17 +1390,18 @@ test("The open item is in the URL: Back closes the viewer and a link opens it", 
     page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
   ).toBeFocused();
   await page.goForward();
-  await expect(page).toHaveURL(/item=42$/);
+  await expect(page).toHaveURL(/\/images\/42$/);
   await expect(viewer).toBeVisible();
-  await page.goto("/images?item=43");
+  await page.goto("/images/43");
   await expect(viewer.getByRole("img", { name: "Unlisted Result", exact: true })).toBeVisible();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/images$/);
+  // Links shared before items had their own paths still open them, at the new path.
   await page.goto("/images?item=browse-0");
   await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/item=41$/);
-  await page.goto("/images?item=999999999");
+  await expect(page).toHaveURL(/\/images\/41$/);
+  await page.goto("/images/999999999");
   await expect(page.getByText("That item is no longer in the gallery.")).toBeVisible();
   await expect(viewer).toBeHidden();
 });
@@ -1514,7 +1609,7 @@ test("Incoming results keep the viewer on its current item and return focus to t
   });
   await expect.poll(() => state.galleryRequests.length).toBeGreaterThan(previousReads);
   await expect(viewer.getByRole("img", { name: "Browse Result 10", exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/item=browse-10$/);
+  await expect(page).toHaveURL(/\/images\/browse-10$/);
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await expect(tile).toBeFocused();
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -1550,7 +1645,7 @@ test("Returning after more than a page of incoming results leaves no gap before 
       },
     });
   });
-  await page.goto("/images?item=browse-0");
+  await page.goto("/images/browse-0");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
   await expect.poll(() => cursors.length).toBe(2);
@@ -1579,7 +1674,7 @@ test("Returning after more than a page of incoming results leaves no gap before 
   await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
   expect(cursors.slice(previousReads)).toEqual(["", "60"]);
   await page.keyboard.press("ArrowLeft");
-  await expect(page).toHaveURL(/item=browse-0$/);
+  await expect(page).toHaveURL(/\/images\/browse-0$/);
   await page.keyboard.press("ArrowRight");
   await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
@@ -1622,14 +1717,14 @@ test("Viewer navigation keeps decoded media visible while the next image loads a
       body: decodeURIComponent(image.slice(image.indexOf(",") + 1)),
     });
   });
-  await page.goto("/images?item=browse-0");
+  await page.goto("/images/browse-0");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const previous = viewer.getByRole("img", { name: "Browse Result 0", exact: true });
   await expect(previous).toBeVisible();
   await previous.evaluate((node: HTMLImageElement) => node.decode());
   try {
     await page.keyboard.press("ArrowRight");
-    await expect(page).toHaveURL(/item=browse-1$/);
+    await expect(page).toHaveURL(/\/images\/browse-1$/);
     await expect.poll(() => requested).toBe(true);
     await expect(previous).toBeVisible();
     await expect(previous).toHaveAttribute("src", image);
@@ -1641,11 +1736,11 @@ test("Viewer navigation keeps decoded media visible while the next image loads a
     nextUrl,
   );
   await page.keyboard.press("ArrowRight");
-  await expect(page).toHaveURL(/item=third$/);
+  await expect(page).toHaveURL(/\/images\/third$/);
   await page.keyboard.press("ArrowRight");
-  await expect(page).toHaveURL(/item=third$/);
+  await expect(page).toHaveURL(/\/images\/third$/);
   await page.keyboard.press("ArrowLeft");
-  await expect(page).toHaveURL(/item=browse-1$/);
+  await expect(page).toHaveURL(/\/images\/browse-1$/);
 });
 
 test("A pending output becomes saved media without losing the viewer or its return focus", async ({
@@ -1671,7 +1766,7 @@ test("A pending output becomes saved media without losing the viewer or its retu
     createdAt: stamp,
     updatedAt: stamp,
   });
-  await page.goto("/images?item=working-0");
+  await page.goto("/images/working-0");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer).toBeVisible();
   state.gallery[0] = {
@@ -1683,7 +1778,7 @@ test("A pending output becomes saved media without losing the viewer or its retu
   };
   state.jobs[0].status = "completed";
   await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/item=501$/);
+  await expect(page).toHaveURL(/\/images\/501$/);
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
@@ -1701,7 +1796,7 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
     test.skip(navigation === "swipe" && !phone, "Phone touch navigation");
     const state = await fixtures(page);
     state.gallery.push(...results(3));
-    await page.goto("/images?item=browse-1");
+    await page.goto("/images/browse-1");
     const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
     await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
     async function move(direction: "next" | "previous", atBound = false) {
@@ -1757,10 +1852,10 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
     ).toHaveCount(0);
     await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
     await move("next");
-    await expect(page).toHaveURL(/item=browse-2$/);
+    await expect(page).toHaveURL(/\/images\/browse-2$/);
     await expect(viewer.getByRole("img", { name: "Browse Result 2", exact: true })).toBeVisible();
     await move("previous");
-    await expect(page).toHaveURL(/item=browse-1$/);
+    await expect(page).toHaveURL(/\/images\/browse-1$/);
     await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Undo", exact: true }).click();
     await expect.poll(() => state.gallery[1].rating).toBeUndefined();
@@ -1768,18 +1863,18 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
       page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
     ).toHaveCount(1);
     await move("previous");
-    await expect(page).toHaveURL(/item=browse-0$/);
+    await expect(page).toHaveURL(/\/images\/browse-0$/);
     await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
     await move("previous", true);
-    await expect(page).toHaveURL(/item=browse-0$/);
+    await expect(page).toHaveURL(/\/images\/browse-0$/);
     await move("next");
-    await expect(page).toHaveURL(/item=browse-1$/);
+    await expect(page).toHaveURL(/\/images\/browse-1$/);
     await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
     await move("next");
-    await expect(page).toHaveURL(/item=browse-2$/);
+    await expect(page).toHaveURL(/\/images\/browse-2$/);
     await expect(viewer.getByRole("img", { name: "Browse Result 2", exact: true })).toBeVisible();
     await move("next", true);
-    await expect(page).toHaveURL(/item=browse-2$/);
+    await expect(page).toHaveURL(/\/images\/browse-2$/);
     await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Open image: Browse Result 2", exact: true }),
@@ -1789,7 +1884,7 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
 test("Closing a disliked item focuses its next visible gallery neighbour", async ({ page }) => {
   const state = await fixtures(page);
   state.gallery.push(...results(3));
-  await page.goto("/images?item=browse-1");
+  await page.goto("/images/browse-1");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
   await viewer.getByRole("button", { name: "Dislike", exact: true }).focus();
@@ -1846,7 +1941,7 @@ test("Completing every held pending output refreshes one head page without walki
       },
     });
   });
-  await page.goto("/images?item=working-0");
+  await page.goto("/images/working-0");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Status", exact: true })).toHaveAttribute(
@@ -1856,7 +1951,7 @@ test("Completing every held pending output refreshes one head page without walki
   const previousReads = cursors.length;
   state.jobs[0].status = "completed";
   await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/item=saved-0$/);
+  await expect(page).toHaveURL(/\/images\/saved-0$/);
   expect(cursors.slice(previousReads)).toEqual([""]);
 });
 
@@ -1904,7 +1999,7 @@ test("The final job completing during pagination defers one head refresh until t
       },
     });
   });
-  await page.goto("/images?item=browse-59");
+  await page.goto("/images/browse-59");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Generating");
   await expect.poll(() => paging).toBe(true);

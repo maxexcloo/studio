@@ -533,3 +533,36 @@ test("origin filters narrow queued and running tiles without hiding matching unf
   assert.equal((await read("")).items.length, 3);
   for (const job of [started, waiting, unknown]) queue.save({ ...job, status: "cancelled" });
 });
+
+test("queued work leads the first page, but a retry waits in its original's place", async () => {
+  const ownerId = "retry-place-account";
+  saveAccountPreferences(ownerId, { galleryWork: "queued" });
+  const session = queue.createSession(ownerId);
+  const input = { kind: "image", prompt: "a lantern" };
+  const waiting = queue.enqueue(ownerId, session.id, input, "image");
+  const retry = queue.enqueue(
+    ownerId,
+    session.id,
+    input,
+    "image",
+    undefined,
+    undefined,
+    undefined,
+    {
+      galleryAt: "2026-10-15T00:00:00.000Z",
+    },
+  );
+  setGallery([
+    { ...item(ownerId, "newer"), createdAt: "2026-10-20T00:00:00.000Z" },
+    { ...item(ownerId, "older"), createdAt: "2026-10-10T00:00:00.000Z" },
+  ]);
+  const page = await call(routes["/api/gallery"], {
+    studioAccount: { userId: ownerId, role: "user", authenticated: true, features: {} },
+    query: {},
+  });
+  assert.deepEqual(
+    page.items.map((row) => row.jobId),
+    [waiting.id, "newer", retry.id, "older"],
+  );
+  for (const job of [waiting, retry]) queue.save({ ...job, status: "cancelled" });
+});

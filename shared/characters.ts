@@ -11,6 +11,8 @@ export const maxCardName = 60;
 // Long enough for a detailed character, such as an owner's ~600-character body and face.
 export const maxCardDescription = 1000;
 export const maxCards = 200;
+/** How much backstory or scene notes an MCP chat's context keeps for Studio's prompt writers. */
+export const maxContextNotes = 2000;
 export const cardKinds = {
   characters: { name: "character", prefix: "chr", images: { min: 1, max: maxCharacterImages } },
   outfits: { name: "outfit", prefix: "out", images: { min: 0, max: 1 } },

@@ -31,8 +31,7 @@ function fixture(
   let clock = 0;
   const model: TasteWriter<ReturnType<typeof userContent>> = {
     settings: () => ({}),
-    model: async (_call, _explicit, writer) =>
-      typeof writer === "object" ? writer.picked || "text" : "text",
+    model: async (_call, _explicit, writer) => writer?.cloud || "text",
     chat: async ({ messages, model: used }) => {
       models.push(used);
       const seen = messages.map(({ role, content }) =>
@@ -101,7 +100,7 @@ function fixture(
             edits: options.edits ?? "instruction",
           }
         : null,
-    promptWriter: () => ({ picked: options.picked, uncensored: false }),
+    promptWriter: () => ({ side: "cloud", cloud: options.picked, uncensored: false }),
     fixed: (kind) => options.fixed?.[kind] ?? [],
     now: () => clock,
   });
@@ -544,7 +543,7 @@ test("idle work writes next steps ahead of time, from the image where the model 
     writer: { supportsVision: async () => vision },
     idle: () => true,
     allowed: () => true,
-    text: () => "cloud",
+    text: () => ({ side: "cloud", uncensored: false }),
     items: () => items,
     visible: () => true,
     image: async () => ({ mime: "image/jpeg", data: "AAAA" }),
@@ -576,7 +575,7 @@ test("switched off, prompt ideas and next steps are never written, while asked-f
     writer: { supportsVision: async () => true },
     idle: () => true,
     allowed: () => true,
-    text: () => "cloud",
+    text: () => ({ side: "cloud", uncensored: false }),
     items: () => items,
     visible: () => true,
     image: async () => ({ mime: "image/jpeg", data: "AAAA" }),

@@ -30,7 +30,11 @@ const maxChats = 200;
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
 const text = (value: unknown, field: string, max: number) => {
   if (typeof value !== "string") throw failure(`Set ${field} to text.`, 400);
-  if (value.trim().length > max) throw failure(`Keep ${field} to ${max} characters.`, 400);
+  if (value.trim().length > max)
+    throw failure(
+      `${field} is ${value.trim().length} characters; shorten it to at most ${max}.`,
+      400,
+    );
   return value.trim();
 };
 

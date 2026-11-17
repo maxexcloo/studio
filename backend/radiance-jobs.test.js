@@ -7,7 +7,7 @@ import test from "node:test";
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-radiance-jobs-"));
 process.env.STUDIO_DATA_DIR = scratch;
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
-const { jobs } = await import("./jobs.js");
+const { jobs, setTerminalJob } = await import("./jobs.js");
 const { runRadianceJob, orderedRadianceReferences } = await import("./radiance-jobs.js");
 const { saveImportedWorkflow } = await import("./custom-workflows.js");
 const { makePendingItems } = await import("./gallery/records.js");
@@ -108,6 +108,23 @@ test("an image run records its queue wait, model load, sampling and save for Det
   assert.equal(timing.loadMs + timing.samplingMs, timing.runMs);
   for (const stage of ["setupMs", "saveMs"]) assert.ok(Number.isFinite(timing[stage]), stage);
   assert.equal(timing.downloadMs, undefined, "an image has no separate download");
+});
+
+test("a run ended by a forced Radiance restart keeps its ending when the dropped request fails", async () => {
+  const id = "ended-by-restart";
+  const body = bodyFor(id);
+  pending(id, body);
+  await runRadianceJob(id, body, worker, {
+    store,
+    client: {
+      images: async () => {
+        setTerminalJob(id, { status: "failed", error: "Its worker was restarted while it ran." });
+        throw new Error("socket hang up");
+      },
+    },
+  });
+  assert.equal(jobs.get(id).error, "Its worker was restarted while it ran.");
+  assert.equal(galleryItems({ jobId: id })[0].failure, undefined);
 });
 
 test("a recorded video reconnects by exact ID and is deleted only after durable output publication", async () => {

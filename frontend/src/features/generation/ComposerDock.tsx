@@ -14,28 +14,28 @@ import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./
 import classes from "./ComposerDock.module.css";
 export const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
 /**
- * The gallery's generation composer; it answers `?compose=1` and shared images. The gallery passes
- * what it needs from the URL, so stepping through the viewer doesn't render it.
+ * The gallery's generation composer; it answers `useOpenComposer` and shared images. The gallery
+ * passes what it needs from its history state, so stepping through the viewer doesn't render it.
  */
 export const ComposerDock = memo(function ComposerDock({
   compose,
   shared,
   opening,
-  onDropParam,
+  onDropState,
   onKindChange,
   onCompared,
 }: {
-  /** The `compose` parameter. */
-  compose: string | null;
-  /** The `shared` parameter: an image shared to the installed app. */
+  /** Keeps the composer open (`?compose=1`) until it closes. */
+  compose: boolean;
+  /** An image shared to the installed app. */
   shared: string;
   /** The key of a navigation from `useOpenComposer`, asking the composer to open. */
   opening: string;
-  onDropParam: (name: string) => void;
+  onDropState: (name: "compose" | "shared") => void;
   onKindChange: (kind: MediaKind) => void;
   onCompared: (comparisonId: string) => void;
 }) {
-  const [opened, { open, close }] = useDisclosure(compose === "1");
+  const [opened, { open, close }] = useDisclosure(compose);
   // The compact bar stays under the expanded panel until it has slid in, so nothing blinks and
   // keystrokes typed meanwhile land in the shared draft.
   const [expanded, setExpanded] = useState(opened);
@@ -112,7 +112,7 @@ export const ComposerDock = memo(function ComposerDock({
   const dockKeyboard = useKeyboard(typingInDock);
   const keyboardInset = dockKeyboard.inset;
   useEffect(() => {
-    if (compose === "1") open();
+    if (compose) open();
   }, [compose, open]);
   // An action staging a draft (`useOpenComposer`) opens the composer with its prompt focused, even
   // when it is already open; phones bring up the sheet and leave the keyboard down.
@@ -134,7 +134,7 @@ export const ComposerDock = memo(function ComposerDock({
     void api<{ asset: ReferenceAsset }>(`/api/reference-assets/${encodeURIComponent(shared)}`)
       .then(({ asset }) => placement.place(asset))
       .catch(failure);
-    onDropParam("shared");
+    onDropState("shared");
   }, [shared]);
   function collapse(restoreFocus = true) {
     returningFocus.current = restoreFocus;
@@ -142,7 +142,7 @@ export const ComposerDock = memo(function ComposerDock({
     setTappedField(false);
     close();
     setExpanded(false);
-    if (compose !== null) onDropParam("compose");
+    if (compose) onDropState("compose");
   }
   const submitted = () => collapse();
   // A layer over the composer (a dialog, popup or picker) is not outside it, unless it is the

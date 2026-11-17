@@ -1,5 +1,6 @@
 import {
   keepPreviousData,
+  queryOptions,
   useInfiniteQuery,
   useMutation,
   useQueryClient,
@@ -9,7 +10,7 @@ import { useRef } from "react";
 import { guidingRoles, slotCapacity } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
-import { titleCase } from "../../ui/titleCase";
+import { titleCase } from "../../../../shared/titles";
 import type { GalleryFilterValues } from "../gallery/GalleryFilters";
 import { galleryKey, galleryQuery } from "../gallery/queries";
 import { useGeneration } from "./GenerationProvider";
@@ -28,6 +29,17 @@ export const galleryReferenceType = "application/x-studio-gallery-item";
 /** What an upload can be (backend/references.js): an image, or a video placed by its first frame. */
 export const uploadTypes = ["image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm"];
 export const referenceKey = (asset: ReferenceAsset) => `${asset.slot}:${asset.id}`;
+
+export const referenceAssetQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["reference-assets", id],
+    queryFn: () =>
+      api<{ asset: ReferenceAsset }>(`/api/reference-assets/${encodeURIComponent(id)}`).then(
+        ({ asset }) => asset,
+      ),
+    retry: false,
+    staleTime: Infinity,
+  });
 export function referenceLabel(asset: ReferenceAsset, index: number, profile?: SlotLayout) {
   const role = profile?.mediaInputs?.find((input) => input.id === asset.slot)?.label;
   return `Reference ${index + 1}${role ? ` · ${role}` : ""}`;

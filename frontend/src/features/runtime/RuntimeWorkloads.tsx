@@ -3,8 +3,10 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { useState } from "react";
 
 import type {
+  RuntimeJob,
   RuntimeOperation,
   RuntimePreview,
+  RuntimeQueueCancel,
   RuntimeStatus,
   WorkloadPhase,
 } from "../../../../shared/runtime";
@@ -16,6 +18,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
+import { statusLabels } from "../generation/Queue";
 import { BenchmarkDialog, benchmarksQuery } from "./Benchmarks";
 import { LogDialog, LogText, PodLog, logTime, useRequester } from "./RuntimeLogs";
 
@@ -106,6 +109,10 @@ function changePhase(
 }
 
 const shortDateTime = dateFormat({ dateStyle: "short", timeStyle: "short" });
+
+/** An accepted job as its workload's row lists it: where it stands, since when, and its prompt. */
+const jobLine = (job: RuntimeJob) =>
+  `${job.cancelling ? "Cancelling" : statusLabels[job.status]} since ${shortDateTime.format(new Date(job.since))}: ${job.title}`;
 
 /** A change's steps as timestamped lines, then how it ended once it has. */
 function logText(entry: RuntimeOperation) {
@@ -239,6 +246,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   const [preview, setPreview] = useState<RuntimePreview | null>(null);
   const [restarting, setRestarting] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState("");
+  const [queueId, setQueueId] = useState("");
   const [logId, setLogId] = useState("");
   const [workloadLogId, setWorkloadLogId] = useState("");
   const [benchmarkId, setBenchmarkId] = useState("");
@@ -265,11 +273,22 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
       void refresh();
     },
   });
+  // Radiance restarts without waiting for its accepted work, which ends.
   const restart = useMutation({
-    mutationFn: (workload: string) => post<RuntimeOperation>("/api/runtime/restart", { workload }),
+    mutationFn: ({ id, radiance }: { id: string; radiance?: true }) =>
+      post<RuntimeOperation>("/api/runtime/restart", { workload: id, force: radiance === true }),
     meta: { inlineError: true },
     onSuccess: () => {
       setRestarting(null);
+      void refresh();
+    },
+  });
+  const cancelQueue = useMutation({
+    mutationFn: (id: string) =>
+      post<RuntimeQueueCancel>(`/api/runtime/workloads/${encodeURIComponent(id)}/cancel-queue`, {}),
+    meta: { inlineError: true },
+    onSuccess: () => {
+      setQueueId("");
       void refresh();
     },
   });
@@ -285,6 +304,12 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   if (status.error) return <Alert color="red">{status.error.message}</Alert>;
   const { workloads, operation, history } = status.data;
   const label = (id: string) => workloads.find((item) => item.id === id)?.label ?? id;
+  const restartTarget = workloads.find((item) => item.id === restarting);
+  // A change waiting for Radiance's work to stop it can stop it now instead.
+  const stopsNow = (item: RuntimeStatus["workloads"][number]) =>
+    Boolean(
+      item.radiance && operation?.stop.includes(item.id) && !operation.start.includes(item.id),
+    );
   const names = workloadNames(workloads);
   const running = workloads.filter((item) => holding(item.phase)).map((item) => item.id);
   const chosen = selection ?? running;
@@ -342,22 +367,29 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
                 item.reason ||
                 // A stopped workload isn't failing, whatever its shared endpoint says.
                 (item.phase !== "parked" && reasons[item.id]) ||
-                (item.acceptedOperations > 0 &&
+                (!item.jobs &&
+                  item.acceptedOperations > 0 &&
                   `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`);
+              // What it runs, which a change stopping it waits for, then what waits for it.
+              const work = [
+                ...(item.jobs ?? []).map(jobLine),
+                ...(item.queued ? [`${item.queued} queued`] : []),
+              ];
               return (
                 <>
                   <Text size="sm" fw={500}>
                     {item.label}
                   </Text>
-                  {note && (
+                  {[note, ...work].filter(Boolean).map((line, index) => (
                     <Text
+                      key={index}
                       size="xs"
-                      c={short ? "red" : "dimmed"}
+                      c={short && index === 0 ? "red" : "dimmed"}
                       style={{ overflowWrap: "anywhere" }}
                     >
-                      {note}
+                      {line}
                     </Text>
-                  )}
+                  ))}
                 </>
               );
             },
@@ -401,10 +433,22 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
             ) : (
               <Menu.Item
                 leftSection={<icons.retry size={16} />}
-                disabled={Boolean(operation) || item.phase !== "running"}
+                disabled={
+                  item.phase !== "running" ||
+                  (Boolean(operation) && !(item.radiance && operation?.stop.includes(item.id)))
+                }
                 onClick={() => setRestarting(item.id)}
               >
-                Restart
+                {stopsNow(item) ? "Stop Now" : "Restart"}
+              </Menu.Item>
+            )}
+            {item.radiance && (
+              <Menu.Item
+                leftSection={<icons.stop size={16} />}
+                disabled={!item.jobs && !item.queued}
+                onClick={() => setQueueId(item.id)}
+              >
+                Cancel Queue
               </Menu.Item>
             )}
             {item.text && benchmarks?.configured && (
@@ -509,18 +553,35 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
         {preview && <PlacementChanges preview={preview} label={label} />}
       </ConfirmDialog>
       <ConfirmDialog
-        opened={Boolean(restarting)}
-        title={`Restart ${restarting ? label(restarting) : ""}`}
-        action="Restart"
+        opened={Boolean(restartTarget)}
+        title={`${restartTarget && stopsNow(restartTarget) ? "Stop Now" : "Restart"} ${restartTarget?.label ?? ""}`}
+        action={restartTarget && stopsNow(restartTarget) ? "Stop Now" : "Restart"}
         pending={restart.isPending}
         error={restart.error?.message}
-        onConfirm={() => restart.mutate(restarting!)}
+        onConfirm={() => restart.mutate(restartTarget!)}
         onClose={() => {
           setRestarting(null);
           restart.reset();
         }}
       >
-        Accepted work finishes first, then it restarts with the same model and GPUs.
+        {!restartTarget?.radiance
+          ? "Accepted work finishes first, then it restarts with the same model and GPUs."
+          : `${stopsNow(restartTarget) ? "The change stops it without waiting for its work" : "It stops at once and starts again with the same model and GPUs"}. Its running work ends and is marked failed, so it can be retried; work already being cancelled is marked cancelled.`}
+      </ConfirmDialog>
+      <ConfirmDialog
+        opened={Boolean(queueId)}
+        title="Cancel Queue"
+        action="Cancel Queue"
+        pending={cancelQueue.isPending}
+        error={cancelQueue.error?.message}
+        onConfirm={() => cancelQueue.mutate(queueId)}
+        onClose={() => {
+          setQueueId("");
+          cancelQueue.reset();
+        }}
+      >
+        Every job waiting for {label(queueId)} is cancelled. Running work is asked to stop: it may
+        still finish and save, or ends when {label(queueId)} restarts.
       </ConfirmDialog>
       <ConfirmDialog
         opened={Boolean(cancelling)}

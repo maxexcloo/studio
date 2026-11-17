@@ -278,7 +278,7 @@ test("An image shared to the installed app opens the composer with it as a refer
   await fixtures(page);
   await page.goto("/images?compose=1&shared=shared-asset");
   await expect(page.getByRole("img", { name: "Reference 1", exact: true }).first()).toBeVisible();
-  await expect(page).toHaveURL(/\/images\?compose=1$/);
+  await expect(page).toHaveURL(/\/images$/);
 });
 
 test("On touch screens, Paste reads a copied photo from the clipboard into the next slot", async ({

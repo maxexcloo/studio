@@ -1,6 +1,6 @@
 import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
-import type { TextSide } from "./taste.ts";
+import type { PromptWriter } from "./taste.ts";
 
 export interface SuggestedPromptItem extends IdleItem {
   prompt?: string;
@@ -12,14 +12,14 @@ export interface SuggestedPromptItem extends IdleItem {
 }
 /** The assistant gateway (assistant.js). */
 interface PromptDescriber {
-  supportsVision(text?: TextSide): Promise<boolean>;
+  supportsVision(writer?: PromptWriter): Promise<boolean>;
   describe(request: {
     images: ModelImage[];
     hint: string;
     title?: string;
     explicit?: boolean;
     signal?: AbortSignal;
-    side?: TextSide;
+    writer?: PromptWriter;
   }): Promise<{ available: boolean; reason?: string; prompt?: string }>;
 }
 
@@ -36,8 +36,8 @@ export function createPromptSuggester(options: {
   writer: PromptDescriber | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  /** Where the owner runs text (account-preferences.js `textSide`). */
-  text(ownerId: string): TextSide;
+  /** The owner's text writer (account-policy.js `promptWriter`). */
+  text(ownerId: string): PromptWriter;
   items(since?: number): Iterable<SuggestedPromptItem>;
   changes?(): number;
   visible(item: SuggestedPromptItem): boolean;
@@ -58,17 +58,17 @@ export function createPromptSuggester(options: {
     continuous: true,
     enabled: () => Boolean(writer) && options.enabled(),
     async unavailable() {
-      vision.local = await writer!.supportsVision("local");
+      vision.local = await writer!.supportsVision({ side: "local", uncensored: false });
       return "";
     },
     wanted: (item) =>
       (item.type === "image" || item.type === "video") &&
       !item.prompt &&
       !item.suggestedPrompt &&
-      (vision[options.text(item.ownerId || "")] || Boolean(item.caption?.text)),
+      (vision[options.text(item.ownerId || "").side] || Boolean(item.caption?.text)),
     async run(item, signal) {
       const text = options.text(item.ownerId || "");
-      const image = vision[text] ? await options.image(item) : null;
+      const image = vision[text.side] ? await options.image(item) : null;
       if (signal.aborted) return;
       const reply = await writer!.describe({
         images: image ? [image] : [],
@@ -76,7 +76,7 @@ export function createPromptSuggester(options: {
         title: item.source?.title || "",
         explicit: options.explicit?.(item.ownerId || "") ?? false,
         signal,
-        side: text,
+        writer: text,
       });
       if (signal.aborted) return;
       if (!reply.available || !reply.prompt) throw new Error(reply.reason || "no prompt written");

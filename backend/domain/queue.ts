@@ -829,14 +829,35 @@ export class GenerationQueue {
     return abandoned;
   }
 
+  /**
+   * Ends accepted work its worker can no longer be running, as after Settings › Workers' Restart:
+   * cancelled where cancellation was asked, otherwise failed so it can be retried.
+   */
+  async end(ownerId: string, id: string, reason: string): Promise<OwnedJob | undefined> {
+    const job = this.store.job(ownerId, id);
+    if (!job || terminalStatuses.has(job.status)) return job;
+    this.progressSeen.delete(id);
+    const ended = this.store.save({
+      ...job,
+      status: job.cancelRequested ? "cancelled" : "failed",
+      progress: undefined,
+      reason: job.cancelRequested ? "Cancelled." : reason,
+    });
+    await this.adapter.settled?.(ended);
+    return ended;
+  }
+
   retry(ownerId: string, id: string): OwnedJob | undefined {
     const job = this.store.job(ownerId, id);
     if (!job || job.status !== "failed") return;
     return this.requeue(job);
   }
 
-  /** Queues the job's input again as a new job, in the job's set. */
+  /** Queues the job's input again as a new job, in the job's set and its place in the gallery. */
   requeue(job: OwnedJob): OwnedJob {
+    const listed = job.items.find((item) => typeof item.createdAt === "string")?.createdAt as
+      | string
+      | undefined;
     return this.store.enqueue(
       job.ownerId,
       job.sessionId,
@@ -845,7 +866,11 @@ export class GenerationQueue {
       job.parentJobId,
       job.resource,
       undefined,
-      { parentItemId: job.parentItemId, queueSet: job.queueSet },
+      {
+        parentItemId: job.parentItemId,
+        queueSet: job.queueSet,
+        galleryAt: job.galleryAt || listed || job.createdAt,
+      },
     );
   }
 }

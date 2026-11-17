@@ -19,6 +19,7 @@ import { adminRefusal } from "../route-access.js";
 import { galleryStats } from "../stats.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
 import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
+import { compareGalleryItems } from "./order.js";
 import { makePendingItems } from "./records.js";
 import {
   cleanupGalleryState,
@@ -204,6 +205,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const words = search && !looksLike ? searchWords(one(query.q)) : [];
     // `since` (an ISO date) keeps items made from then on; work still generating always shows.
     const since = query.since ? Date.parse(String(query.since)) : 0;
+    // `before` (an ISO date) keeps items made by then.
+    const before = query.before ? Date.parse(String(query.before)) : NaN;
     // `similar` (an item id, Find Similar) ranks by likeness to that image, keeping those at least
     // as alike as `strictness` (close, similar or loose); none until it is read.
     const source = query.similar ? galleryItem(String(query.similar)) : null;
@@ -216,9 +219,15 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       : null;
     // `comparisons` keeps results that are in one of the account's comparisons.
     const inComparison = query.comparisons === "1" ? compared(account?.userId || "") : null;
+    // `chat` keeps one MCP conversation's results and `turn` one turn of it (an MCP result link).
+    const chat = one(query.chat);
+    const turn = chat && one(query.turn);
+    const fromChat = (item) =>
+      !chat || (item.chat?.conversationId === chat && (!turn || item.chat.turnId === turn));
     // Unfinished work shows only as the account chooses (Settings › Preferences › Gallery): none,
-    // work in progress, or queued work too; unsaved, none.
-    const work = accountPreferences(account?.userId || "").galleryWork || "none";
+    // work in progress, or queued work too; unsaved, none. A chat's results show all of it, as
+    // its links are opened to watch them.
+    const work = chat ? "queued" : accountPreferences(account?.userId || "").galleryWork || "none";
     const owned = ownedQuery(account);
     const page = owned
       ? pageGallery({
@@ -232,9 +241,12 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
             ...owned,
             // `set` keeps one MCP result set's results.
             ...(query.set && { setId: String(query.set) }),
+            ...(chat && { conversationIds: [chat] }),
+            ...(turn && { turnId: turn }),
             ...(["liked", "disliked"].includes(query.rating) && { rating: query.rating }),
             ...(work === "none" && { notStatus: "pending" }),
             ...(Number.isFinite(since) && since && { since }),
+            ...(Number.isFinite(before) && { before }),
             ...(words.length && { contains: words }),
           },
           // The account and every parameter but the page's own name the filter's count.
@@ -264,6 +276,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     };
     // Work the queue holds has no tiles until it starts; with queued work shown, the first page
     // leads with them. Dream's stays in its own pool; an upscale has no tile.
+    const retried = new Set();
     const queued =
       work !== "queued" || cursor || similarTo || query.uploads === "1"
         ? []
@@ -277,26 +290,37 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
                 !galleryJobItems(job.id).length,
             )
             .reverse()
-            .flatMap((job) =>
-              makePendingItems(job.id, {
+            .flatMap((job) => {
+              if (job.galleryAt) retried.add(job.id);
+              return makePendingItems(job.id, {
                 ...job.input,
                 ownerId: account?.userId || "",
-                createdAt: job.createdAt,
-              }),
-            )
+                createdAt: job.galleryAt || job.createdAt,
+              });
+            })
             .filter(
               (item) =>
                 (!type || item.type === type) &&
                 recordBelongsToAccount(item, account) &&
                 (!query.set || item.resultSet?.id === query.set) &&
+                fromChat(item) &&
                 (!inComparison || inComparison(item)) &&
                 (!search || search(item)),
             );
+    // A retry keeps its failed original's place (domain/queue.ts): it joins this page in order,
+    // or none until it starts when its place is on a later page.
+    const leading = queued.filter((item) => !retried.has(item.jobId));
+    const items = [...page.items];
+    for (const item of queued.filter((item) => retried.has(item.jobId))) {
+      const at = items.findIndex((listed) => compareGalleryItems(item, listed) < 0);
+      if (at >= 0) items.splice(at, 0, item);
+      else if (!page.hasMore) items.push(item);
+    }
     return {
       status: 200,
       payload: {
         ...page,
-        items: resultNumbers.numbered([...queued, ...page.items]).map(listed),
+        items: resultNumbers.numbered([...leading, ...items]).map(listed),
       },
     };
   });
@@ -325,9 +349,11 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     else if (found && !saved.length) {
       const job = store.job(ownerId, found.jobId);
       if (job && !job.cleared && job.operation !== "upscale" && !terminalStatuses.has(job.status))
-        item = makePendingItems(job.id, { ...job.input, ownerId, createdAt: job.createdAt })[
-          found.index
-        ];
+        item = makePendingItems(job.id, {
+          ...job.input,
+          ownerId,
+          createdAt: job.galleryAt || job.createdAt,
+        })[found.index];
     }
     return item && recordBelongsToAccount(item, account)
       ? { status: 200, payload: { item: resultNumbers.numbered([item])[0] } }

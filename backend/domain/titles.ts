@@ -1,5 +1,5 @@
 import { type IdleItem, createIdleWork } from "./idle-work.ts";
-import type { TextSide } from "./taste.ts";
+import type { PromptWriter } from "./taste.ts";
 
 export interface TitleItem extends IdleItem {
   prompt?: string;
@@ -11,7 +11,7 @@ interface TitleWriter {
   title(request: {
     prompt: string;
     signal?: AbortSignal;
-    side?: TextSide;
+    writer?: PromptWriter;
   }): Promise<{ title: string }>;
 }
 
@@ -28,8 +28,8 @@ export function createTitler(options: {
   writer: TitleWriter | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  /** Where the owner runs text (account-preferences.js `textSide`). */
-  text(ownerId: string): TextSide;
+  /** The owner's text writer (account-policy.js `promptWriter`). */
+  text(ownerId: string): PromptWriter;
   items(since?: number): Iterable<TitleItem>;
   /** The title the item's owner already has for the same prompt, if any. */
   titled(item: TitleItem): string | undefined;
@@ -54,7 +54,7 @@ export function createTitler(options: {
       const reply = await writer!.title({
         prompt: item.prompt!,
         signal,
-        side: options.text(item.ownerId || ""),
+        writer: options.text(item.ownerId || ""),
       });
       if (!signal.aborted) options.save(item, reply.title);
     },

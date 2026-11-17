@@ -449,7 +449,8 @@ export function createGenerationSubmission({
       body.seedRandom = true;
     }
     body.clientJobId = id;
-    body.createdAt = new Date().toISOString();
+    // A retry keeps the gallery place of the run it repeats (domain/queue.ts).
+    body.createdAt = job.galleryAt || new Date().toISOString();
     body.startedAt = Date.now();
     const items = makePendingItems(id, body);
     markWorkflowUsed(body.profileId || body.model || body.workflow || "");

@@ -12,7 +12,7 @@ import {
 import { shortTitle } from "../../shared/titles.ts";
 import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import { type ModelImage, userContent } from "./model-content.ts";
-import type { PromptWriter, Taste, TasteWriter, TextSide } from "./taste.ts";
+import type { PromptWriter, Taste, TasteWriter } from "./taste.ts";
 import {
   americanEnglish,
   applyChange,
@@ -247,7 +247,6 @@ export function createSuggestions({
   nextSteps,
   target = async () => null,
   promptWriter = () => undefined,
-  textSide = () => "cloud",
   fixed = () => [],
   now = Date.now,
 }: {
@@ -269,10 +268,8 @@ export function createSuggestions({
   nextSteps: () => boolean;
   /** The model a finished result was made with, for the owner, or null where it isn't available. */
   target?: (ownerId: string, item: SuggestionItem) => Promise<WritingTarget | null>;
-  /** The owner's prompt writer (account-policy.js `promptWriter`), which Ask for a Change uses. */
+  /** The owner's text writer (account-policy.js `promptWriter`). */
   promptWriter?: (ownerId: string) => PromptWriter | undefined;
-  /** Where the owner runs text (account-preferences.js `textSide`), which the rest use. */
-  textSide?: (ownerId: string) => TextSide;
   /** The labels of a Prompt Styles kind's fixed options, which suggestions never repeat. */
   fixed?: (kind: (typeof fixedKinds)[keyof typeof fixedKinds]) => string[];
   now?: () => number;
@@ -379,7 +376,7 @@ export function createSuggestions({
     try {
       ({ text } = await model.chat({
         call: "suggestions",
-        model: await model.model("suggestions", false, textSide(ownerId)),
+        model: await model.model("suggestions", false, promptWriter(ownerId)),
         messages: [
           { role: "system", content: system },
           {
@@ -785,11 +782,11 @@ export function createNextStepWork(options: {
   /** The Settings › Maintenance switch (STUDIO_NEXT_STEPS). */
   enabled(): boolean;
   suggestions: Pick<SuggestionService, "prepare">;
-  writer: { supportsVision(text: TextSide): Promise<boolean> } | null;
+  writer: { supportsVision(writer: PromptWriter): Promise<boolean> } | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  /** Where the owner runs text (account-preferences.js `textSide`). */
-  text(ownerId: string): TextSide;
+  /** The owner's text writer (account-policy.js `promptWriter`). */
+  text(ownerId: string): PromptWriter;
   items(since?: number): Iterable<SuggestionItem>;
   changes?(): number;
   visible(item: SuggestionItem): boolean;

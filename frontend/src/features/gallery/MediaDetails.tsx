@@ -23,7 +23,7 @@ import { formatBytes } from "../../ui/bytes";
 import { useCopy } from "../../ui/clipboard";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
-import { titleCase } from "../../ui/titleCase";
+import { titleCase } from "../../../../shared/titles";
 import { useGroupFeature } from "../auth/AccountGate";
 import { identityNote } from "../characters/identity";
 import { charactersQuery, promptCardsQuery } from "../characters/queries";
@@ -33,9 +33,11 @@ import { loraInfoQuery } from "../generation/LoraPicker";
 import { backendLabel, isProfile, profileName, shownProfileName } from "../generation/payload";
 import { WritingThinking } from "../generation/PromptWriting";
 import { queueQuery } from "../generation/Queue";
+import { referenceAssetQuery } from "../generation/references";
 import { mediaNumber, mediaTitle } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { derivations } from "./versions";
+import { type GalleryState, galleryPath, viewerPath } from "./viewerLink";
 
 import classes from "./MediaDetails.module.css";
 
@@ -426,7 +428,7 @@ function Caption({ item }: { item: MediaItem }) {
             <Badge
               key={tag}
               component={Link}
-              to={`${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(tag)}`}
+              {...gallerySearch(item, tag)}
               aria-label={`Search ${tag}`}
               variant="default"
               radius="sm"
@@ -449,8 +451,10 @@ const contextCards = [
   { kind: "scenes", key: "scene", noun: "Scene" },
 ] as const;
 
-const gallerySearch = (item: MediaItem, words: string) =>
-  `${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(words)}`;
+const gallerySearch = (item: MediaItem, words: string) => ({
+  to: galleryPath(item.type),
+  state: { q: words } satisfies GalleryState,
+});
 
 /**
  * The cards the chat said a result shows: its character, outfit and scene, each searching the
@@ -477,7 +481,7 @@ function ContextCards({ item }: { item: MediaItem }) {
     return (
       <Stack key={key} gap={2}>
         <PartLabel>{noun}</PartLabel>
-        <Anchor component={Link} to={gallerySearch(item, named.name)} size="sm">
+        <Anchor component={Link} {...gallerySearch(item, named.name)} size="sm">
           {named.name}
         </Anchor>
         {named.description && <DetailText>{named.description}</DetailText>}
@@ -584,29 +588,82 @@ function galleryReference(id: string, items: MediaItem[]) {
   return items.find((candidate) => candidate.url === key || candidate.id === key);
 }
 
-/** Links to results an item was made from or made, opening each in the viewer when it can. */
+/** A link's click that `open` shows in this viewer instead, leaving other clicks to the link. */
+const openHere =
+  (item: MediaItem, open?: (item: MediaItem) => void) => (event: React.MouseEvent) => {
+    if (!open || event.button || event.metaKey || event.ctrlKey || event.shiftKey) return;
+    event.preventDefault();
+    open(item);
+  };
+
+/** Links to the pages of results an item was made from or made. */
 function RelatedLinks({ items, open }: { items: MediaItem[]; open?: (item: MediaItem) => void }) {
   return (
     <Stack gap={2} align="flex-start">
-      {items.map((related) =>
-        open ? (
-          <Anchor
-            key={related.id}
-            component="button"
-            type="button"
-            size="sm"
-            ta="left"
-            onClick={() => open(related)}
-          >
-            {mediaTitle(related)}
-          </Anchor>
-        ) : (
-          <Text key={related.id} size="sm">
-            {mediaTitle(related)}
-          </Text>
-        ),
-      )}
+      {items.map((related) => (
+        <Anchor
+          key={related.id}
+          component={Link}
+          to={viewerPath(related)}
+          size="sm"
+          ta="left"
+          onClick={openHere(related, open)}
+        >
+          {mediaTitle(related)}
+        </Anchor>
+      ))}
     </Stack>
+  );
+}
+
+/** A frame reference's ID ends with its frame (backend/references.js), and comes from a video. */
+const isFrameReference = (id: string) => /:(?:last-frame|frame-\d+)$/.test(id);
+
+/**
+ * A reference's thumbnail, linking to the page of the result it was taken from: `source` when it
+ * is loaded, otherwise the result its asset names; a reference no longer in the gallery opens its
+ * picture in a new tab.
+ */
+function ReferenceLink({
+  reference,
+  source,
+  open,
+}: {
+  reference: { id: string; role: string };
+  source?: MediaItem;
+  open?: (item: MediaItem) => void;
+}) {
+  const address = `/api/reference-assets/${encodeURIComponent(reference.id)}`;
+  const asset = useQuery({ ...referenceAssetQuery(reference.id), enabled: !source }).data;
+  const target = source
+    ? viewerPath(source)
+    : asset?.galleryItemId &&
+      viewerPath({
+        id: asset.galleryItemId,
+        type: isFrameReference(reference.id) ? "video" : "image",
+      });
+  const thumbnail = (
+    <Image src={`${address}/thumbnail`} alt="" w={48} h={48} radius="sm" fallbackSrc="" />
+  );
+  return target ? (
+    <UnstyledButton
+      component={Link}
+      to={target}
+      aria-label={`Open ${reference.role}`}
+      onClick={source && openHere(source, open)}
+    >
+      {thumbnail}
+    </UnstyledButton>
+  ) : (
+    <UnstyledButton
+      component="a"
+      href={`${address}/media`}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`Open ${reference.role}`}
+    >
+      {thumbnail}
+    </UnstyledButton>
   );
 }
 
@@ -646,7 +703,7 @@ export function MediaDetails({
       [
         "Series",
         context?.series && (
-          <Anchor key="series" component={Link} to={gallerySearch(item, context.series)} size="sm">
+          <Anchor key="series" component={Link} {...gallerySearch(item, context.series)} size="sm">
             {context.series}
           </Anchor>
         ),
@@ -692,35 +749,13 @@ export function MediaDetails({
       ) && (
         <DetailSection title="References">
           {details.references.map((reference) => {
-            const address = `/api/reference-assets/${encodeURIComponent(reference.id)}`;
             const source = galleryReference(reference.id, [
               ...(loaded || []),
               ...(related.source ? [related.source] : []),
             ]);
-            const thumbnail = (
-              <Image src={`${address}/thumbnail`} alt="" w={48} h={48} radius="sm" fallbackSrc="" />
-            );
-            // A result in the gallery opens in the viewer; any other picture in a new tab.
             return (
               <Group key={`${reference.role}:${reference.id}`} gap="sm" wrap="nowrap">
-                {source && open ? (
-                  <UnstyledButton
-                    aria-label={`Open ${reference.role}`}
-                    onClick={() => open(source)}
-                  >
-                    {thumbnail}
-                  </UnstyledButton>
-                ) : (
-                  <UnstyledButton
-                    component="a"
-                    href={`${address}/media`}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`Open ${reference.role}`}
-                  >
-                    {thumbnail}
-                  </UnstyledButton>
-                )}
+                <ReferenceLink reference={reference} source={source} open={open} />
                 <Stack gap={0}>
                   <Text size="sm">{reference.role}</Text>
                   {reference.strength && (

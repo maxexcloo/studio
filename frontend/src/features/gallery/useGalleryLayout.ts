@@ -1,5 +1,5 @@
 import { useMantineTheme } from "@mantine/core";
-import { useLongPress, useMediaQuery } from "@mantine/hooks";
+import { useMediaQuery } from "@mantine/hooks";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { easing } from "../../theme";
@@ -210,14 +210,17 @@ export function useScrollAnchor(
   }, [places, key, host]);
 }
 
-/** No click or mouse events follow a hold, so a menu it opened doesn't take them as outside presses. */
-export const endHold = (event: React.MouseEvent | React.TouchEvent) => event.preventDefault();
+// A still press this long (ms) is a hold; moving further than this (px) is a scroll instead.
+const holdDelay = 400;
+const holdSlop = 10;
 
 /**
- * Phone hold-to-select over any tile with `data-media-id`, using Mantine's touch gesture with
- * movement cancellation. With `onMenu`, holding a single tile outside
- * a selection opens its menu instead. `held` marks the tile whose release must not also open it.
- * The result stays the same object while its arguments do, so memoised tiles skip scroll renders.
+ * Phone hold-to-select over any tile with `data-media-id`. With `onMenu`, holding a single tile
+ * outside a selection opens its menu instead. `held` marks the tile whose release must not also
+ * open it. A second finger, movement or a scroll cancels the hold. The release is watched on the
+ * window, so it still ends the hold after virtualisation has removed the tile it began on; it then
+ * cancels the click and mouse events, so a menu the hold opened doesn't take them as outside
+ * presses. The result stays the same object, so memoised tiles skip scroll renders.
  */
 export function useHoldToSelect(
   items: MediaItem[],
@@ -226,36 +229,63 @@ export function useHoldToSelect(
 ) {
   const phone = usePhone();
   const held = useRef<string | null>(null);
-  const select = useCallback(
-    (event: React.MouseEvent | React.TouchEvent) => {
-      if (!phone || !selection) return;
-      const element = (event.target as Element).closest<HTMLElement>("[data-media-id]");
-      if (onMenu && element && !selection.selecting && !element.dataset.mediaGroup) {
+  const latest = useRef({ phone, selection, items, onMenu });
+  latest.current = { phone, selection, items, onMenu };
+  const press = useRef<(() => void) | null>(null);
+  useEffect(() => () => press.current?.(), []);
+  const onTouchStart = useCallback((event: React.TouchEvent) => {
+    press.current?.();
+    held.current = null;
+    const element = (event.target as Element).closest<HTMLElement>("[data-media-id]");
+    if (event.touches.length !== 1 || !element || !latest.current.phone) return;
+    const { clientX: x, clientY: y } = event.touches[0];
+    let fired = false;
+    const move = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch || Math.hypot(touch.clientX - x, touch.clientY - y) > holdSlop) stop();
+    };
+    const release = (event: TouchEvent) => {
+      if (fired && event.cancelable) event.preventDefault();
+      stop();
+    };
+    const listeners = [
+      ["touchmove", move, { capture: true, passive: true }],
+      ["touchend", release, { capture: true, passive: false }],
+      ["touchcancel", () => stop(), { capture: true, passive: true }],
+      ["scroll", () => stop(), { capture: true, passive: true }],
+    ] as const;
+    const hold = () => {
+      const { selection, items, onMenu } = latest.current;
+      if (!selection) return;
+      if (onMenu && !selection.selecting && !element.dataset.mediaGroup) {
         held.current = element.dataset.mediaId!;
         onMenu(held.current);
         return;
       }
-      const ids = element?.dataset.mediaGroup?.split(" ") || [element?.dataset.mediaId];
+      const ids = element.dataset.mediaGroup?.split(" ") || [element.dataset.mediaId];
       const group = items.filter((item) => ids.includes(item.id));
       if (!group.length) return;
-      held.current = element!.dataset.mediaId!;
+      held.current = element.dataset.mediaId!;
       if (!selection.selecting) selection.start();
       selection.toggle(group);
-    },
-    [phone, selection, items, onMenu],
-  );
-  const onStart = useCallback(() => {
-    held.current = null;
+    };
+    const timer = window.setTimeout(() => {
+      fired = true;
+      hold();
+    }, holdDelay);
+    function stop() {
+      window.clearTimeout(timer);
+      for (const [type, listener, options] of listeners)
+        window.removeEventListener(type, listener as EventListener, options);
+      press.current = null;
+    }
+    for (const [type, listener, options] of listeners)
+      window.addEventListener(type, listener as EventListener, options);
+    press.current = stop;
   }, []);
-  const handlers = useLongPress(select, {
-    events: ["touch"],
-    cancelOnMove: true,
-    onStart,
-    onFinish: endHold,
-  });
   return useMemo(
     () => ({
-      handlers,
+      handlers: { onTouchStart },
       held,
       /** True, once, for the click that ends a hold on `id`. */
       consumeHold(id: string) {
@@ -264,6 +294,6 @@ export function useHoldToSelect(
         return true;
       },
     }),
-    [handlers],
+    [onTouchStart],
   );
 }

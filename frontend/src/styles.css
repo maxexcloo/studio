@@ -53,32 +53,8 @@ select {
     100% - var(--mantine-spacing-sm) * 2 - env(safe-area-inset-left) - env(safe-area-inset-right)
   );
 }
-/* A banner: its colour as a small dot before the title, rather than Mantine's bar, with the title,
-   message and close button aligned to the title's line. */
 .mantine-Notifications-notification {
-  --studio-notification-line: calc(var(--mantine-font-size-sm) * var(--mantine-line-height-sm));
-  align-items: flex-start;
-  padding: var(--mantine-spacing-sm) var(--mantine-spacing-xs) var(--mantine-spacing-sm)
-    calc(var(--mantine-spacing-sm) * 2 + 8px);
   transition-timing-function: var(--studio-ease-enter) !important;
-}
-.mantine-Notifications-notification::before {
-  top: calc(var(--mantine-spacing-sm) + (var(--studio-notification-line) - 8px) / 2);
-  bottom: auto;
-  inset-inline-start: var(--mantine-spacing-sm);
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-.mantine-Notifications-notification .mantine-Notification-closeButton {
-  margin-block: calc((var(--studio-notification-line) - var(--cb-size)) / 2);
-}
-.mantine-Notifications-notification + .mantine-Notifications-notification {
-  margin-top: var(--mantine-spacing-xs);
-}
-.mantine-Notifications-notification .mantine-Notification-description,
-.mantine-Notifications-notification .mantine-Notification-title {
-  font-size: var(--mantine-font-size-sm);
 }
 :root[data-phone] .mantine-Notifications-notification {
   touch-action: pan-x;

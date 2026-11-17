@@ -31,6 +31,7 @@ export interface QueueOrigin {
   parentItemId?: string;
   dream?: DreamOrigin;
   faceRedo?: true;
+  galleryAt?: string;
 }
 /**
  * `cleared` takes a failed job out of the queue panel; its record stays. `dream` is
@@ -211,6 +212,7 @@ export class Store {
             ...(origin.queueBatch ? { queueBatch: origin.queueBatch } : {}),
             ...(origin.dream ? { dream: origin.dream } : {}),
             ...(origin.faceRedo ? { faceRedo: origin.faceRedo } : {}),
+            ...(origin.galleryAt ? { galleryAt: origin.galleryAt } : {}),
             // A prompt the assistant writes is the item's first stage (queue.ts); it then queues.
             status: awaitsWriting(input) ? "writing" : "queued",
             reason: "",

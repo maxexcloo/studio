@@ -471,3 +471,93 @@ test("a Studio restart mid-swap keeps the swap, restores it and still returns to
   ]);
   await first.controller.settled;
 });
+
+/** A queue whose Radiance work holds `leases` until it ends; `stale` ones go when released. */
+function fakeQueue(stale: { release(): void }[] = []) {
+  const leases: { release(): void }[] = [];
+  const calls: string[] = [];
+  return {
+    leases,
+    calls,
+    queue: {
+      load: (id: string) =>
+        id === "radiance"
+          ? {
+              jobs: [
+                {
+                  id: "job-1",
+                  title: "A lighthouse",
+                  status: "running" as const,
+                  since: "2026-10-27T00:00:00Z",
+                },
+              ],
+              queued: 2,
+            }
+          : { jobs: [], queued: 0 },
+      cancel: async (id: string) => {
+        calls.push(`cancel ${id}`);
+        return { cancelled: 2, cancelling: 1 };
+      },
+      releaseStale: () => {
+        for (const lease of stale.splice(0)) lease.release();
+      },
+      end: async (id: string) => {
+        calls.push(`end ${id}`);
+        for (const lease of leases.splice(0)) lease.release();
+      },
+    },
+  };
+}
+
+test("Radiance restarts without waiting for its work, which ends, and Cancel Queue reaches the queue", async () => {
+  const { kube, controller } = fixture(["radiance"], { withRadiance: true });
+  assert.throws(() => controller.cancelQueue("radiance"), { status: 503 });
+  const { leases, calls, queue } = fakeQueue();
+  controller.useQueue(queue);
+  leases.push(await controller.acquire("radiance"));
+  const status = (await controller.observe()).workloads.find((item) => item.id === "radiance")!;
+  assert.deepEqual(
+    [status.radiance, status.jobs?.[0].title, status.queued],
+    [true, "A lighthouse", 2],
+  );
+  assert.deepEqual(await controller.cancelQueue("radiance"), { cancelled: 2, cancelling: 1 });
+  assert.throws(() => controller.cancelQueue("missing"), { status: 400 });
+  await assert.rejects(controller.restart("image", "local", true), {
+    status: 400,
+    message: "Only Radiance restarts without waiting for its work.",
+  });
+  const operation = await controller.restart("radiance", "account:admin", true);
+  await controller.settled;
+  assert.deepEqual(kube.log, [
+    "scale radiance/radiance 0",
+    "gone radiance/radiance",
+    "scale radiance/radiance 1",
+  ]);
+  assert.deepEqual(calls, ["cancel radiance", "end radiance"]);
+  assert.equal(controller.operation(operation.id).status, "completed");
+  assert.equal(controller.status().find((item) => item.id === "radiance")!.acceptedOperations, 0);
+});
+
+test("a switch waiting on Radiance's work drops stale leases and stops waiting once Radiance is forced", async () => {
+  const { kube, controller } = fixture(["radiance"], { withRadiance: true });
+  await placeByHand(controller, ["radiance"]);
+  const stale = await controller.acquire("radiance");
+  const { leases, queue } = fakeQueue([stale]);
+  controller.useQueue(queue);
+  leases.push(await controller.acquire("radiance"));
+  await assert.rejects(controller.acquire("image"), /Studio is switching the GPUs/);
+  await settle();
+  // The stale lease is gone; the job still running holds the switch.
+  const running = (await controller.observe()).operation!;
+  assert.match(running.progress, /^Waiting for 1 accepted operation on Radiance/);
+  assert.deepEqual(kube.log, []);
+  // Forcing joins the running switch rather than starting another change.
+  assert.equal((await controller.restart("radiance", "account:admin", true)).id, running.id);
+  await controller.settled;
+  assert.deepEqual(kube.log, [
+    "scale radiance/radiance 0",
+    "gone radiance/radiance",
+    "scale comfyui/image 1",
+  ]);
+  assert.equal(controller.operation(running.id).status, "completed");
+});
