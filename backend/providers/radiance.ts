@@ -54,6 +54,15 @@ export function radianceImageLimits(model: string) {
 }
 
 /**
+ * Studio's CFG follows diffusers, uncond + s (cond - uncond), where 1 is unguided. Radiance's
+ * Krea 2 architecture (Krea 2 and its fine-tunes) reads guidance in its card's terms,
+ * cond + s (cond - uncond), where 0 is unguided, so that family's scale is one lower.
+ */
+function radianceGuidance(cfg: number, family: string) {
+  return family === "krea2" ? Math.max(0, cfg - 1) : cfg;
+}
+
+/**
  * What the two nodes take, in ComfyUI's node-list shape, so a Radiance worker's catalogue reads
  * like any worker's: their `model` lists every model the process serves.
  */
@@ -145,8 +154,11 @@ function form(fields: Values, files: RadianceFile[]) {
   return body;
 }
 
-/** A RadianceImageGenerate node's request; references (PNG or JPEG bytes, in order) make it an edit. */
-export function imageRequest(values: Values, references: Uint8Array[] = []) {
+/**
+ * A RadianceImageGenerate node's request for a profile of `family`; references (PNG or JPEG bytes,
+ * in order) make it an edit.
+ */
+export function imageRequest(values: Values, references: Uint8Array[] = [], family = "") {
   const model = String(values.model || "");
   const limits = radianceImageLimits(model);
   if (!String(values.prompt || "").trim()) throw new Error("Enter an image prompt.");
@@ -172,7 +184,7 @@ export function imageRequest(values: Values, references: Uint8Array[] = []) {
   if (values.rebalance && values.rebalance !== "off") body.rebalance = values.rebalance;
   // Send the profile's exact schedule and off value; omission uses the model's own CFG default.
   body.num_inference_steps = Number(values.steps);
-  body.guidance_scale = Number(values.cfg);
+  body.guidance_scale = radianceGuidance(Number(values.cfg), family);
   body.negative_prompt = String(values.negative_prompt || "");
   if (!references.length) return { route: "/v1/images/generations", body };
   if (references.length > limits.maxReferences)
