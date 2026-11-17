@@ -22,11 +22,15 @@ export const viewerPath = (item: { id: string; number?: number; type: MediaKind 
 
 /**
  * The gallery's transient state, held in history rather than the address: a result set or
- * Similar ranking shown alone, a search from a caption tag, an image shared to the installed app.
+ * Similar ranking shown alone, a search from a caption tag, an image shared to the installed app,
+ * or an MCP chat's results: one turn, or the whole chat with `show` "chat".
  */
 export interface GalleryState {
+  chat?: string;
   q?: string;
   set?: string;
   shared?: string;
+  show?: string;
   similar?: string;
+  turn?: string;
 }

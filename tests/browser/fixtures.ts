@@ -643,6 +643,9 @@ export async function fixtures(page: Page) {
           (!url.searchParams.has("tag") ||
             url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
           (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")) &&
+          (!url.searchParams.has("chat") ||
+            i.chat?.conversationId === url.searchParams.get("chat")) &&
+          (!url.searchParams.has("turn") || i.chat?.turnId === url.searchParams.get("turn")) &&
           (url.searchParams.get("comparisons") !== "1" ||
             comparisons.some((entry) =>
               entry.itemIds ? entry.itemIds.includes(i.id) : entry.jobIds.includes(i.jobId),
