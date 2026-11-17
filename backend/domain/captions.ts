@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { type IdleDocument, type IdleItem, createIdleWork, pictured } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
+import type { TextSide } from "./taste.ts";
 
 /** What a finished gallery image shows, in the assistant model's words, so search can find it. */
 export interface Caption {
@@ -17,11 +18,12 @@ export interface CaptionItem extends IdleItem {
 }
 /** The assistant gateway (assistant.js). */
 export interface CaptionWriter {
-  /** Whether the running text model reads images. */
-  supportsVision(): Promise<boolean>;
+  /** Whether the text model the side asks for reads images. */
+  supportsVision(text?: TextSide): Promise<boolean>;
   caption(request: {
     image: ModelImage;
     signal?: AbortSignal;
+    side?: TextSide;
   }): Promise<{ text: string; tags: string[]; model: string }>;
 }
 export const captionCharacters = 600;
@@ -37,7 +39,8 @@ export const captionVersion = createHash("sha256")
 /**
  * Captions finished gallery images, Dream's pool included, while Studio is idle
  * (domain/idle-work.ts): a trickle of new images, or an administrator's Caption Gallery pass, which
- * also redoes captions from an older format. Only while the running text model reads images, and never with cloud.
+ * also redoes captions from an older format, on the text model where the owner runs text (`text`)
+ * while it reads images.
  */
 export function createCaptioner(options: {
   /** The Settings › Generation switch (STUDIO_GALLERY_CAPTIONS). */
@@ -45,6 +48,8 @@ export function createCaptioner(options: {
   writer: CaptionWriter | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
+  /** Where the owner runs text (account-preferences.js `textSide`). */
+  text(ownerId: string): TextSide;
   items(since?: number): Iterable<CaptionItem>;
   changes?(): number;
   visible(item: CaptionItem): boolean;
@@ -57,19 +62,22 @@ export function createCaptioner(options: {
   log?: { info(message: string): void };
 }) {
   const { writer, now = Date.now } = options;
+  // Checked before each pick, so an owner's images wait while their text model can't read them.
+  const vision = { cloud: true, local: false };
   return createIdleWork<CaptionItem>({
     ...options,
     name: "Gallery captions",
     off: "Gallery Captions is off in Settings › Generation.",
     async unavailable() {
       if (!writer) return "No assistant model is configured.";
-      if (!(await writer.supportsVision())) return "The running text model can't read images.";
+      vision.local = await writer.supportsVision("local");
       return "";
     },
     // The trickle and a Missing pass caption new images; Out of Date also redoes captions from older
     // rules, and All redoes every caption written before the pass began.
     wanted: (item, all, target) =>
       pictured(item) &&
+      vision[options.text(item.ownerId || "")] &&
       (!all || target?.scope === "missing"
         ? !item.caption
         : target?.scope === "all"
@@ -79,7 +87,11 @@ export function createCaptioner(options: {
       const image = await options.image(item);
       if (signal.aborted) return;
       if (!image) throw new Error("no image to read");
-      const reply = await writer!.caption({ image, signal });
+      const reply = await writer!.caption({
+        image,
+        signal,
+        side: options.text(item.ownerId || ""),
+      });
       if (signal.aborted) return;
       options.save(item, {
         text: reply.text,

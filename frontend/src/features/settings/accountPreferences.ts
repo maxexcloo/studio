@@ -25,6 +25,8 @@ export interface Preferences {
   galleryWork?: GalleryWorkPreference;
   /** Where images run by default; unsaved (and Cloud while Cloud Models is off), Local. */
   images?: SidePreference;
+  /** Where titles, captions, suggestions and Dream's text run; unsaved, Cloud (Local while Cloud Models is off). */
+  text?: SidePreference;
   /** The text model prompt writing asks for; unsaved, the assistant's default (`/api/assistant`). */
   writingModel?: string;
   /** Unsaved, Fast where the account has local video, otherwise Cloud. */

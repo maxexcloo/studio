@@ -65,15 +65,26 @@ test("settings read the gateway, whose model is the cloud model", async () => {
       "cloud/auto",
     ],
   );
-  // Calls other than an account's prompt writing use the cloud, even while local text runs.
+  // Cloud unless the account runs text locally, and then only while a local text workload runs.
   const environment = gateway();
-  const engine = createAssistant(environment, {
-    localText: async () => ({ model: "local/auto", vision: false }),
-  });
+  let local = null;
+  const engine = createAssistant(environment, { localText: async () => local });
   assert.deepEqual(
-    [await engine.model("title"), await engine.supportsVision()],
+    [await engine.model("title", false, "local"), await engine.supportsVision("local")],
     ["cloud/auto", true],
   );
+  local = { model: "local/auto", vision: false };
+  assert.deepEqual(
+    [await engine.model("title"), await engine.model("title", false, "cloud")],
+    ["cloud/auto", "cloud/auto"],
+  );
+  assert.deepEqual(
+    [await engine.model("title", false, "local"), await engine.supportsVision("local")],
+    ["local/auto", false],
+  );
+  assert.equal(await engine.supportsVision(), true);
+  assert.equal(await engine.model("caption", true, "local"), "local/uncensored");
+  local = null;
   assert.equal(await engine.model("rewrite", true), "cloud/uncensored");
   environment.STUDIO_ASSISTANT_CLOUD_MODEL = "cloud/vision";
   assert.equal(await engine.model("rewrite", true), "cloud/vision");

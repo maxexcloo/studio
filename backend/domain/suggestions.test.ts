@@ -31,7 +31,8 @@ function fixture(
   let clock = 0;
   const model: TasteWriter<ReturnType<typeof userContent>> = {
     settings: () => ({}),
-    model: async (_call, _explicit, writer) => writer?.picked || "text",
+    model: async (_call, _explicit, writer) =>
+      typeof writer === "object" ? writer.picked || "text" : "text",
     chat: async ({ messages, model: used }) => {
       models.push(used);
       const seen = messages.map(({ role, content }) =>
@@ -543,6 +544,7 @@ test("idle work writes next steps ahead of time, from the image where the model 
     writer: { supportsVision: async () => vision },
     idle: () => true,
     allowed: () => true,
+    text: () => "cloud",
     items: () => items,
     visible: () => true,
     image: async () => ({ mime: "image/jpeg", data: "AAAA" }),
@@ -574,6 +576,7 @@ test("switched off, prompt ideas and next steps are never written, while asked-f
     writer: { supportsVision: async () => true },
     idle: () => true,
     allowed: () => true,
+    text: () => "cloud",
     items: () => items,
     visible: () => true,
     image: async () => ({ mime: "image/jpeg", data: "AAAA" }),

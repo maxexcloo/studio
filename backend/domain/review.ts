@@ -1,6 +1,7 @@
 import type { DigestGroup, Project, ProjectBrief, Review } from "../../shared/projects.ts";
 import { type IdleItem, createIdleWork, pictured } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
+import type { TextSide } from "./taste.ts";
 
 export interface ReviewItem extends IdleItem {
   createdAt?: string;
@@ -9,12 +10,13 @@ export interface ReviewItem extends IdleItem {
 }
 /** The assistant gateway (assistant.js). */
 interface ReviewWriter {
-  supportsVision(): Promise<boolean>;
+  supportsVision(text?: TextSide): Promise<boolean>;
   review(request: {
     image: ModelImage;
     brief: string;
     explicit: boolean;
     signal?: AbortSignal;
+    side?: TextSide;
   }): Promise<{ score: number; miss: string; model: string }>;
 }
 
@@ -85,8 +87,8 @@ export function digest<Item extends ReviewItem>(
 
 /**
  * Self-review: while Studio is idle (domain/idle-work.ts, as captions), each unseen Dream image
- * made for a project is scored against its brief by the text model, where it reads images, and
- * its review saved on the result.
+ * made for a project is scored against its brief by the text model where its owner runs text
+ * (`text`) while it reads images, and its review saved on the result.
  */
 export function createReview(options: {
   writer: ReviewWriter | null;
@@ -98,6 +100,8 @@ export function createReview(options: {
   projects(ownerId: string): Project[];
   /** Whether the owner's results may be read with the uncensored model. */
   explicit(ownerId: string): boolean;
+  /** Where the owner runs text (account-preferences.js `textSide`). */
+  text(ownerId: string): TextSide;
   /** A small (≤512 px) copy of the image, or null when there is none. */
   image(item: ReviewItem): Promise<ModelImage | null>;
   save(item: ReviewItem, review: Review): void;
@@ -111,13 +115,15 @@ export function createReview(options: {
       .find((entry) => entry.id === item.dream?.projectId);
     return project ? briefText(project.brief) : "";
   };
+  // Checked before each pick, so an owner's images wait while their text model can't read them.
+  const vision = { cloud: true, local: false };
   return createIdleWork<ReviewItem>({
     ...options,
     name: "Dream review",
     enabled: () => true,
     async unavailable() {
       if (!writer) return "No assistant model is configured.";
-      if (!(await writer.supportsVision())) return "The running text model can't read images.";
+      vision.local = await writer.supportsVision("local");
       return "";
     },
     wanted: (item) =>
@@ -125,6 +131,7 @@ export function createReview(options: {
       Boolean(item.dream.projectId) &&
       !item.review &&
       pictured(item) &&
+      vision[options.text(item.ownerId || "")] &&
       Boolean(brief(item)),
     async run(item, signal) {
       const image = await options.image(item);
@@ -135,6 +142,7 @@ export function createReview(options: {
         brief: brief(item),
         explicit: options.explicit(item.ownerId || ""),
         signal,
+        side: options.text(item.ownerId || ""),
       });
       if (signal.aborted) return;
       options.save(item, { ...reply, at: new Date(now()).toISOString() });

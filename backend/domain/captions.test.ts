@@ -28,6 +28,7 @@ function fixture(items: CaptionItem[], saved: IdleDocument | null = null) {
     enabled: true,
     idle: true,
     vision: true,
+    text: "cloud" as "cloud" | "local",
     allowed: new Set(["alice", "bob"]),
     sent: [] as string[],
     fail: new Set<string>(),
@@ -64,6 +65,7 @@ function fixture(items: CaptionItem[], saved: IdleDocument | null = null) {
       writer,
       idle: () => state.idle,
       allowed: (ownerId) => state.allowed.has(ownerId),
+      text: () => state.text,
       items: () => state.items,
       visible: (item) => !(item as { hidden?: boolean }).hidden,
       image: async (item) => ({ mime: "image/jpeg", data: item.id || "" }),
@@ -144,20 +146,14 @@ test("text work that starts mid-caption makes it step aside within a second", as
   assert.equal(state.items[0].caption, undefined);
 });
 
-test("skips text-only models (saying so once), the switch off and accounts without the assistant", async () => {
+test("skips owners whose local text model can't read images, the switch off and accounts without the assistant", async () => {
   const { state, captioner, later } = fixture([image("bob-1", "bob"), image("alice-1")]);
+  state.text = "local";
   state.vision = false;
-  assert.equal(await captioner.tick(), "unavailable");
-  later();
-  assert.equal(await captioner.tick(), "unavailable");
-  assert.equal(state.logs.length, 1);
-  assert.match(state.logs[0], /running text model can't read images/);
-  assert.deepEqual(
-    [(await captioner.status()).state, (await captioner.status()).reason],
-    ["unavailable", "The running text model can't read images."],
-  );
+  assert.equal(await captioner.tick(), "none");
+  assert.deepEqual(state.sent, []);
 
-  state.vision = true;
+  state.text = "cloud";
   state.enabled = false;
   later();
   assert.equal(await captioner.tick(), "off");
@@ -338,6 +334,7 @@ test("status counts the gallery again only once it changes", async () => {
     writer: null,
     idle: () => true,
     allowed: () => true,
+    text: () => "cloud",
     items: () => {
       walks += 1;
       return items;
