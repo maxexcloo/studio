@@ -22,7 +22,6 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
 import { layerAbove } from "../../ui/popupClicks";
-import { titleCase } from "../../ui/titleCase";
 import { usePhone } from "../../ui/usePhone";
 import { projectPath, projectsQuery } from "../dream/queries";
 import { MediaTile } from "../gallery/MediaTile";
