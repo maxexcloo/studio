@@ -7,10 +7,12 @@ import { icons } from "./icons";
  * bringing back what Clear removed.
  */
 export function ClearButton({
+  className,
   disabled,
   onClear,
   onUndo,
 }: {
+  className?: string;
   disabled?: boolean;
   onClear: () => void;
   onUndo?: () => void;
@@ -20,6 +22,7 @@ export function ClearButton({
   return (
     <Tooltip label={label}>
       <ActionIcon
+        className={className}
         variant="subtle"
         color="gray"
         aria-label={label}
