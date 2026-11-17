@@ -1,6 +1,7 @@
 import {
   ActionIcon,
   Alert,
+  Button,
   Drawer,
   Popover,
   SegmentedControl,
@@ -13,6 +14,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api } from "../../api";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { NumberSetting } from "../../ui/NumberSetting";
 import { SettingRow } from "../../ui/SettingRows";
@@ -161,7 +163,12 @@ export function DreamSettingsButton({ dream }: { dream: Dream }) {
           title="Dream Settings"
           closeButtonProps={{ "aria-label": "Close Dream Settings" }}
         >
-          <SettingsForm dream={dream} />
+          <Stack gap="md">
+            <SettingsForm dream={dream} />
+            <DialogFooter>
+              <Button onClick={() => setOpened(false)}>Done</Button>
+            </DialogFooter>
+          </Stack>
         </Drawer>
       </>
     );
