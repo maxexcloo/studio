@@ -235,7 +235,10 @@ export function TextBox({
       : null;
   const visible = useVisibleRect(menuOpened);
   const bounds = { padding: 12, rootBoundary: visible ?? ("viewport" as const) };
-  const menu = !menuless && tools !== undefined && (
+  // The typing bar shows plain tools with icons beside the menu, so the menu leaves them out.
+  const menuOthers = inBar ? others.filter((tool) => !tool.icon) : others;
+  const barOnly = inBar && !listed.length && !menuOthers.length;
+  const menu = !menuless && !barOnly && tools !== undefined && (
     <Menu
       // In place at rest, the button stands at the text's top, so the menu drops from it.
       position={mobile && inline && !inBar ? "bottom-end" : "top-end"}
@@ -330,8 +333,8 @@ export function TextBox({
             />
           </Fragment>
         ))}
-        {listed.length > 0 && others.length > 0 && <Menu.Divider />}
-        <ActionMenuItems groups={[others]} />
+        {listed.length > 0 && menuOthers.length > 0 && <Menu.Divider />}
+        <ActionMenuItems groups={[menuOthers]} />
       </Menu.Dropdown>
     </Menu>
   );
