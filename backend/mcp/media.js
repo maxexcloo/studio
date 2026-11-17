@@ -120,6 +120,17 @@ const maxListedResults = 24;
 // A search summary reads at most this many results, and names the most common few of each.
 const summaryItems = 5000;
 const summaryTop = 12;
+/** Search's arguments as /api/gallery's filters; its dates are whole UTC days. */
+const galleryFilters = ({ query, kind, rating, model, lora, aspect, before, after }) => ({
+  q: query,
+  type: kind,
+  rating,
+  model,
+  lora,
+  aspect,
+  before: before && `${before}T23:59:59.999Z`,
+  since: after,
+});
 const maxShownResults = 8;
 /** Refuses prompts × count over `max` (the schemas cap each alone), saying how to split. */
 export function assertJobCount(prompts = 1, count = 1, max = maxJobsPerCall) {
@@ -571,6 +582,13 @@ export class McpMedia {
   promptRecord(jobId) {
     return this.rows.prompt(jobId) ?? null;
   }
+  /** Outputs the account's unfinished MCP jobs will make. */
+  async pendingOutputs(owner, signal) {
+    const { jobs = [] } = await this.request("GET", "/api/queue", undefined, owner, { signal });
+    return jobs
+      .filter((job) => !terminal.has(job.status) && this.rows.jobOwner(job.id) === owner)
+      .reduce((sum, job) => sum + (Number(job.input?.count) || 1), 0);
+  }
   /**
    * Queues one job per prompt and count. `record` keeps the user's request and exact source result.
    */
@@ -975,13 +993,8 @@ export class McpMedia {
    * search's `total` and the `cursor` of the next page. Each hit's job joins this scope's refs, so
    * Reuse, Review and Result take it; a job another MCP owner holds is left out.
    */
-  async search(
-    owner,
-    scope,
-    { query, kind, rating, model, lora, aspect, uploads, limit, cursor },
-    { signal } = {},
-  ) {
-    const filters = { q: query, type: kind, rating, model, lora, aspect };
+  async search(owner, scope, { uploads, limit, cursor, ...search }, { signal } = {}) {
+    const filters = galleryFilters(search);
     if (uploads)
       return {
         hits: await this.uploadHits(
@@ -1033,17 +1046,11 @@ export class McpMedia {
    * What a search's results have in common, over all of them (at most `summaryItems`): their
    * count, and the profiles, LoRAs and caption tags most of them share.
    */
-  async searchSummary(owner, { query, kind, rating, model, lora, aspect }, { signal } = {}) {
+  async searchSummary(owner, search, { signal } = {}) {
     const items = [];
     let cursor = "";
     do {
-      const page = await this.galleryPage(
-        owner,
-        { q: query, type: kind, rating, model, lora, aspect },
-        500,
-        cursor,
-        signal,
-      );
+      const page = await this.galleryPage(owner, galleryFilters(search), 500, cursor, signal);
       items.push(...page.items.filter((item) => item.status === "done"));
       cursor = page.nextCursor || "";
     } while (cursor && items.length < summaryItems);

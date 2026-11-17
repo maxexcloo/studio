@@ -204,6 +204,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const words = search && !looksLike ? searchWords(one(query.q)) : [];
     // `since` (an ISO date) keeps items made from then on; work still generating always shows.
     const since = query.since ? Date.parse(String(query.since)) : 0;
+    // `before` (an ISO date) keeps items made by then.
+    const before = query.before ? Date.parse(String(query.before)) : NaN;
     // `similar` (an item id, Find Similar) ranks by likeness to that image, keeping those at least
     // as alike as `strictness` (close, similar or loose); none until it is read.
     const source = query.similar ? galleryItem(String(query.similar)) : null;
@@ -243,6 +245,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
             ...(["liked", "disliked"].includes(query.rating) && { rating: query.rating }),
             ...(work === "none" && { notStatus: "pending" }),
             ...(Number.isFinite(since) && since && { since }),
+            ...(Number.isFinite(before) && { before }),
             ...(words.length && { contains: words }),
           },
           // The account and every parameter but the page's own name the filter's count.
