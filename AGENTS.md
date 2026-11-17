@@ -169,13 +169,13 @@ recur across features.
   Clear are left to the browser, and a box starting from its own text shows
   Reset, then Undo, as one icon beside it while it can act. The button is ⋯,
   or the AI icon when the box has an AI tool; the AI icon (`icons.assistant`)
-  marks everything AI does. The viewer's prompt keeps its AI tools in the
-  bar's AI menu instead.
+  marks everything AI does. On desktop the viewer's prompt keeps its AI tools
+  in the bar's AI menu; on phones they stay with the prompt.
   Composer fields edit in place; other phone text boxes open the shared
   full-screen editor, and AI tools stay beside the text before it opens.
   Phone controls show Copy, Clear/Reset/Undo and More above the keyboard,
-  with tools in More and form sends separate. A box without tools has no ⋯,
-  Copy or Clear.
+  with tools in More, a full-screen sheet, and form sends separate. A box
+  without tools has no ⋯, Copy or Clear.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating

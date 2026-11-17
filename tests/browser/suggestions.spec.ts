@@ -9,6 +9,7 @@ import {
   promptMenu,
   stamp,
   viewerAction,
+  viewerPromptAssist,
   viewerPromptMenu,
 } from "./fixtures";
 
@@ -103,7 +104,8 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
 
 test("The viewer directly offers Suggested and Templates without styles or item descriptions", async ({
   page,
-}) => {
+}, testInfo) => {
+  const phone = testInfo.project.use.isMobile;
   await openViewer(page);
   const asked: any[] = [];
   const others = [{ label: "Snowfall", request: "add snow", prompt: "An amber bird in snow" }];
@@ -139,7 +141,7 @@ test("The viewer directly offers Suggested and Templates without styles or item 
     "false",
   );
   await page.keyboard.press("Escape");
-  await expect(viewer.getByRole("button", { name: "AI", exact: true })).toBeFocused();
+  await expect(await viewerPromptAssist(page)).toBeFocused();
   await viewerPromptMenu(page);
   // Refresh… reads Loading… while they load, with no placeholder row.
   const thinking = menu.getByRole("menuitem", { name: "Loading…", exact: true });
@@ -151,8 +153,8 @@ test("The viewer directly offers Suggested and Templates without styles or item 
     ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
     "Refresh…",
     "Custom…",
-    "More Like This",
-    "Similar",
+    // Phones keep discovery in the bar's AI menu, apart from the prompt's assistance.
+    ...(phone ? [] : ["More Like This", "Similar"]),
   ]);
   expect(asked).toEqual([
     { surface: "viewer", jobId: "job-hub", fresh: false, prompt: "An amber bird", itemId: "hub" },
@@ -217,7 +219,9 @@ test("Custom Animation suggests what could happen from the image, filling the in
   );
 });
 
-test("The prompt offers Library's fixed changes with the image's suggestions", async ({ page }) => {
+test("The prompt offers Library's fixed changes with the image's suggestions", async ({
+  page,
+}, testInfo) => {
   await openViewer(page);
   const asked: any[] = [];
   await page.route("**/api/assistant", (route) =>
@@ -253,8 +257,7 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
     "Refresh…",
     "Softer Shadows",
     "Custom…",
-    "More Like This",
-    "Similar",
+    ...(testInfo.project.use.isMobile ? [] : ["More Like This", "Similar"]),
   ]);
   await menu.getByRole("menuitem", { name: "Softer Shadows", exact: true }).click();
   await expect

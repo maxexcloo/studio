@@ -1,11 +1,13 @@
 import {
   ActionIcon,
   Button,
+  CloseButton,
   FocusTrap,
   Loader,
   Menu,
   Modal,
   type ModalProps,
+  Text,
   Textarea,
   type TextareaProps,
   Tooltip,
@@ -284,25 +286,50 @@ export function TextBox({
           )}
         </Menu.Target>
       </PopupTooltip>
-      <Menu.Dropdown style={{ overflowY: "auto" }}>
-        {listed.map((tool, index) => (
-          <Fragment key={tool.id}>
-            {index > 0 && <Menu.Divider />}
-            {!tool.menu!.flat().some((option) => option.heading) && (
-              <Menu.Label>{tool.label}</Menu.Label>
-            )}
-            <ActionMenuItems
-              groups={tool.menu!.map((group) =>
-                group.map((option) => ({
-                  ...option,
-                  disabled: option.disabled || tool.disabled,
-                })),
-              )}
+      {/* Phones show the menu as a full-screen sheet: its title and Close, then the tools. */}
+      <Menu.Dropdown
+        className={mobile ? classes.sheet : undefined}
+        // Opaque, unlike the glass theme surface, so the editor never shows through.
+        style={
+          mobile
+            ? {
+                background: "var(--mantine-color-body)",
+                backdropFilter: "none",
+                WebkitBackdropFilter: "none",
+                boxShadow: "none",
+              }
+            : { overflowY: "auto" }
+        }
+      >
+        {mobile && (
+          <div className={classes.sheetHeader}>
+            <Text fw={600}>{ai ? "AI" : "More"}</Text>
+            <CloseButton
+              aria-label={`Close ${ai ? "AI" : "More"}`}
+              onClick={() => setMenuOpened(false)}
             />
-          </Fragment>
-        ))}
-        {listed.length > 0 && others.length > 0 && <Menu.Divider />}
-        <ActionMenuItems groups={[others]} />
+          </div>
+        )}
+        <div className={mobile ? classes.sheetBody : undefined}>
+          {listed.map((tool, index) => (
+            <Fragment key={tool.id}>
+              {index > 0 && <Menu.Divider />}
+              {!tool.menu!.flat().some((option) => option.heading) && (
+                <Menu.Label>{tool.label}</Menu.Label>
+              )}
+              <ActionMenuItems
+                groups={tool.menu!.map((group) =>
+                  group.map((option) => ({
+                    ...option,
+                    disabled: option.disabled || tool.disabled,
+                  })),
+                )}
+              />
+            </Fragment>
+          ))}
+          {listed.length > 0 && others.length > 0 && <Menu.Divider />}
+          <ActionMenuItems groups={[others]} />
+        </div>
       </Menu.Dropdown>
     </Menu>
   );
