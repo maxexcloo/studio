@@ -154,6 +154,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       };
     },
     slots: () => state.slots,
+    text: () => "cloud",
     writer: {
       model: async () => "writer",
       chat: async ({ model, messages }) => {

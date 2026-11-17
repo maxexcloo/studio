@@ -17,8 +17,8 @@ import {
  * do (Cloud, or the local Fast or Quality tier); unsaved, each is local, and a saved Cloud reads as
  * unsaved while Cloud Models is off. The side that can't run
  * gives way to the other, saying so; a model the person picks always wins (model/catalogue.js,
- * animate-profile.js). `writingModel` is the text model prompt writing asks for (assistant.js
- * `writerModel`). `galleryWork` is which unfinished work the gallery shows: none (unsaved), work
+ * animate-profile.js). `text` says where other text work runs (`textSide`). `writingModel` is the
+ * text model prompt writing asks for (assistant.js `writerModel`). `galleryWork` is which unfinished work the gallery shows: none (unsaved), work
  * in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
  * settings (shared/appearance.ts), and `chatBrief` the standing brief chats write to
  * (shared/chat-brief.ts). Keys Studio no longer knows are dropped as the document is read.
@@ -33,6 +33,7 @@ const preferenceDefaults = Object.freeze({
 const preferenceChoices = Object.freeze({
   galleryWork: ["none", "running", "queued"],
   images: ["cloud", "local"],
+  text: ["cloud", "local"],
   videos: ["cloud", "fast", "quality"],
 });
 const known = (key) =>
@@ -56,9 +57,19 @@ function saved(ownerId = "") {
 export function accountPreferences(ownerId = "") {
   const preferences = { ...preferenceDefaults, ...saved(ownerId) };
   if (!preferences.cloudModels)
-    for (const key of ["images", "videos"])
+    for (const key of ["images", "text", "videos"])
       if (preferences[key] === "cloud") delete preferences[key];
   return preferences;
+}
+
+/**
+ * Where the account's text work other than its prompt writing runs (assistant.js `modelFor`):
+ * titles, captions, suggestions, Dream and the like. Unsaved, Cloud, or Local while Cloud Models
+ * is off.
+ */
+export function textSide(ownerId = "") {
+  const { cloudModels, text } = accountPreferences(ownerId);
+  return text || (cloudModels ? "cloud" : "local");
 }
 
 /** Which preferences the account has saved, so a value carried over from a device never replaces one. */

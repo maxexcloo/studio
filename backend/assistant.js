@@ -10,7 +10,10 @@ import { replyTitle, titleRule } from "../shared/titles.ts";
  *
  * It uses the gateway credentials (STUDIO_ASSISTANT_URL, _KEY) and asks Bifrost for a model
  * (`model()`): for an account's prompt writing, the text model it picked (`writerModel`); for
- * anything else STUDIO_ASSISTANT_CLOUD_MODEL, so background work never evicts local image models.
+ * anything else, background work included, where the account runs text (its Text preference):
+ * Local asks for the local text model while a workload serving it runs, and Cloud, the default,
+ * STUDIO_ASSISTANT_CLOUD_MODEL, as does work for no account. A call to the local text model makes a
+ * shared GPU worker swap out the image model it is generating with, so only those choices reach it.
  * For an account with uncensored access a base `…/auto` alias becomes `…/uncensored`.
  * Structured calls turn reasoning off with `reasoning_effort` (`reasoningEfforts`).
  * Settings are read on every call, so a model picked in Settings applies at once.
@@ -510,11 +513,6 @@ export function createAssistant(
     return resolved;
   };
 
-  /** Calls other than an account's prompt writing use the cloud, which reads images. */
-  function route() {
-    return { model: settings().cloud, vision: true };
-  }
-
   /**
    * The model an account's prompt writing asks for (Settings › Preferences › Prompt Assistant):
    * `picked`, otherwise the cloud model's uncensored alias where the account may use uncensored
@@ -527,19 +525,21 @@ export function createAssistant(
   }
 
   /**
-   * The Bifrost model calls ask for: the account's `writer` (writerModel's input) for prompt
-   * writing, otherwise the route's, uncensored when `explicit`.
+   * The Bifrost model calls ask for: with the account's `writer` (writerModel's input) its prompt
+   * writing's; otherwise where the account runs text (`writer` "local" or "cloud", its Text
+   * preference): the running local text model for "local" while a workload serves it, else the
+   * cloud model, uncensored when `explicit`.
    */
-  async function modelFor(task, explicit = false, writer) {
-    if (writer) return writerModel(writer);
-    return uncensoredAlias(route().model, explicit);
+  async function modelFor(task, explicit = false, writer = "cloud") {
+    if (typeof writer === "object") return writerModel(writer);
+    const local = writer === "local" && (await localText());
+    return uncensoredAlias(local ? local.model : settings().cloud, explicit);
   }
 
   /** Whether the model calls take reads images: a local one as its workload says, any other always. */
   async function supportsVision(writer) {
-    if (!writer) return route().vision;
+    const model = await modelFor("vision", false, writer);
     const local = await localText();
-    const model = writerModel(writer);
     return model.startsWith("local/") || model === local?.model ? Boolean(local?.vision) : true;
   }
 
@@ -1010,8 +1010,9 @@ export function createAssistant(
     profiles = [],
     loras = [],
     signal,
+    side,
   } = {}) {
-    const model = await modelFor("describe", explicit);
+    const model = await modelFor("describe", explicit, side);
     const started = now();
     const pictures = images.filter((image) => image?.data);
     const vision = pictures.length > 0;
@@ -1085,8 +1086,8 @@ export function createAssistant(
    * (domain/captions.ts). The caller checks the model reads images. A reply that isn't the asked-for
    * JSON is kept as plain text without tags; the text is cut to `captionCharacters`.
    */
-  async function caption({ image, signal } = {}) {
-    const model = await modelFor("caption");
+  async function caption({ image, signal, side } = {}) {
+    const model = await modelFor("caption", false, side);
     const reply = await chat({
       call: "caption",
       model,
@@ -1118,8 +1119,8 @@ export function createAssistant(
    * How a Dream result fits its project's brief (domain/review.ts); the caller checks the model
    * reads images. Throws AssistantError on a reply without a score.
    */
-  async function review({ image, brief, explicit = false, signal } = {}) {
-    const model = await modelFor("review", explicit);
+  async function review({ image, brief, explicit = false, signal, side } = {}) {
+    const model = await modelFor("review", explicit, side);
     const reply = await chat({
       call: "review",
       model,
@@ -1240,8 +1241,8 @@ export function createAssistant(
   }
 
   /** A gallery item's title of a few words, summarised from its prompt; throws on an unusable reply. */
-  async function title({ prompt, signal } = {}) {
-    const model = await modelFor("title");
+  async function title({ prompt, signal, side } = {}) {
+    const model = await modelFor("title", false, side);
     const reply = await chat({
       call: "title",
       model,

@@ -107,10 +107,10 @@ const videoChoices: { value: VideosPreference; label: string }[] = [
   { value: "quality", label: "Quality" },
 ];
 /**
- * Cloud Models, then where Images and Videos run by default: Cloud or Local, and for Videos Cloud
- * or the local Fast or Quality tier (unsaved, Local and Fast). With Cloud Models off, Cloud is no
- * choice, leaving Images none, and a saved Cloud reads as unsaved, as the backend reads it
- * (account-preferences.js).
+ * Cloud Models, then where Images, Text and Videos run by default: Cloud or Local, and for Videos
+ * Cloud or the local Fast or Quality tier (unsaved, Local, Cloud and Fast). With Cloud Models off,
+ * Cloud is no choice, leaving Images and Text none, and a saved Cloud reads as unsaved, as the
+ * backend reads it (account-preferences.js).
  */
 function WhereWorkRuns() {
   const status = useQuery(preferencesQuery).data;
@@ -150,6 +150,14 @@ function WhereWorkRuns() {
           sides,
           preferences.images || "local",
           (images) => save.mutate({ images }),
+        )}
+      {cloud &&
+        row(
+          "Text",
+          "Where titles, captions, suggestions and Dream's writing run. Local shares a GPU with images.",
+          sides,
+          preferences.text || "cloud",
+          (text) => save.mutate({ text }),
         )}
       {row(
         "Videos",

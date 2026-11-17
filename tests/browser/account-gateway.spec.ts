@@ -440,8 +440,9 @@ test("A member turns the Cloud Models its group grants off for itself, leaving C
   await cloud.click({ force: true });
   await expect(cloud).not.toBeChecked();
   await expect.poll(() => state.preferences.preferences.cloudModels).toBe(false);
-  // Images then has nothing to choose, and Videos only the local tiers.
+  // Images and Text then have nothing to choose, and Videos only the local tiers.
   await expect(images).toHaveCount(0);
+  await expect(where.getByRole("radiogroup", { name: "Text", exact: true })).toHaveCount(0);
   const videos = where.getByRole("radiogroup", { name: "Videos", exact: true });
   await expect(videos.getByRole("radio")).toHaveCount(2);
   await expect(videos.getByRole("radio", { name: "Cloud" })).toHaveCount(0);

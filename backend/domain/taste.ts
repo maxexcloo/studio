@@ -152,15 +152,17 @@ export interface PromptWriter {
   picked?: string;
   uncensored: boolean;
 }
+/** Where an account's other text work runs (account-preferences.js `textSide`). */
+export type TextSide = "cloud" | "local";
 
 /** The assistant gateway's chat (assistant.js), which returns its reply without reasoning. */
 export interface TasteWriter<Content = string> {
   settings(): unknown;
   /**
    * The Bifrost model for a call type (assistant.js `modelFor`): the model an account's prompt
-   * writing asks for where its `writer` is given.
+   * writing asks for where its `writer` is given, else where it runs text.
    */
-  model(call: string, explicit?: boolean, writer?: PromptWriter): Promise<string>;
+  model(call: string, explicit?: boolean, writer?: PromptWriter | TextSide): Promise<string>;
   chat(request: {
     model: string;
     /** The call type, which sets its `reasoning_effort` (assistant.js `reasoningEfforts`). */
@@ -612,12 +614,15 @@ const phrases = (value: unknown, limit: number, longest = maxTastePhrase) =>
 export function createTaste({
   dataDir,
   writer = () => null,
+  textSide = () => "cloud",
   online = async () => true,
   updates = () => true,
   now = Date.now,
 }: {
   dataDir: string;
   writer?: (ownerId: string) => TasteWriter | null;
+  /** Where the owner runs text (account-preferences.js `textSide`). */
+  textSide?: (ownerId: string) => TextSide;
   updates?: () => boolean;
   online?: () => Promise<boolean>;
   now?: () => number;
@@ -692,7 +697,7 @@ export function createTaste({
     try {
       ({ text } = await model.chat({
         call: "taste",
-        model: await model.model("taste"),
+        model: await model.model("taste", false, textSide(ownerId)),
         messages: [
           { role: "system", content: instructions },
           {

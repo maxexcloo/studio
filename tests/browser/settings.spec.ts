@@ -344,8 +344,12 @@ test("Settings › Preferences saves the Prompt Assistant and where each area ru
     area(name).locator("label").filter({ hasText: choice }).click();
   // Without a grant there is no Cloud Models switch, and Cloud stays a choice.
   await expect(where.getByRole("switch")).toHaveCount(0);
-  await expect(where.getByRole("radiogroup")).toHaveCount(2);
+  await expect(where.getByRole("radiogroup")).toHaveCount(3);
   await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();
+  // Text runs on Cloud until the account picks Local.
+  await expect(area("Text").getByRole("radio", { name: "Cloud" })).toBeChecked();
+  await choose("Text", "Local");
+  await expect.poll(() => state.preferences.preferences.text).toBe("local");
   // Videos offers Animate's three choices, its saved tier showing.
   await expect(area("Videos").getByRole("radio")).toHaveCount(3);
   await expect(area("Videos").getByRole("radio", { name: "Quality" })).toBeChecked();

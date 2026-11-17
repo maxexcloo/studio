@@ -24,7 +24,7 @@ import {
   mayUseGenerationProfile,
   promptWriter,
 } from "./account-policy.js";
-import { accountPreferences } from "./account-preferences.js";
+import { accountPreferences, textSide } from "./account-preferences.js";
 import {
   accountAccessForId,
   gatewayAccountAccess,
@@ -605,6 +605,7 @@ const textOnline = async () => Boolean(assistantEngine);
 const tasteStore = createTaste({
   dataDir,
   writer: tasteWriter,
+  textSide,
   online: textOnline,
   updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
 });
@@ -832,13 +833,15 @@ const explicitFor = (ownerId) =>
 const suggestions = createSuggestions({
   taste,
   writer: tasteWriter,
+  textSide,
   online: textOnline,
   explicit: explicitFor,
   item: (ownerId, jobId, itemId) =>
     filterVisibleGallery(galleryJobItems(jobId, ownerId)).find(
       (item) => !itemId || item.id === itemId,
     ),
-  image: async (item) => ((await assistantEngine?.supportsVision()) ? smallImage(item) : null),
+  image: async (item) =>
+    (await assistantEngine?.supportsVision(textSide(item.ownerId))) ? smallImage(item) : null,
   save: (item, nextSteps) => updateGalleryJob(galleryKey(item), { nextSteps }),
   ideas: () => flagEnabled("STUDIO_PROMPT_IDEAS"),
   nextSteps: () => flagEnabled("STUDIO_NEXT_STEPS"),
@@ -902,6 +905,7 @@ const dream = createDream({
   slots: () =>
     Math.max(1, listWorkers().filter((worker) => worker.capabilities.includes("image")).length),
   writer: assistantEngine,
+  text: textSide,
   guide: assistant.guide,
   gallery: (ownerId, query) => galleryItems({ ownerId, ...query }).map(withCanonicalProfile),
   count: (ownerId, query) => countGalleryItems({ ownerId, ...query }),
@@ -1070,6 +1074,7 @@ const runtimeLoad = (name) => () => readRuntimeDocument(dataDir, name) ?? null;
 const captioner = createCaptioner({
   enabled: () => flagEnabled("STUDIO_GALLERY_CAPTIONS"),
   writer: assistantEngine,
+  text: textSide,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
   items: idleItems,
@@ -1085,6 +1090,7 @@ registerIdlePassRoutes(app, "/api/gallery/captions", { work: captioner, requireA
 // Dream review (domain/review.ts): each project's unseen results scored against its brief.
 const dreamReview = createReview({
   writer: assistantEngine,
+  text: textSide,
   idle: galleryIdle,
   allowed: (ownerId) => Boolean(dream.access(ownerId)),
   items: idleItems,
@@ -1155,6 +1161,7 @@ onGalleryFilesDeleted((items) => imageSearch.forget(items));
 const titler = createTitler({
   enabled: () => flagEnabled("STUDIO_GALLERY_TITLES"),
   writer: assistantEngine,
+  text: textSide,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
   items: idleItems,
@@ -1168,6 +1175,7 @@ const titler = createTitler({
 const suggester = createPromptSuggester({
   enabled: () => flagEnabled("STUDIO_SUGGESTED_PROMPTS"),
   writer: assistantEngine,
+  text: textSide,
   idle: galleryIdle,
   allowed: promptWriterOwner,
   items: idleItems,
@@ -1182,6 +1190,7 @@ const nextSteps = createNextStepWork({
   enabled: () => flagEnabled("STUDIO_NEXT_STEPS"),
   suggestions,
   writer: assistantEngine,
+  text: textSide,
   idle: galleryIdle,
   allowed: promptWriterOwner,
   items: idleItems,
