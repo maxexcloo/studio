@@ -778,7 +778,7 @@ test("Clicking out of the open composer closes it without opening what lies unde
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
 });
 
-test("Prompt boxes copy and undoably clear, typed in place on phones", async ({
+test("Phone prompt boxes copy and undoably clear in place; desktop leaves both to the browser", async ({
   page,
 }, testInfo) => {
   await fixtures(page);
@@ -811,14 +811,14 @@ test("Prompt boxes copy and undoably clear, typed in place on phones", async ({
           .getByRole("group", { name: "Prompt Tools", exact: true })
           .getByRole("button", { name, exact: true })
       : page.getByRole("button", { name, exact: true });
-  const edit = async (name: string) => {
-    if (phone) return button(name).click();
-    const menu = await promptMenu(page, "Prompt");
-    await menu.getByRole("menuitem", { name, exact: true }).click();
-  };
   if (!phone) {
+    const menu = await promptMenu(page, "Prompt");
+    await expect(menu.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
+    await expect(menu.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
     await expect(button("Copy")).toHaveCount(0);
+    return;
   }
+  const edit = (name: string) => button(name).click();
   await edit("Copy");
   await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("A lantern in fog");
   await edit("Clear");
@@ -827,19 +827,11 @@ test("Prompt boxes copy and undoably clear, typed in place on phones", async ({
   await expect(prompt).toHaveValue("A lantern in fog");
   await edit("Clear");
   await prompt.fill("A");
-  if (phone) {
-    await expect(button("Clear")).toBeVisible();
-    await expect(button("Undo")).toHaveCount(0);
-    // Inline fields keep the Generate sheet's draft, with no second editor.
-    await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toHaveCount(0);
-  } else {
-    const menu = await promptMenu(page, "Prompt");
-    await expect(menu.getByRole("menuitem", { name: "Clear", exact: true })).toBeVisible();
-    await expect(menu.getByRole("menuitem", { name: "Undo", exact: true })).toHaveCount(0);
-    await page.keyboard.press("Escape");
-  }
+  await expect(button("Clear")).toBeVisible();
+  await expect(button("Undo")).toHaveCount(0);
+  // Inline fields keep the Generate sheet's draft, with no second editor.
+  await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toHaveCount(0);
   await prompt.fill("A lantern in fog");
-  if (!phone) return;
   // A tap on the text, rather than the fill's focus, starts the sheet's typing layout.
   await prompt.blur();
   await prompt.click();

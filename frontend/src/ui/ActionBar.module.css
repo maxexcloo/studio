@@ -52,18 +52,18 @@
     color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
-/* Phone item actions spread over a bounded, centred width, clear of the edges; verdict bars opt
-   into equal widths below. */
+/* Phone item actions share a bounded, centred row equally, so every gap matches whatever the
+   action; verdict bars opt into equal names below. */
 .actions[data-stacked] {
   width: 100%;
-  max-width: 20rem;
+  max-width: 26rem;
   margin-inline: auto;
-  justify-content: space-between;
+  justify-content: center;
   gap: 0;
 }
 
 .actions[data-stacked] .divider {
-  margin-inline: 2px;
+  margin-inline: 4px;
 }
 
 /* Narrow sides leave room for touch screens' wider minimum targets. */
@@ -90,24 +90,30 @@
   height: 10px;
 }
 
-/* A phone bar's unnamed controls are narrow, keeping their touch height, so every action and the
-   leading names fit one row; the theme's touch minimum width is an inline style. */
+/* A phone bar's unnamed controls take equal shares at their touch height, their icons centred and
+   any ▾ small in the corner, outside the flow; the theme's touch minimum width is an inline style. */
 .actions[data-stacked] .action:not(.stacked) {
-  width: 32px;
+  position: relative;
+  flex: 1 1 0;
+  width: auto;
+  max-width: 48px;
   min-width: 0 !important;
   padding-inline: 0;
 }
 
-.actions[data-stacked] .action.options {
-  width: auto;
+.actions[data-stacked] .chevron {
+  position: absolute;
+  inset-inline-end: 2px;
+  bottom: 6px;
+  margin: 0;
 }
 
-/* A fitted bar whose names have all gone, and a phone bar, draw each ▾ closer. */
-.actions:is([data-tight], [data-stacked]) .options {
+/* A fitted bar whose names have all gone draws each ▾ closer. */
+.actions[data-tight] .options {
   padding-inline: 2px 1px;
 }
 
-.actions:is([data-tight], [data-stacked]) .chevron {
+.actions[data-tight] .chevron {
   margin-inline-start: 0;
 }
 

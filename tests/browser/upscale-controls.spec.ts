@@ -172,7 +172,7 @@ test("Upscale quality, 2K/4K size and face detail reach one submission while pen
   }
 });
 
-test("Offline workers and unavailable upscale models explain why submission is disabled", async ({
+test("Offline workers offer Check Again and unavailable upscale models explain why", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -204,10 +204,10 @@ test("Offline workers and unavailable upscale models explain why submission is d
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
   await viewerAction(page, "Upscale");
-  // The menu says why, above its settings, and offers to check again.
+  // An offline worker adds no note; Check Again takes the run's place.
   const menu = page.getByRole("menu").last();
-  await expect(menu).toContainText("The selected upscale worker is offline.");
-  // Check Again takes the run's place.
+  await expect(page.getByRole("menuitem", { name: "Check Again", exact: true })).toBeVisible();
+  await expect(menu).not.toContainText("offline");
   await expect(page.getByRole("menuitem", { name: "Upscale", exact: true })).toHaveCount(0);
   offline = false;
   await page.getByRole("menuitem", { name: "Check Again", exact: true }).click();

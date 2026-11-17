@@ -378,33 +378,32 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   }
   await field.fill("The bird unfolds its wings.");
   const more = surface.getByRole("button", { name: "AI Instruction Actions", exact: true });
-  const edit = async (name: string) => {
-    if (phone) return surface.getByRole("button", { name, exact: true }).click();
-    await more.click();
-    await page.getByRole("menuitem", { name, exact: true }).click();
-  };
-  await edit("Copy");
-  await expect
-    .poll(() => page.evaluate(() => (window as any).copied))
-    .toBe("The bird unfolds its wings.");
-  await edit("Clear");
-  await expect(field).toHaveValue("");
-  await expect(surface.getByRole("button", { name: "Animate", exact: true })).toBeDisabled();
-  await edit("Undo");
-  await expect(field).toHaveValue("The bird unfolds its wings.");
+  // Phones copy and clear above the keyboard; desktop leaves both to the browser.
+  if (phone) {
+    const edit = (name: string) => surface.getByRole("button", { name, exact: true }).click();
+    await edit("Copy");
+    await expect
+      .poll(() => page.evaluate(() => (window as any).copied))
+      .toBe("The bird unfolds its wings.");
+    await edit("Clear");
+    await expect(field).toHaveValue("");
+    await expect(surface.getByRole("button", { name: "Animate", exact: true })).toBeDisabled();
+    await edit("Undo");
+    await expect(field).toHaveValue("The bird unfolds its wings.");
+  }
   await more.click();
   await expect(page.getByRole("menu").getByText("Suggestions", { exact: true })).toBeVisible();
-  if (phone) {
-    await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
-  }
+  await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
   await expect(surface).toBeVisible();
   await expect(dialog).toBeVisible();
   await more.click();
-  // Dismissing More by pressing the field leaves its editor and parent intact.
-  await field.click();
+  // Dismissing the tools, by their phone sheet's Close or a press on the field, leaves the editor
+  // and its parent intact.
+  if (phone) await page.getByRole("button", { name: "Close AI", exact: true }).click();
+  else await field.click();
   await expect(page.getByRole("menu")).toBeHidden();
   await expect(surface).toBeVisible();
   if (phone) {
@@ -428,7 +427,7 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   });
 });
 
-test("Viewer prompt keeps edit actions with no assistant tools and restores its original text", async ({
+test("Viewer prompt offers Reset once edited, without a menu, and restores its original text", async ({
   page,
 }, testInfo) => {
   const { viewer } = await seed(page, {}, async (page) => {
@@ -442,17 +441,17 @@ test("Viewer prompt keeps edit actions with no assistant tools and restores its 
   const surface = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
   const more = surface.getByRole("button", { name: "More Prompt Actions", exact: true });
-  await expect(more).toBeDisabled();
+  if (phone) await expect(more).toBeDisabled();
+  else await expect(more).toHaveCount(0);
+  const edit = (name: string) => surface.getByRole("button", { name, exact: true });
+  await expect(edit("Reset")).toHaveCount(0);
   await field.fill("A bird at night");
-  const edit = async (name: string) => {
-    if (phone) return surface.getByRole("button", { name, exact: true }).click();
-    await more.click();
-    await page.getByRole("menuitem", { name, exact: true }).click();
-  };
   if (phone) await expect(surface.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
-  await edit("Reset");
+  await edit("Reset").click();
   await expect(field).toHaveValue("An amber bird");
-  await edit("Undo");
+  // Desktop edits keep the prompt focused, so the bar stays open.
+  if (!phone) await expect(field).toBeFocused();
+  await edit("Undo").click();
   await expect(field).toHaveValue("A bird at night");
 });
 
@@ -1783,9 +1782,9 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       "Recreate",
       "Upscale",
       "AI",
+      "Share",
       "Like",
       "Dislike",
-      "Share",
       "Delete",
     ].map((name) => bar.getByRole("button", { name, exact: true }));
     const tops = await Promise.all(

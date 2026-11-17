@@ -205,8 +205,8 @@ function upscaleSettings(quick: ReturnType<typeof useQuickUpscale>, image: boole
 }
 /**
  * The media actions' Upscale: Show Upscale and Compare Upscale once there is one, its remembered
- * settings, then the run, or Stop Upscale while one is queued or running. Why the worker can't run
- * it shows above them.
+ * settings, then the run, or Stop Upscale while one is queued or running, or Check Again while the
+ * worker is offline. Why a running worker can't upscale shows above them.
  */
 export function useUpscaleAction(
   item: MediaItem,
@@ -238,13 +238,13 @@ export function useUpscaleAction(
   const quick = useQuickUpscale(item, ready);
   const stop = useStopUpscale(item);
   const { data: status, error } = quick.status;
+  // An offline worker is routine (placed by hand), so only a running one that can't upscale says why.
   const unavailable =
-    error?.message ??
-    (status && !status.ready
+    status && !status.ready
       ? status.nodesInstalled
         ? "This worker has no upscale models."
         : `The worker is missing ${status.missingNodes.join(", ")}.`
-      : undefined);
+      : undefined;
   return (
     ready &&
     itemAction("upscale", {

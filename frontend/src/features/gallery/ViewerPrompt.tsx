@@ -12,6 +12,7 @@ import {
   ProposalLabel,
   SendButton,
   UndoButton,
+  assistMenu,
   proposalText,
   proposedClass,
   useChangeSuggestions,
@@ -24,7 +25,7 @@ import { type EditAsk, type Iteration, typedPrompt, useEditReview } from "./useM
 
 import classes from "./MediaViewer.module.css";
 
-/** The prompt's assistance, shown in the viewer bar's AI menu. */
+/** The prompt's assistance: the viewer bar's AI menu on desktop, the prompt's own AI tool on phones. */
 export interface PromptAssist {
   onOpen: () => void;
   settings: Action[];
@@ -38,7 +39,7 @@ export type ViewerAsk = { request: string } | { custom: true };
 
 /**
  * The viewer's prompt and its assistance. The field holds the item's prompt: editing it and
- * pressing Enter or Generate runs it with the item's settings as a new version. The bar's AI menu
+ * pressing Enter or Generate runs it with the item's settings as a new version. Its assistance
  * asks for a suggestion, template or Custom… change through `useItemChange`; tile Edit choices use
  * the same request path. Review Prompt is off until chosen: when on, a proposal fills the field
  * until Run runs it or Undo restores what was typed; otherwise, the proposal runs at once.
@@ -110,8 +111,8 @@ export function useViewerPrompt(
     disabled: ask.pending,
     onPick: pick,
   });
-  // The viewer bar's AI menu holds these ahead of the item's own (MediaActions).
-  const assist: PromptAssist | null = ask.available
+  const phone = usePhone();
+  const assistance: PromptAssist | null = ask.available
     ? {
         onOpen: () => setSuggestionSource({ item: item.id, prompt: ask.typed ?? prompt }),
         settings: [
@@ -143,7 +144,22 @@ export function useViewerPrompt(
         ],
       }
     : null;
-  return { item, original, prompt, setPrompt, field, ask, custom, edit, assist };
+  // Desktop's bar AI menu holds these ahead of the item's own (MediaActions); phones keep them with
+  // the prompt, beside its text and in its full-screen editor.
+  const assist = phone ? null : assistance;
+  const tools: Action[] =
+    phone && assistance
+      ? [
+          {
+            id: "assistant",
+            label: "Suggestions",
+            icon: icons.assistant,
+            onOpen: assistance.onOpen,
+            menu: assistMenu({ ...assistance, last: [] }),
+          },
+        ]
+      : [];
+  return { item, original, prompt, setPrompt, field, ask, custom, edit, assist, tools };
 }
 
 export type ViewerPromptState = ReturnType<typeof useViewerPrompt>;
@@ -159,7 +175,7 @@ export function ViewerPrompt({
   pending?: Iteration;
 }) {
   const phone = usePhone();
-  const { item, original, prompt, setPrompt, field, ask, custom } = state;
+  const { item, original, prompt, setPrompt, field, ask, custom, tools } = state;
   const change = ask.proposal;
   const video = item.type === "video";
   const running = pending?.kind === "prompt";
@@ -226,8 +242,7 @@ export function ViewerPrompt({
         readOnly={change?.action === "upscale"}
         onChange={setPrompt}
         onKeyDown={keys}
-        tools={[]}
-        copy={false}
+        tools={tools}
         reset={original}
         send={send}
         busy={ask.pending ? "Asking for a Change…" : undefined}

@@ -591,28 +591,6 @@ export function GalleryPage() {
           }
           toggles={
             <>
-              {view === "grid" && (
-                <Switch
-                  label="Originals Only"
-                  labelPosition="left"
-                  checked={originalsOnly}
-                  onChange={(event) => setOriginalsOnly(event.currentTarget.checked)}
-                />
-              )}
-              {phone && (
-                <Switch
-                  label="Disliked"
-                  labelPosition="left"
-                  checked={filters.rating === "disliked"}
-                  onChange={(event) =>
-                    setFilters({
-                      ...filters,
-                      rating: event.currentTarget.checked ? "disliked" : "",
-                      uploads: false,
-                    })
-                  }
-                />
-              )}
               {kind === "image" && (
                 <Switch
                   label="Comparisons"
@@ -621,6 +599,14 @@ export function GalleryPage() {
                   onChange={(event) =>
                     setFilters({ ...filters, comparisons: event.currentTarget.checked })
                   }
+                />
+              )}
+              {view === "grid" && (
+                <Switch
+                  label="Originals Only"
+                  labelPosition="left"
+                  checked={originalsOnly}
+                  onChange={(event) => setOriginalsOnly(event.currentTarget.checked)}
                 />
               )}
             </>

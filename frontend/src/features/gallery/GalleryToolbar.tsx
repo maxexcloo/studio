@@ -192,20 +192,18 @@ export function GalleryToolbar({
           onChange({ ...value, rating: value.rating === "liked" ? "" : "liked", uploads: false })
         }
       />
-      {!phone && (
-        <FilterToggle
-          label="Disliked"
-          icon={icons.dislike}
-          on={value.rating === "disliked"}
-          onToggle={() =>
-            onChange({
-              ...value,
-              rating: value.rating === "disliked" ? "" : "disliked",
-              uploads: false,
-            })
-          }
-        />
-      )}
+      <FilterToggle
+        label="Disliked"
+        icon={icons.dislike}
+        on={value.rating === "disliked"}
+        onToggle={() =>
+          onChange({
+            ...value,
+            rating: value.rating === "disliked" ? "" : "disliked",
+            uploads: false,
+          })
+        }
+      />
       <FilterToggle
         label="Uploads"
         icon={icons.uploads}
