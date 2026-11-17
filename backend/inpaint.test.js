@@ -9,6 +9,7 @@ import {
   inpaintNodes,
   maskBounds,
   maskBufferFromDataUrl,
+  radianceMask,
 } from "./inpaint.js";
 
 const objectInfo = recordedObjectInfo();
@@ -159,6 +160,39 @@ test("the files: an exact crop, a hard grown sampling mask and a feathered stitc
     .toBuffer();
   assert.equal(
     await inpaintFiles(sharp, source, empty, { targetPixels: 1024 * 1024, feather: 0.4 }),
+    null,
+  );
+});
+
+test("Radiance's mask covers the first picture, transparent only where the mask was painted", async () => {
+  const sharp = (await import("sharp")).default;
+  const picture = await sharp({
+    create: { width: 64, height: 32, channels: 3, background: "#808080" },
+  })
+    .png()
+    .toBuffer();
+  // Painted on the left half of a mask at half the picture's size.
+  const painted = Buffer.alloc(32 * 16);
+  for (let y = 0; y < 16; y += 1) painted.fill(255, y * 32, y * 32 + 16);
+  const mask = await sharp(painted, { raw: { width: 32, height: 16, channels: 1 } })
+    .png()
+    .toBuffer();
+  const { data, info } = await sharp(await radianceMask(sharp, picture, mask))
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  assert.deepEqual([info.width, info.height], [64, 32]);
+  const alpha = (x, y) => data[(y * 64 + x) * info.channels + 3];
+  assert.equal(alpha(4, 16), 0);
+  assert.equal(alpha(60, 16), 255);
+  assert.equal(
+    await radianceMask(
+      sharp,
+      picture,
+      await sharp(Buffer.alloc(32 * 16), { raw: { width: 32, height: 16, channels: 1 } })
+        .png()
+        .toBuffer(),
+    ),
     null,
   );
 });

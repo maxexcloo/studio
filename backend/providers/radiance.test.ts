@@ -38,6 +38,13 @@ test("an image request sends its exact schedule, guidance and LoRAs", () => {
   assert.equal(edit.route, "/v1/images/edits");
   assert.equal((edit.body as FormData).getAll("image[]").length, 2);
   assert.equal((edit.body as FormData).get("loras"), '[{"name":"styles/ink","weight":0.6}]');
+  const masked = imageRequest(image, [new Uint8Array([1])], "", {
+    mask: new Uint8Array([2]),
+    transparent: true,
+  }).body as FormData;
+  assert.ok(masked.get("mask"));
+  assert.equal(masked.get("background"), "transparent");
+  assert.equal(masked.get("output_format"), "png");
 });
 
 test("an edit reaches Radiance as multipart fields through the default client", async () => {

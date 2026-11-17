@@ -320,7 +320,12 @@ export function inferModels(
           familyStep,
         )
       : {};
-    if (Object.values(workflow.graph || {}).some((node) => node.class_type === radianceImageNode)) {
+    const radianceImage = Object.values(workflow.graph || {}).some(
+      (node) => node.class_type === radianceImageNode,
+    );
+    // Radiance's Qwen-Image 2.1 family (Noct included) repaints a mask and draws transparency itself.
+    const radianceQwen = radianceImage && loraFamilyId(workflow.family) === "qwen_image_21";
+    if (radianceImage) {
       const { maxSide } = radianceImageLimits(String(defaults.model || ""));
       widthRange.max = Math.min(widthRange.max ?? maxSide, maxSide);
       heightRange.max = Math.min(heightRange.max ?? maxSide, maxSide);
@@ -473,14 +478,19 @@ export function inferModels(
       imageModes: workflow.imageModes,
       capabilities: {
         ...workflow.capabilities,
-        // A mask needs an image the graph takes in, a saved image to stitch into and the stitch's
-        // core nodes (checked once a worker answers).
+        // A mask needs an image the graph takes in and, on ComfyUI, a saved image to stitch into
+        // and the stitch's core nodes (checked once a worker answers).
         inpaint:
           workflow.kind === "image" &&
           workflow.capabilities.inpaint !== false &&
           Boolean(workflow.mediaInputs?.length || workflow.controls?.startImage) &&
-          imageSaves(workflow.graph).length > 0 &&
-          (configuredOnly || !missingNodes(info, inpaintNodes).length),
+          (radianceImage
+            ? radianceQwen
+            : imageSaves(workflow.graph).length > 0 &&
+              (configuredOnly || !missingNodes(info, inpaintNodes).length)),
+        // Mask strength and edge softness shape ComfyUI's stitch; Radiance repaints the mask exactly.
+        inpaintStitch: !radianceImage,
+        transparent: radianceQwen,
       },
       mediaInputs: workflow.mediaInputs || [],
       aspectPolicy: workflow.aspectPolicy,

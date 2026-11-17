@@ -358,6 +358,10 @@ export function sanitizeGenerateBody(
     rebalance,
     // A model that makes sound (Grok Imagine Video 1.5) can be asked for a silent video.
     ...(profile.capabilities.sound && input.sound === false ? { sound: false } : {}),
+    // Radiance's Qwen draws a transparent background where asked.
+    ...(profile.capabilities.transparent && input.transparent === true
+      ? { transparent: true }
+      : {}),
     // The size tier the run's width and height came from (shared/resolution.ts), kept for reuse.
     ...(isResolution(input.resolutionTier) ? { resolutionTier: input.resolutionTier } : {}),
     frames: kind === "video" ? videoFrames(input.frames, frameRange) : 0,
