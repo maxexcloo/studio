@@ -14,7 +14,6 @@ import {
 import { selectedResolution, withResolution } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { accessFeatures } from "../account-policy.js";
-import { accountPreferences } from "../account-preferences.js";
 import { animateProfile, frameSize } from "../animate-profile.js";
 import { step } from "../event-loop.js";
 import { topCaptionTags } from "../gallery/filters.js";
@@ -491,7 +490,7 @@ export class McpMedia {
     // Concurrent submissions share discovery; do not queue repeated catalogue scans.
     if (stale && !this.profileRequests.has(owner)) {
       const generation = this.profileGeneration || 0;
-      const pending = this.request("GET", "/api/models?cached=1", undefined, owner)
+      const pending = this.request("GET", "/api/models?cached=1&preferences=0", undefined, owner)
         .then((result) => {
           // A scan that overlapped a model-list change is used once but not cached.
           if ((this.profileGeneration || 0) === generation) {
@@ -740,18 +739,7 @@ export class McpMedia {
     )
       body.tiledDecode = true;
     const writing = write?.animate ? { kind: "animate", ...write.animate } : null;
-    // A set's prompts spread the LoRAs left to Studio around the strengths the account liked.
     const vary = Boolean(result_set) && !request.comparison && stack.some((lora) => !lora.fixed);
-    const liked = vary
-      ? Object.fromEntries(
-          (
-            (await this.request("GET", "/api/taste", undefined, owner).catch(() => ({})))
-              .loraScores || []
-          )
-            .filter((lora) => Number.isFinite(lora.strength))
-            .map((lora) => [lora.name, lora.strength]),
-        )
-      : {};
     // How long the set should take, asked alongside submission; it never holds up or fails the set.
     const estimate = this.runEstimate(
       owner,
@@ -801,7 +789,7 @@ export class McpMedia {
                   : {}),
                 ...(vary
                   ? {
-                      loras: varyLoras(stack, infos, (result_set.first ?? 0) + position, liked).map(
+                      loras: varyLoras(stack, infos, (result_set.first ?? 0) + position).map(
                         (lora) => ({
                           ...lora,
                           enabled: true,
@@ -1815,13 +1803,10 @@ export class McpMedia {
     // on its video's own model while that runs and is in the pool asked (`where`: auto, local or
     // cloud, which always takes Animate's pick), and anything else takes Animate's own pick.
     const videos = await this.profiles("video", owner);
-    // The account's Videos preference, as in the app (model/routes.js): Cloud first, else local.
-    const cloudPreferred = where === "auto" && accountPreferences(owner).videos === "cloud";
     const own =
       item.type === "video" &&
       !tier &&
       where !== "cloud" &&
-      !cloudPreferred &&
       videos.find(
         (profile) =>
           profile.id === canonicalProfileId(item.settings.profileId) &&
@@ -1839,7 +1824,7 @@ export class McpMedia {
         localParked: models.backends?.video?.parked === true,
         tier,
         where,
-        prefer: cloudPreferred ? "cloud" : "local",
+        prefer: "local",
       });
       base = choice.profile;
       note = choice.note ? `${choice.note} Tell the user. ` : "";

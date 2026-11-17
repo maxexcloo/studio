@@ -44,16 +44,7 @@ import {
 } from "./controls.js";
 import { findCard } from "./manage.js";
 import { aboutTime, assertJobCount, mcpJson, readyIn, setItems } from "./media.js";
-import {
-  accountBrief,
-  accountBriefLine,
-  assertAvoided,
-  assertNotDisliked,
-  briefLine,
-  keptChoices,
-  projectArgs,
-  projectTargets,
-} from "./project.js";
+import { assertAvoided, briefLine, keptChoices, projectArgs, projectTargets } from "./project.js";
 import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
 import { output, shortPrompt } from "./results.js";
 import {
@@ -1129,10 +1120,7 @@ export function registerGenerateTools({
     );
   };
   const generateOnce = async (input, signal, accepted) => {
-    const [project, account] = await Promise.all([
-      attachedProject(signal),
-      accountBrief(media, owner, signal),
-    ]);
+    const project = await attachedProject(signal);
     const choices = chatChoices.read(owner, conversation);
     const remembered = keptChoices(choices, structuredClone(input));
     const constrained = project
@@ -1244,7 +1232,6 @@ export function registerGenerateTools({
       );
     }
     if (project) assertAvoided(project, args.prompts);
-    assertNotDisliked(account, args.prompts);
     if ([args.profile_id, profile_ids, each_profile].filter(Boolean).length > 1)
       throw new Error(
         "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call generate again.",
@@ -1332,33 +1319,11 @@ export function registerGenerateTools({
         } catch {
           // Gone or no longer granted: Studio picks as usual.
         }
-      // Otherwise the first ready favourite in the user's taste that fits.
-      let favourite = null;
-      if (
-        args.profile_id === undefined &&
-        !fits &&
-        !keptModel &&
-        !card &&
-        !args.loras?.length &&
-        account.models.length
-      ) {
-        const ready = localUnlessAsked(await media.profiles(kind || "image", owner), { request });
-        const pool = wanted ? profilesForTier(ready, wanted) : ready;
-        const found = account.models
-          .map((id) => pool.find((profile) => profile.id === id))
-          .find((profile) => profile && (profile.mediaInputs || []).length >= references);
-        if (found)
-          favourite = {
-            profile: found,
-            note: `Ran on ${found.label || found.id}, the user's favourite. `,
-          };
-      }
       targets = [
         args.profile_id === undefined
           ? fits
             ? fromRequest
             : keptModel ||
-              favourite ||
               picked(
                 await media.choices(owner, {
                   kind,
@@ -1414,9 +1379,6 @@ export function registerGenerateTools({
       throw new Error("These models cannot hold a seed for a controlled comparison.");
     if (axis && several && targets.length < compareVariants.min)
       throw new Error(`Compare at least ${compareVariants.min} models.`);
-    // The account's brief comes back with a chat's first generate, and again as its guide would.
-    const accountLine = accountBriefLine(account, await media.profiles("all", owner));
-    if (accountLine && review(refs, "brief")) projectNote = `${accountLine}${projectNote}`;
     chatChoices.remember(
       owner,
       conversation,
@@ -1749,12 +1711,8 @@ export function registerGenerateTools({
       const minor = minorAgeRefusal(prompt);
       if (minor) throw new Error(minor);
     }
-    const [project, account] = await Promise.all([
-      attachedProject(signal),
-      accountBrief(media, owner, signal),
-    ]);
+    const project = await attachedProject(signal);
     if (project) assertAvoided(project, checked);
-    assertNotDisliked(account, checked);
     // Each plan's chosen prompts, grouped by how many images each runs, become a submission.
     const all = await media.profiles("all", owner);
     const seed = crypto.randomInt(2 ** 31);

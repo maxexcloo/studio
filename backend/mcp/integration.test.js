@@ -469,7 +469,7 @@ async function fixture(
           defaults: { imageModel: defaults.image, videoModel: defaults.video },
           ...(backends ? { backends } : {}),
         },
-        preferences,
+        req.query.preferences === "0" ? {} : preferences,
       ),
     ),
   );
@@ -3819,7 +3819,7 @@ test("A set's prompts spread LoRA strengths left to Studio within their range, k
     ["fixture-effect 1", "fixture-unknown 0.4"],
     ["fixture-effect 0.8", "fixture-unknown 0.4"],
   ]);
-  // Centred on the strength the account liked; with two left to Studio, the fourth leaves one out.
+  // Account taste does not change the strengths; the fourth leaves the last free LoRA out.
   f.app.get("/api/taste", (_req, res) =>
     res.json({ loraScores: [{ name: "fixture-effect.safetensors", strength: 1, score: 2 }] }),
   );
@@ -3828,10 +3828,10 @@ test("A set's prompts spread LoRA strengths left to Studio within their range, k
     loras: [{ name: "fixture-effect" }, { name: "fixture-unknown" }],
   });
   assert.deepEqual(strengths(), [
-    ["fixture-effect 1", "fixture-unknown 1"],
-    ["fixture-effect 0.6", "fixture-unknown 0.85"],
-    ["fixture-effect 1.1", "fixture-unknown 1.15"],
-    ["fixture-effect 1"],
+    ["fixture-effect 0.8", "fixture-unknown 1"],
+    ["fixture-effect 0.5", "fixture-unknown 0.85"],
+    ["fixture-effect 1", "fixture-unknown 1.15"],
+    ["fixture-effect 0.8"],
   ]);
 });
 
@@ -5020,10 +5020,10 @@ test("video stays local while the worker is up, and a plain request never reache
     data(await call(full, "generate", { kind: "video", prompts: ["A wave"], count: 1 })).profile.id,
     "fl-fast",
   );
-  // Videos preferred in the cloud run there by default, with no note.
+  // Browser video preferences do not send a plain MCP request to the cloud.
   await f.profiles(videoCatalogue(), { preferences: { videos: "cloud" } });
   const preferred = await call(full, "generate", { kind: "video", prompts: ["A wave"], count: 1 });
-  assert.equal(data(preferred).profile.remote, true);
+  assert.equal(data(preferred).profile.remote, undefined);
   assert.doesNotMatch(texts(preferred), /No local/);
   f.submitted.pop();
   await f.profiles(videoCatalogue(), { preferences: {} });
@@ -7958,10 +7958,10 @@ test("axis varies one thing at one seed, one image each, as a lettered side-by-s
   assert.equal(f.submitted.length, 0);
 });
 
-test("the account's brief comes back with a chat's first generate, picks its taste's favourite model and refuses its Dislikes", async (t) => {
+test("MCP generation follows supplied prompts independently of saved account brief and taste", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
-  // Each field is the user's where they set it, else what Studio learnt; learnt Dislikes refuse too.
+  // Explicit preference edits remain available without constraining generation.
   const learnt = { avoid: ["coat"], models: [], loras: ["film"] };
   const taste = { ...learnt, preferences: {} };
   f.app.get("/api/taste", (_req, res) => res.json(taste));
@@ -7973,7 +7973,7 @@ test("the account's brief comes back with a chat's first generate, picks its tas
     }
     res.json(taste);
   });
-  await failure(client, "generate", { prompts: ["A red coat"] });
+  await generate(client, { prompts: ["A red coat"] });
   const saved = data(
     await call(client, "project", {
       action: "brief",
@@ -7986,19 +7986,12 @@ test("the account's brief comes back with a chat's first generate, picks its tas
   assert.equal(saved.user_brief.subjects, "a woman in her 30s");
   assert.deepEqual(saved.avoid, ["buttons"]);
   assert.deepEqual(saved.lora_names, ["film"]);
-  await failure(client, "generate", { prompts: ["A coat with buttons"] });
+  await generate(client, { prompts: ["A coat with buttons"] });
   const reply = await call(client, "generate", { prompts: ["A woollen coat"] });
-  assert.match(
-    texts(reply),
-    /The user's brief: subjects a woman in her 30s; favourite models .+; favourite LoRAs film; avoid buttons\./,
-  );
-  assert.match(texts(reply), /the user's favourite/);
+  assert.doesNotMatch(texts(reply), /The user's brief|the user's favourite/);
+  assert.equal(f.submitted.at(-1).prompt, "A woollen coat");
   assert.equal(f.submitted.at(-1).profileId, imageProfile.id);
   assert.doesNotMatch(
-    texts(await call(client, "generate", { prompts: ["A linen coat"] })),
-    /The user's brief/,
-  );
-  assert.match(
     texts(await call(await f.client(), "generate", { prompts: ["A cotton coat"] })),
     /The user's brief/,
   );
