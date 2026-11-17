@@ -17,6 +17,7 @@ import { maxPromptCharacters } from "../shared/queue.ts";
 import { AssistantError, cleanPrompt } from "./assistant.js";
 import { userContent } from "./domain/model-content.ts";
 import {
+  americanEnglish,
   contentRule,
   fidelity,
   filler,
@@ -113,11 +114,12 @@ export function animateInstructions({
     frameKnowledge[known],
     "The source prompt is guidance on intent and mood, not proof that every described subject, prop or event is visible. Where it and the frame disagree, the frame wins. Begin from the actual pose and arrangement; carry out the requested action through physically connected movements without resetting the scene.",
     fidelity,
+    americanEnglish,
     "Never contradict the frame. Keep each subject's identity, face, body, outfit, setting and style as they are unless the theme or instruction changes them.",
     pacing(seconds, fps),
     "Choose a visible development that suits the source and theme, with preparation, action and reaction forming one achievable sequence. A held pose or quiet reaction can be a beat; do not add a separate gesture or event just to fill it.",
     fps && fps < 20
-      ? `At ${fps} fps fast motion judders: favour fluid, moderate-speed movement and steady camera moves.`
+      ? `At ${fps} fps fast motion judders: favor fluid, moderate-speed movement and steady camera moves.`
       : "",
     "Keep it clean and consistent: one through-line of action that the frame sets up, each beat following from the last, not a list of unrelated motions. Keep it alive: pick what is particular to this frame (its subject, props, weather, light) and make that move, rather than a stock gesture any image would get.",
     "Make every beat concrete and physical: what the hands, eyes, head and body do; how hair, fabric, water, smoke, dust and light respond; how the subject touches or disturbs the things and people around them.",

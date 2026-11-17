@@ -42,7 +42,7 @@ test("every recorded reply passes the scorer when replayed through the engine", 
   assert.equal(passed, total);
 });
 
-test("the scorer catches dropped subjects and quotes, setting words, missing tone, length and preambles", () => {
+test("the scorer catches dropped subjects and quotes, setting words, spelling, missing tone, length and preambles", () => {
   const item = {
     id: "x",
     prompt: 'a sign reading "Open Late" on a bar',
@@ -68,6 +68,10 @@ test("the scorer catches dropped subjects and quotes, setting words, missing ton
   assert.deepEqual(
     failing('Portrait of a man at a bar, sign reading "Open Late", 16:9, 4K, turbo.'),
     ["no setting words"],
+  );
+  assert.deepEqual(
+    failing('Portrait of a man at a bar with a grey sign reading "Open Late", 35mm lens.'),
+    ["American spelling"],
   );
   assert.deepEqual(failing('A painting of a bar with a sign reading "Open Late".'), [
     "portrait tone",

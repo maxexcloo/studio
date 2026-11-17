@@ -21,7 +21,7 @@
       "expect": {
         "keep": ["cabin", "snow"]
       },
-      "recorded": "A cosy wooden cabin half-buried in fresh snow at night, warm amber light spilling from its small square windows, smoke curling from the stone chimney, snow-laden pines around it under a clear starry sky."
+      "recorded": "A cozy wooden cabin half-buried in fresh snow at night, warm amber light spilling from its small square windows, smoke curling from the stone chimney, snow-laden pines around it under a clear starry sky."
     },
     {
       "id": "enhance-sign-quote",
@@ -87,7 +87,7 @@
       "expect": {
         "keep": ["fisherman"]
       },
-      "recorded": "Close-up portrait of an old fisherman on a harbour wall, deep weathered lines across his face, grey stubble and a navy wool cap, his pale eyes looking just past the camera with a wry half-smile, soft overcast light from the left, an 85mm lens with shallow depth of field, the boats behind him a soft grey-blue wash."
+      "recorded": "Close-up portrait of an old fisherman on a harbor wall, deep weathered lines across his face, gray stubble and a navy wool cap, his pale eyes looking just past the camera with a wry half-smile, soft overcast light from the left, an 85mm lens with shallow depth of field, the boats behind him a soft gray-blue wash."
     },
     {
       "id": "illustration-tokyo",
@@ -109,7 +109,7 @@
       "expect": {
         "keep": ["Tokyo", "night"]
       },
-      "recorded": "Watercolour illustration of a narrow rainy lane in Tokyo at night, loose wet-on-wet washes of indigo and violet, red and white lanterns bleeding warm glows into the puddles, a commuter with a clear umbrella drawn in fine ink linework, the paper's texture showing through the rain."
+      "recorded": "Watercolor illustration of a narrow rainy lane in Tokyo at night, loose wet-on-wet washes of indigo and violet, red and white lanterns bleeding warm glows into the puddles, a commuter with a clear umbrella drawn in fine ink linework, the paper's texture showing through the rain."
     },
     {
       "id": "cinematic-desert",
@@ -197,7 +197,7 @@
       "expect": {
         "keep": ["poster", "saxophone"]
       },
-      "recorded": "A vintage poster titled \"Summer Jazz\" showing a saxophone player in warm sunset colours."
+      "recorded": "A vintage poster titled \"Summer Jazz\" showing a saxophone player in warm sunset colors."
     },
     {
       "id": "candid-family",
@@ -243,7 +243,7 @@
         "keep": ["dog", "sofa"],
         "avoid": ["blurry", "grainy", "motion blur", "phone", "snapshot"]
       },
-      "recorded": "An unposed everyday photograph of a scruffy terrier dog dozing on a worn grey sofa, one ear flopped over, a crumpled blanket and a half-read paperback beside it, afternoon daylight through half-closed blinds laying soft stripes across the cushions."
+      "recorded": "An unposed everyday photograph of a scruffy terrier dog dozing on a worn gray sofa, one ear flopped over, a crumpled blanket and a half-read paperback beside it, afternoon daylight through half-closed blinds laying soft stripes across the cushions."
     },
     {
       "id": "spicy-couple",
@@ -490,7 +490,7 @@
         "avoid": ["snow"],
         "tone": ["summer"]
       },
-      "recorded": "A cosy wooden cabin on a warm summer evening, its porch lanterns just lit, wildflowers and long grass around it, the sky fading from apricot to lavender over the pines behind.",
+      "recorded": "A cozy wooden cabin on a warm summer evening, its porch lanterns just lit, wildflowers and long grass around it, the sky fading from apricot to lavender over the pines behind.",
       "instruction": "make it a summer evening instead"
     }
   ]

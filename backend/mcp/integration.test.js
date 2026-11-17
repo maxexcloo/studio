@@ -1113,8 +1113,8 @@ test("media and administrator credentials discover only their own friendly tools
     // person's age and ethnicity first, to 20,250 for Search's dislikes, pages and summary and for
     // leaving LoRA strengths to vary, and to 21,750 for generate's chat context and create_characters;
     // sets, axis comparisons and the user's brief were then fitted within it; then to 21,900 for
-    // cancel_all's chat and account scopes.
-    JSON.stringify(tools).length + media.getInstructions().length < 21900,
+    // cancel_all's chat and account scopes, and to 22,050 for writing prompts in American English.
+    JSON.stringify(tools).length + media.getInstructions().length < 22050,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });

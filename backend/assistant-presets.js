@@ -24,7 +24,7 @@ export const seedStyles = Object.freeze([
     label: "Cinematic",
     description: "A film still: framing, grade and mood.",
     instruction:
-      "Cinematic: write it as a still from a film, a moment caught mid-story. Name the framing and camera angle, dramatic motivated light, the colour grade and the atmosphere, as a cinematographer would.",
+      "Cinematic: write it as a still from a film, a moment caught mid-story. Name the framing and camera angle, dramatic motivated light, the color grade and the atmosphere, as a cinematographer would.",
   },
   {
     id: "concise",
@@ -69,7 +69,7 @@ export const seedStyles = Object.freeze([
     label: "Illustration",
     description: "Artwork in one specific medium and style.",
     instruction:
-      "Illustration: make it artwork, not a photograph. Use the medium the prompt names, or choose one that suits the subject (such as watercolour, ink, gouache, flat vector, cel-shaded animation or oil paint), and describe its linework, palette, texture and composition. No camera, lens or photographic words.",
+      "Illustration: make it artwork, not a photograph. Use the medium the prompt names, or choose one that suits the subject (such as watercolor, ink, gouache, flat vector, cel-shaded animation or oil paint), and describe its linework, palette, texture and composition. No camera, lens or photographic words.",
   },
   {
     id: "photographic",
@@ -170,7 +170,7 @@ export const seedStyles = Object.freeze([
     label: "Warmer Light",
     description: "Golden, warm-toned light.",
     instruction:
-      "Warmer Light: change the light to warm, golden tones, as in late afternoon sun or lamplight, with warmer colours and softer shadows.",
+      "Warmer Light: change the light to warm, golden tones, as in late afternoon sun or lamplight, with warmer colors and softer shadows.",
   },
   {
     id: "cooler",
@@ -179,7 +179,7 @@ export const seedStyles = Object.freeze([
     label: "Cooler Light",
     description: "Cool, blue-toned light.",
     instruction:
-      "Cooler Light: change the light to cool, blue tones, as in overcast daylight or early morning, with cooler colours and crisper shadows.",
+      "Cooler Light: change the light to cool, blue tones, as in overcast daylight or early morning, with cooler colors and crisper shadows.",
   },
   {
     id: "night",
@@ -206,7 +206,7 @@ export const seedStyles = Object.freeze([
     label: "Simplify Background",
     description: "A plain, uncluttered background.",
     instruction:
-      "Simplify Background: replace the background with a plain, uncluttered one in colours that suit the subject, keeping the subject and its light unchanged.",
+      "Simplify Background: replace the background with a plain, uncluttered one in colors that suit the subject, keeping the subject and its light unchanged.",
   },
 ]);
 

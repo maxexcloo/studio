@@ -25,6 +25,7 @@ import { captionCharacters, captionInstructions, captionTags } from "./domain/ca
 import { userContent } from "./domain/model-content.ts";
 import { reviewInstructions, reviewReply } from "./domain/review.ts";
 import {
+  americanEnglish,
   avoidFiller,
   contentRule,
   fidelity,
@@ -56,7 +57,7 @@ const characterInstructions = `Describe the main person or creature in the image
 // The same for outfit and scene cards (shared/characters.ts cardKinds): only what the card adds.
 const cardInstructions = {
   characters: characterInstructions,
-  outfits: `Describe the clothing the main person in the image wears so an image model can dress someone else in it: each garment, its colour, material and fit, accessories, and the footwear or bare feet. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "yellow raincoat, dark slim jeans, black rubber boots". Leave out the person's body, face and hair, the pose, the setting and the style.`,
+  outfits: `Describe the clothing the main person in the image wears so an image model can dress someone else in it: each garment, its color, material and fit, accessories, and the footwear or bare feet. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "yellow raincoat, dark slim jeans, black rubber boots". Leave out the person's body, face and hair, the pose, the setting and the style.`,
   scenes: `Describe the setting in the image so an image model can place someone else in it: the place and its notable details, the light and the time of day. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "rainy city street at night, neon signs, wet asphalt reflections". Leave out any people, their clothing and poses, and the photographic style.`,
 };
 // A card's name and description ideas from its images (the card editors' ▾ beside each field).
@@ -450,6 +451,7 @@ function rewriteInstructions({
     subjectFirst,
     proportionate,
     `${matchEffort} Then apply the style below.`,
+    americanEnglish,
     avoidFiller(),
     'Words about speed, quality tier, model, size, aspect or count (such as "turbo", "fast", "landscape", "16:9", "2K", "two images") are settings, not scene: leave them out.',
     references && vision
@@ -874,8 +876,9 @@ export function createAssistant(
     const model = await modelFor("negative", false, writer);
     const system = [
       `You write negative prompts for the ${profile.kind === "video" ? "video" : "image"} model ${profile.label || profile.id || "in use"}.`,
-      "Reply with the negative prompt only: a short comma-separated list of unwanted traits (artefacts, defects, styles to avoid), at most 40 words, no preamble.",
+      "Reply with the negative prompt only: a short comma-separated list of unwanted traits (artifacts, defects, styles to avoid), at most 40 words, no preamble.",
       "Never list anything the positive prompt asks for, and never add subjects.",
+      americanEnglish,
       guide?.negative ? `The guide's negative advice: ${JSON.stringify(guide.negative)}` : "",
       `Prompting guide: ${writerGuide(guide) || "(none)"}`,
     ]
@@ -1031,6 +1034,7 @@ export function createAssistant(
         : "Write clear, specific natural language.",
       profile?.id ? precedence : "",
       fidelity,
+      americanEnglish,
       contentRule(explicit),
       avoidFiller(),
       `Reply with JSON only: {"prompt": "...", "negative": "..." or "", "profile": one of ${JSON.stringify(profiles.map((item) => item.id).slice(0, 40))} or "", "loras": names from ${JSON.stringify(loras.map((item) => item.name).slice(0, 40))}}.`,
@@ -1146,7 +1150,7 @@ export function createAssistant(
       messages: [
         {
           role: "system",
-          content: `${cardInstructions[kind]} Reply with only the phrase. ${contentRule(explicit)}`,
+          content: `${cardInstructions[kind]} Reply with only the phrase. ${americanEnglish} ${contentRule(explicit)}`,
         },
         {
           role: "user",
@@ -1175,7 +1179,7 @@ export function createAssistant(
       messages: [
         {
           role: "system",
-          content: `${cardIdeaInstructions[field](kind, count)} Reply with only JSON: {"options":["…"]}. ${contentRule(explicit)} ${suggestionChoices("card", explicit)}`,
+          content: `${cardIdeaInstructions[field](kind, count)} Reply with only JSON: {"options":["…"]}. ${americanEnglish} ${contentRule(explicit)} ${suggestionChoices("card", explicit)}`,
         },
         {
           role: "user",
@@ -1275,6 +1279,7 @@ export function createAssistant(
       `You write prompting guides for the ${profile.kind === "video" ? "video" : "image"} model ${profile.label || profile.id || family}${family ? ` (family ${family})` : ""}.`,
       'Reply with JSON only, a pack with: "name", "summary" (one sentence), "patterns" (list), "rules" (list), "sampling" (object of recommended settings), "pitfalls" (list), "example" (one prompt), "negative" ({"effect": "recommended"|"optional"|"none", "default": "..."}).',
       "Use only what the source says or what the nearest guide establishes for this family; never invent settings.",
+      americanEnglish,
       nearest ? `Nearest existing guide: ${writerGuide(nearest)}` : "",
       `Source page: ${one(sourceText, 12000)}`,
     ]
