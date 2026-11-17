@@ -17,10 +17,10 @@ import { useForm } from "@mantine/form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { loraRoles, loraTypes } from "../../../../shared/profiles";
+import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
-import { titleCase } from "../../../../shared/titles";
 import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
