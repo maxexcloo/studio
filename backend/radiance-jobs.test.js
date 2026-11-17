@@ -84,6 +84,32 @@ test("Stop during an accepted synchronous image retains the connection and saves
   assert.ok(mediaFile(params.get("filename"), params.get("subfolder")));
 });
 
+test("an image run records its queue wait, model load, sampling and save for Details", async () => {
+  const id = "timed-image";
+  const body = { ...bodyFor(id), queuedAt: Date.now() - 5000 };
+  pending(id, body);
+  let state = "parked";
+  await runRadianceJob(id, body, worker, {
+    store,
+    client: {
+      models: async () => [{ id: "krea-2-turbo-iq8r", state }],
+      images: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        state = "resident";
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        return [png];
+      },
+    },
+  });
+  const { timing } = galleryItems({ jobId: id })[0];
+  assert.ok(timing.queueMs >= 4900);
+  assert.ok(timing.loadMs >= 1000, "the model loaded before it sampled");
+  assert.ok(timing.samplingMs > 0 && timing.samplingMs < timing.runMs);
+  assert.equal(timing.loadMs + timing.samplingMs, timing.runMs);
+  for (const stage of ["setupMs", "saveMs"]) assert.ok(Number.isFinite(timing[stage]), stage);
+  assert.equal(timing.downloadMs, undefined, "an image has no separate download");
+});
+
 test("a run ended by a forced Radiance restart keeps its ending when the dropped request fails", async () => {
   const id = "ended-by-restart";
   const body = bodyFor(id);

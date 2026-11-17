@@ -222,8 +222,11 @@ function generationDetails(
     timing: rows([
       ["Queue", elapsed(item.timing?.queueMs)],
       ["Setup", elapsed(item.timing?.setupMs)],
+      ["Model Load", elapsed(item.timing?.loadMs)],
       ["Sampling", elapsed(item.timing?.samplingMs)],
+      ["Download", elapsed(item.timing?.downloadMs)],
       ["Finishing", elapsed(item.timing?.finishMs)],
+      ["Saving", elapsed(item.timing?.saveMs)],
       ["Active", elapsed(item.timing?.runMs)],
       ["Total", elapsed(item.durationMs || undefined)],
     ]),

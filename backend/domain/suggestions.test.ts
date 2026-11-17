@@ -585,7 +585,7 @@ test("switched off, prompt ideas and next steps are never written, while asked-f
   await work.completed(items);
   assert.deepEqual(await suggestions.suggest("alice", { surface: "composer", kind: "image" }), {
     suggestions: [],
-    reason: "Prompt Ideas is off in Settings › Gallery.",
+    reason: "Prompt Ideas is off in Settings › Maintenance.",
   });
   for (const body of [
     { surface: "viewer", jobId: "job-a" },
@@ -594,7 +594,7 @@ test("switched off, prompt ideas and next steps are never written, while asked-f
   ])
     assert.equal(
       (await suggestions.suggest("alice", body)).reason,
-      "Suggestions are off in Settings › Gallery.",
+      "Suggestions are off in Settings › Maintenance.",
     );
   assert.equal(calls.length, 0);
   await suggestions.suggest("alice", {

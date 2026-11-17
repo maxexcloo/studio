@@ -7,11 +7,11 @@ import { type Flag, deploymentQuery, lockedNote, useDeploymentSetting } from "./
 import { GalleryPass } from "./GalleryPass";
 import { UnfinishedItems } from "./UnfinishedItems";
 
-/** Settings › Gallery: Background AI switches and gallery passes. */
-export function GallerySettings() {
+/** Settings › Maintenance: Background AI switches, gallery passes and unfinished items. */
+export function MaintenanceSettings() {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
-  if (deployment.isPending) return <LoadingState label="Loading Gallery" fill />;
+  if (deployment.isPending) return <LoadingState label="Loading Maintenance" fill />;
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
   const { catalogue } = deployment.data;
   const flagRow = (flag: Flag) => (
@@ -61,6 +61,8 @@ export function GallerySettings() {
           progressLabel="Index Progress"
         />
         {whileBusy && flagRow(whileBusy)}
+      </SettingGroup>
+      <SettingGroup title="Queue">
         <UnfinishedItems />
       </SettingGroup>
     </Stack>
