@@ -67,7 +67,7 @@ function DigestCard({
       </Stack>
       {/* The row is shared by label length, so no label is cut short. */}
       <Group gap="xs" p="xs" wrap="nowrap">
-        {/* The deck bar's large choices; Keep is light here, as every card has one. */}
+        {/* The ratings; Like is light here, as every card has one. */}
         {dreamChoices({ kind: "dream", key: item.id, item })
           .flat()
           .filter((choice) => choice.main)
@@ -246,10 +246,8 @@ export function DreamDigest({
           items={order}
           navigate={(item) => setViewing(item.id)}
           close={() => setViewing(null)}
-          actions={viewerChoices(
-            { kind: "dream", key: current.id, item: current },
-            (choice) => act(current, choice as Verdict),
-            phone,
+          actions={viewerChoices({ kind: "dream", key: current.id, item: current }, (choice) =>
+            act(current, choice as Verdict),
           )}
         />
       )}

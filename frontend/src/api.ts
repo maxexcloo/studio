@@ -10,7 +10,12 @@ export async function request(url: string, options: RequestInit = {}): Promise<R
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     // The body stays as the cause, for refusals that say more than their message.
-    throw new Error(data.error || `Studio returned ${response.status}`, { cause: data });
+    throw Object.assign(
+      new Error(data.error || `Studio returned ${response.status}`, { cause: data }),
+      {
+        status: response.status,
+      },
+    );
   }
   return response;
 }

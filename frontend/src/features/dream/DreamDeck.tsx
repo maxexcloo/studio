@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { loraName } from "../../../../shared/profiles";
-import { post } from "../../api";
+import { failure, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { ActionBarSurface } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
@@ -20,7 +20,7 @@ import { useGenerationActions } from "../generation/GenerationProvider";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
-import { type Verdict, viewerChoices } from "./choices";
+import { type Verdict, deckChoices, viewerChoices } from "./choices";
 import { type DeckCard, type PairDeckCard, cardIds, deckCards } from "./deck";
 import { PairContent, sideLabel } from "./PairCard";
 import {
@@ -62,8 +62,10 @@ const keyDirections: Record<string, Direction> = {
   ArrowUp: "up",
   ArrowDown: "down",
 };
-/** Full screen's choices that return to the deck: a verdict or answer, not Like, Edit and others. */
+/** Full screen's verdicts and answers return to the deck; Superlike, Edit and others don't. */
 const closing = new Set<string>(["discard", "keep", "a", "b", "both", "neither"]);
+/** Verdicts that start work at once, so they send straight away rather than wait for Undo. */
+const immediate = new Set<string>(["variations", "animate", "refine", "more"]);
 
 /** Deck media stays still; opening the shared viewer owns playback and its lifecycle. */
 function Media({ item }: { item: MediaItem }) {
@@ -121,7 +123,8 @@ export type Judgement =
 
 /**
  * Sends a verdict: Dream results move to the gallery or, disliked, out of sight; gallery images
- * teach, and a Like or Dislike rates them too.
+ * teach, and a Superlike or Dislike rates them too. A card whose item has gone since it was drawn
+ * just leaves the deck; other failures put it back.
  */
 export function useJudge(onFailed: (card: DeckCard) => void) {
   const client = useQueryClient();
@@ -147,15 +150,17 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
       const { item } = judgement.card;
       const verdict = judgement.verdict as Verdict;
       if (judgement.card.kind === "calibration") {
+        // Calibration first: a disliked image leaves the pool calibration reads.
+        await post(
+          "/api/dream/calibration",
+          verdict === "discard" ? { passed: [item.id] } : { liked: [item.id] },
+        );
         if (verdict === "like" || verdict === "discard")
           await post("/api/gallery/favorite", {
             ids: [item.id],
             rating: verdict === "like" ? "liked" : "disliked",
           });
-        return post(
-          "/api/dream/calibration",
-          verdict === "discard" ? { passed: [item.id] } : { liked: [item.id] },
-        );
+        return;
       }
       if (verdict === "discard") return post(dreamItemPath(item, "discard"));
       if (verdict === "more") return post(dreamItemPath(item, "more"));
@@ -174,7 +179,12 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
         openComposer(verdict === "animate" ? "video" : "image");
       }
     },
-    onError: (_error, { card }) => onFailed(card),
+    meta: { inlineError: true },
+    onError: (error, { card }) => {
+      if ((error as Error & { status?: number }).status === 404) return;
+      failure(error);
+      onFailed(card);
+    },
     onSettled: () =>
       Promise.all(
         [dreamQuery.queryKey, galleryKey, ["gallery-filters"]].map((queryKey) =>
@@ -309,68 +319,61 @@ export function DreamDeck({
       dreamed: previous.dreamed + dreamed(card),
     }));
   }
+  // The last judgement waits for Undo until the next one, leaving the deck or hiding the page.
+  const [pending, setPending] = useState<Judgement | null>(null);
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
+  function send() {
+    const last = pendingRef.current;
+    if (!last) return;
+    pendingRef.current = null;
+    setPending(null);
+    judge.mutate(last);
+  }
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  useEffect(() => {
+    const hide = () => document.visibilityState === "hidden" && sendRef.current();
+    document.addEventListener("visibilitychange", hide);
+    return () => {
+      document.removeEventListener("visibilitychange", hide);
+      sendRef.current();
+    };
+  }, []);
+  /** Takes the card off the deck, holding its judgement for Undo unless it starts work. */
   function commit(judgement: Judgement) {
+    send();
     decide(judgement.card);
-    judge.mutate(judgement);
+    if (immediate.has(judgement.verdict)) return judge.mutate(judgement);
+    pendingRef.current = judgement;
+    setPending(judgement);
   }
-  // A chosen side answers once Undo has stood for a moment or the next choice is made.
-  const [chosen, setChosen] = useState<{ card: PairDeckCard; side: 0 | 1 } | null>(null);
-  const chosenRef = useRef(chosen);
-  chosenRef.current = chosen;
-  const undoTimer = useRef(0);
-  function answerChosen() {
-    window.clearTimeout(undoTimer.current);
-    const last = chosenRef.current;
+  function undo() {
+    const last = pendingRef.current;
     if (!last) return;
-    chosenRef.current = null;
-    setChosen(null);
-    judge.mutate({ card: last.card, verdict: last.side ? "b" : "a" });
-  }
-  const answerRef = useRef(answerChosen);
-  answerRef.current = answerChosen;
-  useEffect(() => () => answerRef.current(), []);
-  function undoChosen() {
-    window.clearTimeout(undoTimer.current);
-    const last = chosenRef.current;
-    if (!last) return;
-    chosenRef.current = null;
-    setChosen(null);
+    pendingRef.current = null;
+    setPending(null);
+    setPicked(null);
     restore(last.card);
     setCounts((previous) => ({
       judged: previous.judged - 1,
       dreamed: previous.dreamed - dreamed(last.card),
     }));
   }
-  /** A chosen side answers once its Undo has gone, unless undone. */
-  async function pick(side: 0 | 1) {
-    if (top?.kind !== "pair" || busy.current) return;
-    busy.current = true;
-    const card = top;
-    answerChosen();
-    setPicked({ key: card.key, side });
-    try {
-      await fly.current?.(answerDirections[side ? "b" : "a"]);
-      decide(card);
-    } finally {
-      busy.current = false;
-    }
-    chosenRef.current = { card, side };
-    setChosen({ card, side });
-    undoTimer.current = window.setTimeout(answerChosen, 4000);
-  }
   /** Flies the top card out its way, then commits the verdict or answer. */
   async function act(choice: Verdict | PairAnswer) {
     if (!top || busy.current) return;
-    answerChosen();
     busy.current = true;
     try {
       if (top.kind === "pair") {
         if (!(choice in answerDirections)) return;
+        if (choice === "a" || choice === "b")
+          setPicked({ key: top.key, side: choice === "a" ? 0 : 1 });
         await fly.current?.(answerDirections[choice as PairAnswer]);
         return commit({ card: top, verdict: choice as PairAnswer });
       }
       if (!(choice in directions)) return;
-      if (["variations", "animate", "refine", "more"].includes(choice) && !(image && dream)) return;
+      if (immediate.has(choice) && !(image && dream)) return;
       await fly.current?.(directions[choice as Verdict]);
       commit({ card: top, verdict: choice as Verdict });
     } finally {
@@ -428,34 +431,34 @@ export function DreamDeck({
           preventScroll: true,
         });
       }}
-      actions={viewerChoices(
-        top,
-        (choice) => {
-          if (closing.has(choice)) setViewing(null);
-          if (choice === "a" || choice === "b") void pick(choice === "a" ? 0 : 1);
-          else void act(choice);
-        },
-        phone,
-      )}
+      actions={viewerChoices(top, (choice) => {
+        if (closing.has(choice)) setViewing(null);
+        void act(choice);
+      })}
       itemLabel={top.kind === "pair" ? pairLabel : undefined}
       sideBySide={top.kind === "pair"}
     />
   );
-  const undo =
-    chosen &&
+  const undoAction = {
+    id: "undo",
+    label: "Undo",
+    icon: icons.undo,
+    disabled: !pending,
+    onClick: undo,
+  };
+  // With the deck empty, Undo brings back the last card from the toolbar.
+  const emptyUndo =
+    pending &&
     undoTarget &&
     createPortal(
-      <Tooltip label={`Chose ${sideLabel(chosen.card, chosen.side)}`}>
-        <Button
-          size="compact-xs"
-          variant="subtle"
-          leftSection={<icons.undo size={12} />}
-          aria-description={`Chose ${sideLabel(chosen.card, chosen.side)}`}
-          onClick={undoChosen}
-        >
-          Undo
-        </Button>
-      </Tooltip>,
+      <Button
+        size="compact-xs"
+        variant="subtle"
+        leftSection={<icons.undo size={12} />}
+        onClick={undo}
+      >
+        Undo
+      </Button>,
       undoTarget,
     );
   if (!top)
@@ -464,17 +467,10 @@ export function DreamDeck({
     ) : (
       <>
         {empty}
-        {undo}
+        {emptyUndo}
       </>
     );
-  const actions = viewerChoices(
-    top,
-    (choice) => {
-      if (choice === "a" || choice === "b") void pick(choice === "a" ? 0 : 1);
-      else void act(choice);
-    },
-    phone,
-  );
+  const actions = deckChoices(top, (choice) => void act(choice), undoAction);
   const view = (item: MediaItem) => (
     <Tooltip label="View">
       <ActionIcon
@@ -507,7 +503,7 @@ export function DreamDeck({
                     ? { left: "A", right: "B", up: "Both", down: "Neither" }
                     : {
                         left: "Dislike",
-                        right: "Keep",
+                        right: "Like",
                         ...(card.kind === "dream" && card.item.type === "image"
                           ? { up: "Variations" }
                           : {}),
@@ -526,7 +522,6 @@ export function DreamDeck({
                 onSwipe={(direction) => {
                   const choice = card.kind === "pair" ? answers[direction] : intent(direction);
                   if (!choice) return;
-                  answerChosen();
                   commit({ card, verdict: choice } as Judgement);
                 }}
               >
@@ -576,10 +571,9 @@ export function DreamDeck({
         <Text size="xs" c="dimmed" ta="center">
           {top.kind === "pair"
             ? "← A · → B · ↑ Both · ↓ Neither"
-            : `← Dislike · → Keep${image && dream ? " · ↑ Keep & Variations" : ""}`}
+            : `← Dislike · → Like${image && dream ? " · ↑ Like & Variations" : ""}`}
         </Text>
       )}
-      {undo}
       {viewer}
     </>
   );

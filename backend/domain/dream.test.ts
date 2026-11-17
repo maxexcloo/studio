@@ -118,6 +118,9 @@ function fixture(t: TestContext, catalogue = profiles) {
             [query.dreamState].flat().includes(item.dream?.state)) &&
           (!query.liked || item.rating === "liked" || item.dream?.state === "kept") &&
           (!query.rating || item.rating === query.rating) &&
+          (query.unlisted === undefined ||
+            (item.rating === "disliked" || (!!item.dream && item.dream.state !== "kept")) ===
+              query.unlisted) &&
           (!query.type || item.type === query.type) &&
           (!query.status || item.status === query.status) &&
           (!query.conversationIds || query.conversationIds.includes(item.chat?.conversationId)) &&
@@ -1403,6 +1406,7 @@ test("Calibration offers the account's older Studio generations, unjudged first,
     image("clip", { type: "video" }),
     image("unseen", { dream: { prompt: "p", why: "", at: old, state: "unseen" } }),
     image("bobs", { ownerId: "bob" }),
+    image("disliked", { rating: "disliked" }),
   );
   // Not Studio generations of this account: an upload or import without a job here, and a record
   // attributed to alice whose job another account ran.
@@ -1418,7 +1422,7 @@ test("Calibration offers the account's older Studio generations, unjudged first,
   assert.equal((await request("/calibration", { liked: ["a", "b"], passed: ["c"] })).status, 400);
   assert.equal((await request("/calibration", {})).status, 400);
   assert.equal((await request("/calibration", { liked: ["a"], passed: ["a"] })).status, 400);
-  for (const id of ["bobs", "upload", "borrowed"])
+  for (const id of ["bobs", "upload", "borrowed", "disliked"])
     assert.equal((await request("/calibration", { liked: [id] })).status, 404);
   assert.equal((await request("/calibration", { liked: ["new"] })).status, 404);
   assert.equal((await request("/calibration", { liked: ["a"], passed: ["b"] })).status, 200);
