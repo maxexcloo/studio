@@ -108,7 +108,7 @@ function SettingsForm({ dream }: { dream: Dream }) {
       </Text>
       {dream.reason && (
         <Text size="xs" c="dimmed" role="status" aria-label="Dream Status">
-          {dream.status === "unavailable" ? `Can't run: ${dream.reason}` : dream.reason}
+          {dream.reason}
         </Text>
       )}
       <div>
