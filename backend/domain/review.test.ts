@@ -83,6 +83,7 @@ test("review scores each unseen project image against its brief and saves it", a
     },
     idle: () => true,
     allowed: () => true,
+    text: () => "cloud",
     items: () => items,
     visible: () => true,
     projects: () => [project("beach", { subjects: "the sea", avoid: "people" }), project("empty")],

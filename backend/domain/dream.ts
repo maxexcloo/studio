@@ -33,6 +33,7 @@ import {
   type Taste,
   type TasteChoice,
   type TasteRecord,
+  type TextSide,
   itemValues,
   pairAttributes,
   pairSignal,
@@ -191,7 +192,7 @@ export interface DreamAccess {
 }
 /** The assistant gateway (assistant.js): its models and a chat that returns the reply and its reasoning apart. */
 interface DreamWriter {
-  model(call: string): Promise<string>;
+  model(call: string, explicit: boolean, text: TextSide): Promise<string>;
   chat(request: {
     model: string;
     /** The call type, which sets its `reasoning_effort` (assistant.js `reasoningEfforts`). */
@@ -686,6 +687,8 @@ export function createDream(options: {
   /** How many Dream jobs an account may have at once: one per media worker, so every idle GPU dreams. */
   slots(): number;
   writer: DreamWriter | null;
+  /** Where the owner runs text (account-preferences.js `textSide`), Dream's writing included. */
+  text(ownerId: string): TextSide;
   guide(profile: DreamProfile): unknown;
   /** The owner's gallery records the query matches, Dream's pool included, newest first. */
   gallery(ownerId: string, query: DreamQuery): DreamItem[];
@@ -1474,7 +1477,7 @@ export function createDream(options: {
     const spicy = (job.input.writing as DreamWriting).spicy && access.uncensored;
     const { recent, subjects = [], anchors = [] } = read(ownerId);
     const media = kindOf(profile);
-    const model = await writer.model("dream");
+    const model = await writer.model("dream", false, options.text(ownerId));
     const guide = `Prompting guide: ${writerGuide(options.guide(profile)) || "(none)"}`;
     const briefLines = brief.length
       ? [
@@ -2445,7 +2448,7 @@ export function createDream(options: {
     const noun = (kind: CardKind) => cardKinds[kind].name;
     const { text } = await writer.chat({
       call: "dream",
-      model: await writer.model("dream"),
+      model: await writer.model("dream", false, options.text(ownerId)),
       messages: [
         {
           role: "system",
