@@ -10,33 +10,26 @@ import { askChange } from "../taste/suggestions";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { showDisliked, useRatings } from "./useMediaRating";
 
-const issues = ["Hands", "Face", "Anatomy", "Text", "Artefacts", "Wrong Subject", "Other"];
+/** Report's preset issues: its menu's choices and the dialog's chips. */
+export const issues = ["Anatomy", "Artefacts", "Face", "Hands", "Text", "Wrong Subject"];
 
 /**
- * Report Issue…: what is wrong with a finished item, as toggle chips and words. Studio asks the
- * assistant for a fix, an edit of the image for a local fault or a run on its seed with a fixed
- * prompt, runs it as a new version (the viewer's `iterate` joins its strip), and dislikes the
- * original with the issue, hiding it until restored.
+ * Reports what is wrong with a finished item. Studio asks the assistant for a fix, an edit of the
+ * image for a local fault or a run on its seed with a fixed prompt, runs it as a new version (the
+ * viewer's `iterate` joins its strip), and dislikes the original with the issue, hiding it until
+ * restored. Its failure shows inline where `inlineError` says a form renders it.
  */
-export function ReportIssueDialog({
-  item,
-  iterate,
-  onClose,
-}: {
-  item: MediaItem;
-  iterate?: (iteration: Iteration) => void;
-  onClose: () => void;
-}) {
-  const phone = usePhone();
+export function useReportIssue(
+  item: MediaItem,
+  iterate?: (iteration: Iteration) => void,
+  inlineError = false,
+) {
   const iteration = useMediaIteration(item);
   const ratings = useRatings();
-  const [picked, setPicked] = useState<string[]>([]);
-  const [details, setDetails] = useState("");
-  const issue = [picked.join(", "), details.trim()].filter(Boolean).join(": ");
   const video = item.type === "video";
-  const fix = useMutation({
-    meta: { inlineError: true },
-    mutationFn: async () => {
+  return useMutation({
+    meta: { inlineError },
+    mutationFn: async (issue: string) => {
       const answer = await askChange(
         item.jobId!,
         `Fix what is wrong, keeping everything else: ${issue}`,
@@ -58,15 +51,31 @@ export function ReportIssueDialog({
       await ratings.mutateAsync({ ids: [item.id], rating: "disliked", issue });
       showDisliked(1, () => ratings.mutate({ ids: [item.id], rating: was }));
     },
-    onSuccess: onClose,
   });
+}
+
+/** Report's Custom…: the issue as toggle chips and words. */
+export function ReportIssueDialog({
+  item,
+  iterate,
+  onClose,
+}: {
+  item: MediaItem;
+  iterate?: (iteration: Iteration) => void;
+  onClose: () => void;
+}) {
+  const phone = usePhone();
+  const fix = useReportIssue(item, iterate, true);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [details, setDetails] = useState("");
+  const issue = [picked.join(", "), details.trim()].filter(Boolean).join(": ");
   return (
     <Modal opened onClose={onClose} title="Report Issue" size="sm" fullScreen={phone}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (issue) fix.mutate();
+          if (issue) fix.mutate(issue, { onSuccess: onClose });
         }}
       >
         <Stack>
