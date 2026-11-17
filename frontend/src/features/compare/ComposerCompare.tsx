@@ -204,12 +204,16 @@ export function CompareMenu() {
           variant="default"
           leftSection={<icons.duplicate size={16} />}
           disabled={!canAddVariant(draft)}
+          // The popup names the variant it acts on, so the footer keeps to one row.
+          aria-label={
+            draft.compare ? `Duplicate Variant ${letter(draft.compare.active)}` : undefined
+          }
           onClick={() => {
             setDraft(addVariant);
             close();
           }}
         >
-          {draft.compare ? `Duplicate Variant ${letter(draft.compare.active)}` : "Add Variant"}
+          {draft.compare ? "Duplicate" : "Add Variant"}
         </Button>
       }
       primary={
