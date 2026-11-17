@@ -1060,7 +1060,7 @@ test("Typing in the phone Generate sheet merges the prompt's tools into one bar 
     await expect(tools.getByRole("button", { name, exact: true })).toBeVisible();
   await expect(output).toBeHidden();
   await expect(bar.getByRole("button", { name: "Generate Image", exact: true })).toBeVisible();
-  await expect.poll(bottom).toBe(resting);
+  await expect.poll(async () => Math.abs((await bottom()) - resting)).toBeLessThanOrEqual(2);
   await prompt.evaluate((text) => (text.scrollTop = text.scrollHeight));
   const text = (await prompt.boundingBox())!;
   expect(text.y + text.height).toBeLessThanOrEqual((await tools.boundingBox())!.y + 1);

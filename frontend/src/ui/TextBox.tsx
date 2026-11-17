@@ -225,7 +225,14 @@ export function TextBox({
   );
   const bar = useContext(TextToolsBar);
   const [active, setActive] = useState(false);
-  const inBar = mobile && inline && bar && active ? bar : null;
+  // Only a box in the bar's own surface, not one in a dialog opened from it, joins the bar.
+  const inBar =
+    mobile &&
+    inline &&
+    active &&
+    bar?.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]')
+      ? bar
+      : null;
   const visible = useVisibleRect(menuOpened);
   const bounds = { padding: 12, rootBoundary: visible ?? ("viewport" as const) };
   const menu = !menuless && tools !== undefined && (

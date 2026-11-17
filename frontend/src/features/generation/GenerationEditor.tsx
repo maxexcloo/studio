@@ -433,6 +433,8 @@ export function GenerationEditor({
                     size={44}
                     aria-label={label}
                     loading={pending}
+                    // The text keeps focus until the press ends, so the bar keeps this icon.
+                    onMouseDown={(event) => event.preventDefault()}
                     {...blockedProps(blockedReason)}
                   >
                     <ArrowUp size={20} />
