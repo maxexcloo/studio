@@ -1,6 +1,11 @@
 // Gallery records built from a run: its pending tiles, recorded settings and what ComfyUI's history
 // says it made. Pure functions, so code that only builds records never loads the gallery (store.js).
-import { cardKinds, maxCardDescription, maxCardName } from "../../shared/characters.ts";
+import {
+  cardKinds,
+  maxCardDescription,
+  maxCardName,
+  maxContextNotes,
+} from "../../shared/characters.ts";
 import { titleCase } from "../../shared/titles.ts";
 import { keptTriggers } from "../lora/prompts.js";
 import { videoPattern } from "../media-paths.js";
@@ -110,6 +115,8 @@ function storedContext(value) {
   }
   const series = shortText(value.series, 80);
   if (series) context.series = series;
+  const notes = shortText(value.notes, maxContextNotes);
+  if (notes) context.notes = notes;
   return Object.keys(context).length ? context : null;
 }
 

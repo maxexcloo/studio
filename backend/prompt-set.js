@@ -21,6 +21,7 @@ export async function writeSetPrompt({
   source,
   intent,
   prompts,
+  story = "",
   writer,
   frame = async () => null,
   caption = () => "",
@@ -62,6 +63,7 @@ export async function writeSetPrompt({
             `Source prompt (authoritative subject and theme):\n${source}`,
             shown ? `What the selected image shows: ${shown}` : "",
             intent ? `Typed source prompt (user intent): ${intent}` : "",
+            story,
             `Previous variations (avoid repetition, not subject guidance):\n${prompts
               .slice(-shownPrompts)
               .map((prompt) => `- ${prompt.replace(/\s+/g, " ").slice(0, 1000)}`)

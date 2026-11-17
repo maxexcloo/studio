@@ -189,6 +189,11 @@ test("the writing stage streams the motion prompt and its thinking with room to 
         frames: 120,
         fps: 24,
         writing: { kind: "animate", theme: "cinematic", source: "An amber bird" },
+        resultSet: {
+          id: "set-1",
+          title: "Birds",
+          context: { series: "Aviary", notes: "The bird was rescued from a storm." },
+        },
       },
     },
     {
@@ -209,6 +214,11 @@ test("the writing stage streams the motion prompt and its thinking with room to 
   assert.match(calls[0].messages[0].content, /Cinematic Camera/);
   assert.match(calls[0].messages[0].content, /only 5 seconds long at 24 fps/);
   assert.match(calls[0].messages[1].content, /An amber bird/);
+  // The story an MCP chat gave its set reaches the writer.
+  assert.match(
+    calls[0].messages[1].content,
+    /Story context.*series Aviary; notes: The bird was rescued from a storm\./,
+  );
   const spicy = await writeAnimatePrompt({
     engine,
     profile: video,

@@ -6,6 +6,7 @@
 // result (`assistant`, source "chat") for Details and Recreate, even across a restart.
 import { z } from "zod";
 
+import { maxContextNotes } from "../../shared/characters.ts";
 import { maxPromptCharacters } from "../../shared/queue.ts";
 import { logger } from "../crash-log.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
@@ -150,6 +151,7 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
             context.addIssue({ code: "custom", message: `Use one of ${presetIds().join(", ")}` });
         }),
       reference_asset_ids: z.array(z.string().min(1)).max(maxReferences).optional(),
+      context: z.string().trim().max(maxContextNotes).optional().describe("Backstory to keep to."),
     },
     async (
       {
@@ -157,6 +159,7 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
         profile_id,
         preset = promptStyleStore().defaultId(),
         reference_asset_ids = [],
+        context,
       },
       signal,
     ) => {
@@ -164,7 +167,13 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
       const references = await Promise.all(reference_asset_ids.map((id) => reference(id, signal)));
       const written = await ask(
         "rewrite",
-        { profileId: profile.id, prompt: text, preset, references },
+        {
+          profileId: profile.id,
+          prompt: text,
+          preset,
+          references,
+          ...(context ? { context } : {}),
+        },
         signal,
       );
       if (written.source === "fallback")
