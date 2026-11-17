@@ -46,18 +46,21 @@
   display: none;
 }
 
-/* Copy and Reset/Undo keep accessible names when the tools and send need the room. */
-.toolbar:has(.sends) .editAction {
+/* Copy and Reset/Undo keep accessible names as icons in the text's corner, or beside sends. */
+.toolbar:has(.sends) .editAction,
+.corner .editAction {
   width: 32px;
   min-width: 0 !important;
   padding-inline: 0;
 }
 
-.toolbar:has(.sends) .editText {
+.toolbar:has(.sends) .editText,
+.corner .editText {
   display: none;
 }
 
-.toolbar:has(.sends) .editIcon {
+.toolbar:has(.sends) .editIcon,
+.corner .editIcon {
   display: block;
 }
 
@@ -190,6 +193,18 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* In place, the tools stand at the top of the text's end. */
+.editor > .columned {
+  flex-direction: row;
+}
+
+.corner {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .editor textarea {

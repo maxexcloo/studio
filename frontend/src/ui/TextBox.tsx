@@ -249,7 +249,7 @@ export function TextBox({
     >
       <PopupTooltip label={busy || (ai ? "AI Actions" : "More Actions")}>
         <Menu.Target>
-          {mobile && !ai ? (
+          {phone && !ai ? (
             <Button
               ref={more}
               onMouseDown={focusTool}
@@ -456,7 +456,26 @@ export function TextBox({
       {busy && spins && <VisuallyHidden role="status">{busy}</VisuallyHidden>}
       {/* AI tools remain available beside the summary before its phone editor opens. */}
       {mobile && inline ? (
-        editor(textarea)
+        // In place, the text fills the surface with its tools as icons in its corner.
+        <div className={classes.editor} data-text-editor>
+          <div className={classes.columned}>
+            {textarea}
+            {(tools || send) && (
+              <div
+                className={classes.corner}
+                role="group"
+                aria-label={`${title} Tools`}
+                onMouseDown={keepFocus}
+              >
+                {editButtons}
+                {menu}
+                {send}
+              </div>
+            )}
+          </div>
+          {below && <div className={classes.below}>{below}</div>}
+          {popups && <div className={classes.anchor}>{popups}</div>}
+        </div>
       ) : ((!phone || ai) && tools && !inside) || send ? (
         <div className={classes.columned}>
           {textarea}
