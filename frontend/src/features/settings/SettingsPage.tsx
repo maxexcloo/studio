@@ -11,9 +11,9 @@ import { runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { AboutStudio } from "./AboutStudio";
 import { GroupsAdmin, UsersAdmin } from "./AccountAdmin";
 import { DreamAdministration } from "./DreamAdministration";
-import { GallerySettings } from "./GallerySettings";
 import { GenerationSettings } from "./GenerationSettings";
 import { IntegrationSettings } from "./IntegrationSettings";
+import { MaintenanceSettings } from "./MaintenanceSettings";
 import { OwnAccount } from "./OwnAccount";
 import { Preferences } from "./Preferences";
 import { useSettingsNavigation } from "./SettingsNavigation";
@@ -69,10 +69,10 @@ export function SettingsPage() {
         ),
         preferences: <Preferences />,
         dream: <DreamAdministration />,
-        gallery: <GallerySettings />,
         generation: <GenerationSettings />,
         groups: (heading) => <GroupsAdmin heading={heading} />,
         integrations: <IntegrationSettings />,
+        maintenance: <MaintenanceSettings />,
         users: (heading) => <UsersAdmin heading={heading} />,
         workers: (heading) => <WorkerSettings heading={heading} />,
         about: <AboutStudio />,

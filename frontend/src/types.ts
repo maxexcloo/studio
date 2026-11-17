@@ -218,8 +218,11 @@ export interface MediaItem {
     runMs?: number;
     queueMs?: number;
     setupMs?: number;
+    loadMs?: number;
     samplingMs?: number;
+    downloadMs?: number;
     finishMs?: number;
+    saveMs?: number;
   };
   upscaleActive?: boolean;
   upscale?: {
