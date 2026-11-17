@@ -64,9 +64,18 @@ export function createRuntimeRouter(
   router.post(
     "/restart",
     handle(
-      (request) => controller.restart(String(request.body?.workload ?? ""), requestedBy(request)),
+      (request) =>
+        controller.restart(
+          String(request.body?.workload ?? ""),
+          requestedBy(request),
+          request.body?.force === true,
+        ),
       202,
     ),
+  );
+  router.post(
+    "/workloads/:id/cancel-queue",
+    handle((request) => controller.cancelQueue(String(request.params.id))),
   );
   router.get(
     "/workloads/:id/logs",
