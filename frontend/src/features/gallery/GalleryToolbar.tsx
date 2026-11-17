@@ -57,16 +57,10 @@ export function GalleryToolbar({
   useEffect(() => {
     if (query && phone) setSearching(true);
   }, [query, phone]);
-  const chips = useActiveFilters({ kind, value, onChange }, extraChips).filter(
-    (chip) => phone || chip.key !== "disliked",
-  );
-  // Quick toggles stay on; phones treat Disliked as a filter inside the sheet.
+  const chips = useActiveFilters({ kind, value, onChange }, extraChips);
+  // The toolbar's own toggles stay on.
   const clear = () => {
-    onChange({
-      ...emptyGalleryFilters,
-      rating: !phone || value.rating === "liked" ? value.rating : "",
-      uploads: value.uploads,
-    });
+    onChange({ ...emptyGalleryFilters, rating: value.rating, uploads: value.uploads });
     for (const chip of extraChips) chip.remove();
   };
   const toolbar = useRef<HTMLDivElement>(null);

@@ -26,8 +26,11 @@
   flex-shrink: 0;
 }
 
-/* A phone's row scrolls sideways where its chips outgrow it, rather than wrapping. */
+/* A phone's row scrolls sideways where its chips outgrow it, rather than wrapping. Its padding,
+   taken back by the margin, keeps the Filter count and focus rings inside the scroller's clip. */
 :root[data-phone] .mode {
+  margin: -4px;
+  padding: 4px;
   overflow-x: auto;
   scrollbar-width: none;
 }
