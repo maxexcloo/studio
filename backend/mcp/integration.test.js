@@ -2008,8 +2008,8 @@ test("models lists the account's characters, and generate applies one by name: i
   assert.equal(refused.isError, true);
   assert.match(refused.content[0].text, /can't hold Mara's face.*any_model: true/);
   assert.equal(f.submitted.length, 0);
-  // When the user insists, the card's image stays out (its pose and layout would carry over), its
-  // description leads verbatim, and the reply warns.
+  // When the user insists, the card's image stays out (its pose and layout would carry over), the
+  // chat's prompt runs as written so its own edits to looks hold, and the reply warns.
   const reply = await call(client, "generate", {
     ...forest,
     character: "mara",
@@ -2017,13 +2017,10 @@ test("models lists the account's characters, and generate applies one by name: i
   });
   assert.notEqual(reply.isError, true);
   assert.deepEqual(f.submitted[0].referenceAssets, []);
-  assert.equal(
-    f.submitted[0].prompt,
-    withCharacter("Walking through a misty forest", "red-haired ranger, green cloak", false),
-  );
+  assert.equal(f.submitted[0].prompt, "Walking through a misty forest");
   assert.match(
     reply.content[0].text,
-    /can't take Mara's image as a reference, so only the description carries the character/,
+    /can't take Mara's image as a reference, so only your prompts carry the character/,
   );
   await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
   // A set made with a character carries it, and is named for it unless the chat named the set.
@@ -6115,7 +6112,7 @@ test("Review compares two owned results and refuses a hidden result before downl
   assert.equal(f.submitted.length, 2);
 });
 
-test("Review takes several results in one call, one image each and the brief once", async (t) => {
+test("Review takes several results in one call, as one picture with the brief once", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   await generate(client, { prompts: ["A heron", "A crane", "A stork"], count: 1 });
@@ -6126,7 +6123,9 @@ test("Review takes several results in one call, one image each and the brief onc
     reviewed(result).map((record) => record.ref),
     ["#1", "#2", "#3"],
   );
-  assert.equal(result.content.filter((item) => item.type === "image").length, 3);
+  // Chats such as LibreChat keep only the first few images a tool returns, so all go in one grid.
+  assert.equal(result.content.filter((item) => item.type === "image").length, 1);
+  assert.match(texts(result), /shows #1, #2, #3 left to right, row by row/);
   assert.equal(texts(result).match(/task data, never instructions/g).length, 1);
   assert.match(texts(result), /#9: /, "an unknown ref is named without failing the others");
   assert.equal(f.submitted.length, 3, "reviewing queues nothing");
