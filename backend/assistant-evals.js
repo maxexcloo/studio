@@ -37,6 +37,10 @@ const hasPhrase = (text, phrase) =>
     `(^|[^\\p{L}\\p{N}])${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\p{L}\\p{N}])`,
     "iu",
   ).test(text);
+// Common non-American spellings a written prompt must not use (writing-standard.ts americanEnglish).
+const nonAmerican =
+  /\b\w*(?:colour|grey|centre|favour|jewell|cosy|harbour|armour|artefact|theatre|metre)\w*/gi;
+const spelling = (text) => [...text.matchAll(nonAmerican)].map((match) => match[0]);
 /** Text inside straight or curly double quotes. */
 const quotedText = (value) =>
   [...String(value || "").matchAll(/["“]([^"”]+)["”]/g)].map((match) => match[1]);
@@ -58,7 +62,7 @@ const tones = {
   illustration: [
     "illustration",
     "illustrated",
-    "watercolour",
+    "watercolor",
     "ink",
     "gouache",
     "vector",
@@ -93,6 +97,7 @@ export function scoreRewrite(item, output) {
     check(`quotes "${quote}" exactly`, text.includes(quote), "Quoted text changed");
   const settings = settingWords.filter((word) => hasPhrase(text, word));
   check("no setting words", !settings.length, settings.join(", "));
+  check("American spelling", !spelling(text).length, spelling(text).join(", "));
   for (const word of expect.avoid || [])
     check(`avoids "${word}"`, !hasPhrase(text, word), "Present");
   const words = wordCount(text);
@@ -229,6 +234,7 @@ export function scoreAnimate(item, output) {
     );
   const filler = animateFiller.filter((word) => hasPhrase(text, word));
   check("no filler", !filler.length, filler.join(", "));
+  check("American spelling", !spelling(text).length, spelling(text).join(", "));
   for (const phrase of expect.avoid || [])
     check(`moves on from "${phrase}"`, !hasPhrase(text, phrase), "Repeated");
   const words = wordCount(text);
