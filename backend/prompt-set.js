@@ -3,7 +3,7 @@ import { maxPromptCharacters } from "../shared/queue.ts";
 import { replyTitle } from "../shared/titles.ts";
 import { AssistantError, cleanPrompt } from "./assistant.js";
 import { userContent } from "./domain/model-content.ts";
-import { writerGuide } from "./domain/writing-standard.ts";
+import { americanEnglish, writerGuide } from "./domain/writing-standard.ts";
 
 // The newest prompts are enough to steer away from; older ones only lengthen the request.
 const shownPrompts = 12;
@@ -47,6 +47,7 @@ export async function writeSetPrompt({
           scope === "image" && intent
             ? "The typed source prompt records the user's intent before trigger words. Where it differs from the recorded source prompt or image, keep the selected image's identity and species authoritative; do not substitute the typed prompt's subject."
             : "",
+          americanEnglish,
           "The set title is only a label and may be incomplete. Previous variations are only for avoiding repetition: ignore any that drift away from the source; they must never redefine the subject or theme.",
           `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
           'Reply with JSON only: {"title": "a concise two to four word Title Case label naming the content, without request wording", "prompt": "the finished prompt"}.',

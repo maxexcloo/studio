@@ -654,7 +654,7 @@ test("a change lands where an edit can make it, else recreates with the seed, wr
   assert.match(editing, /- edit: [^\n]*local changes \(face, expression, hair, clothing/);
   assert.match(editing, /- recreate: [^\n]*same seed/);
   const redraw = await ask("description");
-  assert.match(redraw, /- edit: [^\n]*only for light, colour, weather and texture/);
+  assert.match(redraw, /- edit: [^\n]*only for light, color, weather and texture/);
   assert.match(redraw, /- recreate: [^\n]*to the person \(body, figure, face/);
   // The prompt changes the words concerned, in absolute terms, and nothing else.
   assert.match(redraw, /rewrite the words it concerns in place[^\n]*never "a redder dress"/);
