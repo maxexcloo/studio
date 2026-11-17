@@ -174,10 +174,11 @@ export function ChipPopup({
             {/* The sheet itself takes focus, so its search doesn't raise the keyboard. */}
             <FocusTrap.InitialFocus />
             <Modal.Header className={classes.sheetHeader}>
-              <Modal.Title className={classes.sheetTitle}>
-                {title}
+              {/* The detail stays outside the title, which names the sheet. */}
+              <div className={classes.sheetTitle}>
+                <Modal.Title>{title}</Modal.Title>
                 {detail}
-              </Modal.Title>
+              </div>
               {actions}
               <Modal.CloseButton aria-label={`Close ${title}`} />
             </Modal.Header>

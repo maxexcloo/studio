@@ -240,7 +240,7 @@ export function usePromptHistory({
           <Switch
             // Remounts once loaded so the saved state appears without the thumb sliding.
             key={keep.history.data ? "loaded" : "loading"}
-            label="Save Recent Prompts"
+            label="Keep Recent Prompts"
             checked={keep.history.data?.enabled ?? false}
             disabled={!keep.history.data}
             onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
