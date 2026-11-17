@@ -134,8 +134,7 @@ recur across features.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
   phone media item bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and
-  only then do they wrap, never scrolling. The phone viewer bar alone nests
-  Report under Edit to fit one row.
+  only then do they wrap, never scrolling.
 - Like and Dislike rate an item and teach taste. A Dislike never deletes: it
   hides the item with Undo, and the gallery's Disliked filter shows it again.
 - A finished selection action ends the selection, keeping selected only the

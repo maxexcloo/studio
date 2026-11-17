@@ -1024,9 +1024,6 @@ export async function editorMenu(scope: Page | Locator, box: string, tool: strin
  */
 export async function viewerAction(page: Page, label: string, ...options: string[]) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  const nested = ({ Report: "Edit" } as Record<string, string>)[label];
-  if (nested && (await viewer.getByRole("button", { name: label, exact: true }).count()) === 0)
-    return viewerAction(page, nested, label, ...options);
   await viewer
     .getByRole("button", { name: label, exact: true })
     .or(viewer.getByRole("link", { name: label, exact: true }))
