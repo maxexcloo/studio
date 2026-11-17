@@ -762,8 +762,9 @@ export function createAssistant(
    * `explicit` (the account holds Uncensored Models) lets it ask for explicit wording. References
    * are read only by a vision model; otherwise the rewrite is text-only and says so
    * (referencesRead: false).
-   * FLUX.3's Enhance uses the maker's upsampler prompt verbatim. On failure the original prompt
-   * comes back with source "fallback" and the reason.
+   * FLUX.3's Enhance uses the maker's upsampler prompt verbatim, on the maker's upsampler model
+   * while the gateway lists it. On failure the original prompt comes back with source "fallback"
+   * and the reason.
    */
   async function rewrite({
     profile = {},
@@ -797,11 +798,12 @@ export function createAssistant(
     if (!original) throw new AssistantError("Enter a prompt to rewrite.", { status: 400 });
     const refusal = minorAgeRefusal(`${original}\n${asked}\n${notes}`);
     if (refusal) throw new AssistantError(refusal, { status: 400 });
-    const model = await modelFor("rewrite", explicit, writer);
+    const upsampler = preset.id === "enhance" ? familyUpsampler(profile) : null;
+    const maker = upsampler && (await listModels()).includes(upsampler.model);
+    const model = maker ? upsampler.model : await modelFor("rewrite", explicit, writer);
     const started = now();
     const images = Array.isArray(references) ? references.filter((image) => image?.data) : [];
-    const vision = images.length ? await supportsVision(writer) : false;
-    const upsampler = preset.id === "enhance" ? familyUpsampler(profile) : null;
+    const vision = images.length ? maker || (await supportsVision(writer)) : false;
     let system;
     let user = original;
     if (upsampler) {
@@ -837,7 +839,7 @@ export function createAssistant(
           { role: "system", content: system },
           { role: "user", content: userContent(user, images, vision) },
         ],
-        temperature: upsampler ? 0.3 : 0.7,
+        temperature: maker ? 0 : upsampler ? 0.3 : 0.7,
         signal,
         onDelta,
       });
