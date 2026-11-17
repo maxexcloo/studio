@@ -15,6 +15,7 @@ import { ArrowLeft } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
+import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
@@ -31,9 +32,6 @@ import { type Comparison, comparisonQuery } from "./queries";
 import { useStageComparison } from "./variants";
 
 import classes from "./ComparePage.module.css";
-
-const titleCase = (text: string) =>
-  text.replace(/(^|\s)\p{Ll}/gu, (letter) => letter.toUpperCase());
 
 /**
  * A compare set side by side, labelled by what sets each variant apart: pick the winner (liking it), take one
