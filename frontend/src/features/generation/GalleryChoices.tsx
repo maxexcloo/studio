@@ -1,13 +1,9 @@
-import { ActionIcon, Alert, ScrollArea, Text, getDefaultZIndex } from "@mantine/core";
+import { Alert, ScrollArea, Text } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { api } from "../../api";
 import type { MediaItem } from "../../types";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
-import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import {
   GalleryFilterPanel,
@@ -17,7 +13,6 @@ import {
 import { useWindowSpan } from "../gallery/MediaGrid";
 import { useMediaPreview } from "../gallery/MediaPreview";
 import { MorePages } from "../gallery/MorePages";
-import { galleryKey } from "../gallery/queries";
 import { PickerGrid, PickerHeader, PickerTile } from "./Picker";
 import { galleryReferenceType, useGalleryImages } from "./references";
 import type { ReferenceBrowser } from "./useReferenceBrowser";
@@ -34,8 +29,7 @@ export const galleryTabs: { value: Tab; label: string }[] = [
  * The gallery's images to choose from, as the References sheet and the card editors show them: the
  * picker header (the gallery's tabs and any `more` after them, search, Filter ▾ and `actions`),
  * then the tiles, each with a Preview, paged and virtualised as they scroll in the room they are
- * given, keeping their place in `browser`. An upload's tile deletes it, asking first; `onLayer`
- * hears while that or a preview is open.
+ * given, keeping their place in `browser`; `onLayer` hears while a preview is open.
  * Render inside a flex column that bounds its height.
  */
 export function GalleryChoices({
@@ -46,7 +40,6 @@ export function GalleryChoices({
   enabled,
   actions,
   tile,
-  onDeleted,
   onLayer,
 }: {
   /** Names the picker and its grid, such as "References". */
@@ -61,7 +54,6 @@ export function GalleryChoices({
     item: MediaItem,
     name: string,
   ) => { label: string; selected: boolean; disabled: boolean; onToggle: () => void };
-  onDeleted: (id: string) => void;
   onLayer?: (open: boolean) => void;
 }) {
   const tabs = [galleryTabs, ...more];
@@ -83,17 +75,6 @@ export function GalleryChoices({
   const [search] = useDebouncedValue(query, 250);
   // Uploads is the gallery's own filter, set by the tab.
   const { listing, items } = useGalleryImages(search, { ...filters, rating: "", uploads }, enabled);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const client = useQueryClient();
-  const deletion = useMutation({
-    meta: { inlineError: true },
-    mutationFn: (id: string) => api(`/api/gallery/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    onSuccess: async (_result, id) => {
-      onDeleted(id);
-      await client.invalidateQueries({ queryKey: galleryKey });
-      setDeleteId(null);
-    },
-  });
   const [viewport, setViewport] = useState<HTMLDivElement | null>(null);
   const grid = useRef<HTMLDivElement>(null);
   // Tiles are square in a CSS grid: its columns and one row's height place every row unmeasured.
@@ -134,8 +115,7 @@ export function GalleryChoices({
     }
   }, [viewport, items.length, pitch, browser.scroll]);
   const preview = useMediaPreview();
-  const layered = deleteId !== null || preview.opened;
-  useEffect(() => onLayer?.(layered), [layered, onLayer]);
+  useEffect(() => onLayer?.(preview.opened), [preview.opened, onLayer]);
   const name = (item: MediaItem, index: number) =>
     item.uploaded ? `Upload ${index + 1}` : item.prompt || "Result";
   const morePages = (
@@ -215,21 +195,6 @@ export function GalleryChoices({
                     image: { src: item.url, alt: title },
                     open: () => preview.open(items, index),
                   }}
-                  action={
-                    item.uploaded && (
-                      <ActionIcon
-                        variant="default"
-                        color="red"
-                        aria-label={`Delete Upload ${index + 1}`}
-                        onClick={() => {
-                          deletion.reset();
-                          setDeleteId(item.id);
-                        }}
-                      >
-                        <icons.delete size={14} />
-                      </ActionIcon>
-                    )
-                  }
                 />
               );
             })}
@@ -248,19 +213,6 @@ export function GalleryChoices({
         </ScrollArea.Autosize>
       )}
       {preview.element}
-      <ConfirmDialog
-        opened={deleteId !== null}
-        title="Delete Upload"
-        action="Delete Upload"
-        pending={deletion.isPending}
-        error={deletion.error?.message}
-        // Above the References popover and the card editors over it.
-        zIndex={getDefaultZIndex("overlay") + 1}
-        onConfirm={() => deleteId && deletion.mutate(deleteId)}
-        onClose={() => !deletion.isPending && setDeleteId(null)}
-      >
-        Delete this upload? References using it will need another image.
-      </ConfirmDialog>
     </>
   );
 }

@@ -149,18 +149,15 @@ export function GalleryToolbar({
         onOpenedChange={setFiltering}
         width={340}
         position="bottom-start"
-        actions={
-          <>
-            {results && (
-              <Text size="sm" c="dimmed">
-                {results}
-              </Text>
-            )}
-            <Button size="compact-sm" variant="subtle" disabled={!chips.length} onClick={clear}>
-              Clear
-            </Button>
-          </>
+        detail={
+          results && (
+            <Text size="sm" c="dimmed">
+              {results}
+            </Text>
+          )
         }
+        onClear={clear}
+        clearDisabled={!chips.length}
         target={
           <FilterButton
             label="Gallery Filters"

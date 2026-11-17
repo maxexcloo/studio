@@ -9,6 +9,7 @@ import {
   editorMenu,
   fixtures,
   image,
+  openReferenceChoices,
   profiles,
   promptMenu,
   section,
@@ -35,8 +36,7 @@ const mara = {
 };
 
 async function openCharacters(page: Page) {
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  const references = page.getByRole("region", { name: "References", exact: true });
+  const references = await openReferenceChoices(page);
   await references.getByText("Characters", { exact: true }).click();
   return references;
 }
@@ -507,9 +507,8 @@ test("A member sees only their cards and Presets in the Library, and a group wit
   await page.reload();
   await expect(page.getByText("No Presets", { exact: true })).toBeVisible();
   await page.goto("/images?compose=1");
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await expect(
-    page.getByRole("region", { name: "References", exact: true }).getByText("Characters", {
+    (await openReferenceChoices(page)).getByText("Characters", {
       exact: true,
     }),
   ).toHaveCount(0);
@@ -581,8 +580,7 @@ test("Picking and removing outfits preserves handwritten text even when it match
   const typed = `${outfitPart(yellow)} At a bus stop.`;
   await prompt.fill(typed);
   const pick = async (label: string) => {
-    await page.getByRole("button", { name: "Choose References", exact: true }).click();
-    const references = page.getByRole("region", { name: "References", exact: true });
+    const references = await openReferenceChoices(page);
     await references.getByText("Outfits", { exact: true }).click();
     await references.getByRole("button", { name: label, exact: true }).click();
     await closeReferences(page);
@@ -609,8 +607,7 @@ test("Outfits and scenes go into the prompt in order from the References sheet, 
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.fill("Walking slowly.");
   const pick = async (tab: string, name: string) => {
-    await page.getByRole("button", { name: "Choose References", exact: true }).click();
-    const references = page.getByRole("region", { name: "References", exact: true });
+    const references = await openReferenceChoices(page);
     await references.getByText(tab, { exact: true }).click();
     await references.getByRole("button", { name, exact: true }).click();
     await closeReferences(page);

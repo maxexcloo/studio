@@ -95,10 +95,12 @@ recur across features.
   `DialogFooter` of real buttons: any default secondary actions, Cancel, then
   one filled primary, which follows the secondaries alone (Done, Close) where
   there is nothing to cancel. A primary is its bare verb (Save, Compare,
-  Create), adding a noun only where the verb alone is ambiguous; no other
-  action sits beside or below it. Consequential actions sit in a final Danger
-  Zone or row menu and use `ConfirmDialog`, titled with the action and no
-  question mark.
+  Create), adding a noun only where the verb alone is ambiguous. Clearing a
+  form or popup is the shared `ClearButton` ✕ immediately before the primary,
+  as in the composer's Generate row, never a text action in a heading; no
+  other action sits beside or below the primary. Consequential actions sit in
+  a final Danger Zone or row menu and use `ConfirmDialog`, titled with the
+  action and no question mark.
 - Choose controls by selection semantics: a SegmentedControl or radio group
   selects exactly one choice, a Switch changes one setting, and toggle chips
   or MultiSelect combine options. All and Any are choices, not deselection.
@@ -167,11 +169,11 @@ recur across features.
 - Shared chip popups (`ChipPopup`) anchor on desktop and open full-screen
   sheets on phones where the content needs the room; small forms stay
   `floating`. Their heading (`PopupHeading`, or the sheet's header beside
-  Close) holds the title and any count, then compact subtle actions with
-  Clear first and record actions (Save) after. Their footer holds at most one
-  secondary that adds content (Add) and the primary; choices apply as made,
-  so the phone sheet ends with Done where there is no other primary. A saved
-  record's name is one `SavedName` combobox.
+  Close) holds the title and any count, then compact subtle record actions
+  (Save). Their footer holds at most one secondary that adds content (Add),
+  then Clear and the primary; choices apply as made, so the footer ends with
+  Done where there is no other primary. A saved record's name is one
+  `SavedName` combobox.
 - On phones, overlays keep their actions at the bottom and always in sight:
   full-screen dialogs and sheets take the page's solid surface and pin their
   `DialogFooter` above the safe area while the content between scrolls, with

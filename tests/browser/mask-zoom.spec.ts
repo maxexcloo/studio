@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-import { closeReferences, create, fixtures, showUploads } from "./fixtures";
+import { closeReferences, create, fixtures, openReferenceChoices, showUploads } from "./fixtures";
 
 test("Mask zoom and Hand pan preserve painting history and saved masks", async ({
   page,
 }, testInfo) => {
   await fixtures(page);
   await create(page);
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await openReferenceChoices(page);
   const upload = page.waitForEvent("filechooser");
   await showUploads(page);
   await page.getByRole("button", { name: "Upload Reference", exact: true }).click();

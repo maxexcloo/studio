@@ -160,6 +160,8 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
   const input = value || context.input;
   const phone = usePhone();
   const [adding, setAdding] = useState(false);
+  const { update } = useLoraDraft({ value, onChange });
+  const clear = { onClear: () => update([]), clearDisabled: !input.loras.length };
   // The picker's data loads with the chip, so its first frame is final.
   const info = useQuery(loraInfoQuery);
   useQuery(loraLibraryQuery);
@@ -206,7 +208,8 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
         }}
         target={trigger}
         detail={<StackCount value={value} onChange={onChange} picker={picker} />}
-        actions={<StackActions value={value} onChange={onChange} picker={picker} />}
+        actions={<StackSave value={value} onChange={onChange} picker={picker} />}
+        {...clear}
         secondary={
           <ChipPopup
             title="Add LoRAs"
@@ -235,6 +238,7 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
       onOpenedChange={picker.setOpened}
       target={trigger}
       aside={stack}
+      {...clear}
     >
       {choices}
     </ChipPopup>
@@ -507,31 +511,20 @@ function useStackDraft({ value, onChange, picker }: LoraPickerProps) {
 }
 
 /**
- * The stack's Clear and Save Preset: beside its heading, or in the phone sheet's footer. Save
- * Preset updates the current preset's LoRAs, or names a new preset of only LoRAs.
+ * The stack's Save Preset, beside its heading or in the phone sheet's header: it updates the current
+ * preset's LoRAs, or names a new preset of only LoRAs.
  */
-function StackActions(props: LoraPickerProps) {
-  const { input, update, presets, current, edited } = useStackDraft(props);
+function StackSave(props: LoraPickerProps) {
+  const { input, presets, current, edited } = useStackDraft(props);
   return (
-    <>
-      <Button
-        size="compact-sm"
-        variant="subtle"
-        aria-label="Clear LoRAs"
-        disabled={!input.loras.length}
-        onClick={() => update([])}
-      >
-        Clear
-      </Button>
-      <SaveButton
-        noun="Preset"
-        naming={props.picker.naming}
-        current={current}
-        edited={edited}
-        disabled={!input.loras.length || !presets.isSuccess}
-        onUpdate={(preset) => presets.update(preset, { ...preset.input, loras: input.loras })}
-      />
-    </>
+    <SaveButton
+      noun="Preset"
+      naming={props.picker.naming}
+      current={current}
+      edited={edited}
+      disabled={!input.loras.length || !presets.isSuccess}
+      onUpdate={(preset) => presets.update(preset, { ...preset.input, loras: input.loras })}
+    />
   );
 }
 
@@ -606,7 +599,7 @@ function LoraStack(props: LoraPickerProps) {
         <PopupHeading
           title="Stack"
           detail={<StackCount {...props} />}
-          actions={<StackActions {...props} />}
+          actions={<StackSave {...props} />}
         />
       )}
       {(!!input.loras.length || !!records.length) && <StackPreset {...props} />}

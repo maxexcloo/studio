@@ -8,9 +8,11 @@ import {
   create,
   fixtures,
   image,
+  openReferenceChoices,
   pickerTab,
   profiles,
   serveProfiles,
+  showReferenceStack,
   showUploads,
   stamp,
 } from "./fixtures";
@@ -86,9 +88,9 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Combine all ten references");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  const picker = page.getByRole("region", { name: "References", exact: true });
-  const cells = picker.getByRole("group", { name: "Reference Slots", exact: true });
+  const cells = page.getByRole("group", { name: "Reference Slots", exact: true });
   await expect(cells.getByRole("button", { name: /^Slot / })).toHaveText(["1", "2", "3"]);
+  const picker = await openReferenceChoices(page);
   await showUploads(page);
   await picker.locator('input[type="file"]').setInputFiles(
     Array.from({ length: 13 }, (_, index) => ({
@@ -101,28 +103,38 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
     })),
   );
   // The stack fills its ten declared slots, then Start and End; nothing is left for the 13th.
-  await expect(picker.getByText("Reference Image · 10/10", { exact: true })).toBeVisible();
+  await expect(cells.getByText("Reference Image · 10/10", { exact: true })).toBeVisible();
   await expect(
     cells.getByRole("button", { name: "Reference 12 · End", exact: true }),
   ).toBeVisible();
   expect(uploaded).toBe(12);
+  // Filling the stack returns the phone to it.
   await expect(
-    picker.getByRole("button", { name: "Upload Reference", exact: true }),
+    (await openReferenceChoices(page)).getByRole("button", {
+      name: "Upload Reference",
+      exact: true,
+    }),
   ).toBeDisabled();
+  // Back to the gallery's generations.
+  await pickerTab(page, "References", "Gallery");
+  await showReferenceStack(page);
   await cells.getByRole("button", { name: "Reference 10 · Reference Image", exact: true }).click();
   await page
     .getByRole("menu", { name: "Reference 10 · Reference Image", exact: true })
     .getByRole("menuitem", { name: "Move Earlier", exact: true })
     .click();
-  // Back to the gallery's generations.
-  await pickerTab(page, "References", "Gallery");
   for (const label of ["Reference 11 · Start", "Reference 12 · End"]) {
     await cells.getByRole("button", { name: label, exact: true }).click();
     await page
       .getByRole("menu", { name: label, exact: true })
       .getByRole("menuitem", { name: "Replace", exact: true })
       .click();
-    await picker.getByRole("button", { name: "Use reference: Shared frame", exact: true }).click();
+    // Replacing opens the phone's choices, and the pick returns to the stack.
+    await (
+      await openReferenceChoices(page)
+    )
+      .getByRole("button", { name: "Use reference: Shared frame", exact: true })
+      .click();
   }
   await closeReferences(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();

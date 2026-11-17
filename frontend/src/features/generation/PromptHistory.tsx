@@ -189,17 +189,8 @@ export function usePromptHistory({
       opened={opened}
       onOpenedChange={setOpened}
       target={<span />}
-      actions={
-        <Button
-          size="compact-sm"
-          variant="subtle"
-          aria-label="Clear Recent"
-          disabled={!history.data?.prompts.some((entry) => !entry.liked)}
-          onClick={() => edit.mutate({ action: "clear" })}
-        >
-          Clear
-        </Button>
-      }
+      onClear={() => edit.mutate({ action: "clear" })}
+      clearDisabled={!history.data?.prompts.some((entry) => !entry.liked)}
       secondary={
         <Button
           variant="default"
