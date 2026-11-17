@@ -34,7 +34,7 @@ import {
   studioTheme,
 } from "../theme";
 import { PopupTooltip } from "./PopupTooltip";
-import { titleCase } from "./titleCase";
+import { titleCase } from "../../../shared/titles";
 import { usePhone, useSideways, useTouch } from "./usePhone";
 
 const defaults: Appearance = {
