@@ -1109,21 +1109,30 @@ export async function showUploads(page: Page) {
  * Returns them.
  */
 export async function openReferenceChoices(page: Page) {
-  const choices = page.getByRole("region", { name: "Reference Choices", exact: true });
-  if (await choices.isVisible()) return choices;
-  if (!(await page.getByRole("dialog", { name: "References", exact: true }).isVisible()))
+  // The triggers say whether their popups are open, so one fading out after a pick doesn't count.
+  const expanded = async (name: string) => {
+    const trigger = page.getByRole("button", { name, exact: true });
+    return (await trigger.count()) > 0 && (await trigger.getAttribute("aria-expanded")) === "true";
+  };
+  if (!(await expanded("Choose References")))
     await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  if (await page.evaluate(() => "phone" in document.documentElement.dataset))
+  const phone = await page.evaluate(() => "phone" in document.documentElement.dataset);
+  if (phone && !(await expanded("Add References")))
     await page.getByRole("button", { name: "Add References", exact: true }).click();
+  const choices = page.getByRole("region", { name: "Reference Choices", exact: true });
   await expect(choices).toBeVisible();
   return choices;
 }
 
-/** Returns from the phone's reference choices to the stack; desktop shows both. */
+/**
+ * Returns from the phone's reference choices to the stack, unless a pick returned already; desktop
+ * shows both.
+ */
 export async function showReferenceStack(page: Page) {
+  const add = page.getByRole("button", { name: "Add References", exact: true });
   const adding = page.getByRole("dialog", { name: "Add References", exact: true });
-  if (!(await adding.isVisible())) return;
-  await adding.getByRole("button", { name: "Done", exact: true }).click();
+  if ((await add.count()) && (await add.getAttribute("aria-expanded")) === "true")
+    await adding.getByRole("button", { name: "Done", exact: true }).click();
   await expect(adding).toBeHidden();
 }
 

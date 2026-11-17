@@ -415,7 +415,8 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
     await expect(beside("Result 148")).toBeHidden();
     await expect(tile).toBeFocused();
     await page.mouse.move(0, 0);
-    await previewButton.hover();
+    // Away from where the click opened the preview, which a resting pointer does not peek from.
+    await previewButton.hover({ position: { x: 4, y: 4 } });
     await expect(beside(fullPrompt)).toBeVisible();
     // Pressing Preview while the image shows opens it full screen.
     await previewButton.click();

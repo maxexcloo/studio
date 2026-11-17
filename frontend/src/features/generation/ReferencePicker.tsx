@@ -94,6 +94,7 @@ export function ReferencePicker({
   const setOpened = (opened: boolean) => {
     setLocalOpen(opened);
     onOpenedChange?.(opened);
+    if (!opened) setAdding(false);
   };
   const phone = usePhone();
   const { draft, setDraft } = useGeneration();
@@ -426,6 +427,7 @@ export function ReferencePicker({
   const trigger = compact ? (
     <ActionIcon
       aria-label="Choose References"
+      aria-expanded={opened}
       variant="subtle"
       color="gray"
       size={44}
@@ -479,10 +481,7 @@ export function ReferencePicker({
         title="References"
         width="100%"
         opened={opened}
-        onOpenedChange={(opened) => {
-          setOpened(opened);
-          if (!opened) setAdding(false);
-        }}
+        onOpenedChange={setOpened}
         trap={!layer}
         target={trigger}
         detail={count}
@@ -491,14 +490,19 @@ export function ReferencePicker({
           <ChipPopup
             title="Add References"
             width="100%"
-            opened={adding}
+            opened={opened && adding}
             onOpenedChange={(adding) => {
               setAdding(adding);
               if (!adding) settle();
             }}
             trap={!layer}
             target={
-              <Button variant="default" aria-label="Add References" onClick={() => setAdding(true)}>
+              <Button
+                variant="default"
+                aria-label="Add References"
+                aria-expanded={opened && adding}
+                onClick={() => setAdding(true)}
+              >
                 Add
               </Button>
             }
