@@ -1,4 +1,4 @@
-import { Boxes, Images, Info, Plug, Server, Shield, UserRound, UsersRound } from "lucide-react";
+import { Boxes, Info, Plug, Server, Shield, UserRound, UsersRound, Wrench } from "lucide-react";
 
 import { icons } from "../../ui/icons";
 import {
@@ -31,13 +31,6 @@ const settingSections = {
     admin: true,
     group: "Administration",
   },
-  gallery: {
-    label: "Gallery",
-    description: "Background AI and the passes that caption, check and index the gallery.",
-    icon: Images,
-    admin: true,
-    group: "Administration",
-  },
   generation: {
     label: "Generation",
     description:
@@ -51,6 +44,14 @@ const settingSections = {
     description:
       "Which models, uncensored content, Characters and Dream each group can use; administrators can use everything.",
     icon: Shield,
+    admin: true,
+    group: "Administration",
+  },
+  maintenance: {
+    label: "Maintenance",
+    description:
+      "Background AI, the passes that caption, check and index the gallery, and unfinished items.",
+    icon: Wrench,
     admin: true,
     group: "Administration",
   },

@@ -31,7 +31,7 @@ interface PromptDescriber {
  * prompt assistant.
  */
 export function createPromptSuggester(options: {
-  /** The Settings › Gallery switch (STUDIO_SUGGESTED_PROMPTS). */
+  /** The Settings › Maintenance switch (STUDIO_SUGGESTED_PROMPTS). */
   enabled(): boolean;
   writer: PromptDescriber | null;
   idle(): boolean;

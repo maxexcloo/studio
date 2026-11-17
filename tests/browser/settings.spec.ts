@@ -58,9 +58,9 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Account",
     "Preferences",
     "Dream",
-    "Gallery",
     "Generation",
     "Groups",
+    "Maintenance",
     "Users",
     "Workers",
     "Integrations",
@@ -101,7 +101,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   await expect.poll(() => statusReads).toBeGreaterThan(before);
 });
 
-test("Caption Gallery in Settings › Gallery starts a pass, shows its progress and stops", async ({
+test("Caption Gallery in Settings › Maintenance starts a pass, shows its progress and stops", async ({
   page,
 }) => {
   await fixtures(page);
@@ -139,7 +139,7 @@ test("Caption Gallery in Settings › Gallery starts a pass, shows its progress 
     if (action !== "captions") actions.push([action, route.request().postDataJSON()]);
     return route.fulfill({ json: status });
   });
-  await page.goto("/settings#gallery");
+  await page.goto("/settings#maintenance");
   const row = page.getByRole("region", { name: "Gallery", exact: true });
   await expect(row.getByText("Ready · 9,000 to caption", { exact: true })).toBeVisible();
   await row.getByRole("combobox", { name: "Images to Caption", exact: true }).click();
@@ -163,7 +163,7 @@ test("Caption Gallery in Settings › Gallery starts a pass, shows its progress 
   ]);
 });
 
-test("Unfinished Items in Settings › Gallery retry, stop and clear any account's stuck jobs", async ({
+test("Unfinished Items in Settings › Maintenance retry, stop and clear any account's stuck jobs", async ({
   page,
 }) => {
   await fixtures(page);
@@ -193,8 +193,8 @@ test("Unfinished Items in Settings › Gallery retry, stop and clear any account
     jobs = body.jobs ? [] : jobs.filter((entry) => entry.id !== body.id);
     return route.fulfill({ json: { job: jobs[0] } });
   });
-  await page.goto("/settings#gallery");
-  const row = page.getByRole("region", { name: "Gallery", exact: true });
+  await page.goto("/settings#maintenance");
+  const row = page.getByRole("region", { name: "Queue", exact: true });
   await expect(row.getByText(/2 now\.$/)).toBeVisible();
   await row.getByRole("button", { name: "Review", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Unfinished Items", exact: true });
@@ -864,7 +864,7 @@ test("Status counts running workers, reads a parked service as Stopped and offer
   await expect(drawer.getByRole("button", { name: "Start Videos" })).toHaveCount(0);
 });
 
-test("Settings › Gallery switches follow at once and settle back after a failed save", async ({
+test("Settings › Maintenance switches follow at once and settle back after a failed save", async ({
   page,
 }) => {
   await fixtures(page);
@@ -912,7 +912,7 @@ test("Settings › Gallery switches follow at once and settle back after a faile
       },
     });
   });
-  await page.goto("/settings#gallery");
+  await page.goto("/settings#maintenance");
   const toggle = page
     .getByRole("region", { name: "Background AI", exact: true })
     .getByRole("switch", { name: "Gallery Captions", exact: true });

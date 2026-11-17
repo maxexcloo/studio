@@ -28,7 +28,7 @@ const flag = (key, label, description, defaultOn = true) => ({
 });
 
 /**
- * Settings › Gallery switches. Background AI (A–Z) covers every model call Studio makes on its
+ * Settings › Maintenance switches. Background AI (A–Z) covers every model call Studio makes on its
  * own; what a person asks for (Improve, Ask for a Change, Animate) is never switched
  * off here. Run While Busy sits with the gallery passes.
  */

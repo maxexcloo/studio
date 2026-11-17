@@ -25,6 +25,7 @@ import { markWorkflowUsed } from "./workflow-catalogue.js";
 import { resolveImageMode } from "./workflow-modes.js";
 
 const videoPollMs = 2000;
+const modelPollMs = 1000;
 const stopping = (id) => ["cancelling", "cancelled"].includes(jobs.get(id)?.status);
 
 /** Slot identity owns conditioning order; reordering a draft never swaps first and last frames. */
@@ -81,12 +82,37 @@ function cancelledRun(id) {
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const transient = (error) => !error.status || error.status >= 500 || error.status === 429;
 
-/** A DELETE forgets an active video before its GPU stops; retain it until its terminal status. */
-async function runVideo(id, client, record, save, body, pollMs) {
+/**
+ * When Radiance first lists `model` as resident while `request` is open, or null when it never
+ * does; a model already resident on the first look took no loading.
+ */
+async function residentAt(client, model, request, pollMs) {
+  let settled = false;
+  request.then(
+    () => (settled = true),
+    () => (settled = true),
+  );
+  for (let first = true; !settled; first = false) {
+    const models = await Promise.resolve()
+      .then(() => client.models())
+      .catch(() => []);
+    if (models.find((entry) => entry.id === model)?.state === "resident")
+      return first ? null : Date.now();
+    await Promise.race([pause(pollMs), request.catch(() => null)]);
+  }
+  return null;
+}
+
+/**
+ * A DELETE forgets an active video before its GPU stops; retain it until its terminal status.
+ * `marks` takes when Radiance accepted the video (its model loaded) and when it completed.
+ */
+async function runVideo(id, client, record, save, body, pollMs, marks = {}) {
   let video;
   if (record.videoId) video = await client.video(record.videoId);
   else {
     video = await client.createVideo(body);
+    marks.created = Date.now();
     record.videoId = video.id;
     save();
   }
@@ -108,8 +134,27 @@ async function runVideo(id, client, record, save, body, pollMs) {
       showProgress(id, "Reconnecting");
     }
   }
+  marks.completed = Date.now();
   showProgress(id, "Saving");
   return [await client.videoContent(record.videoId)];
+}
+
+/** The stages Studio saw, for Details › Timing; each only when it was measured. */
+function radianceTiming(body, marks) {
+  const span = (from, to) => (from && to && to >= from ? Math.round(to - from) : undefined);
+  const stages = {
+    queueMs: span(body.queuedAt, body.startedAt),
+    setupMs: span(marks.start, marks.sent),
+    loadMs: span(marks.sent, marks.created || marks.resident),
+    samplingMs: span(
+      marks.created || marks.resident || marks.sent,
+      marks.completed || marks.received,
+    ),
+    downloadMs: span(marks.completed, marks.received),
+    saveMs: span(marks.received, marks.saved),
+    runMs: span(marks.sent, marks.received),
+  };
+  return Object.fromEntries(Object.entries(stages).filter(([, ms]) => ms !== undefined));
 }
 
 /**
@@ -126,6 +171,8 @@ export async function runRadianceJob(
   const ownerId = body.ownerId || "";
   let record = store?.providerRecord(ownerId, id);
   const save = () => store?.saveProviderRecord(ownerId, id, record);
+  // A recovered run's earlier stages happened in another process, so only a fresh run is timed.
+  const marks = recovered ? null : { start: Date.now() };
   try {
     if (!record) {
       if (stopping(id)) return cancelledRun(id);
@@ -167,9 +214,20 @@ export async function runRadianceJob(
           : imageRequest(record.values, references);
         if (stopping(id)) return cancelledRun(id);
         showProgress(id, "Generating");
-        made = record.video
-          ? await runVideo(id, client, record, save, request.body, pollMs)
-          : await client.images(request.route, request.body, AbortSignal.timeout(radianceWorkMs));
+        if (marks) marks.sent = Date.now();
+        if (record.video)
+          made = await runVideo(id, client, record, save, request.body, pollMs, marks || {});
+        else {
+          const images = client.images(
+            request.route,
+            request.body,
+            AbortSignal.timeout(radianceWorkMs),
+          );
+          const loaded = marks && residentAt(client, record.values.model, images, modelPollMs);
+          made = await images;
+          if (marks) marks.resident = await loaded;
+        }
+        if (marks) marks.received = Date.now();
       }
       // Keep accepted bytes in this process while local storage is unavailable.
       for (const [index, bytes] of made.entries()) {
@@ -206,6 +264,10 @@ export async function runRadianceJob(
           },
         }))
       : outputs;
+    if (marks?.received) {
+      marks.saved = Date.now();
+      jobs.set(id, { ...jobs.get(id), timing: radianceTiming(record.body, marks) });
+    }
     const completed = await replaceGalleryJob(id, delivered, record.body, jobs);
     markWorkflowUsed(record.body.profileId || record.body.model || record.body.workflow || "");
     setTerminalJob(id, { status: "done", outputs: completed });
