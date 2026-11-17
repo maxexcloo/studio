@@ -13,7 +13,7 @@
 ## Delivery
 
 - The container image on GHCR, built and verified by CI, is the only delivery. There is no `docs/` website, desktop launcher, packaged download, self-updater or release signing; do not add them.
-- Studio builds the app and `studio-worker` GPU images. Deployment configuration belongs to kubelab (`apps/base/studio`); Studio controls configured GPU workloads only through an administrator's placement in Settings › Workers: Radiance on both GPUs is the default and switches its own models, and queued work never starts or swaps a workload.
+- Studio builds the app and `studio-worker` GPU images. Deployment configuration belongs to kubelab (`apps/base/studio`); Studio controls configured GPU workloads: Radiance on both GPUs is the default placement and switches its own models; while an administrator's placement includes Radiance, waiting ComfyUI-only work swaps its ComfyUI workloads in once Radiance's accepted work finishes, and Radiance returns after two minutes without ComfyUI work. A placement without Radiance in Settings › Workers pauses swapping until Radiance is placed again.
 - Every green `main` commit publishes images and deploys through kubelab. CI owns versioning and releases. After a release, tick the manual-run box on kubelab's Dependency Dashboard (issue 23) so the hosted Renovate app deploys it promptly; kubelab requires an up-to-date branch, so update its deploy PR and merge once Check passes.
 - Open a pull request for large changes. Merge only what is ready for production, including any real-model verification it needs.
 - Single-user mode keeps working for local development.
@@ -111,8 +111,8 @@ recur across features.
   in its menu, not a separate dialog. An option whose label alone is ambiguous
   carries a one-line `description`, except in item action menus.
 - Media categories use Images, Videos, Text. Other unordered peers sort
-  alphabetically, except settings first, Like before Dislike, Refresh and
-  Custom… last and Delete last.
+  alphabetically, except settings first, Like before Dislike, Name A–Z and
+  Name Z–A last in sort menus, Refresh and Custom… last and Delete last.
 - Labels name the verb alone where the menu or box already says what it acts
   on (Upscale, Share, Clear; not Clear Prompt), adding a word only where the
   verb alone is ambiguous (Stop Upscale, Edit in Composer). One action keeps

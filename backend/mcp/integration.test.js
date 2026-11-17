@@ -1841,12 +1841,12 @@ test("uploaded references belong to their uploader and map to declared profile s
   await generate(alice, {
     reference_asset_ids: [assetId],
     denoise: 0.4,
-    loras: [{ name: "fixture-effect.safetensors", strength: -0.5 }],
+    loras: [{ name: "fixture-effect.safetensors", strength: 0.5 }],
   });
   assert.deepEqual(f.submitted[0].referenceAssets, [{ slot: "reference", assetId }]);
   assert.equal(f.submitted[0].denoise, 0.4);
   assert.deepEqual(f.submitted[0].loras, [
-    { name: "fixture-effect.safetensors", strength: -0.5, enabled: true },
+    { name: "fixture-effect.safetensors", strength: 0.5, enabled: true },
   ]);
 });
 
@@ -3792,7 +3792,7 @@ test("Generate takes LoRA names alone, fills the recommended strength and refuse
   );
   assert.equal(chosen.profile.id, "fixture-sdxl");
   assert.deepEqual(f.submitted.at(-1).loras, [
-    { name: "fixture-other.safetensors", strength: 0.7, enabled: true },
+    { name: "fixture-other.safetensors", strength: 1, enabled: true },
   ]);
   const nowhere = await call(client, "generate", {
     kind: "image",
@@ -3833,9 +3833,9 @@ test("A set's prompts spread LoRA strengths left to Studio within their range, k
     loras: [{ name: "fixture-effect" }, { name: "fixture-unknown" }],
   });
   assert.deepEqual(strengths(), [
-    ["fixture-effect 1", "fixture-unknown 0.7"],
-    ["fixture-effect 0.6", "fixture-unknown 0.55"],
-    ["fixture-effect 1.1", "fixture-unknown 0.85"],
+    ["fixture-effect 1", "fixture-unknown 1"],
+    ["fixture-effect 0.6", "fixture-unknown 0.85"],
+    ["fixture-effect 1.1", "fixture-unknown 1.15"],
     ["fixture-effect 1"],
   ]);
 });

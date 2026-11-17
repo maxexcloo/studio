@@ -29,16 +29,24 @@ const workloads = [
   workload("gaming", "text", "text", 1, "gaming"),
 ];
 
+const radiance: Workload = {
+  ...workload("radiance", "image", "radiance", 2),
+  backend: "radiance",
+};
+
 function fixture(
   running: string[],
   {
     store,
+    withRadiance = false,
   }: {
     store?: RuntimeStore;
+    withRadiance?: boolean;
   } = {},
 ) {
+  const configured = withRadiance ? [...workloads, radiance] : workloads;
   const kube = fakeKubernetes(
-    workloads.map((item) => ({
+    configured.map((item) => ({
       namespace: item.namespace,
       name: item.deployment,
       replicas: running.includes(item.id) ? 1 : 0,
@@ -47,7 +55,7 @@ function fixture(
   let clock = Date.parse("2026-10-27T00:00:00Z");
   const controller = new RuntimeController({
     engine: new KubernetesEngine(kube.request),
-    workloads,
+    workloads: configured,
     pools: { gpu: 2, gaming: 1 },
     ...(store ? { store } : {}),
     now: () => clock,
@@ -59,8 +67,25 @@ function fixture(
     },
     timeouts: { drain: 60 * 60_000, stop: 60_000, start: 60_000 },
   });
-  return { kube, controller };
+  return { kube, controller, advance: (ms: number) => (clock += ms) };
 }
+
+/** A store a test can read, which a controller "lost in a restart" no longer writes. */
+function sharedStore() {
+  let saved: unknown;
+  return (writes = () => true): RuntimeStore => ({
+    read: () => (saved ? structuredClone(saved) : undefined) as never,
+    write: (record) => {
+      if (writes()) saved = structuredClone(record);
+    },
+  });
+}
+const placeByHand = async (controller: RuntimeController, ids: string[]) => {
+  const preview = await controller.preview(ids);
+  await controller.apply(ids, preview.signature, "account:admin");
+  await controller.settled;
+};
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 test("status reports phases, GPU use and why a pod is not ready", async () => {
   const { kube, controller } = fixture(["image", "text"]);
@@ -375,5 +400,96 @@ test("history survives a restart and a change cut short is marked interrupted", 
   await second.controller.reconcile();
   assert.equal((await second.controller.observe()).history.length, 1);
   lease.release();
+  await first.controller.settled;
+});
+
+test("waiting ComfyUI work swaps Radiance out after its accepted work, and Radiance returns when idle", async () => {
+  const { kube, controller, advance } = fixture(["radiance"], { withRadiance: true });
+  await placeByHand(controller, ["radiance"]);
+  assert.equal((await controller.observe()).swaps, "automatic");
+  const accepted = await controller.acquire("radiance");
+  await assert.rejects(controller.acquire("image"), {
+    status: 503,
+    message: "Waiting for Image — Studio is switching the GPUs.",
+  });
+  await settle();
+  // Nothing stops while Radiance's accepted work runs, and new Radiance work waits for the swap.
+  assert.match((await controller.observe()).operation!.progress, /accepted operation on Radiance/);
+  await assert.rejects(controller.acquire("radiance"), /Waiting for the runtime change to finish/);
+  assert.deepEqual(kube.log, []);
+  accepted.release();
+  await controller.settled;
+  assert.deepEqual(kube.log, [
+    "scale radiance/radiance 0",
+    "gone radiance/radiance",
+    "scale comfyui/image 1",
+  ]);
+  assert.equal(
+    (await controller.observe()).history[0].requestedBy,
+    "automatic: switching to Image for waiting ComfyUI work",
+  );
+  (await controller.acquire("image")).release();
+  await assert.rejects(controller.acquire("radiance"), {
+    message: "Waiting for Radiance — Studio switches the GPUs back once the ComfyUI work finishes.",
+  });
+  // Not yet idle for two minutes: the swap stays.
+  advance(60_000);
+  await controller.swapOnDemand();
+  assert.equal((await controller.observe()).operation, undefined);
+  advance(60_000);
+  await controller.swapOnDemand();
+  await controller.settled;
+  assert.deepEqual(kube.log.slice(3), [
+    "scale comfyui/image 0",
+    "gone comfyui/image",
+    "scale radiance/radiance 1",
+  ]);
+  const status = await controller.observe();
+  assert.match(status.history[0].requestedBy, /^automatic: back to Radiance after 2 minutes/);
+  assert.equal(status.swaps, "automatic");
+  (await controller.acquire("radiance")).release();
+});
+
+test("a placement by hand without Radiance pauses swaps until Radiance is placed again", async () => {
+  // As the live record holds a conversion window: an apply of ComfyUI alone.
+  const store = sharedStore()();
+  store.write({ desired: ["image"], operations: [] });
+  const { kube, controller } = fixture(["image"], { withRadiance: true, store });
+  assert.equal((await controller.observe()).swaps, "paused");
+  await assert.rejects(controller.acquire("video-tp2"), {
+    message: "Video-tp2 is stopped: an administrator can start it in Settings › Workers.",
+  });
+  await controller.swapOnDemand();
+  await controller.reconcile();
+  assert.deepEqual(kube.log, []);
+  await placeByHand(controller, ["radiance"]);
+  assert.equal((await controller.observe()).swaps, "automatic");
+});
+
+test("a Studio restart mid-swap keeps the swap, restores it and still returns to Radiance", async () => {
+  const shared = sharedStore();
+  let firstAlive = true;
+  const first = fixture(["radiance"], { withRadiance: true, store: shared(() => firstAlive) });
+  await placeByHand(first.controller, ["radiance"]);
+  await assert.rejects(first.controller.acquire("image"), /Studio is switching the GPUs/);
+  while (!first.kube.log.includes("scale radiance/radiance 0")) await settle();
+  firstAlive = false;
+  // Studio restarts after stopping Radiance, before Image has started.
+  const second = fixture([], { withRadiance: true, store: shared() });
+  const status = await second.controller.observe();
+  assert.equal(status.history[0].status, "interrupted");
+  assert.equal(status.swaps, "automatic");
+  await second.controller.reconcile();
+  await second.controller.settled;
+  assert.deepEqual(second.kube.log, ["scale comfyui/image 1"]);
+  (await second.controller.acquire("image")).release();
+  second.advance(2 * 60_000);
+  await second.controller.swapOnDemand();
+  await second.controller.settled;
+  assert.deepEqual(second.kube.log.slice(1), [
+    "scale comfyui/image 0",
+    "gone comfyui/image",
+    "scale radiance/radiance 1",
+  ]);
   await first.controller.settled;
 });

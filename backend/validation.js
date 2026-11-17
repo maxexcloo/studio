@@ -1,4 +1,4 @@
-import { maxLoras } from "../shared/profiles.ts";
+import { loraDefaultStrength, maxLoras } from "../shared/profiles.ts";
 import { isResolution } from "../shared/resolution.ts";
 import { missingNodes, nodeRange, optionsFor } from "./comfy/comfy.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
@@ -90,8 +90,9 @@ function sanitizeLoras(
     const name = String(item.name || "").trim();
     if (!name) continue;
     if (!installed.includes(name)) throw new Error(`LoRA “${name}” isn't available in ComfyUI.`);
-    const strength = snapNumber(item.strength, strengthRange.default ?? 0.7, strengthRange);
-    const issue = optionalLoraPolicyIssue({ name, strength }, catalogueLoraInfo(name), {
+    const loraInfo = catalogueLoraInfo(name);
+    const strength = snapNumber(item.strength, loraDefaultStrength(loraInfo), strengthRange);
+    const issue = optionalLoraPolicyIssue({ name, strength }, loraInfo, {
       ...profile,
       loraAdapter: adapter,
     });

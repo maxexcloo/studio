@@ -56,8 +56,15 @@ export async function loadRuntime(
     fetchImpl,
     ...document<BenchmarkRun[]>("runtime-benchmarks"),
   });
-  // Restores the last placement after an outside stop.
-  setInterval(() => void controller.reconcile().catch(() => {}), 30_000).unref();
+  // Restores the last placement after an outside stop, then swaps for ComfyUI work or back.
+  setInterval(
+    () =>
+      void controller
+        .reconcile()
+        .then(() => controller.swapOnDemand())
+        .catch(() => {}),
+    30_000,
+  ).unref();
   return { controller, benchmarks };
 }
 

@@ -23,6 +23,8 @@ import {
   loraDefaultStrength,
   loraFamilyId,
   loraName,
+  loraStrengthIssue,
+  loraStrengthRange,
 } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, Profile, Rating } from "../../types";
@@ -73,10 +75,11 @@ export const loraInfoQuery = queryOptions({
   queryKey: ["lora-info"],
   queryFn: () => api<{ loras: Record<string, LoraInfo> }>("/api/loras/info"),
 });
-/** The newest own image made with each LoRA, by file name. */
+/** By file name, the newest own image made with each LoRA and how many own images used it. */
 const loraPreviewsQuery = queryOptions({
   queryKey: ["lora-previews"],
-  queryFn: () => api<{ previews: Record<string, string> }>("/api/loras/previews"),
+  queryFn: () =>
+    api<{ previews: Record<string, string>; uses: Record<string, number> }>("/api/loras/previews"),
 });
 const typeNames: Record<string, string> = {
   slider: "Slider",
@@ -90,8 +93,6 @@ const loraTabs = [
   { value: "liked", label: "Liked" },
 ] as const;
 type LoraTab = (typeof loraTabs)[number]["value"];
-/** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
-const defaultStrength = (info: LoraInfo | undefined) => loraDefaultStrength(info, 1);
 /** Whether a LoRA lists the family, however the profile spells it. */
 const fitsFamily = (families: string[], family: string) =>
   families.some((value) => loraFamilyId(value) === loraFamilyId(family));
@@ -107,9 +108,10 @@ export const unavailableFor = (profile: Profile | undefined, info?: LoraInfo) =>
   profile?.loraAdapter === "radiance-tags-v1" ? info?.unavailableReason : undefined;
 
 const ratingOrder = (rating?: Rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);
-/** The LoRA choices' orders: by rating (the default every LoRA list shares), or by name. */
-type LoraSort = "rating" | "name-asc" | "name-desc";
+/** The LoRA choices' orders: by rating (the default every LoRA list shares), use or name. */
+type LoraSort = "used" | "rating" | "name-asc" | "name-desc";
 const loraSortLabels: Record<LoraSort, string> = {
+  used: "Most Used",
   rating: "Rating",
   "name-asc": "Name A–Z",
   "name-desc": "Name Z–A",
@@ -125,7 +127,7 @@ export function useLoraPicker() {
   const [family, setFamily] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useRemembered<LoraTab>("lora-tab", "all");
-  const [loraSort, setLoraSort] = useState<LoraSort>("rating");
+  const [loraSort, setLoraSort] = useRemembered<LoraSort>("lora-sort", "rating");
   // The preset the stack was loaded from or saved as, and its name field's state.
   const [presetId, setPresetId] = useState<string>();
   const naming = useNaming();
@@ -341,6 +343,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
       !["acceleration", "supporting"].includes(metadata[file]?.role || ""),
   );
   const ratings = library.data?.library.ratings || {};
+  const uses = previews.data?.uses || {};
   // A tab remembered from before shows All.
   const tab = loraTabs.some((item) => item.value === picker.tab) ? picker.tab : "all";
   const listed =
@@ -365,7 +368,9 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
     .sort(
       picker.loraSort === "rating"
         ? byRating(ratings, title)
-        : (a, b) => (picker.loraSort === "name-asc" ? 1 : -1) * title(a).localeCompare(title(b)),
+        : picker.loraSort === "used"
+          ? (a, b) => (uses[b] || 0) - (uses[a] || 0) || title(a).localeCompare(title(b))
+          : (a, b) => (picker.loraSort === "name-desc" ? -1 : 1) * title(a).localeCompare(title(b)),
     );
   const selected = new Set(input.loras.map((lora) => lora.name));
   const toggle = (file: string) =>
@@ -376,7 +381,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
             ...input.loras,
             {
               name: file,
-              strength: defaultStrength(metadata[file]),
+              strength: loraDefaultStrength(metadata[file]),
               enabled: true,
               triggers: true,
             },
@@ -664,11 +669,9 @@ function StackEntry({
   onRemove: () => void;
 }) {
   const range = info?.strengthRange;
-  const step = range?.step ?? 0.05;
-  // The catalogue's published range bounds the control; without one, 0 to 2.
-  const min = range?.min ?? 0;
-  const max = range?.max ?? 2;
+  const { min, max, step } = loraStrengthRange(info);
   const enabled = lora.enabled !== false;
+  const strengthIssue = enabled && loraStrengthIssue(info, lora.strength, title);
   // The trigger words switched on lead the prompt when the run is sent (backend/lora/prompts.js).
   const triggers = info?.triggers || [];
   const chosenTriggers =
@@ -702,14 +705,20 @@ function StackEntry({
           min={min}
           max={max}
           step={step}
-          mark={info?.recommendedStrength ?? range?.default}
+          mark={loraDefaultStrength(info)}
           onChange={(strength) => onChange({ strength })}
         />
-        {range && (
-          <Text size="xs" c="dimmed">
-            Suggested {range.min} to {range.max}
-            {range.default !== undefined && `, default ${range.default}`}
+        {strengthIssue ? (
+          <Text size="xs" c="red">
+            {strengthIssue}
           </Text>
+        ) : (
+          range && (
+            <Text size="xs" c="dimmed">
+              Suggested {range.min} to {range.max}
+              {range.default !== undefined && `, default ${range.default}`}
+            </Text>
+          )
         )}
         {!compatible && (
           <Text size="xs" c="yellow">

@@ -306,6 +306,21 @@ test("a hidden LoRA stays in the catalogue, marked hidden until shown again", (t
   assert.equal(store.loraView().catalogue["style.safetensors"].hidden, undefined);
 });
 
+test("a strength edit is refused when its default or step falls outside its range", (t) => {
+  const store = fixture(t).store();
+  store.migrate();
+  const edit = (strength) => store.edit("loras/style.safetensors", { strength });
+  assert.throws(() => edit({ min: 1, max: 0.5 }), /min must be below/);
+  assert.throws(() => edit({ default: 1.5, min: 0, max: 1 }), /default must lie between/);
+  assert.throws(() => edit({ min: 0, max: 1, step: 2 }), /step must be above 0/);
+  edit({ default: 0.8, min: 0, max: 1 });
+  assert.deepEqual(store.loraView().catalogue["style.safetensors"].strengthRange, {
+    min: 0,
+    max: 1,
+    default: 0.8,
+  });
+});
+
 test("LoRA strength recommendations retain known bounds and leave missing bounds unspecified", (t) => {
   const f = fixture(t);
   const catalogueFile = path.join(f.dir, "library/catalogue.json");
@@ -346,7 +361,7 @@ test("LoRA strength recommendations retain known bounds and leave missing bounds
       strengthRange(info),
       name === "recommended-1.safetensors" ? { min: 1, max: 2, step: 0.05, default: 1 } : null,
     );
-    assert.equal(loraDefaultStrength(info, 1), expected, "the browser's initial strength");
+    assert.equal(loraDefaultStrength(info), expected, "the browser's initial strength");
     const profile = { family: "krea2", options: { loras: [name] } };
     assert.equal(
       mcpLoras(profile, { [name]: info }, { names: [name] }).loras[0].strength.recommended,
