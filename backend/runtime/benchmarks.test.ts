@@ -6,15 +6,17 @@ import { Benchmarks, benchmarkJob, parseBenchmarkLog } from "./benchmarks.ts";
 import type { Workload } from "./controller.ts";
 import type { KubernetesRequest } from "./kubernetes.ts";
 
-const gemma: Workload = {
-  id: "gemma",
-  label: "Gemma",
-  kind: "text",
-  namespace: "text",
-  deployment: "gemma",
+const radiance: Workload = {
+  id: "radiance",
+  label: "Radiance",
+  kind: "image",
+  namespace: "radiance",
+  deployment: "radiance",
   pool: "gpu",
-  gpus: 1,
-  url: "http://gemma.text.svc.cluster.local:8000",
+  gpus: 2,
+  url: "http://radiance.radiance.svc.cluster.local:8000",
+  capabilities: ["image", "text", "video"],
+  backend: "radiance",
   model: "local/auto",
 };
 const summaryLine = `STUDIO-BENCHMARK {"version": "0.9.0", "decode": 61.2, "ttftMs": 140.5, "aggregate": {"level": 8, "tps": 290.1}, "prefill": {"depth": 64000, "tps": 4100.0}}`;
@@ -22,12 +24,12 @@ const summaryLine = `STUDIO-BENCHMARK {"version": "0.9.0", "decode": 61.2, "ttft
 test("the Job benchmarks the workload's own endpoint with the key from its namespace's secret", () => {
   const job = benchmarkJob({
     name: "studio-benchmark-1a2b3c4d",
-    workload: gemma,
-    model: "gemma-4-31b",
+    workload: radiance,
+    model: "auto",
     image: "ghcr.io/maxexcloo/betterbench:v0.6.1-1",
-    secret: "text",
+    secret: "radiance",
   });
-  assert.equal(job.metadata.namespace, "text");
+  assert.equal(job.metadata.namespace, "radiance");
   assert.equal(job.spec.backoffLimit, 0);
   const pod = job.spec.template.spec;
   assert.equal(pod.restartPolicy, "Never");
@@ -38,13 +40,13 @@ test("the Job benchmarks the workload's own endpoint with the key from its names
   const [container] = pod.containers;
   assert.equal(container.image, "ghcr.io/maxexcloo/betterbench:v0.6.1-1");
   assert.deepEqual(container.command.slice(-2), [
-    "http://gemma.text.svc.cluster.local:8000/v1",
-    "gemma-4-31b",
+    "http://radiance.radiance.svc.cluster.local:8000/v1",
+    "auto",
   ]);
   assert.deepEqual(container.env, [
     {
       name: "BETTERBENCH_API_KEY",
-      valueFrom: { secretKeyRef: { name: "text", key: "API_KEY" } },
+      valueFrom: { secretKeyRef: { name: "radiance", key: "API_KEY" } },
     },
   ]);
 });
@@ -91,33 +93,33 @@ test("a run creates its Job, reads the summary once it succeeds and refuses a se
     };
   };
   const fetchImpl = (async (url: string, init: RequestInit) => {
-    assert.equal(url, "http://gemma.text.svc.cluster.local:8000/v1/models");
-    assert.deepEqual(init.headers, { Authorization: "Bearer fixture-text" });
-    return Response.json({ data: [{ id: "gemma-4-31b" }] });
+    assert.equal(url, "http://radiance.radiance.svc.cluster.local:8000/health");
+    assert.deepEqual(init.headers, { Authorization: "Bearer fixture-key" });
+    return Response.json({ status: "ok" });
   }) as typeof fetch;
   const benchmarks = new Benchmarks({
     request,
-    workloads: [gemma],
+    workloads: [radiance],
     environment: {
       STUDIO_BENCHMARK_IMAGE: "ghcr.io/maxexcloo/betterbench:v0.6.1-1",
-      STUDIO_BENCHMARK_SECRET: "text",
-      STUDIO_TEXT_KEY: "fixture-text",
+      STUDIO_BENCHMARK_SECRET: "radiance",
+      STUDIO_RADIANCE_KEY: "fixture-key",
     },
     fetchImpl,
     pollMs: 60_000,
   });
   // A second start while the first checks its model is refused.
   const [first, second] = await Promise.allSettled([
-    benchmarks.start("gemma", "account:admin"),
-    benchmarks.start("gemma", "account:admin"),
+    benchmarks.start("radiance", "account:admin"),
+    benchmarks.start("radiance", "account:admin"),
   ]);
   assert.match(String((second as PromiseRejectedResult).reason), /already running/);
   const run = (first as PromiseFulfilledResult<BenchmarkRun>).value;
-  assert.equal(run.model, "gemma-4-31b");
+  assert.equal(run.model, "auto");
   assert.equal(run.requestedBy, "account:admin");
   assert.equal(run.status, "running");
-  assert.deepEqual(calls, ["POST /apis/batch/v1/namespaces/text/jobs"]);
-  await assert.rejects(benchmarks.start("gemma", "account:admin"), /already running/);
+  assert.deepEqual(calls, ["POST /apis/batch/v1/namespaces/radiance/jobs"]);
+  await assert.rejects(benchmarks.start("radiance", "account:admin"), /already running/);
 
   await benchmarks.poll();
   assert.equal(benchmarks.list().runs[0].status, "running");
@@ -126,7 +128,7 @@ test("a run creates its Job, reads the summary once it succeeds and refuses a se
   const [done] = benchmarks.list().runs;
   assert.equal(done.status, "completed");
   assert.equal(done.summary?.decode, 61.2);
-  assert.ok(calls.includes("GET /api/v1/namespaces/text/pods/bench-pod/log"));
+  assert.ok(calls.includes("GET /api/v1/namespaces/radiance/pods/bench-pod/log"));
   // Its log shows the Job pod's tail, as a workload's log does.
   assert.deepEqual(await benchmarks.logs(run.id, 50), {
     pods: [
@@ -158,12 +160,12 @@ test("a failed Job reports why, and Stop deletes a Job still running", async () 
   };
   const benchmarks = new Benchmarks({
     request,
-    workloads: [gemma],
-    environment: { STUDIO_BENCHMARK_IMAGE: "image", STUDIO_BENCHMARK_SECRET: "text" },
-    fetchImpl: (async () => Response.json({ data: [{ id: "gemma-4-31b" }] })) as typeof fetch,
+    workloads: [radiance],
+    environment: { STUDIO_BENCHMARK_IMAGE: "image", STUDIO_BENCHMARK_SECRET: "radiance" },
+    fetchImpl: (async () => Response.json({ status: "ok" })) as typeof fetch,
     pollMs: 60_000,
   });
-  await benchmarks.start("gemma", "local");
+  await benchmarks.start("radiance", "local");
   await benchmarks.poll();
   assert.equal(benchmarks.list().runs[0].status, "failed");
   assert.equal(benchmarks.list().runs[0].error, "HTTP 401 Unauthorized");
@@ -174,12 +176,12 @@ test("a failed Job reports why, and Stop deletes a Job still running", async () 
       { type: "Failed", reason: "DeadlineExceeded", message: "Job was active too long" },
     ],
   };
-  await benchmarks.start("gemma", "local");
+  await benchmarks.start("radiance", "local");
   await benchmarks.poll();
   assert.equal(benchmarks.list().runs[0].error, "Job was active too long");
 
   job = {};
-  const second = await benchmarks.start("gemma", "local");
+  const second = await benchmarks.start("radiance", "local");
   await benchmarks.stop(second.id);
   assert.equal(second.status, "stopped");
   assert.match(
@@ -189,7 +191,7 @@ test("a failed Job reports why, and Stop deletes a Job still running", async () 
 
   // A Job that ended before Stop keeps its outcome and isn't deleted.
   deleted = "";
-  const third = await benchmarks.start("gemma", "local");
+  const third = await benchmarks.start("radiance", "local");
   job = { failed: 1 };
   await benchmarks.stop(third.id);
   assert.equal(third.status, "failed");
@@ -206,12 +208,15 @@ test("a failed Job reports why, and Stop deletes a Job still running", async () 
 test("a stopped model refuses a benchmark before any Job starts", async () => {
   const benchmarks = new Benchmarks({
     request: async () => assert.fail("no Kubernetes call"),
-    workloads: [gemma],
-    environment: { STUDIO_BENCHMARK_IMAGE: "image", STUDIO_BENCHMARK_SECRET: "text" },
+    workloads: [radiance],
+    environment: { STUDIO_BENCHMARK_IMAGE: "image", STUDIO_BENCHMARK_SECRET: "radiance" },
     fetchImpl: (async () => {
       throw new TypeError("fetch failed");
     }) as typeof fetch,
   });
-  await assert.rejects(benchmarks.start("gemma", "local"), /Gemma isn't answering: start it first/);
+  await assert.rejects(
+    benchmarks.start("radiance", "local"),
+    /Radiance isn't answering: start it first/,
+  );
   assert.deepEqual(benchmarks.list().runs, []);
 });

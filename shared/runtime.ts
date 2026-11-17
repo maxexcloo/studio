@@ -10,6 +10,8 @@ interface RuntimeWorkload {
   id: string;
   label: string;
   kind: ServiceKind;
+  /** It serves local text while it runs. */
+  text?: true;
   pool: string;
   gpus: number;
   phase: WorkloadPhase;
@@ -81,7 +83,7 @@ export interface BenchmarkSummary {
   prefill: { depth: number; tps: number } | null;
 }
 
-/** One BetterBench run against a local text workload (`/api/runtime/benchmarks`). */
+/** One BetterBench run against a workload's local text (`/api/runtime/benchmarks`). */
 export interface BenchmarkRun {
   id: string;
   workload: string;

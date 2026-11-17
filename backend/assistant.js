@@ -10,7 +10,7 @@ import { replyTitle } from "../shared/titles.ts";
  *
  * It uses the gateway credentials (STUDIO_ASSISTANT_URL, _KEY) and asks Bifrost for a model
  * (`model()`): for an account's prompt writing, the text model it picked (`writerModel`); for
- * anything else the running local text workload's model, otherwise STUDIO_ASSISTANT_CLOUD_MODEL.
+ * anything else the local text model while a workload serving it runs, otherwise STUDIO_ASSISTANT_CLOUD_MODEL.
  * For an account with uncensored access a base `…/auto` alias becomes `…/uncensored`.
  * Structured calls turn reasoning off with `reasoning_effort` (`reasoningEfforts`).
  * Settings are read on every call, so a model picked in Settings applies at once.
@@ -509,7 +509,7 @@ export function createAssistant(
     return resolved;
   };
 
-  /** Local while a local text workload runs (reading images as it says), else the cloud, which does. */
+  /** Local while a workload serving text runs (reading images as it says), else the cloud, which does. */
   async function route() {
     return (await localText()) || { model: settings().cloud, vision: true };
   }

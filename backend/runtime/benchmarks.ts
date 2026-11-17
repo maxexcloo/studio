@@ -12,6 +12,7 @@ import {
   RuntimeUnavailable,
   type Workload,
   memoryStore,
+  servesText,
 } from "./controller.ts";
 import { KubernetesEngine, type KubernetesRequest } from "./kubernetes.ts";
 
@@ -49,8 +50,9 @@ print(${JSON.stringify(marker)} + json.dumps({
 `;
 
 /**
- * The Job that benchmarks one text workload from inside its namespace. The endpoint key comes from
- * the namespace's `secret` (its `API_KEY`, as the models read it), so Studio never handles it.
+ * The Job that benchmarks one workload's local text from inside its namespace. The endpoint key
+ * comes from the namespace's `secret` (its `API_KEY`, as the server reads it), so Studio never
+ * handles it.
  */
 export function benchmarkJob({
   name,
@@ -143,8 +145,9 @@ export function parseBenchmarkLog(text: string): BenchmarkSummary | undefined {
 const brief = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 240);
 
 /**
- * Benchmarks Studio's local text workloads one at a time with a BetterBench Job, which runs beside
- * the model's ordinary work, and keeps the past runs. Without STUDIO_BENCHMARK_IMAGE there are none.
+ * Benchmarks the local text of Studio's workloads one at a time with a BetterBench Job, which runs
+ * beside the model's ordinary work, and keeps the past runs. Without STUDIO_BENCHMARK_IMAGE there
+ * are none.
  */
 export class Benchmarks {
   readonly configured: boolean;
@@ -204,25 +207,29 @@ export class Benchmarks {
     }
   }
 
-  /** The model the workload's server reports; it answers only while the workload runs. */
+  /**
+   * The model to benchmark: the workload's gateway model without its provider, such as `auto` for
+   * `local/auto`, which the workload serves under that name. It answers only while the workload runs.
+   */
   private async servedModel(workload: Workload) {
     const fetchImpl = this.options.fetchImpl ?? fetch;
+    const key = this.options.environment.STUDIO_RADIANCE_KEY;
     try {
-      const response = await fetchImpl(`${workload.url}/v1/models`, {
-        headers: { Authorization: `Bearer ${this.options.environment.STUDIO_TEXT_KEY}` },
+      const response = await fetchImpl(`${workload.url}/health`, {
+        headers: key ? { Authorization: `Bearer ${key}` } : {},
         redirect: "error",
         signal: AbortSignal.timeout(5000),
       });
-      const id = response.ok ? (await response.json())?.data?.[0]?.id : undefined;
-      if (typeof id === "string" && id) return id;
+      await response.body?.cancel();
+      if (response.ok) return workload.model!.replace(/^[^/]+\//, "");
     } catch {}
     throw new RuntimeConflict(`${workload.label} isn't answering: start it first.`);
   }
 
   async start(id: string, requestedBy: string) {
     if (!this.configured) throw new RuntimeRequestError("Benchmarks need STUDIO_BENCHMARK_IMAGE.");
-    const workload = this.options.workloads.find((item) => item.id === id && item.kind === "text");
-    if (!workload) throw new RuntimeRequestError("workload must be a local text workload.");
+    const workload = this.options.workloads.find((item) => item.id === id && servesText(item));
+    if (!workload) throw new RuntimeRequestError("workload must be a workload serving local text.");
     if (this.starting || this.runs.some((run) => run.status === "running"))
       throw new RuntimeConflict("A benchmark is already running.");
     this.starting = true;

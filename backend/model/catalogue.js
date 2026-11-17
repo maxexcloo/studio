@@ -198,11 +198,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
   function workerWorkloads(worker) {
     if (!worker || !runtime) return [];
     return runtime.controller.workloads
-      .filter(
-        (workload) =>
-          workload.kind !== "text" &&
-          workload.url.replace(/\/$/, "") === worker.url.replace(/\/$/, ""),
-      )
+      .filter((workload) => workload.url.replace(/\/$/, "") === worker.url.replace(/\/$/, ""))
       .map((workload) => workload.id);
   }
 

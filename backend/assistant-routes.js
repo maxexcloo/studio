@@ -137,7 +137,7 @@ export async function assistantIntegration({ environment = process.env, engine }
 
 /**
  * The text models to choose from: the gateway's curated aliases (`cloud/…`, `local/…`, not every
- * model it can reach) and those of Studio's text workloads.
+ * model it can reach) and those of Studio's workloads serving text.
  */
 async function textModels(engine, workloadModels) {
   return [...new Set([...(await engine.listModels()), ...workloadModels])].filter((model) =>
@@ -146,7 +146,7 @@ async function textModels(engine, workloadModels) {
 }
 
 /**
- * `workloadModels()`: the models of Studio's text workloads, running or not, which prompt writing
+ * `workloadModels()`: the models of Studio's workloads serving text, running or not, which prompt writing
  * may pick too. `profiles(req)`: the generation profiles this account may use (account-scoped).
  * `guide(profile)`: its detailed prompting guide. `loras(req)`: [{ name, info }] the account may stack. `liked(req,
  * profile)`: { examples, loras } from liked results on the same family. `frame(req, assetId)`: a

@@ -72,7 +72,6 @@ function fixture(t: TestContext, catalogue = profiles) {
       string,
       boolean | "parked"
     >,
-    textBusy: false,
     slots: 1,
     prompts: 0,
     replies: [] as { prompt: string; title?: string }[],
@@ -151,7 +150,6 @@ function fixture(t: TestContext, catalogue = profiles) {
         media: reach(state.online[backend === "cloud" ? "cloud" : kind]),
       };
     },
-    textBusy: () => state.textBusy,
     slots: () => state.slots,
     writer: {
       model: async () => "writer",
@@ -316,7 +314,7 @@ function fixture(t: TestContext, catalogue = profiles) {
 }
 
 test("Dream is off until turned on, queues one hidden job per account only while Studio is idle and waits below other work", async (t) => {
-  const { dream, store, state, admission, dreamJobs, live } = fixture(t);
+  const { dream, store, admission, dreamJobs, live } = fixture(t);
   assert.deepEqual(dream.read("alice").settings, {
     enabled: false,
     paused: false,
@@ -353,11 +351,6 @@ test("Dream is off until turned on, queues one hidden job per account only while
   await dream.tick();
   assert.equal(dreamJobs().length, 0);
   store.save({ ...mcp, status: "completed" });
-  // Text work holds it back too.
-  state.textBusy = true;
-  await dream.tick();
-  assert.equal(dreamJobs().length, 0);
-  state.textBusy = false;
 
   await dream.tick();
   const [job] = dreamJobs("alice");

@@ -90,7 +90,7 @@ Every MCP action calls the route its UI action calls with the caller's own crede
 
 ### Prompt Assistant
 
-The prompt assistant uses an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` (such as `cloud/auto`). Prompt writing uses the text model each account picks; Studio's own calls go to `STUDIO_LOCAL_TEXT_MODEL` (such as `local/auto`) while a text workload runs, otherwise the cloud model. Without the gateway, the assistant is off.
+The prompt assistant uses an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` (such as `cloud/auto`). Prompt writing uses the text model each account picks; Studio's own calls go to `STUDIO_LOCAL_TEXT_MODEL` (such as `local/auto`) while a workload serving text runs, otherwise the cloud model. Without the gateway, the assistant is off.
 
 **Background AI** (**Settings › Gallery**) has a switch for each call Studio makes on its own, each on by default; `0` turns it off: `STUDIO_FACE_CHECK`, `STUDIO_FACE_REDO`, `STUDIO_GALLERY_CAPTIONS`, `STUDIO_GALLERY_TITLES`, `STUDIO_IMAGE_SEARCH`, `STUDIO_NEXT_STEPS`, `STUDIO_PROMPT_IDEAS`, `STUDIO_SUGGESTED_PROMPTS` and `STUDIO_TASTE_UPDATES`. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use. `STUDIO_GALLERY_WHILE_BUSY=1` lets that work run while Studio is generating.
 
@@ -145,17 +145,17 @@ For the Radiance 2 cutover, version profiles through the administrator editor fi
 
 ### Runtime Control
 
-On Kubernetes, Studio scales its GPU workloads between 0 and 1 replicas itself. At start it finds the deployments labelled `studio.excloo.dev/kind` (`image`, `video` or `text`) in `STUDIO_KUBERNETES_NAMESPACES`; `STUDIO_KUBERNETES_GPUS` gives the GPUs per node pool:
+On Kubernetes, Studio scales its GPU workloads between 0 and 1 replicas itself. At start it finds the deployments labelled `studio.excloo.dev/kind` (`image` or `video`) in `STUDIO_KUBERNETES_NAMESPACES`; `STUDIO_KUBERNETES_GPUS` gives the GPUs per node pool:
 
 ```bash
 STUDIO_KUBERNETES_GPUS='{"gpu": 2, "gaming": 1}'
-STUDIO_KUBERNETES_NAMESPACES=comfyui-image,comfyui-video,text
+STUDIO_KUBERNETES_NAMESPACES=comfyui-image,comfyui-video,radiance
 STUDIO_LOCAL_TEXT_MODEL=local/auto
 ```
 
-Each deployment's name is its workload id, its node selector names its pool, its resource claim templates give its GPUs, and the one Service selecting its pods gives its address. Optional `studio.excloo.dev/` annotations add `label`, `vision: "true"` for text workloads that read images, and `worker`, `capabilities` and `backend` (`radiance` for a Radiance worker) for media. Text workloads serve `STUDIO_LOCAL_TEXT_MODEL` and take `STUDIO_TEXT_KEY` for their health check. Anything missing or ambiguous stops Studio at start with the deployment's name; restart Studio after changing a workload. Its service account needs, in each namespace, to list deployments, Services and `resourceclaimtemplates`, read pods and their logs, and update `deployments/scale`. `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
+Each deployment's name is its workload id, its node selector names its pool, its resource claim templates give its GPUs, and the one Service selecting its pods gives its address. Optional `studio.excloo.dev/` annotations add `label`, `worker`, `capabilities` and `backend` (`radiance` for a Radiance worker). A `text` capability means the workload serves `STUDIO_LOCAL_TEXT_MODEL` while it runs (through the gateway), and `vision: "true"` that its text models read images. Studio sends `STUDIO_RADIANCE_KEY`, when set, to Radiance as its API key. Anything missing or ambiguous stops Studio at start with the deployment's name; restart Studio after changing a workload. Its service account needs, in each namespace, to list deployments, Services and `resourceclaimtemplates`, read pods and their logs, and update `deployments/scale`. `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
 
-With `STUDIO_BENCHMARK_IMAGE` (a [BetterBench](https://github.com/GGZ14/BetterBench) image), administrators can benchmark a running text workload from Settings › Workers: Studio runs a Job in the workload's namespace whose pods are labelled `app.kubernetes.io/name: betterbench`, so the model's network policy must admit them. `STUDIO_BENCHMARK_SECRET` names the Secret there whose `API_KEY` is the model's key. The service account also needs to create, get and delete Jobs and list pods in that namespace.
+With `STUDIO_BENCHMARK_IMAGE` (a [BetterBench](https://github.com/GGZ14/BetterBench) image), administrators can benchmark a running workload's local text from Settings › Workers: Studio runs a Job in the workload's namespace whose pods are labelled `app.kubernetes.io/name: betterbench`, so its network policy must admit them. The benchmark names `STUDIO_LOCAL_TEXT_MODEL` without its gateway provider (`auto`), which the workload serves. `STUDIO_BENCHMARK_SECRET` names the Secret there whose `API_KEY` is the workload's key. The service account also needs to create, get and delete Jobs and list pods in that namespace.
 
 Administrators choose the running workloads in **Settings › Workers**.
 

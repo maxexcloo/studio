@@ -463,7 +463,7 @@ test("Status summarises each kind's workers and state, quietly", async ({ page }
   const drawer = page.getByRole("dialog", { name: "Generations", exact: true });
   const summary = drawer.getByRole("region", { name: "Service Status", exact: true });
   await expect(summary).toHaveText(
-    "Images1 worker · IdleVideos1 worker · OfflineText1 local model · Running",
+    "Images1 worker · IdleVideos1 worker · OfflineText1 worker · Running",
   );
   // Nothing in it acts.
   await expect(summary.getByRole("link")).toHaveCount(0);
@@ -488,7 +488,8 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   const workload = (id: string, label: string, phase: string, gpus = 1) => ({
     id,
     label,
-    kind: id === "text" ? "text" : id.startsWith("video") ? "video" : "image",
+    kind: id.startsWith("video") ? "video" : "image",
+    ...(id === "text" ? { text: true } : {}),
     pool: "gpu",
     gpus,
     phase,
@@ -713,10 +714,11 @@ test("Workers benchmark a running local text model and list each run's figures",
       },
     }),
   );
-  const workload = (id: string, label: string, kind: string, phase: string) => ({
+  const workload = (id: string, label: string, text: boolean, phase: string) => ({
     id,
     label,
-    kind,
+    kind: "image",
+    ...(text ? { text } : {}),
     pool: "gpu",
     gpus: 1,
     phase,
@@ -730,9 +732,9 @@ test("Workers benchmark a running local text model and list each run's figures",
         pools: [{ id: "gpu", capacity: 2, used: 1 }],
         history: [],
         workloads: [
-          workload("gemma", "Gemma", "text", "running"),
-          workload("image", "Image", "image", "running"),
-          workload("qwen", "Qwen", "text", "parked"),
+          workload("gemma", "Gemma", true, "running"),
+          workload("image", "Image", false, "running"),
+          workload("qwen", "Qwen", true, "parked"),
         ],
       },
     }),
@@ -792,7 +794,7 @@ test("Workers benchmark a running local text model and list each run's figures",
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menu")).toHaveCount(0);
   };
-  // Media has no benchmark, and a stopped model can't run one.
+  // A workload without local text has no benchmark, and a stopped one can't run one.
   await expect(await menu("Image")).toHaveCount(0);
   await closeMenu();
   await expect(await menu("Qwen")).toBeDisabled();
