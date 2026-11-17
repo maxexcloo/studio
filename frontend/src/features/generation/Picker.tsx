@@ -423,6 +423,7 @@ export function PickerTile({
   const peekable = !useTouch() && Boolean(preview?.image);
   const [peek, setPeek] = useState(false);
   const peekTimer = useRef(0);
+  const openedAt = useRef("");
   const hover = (on: boolean) => {
     window.clearTimeout(peekTimer.current);
     if (on) peekTimer.current = window.setTimeout(() => setPeek(true), 400);
@@ -521,9 +522,15 @@ export function PickerTile({
                     aria-label={preview.label}
                     // Expanded, a press on it opens the preview rather than only closing the image.
                     aria-expanded={peekable ? peek : undefined}
-                    onMouseEnter={() => peekable && hover(true)}
+                    // The pointer still resting where it opened the preview does not peek as it closes.
+                    onMouseEnter={(event) =>
+                      peekable &&
+                      `${event.clientX},${event.clientY}` !== openedAt.current &&
+                      hover(true)
+                    }
                     onMouseLeave={() => hover(false)}
-                    onClick={() => {
+                    onClick={(event) => {
+                      openedAt.current = `${event.clientX},${event.clientY}`;
                       hover(false);
                       preview.open();
                     }}
