@@ -133,23 +133,21 @@ test("the client reads model states and keeps Radiance's own words on failure", 
 });
 
 test("one-GPU Qwen and Noct fit their actual conditioning limits without constraining FLUX3", () => {
-  for (const model of ["qwen-image-2.1-iq8r", "noctq-v4-iq8r"]) {
+  for (const model of ["qwen-image-2.1-iq8r", "noctq-v4-lightning-iq8r"]) {
     // 1792 × 1024 shrinks to 1344 × 768.
     const wide = imageRequest({ ...image, model, width: 1792 }).body as { size: string };
     assert.equal(wide.size, "1344x768");
     assert.throws(
-      () => imageRequest({ ...image, model }, Array(5).fill(new Uint8Array([1]))),
-      /4 reference/,
+      () => imageRequest({ ...image, model }, Array(4).fill(new Uint8Array([1]))),
+      /3 reference/,
     );
+    // The two-GPU twin holds four references at 2048.
+    const twin = imageRequest(
+      { ...image, model: `${model}-refs`, width: 2048 },
+      Array(4).fill(new Uint8Array([1])),
+    );
+    assert.equal((twin.body as FormData).get("size"), "2048x1024");
   }
-  assert.throws(
-    () =>
-      imageRequest(
-        { ...image, model: "noctq-v4-lightning-iq8r" },
-        Array(4).fill(new Uint8Array([1])),
-      ),
-    /3 reference/,
-  );
   const edit = imageRequest(
     { ...image, model: "flux-3-image-klein-iq8r", width: 1408, height: 1408 },
     Array(10).fill(new Uint8Array([1])),
