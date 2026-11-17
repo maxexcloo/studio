@@ -34,6 +34,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       browser-image: ${{ steps.browser-image.outputs.image }}
     steps:
@@ -69,6 +70,7 @@ jobs:
     if: ${{ !inputs.skip_checks }}
     needs: check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       # Every shard reports its failures; one failing shard doesn't hide the others'.
       fail-fast: false
@@ -108,6 +110,7 @@ jobs:
     needs: check
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
