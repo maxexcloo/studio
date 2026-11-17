@@ -106,6 +106,11 @@ function SettingsForm({ dream }: { dream: Dream }) {
       <Text size="xs" c="dimmed">
         {dreamWhen(dream)}
       </Text>
+      {dream.reason && (
+        <Text size="xs" c="dimmed" role="status" aria-label="Dream Status">
+          {dream.status === "unavailable" ? `Can't run: ${dream.reason}` : dream.reason}
+        </Text>
+      )}
       <div>
         {toggle("enabled", "Dream", "Make new images from your taste in idle time.")}
         {/* Spicy sits under the main switch; the rest run A–Z, each switch above its cap. */}

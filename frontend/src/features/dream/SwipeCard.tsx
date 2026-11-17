@@ -19,8 +19,8 @@ const tap = 6;
 const holdTime = 500;
 
 /**
- * The top card follows a finger or pointer, tilting with the drag, and flies out past a third of
- * its width in a direction `hints` names (the word showing while dragging that way); below that it
+ * The top card follows a finger or pointer, tilting with the drag while motion is on, and flies
+ * out past a third of its width in a direction `hints` names (the word showing while dragging that way); below that it
  * springs back. A tap calls `onTap` with the element pressed, and a hold or a second finger (a
  * pinch) calls `onHold` with it; its release does nothing more. Buttons and keys fly it out the
  * same way through `fly`. Motion follows the shared animation-speed token; with Off or reduced
@@ -84,7 +84,7 @@ export function SwipeCard({
   function place(dx: number, dy: number) {
     const element = card.current!;
     const width = element.offsetWidth || 1;
-    element.style.transform = `translate3d(${dx}px, ${dy}px, 0) rotate(${(dx / width) * 14}deg)`;
+    element.style.transform = `translate3d(${dx}px, ${dy}px, 0) rotate(${duration ? (dx / width) * 14 : 0}deg)`;
     const threshold = width / 3;
     const toward = lean(dx, dy);
     for (const direction of ["left", "right", "up", "down"] as const)
