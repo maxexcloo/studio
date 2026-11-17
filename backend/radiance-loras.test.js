@@ -9,6 +9,8 @@ process.env.STUDIO_DATA_DIR = scratch;
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const { metadataFromJson, saveImportedWorkflow } = await import("./custom-workflows.js");
 const { customWorkflowGraph } = await import("./graphs.js");
+const { radianceInfo } = await import("./providers/radiance.ts");
+const { sanitizeGenerateBody } = await import("./validation.js");
 
 const prompt = "A lighthouse at dusk";
 const raw = (loraStack, id = "radiance-loras") => ({
@@ -124,16 +126,27 @@ test("LoRAs the profile names stay ahead of the request stack", async () => {
   ]);
 });
 
-test("a run with LoRAs moves to the stack's model, with the adapters that model needs first", async () => {
+test("a run with LoRAs moves to the stack's model, records it, and takes the adapters that model needs first", async () => {
   const lightning = { name: "speed/lightning.safetensors", strength: 1 };
   const stack = { adapter: "radiance-tags-v1", node: "1", model: "noctq-bf16", loras: [lightning] };
-  saveImportedWorkflow(raw(stack, "radiance-bf16"));
-  const run = (loras) =>
-    customWorkflowGraph({ workflow: "custom:radiance-bf16", prompt, seed: 1, loras });
+  const profile = raw(stack, "radiance-bf16");
+  profile.studio.controls.model = { node: "1", input: "model" };
+  profile.studio.defaults = { model: "krea-2-turbo-iq8r" };
+  saveImportedWorkflow(profile);
+  const info = radianceInfo([{ id: "krea-2-turbo-iq8r" }], ["a.safetensors"]);
+  const run = async (loras) => {
+    const body = sanitizeGenerateBody(
+      { workflow: "custom:radiance-bf16", model: "custom:radiance-bf16", prompt, seed: 1, loras },
+      info,
+    );
+    return { body, graph: await customWorkflowGraph(body) };
+  };
   const plain = await run([]);
-  assert.equal(plain[1].inputs.model, "krea-2-turbo-iq8r");
-  assert.equal(plain[1].inputs.loras, "[]");
-  const styled = await run([{ name: "a.safetensors", strength: 0.5 }]);
+  assert.equal(plain.body.modelName, "krea-2-turbo-iq8r");
+  assert.equal(plain.graph[1].inputs.model, "krea-2-turbo-iq8r");
+  assert.equal(plain.graph[1].inputs.loras, "[]");
+  const { body, graph: styled } = await run([{ name: "a.safetensors", strength: 0.5 }]);
+  assert.equal(body.modelName, "noctq-bf16");
   assert.equal(styled[1].inputs.model, "noctq-bf16");
   assert.deepEqual(JSON.parse(styled[1].inputs.loras), [
     lightning,

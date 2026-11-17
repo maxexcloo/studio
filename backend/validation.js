@@ -301,7 +301,13 @@ export function sanitizeGenerateBody(
     prompt,
     negative: String(input.negative || "").trim() ? String(input.negative) : negative,
     model: String(input.model || ""),
-    modelName: String(input.modelName || customWorkflow?.defaults?.model || ""),
+    // A run with LoRAs moves to the stack's own model, which graphs.js sends and the item records.
+    modelName: String(
+      (loras.length && customWorkflow?.loraStack?.model) ||
+        input.modelName ||
+        customWorkflow?.defaults?.model ||
+        "",
+    ),
     textEncoder,
     vae,
     clipType: String(input.clipType || ""),
