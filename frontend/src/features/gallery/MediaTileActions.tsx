@@ -49,10 +49,10 @@ export function MediaTileActions({
           <Tooltip label={ratingLabel("like", liked)}>
             <ActionIcon
               className={`${classes.control} ${classes.like}`}
-              data-liked={liked || undefined}
               aria-label={`${ratingLabel("like", liked)} ${name}`}
               aria-pressed={liked}
               variant="default"
+              size={28}
               onClick={rating.like}
             >
               <icons.like size={16} fill={liked ? "currentColor" : "none"} />
@@ -67,6 +67,7 @@ export function MediaTileActions({
               className={`${classes.control} ${classes.download}`}
               aria-label={`Download ${name}`}
               variant="default"
+              size={28}
             >
               <icons.download size={16} />
             </ActionIcon>
@@ -79,8 +80,9 @@ export function MediaTileActions({
               data-hidden={hideMore || undefined}
               aria-label={`More Actions for ${name}`}
               variant="default"
+              size={28}
             >
-              <icons.more size={18} />
+              <icons.more size={16} />
             </ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
