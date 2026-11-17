@@ -19,7 +19,9 @@ import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { layerAbove } from "../../ui/popupClicks";
+import { titleCase } from "../../ui/titleCase";
 import { usePhone } from "../../ui/usePhone";
 import { projectPath, projectsQuery } from "../dream/queries";
 import { MediaTile } from "../gallery/MediaTile";
@@ -31,9 +33,6 @@ import { type Comparison, comparisonQuery } from "./queries";
 import { useStageComparison } from "./variants";
 
 import classes from "./ComparePage.module.css";
-
-const titleCase = (text: string) =>
-  text.replace(/(^|\s)\p{Ll}/gu, (letter) => letter.toUpperCase());
 
 /**
  * A compare set side by side, labelled by what sets each variant apart: pick the winner (liking it), take one
@@ -154,7 +153,7 @@ export function ComparePage() {
           </Title>
         </Group>
         <Text size="sm" c="dimmed" ta="right">
-          {[`${variants.length} Variants`, seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
+          {[plural(variants.length, "Variant"), seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
         </Text>
       </Group>
       {(prompt || negative) && (

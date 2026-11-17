@@ -19,7 +19,7 @@ const nouns = { name: "Name", description: "Description" } as const;
 
 /**
  * A card field's ✨ ▾: names or descriptions the prompt assistant writes from the card's images,
- * asked for when it opens, then Refresh… for others and Custom… to say what to write.
+ * asked for when it opens, then Refresh for others and Custom… to say what to write.
  * Picking one fills the field, with Undo beside it until the field next changes.
  */
 export function useCardIdeas({

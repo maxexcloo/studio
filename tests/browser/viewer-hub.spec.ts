@@ -1178,8 +1178,7 @@ test("With local video stopped, Animate in Composer pre-selects Grok", async ({ 
 });
 
 test("With neither local video nor Grok, Animate's options are disabled", async ({ page }) => {
-  const reason =
-    "Local video isn't running and this account has no Grok access (Cloud Models), so nothing can animate this image right now.";
+  const reason = "Local video isn't running and cloud video isn't available to this account.";
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) =>
       route.fulfill({ status: 409, json: { ok: false, error: reason } }),

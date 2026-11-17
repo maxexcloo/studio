@@ -649,7 +649,7 @@ test("Library › Presets lists what each preset holds, renames with unique name
   const rename = page.getByRole("dialog", { name: "Rename Preset", exact: true });
   const name = rename.getByRole("textbox", { name: "Name", exact: true });
   await name.fill("fine detail");
-  await expect(rename.getByText("A preset has this name", { exact: true })).toBeVisible();
+  await expect(rename.getByText("Name in Use", { exact: true })).toBeVisible();
   await expect(rename.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
   await name.fill("Grey Heron");
   await rename.getByRole("button", { name: "Save", exact: true }).click();

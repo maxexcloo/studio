@@ -72,7 +72,7 @@ export function TextBox({
   send?: ReactNode;
   /** Popups its tools open (Recent Prompts), anchored at the box's end where the ⋯ stands. */
   popups?: ReactNode;
-  /** What a tool is doing (Improving the prompt…): the ⋯ spins, its menu still open to use. */
+  /** What a tool is doing (Improving Prompt…): the ⋯ spins, its menu still open to use. */
   busy?: string;
   /** Leaves the tools out beside the text (a collapsed composer), keeping the text mounted. */
   hideTools?: boolean;

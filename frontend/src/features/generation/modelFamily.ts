@@ -1,4 +1,5 @@
 import { loraFamilyId } from "../../../../shared/profiles";
+import { titleCase } from "../../ui/titleCase";
 
 // Names the catalogue doesn't define: quantisation formats and older family ids.
 const names: Record<string, string> = {
@@ -27,11 +28,5 @@ export function modelFamilyLabel(family = "", familyName?: string): string {
   // A written family name (a profile's own, such as "Qwen-Image") is shown as written.
   if (familyName && /[A-Z]/.test(familyName) && !familyName.includes("_")) return label;
   const key = label.toLowerCase().replace(/[- ]/g, "_");
-  return (
-    names[key] ||
-    label
-      .replace(/[_-]+/g, " ")
-      .replace(/([a-z])(\d)/g, "$1 $2")
-      .replace(/\b[a-z]/g, (letter) => letter.toUpperCase())
-  );
+  return names[key] || titleCase(label.replace(/[_-]+/g, " ").replace(/([a-z])(\d)/g, "$1 $2"));
 }

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { titleCase } from "../../ui/titleCase";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import {
@@ -55,7 +56,7 @@ function ModelChoices() {
       <ModelChoiceRow
         choice="uncensoredModels"
         label="Uncensored"
-        description="Offer the uncensored models and themes you have access to, and let prompt ideas and suggestions use explicit wording."
+        description="Offer uncensored models and themes, and allow explicit prompt ideas."
       />
     </SettingGroup>
   );
@@ -254,7 +255,7 @@ export function Preferences() {
 }
 
 const brands: Record<string, string> = { deepseek: "DeepSeek", glm: "GLM", mimo: "MiMo" };
-const titled = (word: string) => brands[word] ?? word.charAt(0).toUpperCase() + word.slice(1);
+const titled = (word: string) => brands[word] ?? titleCase(word);
 /** A gateway alias by its readable name: `cloud/glm-flash` reads GLM Flash · Cloud. */
 const textModelName = (id: string) => {
   const [side, name = ""] = id.split("/");

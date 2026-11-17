@@ -95,7 +95,7 @@ export function CharacterChoices({
       )}
       {!editor && profile && !keepsIdentity(profile) && cards.length > 0 && (
         <Text size="xs" c="dimmed">
-          {`${profileName(profile)} starts from a reference image (img2img), so a character's pose and layout carry over. For new scenes, choose a model that edits with references.`}
+          {`${profileName(profile)} keeps a reference's pose and layout. For new scenes, choose a model that edits with references.`}
         </Text>
       )}
       <ScrollArea.Autosize style={{ flex: 1, minHeight: 0 }}>

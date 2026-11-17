@@ -61,9 +61,7 @@ export function animateProfile(
   },
 ) {
   // A parked worker was stopped on purpose; say so rather than call it not running.
-  const notRunning = localParked
-    ? "Videos are Stopped (an administrator can start them in Settings › Workers)"
-    : "Local video isn't running";
+  const notRunning = localParked ? "Local video is stopped" : "Local video isn't running";
   const usable = profiles.filter(
     (profile) => profile.kind === "video" && profile.ready !== false && profile.mediaInputs?.length,
   );
@@ -113,25 +111,21 @@ export function animateProfile(
     return withSize({ ...choice, cloud: false, offers, note }, width, height);
   }
   if (where === "local")
-    refuse(
-      anyLocal.length
-        ? `${notRunning}, so Local GPU can't animate this right now.`
-        : "This account has no local video profile that takes a starting image.",
-    );
+    refuse(anyLocal.length ? `${notRunning}.` : "No local video model can animate images.");
   if (!grok.length)
     refuse(
       where === "cloud"
-        ? "This account has no Grok video profile; Cloud Models is off for it."
+        ? "Cloud video isn't available to this account."
         : localRunning
-          ? "No video profile that takes a starting image is available to this account."
-          : `${notRunning} and this account has no Grok access (Cloud Models), so nothing can animate this image right now.`,
+          ? "No video model can animate images."
+          : `${notRunning} and cloud video isn't available to this account.`,
     );
   const label = choose(grok).profile.label || choose(grok).profile.id;
   return cloudChoice(
     where === "cloud"
       ? ""
       : localRunning
-        ? `No local video profile takes a starting image, so this runs on ${label}.`
+        ? `No local video model can animate images, so this runs on ${label}.`
         : `${notRunning}, so this runs on ${label}.`,
   );
 }

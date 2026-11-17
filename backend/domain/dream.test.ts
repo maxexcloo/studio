@@ -1971,7 +1971,7 @@ test("Dream videos animate the best-reviewed still and extend kept videos, each 
   assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").reason, "The video worker is offline.");
   state.online.video = true;
-  state.videoRefusal = "No video profile that takes a starting image is available to this account.";
+  state.videoRefusal = "No video model can animate images.";
   assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").reason, state.videoRefusal);
   assert.deepEqual(walks(), [], "Dream never walks the whole gallery");
@@ -2150,7 +2150,7 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
     settings: { profileId: "wan" },
   });
   assert.equal(await fx.dreamOnce(), undefined);
-  assert.match(fx.dream.status("alice").reason!, /selected Dream backend/);
+  assert.match(fx.dream.status("alice").reason!, /No video model is ready/);
   await fx.dream.save("alice", { videoBackend: "local" });
   fx.state.online.video = true;
   const extension = await fx.dreamOnce();

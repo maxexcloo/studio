@@ -55,7 +55,7 @@ test("Picking a character places its first image and leads the prompt with it, a
   // tab says.
   await expect(
     references.getByText(
-      "Image Quality starts from a reference image (img2img), so a character's pose and layout carry over. For new scenes, choose a model that edits with references.",
+      "Image Quality keeps a reference's pose and layout. For new scenes, choose a model that edits with references.",
     ),
   ).toBeVisible();
   await references.getByRole("button", { name: "Use character: Mara", exact: true }).click();
@@ -365,7 +365,7 @@ test("Use as Character starts a card from a gallery image in Library › Charact
     "Rook",
     "Sloane",
     "Wren",
-    "Refresh…",
+    "Refresh",
     "Custom…",
   ]);
   await page.getByRole("menuitem", { name: "Wren", exact: true }).click();
@@ -389,7 +389,7 @@ test("Use as Character starts a card from a gallery image in Library › Charact
     "scarred ranger",
     "tall ranger",
     "young ranger",
-    "Refresh…",
+    "Refresh",
     "Custom…",
   ]);
   await page.getByRole("menuitem", { name: "red-haired ranger, green cloak", exact: true }).click();

@@ -325,7 +325,7 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
           loading={list.isPending && "Loading Prompt Styles"}
           query={query}
           searchText={(style) => [style.label, style.description, style.instruction]}
-          empty="None Yet"
+          empty="No Prompt Styles"
           initialSort={{ key: "name", descending: false }}
           columns={[
             {

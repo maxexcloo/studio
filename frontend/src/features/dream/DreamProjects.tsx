@@ -38,6 +38,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextBox } from "../../ui/TextBox";
+import { titleCase } from "../../ui/titleCase";
 import { CardDialog, CardForm } from "../characters/CardImages";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
@@ -58,8 +59,7 @@ const briefFields = [
   ["rules", "Banned Changes & Rules", "Standing rules every prompt keeps to."],
   ["avoid", "Avoid", "What prompts must never name, separated by commas."],
 ] as const;
-const aspectLabel = (aspect: string) =>
-  aspect.includes(":") ? aspect : aspect[0].toUpperCase() + aspect.slice(1);
+const aspectLabel = (aspect: string) => (aspect.includes(":") ? aspect : titleCase(aspect));
 
 /** Saves a project's content: a new one without `id`. */
 function useSaveProject(id?: string) {
@@ -293,7 +293,7 @@ export function DreamProjects() {
         </Alert>
       ) : !list.length ? (
         <EmptyState fill action={create}>
-          A project is a brief that Dream and attached chats follow.
+          No Projects
         </EmptyState>
       ) : (
         <ScrollArea flex={1} mih={0}>

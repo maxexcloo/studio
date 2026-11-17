@@ -143,15 +143,15 @@ test("The viewer directly offers Suggested and Templates without styles or item 
   await page.keyboard.press("Escape");
   await expect(await viewerPromptAssist(page)).toBeFocused();
   await viewerPromptMenu(page);
-  // Refresh… reads Loading… while they load, with no placeholder row.
+  // Refresh reads Loading… while they load, with no placeholder row.
   const thinking = menu.getByRole("menuitem", { name: "Loading…", exact: true });
   await expect(thinking).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "Refresh…", exact: true })).toHaveCount(0);
+  await expect(menu.getByRole("menuitem", { name: "Refresh", exact: true })).toHaveCount(0);
   release[0]();
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
     ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
-    "Refresh…",
+    "Refresh",
     "Custom…",
     // Phones keep discovery in the bar's AI menu, apart from the prompt's assistance.
     ...(phone ? [] : ["More Like This", "Similar"]),
@@ -159,7 +159,7 @@ test("The viewer directly offers Suggested and Templates without styles or item 
   expect(asked).toEqual([
     { surface: "viewer", jobId: "job-hub", fresh: false, prompt: "An amber bird", itemId: "hub" },
   ]);
-  await menu.getByRole("menuitem", { name: "Refresh…", exact: true }).click();
+  await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
   await expect(thinking).toBeVisible();
   release[1]();
   await expect(menu.getByRole("menuitem", { name: "Snowfall", exact: true })).toBeVisible();
@@ -254,7 +254,7 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
     ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
-    "Refresh…",
+    "Refresh",
     "Softer Shadows",
     "Custom…",
     ...(testInfo.project.use.isMobile ? [] : ["More Like This", "Similar"]),
@@ -297,7 +297,7 @@ test("Animate offers motions written for the image, then its templates and Custo
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
     ...motion.map((idea) => idea.label).sort((a, b) => a.localeCompare(b)),
-    "Refresh…",
+    "Refresh",
     "Action",
     "Cinematic Camera",
     "Dialogue",
