@@ -15,7 +15,7 @@ import {
 import type { Draft } from "./GenerationProvider";
 import { usePromptAssistant } from "./PromptAssistant";
 import { usePromptHistory } from "./PromptHistory";
-import type { usePromptIdeas } from "./PromptIdeas";
+import { usePromptIdeas } from "./PromptIdeas";
 
 import classes from "./PromptFields.module.css";
 
@@ -84,7 +84,7 @@ export function PromptFields({
   textareaRef,
   autoFocus = false,
   fill = false,
-  ideaFocus,
+  ideas: offerIdeas = false,
   ask,
 }: {
   input: GenerationInput;
@@ -99,8 +99,8 @@ export function PromptFields({
   autoFocus?: boolean;
   /** Fills the phone Generate sheet: the prompt takes the room left above the settings, typed in place. */
   fill?: boolean;
-  /** Asks for prompt ideas once the prompt is focused (`usePromptIdeas`). */
-  ideaFocus?: ReturnType<typeof usePromptIdeas>["focusProps"];
+  /** Offers taste-led prompt ideas in the AI menu while the prompt is empty (`usePromptIdeas`). */
+  ideas?: boolean;
   /** Sends the assistant's Custom… as a change to the draft (`useDraftChange`). */
   ask?: DraftChange;
 }) {
@@ -135,13 +135,19 @@ export function PromptFields({
     value: input.prompt,
     onPick: (prompt) => onChange({ prompt }),
   });
+  const ideas = usePromptIdeas({
+    kind: input.kind,
+    value: input.prompt,
+    onChange: (prompt) => onChange({ prompt }),
+  });
+  const idea = offerIdeas ? ideas.tool : undefined;
   return (
     <>
-      <div className={classes.area} data-fill={fill || undefined} {...ideaFocus}>
+      <div className={classes.area} data-fill={fill || undefined}>
         <TextBox
           ref={textareaRef}
-          tools={assistant.action ? [assistant.action, history.action] : [history.action]}
-          send={proposal && <UndoButton onClick={ask.undo} />}
+          tools={[idea, assistant.action, history.action].filter((tool) => !!tool)}
+          send={proposal ? <UndoButton onClick={ask.undo} /> : offerIdeas && ideas.undo}
           busy={assistant.working}
           popups={history.popup}
           data-expanded-prompt

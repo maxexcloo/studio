@@ -20,7 +20,7 @@ import {
   pendingStatuses,
 } from "../../shared/queue.ts";
 import type { DreamActivity } from "../../shared/taste.ts";
-import { replyTitle } from "../../shared/titles.ts";
+import { replyTitle, titleRule } from "../../shared/titles.ts";
 import { logger } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
@@ -1482,8 +1482,7 @@ export function createDream(options: {
           ...brief.map(([label, value]) => `- ${label}: ${value}`),
         ]
       : [];
-    const reply =
-      'Reply with JSON only: {"prompt": "<the prompt>", "why": "<at most 15 words on which of their tastes it draws on>", "title": "<a Title Case title of two to five words naming its subject>"}.';
+    const reply = `Reply with JSON only: {"prompt": "<the prompt>", "why": "<at most 15 words on which of their tastes it draws on>", "title": "<${titleRule}>"}.`;
     let messages: { role: "system" | "user"; content: string }[];
     const noveltyPrompts = [...recent];
     let drawnAnchors: string[] = [];

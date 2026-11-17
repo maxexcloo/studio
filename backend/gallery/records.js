@@ -1,6 +1,7 @@
 // Gallery records built from a run: its pending tiles, recorded settings and what ComfyUI's history
 // says it made. Pure functions, so code that only builds records never loads the gallery (store.js).
 import { cardKinds, maxCardDescription, maxCardName } from "../../shared/characters.ts";
+import { titleCase } from "../../shared/titles.ts";
 import { keptTriggers } from "../lora/prompts.js";
 import { videoPattern } from "../media-paths.js";
 import { defaultWorkerId, isRadianceWorker, workerById } from "../workers.js";
@@ -66,14 +67,15 @@ const shortText = (value, max) =>
  * The MCP result set a run belongs to (mcp/media.js queue): one generate call's id and title, the
  * client that asked (`source`), the character card it was made with (`character`), what the chat
  * said it shows (`context`: a character, outfit and scene by name and description, and a series),
- * and this run's prompt position and its own title (`variation`); null for anything else.
+ * and this run's prompt position and its own title (`variation`), titles in Title Case; null for
+ * anything else.
  */
 export function storedResultSet(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const id = typeof value.id === "string" && /^[\w-]{1,64}$/.test(value.id) ? value.id : "";
-  const title = shortText(value.title, 80);
+  const title = titleCase(shortText(value.title, 80));
   if (!id || !title) return null;
-  const variation = shortText(value.variation, 80);
+  const variation = titleCase(shortText(value.variation, 80));
   const source = shortText(value.source, 40);
   const characterId =
     typeof value.character?.id === "string" && /^[\w-]{1,64}$/.test(value.character.id)

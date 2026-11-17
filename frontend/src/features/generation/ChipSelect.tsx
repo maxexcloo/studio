@@ -23,7 +23,7 @@ import { chipProps } from "./chip";
 import classes from "./GenerationInputControls.module.css";
 
 /**
- * A rail chip that opens its option list: the composer's Profile and prompt ideas. `swatch`
+ * A rail chip that opens its option list: the composer's Profile. `swatch`
  * is a readiness colour beside the name; `target` adds attributes to the chip itself. On touch
  * screens the search waits for a tap; desktop opening focuses it for keyboard navigation.
  */
