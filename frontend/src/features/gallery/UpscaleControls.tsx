@@ -13,6 +13,7 @@ import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import type { Action } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
+import { titleCase } from "../../ui/titleCase";
 import { usePhone } from "../../ui/usePhone";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
@@ -151,7 +152,7 @@ function upscaleSettings(quick: ReturnType<typeof useQuickUpscale>, image: boole
         value: quick.quality,
         options: (status?.qualities ?? upscaleQualities).map((value) => ({
           value,
-          label: value[0].toUpperCase() + value.slice(1),
+          label: titleCase(value),
         })),
         onChange: (value: string) => quick.setQuality(value as typeof quick.quality),
       },

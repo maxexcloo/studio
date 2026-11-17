@@ -1759,7 +1759,7 @@ export function createDream(options: {
     if (now() < (failures.get(ownerId)?.until ?? 0))
       return {
         status: "waiting",
-        reason: "Dream's last ideas failed to write; it tries again soon.",
+        reason: "Dream couldn't write ideas; it tries again soon.",
       };
     const access = options.access(ownerId);
     if (!access) return { status: "unavailable", reason: "This account is unavailable." };
@@ -1813,7 +1813,7 @@ export function createDream(options: {
         steer?.profileId &&
         !catalogue.profiles.some((profile) => profile.id === steer.profileId)
       ) {
-        reason = "The source image's model is not ready on the selected Dream backend.";
+        reason = "The source image's model isn't ready.";
         continue;
       }
       if (
@@ -2068,9 +2068,9 @@ export function createDream(options: {
     }
     const { profile } = choice;
     if (extend && profile.id !== item.settings?.profileId)
-      return "The source video's model is not ready on the selected Dream backend.";
+      return "The source video's model isn't ready.";
     if (isCloudProfile(profile) !== (record.settings.videoBackend === "cloud"))
-      return "No ready video model on the selected Dream backend.";
+      return "No video model is ready.";
     const slot =
       profile.mediaInputs?.find((input) => input.role === "start") || profile.mediaInputs?.[0];
     const spicy = spicyShare(record, access);

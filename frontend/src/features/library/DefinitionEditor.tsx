@@ -28,6 +28,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
+import { titleCase } from "../../ui/titleCase";
 import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
@@ -331,11 +332,7 @@ function DefinitionForm({
                             <NumberInput
                               key={key}
                               label={
-                                key === "cfg"
-                                  ? "Guidance"
-                                  : key === "fps"
-                                    ? "FPS"
-                                    : key[0].toUpperCase() + key.slice(1)
+                                key === "cfg" ? "Guidance" : key === "fps" ? "FPS" : titleCase(key)
                               }
                               value={
                                 typeof (metadata.defaults as Record<string, unknown>)?.[key] ===

@@ -41,7 +41,7 @@ export function GallerySettings() {
         <GalleryPass
           route="/api/gallery/captions"
           label="Caption Gallery"
-          description="Describe and tag images for search while Studio is idle. Out of Date covers missing captions and those from older rules."
+          description="Describe and tag images for search while Studio is idle."
           remaining="to caption"
           progressLabel="Caption Progress"
           scopeLabel="Images to Caption"
@@ -49,7 +49,7 @@ export function GallerySettings() {
         <GalleryPass
           route="/api/gallery/faces"
           label="Check Faces"
-          description="Compare images made with a character with the character's image by face, on the CPU while Studio is idle. The first run downloads the models."
+          description="Match faces in images made with a character to its image while Studio is idle."
           remaining="to check"
           progressLabel="Face Check Progress"
         />

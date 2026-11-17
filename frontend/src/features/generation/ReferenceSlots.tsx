@@ -286,9 +286,8 @@ export function ReferenceRoles({
     <Stack gap="xs">
       {startIndex >= 0 && (
         <Text size="xs" c="dimmed">
-          Reference {startIndex + 1} is the start image: the result is drawn from it (img2img)
-          rather than guided by it.
-          {start?.denoise && " Its Strength is the denoise: higher changes more."}
+          Reference {startIndex + 1} is the start image: the result is drawn from it.
+          {start?.denoise && " Higher Strength changes more."}
         </Text>
       )}
       {strengths.map(({ asset, index, range, value, mark, set }) => {

@@ -91,7 +91,7 @@ test("Stopping held assistance retains the draft and unblocks generation", async
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeDisabled();
     // The ⋯ spins and says what it is doing until it finishes or its Stop is chosen.
     const more = page.getByRole("button", { name: "AI Prompt Actions", exact: true });
-    await expect(more).toHaveAccessibleDescription("Improving the prompt…");
+    await expect(more).toHaveAccessibleDescription("Improving Prompt…");
     await more.click();
     await page.getByRole("menuitem", { name: "Stop Assistance", exact: true }).click();
     // A press while the menu fades out only closes it.

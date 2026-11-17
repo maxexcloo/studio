@@ -23,6 +23,7 @@ import { formatBytes } from "../../ui/bytes";
 import { useCopy } from "../../ui/clipboard";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
+import { titleCase } from "../../ui/titleCase";
 import { useGroupFeature } from "../auth/AccountGate";
 import { identityNote } from "../characters/identity";
 import { charactersQuery, promptCardsQuery } from "../characters/queries";
@@ -145,9 +146,7 @@ function generationDetails(
   const denoise = Number(settings.denoise);
   const references = staged.map(({ slot, assetId: id }, index): RanReference => {
     // A video's frames read by their slot, such as First Frame; an unlabelled one by its ID.
-    const named =
-      slots.find((input) => input.id === slot)?.label ||
-      String(slot || "").replace(/^\w/, (letter) => letter.toUpperCase());
+    const named = slots.find((input) => input.id === slot)?.label || titleCase(String(slot || ""));
     if (video) return { id, role: named || `Reference ${index + 1}`, strength: "" };
     if (staged[index] !== primary || guides)
       return { id, role: `Reference ${index + 1}`, strength: "Guides the picture" };
