@@ -8,6 +8,12 @@
   box-shadow: none;
 }
 
+/* The viewer sits over the blurred page, unlike other full-screen dialogs, which take the page's
+   solid surface (theme.module.css); the repeated class outranks that rule. */
+.content.content[data-full-screen] {
+  background: transparent !important;
+}
+
 /* The header only names the dialog; the viewer draws its own close action. */
 .header {
   position: absolute;
