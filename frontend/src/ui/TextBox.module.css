@@ -195,15 +195,12 @@
   flex-direction: column;
 }
 
-/* In place, the tools stand at the top of the text's end. */
-.editor > .columned {
-  flex-direction: row;
-}
-
+/* In place, the tools stand in a slim row over the text's end, so they never cover its lines. */
 .corner {
+  order: -1;
   display: flex;
   flex-shrink: 0;
-  align-items: flex-start;
+  align-self: flex-end;
   gap: 4px;
 }
 
@@ -228,34 +225,4 @@
 
 .secondarySend :global(.mantine-Button-section) {
   margin: 0;
-}
-
-/* A phone's tools menu fills the screen, over the floating position and size Mantine gives it. */
-.sheet {
-  position: fixed !important;
-  inset: 0 !important;
-  width: auto !important;
-  max-width: none !important;
-  max-height: none !important;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-}
-
-.sheetHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: max(var(--mantine-spacing-md), env(safe-area-inset-top)) var(--mantine-spacing-md)
-    var(--mantine-spacing-xs);
-}
-
-.sheetBody {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 0 var(--mantine-spacing-xs) max(var(--mantine-spacing-md), env(safe-area-inset-bottom));
 }

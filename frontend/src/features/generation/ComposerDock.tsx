@@ -356,6 +356,8 @@ export const ComposerDock = memo(function ComposerDock({
             data-typing={typing || undefined}
             onPointerDown={(event) => {
               tapping.current = sheetField(event.currentTarget, event.target);
+              // A tap on text that already has focus (returned from a menu) raises the keyboard too.
+              if (tapping.current && event.target === document.activeElement) setTappedField(true);
             }}
             onFocus={(event) => {
               if (tapping.current && sheetField(event.currentTarget, event.target))

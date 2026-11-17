@@ -188,13 +188,17 @@ recur across features.
   or the AI icon when the box has an AI tool; the AI icon (`icons.assistant`)
   marks everything AI does. The viewer's prompt keeps its AI tools in the
   bar's AI menu and its send beside the text.
-  Composer fields edit in place: typing in the phone Generate sheet shows
-  only the text, with Copy, Clear/Reset/Undo and its menu button as icons in
-  its corner, above the sheet's action bar. Other phone text boxes open the
-  shared full-screen editor, and AI tools stay beside the text before it
-  opens. That editor shows Copy, Clear/Reset/Undo and More above the
-  keyboard, with tools in More, a full-screen sheet, and form sends separate.
-  A box without tools has no ⋯, Copy or Clear.
+  Composer fields edit in place: at rest the phone Generate sheet shows each
+  box's Copy, Clear/Reset/Undo and menu button as icons in a slim row over
+  the text's end, never over its lines. Typing shows only the text under the
+  sheet's header and Close, above one action bar of icons: the box's tools,
+  its menu's plain tools (Recent Prompts) and Generate, in place of the
+  output and Clear. Other phone text boxes open the shared full-screen
+  editor, and AI tools stay beside the text before it opens. That editor
+  shows Copy, Clear/Reset/Undo and More above the keyboard, with tools in
+  More and form sends separate. The tools menu stays an anchored menu on
+  phones, fitted to the visual viewport. A box without tools has no ⋯, Copy
+  or Clear.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating

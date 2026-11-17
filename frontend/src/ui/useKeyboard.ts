@@ -59,6 +59,33 @@ export function useKeyboardDrop(active: boolean, onDrop: () => void) {
   }, [active]);
 }
 
+/**
+ * While `active`, the visual viewport within the layout viewport: the room a popup has above the
+ * keyboard and a browser's toolbars.
+ */
+export function useVisibleRect(active: boolean) {
+  const [rect, setRect] = useState<{ x: number; y: number; width: number; height: number }>();
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!active || !viewport) return setRect(undefined);
+    const resize = () =>
+      setRect({
+        x: viewport.offsetLeft,
+        y: viewport.offsetTop,
+        width: viewport.width,
+        height: viewport.height,
+      });
+    resize();
+    viewport.addEventListener("resize", resize);
+    viewport.addEventListener("scroll", resize);
+    return () => {
+      viewport.removeEventListener("resize", resize);
+      viewport.removeEventListener("scroll", resize);
+    };
+  }, [active]);
+  return rect;
+}
+
 /** While `active`, whether a text field that `within` accepts has focus. */
 export function useTypingIn(active: boolean, within: (field: Element) => boolean) {
   const [typing, setTyping] = useState(false);
