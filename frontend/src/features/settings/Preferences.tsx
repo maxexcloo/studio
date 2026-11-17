@@ -1,17 +1,10 @@
 import { Button, SegmentedControl, Select, Stack, Switch } from "@mantine/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
-import { post } from "../../api";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { useAccount } from "../auth/AccountGate";
-import { galleryKey } from "../gallery/queries";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
-import { queueQuery } from "../generation/Queue";
-import { accountAdminQuery } from "./AccountAdmin";
 import {
   type GalleryWorkPreference,
   type SidePreference,
@@ -20,88 +13,8 @@ import {
   useSavePreferences,
   useTileCaptions,
 } from "./accountPreferences";
+import { DeleteFailedItems } from "./DeleteFailedItems";
 import { FinishLikedImages } from "./FinishLikedImages";
-
-/**
- * Delete Failed Items: everyone deletes their own; administrators of a multi-user Studio may choose
- * another account's, or every account's.
- */
-function DeleteFailedItems() {
-  const client = useQueryClient();
-  const account = useAccount().data;
-  const others = account?.mode === "multi-user" && account.account?.role === "administrator";
-  const accounts = useQuery({ ...accountAdminQuery, enabled: others });
-  const [owner, setOwner] = useState("mine");
-  const [confirming, setConfirming] = useState(false);
-  const owners = [
-    { value: "all", label: "All Users" },
-    { value: "mine", label: "Mine" },
-    ...(accounts.data?.accounts || [])
-      .filter((entry) => entry.id !== account?.account?.id)
-      .map((entry) => ({ value: entry.id, label: entry.username }))
-      .sort((a, b) => a.label.localeCompare(b.label)),
-  ];
-  const whose =
-    owner === "all"
-      ? "every account's"
-      : owner === "mine"
-        ? "your"
-        : `${owners.find((entry) => entry.value === owner)?.label}'s`;
-  const remove = useMutation({
-    mutationFn: () =>
-      post<{ cleared: number }>(
-        "/api/gallery/errors/clear",
-        owner === "mine" ? undefined : { owner },
-      ),
-    onSuccess: () => {
-      for (const queryKey of [galleryKey, ["gallery-filters"], queueQuery.queryKey])
-        void client.invalidateQueries({ queryKey });
-      setConfirming(false);
-    },
-  });
-  return (
-    <SettingRow
-      label="Delete Failed Items"
-      description={
-        remove.data
-          ? `${remove.data.cleared.toLocaleString()} deleted.`
-          : "Remove failed and cancelled items from the gallery."
-      }
-    >
-      {others && (
-        <Select
-          aria-label="Whose Failed Items"
-          size="xs"
-          w={150}
-          data={owners}
-          value={owner}
-          allowDeselect={false}
-          searchable={owners.length > 8}
-          onChange={(value) => value && setOwner(value)}
-        />
-      )}
-      <Button
-        size="compact-sm"
-        color="red"
-        variant="light"
-        leftSection={<icons.delete size={16} />}
-        onClick={() => setConfirming(true)}
-      >
-        Delete
-      </Button>
-      <ConfirmDialog
-        opened={confirming}
-        title="Delete Failed Items"
-        action="Delete"
-        pending={remove.isPending}
-        onConfirm={() => remove.mutate()}
-        onClose={() => setConfirming(false)}
-      >
-        Remove {whose} failed and cancelled items from the gallery?
-      </ConfirmDialog>
-    </SettingRow>
-  );
-}
 
 type ModelChoice = "cloudModels" | "loras" | "uncensoredModels";
 /** A switch for a model choice the account turns off for itself, shown only where its role or group grants it. */

@@ -1,17 +1,15 @@
 import {
   ActionIcon,
-  Box,
   Button,
   NumberInput,
   Select,
-  SimpleGrid,
   Stack,
   Text,
   TextInput,
   Tooltip,
 } from "@mantine/core";
 import { Dices } from "lucide-react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import type { GenerationInput, Profile } from "../../types";
 import { icons } from "../../ui/icons";
@@ -49,8 +47,8 @@ export function GenerationSettings({
     (slot, index) =>
       input.textEncoders?.[index] || (index === 0 ? input.textEncoder : "") || slot.default,
   );
-  // Each setting the profile offers, listed alphabetically; wide ones take the full row.
-  const fields: { label: string; wide?: boolean; control: ReactNode }[] = [];
+  // Each setting the profile offers, listed alphabetically, one per row.
+  const fields: { label: string; control: ReactNode }[] = [];
   function number(
     key: keyof GenerationInput & string,
     label: string,
@@ -87,7 +85,6 @@ export function GenerationSettings({
   if (capabilities.seed !== false)
     fields.push({
       label: "Seed",
-      wide: true,
       control: (
         <TextInput
           label="Seed"
@@ -116,7 +113,6 @@ export function GenerationSettings({
     if (profile?.options?.[options]?.length && capabilities[field] !== false)
       fields.push({
         label,
-        wide: true,
         control: (
           <Select
             label={label}
@@ -131,7 +127,6 @@ export function GenerationSettings({
     const label = encoderSlots.length > 1 ? slot.label : "Text Encoder";
     fields.push({
       label,
-      wide: true,
       control: (
         <Select
           label={label}
@@ -153,7 +148,6 @@ export function GenerationSettings({
   if (!encoderSlots.length && !!profile?.options?.textEncoders?.length)
     fields.push({
       label: "Text Encoder",
-      wide: true,
       control: (
         <Select
           label="Text Encoder"
@@ -170,7 +164,6 @@ export function GenerationSettings({
   if (!!profile?.options?.weightDtypes?.length && capabilities.weightDtype !== false)
     fields.push({
       label: "Weight Type",
-      wide: true,
       control: (
         <Select
           label="Weight Type"
@@ -218,13 +211,9 @@ export function GenerationSettings({
   fields.sort((a, b) => a.label.localeCompare(b.label));
   const content = (
     <Stack gap="sm">
-      <SimpleGrid cols={2} spacing="xs" verticalSpacing="sm">
-        {fields.map(({ label, wide, control }) => (
-          <Box key={label} style={wide ? { gridColumn: "1 / -1" } : undefined}>
-            {control}
-          </Box>
-        ))}
-      </SimpleGrid>
+      {fields.map(({ label, control }) => (
+        <Fragment key={label}>{control}</Fragment>
+      ))}
       {profile?.encoderBuiltIn && (
         <Text size="xs" c="dimmed">
           Text encoder built into the checkpoint.

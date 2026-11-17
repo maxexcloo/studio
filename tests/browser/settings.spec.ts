@@ -78,7 +78,7 @@ test("Settings follow the settled section order and run maintenance and worker r
     await expect(
       page.getByRole("group", { name: "Administration", exact: true }).getByRole("link"),
     ).toHaveText(order.slice(2, 8));
-  await section(page, "Settings", "Preferences");
+  await section(page, "Settings", "Generation");
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
   await page.getByRole("option", { name: "member@example.test", exact: true }).click();
@@ -927,11 +927,11 @@ test("Settings › Dream forces a setting on every account and hands it back to 
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
   await page.goto("/settings#dream");
-  const images = page.getByRole("radiogroup", { name: "Dream Images Run On" });
+  const images = page.getByRole("radiogroup", { name: "Dream Images" });
   const spicy = page.getByRole("radiogroup", { name: "Dream Spicy" });
   const choice = (group: typeof images, name: string) =>
     group.getByRole("radio", { name, exact: true });
-  await expect(choice(images, "Account's Choice")).toBeChecked();
+  await expect(choice(images, "Per Account")).toBeChecked();
   await images.getByText("Cloud", { exact: true }).click();
   await spicy.getByText("Off", { exact: true }).click();
   await expect(choice(images, "Cloud")).toBeChecked();
@@ -939,9 +939,9 @@ test("Settings › Dream forces a setting on every account and hands it back to 
   await expect(choice(images, "Cloud")).toBeChecked();
   await expect(choice(spicy, "Off")).toBeChecked();
   await expect(
-    choice(page.getByRole("radiogroup", { name: "Dream Videos Run On" }), "Account's Choice"),
+    choice(page.getByRole("radiogroup", { name: "Dream Videos" }), "Per Account"),
   ).toBeChecked();
-  await spicy.getByText("Account's Choice", { exact: true }).click();
+  await spicy.getByText("Per Account", { exact: true }).click();
   await page.reload();
-  await expect(choice(spicy, "Account's Choice")).toBeChecked();
+  await expect(choice(spicy, "Per Account")).toBeChecked();
 });

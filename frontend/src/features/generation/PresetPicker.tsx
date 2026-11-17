@@ -165,6 +165,7 @@ export function PresetPicker({
       tooltip
       position="top-end"
       width={360}
+      floating
       opened={opened}
       onOpenedChange={setOpened}
       target={
@@ -177,7 +178,7 @@ export function PresetPicker({
           <icons.preset size={16} />
         </Button>
       }
-      headerEnd={
+      actions={
         <>
           <Button
             size="compact-sm"

@@ -205,27 +205,23 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
           if (!opened) setAdding(false);
         }}
         target={trigger}
-        headerEnd={<StackActions value={value} onChange={onChange} picker={picker} />}
-        footer={{
-          apply: true,
-          start: (
-            <ChipPopup
-              title="Add LoRAs"
-              width="100%"
-              opened={adding}
-              onOpenedChange={setAdding}
-              target={
-                // "Add" keeps the footer to one row beside Clear, Save and Apply.
-                <Button variant="default" aria-label="Add LoRAs" onClick={() => setAdding(true)}>
-                  Add
-                </Button>
-              }
-              footer={{ apply: true }}
-            >
-              {choices}
-            </ChipPopup>
-          ),
-        }}
+        detail={<StackCount value={value} onChange={onChange} picker={picker} />}
+        actions={<StackActions value={value} onChange={onChange} picker={picker} />}
+        secondary={
+          <ChipPopup
+            title="Add LoRAs"
+            width="100%"
+            opened={adding}
+            onOpenedChange={setAdding}
+            target={
+              <Button variant="default" aria-label="Add LoRAs" onClick={() => setAdding(true)}>
+                Add
+              </Button>
+            }
+          >
+            {choices}
+          </ChipPopup>
+        }
       >
         {stack}
       </ChipPopup>
@@ -578,29 +574,41 @@ function StackPreset(props: LoraPickerProps) {
   );
 }
 
-/** The stack's name, then the chosen LoRAs in order under their heading. */
+/** The stack's enabled LoRAs against the profile's limit, beside its heading. */
+function StackCount(props: LoraPickerProps) {
+  const { input, profile } = useStackDraft(props);
+  const enabledCount = input.loras.filter((lora) => lora.enabled !== false).length;
+  if (!profile?.maxLoras) return null;
+  return (
+    <Text
+      span
+      size="xs"
+      c={enabledCount > profile.maxLoras ? "yellow" : "dimmed"}
+      style={{ whiteSpace: "nowrap" }}
+      aria-label={`${enabledCount} of ${profile.maxLoras} Enabled`}
+    >
+      {enabledCount}/{profile.maxLoras}
+    </Text>
+  );
+}
+
+/**
+ * The stack's name, then the chosen LoRAs in order. Desktop heads its column Stack; the phone
+ * sheet is the stack itself, so its header carries the count and actions instead.
+ */
 function LoraStack(props: LoraPickerProps) {
   const phone = usePhone();
   const { input, profile, update, metadata, title, compatible, records } = useStackDraft(props);
   const enabledCount = input.loras.filter((lora) => lora.enabled !== false).length;
   return (
     <>
-      <PopupHeading
-        title="Stack"
-        detail={
-          !!profile?.maxLoras && (
-            <Text
-              size="xs"
-              c={enabledCount > profile.maxLoras ? "yellow" : "dimmed"}
-              style={{ whiteSpace: "nowrap" }}
-              aria-label={`${enabledCount} of ${profile.maxLoras} Enabled`}
-            >
-              {enabledCount}/{profile.maxLoras}
-            </Text>
-          )
-        }
-        actions={!phone && <StackActions {...props} />}
-      />
+      {!phone && (
+        <PopupHeading
+          title="Stack"
+          detail={<StackCount {...props} />}
+          actions={<StackActions {...props} />}
+        />
+      )}
       {(!!input.loras.length || !!records.length) && <StackPreset {...props} />}
       {/* With nothing chosen, the empty state centres in the pane. */}
       {!input.loras.length ? (

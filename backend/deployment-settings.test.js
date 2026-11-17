@@ -82,15 +82,15 @@ test("Dream overrides force only what is set, off included, and deployment locks
   assert.deepEqual(settings.dreamOverrides(), { spicy: false, imageBackend: "cloud" });
   assert.equal(settings.describeDreamOverrides().imageBackend.source, "studio");
   assert.equal(settings.describeDreamOverrides().enabled.value, null);
-  process.env.STUDIO_DREAM_OVERRIDE_PAUSED = "1";
+  process.env.STUDIO_DREAM_OVERRIDE_ENABLED = "1";
   try {
-    assert.equal(settings.describeDreamOverrides().paused.locked, true);
-    assert.equal(settings.dreamOverrides().paused, true);
-    assert.throws(() => settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_PAUSED", "0"), {
+    assert.equal(settings.describeDreamOverrides().enabled.locked, true);
+    assert.equal(settings.dreamOverrides().enabled, true);
+    assert.throws(() => settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_ENABLED", "0"), {
       status: 409,
     });
   } finally {
-    delete process.env.STUDIO_DREAM_OVERRIDE_PAUSED;
+    delete process.env.STUDIO_DREAM_OVERRIDE_ENABLED;
   }
 });
 
@@ -142,7 +142,8 @@ test("Dream administration requires admin authority, validates inputs and reads 
       }
     }
     for (const [key, value] of [
-      ["STUDIO_DREAM_OVERRIDE_PAUSED", "false"],
+      // Paused is each account's own; it is not an override.
+      ["STUDIO_DREAM_OVERRIDE_PAUSED", false],
       ["STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND", "auto"],
       // Only the overridable settings are here; daily caps stay each account's.
       ["STUDIO_DREAM_DAILY_IMAGES", 10],
