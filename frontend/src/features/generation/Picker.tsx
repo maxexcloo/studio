@@ -875,7 +875,7 @@ export function SavedName<T extends SavedItem>({
   if (mode === "rename") actions.reverse();
   const empty = mode
     ? typed
-      ? `A ${noun.toLowerCase()} has this name`
+      ? "Name in Use"
       : "Type a Name"
     : records.length
       ? "No Matches"

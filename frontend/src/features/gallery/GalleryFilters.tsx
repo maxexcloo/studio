@@ -21,6 +21,7 @@ import { loraName, profileNameParts } from "../../../../shared/profiles";
 import { api } from "../../api";
 import type { MediaKind, Profile, Rating } from "../../types";
 import { icons } from "../../ui/icons";
+import { titleCase } from "../../ui/titleCase";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { useGenerationActions } from "../generation/GenerationProvider";
@@ -139,7 +140,7 @@ function modelKeyName(key: string) {
           word,
         ),
     );
-  return words.map((word) => word[0].toUpperCase() + word.slice(1)).join(" ") || key;
+  return titleCase(words.join(" ")) || key;
 }
 
 /** One option per clean name, standing for every recorded value with that name, A–Z. */

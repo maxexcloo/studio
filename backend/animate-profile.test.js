@@ -58,19 +58,17 @@ test("Picking Cloud or Local GPU takes only that pool, and Local refuses rather 
   assert.throws(
     () => choose({ localRunning: false, localParked: true, where: "local" }),
     (error) =>
-      /^Videos are Stopped .*, so Local GPU can't animate this right now\.$/.test(error.message) &&
-      error.offers.fast &&
-      error.offers.cloud,
+      /^Local video is stopped\.$/.test(error.message) && error.offers.fast && error.offers.cloud,
   );
   const offline = profiles.map((p) => (p.family ? p : { ...p, availability: "offline" }));
   assert.throws(
     () => choose({ localRunning: true, where: "local" }, offline),
-    /^Error: Local video isn't running, so Local GPU/,
+    /^Error: Local video isn't running\.$/,
   );
   assert.throws(
     () => choose({ localRunning: true, where: "local" }, [grok]),
     (error) =>
-      /no local video profile/.test(error.message) && !error.offers.fast && !error.offers.quality,
+      /No local video model/.test(error.message) && !error.offers.fast && !error.offers.quality,
   );
 });
 
@@ -102,15 +100,15 @@ test("Animate refuses clearly when neither local video nor Grok is available", (
   const local = profiles.filter((profile) => profile !== grok);
   assert.throws(
     () => choose({ localRunning: false }, local),
-    /^Error: Local video isn't running and this account has no Grok access \(Cloud Models\)/,
+    /^Error: Local video isn't running and cloud video isn't available/,
   );
   assert.throws(
     () => choose({ localRunning: true, where: "cloud" }, local),
-    (error) => /no Grok video profile/.test(error.message) && !error.offers.cloud,
+    (error) => /Cloud video isn't available/.test(error.message) && !error.offers.cloud,
   );
   assert.throws(
     () => choose({ localRunning: true }, [profiles[0]]),
-    /No video profile that takes a starting image/,
+    /No video model can animate images/,
   );
 });
 
@@ -148,6 +146,6 @@ test("Dream's videos run only on local GPUs, even for an account that prefers Cl
   assert.equal(dream({ videos: "cloud", extend: "grok-video" }).profile.id, "fl-fast");
   // Without local video it refuses rather than fall back to Grok.
   assert.throws(() => dream({ videos: "cloud", localRunning: false }), {
-    message: "Local video isn't running, so Local GPU can't animate this right now.",
+    message: "Local video isn't running.",
   });
 });

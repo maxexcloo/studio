@@ -44,6 +44,8 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
+import { titleCase } from "../../ui/titleCase";
 import { usePhone } from "../../ui/usePhone";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
@@ -297,7 +299,7 @@ export function settingChips(
     name,
     input.width && input.height ? `${input.width} × ${input.height}` : "",
     input.kind === "video" && seconds ? `${Math.round(seconds * 10) / 10} s` : "",
-    steps ? `${input.steps} Steps` : "",
+    steps ? plural(Number(input.steps), "Step") : "",
     input.seed !== undefined && input.seed !== "" ? `Seed ${input.seed}` : "",
     ...(loraName
       ? loras.map((lora) => `${loraName(lora.name)} ${Number(lora.strength ?? 1).toFixed(2)}`)
@@ -363,8 +365,7 @@ function QueueJobDetails({
 }
 
 /** A worker's progress phase ("Loading model") in Title Case, as Studio's labels are. */
-export const phaseLabel = (phase: unknown) =>
-  String(phase || "").replace(/\b\p{Ll}/gu, (letter) => letter.toUpperCase());
+export const phaseLabel = (phase: unknown) => titleCase(String(phase || ""));
 
 /** A job's state in short: Upscaling for a running upscale, then its progress or phase. */
 function shortStatus(job: QueueJob) {

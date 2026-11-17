@@ -4975,7 +4975,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
     prompt: "The heron takes flight",
   });
   assert.equal(local.isError, true);
-  assert.match(texts(local), /^This account has no local video profile that takes a starting/);
+  assert.match(texts(local), /^No local video model can animate images/);
   await failure(client, "reuse", {
     job_id: "#1",
     mode: "animate",
@@ -5066,7 +5066,7 @@ test("video stays local while the worker is up, and a plain request never reache
   finish(f);
   const nowhere = await call(restricted, "reuse", { job_id: "#1", mode: "animate" });
   assert.equal(nowhere.isError, true);
-  assert.match(texts(nowhere), /Local video isn't running and this account has no Grok access/);
+  assert.match(texts(nowhere), /Local video isn't running and cloud video isn't available/);
   assert.deepEqual(
     f.submitted.map((body) => body.profileId),
     ["fl-fast", videoProfile.id, "fl-fast", imageProfile.id, "fl-fast", imageProfile.id],

@@ -176,11 +176,7 @@ export function GalleryChoices({
           fill
           action={
             <>
-              {uploads && (
-                <Text size="xs">
-                  {search ? "No matching uploads." : "Upload, paste or drop images."}
-                </Text>
-              )}
+              {uploads && !search && <Text size="xs">Upload, paste or drop images.</Text>}
               {morePages}
             </>
           }

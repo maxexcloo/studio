@@ -51,8 +51,8 @@ interface Result {
 }
 type Action = "rewrite" | "negative" | "loras";
 const workingLabels: Record<Action, string> = {
-  rewrite: "Improving the prompt…",
-  negative: "Writing a negative prompt…",
+  rewrite: "Improving Prompt…",
+  negative: "Writing Negative…",
   loras: "Finding LoRAs…",
 };
 

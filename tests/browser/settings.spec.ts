@@ -323,7 +323,7 @@ test("Settings › Preferences saves the Prompt Assistant and where each area ru
     }),
   );
   await page.goto("/settings#preferences");
-  // Prompts leads with the Prompt Assistant, unsaved the account's default.
+  // The Prompt Assistant, unsaved, reads the account's default.
   const prompts = page.getByRole("region", { name: "Prompts", exact: true });
   const writing = prompts.getByRole("combobox", { name: "Prompt Assistant", exact: true });
   await expect(writing).toHaveValue("Uncensored · Cloud");

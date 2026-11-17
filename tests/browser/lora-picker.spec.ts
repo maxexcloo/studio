@@ -375,7 +375,7 @@ test("The stack's preset field saves, loads and renames LoRA presets, marks edit
   await expect(name).toBeFocused();
   await name.fill("portrait");
   await expect(page.getByRole("option", { name: /^Save as New Preset/ })).toHaveCount(0);
-  await expect(page.getByText("A preset has this name", { exact: true })).toBeVisible();
+  await expect(page.getByText("Name in Use", { exact: true })).toBeVisible();
   await name.press("Escape");
   await saveCurrent(page, "Soft Look");
   await expect.poll(() => state.presets.length).toBe(4);

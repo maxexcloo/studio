@@ -6,6 +6,7 @@ import { homepage as repository } from "../../../../package.json";
 import { api } from "../../api";
 import { CopyButton } from "../../ui/CopyButton";
 import { icons } from "../../ui/icons";
+import { plural } from "../../ui/plural";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { StudioLogo } from "../../ui/StudioLogo";
 import { usePhone } from "../../ui/usePhone";
@@ -134,7 +135,7 @@ export function AboutStudio() {
         <StudioLogo order={2} />
         <Text size="sm" c="dimmed" ta="center">
           An image and video studio for your own models.
-          {outputs ? ` ${outputs.toLocaleString()} results made here · no telemetry.` : ""}
+          {outputs ? ` ${plural(outputs, "result")} made here · no telemetry.` : ""}
         </Text>
       </Stack>
       {/* What is running leads; the other groups follow A–Z. */}

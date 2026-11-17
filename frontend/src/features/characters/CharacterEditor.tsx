@@ -27,6 +27,7 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
+import { titleCase } from "../../ui/titleCase";
 import { chipProps } from "../generation/chip";
 import { CardDialog, CardFields, CardForm, CardThumbnails } from "./CardImages";
 import { type CharacterCard, charactersQuery, useMakeSheet, useSaveCharacter } from "./queries";
@@ -191,7 +192,7 @@ export const sheetViews = (card: CharacterCard) =>
       key: panel.id,
       src: panel.url || panel.thumbnailUrl,
       thumbnailUrl: panel.thumbnailUrl,
-      alt: `${card.name} ${panel.role[0].toUpperCase()}${panel.role.slice(1)}`,
+      alt: `${card.name} ${titleCase(panel.role)}`,
     }));
 
 /** A part of the editor under its label: its content then its action, or, empty, both framed. */

@@ -978,7 +978,7 @@ const dream = createDream({
       (profile) => isCloudProfile(profile) === (backend === "cloud"),
     );
     if (extend && !profiles.some((profile) => profile.id === canonicalProfileId(extend)))
-      throw new Error("The source video's model is not ready on the selected Dream backend.");
+      throw new Error("The source video's model isn't ready.");
     if (backend === "cloud") {
       const pool = extend
         ? profiles.filter((profile) => profile.id === canonicalProfileId(extend))
