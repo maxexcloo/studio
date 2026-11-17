@@ -2,7 +2,7 @@ import { cardKinds, maxCardDescription, maxCardName } from "../shared/characters
 import { loraCompatibility, loraName, loraStrengthRange } from "../shared/profiles.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { maxSuggestions } from "../shared/suggestions.ts";
-import { replyTitle } from "../shared/titles.ts";
+import { replyTitle, titleRule } from "../shared/titles.ts";
 /**
  * The prompt assistant engine: one OpenAI-compatible adapter behind every assistant
  * operation, shared by the Studio UI routes (assistant-routes.js), the queue's writing stage
@@ -49,8 +49,7 @@ const gatewayKeys = [
   "STUDIO_ASSISTANT_CLOUD_MODEL",
 ];
 // A gallery item's title, from its prompt.
-const titleInstructions =
-  "Title what the text below describes: the prompt that made an image or video. Reply with only a concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
+const titleInstructions = `Title what the text below describes: the prompt that made an image or video. Reply with only ${titleRule}, without quotes or punctuation.`;
 // A character card's description (Make Character), which leads a prompt with the card's images.
 // Clothing stays out: a card's character changes outfits, and a described one fights the prompt's.
 const characterInstructions = `Describe the main person or creature in the image so an image model can draw them again in other outfits and scenes: their lasting look (apparent age, build, hair, eyes, skin, distinguishing marks such as scars or tattoos). Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "red-haired woman in her thirties, freckles, slim build, scar over left eye". Leave out clothing, the setting, pose, expression, lighting and style, and never guess a name or identity.`;
