@@ -27,6 +27,7 @@ function fixture(items: SuggestedPromptItem[], vision: boolean) {
     },
     idle: () => true,
     allowed: (ownerId) => ownerId === "alice",
+    text: () => "local",
     items: () => state.items,
     visible: () => true,
     image: async () => ({ mime: "image/jpeg", data: "AA==" }),

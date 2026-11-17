@@ -12,7 +12,7 @@ import {
 import { shortTitle } from "../../shared/titles.ts";
 import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import { type ModelImage, userContent } from "./model-content.ts";
-import type { PromptWriter, Taste, TasteWriter } from "./taste.ts";
+import type { PromptWriter, Taste, TasteWriter, TextSide } from "./taste.ts";
 import {
   americanEnglish,
   applyChange,
@@ -247,6 +247,7 @@ export function createSuggestions({
   nextSteps,
   target = async () => null,
   promptWriter = () => undefined,
+  textSide = () => "cloud",
   fixed = () => [],
   now = Date.now,
 }: {
@@ -270,6 +271,8 @@ export function createSuggestions({
   target?: (ownerId: string, item: SuggestionItem) => Promise<WritingTarget | null>;
   /** The owner's prompt writer (account-policy.js `promptWriter`), which Ask for a Change uses. */
   promptWriter?: (ownerId: string) => PromptWriter | undefined;
+  /** Where the owner runs text (account-preferences.js `textSide`), which the rest use. */
+  textSide?: (ownerId: string) => TextSide;
   /** The labels of a Prompt Styles kind's fixed options, which suggestions never repeat. */
   fixed?: (kind: (typeof fixedKinds)[keyof typeof fixedKinds]) => string[];
   now?: () => number;
@@ -297,6 +300,7 @@ export function createSuggestions({
 
   async function write(
     model: Writer,
+    ownerId: string,
     surface: Exclude<SuggestionSurface, "change">,
     kind: "image" | "video",
     context: string,
@@ -375,7 +379,7 @@ export function createSuggestions({
     try {
       ({ text } = await model.chat({
         call: "suggestions",
-        model: await model.model("suggestions"),
+        model: await model.model("suggestions", false, textSide(ownerId)),
         messages: [
           { role: "system", content: system },
           {
@@ -491,7 +495,7 @@ export function createSuggestions({
         ? ["", `Already suggested (offer different ones): ${latest.join(", ")}`]
         : []),
     ];
-    const answer = await write(model, "viewer", "image", context.join("\n"), {
+    const answer = await write(model, ownerId, "viewer", "image", context.join("\n"), {
       ...options,
       spicy,
       target: writing,
@@ -744,6 +748,7 @@ export function createSuggestions({
         const latest = shown.get(menu) ?? [];
         const ideas = await write(
           model,
+          ownerId,
           source ? "animate" : surface,
           source ? "image" : kind,
           latest.length
@@ -772,17 +777,19 @@ type SuggestionService = ReturnType<typeof createSuggestions>;
 
 /**
  * Writes finished images' viewer next steps ahead of time as idle work (domain/idle-work.ts), a
- * trickle of the newest first: from the image too where the running text model reads images, from
- * its prompt and settings where it can't. Only for owners `allowed` to use the prompt assistant,
- * and never with cloud.
+ * trickle of the newest first: from the image too where the text model the owner runs (`text`)
+ * reads images, from its prompt and settings where it can't. Only for owners `allowed` to use the
+ * prompt assistant.
  */
 export function createNextStepWork(options: {
   /** The Settings › Gallery switch (STUDIO_NEXT_STEPS). */
   enabled(): boolean;
   suggestions: Pick<SuggestionService, "prepare">;
-  writer: { supportsVision(): Promise<boolean> } | null;
+  writer: { supportsVision(text: TextSide): Promise<boolean> } | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
+  /** Where the owner runs text (account-preferences.js `textSide`). */
+  text(ownerId: string): TextSide;
   items(since?: number): Iterable<SuggestionItem>;
   changes?(): number;
   visible(item: SuggestionItem): boolean;
@@ -800,7 +807,8 @@ export function createNextStepWork(options: {
     wanted: (item) =>
       item.type === "image" && Boolean(item.jobId && item.prompt) && !item.nextSteps,
     async run(item, signal) {
-      const image = (await writer!.supportsVision()) ? await options.image(item) : null;
+      const vision = await writer!.supportsVision(options.text(item.ownerId || ""));
+      const image = vision ? await options.image(item) : null;
       if (!signal.aborted) await options.suggestions.prepare(item, signal, image);
     },
   });
