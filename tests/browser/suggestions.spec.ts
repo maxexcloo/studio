@@ -95,7 +95,7 @@ test("The empty composer prompt's AI menu offers Suggested ideas that fill it wi
   for (const idea of sorted)
     await expect(menu.getByRole("menuitem", { name: idea, exact: true })).toBeVisible();
   expect(asked).toEqual([{ surface: "composer", kind: "image", fresh: false }]);
-  await menu.getByRole("menuitem", { name: "Refresh…", exact: true }).click();
+  await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
   await expect.poll(() => asked.at(-1)?.fresh).toBe(true);
   await menu.getByRole("menuitem", { name: ideas[1], exact: true }).click();
   await expect(prompt).toHaveValue(ideas[1]);
