@@ -298,6 +298,7 @@ export function studioTheme({
       Modal: Modal.extend({
         defaultProps: {
           centered: true,
+          closeButtonProps: { "aria-label": "Close" },
           overlayProps: { blur: 8, backgroundOpacity: 0.55 },
           transitionProps: popupTransition,
           radius: "lg",
@@ -336,7 +337,8 @@ export function studioTheme({
       NavLink: NavLink.extend({
         styles: { root: { borderRadius: "var(--mantine-radius-md)", ...target } },
       }),
-      // A small glass banner on one line; a failure marks its colour with a dot.
+      // A small solid banner on one line, readable over the header it drops onto; a failure marks
+      // its colour with a dot.
       Notification: Notification.extend({
         classNames: (_theme, props) => ({
           root: `${classes.notification} ${props.color ? classes.alert : ""}`,
@@ -345,7 +347,13 @@ export function studioTheme({
           withBorder: true,
           closeButtonProps: { "aria-label": "Dismiss Notification" },
         },
-        styles: { root: { ...glass, boxShadow: "var(--mantine-shadow-md)" } },
+        styles: {
+          root: {
+            ...glass,
+            background: "var(--studio-glass-solid)",
+            boxShadow: "var(--mantine-shadow-md)",
+          },
+        },
       }),
       // Paper also renders Card, Dialog, ActionBar and Modal/Drawer content.
       Paper: Paper.extend({
@@ -465,9 +473,11 @@ const glassTokens = (scheme: "light" | "dark", transparency: boolean) => {
   const lift = scheme === "dark" ? "white 7%" : "white 60%";
   const hover = scheme === "dark" ? "white 13%" : "black 5%";
   const translucent = (colour: string) => `color-mix(in srgb, ${colour} ${opacity}, transparent)`;
+  const raised = `color-mix(in srgb, var(--mantine-color-body), ${lift})`;
   return {
     "--studio-glass-chrome": translucent("var(--mantine-color-body)"),
-    "--studio-glass-raised": translucent(`color-mix(in srgb, var(--mantine-color-body), ${lift})`),
+    "--studio-glass-raised": translucent(raised),
+    "--studio-glass-solid": raised,
     "--studio-glass-raised-hover": translucent(
       `color-mix(in srgb, var(--mantine-color-body), ${hover})`,
     ),
@@ -496,6 +506,8 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--mantine-color-default-border": "#27272a",
       // Mantine's dark placeholder is too faint over translucent surfaces.
       "--mantine-color-placeholder": "var(--mantine-color-dark-2)",
+      // Mantine's dark light-variant red is near white, so a subtle Delete lost its colour.
+      "--mantine-color-red-light-color": "var(--mantine-color-red-4)",
       ...glassTokens("dark", transparency),
     },
     light: {
@@ -503,6 +515,8 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--mantine-color-default": "#ffffff",
       "--mantine-color-default-hover": "#f4f4f5",
       "--mantine-color-default-border": "#e4e4e7",
+      // Links take the primary's text shade, as its light buttons do; the filled shade is too pale.
+      "--mantine-color-anchor": "var(--mantine-primary-color-light-color)",
       ...glassTokens("light", transparency),
     },
   };
