@@ -26,7 +26,7 @@ const settingSections = {
   dream: {
     label: "Dream",
     description:
-      "Dream settings forced on every account, which can't change them; Account's Choice leaves each account free.",
+      "Dream settings forced on every account, which can't change them; Per Account leaves each account free.",
     icon: icons.dream,
     admin: true,
     group: "Administration",
@@ -40,7 +40,8 @@ const settingSections = {
   },
   generation: {
     label: "Generation",
-    description: "The profiles new drafts start on for everyone.",
+    description:
+      "The profiles new drafts start on for everyone, and deleting any account's failed items.",
     icon: Boxes,
     admin: true,
     group: "Administration",

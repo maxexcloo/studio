@@ -83,12 +83,14 @@ function SettingsForm({ dream }: { dream: Dream }) {
   );
   const backend = (key: "imageBackend" | "videoBackend", label: string) => (
     <SettingRow
+      wide
       label={`${label} Run On`}
       description={`Uses ready models allowed for your account. Waits if unavailable.${note(key)}`}
     >
       <SegmentedControl
         role="radiogroup"
         aria-label={`Dream ${label} Run On`}
+        fullWidth
         value={settings[key]}
         disabled={locked(key)}
         data={[

@@ -34,6 +34,7 @@ import {
 } from "react";
 
 import { menuWidth } from "../../theme";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { formatDateTime } from "../../ui/dates";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
@@ -54,8 +55,8 @@ import classes from "./Picker.module.css";
  */
 
 /**
- * A popup's or column's heading: its title and any `detail`, with its actions, such as Clear, at
- * the end.
+ * A popup's or column's heading: its title and any `detail`, then its compact subtle actions (Clear
+ * first, then record actions such as Save) at the end.
  */
 export function PopupHeading({
   title,
@@ -67,13 +68,15 @@ export function PopupHeading({
   actions?: ReactNode;
 }) {
   return (
-    <Group className={classes.heading} justify="space-between" gap="xs" mih={28}>
+    <Group className={classes.heading} justify="space-between" gap="xs" mih={28} wrap="nowrap">
       <Group gap="xs" wrap="nowrap" miw={0}>
-        <Text fw={500}>{title}</Text>
+        <Text fw={500} truncate>
+          {title}
+        </Text>
         {detail}
       </Group>
       {actions && (
-        <Group className={classes.actions} justify="flex-end" gap="xs" wrap="nowrap">
+        <Group gap="xs" wrap="nowrap">
           {actions}
         </Group>
       )}
@@ -82,38 +85,44 @@ export function PopupHeading({
 }
 
 /**
- * A chip's popup: a `PopupHeading` with the title and its actions, the content, then any `footer`
- * actions. An `aside`, such as the LoRA stack, starts with its own `PopupHeading`: desktop shows it
- * as a column beside everything else, divided to the top; phones leave it out.
+ * A chip's popup. Its heading holds the title, any `detail` and its compact subtle `actions` (Clear
+ * first), on desktop as in the phone sheet's header beside Close. Its footer is the shared
+ * `DialogFooter`: at most one `secondary` action that adds content (Add), then the `primary`.
+ * Choices apply as they are made, so desktop shows a footer only for a real `primary` or
+ * `secondary`, and the phone sheet's footer ends with Done where it has no `primary`.
+ * An `aside`, such as the LoRA stack, starts with its own `PopupHeading`: desktop shows it as a
+ * column beside everything else, divided to the top; phones leave it out.
  * Desktop anchors a Popover to the chip; phones open a full-screen sheet whose content scrolls
- * between the header and the footer, pinned above the safe area, which holds the heading's actions
- * (`headerEnd`, such as Clear and Save) at its end, so a popover never opens a second
- * level there, unless the popup is `floating`: a small form, such as Settings, stays a
- * popover fitted to the screen, as the rail's other dropdowns. Escape closes nested layers first.
+ * between the header and the footer, pinned above the safe area, unless the popup is `floating`: a
+ * small form, such as Settings or Presets, stays a popover fitted to the screen, as the rail's other
+ * dropdowns. Escape closes nested layers first.
  */
 export function ChipPopup({
   title,
+  detail,
   opened,
   onOpenedChange,
   target,
   tooltip = false,
-  headerEnd,
+  actions,
   width,
   position = "top-start",
   trap = true,
   withinPortal = true,
   floating = false,
-  footer,
+  secondary,
+  primary,
   aside,
   children,
 }: {
   title: string;
+  detail?: ReactNode;
   opened: boolean;
   onOpenedChange: (opened: boolean) => void;
   target: ReactNode;
   /** Icon-only chips name themselves with the title's tooltip. */
   tooltip?: boolean;
-  headerEnd?: ReactNode;
+  actions?: ReactNode;
   width: number | string;
   position?: PopoverProps["position"];
   /** Off while a confirmation over the popup owns focus and clicks. */
@@ -122,12 +131,8 @@ export function ChipPopup({
   withinPortal?: boolean;
   /** A popover on phones too, instead of a full-screen sheet. */
   floating?: boolean;
-  /**
-   * Actions under the content: `start` (such as Like Current Prompt), with Clear and Save in the
-   * heading, or after `start` in the phone sheet's footer. `apply` adds Apply to the phone sheet,
-   * which closes it; choices apply as they are made.
-   */
-  footer?: { start?: ReactNode; apply?: boolean };
+  secondary?: ReactNode;
+  primary?: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
 }) {
@@ -148,23 +153,6 @@ export function ChipPopup({
     },
   };
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => trap && escapePanel(event, close);
-  const actions = footer?.start && (
-    <Group gap="xs" wrap="nowrap">
-      {footer.start}
-    </Group>
-  );
-  // The phone sheet's footer: `start`, then the heading's actions and Apply at the end.
-  const sheetActions = (headerEnd || footer) && (
-    <Group justify="space-between" gap="xs" wrap="nowrap">
-      <Group className={classes.footerStart} gap="xs" wrap="nowrap">
-        {footer?.start}
-      </Group>
-      <Group className={classes.actions} justify="flex-end" gap="xs" wrap="nowrap">
-        {headerEnd}
-        {footer?.apply && <Button onClick={close}>Apply</Button>}
-      </Group>
-    </Group>
-  );
   if (phone && !floating)
     return (
       <>
@@ -186,11 +174,19 @@ export function ChipPopup({
             {/* The sheet itself takes focus, so its search doesn't raise the keyboard. */}
             <FocusTrap.InitialFocus />
             <Modal.Header className={classes.sheetHeader}>
-              <Modal.Title>{title}</Modal.Title>
+              <Modal.Title className={classes.sheetTitle}>
+                {title}
+                {detail}
+              </Modal.Title>
+              {actions}
               <Modal.CloseButton aria-label={`Close ${title}`} />
             </Modal.Header>
-            <Modal.Body className={classes.sheetBody}>{children}</Modal.Body>
-            {sheetActions && <div className={classes.sheetFooter}>{sheetActions}</div>}
+            <Modal.Body className={classes.sheetBody}>
+              {children}
+              <DialogFooter secondary={secondary}>
+                {primary || <Button onClick={close}>Done</Button>}
+              </DialogFooter>
+            </Modal.Body>
           </Modal.Content>
         </Modal.Root>
       </>
@@ -223,9 +219,9 @@ export function ChipPopup({
         {touch && <FocusTrap.InitialFocus />}
         <div className={aside ? classes.columns : undefined}>
           <Stack gap="sm">
-            <PopupHeading title={title} actions={headerEnd} />
+            <PopupHeading title={title} detail={detail} actions={actions} />
             {children}
-            {actions}
+            {(secondary || primary) && <DialogFooter secondary={secondary}>{primary}</DialogFooter>}
           </Stack>
           {aside && <div className={classes.aside}>{aside}</div>}
         </div>
@@ -305,7 +301,7 @@ export function PickerHeader<Tab extends string>({
               width={340}
               position="bottom-end"
               withinPortal={false}
-              headerEnd={
+              actions={
                 onClearFilters && (
                   <Button
                     size="compact-sm"

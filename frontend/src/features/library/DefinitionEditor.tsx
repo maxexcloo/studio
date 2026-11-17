@@ -26,7 +26,7 @@ import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { SettingGroup } from "../../ui/SettingRows";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
@@ -518,51 +518,59 @@ function DefinitionForm({
             ))}
           </Alert>
         )}
-        <Group justify="space-between">
-          <Group gap="xs">
-            {kind === "profile" && !creating && (
+        {!creating && (
+          <SettingGroup title="Danger Zone" danger>
+            <SettingRow
+              label={`Delete ${noun}`}
+              description="Removes it from the Library for everyone."
+            >
               <Button
-                variant="default"
-                loading={validate.isPending}
-                disabled={!!error}
-                onClick={() => validate.mutate()}
-              >
-                Check Profile
-              </Button>
-            )}
-            {meta?.aiDrafted && (
-              <Button
-                variant="default"
-                disabled={busy || form.isDirty()}
-                onClick={() => action.mutate({ action: "approve" })}
-              >
-                Approve Draft
-              </Button>
-            )}
-            {!creating && (
-              <Button
-                variant="default"
+                size="compact-sm"
+                color="red"
+                variant="light"
                 leftSection={<icons.delete size={16} />}
                 disabled={busy}
                 onClick={() => setRemoving(true)}
               >
-                Delete {noun}
+                Delete
               </Button>
-            )}
-          </Group>
-          <Group gap="xs">
-            <Button variant="default" onClick={close}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              loading={save.isPending}
-              disabled={!!error || collision || busy || (!creating && !form.isDirty())}
-            >
-              {creating ? "Create" : "Save"} {noun}
-            </Button>
-          </Group>
-        </Group>
+            </SettingRow>
+          </SettingGroup>
+        )}
+        <DialogFooter
+          onCancel={close}
+          secondary={
+            <>
+              {kind === "profile" && !creating && (
+                <Button
+                  variant="default"
+                  loading={validate.isPending}
+                  disabled={!!error}
+                  onClick={() => validate.mutate()}
+                >
+                  Check
+                </Button>
+              )}
+              {meta?.aiDrafted && (
+                <Button
+                  variant="default"
+                  disabled={busy || form.isDirty()}
+                  onClick={() => action.mutate({ action: "approve" })}
+                >
+                  Approve
+                </Button>
+              )}
+            </>
+          }
+        >
+          <Button
+            type="submit"
+            loading={save.isPending}
+            disabled={!!error || collision || busy || (!creating && !form.isDirty())}
+          >
+            {creating ? "Create" : "Save"}
+          </Button>
+        </DialogFooter>
       </Stack>
       <ConfirmDialog
         opened={removing}

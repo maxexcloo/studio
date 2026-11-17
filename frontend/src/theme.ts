@@ -336,9 +336,13 @@ export function studioTheme({
       NavLink: NavLink.extend({
         styles: { root: { borderRadius: "var(--mantine-radius-md)", ...target } },
       }),
+      // A solid card, so the header never shows through a banner over it (styles.css).
       Notification: Notification.extend({
-        defaultProps: { closeButtonProps: { "aria-label": "Dismiss Notification" } },
-        styles: { root: glass },
+        defaultProps: {
+          withBorder: true,
+          closeButtonProps: { "aria-label": "Dismiss Notification" },
+        },
+        styles: { root: { background: "var(--mantine-color-body)" } },
       }),
       // Paper also renders Card, Dialog, ActionBar and Modal/Drawer content.
       Paper: Paper.extend({
@@ -382,8 +386,8 @@ export function studioTheme({
       SegmentedControl: SegmentedControl.extend({
         classNames: { root: classes.segmented },
         defaultProps: {
-          // On touch screens, the form controls' text size and height.
-          size: touch ? "md" : "sm",
+          // Compact text everywhere; touch screens raise its height below, not its text.
+          size: "sm",
           withItemsBorders: false,
           transitionDuration: motionDuration,
           transitionTimingFunction: easing.enter,

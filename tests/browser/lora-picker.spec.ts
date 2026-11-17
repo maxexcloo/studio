@@ -337,7 +337,7 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
   // The list scrolls inside itself, keeping the search and the footer in sight.
   await adding.getByRole("button", { name: "Extra 9", exact: true }).scrollIntoViewIfNeeded();
   await expect(search).toBeInViewport();
-  await expect(adding.getByRole("button", { name: "Apply", exact: true })).toBeInViewport();
+  await expect(adding.getByRole("button", { name: "Done", exact: true })).toBeInViewport();
   await adding.getByRole("button", { name: "Detail Slider", exact: true }).click();
   await showLoraStack(page);
   // The stack keeps its controls under the sheet's Add LoRAs.

@@ -2,21 +2,25 @@ import { Alert, Button, FocusTrap, Group, Modal, Stack, Text } from "@mantine/co
 import { type ReactNode, useRef } from "react";
 
 /**
- * Every dialog's footer: Cancel, then its one primary action (`children`), at the right. Without
- * `onCancel`, where there is nothing to cancel, the action (Done, Close) stands alone.
+ * Every dialog's and sheet's footer, at the right: any `secondary` actions (default buttons, such
+ * as Check or Add), Cancel, then its one filled primary action (`children`). Without `onCancel`,
+ * where there is nothing to cancel, the action (Done, Close) follows the secondary ones.
  */
 export function DialogFooter({
   pending,
   onCancel,
+  secondary,
   children,
 }: {
   pending?: boolean;
   onCancel?: () => void;
+  secondary?: ReactNode;
   children: ReactNode;
 }) {
   // A phone's full-screen dialog pins it to the bottom, in sight while the body scrolls (theme).
   return (
-    <Group justify="flex-end" data-dialog-footer>
+    <Group justify="flex-end" gap="xs" data-dialog-footer>
+      {secondary}
       {onCancel && (
         <Button variant="default" disabled={pending} onClick={onCancel}>
           Cancel

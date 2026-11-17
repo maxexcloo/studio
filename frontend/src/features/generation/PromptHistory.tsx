@@ -189,39 +189,26 @@ export function usePromptHistory({
       opened={opened}
       onOpenedChange={setOpened}
       target={<span />}
-      headerEnd={
-        <>
-          <Switch
-            // Remounts once loaded so the saved state appears without the thumb sliding.
-            key={keep.history.data ? "loaded" : "loading"}
-            label="Save Recent Prompts"
-            labelPosition="left"
-            checked={keep.history.data?.enabled ?? false}
-            disabled={!keep.history.data}
-            onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
-          />
-          <Button
-            size="compact-sm"
-            variant="subtle"
-            aria-label="Clear Recent"
-            disabled={!history.data?.prompts.some((entry) => !entry.liked)}
-            onClick={() => edit.mutate({ action: "clear" })}
-          >
-            Clear
-          </Button>
-        </>
+      actions={
+        <Button
+          size="compact-sm"
+          variant="subtle"
+          aria-label="Clear Recent"
+          disabled={!history.data?.prompts.some((entry) => !entry.liked)}
+          onClick={() => edit.mutate({ action: "clear" })}
+        >
+          Clear
+        </Button>
       }
-      footer={{
-        start: (
-          <Button
-            variant="default"
-            disabled={!value.trim() || currentLiked}
-            onClick={() => like(value, true)}
-          >
-            Like Current Prompt
-          </Button>
-        ),
-      }}
+      secondary={
+        <Button
+          variant="default"
+          disabled={!value.trim() || currentLiked}
+          onClick={() => like(value, true)}
+        >
+          Like Current Prompt
+        </Button>
+      }
     >
       <Combobox
         store={combobox}
@@ -250,6 +237,14 @@ export function usePromptHistory({
               data-autofocus
             />
           </Combobox.EventsTarget>
+          <Switch
+            // Remounts once loaded so the saved state appears without the thumb sliding.
+            key={keep.history.data ? "loaded" : "loading"}
+            label="Save Recent Prompts"
+            checked={keep.history.data?.enabled ?? false}
+            disabled={!keep.history.data}
+            onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
+          />
           {history.isPending ? (
             <LoadingState label="Loading Prompt History" fill />
           ) : history.error ? (

@@ -76,7 +76,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
   });
   const editor = await editDefinition(page, "Profile");
   await editor.getByRole("textbox", { name: "Name", exact: true }).fill("My Edited Profile");
-  await editor.getByRole("button", { name: "Save Profile", exact: true }).click();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor.getByRole("alert")).toContainText("changed while you were editing");
   await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
     "My Edited Profile",
@@ -93,7 +93,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
     "Changed by Another Editor",
   );
   await editor.getByRole("textbox", { name: "Name", exact: true }).fill("My Edited Profile");
-  await editor.getByRole("button", { name: "Save Profile", exact: true }).click();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(requests[1].baseHash).toBe("latest-hash");
   await editDefinition(page, "Profile");
@@ -173,7 +173,7 @@ test("Guide editing and restoring an earlier version create distinct saved revis
   });
   const editor = await editDefinition(page, "Guide");
   await editor.getByRole("textbox", { name: "Summary", exact: true }).fill("Updated guidance.");
-  await editor.getByRole("button", { name: "Save Guide", exact: true }).click();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(saved[1]).toEqual({ ...original, summary: "Updated guidance." });
   // Library › Guides lists a guide by its name.
@@ -211,7 +211,7 @@ test("Guide editing and restoring an earlier version create distinct saved revis
     "Original guidance.",
   );
   // A guide that profiles still use stays, and the confirmation says why.
-  await editor.getByRole("button", { name: "Delete Guide", exact: true }).click();
+  await editor.getByRole("button", { name: "Delete", exact: true }).click();
   const confirm = page.getByRole("dialog", { name: "Delete Guide", exact: true });
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(confirm).toContainText("This guide is still used by custom:fixture.");
@@ -374,7 +374,7 @@ test("A combined profile's Backend select is a saved edit that switches what the
   await page.getByRole("option", { name: "ComfyUI", exact: true }).click();
   await expect(description).toHaveValue("ComfyUI graph.");
   await description.fill("ComfyUI graph, edited.");
-  await editor.getByRole("button", { name: "Save Profile", exact: true }).click();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   const studio = JSON.parse(saved[0].text).studio;
   expect(saved[0].baseHash).toBe("opened");
@@ -523,7 +523,7 @@ test("Import Workflow opens a workflow, and a row's Duplicate copies its profile
   await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
     "Owned Profile Copy",
   );
-  await editor.getByRole("button", { name: "Create Profile", exact: true }).click();
+  await editor.getByRole("button", { name: "Create", exact: true }).click();
   await expect(editor).toBeHidden();
   const studio = { ...original.studio, id: "owned-copy", name: "Owned Profile Copy" };
   expect(created).toEqual([{ workflow: { ...original, studio }, metadata: studio }]);
