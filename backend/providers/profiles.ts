@@ -13,7 +13,11 @@ const resolutions: Record<string, string[]> = {
   "grok-imagine-image-quality": [],
   "grok-imagine-video": ["480p", "720p"],
   "grok-imagine-video-1.5": ["480p", "720p", "1080p"],
+  "grok-imagine-video-1.5-lite": ["480p", "720p", "1080p"],
 };
+// Video 1.5 and its Lite tier make sound unless asked not to; only 1.5 pins a last frame.
+const takesSound = (model: string) => model.startsWith("grok-imagine-video-1.5");
+const takesLastFrame = (model: string) => model === "grok-imagine-video-1.5";
 // The size a model draws for each ratio at each of its resolutions, where known. xAI publishes
 // none; Grok Imagine Image 2.0's are Runware's model schema, matching sizes returned by xAI.
 const nativeSizes: Record<string, Record<string, Record<string, [number, number]>>> = {
@@ -105,7 +109,12 @@ export function studioCloudProfiles(options: ProfileOptions) {
               workflow: workflow.profileId,
               defaults,
               aspects: resolutions[model]?.length ? aspectPresets(model) : [],
-              capabilities: { ...workflow.capabilities, inpaint: false, lora: false },
+              capabilities: {
+                ...workflow.capabilities,
+                inpaint: false,
+                lora: false,
+                sound: takesSound(model),
+              },
               // The model's own resolutions, which the size chip offers beside its aspects.
               options: {
                 ...workflow.options,
@@ -131,7 +140,9 @@ export function studioCloudProfiles(options: ProfileOptions) {
         status: 403,
       });
     const references = (input.referenceAssets || []).filter((item: Value) => item.assetId);
-    const referenceId = references[0]?.assetId;
+    // A video's "end" slot is its last frame; any other reference is the first frame or the edit.
+    const lastFrameId = references.find((item: Value) => item.slot === "end")?.assetId;
+    const referenceId = references.find((item: Value) => item.slot !== "end")?.assetId;
     const workflow = workflowFor(profile.id)!;
     const selectedMode = workflow.imageModes?.[referenceId ? "reference" : "generate"] || workflow;
     const defaults = {
@@ -144,7 +155,10 @@ export function studioCloudProfiles(options: ProfileOptions) {
       profile.kind,
       selectedMode.defaults?.model || profile.baseModel,
     );
-    if (references.length > 1) throw new Error("This cloud provider accepts one reference image.");
+    if (references.length > (lastFrameId ? 2 : 1))
+      throw new Error("This cloud provider accepts one reference image.");
+    if (lastFrameId && !takesLastFrame(model))
+      throw new Error("Only Grok Imagine Video 1.5 pins a last frame.");
     if (input.inpaint) throw new Error("This cloud profile does not support masking.");
     if (input.loras?.some((item: Value) => item.enabled !== false))
       throw new Error("This cloud profile does not support LoRAs.");
@@ -157,17 +171,24 @@ export function studioCloudProfiles(options: ProfileOptions) {
     const duration = Number(input.duration ?? defaults.duration);
     if (profile.kind === "video" && (!Number.isInteger(duration) || duration < 1 || duration > 15))
       throw new Error("Video duration must be between 1 and 15 seconds.");
-    let reference: Uint8Array | undefined;
-    if (referenceId) reference = await options.reference(account, referenceId);
-    let width = Number(input.width ?? defaults.width);
-    let height = Number(input.height ?? defaults.height);
-    if (reference) {
-      const { data, info } = await sharp(reference)
+    const prepared = async (id: string) =>
+      sharp(await options.reference(account, id))
         .rotate()
         .resize(referenceEdge, referenceEdge, { fit: "inside", withoutEnlargement: true })
         // JPEG keeps the inline request under Grok's body limit, which a 2048 px PNG exceeds.
         .jpeg({ quality: 90 })
         .toBuffer({ resolveWithObject: true });
+    let width = Number(input.width ?? defaults.width);
+    let height = Number(input.height ?? defaults.height);
+    let reference: Uint8Array | undefined;
+    let lastFrame: Uint8Array | undefined;
+    if (lastFrameId) {
+      const { data, info } = await prepared(lastFrameId);
+      lastFrame = data;
+      ({ width, height } = info);
+    }
+    if (referenceId) {
+      const { data, info } = await prepared(referenceId);
       reference = data;
       // A first frame gives the video its shape.
       if (profile.kind === "video") ({ width, height } = info);
@@ -190,6 +211,8 @@ export function studioCloudProfiles(options: ProfileOptions) {
       resolution,
       count,
       ...(reference ? { reference } : {}),
+      ...(lastFrame ? { lastFrame } : {}),
+      ...(takesSound(model) && input.sound === false ? { sound: false } : {}),
     };
   }
   return {

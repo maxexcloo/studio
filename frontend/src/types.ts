@@ -133,6 +133,8 @@ export interface GenerationInput extends Record<string, unknown> {
   weightDtype?: string;
   /** The size tier; width and height give only the shape where it applies (shared/resolution.ts). */
   resolutionTier?: Resolution;
+  /** False makes a silent video where the profile makes sound (`capabilities.sound`). */
+  sound?: boolean;
   /** The backend a combined profile runs on; the profile's current one when absent. */
   profileBackend?: string;
 }
