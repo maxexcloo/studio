@@ -223,6 +223,20 @@ function cleanCataloguePatch(patch, { provenance = false } = {}) {
           strength.min >= strength.max
         )
           throw new Error("strength.min must be below strength.max.");
+        if (
+          strength.default !== undefined &&
+          (strength.default < (strength.min ?? -Infinity) ||
+            strength.default > (strength.max ?? Infinity))
+        )
+          throw new Error("strength.default must lie between strength.min and strength.max.");
+        if (
+          strength.step !== undefined &&
+          (strength.step <= 0 ||
+            strength.step > (strength.max ?? Infinity) - (strength.min ?? -Infinity))
+        )
+          throw new Error(
+            "strength.step must be above 0 and fit between strength.min and strength.max.",
+          );
         clean.strength = strength;
         break;
       }

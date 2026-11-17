@@ -1,5 +1,5 @@
 import { cardKinds, maxCardDescription, maxCardName } from "../shared/characters.ts";
-import { loraCompatibility, loraName } from "../shared/profiles.ts";
+import { loraCompatibility, loraName, loraStrengthRange } from "../shared/profiles.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { maxSuggestions } from "../shared/suggestions.ts";
 import { replyTitle } from "../shared/titles.ts";
@@ -369,15 +369,16 @@ const one = (value, limit = 600) =>
     .slice(0, limit);
 const isRole = (info) => ["acceleration", "supporting"].includes(info?.role) || info?.hidden;
 
-/** A LoRA's suggested strength: the publisher's default, a "Strength 0.7" note, else 1. */
+/** A LoRA's suggested strength: the publisher's recommendation, a "Strength 0.7" note, else 1. */
 function suggestedStrength(info) {
-  const range = strengthRange(info);
-  if (range?.default !== undefined) return range.default;
   const noted = Number(
     /strength\s*:?\s*(-?\d+(?:\.\d+)?)/i.exec(`${info?.note || ""} ${info?.guidance || ""}`)?.[1],
   );
-  if (Number.isFinite(noted) && noted >= -10 && noted <= 10) return noted;
-  return 1;
+  return (
+    info?.recommendedStrength ??
+    info?.strengthRange?.default ??
+    (Number.isFinite(noted) ? noted : 1)
+  );
 }
 
 /**
@@ -409,10 +410,8 @@ export function preFilterLoras({ profile, prompt, loras = [], liked = [], limit 
 }
 
 const suggestion = ({ name, info }, reason, strength = suggestedStrength(info)) => {
-  const range = strengthRange(info);
-  const bounded = range
-    ? Math.min(range.max, Math.max(range.min, strength))
-    : Math.min(4, Math.max(-4, strength));
+  const { min, max } = loraStrengthRange(info);
+  const bounded = Math.min(max, Math.max(min, strength));
   return {
     name,
     title: loraName(name, info),

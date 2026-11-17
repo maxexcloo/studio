@@ -1,8 +1,10 @@
 import {
   Button,
   Checkbox,
+  Chip,
   Divider,
   Group,
+  Input,
   MultiSelect,
   NumberInput,
   SegmentedControl,
@@ -16,7 +18,13 @@ import { ChevronDown, X } from "lucide-react";
 import { useState } from "react";
 
 import { compareVariants } from "../../../../shared/compare";
-import { loraDefaultStrength, loraName } from "../../../../shared/profiles";
+import {
+  loraDefaultStrength,
+  loraName,
+  loraStrengthChoices,
+  loraStrengthRange,
+  loraStrengthSweep,
+} from "../../../../shared/profiles";
 import {
   type Resolution,
   availableResolutions,
@@ -53,8 +61,6 @@ import {
 } from "./variants";
 
 const noChoices: string[] = [];
-const defaultStrengths = [0, 0.6, 0.8, 1];
-const strengthOptions = [0, 0.4, 0.6, 0.8, 1, 1.2];
 const axes = ["Model", "LoRA", "LoRA Strength", "Resolution", "Seed", "Prompt"];
 
 const modelName = (name: string) =>
@@ -74,7 +80,7 @@ export function CompareMenu() {
   const [models, setModels] = useRemembered("compare-models", noChoices);
   const [loras, setLoras] = useRemembered("compare-loras", noChoices);
   const [withoutLora, setWithoutLora] = useRemembered("compare-without-lora", true);
-  const [strengths, setStrengths] = useRemembered("compare-strengths", defaultStrengths);
+  const [savedStrengths, setStrengths] = useRemembered<number[] | null>("compare-strengths", null);
   const [loraFile, setLoraFile] = useRemembered("compare-strength-lora", "");
   const [sizes, setSizes] = useRemembered("compare-resolutions", noChoices);
   const [seeds, setSeeds] = useRemembered("compare-seeds", "4");
@@ -95,6 +101,14 @@ export function CompareMenu() {
     .map((file) => ({ value: file, label: loraName(file, info[file]) }))
     .sort((a, b) => a.label.localeCompare(b.label));
   const selectedLoras = compatible.filter((file) => loras.includes(file));
+  // Only strengths the LoRA accepts; picks made for another range give way to its default sweep.
+  const strengthChoices = loraStrengthChoices(info[loraFile]);
+  const strengths =
+    savedStrengths &&
+    savedStrengths.every((value) => value === 0 || strengthChoices.includes(value))
+      ? savedStrengths
+      : loraStrengthSweep(info[loraFile]);
+  const strengthRange = loraStrengthRange(info[loraFile]);
   const native = effective?.options?.resolutions ?? [];
   const sizeOptions = (native.length ? native : availableResolutions(effective, input)).map(
     (value) => ({ value, label: value.toUpperCase() }),
@@ -128,7 +142,7 @@ export function CompareMenu() {
           name,
           strength:
             input.loras.find((lora) => lora.name === name)?.strength ??
-            loraDefaultStrength(info[name], 1),
+            loraDefaultStrength(info[name]),
         })),
         withoutLora,
       );
@@ -230,16 +244,26 @@ export function CompareMenu() {
               allowDeselect={false}
               nothingFoundMessage="No compatible LoRAs"
             />
-            <MultiSelect
-              label="Strengths"
-              data={strengthOptions.map((strength) => ({
-                value: String(strength),
-                label: strength ? String(strength) : "Without LoRA",
-              }))}
-              value={strengths.map(String)}
-              onChange={(values) => setStrengths(values.map(Number).sort((a, b) => a - b))}
-              comboboxProps={{ withinPortal: false }}
-            />
+            {compatible.includes(loraFile) && (
+              <Input.Wrapper
+                label="Strengths"
+                description={`Supports ${strengthRange.min} to ${strengthRange.max}.`}
+              >
+                <Chip.Group
+                  multiple
+                  value={strengths.map(String)}
+                  onChange={(values) => setStrengths(values.map(Number).sort((a, b) => a - b))}
+                >
+                  <Group gap={6} mt={6} role="group" aria-label="Strengths">
+                    {[0, ...strengthChoices].map((strength) => (
+                      <Chip key={strength} value={String(strength)} size="xs" variant="light">
+                        {strength ? strength : "Without LoRA"}
+                      </Chip>
+                    ))}
+                  </Group>
+                </Chip.Group>
+              </Input.Wrapper>
+            )}
           </>
         )}
         {axis === "Resolution" && (

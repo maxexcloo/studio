@@ -1,4 +1,9 @@
-import { loraCompatibility, loraRoles, loraTypes } from "../../shared/profiles.ts";
+import {
+  loraCompatibility,
+  loraRoles,
+  loraStrengthIssue,
+  loraTypes,
+} from "../../shared/profiles.ts";
 import { strengthRange } from "./policy.js";
 
 /** Name-refined models of the same kind share their parent family's adapter layout. */
@@ -196,8 +201,5 @@ export function optionalLoraPolicyIssue(item, info, profile) {
       ? `${info?.title || item.name} is for ${family}, not ${profile?.displayName || profile?.label || "this model"}. Remove it from the optional LoRA stack to generate.`
       : `${info?.title || item.name} does not support this model or conditioning variant. Remove it from the optional LoRA stack to generate.`;
   }
-  const range = strengthRange(info);
-  if (range && (item.strength < range.min || item.strength > range.max))
-    return `${info?.title || item.name} supports strength ${range.min} to ${range.max}. Choose a value in that published range.`;
-  return "";
+  return loraStrengthIssue(info, item.strength, item.name);
 }
