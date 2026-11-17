@@ -530,7 +530,7 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   await page.getByRole("button", { name: "View B", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "B", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
   await showView(page, "History");
   // Calibration hears of a disliked image before the rating hides it.
   await expect.poll(() => dream.requests.length).toBe(5);
@@ -860,7 +860,7 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   await showView(page, "Deck");
   await expect(pair).toBeVisible();
   await page.getByRole("button", { name: "B", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
   await showView(page, "History");
   await expect
     .poll(() => dream.requests)
