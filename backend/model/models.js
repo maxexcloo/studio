@@ -10,7 +10,11 @@ import {
 import { families } from "../family-catalogue.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
 import { canonicalProfileId } from "../profile/store.js";
-import { radianceImageLimits, radianceImageNode } from "../providers/radiance.ts";
+import {
+  radianceImageLimits,
+  radianceImageNode,
+  radianceVideoLimits,
+} from "../providers/radiance.ts";
 import { classifyModel } from "./families.js";
 
 function modelBasename(name = "") {
@@ -371,6 +375,13 @@ export function inferModels(
         max: Math.min(362, Number(frameRange.max) || 362),
         step: 17,
         offset: 5,
+      });
+      Object.assign(fpsRange, { default: 24, min: 24, max: 24, step: 1 });
+    }
+    if (loraFamilyId(workflow.family) === "ltx2") {
+      Object.assign(frameRange, {
+        ...radianceVideoLimits(String(defaults.model || "")).frames,
+        default: Number(defaults.frames || 121),
       });
       Object.assign(fpsRange, { default: 24, min: 24, max: 24, step: 1 });
     }
