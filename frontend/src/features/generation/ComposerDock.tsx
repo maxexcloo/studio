@@ -18,21 +18,24 @@ export const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLa
  * passes what it needs from its history state, so stepping through the viewer doesn't render it.
  */
 export const ComposerDock = memo(function ComposerDock({
+  compose,
   shared,
   opening,
   onDropState,
   onKindChange,
   onCompared,
 }: {
+  /** Keeps the composer open (`?compose=1`) until it closes. */
+  compose: boolean;
   /** An image shared to the installed app. */
   shared: string;
-  /** A request to open the composer, focusing its prompt for `useOpenComposer`. */
-  opening?: { focus: boolean };
-  onDropState: (name: "shared") => void;
+  /** The key of a navigation from `useOpenComposer`, asking the composer to open. */
+  opening: string;
+  onDropState: (name: "compose" | "shared") => void;
   onKindChange: (kind: MediaKind) => void;
   onCompared: (comparisonId: string) => void;
 }) {
-  const [opened, { open, close }] = useDisclosure(false);
+  const [opened, { open, close }] = useDisclosure(compose);
   // The compact bar stays under the expanded panel until it has slid in, so nothing blinks and
   // keystrokes typed meanwhile land in the shared draft.
   const [expanded, setExpanded] = useState(opened);
@@ -108,13 +111,16 @@ export const ComposerDock = memo(function ComposerDock({
   );
   const dockKeyboard = useKeyboard(typingInDock);
   const keyboardInset = dockKeyboard.inset;
+  useEffect(() => {
+    if (compose) open();
+  }, [compose, open]);
   // An action staging a draft (`useOpenComposer`) opens the composer with its prompt focused, even
   // when it is already open; phones bring up the sheet and leave the keyboard down.
   useEffect(() => {
     if (!opening) return;
-    if (opening.focus) focusIntent.current = "[data-expanded-prompt]";
+    focusIntent.current = "[data-expanded-prompt]";
     open();
-    if (phone || !opening.focus) return;
+    if (phone) return;
     const frame = requestAnimationFrame(() =>
       dock.current
         ?.querySelector<HTMLElement>("[data-expanded-prompt]")
@@ -136,6 +142,7 @@ export const ComposerDock = memo(function ComposerDock({
     setTappedField(false);
     close();
     setExpanded(false);
+    if (compose) onDropState("compose");
   }
   const submitted = () => collapse();
   // A layer over the composer (a dialog, popup or picker) is not outside it, unless it is the

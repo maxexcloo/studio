@@ -160,15 +160,14 @@ function Gallery() {
     setQuery(linkedQuery);
     dropState("q");
   }, [linkedQuery, dropState]);
-  // A request to open the composer is taken once, so a reload doesn't repeat it: `?compose=1`
-  // opens it, and `useOpenComposer` also focuses its prompt.
-  const [opening, setOpening] = useState<{ focus: boolean }>();
-  const openRequest = state?.openComposer ? "focus" : state?.compose ? "open" : "";
+  // `useOpenComposer`'s request to open the composer and focus its prompt is taken once, so a
+  // reload doesn't repeat it; `compose` keeps the composer open through a reload until it closes.
+  const [opening, setOpening] = useState("");
+  const openRequest = state?.openComposer ? location.key : "";
   useEffect(() => {
     if (!openRequest) return;
-    setOpening({ focus: openRequest === "focus" });
+    setOpening(openRequest);
     dropState("openComposer");
-    dropState("compose");
   }, [openRequest, dropState]);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const client = useQueryClient();
@@ -720,6 +719,7 @@ function Gallery() {
       <MorePages listing={gallery} results={JSON.stringify(listingKey)} paused={!!itemId} />
       {!selection.selecting && (
         <ComposerDock
+          compose={!!state?.compose}
           shared={state?.shared || ""}
           opening={opening}
           onDropState={dropState}
