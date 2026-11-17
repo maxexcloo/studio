@@ -145,19 +145,26 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
       throw error;
     }
     contextFailures.delete(worker.id);
-    // Radiance shares ComfyUI's LoRA folder. Its native per-model inventory endpoint would
-    // load a cold model, so catalogue reads use the model library's saved installed inventory.
-    const library = modelLibraryWorker();
-    const installed =
-      library && (contextFor(library.id).info || store.workerModels(library.id, library.url)?.info);
+    // Radiance's native per-model inventory endpoint would load a cold model.
     const result = {
-      info: radianceInfo(models, optionsFor(installed, "LoraLoader", "lora_name")),
+      info: radianceInfo(models, installedLoras()),
       stats: { radiance: models },
       fetchedAt: Date.now(),
     };
     contextCaches.set(worker.id, result);
     store.saveWorkerModels(worker.id, worker.url, { info: result.info, stats: result.stats });
     return result;
+  }
+
+  /**
+   * The installed LoRAs: the model library worker's latest list, else its last stored one wherever
+   * it was observed. Every worker loads LoRAs from that shared folder, so they stay listed while its
+   * ComfyUI is parked or has moved; nothing here waits on a worker.
+   */
+  function installedLoras() {
+    const library = modelLibraryWorker();
+    const info = library && (contextFor(library.id).info || store.workerModels(library.id)?.info);
+    return optionsFor(info, "LoraLoader", "lora_name");
   }
 
   /** What to say when worker `backend`'s ComfyUI does not answer. */
@@ -366,6 +373,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
   return {
     catalogueModels,
     comfyDownMessage,
+    installedLoras,
     latestComfyContext,
     loadComfyContext,
     mediaModels,

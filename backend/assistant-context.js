@@ -1,7 +1,6 @@
 import { isCloudProfile } from "../shared/profiles.ts";
 import { ownedQuery, recordBelongsToRequest } from "./account-ownership.js";
 import { downscaleReferences } from "./assistant-routes.js";
-import { optionsFor } from "./comfy/comfy.js";
 import { logWarning } from "./crash-log.js";
 import { families } from "./family-catalogue.js";
 import { galleryItems } from "./gallery/store.js";
@@ -13,10 +12,10 @@ import { defaultWorkerId } from "./workers.js";
 
 /**
  * What the prompt assistant reads for an account: its profiles, their prompting guides, its LoRAs,
- * its liked prompts and reference images. `catalogueModels` and `loadComfyContext` are
+ * its liked prompts and reference images. `catalogueModels` and `installedLoras` are
  * model/catalogue.js's.
  */
-export function createAssistantContext({ catalogueModels, loadComfyContext }) {
+export function createAssistantContext({ catalogueModels, installedLoras }) {
   const guides = (() => {
     try {
       return livePrompting();
@@ -35,11 +34,7 @@ export function createAssistantContext({ catalogueModels, loadComfyContext }) {
   const loras = async (req) => {
     if (!accountMayUseLoras(req)) return [];
     try {
-      const names = optionsFor(
-        (await loadComfyContext(defaultWorkerId())).info,
-        "LoraLoader",
-        "lora_name",
-      ).filter(loraAllowed(req.studioAccount));
+      const names = installedLoras().filter(loraAllowed(req.studioAccount));
       const infos = await loraInfos(defaultWorkerId(), names);
       return names.map((name) => ({ name, info: infos[name] || { families: [], triggers: [] } }));
     } catch {

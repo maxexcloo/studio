@@ -298,6 +298,7 @@ const catalogue = createModelCatalogue({ store, runtime, directCloud });
 const {
   catalogueModels,
   comfyDownMessage,
+  installedLoras,
   latestComfyContext,
   loadComfyContext,
   mediaModels,
@@ -553,7 +554,7 @@ registerProfileRoutes(app, {
 
 // The prompt assistant (assistant-routes.js): account-scoped, behind the Prompt Assistant feature,
 // reading what an account may use (assistant-context.js).
-const assistant = createAssistantContext({ catalogueModels, loadComfyContext });
+const assistant = createAssistantContext({ catalogueModels, installedLoras });
 // The gateway lists only running models; those of stopped workloads serving text are choices too.
 const workloadModels = () =>
   (runtime?.controller.workloads || [])
@@ -584,7 +585,7 @@ registerGalleryReadRoutes(app, {
   similar: (item, strictness) => imageSearch.similar(item, strictness),
 });
 
-registerLoraRoutes(app, { comfyDownMessage, latestComfyContext });
+registerLoraRoutes(app, { installedLoras });
 
 // Taste profiles (domain/taste.ts) learn from likes and dislikes, compare votes and iterations on a result.
 // A gone or disabled account's prompts never reach the text model.
