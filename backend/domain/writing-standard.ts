@@ -8,9 +8,13 @@
 export const precedence =
   "Where these instructions disagree, the model's prompting guide decides the length and format for its mode, the chosen style or theme decides the tone, and the person's own wording wins over both.";
 
+/** Generation models read and voice American English; other spellings read and sound wrong to them. */
+export const americanEnglish =
+  "Write prompt text in American English (color, gray, center), whatever spelling the input or these instructions use; quoted text stays as written.";
+
 /** What the writer may add: only what the input states or implies. */
 export const fidelity =
-  "Ground every detail in the input and any image: never add subjects or objects, or invent specific clothing, colours or materials, that the person didn't ask for or clearly imply.";
+  "Ground every detail in the input and any image: never add subjects or objects, or invent specific clothing, colors or materials, that the person didn't ask for or clearly imply.";
 
 /** A person's description stays word for word, so a subject looks the same from prompt to prompt. */
 export const keepDescriptions =
