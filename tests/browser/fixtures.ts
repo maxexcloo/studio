@@ -995,7 +995,7 @@ export async function viewerPromptAssist(page: Page) {
   return viewer.getByRole("button", { name: phone ? "AI Prompt Actions" : "AI", exact: true });
 }
 
-/** Opens the viewer prompt's assistance menu (a full-screen sheet on phones). */
+/** Opens the viewer prompt's assistance menu. */
 export async function viewerPromptMenu(page: Page) {
   await (await viewerPromptAssist(page)).click();
   return page.getByRole("menu");

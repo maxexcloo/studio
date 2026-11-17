@@ -1,13 +1,11 @@
 import {
   ActionIcon,
   Button,
-  CloseButton,
   FocusTrap,
   Loader,
   Menu,
   Modal,
   type ModalProps,
-  Text,
   Textarea,
   type TextareaProps,
   Tooltip,
@@ -36,7 +34,7 @@ import { useCopy } from "./clipboard";
 import { icons } from "./icons";
 import { layerAbove, popupLayer } from "./popupClicks";
 import { PopupTooltip } from "./PopupTooltip";
-import { useKeyboard, useKeyboardDrop } from "./useKeyboard";
+import { useKeyboard, useKeyboardDrop, useVisibleRect } from "./useKeyboard";
 import { usePhone } from "./usePhone";
 
 import classes from "./TextBox.module.css";
@@ -216,12 +214,17 @@ export function TextBox({
       </ActionIcon>
     </Tooltip>
   );
+  const visible = useVisibleRect(menuOpened);
+  const bounds = { padding: 12, rootBoundary: visible ?? ("viewport" as const) };
   const menu = !menuless && tools !== undefined && (
     <Menu
-      position="top-end"
+      // In place, the button stands at the text's top, so the menu drops from it.
+      position={mobile && inline ? "bottom-end" : "top-end"}
       width={menuWidth}
-      // A long list scrolls within the room the page leaves it.
-      middlewares={{ size: true }}
+      // A long list scrolls within the visible room, above a phone's keyboard and toolbar.
+      middlewares={{ flip: bounds, shift: bounds, size: bounds }}
+      // Compact rows, as on desktop, keep the list short on a phone.
+      styles={{ item: { minHeight: 36 } }}
       // Above any dialog holding the box: a card's sits over the popovers it opens from.
       zIndex={getDefaultZIndex("max")}
       opened={menuOpened}
@@ -230,20 +233,23 @@ export function TextBox({
         openedFrom.current = document.activeElement;
         tools.forEach((tool) => tool.onOpen?.());
       }}
-      // An item that moves focus itself keeps it; otherwise it returns.
+      // An item that moves focus itself keeps it; otherwise it returns, to the text where the menu
+      // opened from it.
       returnFocus={false}
       onClose={() =>
         setTimeout(() => {
           const active = document.activeElement;
+          const from = openedFrom.current;
           if (
             !active ||
             active === document.body ||
-            (ai &&
-              !editing &&
-              openedFrom.current?.tagName !== "TEXTAREA" &&
-              active === openedFrom.current)
+            (ai && !editing && from?.tagName !== "TEXTAREA" && active === from)
           )
-            more.current?.focus({ preventScroll: true });
+            (
+              (from?.tagName === "TEXTAREA" && from.isConnected
+                ? from
+                : more.current) as HTMLElement | null
+            )?.focus({ preventScroll: true });
         })
       }
     >
@@ -286,50 +292,25 @@ export function TextBox({
           )}
         </Menu.Target>
       </PopupTooltip>
-      {/* Phones show the menu as a full-screen sheet: its title and Close, then the tools. */}
-      <Menu.Dropdown
-        className={mobile ? classes.sheet : undefined}
-        // Opaque, unlike the glass theme surface, so the editor never shows through.
-        style={
-          mobile
-            ? {
-                background: "var(--mantine-color-body)",
-                backdropFilter: "none",
-                WebkitBackdropFilter: "none",
-                boxShadow: "none",
-              }
-            : { overflowY: "auto" }
-        }
-      >
-        {mobile && (
-          <div className={classes.sheetHeader}>
-            <Text fw={600}>{ai ? "AI" : "More"}</Text>
-            <CloseButton
-              aria-label={`Close ${ai ? "AI" : "More"}`}
-              onClick={() => setMenuOpened(false)}
-            />
-          </div>
-        )}
-        <div className={mobile ? classes.sheetBody : undefined}>
-          {listed.map((tool, index) => (
-            <Fragment key={tool.id}>
-              {index > 0 && <Menu.Divider />}
-              {!tool.menu!.flat().some((option) => option.heading) && (
-                <Menu.Label>{tool.label}</Menu.Label>
+      <Menu.Dropdown style={{ overflowY: "auto" }}>
+        {listed.map((tool, index) => (
+          <Fragment key={tool.id}>
+            {index > 0 && <Menu.Divider />}
+            {!tool.menu!.flat().some((option) => option.heading) && (
+              <Menu.Label>{tool.label}</Menu.Label>
+            )}
+            <ActionMenuItems
+              groups={tool.menu!.map((group) =>
+                group.map((option) => ({
+                  ...option,
+                  disabled: option.disabled || tool.disabled,
+                })),
               )}
-              <ActionMenuItems
-                groups={tool.menu!.map((group) =>
-                  group.map((option) => ({
-                    ...option,
-                    disabled: option.disabled || tool.disabled,
-                  })),
-                )}
-              />
-            </Fragment>
-          ))}
-          {listed.length > 0 && others.length > 0 && <Menu.Divider />}
-          <ActionMenuItems groups={[others]} />
-        </div>
+            />
+          </Fragment>
+        ))}
+        {listed.length > 0 && others.length > 0 && <Menu.Divider />}
+        <ActionMenuItems groups={[others]} />
       </Menu.Dropdown>
     </Menu>
   );

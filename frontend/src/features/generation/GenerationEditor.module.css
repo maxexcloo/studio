@@ -41,7 +41,7 @@
 }
 
 .editor[data-fill] .fields {
-  overflow: hidden;
+  overflow: clip;
 }
 
 .editor[data-fill] .footer {

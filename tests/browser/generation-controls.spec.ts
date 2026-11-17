@@ -840,8 +840,8 @@ test("Phone prompt boxes copy and undoably clear in place; desktop leaves both t
   );
   await page.keyboard.type(" at dusk");
   await expect(prompt).toHaveValue("A lantern in fog at dusk");
-  // Typing shows only the text, its tools in its corner, and the action bar.
-  await expect(generate.getByRole("button", { name: "Close Generate", exact: true })).toBeHidden();
+  // Typing shows the text, its tools in its corner, the action bar and Close.
+  await expect(generate.getByRole("button", { name: "Close Generate", exact: true })).toBeVisible();
   await expect(generate.getByRole("group", { name: "Prompt Tools", exact: true })).toBeVisible();
   await expect(generate.locator("[data-text-editor]", { has: prompt })).toBeVisible();
   await expect(
@@ -1028,6 +1028,91 @@ test("The phone Generate sheet fits the screen and keeps Generate above the keyb
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.prompt).toContain("A copper fox");
   await expect(sheet).toBeHidden();
+});
+
+test("Typing in the phone Generate sheet keeps Close, the bar in place and the tools off the text", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Phones only");
+  await fixtures(page);
+  await page.goto("/images");
+  await page.locator("[data-composer-prompt]").click();
+  const sheet = page.getByRole("dialog", { name: "Generate", exact: true });
+  const prompt = sheet.getByRole("textbox", { name: "Prompt", exact: true });
+  const bar = sheet.getByRole("group", { name: "Generation Actions", exact: true });
+  const bottom = async () => {
+    const box = (await bar.boundingBox())!;
+    return Math.round(box.y + box.height);
+  };
+  await expect(prompt).toBeVisible();
+  const resting = await bottom();
+  expect(resting).toBeLessThanOrEqual(page.viewportSize()!.height);
+  await prompt.click();
+  await prompt.fill("A copper fox in a misty forest at dawn, cinematic light, ".repeat(20));
+  // Focus moves nothing but the text: the bar ends where it did.
+  await expect.poll(bottom).toBe(resting);
+  // The prompt's tools stand above its lines, never over them, even scrolled to its end.
+  await prompt.evaluate((text) => (text.scrollTop = text.scrollHeight));
+  const tools = (await sheet
+    .getByRole("group", { name: "Prompt Tools", exact: true })
+    .boundingBox())!;
+  const text = (await prompt.boundingBox())!;
+  expect(tools.y + tools.height).toBeLessThanOrEqual(text.y + 1);
+  // Close stays in sight while typing, and Escape closes too.
+  const close = sheet.getByRole("button", { name: "Close Generate", exact: true });
+  await expect(close).toBeInViewport({ ratio: 1 });
+  await close.click();
+  await expect(sheet).toBeHidden();
+  await page.locator("[data-composer-prompt]").click();
+  await prompt.click();
+  await expect(prompt).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+});
+
+test("A phone prompt's AI menu lets the keyboard go and fits above it", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Phones only");
+  await fixtures(page);
+  await page.goto("/images");
+  await page.locator("[data-composer-prompt]").click();
+  const sheet = page.getByRole("dialog", { name: "Generate", exact: true });
+  const prompt = sheet.getByRole("textbox", { name: "Prompt", exact: true });
+  await prompt.click();
+  await prompt.fill("A bird");
+  // The keyboard covers the bottom 300 px.
+  const visible = await page.evaluate(() => {
+    const height = window.innerHeight - 300;
+    Object.defineProperty(window.visualViewport, "height", {
+      get: () => height,
+      configurable: true,
+    });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+    return height;
+  });
+  const menu = await promptMenu(sheet, "Prompt");
+  await expect(menu).toBeVisible();
+  // A menu, not a full-screen sheet, within the room above the keyboard; the text lets the
+  // keyboard go while it is open.
+  await expect(prompt).not.toBeFocused();
+  await expect
+    .poll(async () => {
+      const box = (await menu.boundingBox())!;
+      return box.y >= 0 && box.y + box.height <= visible;
+    })
+    .toBe(true);
+  await menu.getByRole("menuitem", { name: "Improve Prompt", exact: true }).click();
+  await expect(menu).toBeHidden();
+  await expect(prompt).toHaveValue("A cinematic amber bird");
+  await expect(prompt).toBeFocused();
+  // Escape closes only the menu, and the text takes focus back.
+  await promptMenu(sheet, "Prompt");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(sheet).toBeVisible();
+  await expect(prompt).toBeFocused();
 });
 
 test("Composer popups on a tablet open with the keyboard down", async ({ page }, testInfo) => {
