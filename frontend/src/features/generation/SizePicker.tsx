@@ -9,10 +9,11 @@ import {
   Text,
 } from "@mantine/core";
 import { ChevronDown, RectangleHorizontal } from "lucide-react";
+import { useState } from "react";
 
 import {
-  type Resolution,
   availableResolutions,
+  isResolution,
   orderedAspects,
   resolutionSize,
   selectedResolution,
@@ -49,11 +50,6 @@ export function SizePicker({
   const aspect = framed ? `${framed.width / common}:${framed.height / common}` : "";
   const choices = availableResolutions(profile, input);
   const tier = selectedResolution(input, profile);
-  const tiered = Boolean(tier);
-  const at = (size: Size) => {
-    const { width, height } = resolutionSize({ width: size.w, height: size.h }, tier!, profile);
-    return { w: width, h: height };
-  };
   // A model with its own resolutions (Grok's 1K or 2K, 480p to 1080p) takes the shape from the
   // aspect and the size from its resolution: a preset shows the size it draws there where known.
   const native = profile?.options?.resolutions || [];
@@ -62,24 +58,54 @@ export function SizePicker({
       profile?.defaults?.resolution ||
       (input.kind === "video" ? "720p" : Math.max(input.width, input.height) > 1024 ? "2k" : "1k"),
   );
-  const tiers = native.length
-    ? native.map((value) => ({ value, label: value.toUpperCase() }))
-    : choices.length
-      ? [{ value: "pixels", label: "Custom" }, ...choices]
-      : [];
-  const sized = (preset: (typeof presets)[number]): Size | undefined =>
-    tiered ? at(preset) : native.length ? preset.sizes?.[nativeResolution] : preset;
+  // One tab per resolution the presets draw at (a single one reads Presets), then Custom's own
+  // width and height where the model takes any size.
+  const views: string[] = native.length ? native : choices.length ? choices : ["presets"];
+  const tabs = [
+    ...(presets.length
+      ? views.map((value) => ({
+          value,
+          label: views.length > 1 ? value.toUpperCase() : "Presets",
+        }))
+      : []),
+    ...(native.length ? [] : [{ value: "custom", label: "Custom" }]),
+  ];
+  const sizeAt = (preset: Size, view: string): Size | undefined => {
+    if (native.length) return (preset as (typeof presets)[number]).sizes?.[view];
+    if (!isResolution(view)) return preset;
+    const { width, height } = resolutionSize({ width: preset.w, height: preset.h }, view, profile);
+    return { w: width, h: height };
+  };
   const current = { w: input.width, h: input.height };
+  const same = (a: Size | undefined, b: Size) => a?.w === b.w && a?.h === b.h;
   // A preset of the current shape is the active one; the exact size is in the title.
   const active = presets.find((preset) => preset.w * current.h === preset.h * current.w);
-  const shown = (active && native.length && sized(active)) || (tiered ? at(current) : current);
+  // The view whose preset draws the current size, explicitly or by matching it exactly.
+  const matched = native.length
+    ? nativeResolution
+    : tier || views.find((view) => presets.some((preset) => same(sizeAt(preset, view), current)));
+  const shown =
+    (tier && sizeAt(current, tier)) ||
+    (active && native.length && sizeAt(active, matched!)) ||
+    current;
+  const opening = matched || "custom";
+  const [tab, setTab] = useState(opening);
+  const view = tabs.some((item) => item.value === tab) ? tab : opening;
   const label = framed
     ? `Reference · ${aspect}`
-    : active
-      ? `${active.label} · ${tiered ? tier : native.length ? nativeResolution.toUpperCase() : `${shown.w} × ${shown.h}`}`
-      : `${shown.w} × ${shown.h}`;
+    : active && matched && matched !== "presets"
+      ? `${active.label} · ${matched.toUpperCase()}`
+      : active
+        ? `${active.label} · ${shown.w} × ${shown.h}`
+        : `${shown.w} × ${shown.h}`;
   return (
-    <Popover position="top-start" width={300} trapFocus {...fittedPopup}>
+    <Popover
+      position="top-start"
+      width={300}
+      trapFocus
+      onOpen={() => setTab(opening)}
+      {...fittedPopup}
+    >
       <Popover.Target>
         <Button
           {...chipProps}
@@ -110,26 +136,43 @@ export function SizePicker({
           </Stack>
         ) : (
           <Stack gap="sm">
-            {tiers.length > 1 && (
+            {tabs.length > 1 && (
               <SegmentedControl
                 aria-label="Resolution"
                 fullWidth
-                value={native.length ? nativeResolution : tier || "pixels"}
-                onChange={(value) =>
-                  onChange(
-                    native.length
-                      ? { resolution: value }
-                      : { resolutionTier: value === "pixels" ? undefined : (value as Resolution) },
-                  )
-                }
-                data={tiers}
+                value={view}
+                onChange={(value) => {
+                  setTab(value);
+                  if (native.length) onChange({ resolution: value });
+                  else if (isResolution(value)) onChange({ resolutionTier: value });
+                  // Custom starts from the size drawn now.
+                  else if (value === "custom" && tier)
+                    onChange({ width: shown.w, height: shown.h, resolutionTier: undefined });
+                }}
+                data={tabs}
               />
             )}
-            {!!presets.length && (
+            {view === "custom" || !tabs.length ? (
+              <SimpleGrid cols={2} spacing="xs">
+                {(["width", "height"] as const).map((key) => (
+                  <NumberInput
+                    key={key}
+                    label={key === "width" ? "Width" : "Height"}
+                    value={input[key]}
+                    min={profile?.constraints?.[key]?.min}
+                    max={profile?.constraints?.[key]?.max}
+                    step={profile?.constraints?.[key]?.step}
+                    onChange={(value) =>
+                      onChange({ [key]: Number(value), resolutionTier: undefined })
+                    }
+                  />
+                ))}
+              </SimpleGrid>
+            ) : (
               <Stack gap={4} role="group" aria-label="Aspect Presets">
                 {presets.map((preset) => {
-                  const size = sized(preset);
-                  const selected = preset === active;
+                  const size = sizeAt(preset, view);
+                  const selected = preset === active && view === matched;
                   return (
                     <Button
                       key={preset.label}
@@ -146,7 +189,11 @@ export function SizePicker({
                         )
                       }
                       onClick={() =>
-                        onChange({ width: preset.w, height: preset.h, resolutionTier: tier })
+                        onChange({
+                          width: preset.w,
+                          height: preset.h,
+                          resolutionTier: isResolution(view) ? view : undefined,
+                        })
                       }
                     >
                       {preset.label}
@@ -154,23 +201,6 @@ export function SizePicker({
                   );
                 })}
               </Stack>
-            )}
-            {!tiered && !(native.length && presets.length) && (
-              <SimpleGrid cols={2} spacing="xs">
-                {(["width", "height"] as const).map((key) => (
-                  <NumberInput
-                    key={key}
-                    label={key === "width" ? "Width" : "Height"}
-                    value={input[key]}
-                    min={profile?.constraints?.[key]?.min}
-                    max={profile?.constraints?.[key]?.max}
-                    step={profile?.constraints?.[key]?.step}
-                    onChange={(value) =>
-                      onChange({ [key]: Number(value), resolutionTier: undefined })
-                    }
-                  />
-                ))}
-              </SimpleGrid>
             )}
           </Stack>
         )}
