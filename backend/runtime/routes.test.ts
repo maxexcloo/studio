@@ -105,6 +105,7 @@ test("administrator runtime routes preview, apply and report operations, with pl
   assert.equal((await send("/workloads/media/cancel-queue", {})).status, 503);
   controller.useQueue({
     load: () => ({ jobs: [], queued: 0 }),
+    waitingTier: () => Infinity,
     cancel: async () => ({ cancelled: 1, cancelling: 0 }),
     releaseStale: () => {},
     end: async () => {},
