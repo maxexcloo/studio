@@ -144,9 +144,10 @@ function applyRadianceLoraStack(graph, body, config) {
   const inputs = (node.inputs ||= {});
   const fixed = JSON.parse(inputs.loras || "[]");
   const chosen = enabledLoras(body, config.max);
-  // A run on the stack's own model (validation.js) takes the adapters that model needs first
-  // (a speed LoRA its default model has baked in).
-  const swapped = config.model && inputs.model === config.model;
+  // A run with LoRAs moves to the stack's own model (recorded by validation.js), with the adapters
+  // that model needs first (a speed LoRA its default model has baked in).
+  const swapped = chosen.length && config.model;
+  if (swapped) inputs.model = config.model;
   inputs.loras = JSON.stringify([
     ...fixed,
     ...(swapped ? config.loras || [] : []),
