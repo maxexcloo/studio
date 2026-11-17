@@ -14,7 +14,6 @@ import {
   MessagesSquare,
   Repeat,
   Rewind,
-  Scissors,
   Shuffle,
   Snail,
   SquareCheck,
@@ -77,7 +76,7 @@ import {
 import { useMediaRating } from "./useMediaRating";
 import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
-import { TrimVideoDialog, type VideoEdit, useVideoEdit } from "./videoEdits";
+import { type VideoEdit, useVideoEdit } from "./videoEdits";
 import { viewerItemId } from "./viewerLink";
 import type { PromptAssist, ViewerAsk } from "./ViewerPrompt";
 
@@ -262,7 +261,6 @@ interface MediaActionOptions {
   /** Opens Report's dialog. */
   onReport: () => void;
   onRetried?: (jobId: string) => void;
-  onTrim: () => void;
   onVersionChange?: (id: string, active: boolean) => void;
 }
 
@@ -284,7 +282,6 @@ export function useMediaActions(
     onDelete,
     onReport,
     onRetried,
-    onTrim,
     onVersionChange,
   }: MediaActionOptions,
 ): ActionGroups {
@@ -322,7 +319,7 @@ export function useMediaActions(
     id: string,
     label: string,
     icon: LucideIcon,
-    kind: Exclude<VideoEdit["kind"], "trim">,
+    kind: VideoEdit["kind"],
   ): Action => ({
     id,
     label: edited === `${item.id}:${kind}` ? "Saved as New Version" : label,
@@ -589,7 +586,6 @@ export function useMediaActions(
                   editAction("reverse", "Reverse", Rewind, "reverse"),
                   editAction("slow-motion", "Slow Motion", Snail, "slow"),
                   editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
-                  { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
                 ],
               ],
           last: image
@@ -764,18 +760,16 @@ export function useMediaActions(
 }
 
 /**
- * Animate's, Trim's and Report's dialogs for an item's actions: spread the handlers into its
+ * Animate's and Report's dialogs for an item's actions: spread the handlers into its
  * options and render `dialogs` where they outlive a closing menu.
  */
 export function useMediaDialogs(item: MediaItem, iterate?: (iteration: Iteration) => void) {
   const [animating, setAnimating] = useState<AnimateRequest | null>(null);
-  const [trimming, setTrimming] = useState(false);
   const [reporting, setReporting] = useState(false);
   return {
     handlers: {
       onAnimate: setAnimating,
       onReport: () => setReporting(true),
-      onTrim: () => setTrimming(true),
     },
     dialogs: (
       <>
@@ -787,7 +781,6 @@ export function useMediaDialogs(item: MediaItem, iterate?: (iteration: Iteration
             onClose={() => setAnimating(null)}
           />
         )}
-        {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
         {reporting && (
           <ReportIssueDialog item={item} iterate={iterate} onClose={() => setReporting(false)} />
         )}
