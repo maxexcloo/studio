@@ -19,6 +19,7 @@ import { adminRefusal } from "../route-access.js";
 import { galleryStats } from "../stats.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
 import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
+import { compareGalleryItems } from "./order.js";
 import { makePendingItems } from "./records.js";
 import {
   cleanupGalleryState,
@@ -275,6 +276,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     };
     // Work the queue holds has no tiles until it starts; with queued work shown, the first page
     // leads with them. Dream's stays in its own pool; an upscale has no tile.
+    const retried = new Set();
     const queued =
       work !== "queued" || cursor || similarTo || query.uploads === "1"
         ? []
@@ -288,13 +290,14 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
                 !galleryJobItems(job.id).length,
             )
             .reverse()
-            .flatMap((job) =>
-              makePendingItems(job.id, {
+            .flatMap((job) => {
+              if (job.galleryAt) retried.add(job.id);
+              return makePendingItems(job.id, {
                 ...job.input,
                 ownerId: account?.userId || "",
-                createdAt: job.createdAt,
-              }),
-            )
+                createdAt: job.galleryAt || job.createdAt,
+              });
+            })
             .filter(
               (item) =>
                 (!type || item.type === type) &&
@@ -304,11 +307,20 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
                 (!inComparison || inComparison(item)) &&
                 (!search || search(item)),
             );
+    // A retry keeps its failed original's place (domain/queue.ts): it joins this page in order,
+    // or none until it starts when its place is on a later page.
+    const leading = queued.filter((item) => !retried.has(item.jobId));
+    const items = [...page.items];
+    for (const item of queued.filter((item) => retried.has(item.jobId))) {
+      const at = items.findIndex((listed) => compareGalleryItems(item, listed) < 0);
+      if (at >= 0) items.splice(at, 0, item);
+      else if (!page.hasMore) items.push(item);
+    }
     return {
       status: 200,
       payload: {
         ...page,
-        items: resultNumbers.numbered([...queued, ...page.items]).map(listed),
+        items: resultNumbers.numbered([...leading, ...items]).map(listed),
       },
     };
   });
@@ -337,9 +349,11 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     else if (found && !saved.length) {
       const job = store.job(ownerId, found.jobId);
       if (job && !job.cleared && job.operation !== "upscale" && !terminalStatuses.has(job.status))
-        item = makePendingItems(job.id, { ...job.input, ownerId, createdAt: job.createdAt })[
-          found.index
-        ];
+        item = makePendingItems(job.id, {
+          ...job.input,
+          ownerId,
+          createdAt: job.galleryAt || job.createdAt,
+        })[found.index];
     }
     return item && recordBelongsToAccount(item, account)
       ? { status: 200, payload: { item: resultNumbers.numbered([item])[0] } }
