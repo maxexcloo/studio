@@ -41,7 +41,7 @@
 }
 
 .editor[data-fill] .fields {
-  overflow: hidden;
+  overflow: clip;
 }
 
 .editor[data-fill] .footer {
@@ -85,4 +85,26 @@
   from {
     opacity: 0;
   }
+}
+
+/*
+ * While a text box has focus, its tools join the action bar in place of the output and Clear, and
+ * Generate gives way to its icon.
+ */
+.textTools {
+  display: flex;
+  min-width: 0;
+}
+
+.textTools:empty,
+.send {
+  display: none;
+}
+
+.footer:has(.textTools:not(:empty)) .resting {
+  display: none;
+}
+
+.footer:has(.textTools:not(:empty)) .send {
+  display: flex;
 }

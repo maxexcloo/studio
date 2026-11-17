@@ -1,13 +1,11 @@
 import {
   ActionIcon,
   Button,
-  CloseButton,
   FocusTrap,
   Loader,
   Menu,
   Modal,
   type ModalProps,
-  Text,
   Textarea,
   type TextareaProps,
   Tooltip,
@@ -24,11 +22,14 @@ import {
   type MouseEvent,
   type ReactNode,
   type Ref,
+  createContext,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 
 import { menuWidth } from "../theme";
 import { type Action, ActionMenuItems } from "./ActionBar";
@@ -36,7 +37,7 @@ import { useCopy } from "./clipboard";
 import { icons } from "./icons";
 import { layerAbove, popupLayer } from "./popupClicks";
 import { PopupTooltip } from "./PopupTooltip";
-import { useKeyboard, useKeyboardDrop } from "./useKeyboard";
+import { useKeyboard, useKeyboardDrop, useVisibleRect } from "./useKeyboard";
 import { usePhone } from "./usePhone";
 
 import classes from "./TextBox.module.css";
@@ -44,6 +45,12 @@ import classes from "./TextBox.module.css";
 // Pressing the tools control or a phone editor tool keeps focus (and the keyboard) in the text, so nothing that
 // follows the focus (a sheet's header) moves the control from under the press.
 const keepFocus = (event: MouseEvent) => event.preventDefault();
+
+/**
+ * Where an in-place box shows its tools while it has focus: its form's action bar, above the
+ * phone keyboard.
+ */
+export const TextToolsBar = createContext<HTMLElement | null>(null);
 
 /** Shared text editing, with a flat tools menu and a full-screen phone editor. */
 export function TextBox({
@@ -216,12 +223,27 @@ export function TextBox({
       </ActionIcon>
     </Tooltip>
   );
+  const bar = useContext(TextToolsBar);
+  const [active, setActive] = useState(false);
+  // Only a box in the bar's own surface, not one in a dialog opened from it, joins the bar.
+  const inBar =
+    mobile &&
+    inline &&
+    active &&
+    bar?.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]')
+      ? bar
+      : null;
+  const visible = useVisibleRect(menuOpened);
+  const bounds = { padding: 12, rootBoundary: visible ?? ("viewport" as const) };
   const menu = !menuless && tools !== undefined && (
     <Menu
-      position="top-end"
+      // In place at rest, the button stands at the text's top, so the menu drops from it.
+      position={mobile && inline && !inBar ? "bottom-end" : "top-end"}
       width={menuWidth}
-      // A long list scrolls within the room the page leaves it.
-      middlewares={{ size: true }}
+      // A long list scrolls within the visible room, above a phone's keyboard and toolbar.
+      middlewares={{ flip: bounds, shift: bounds, size: bounds }}
+      // Compact rows, as on desktop, keep the list short on a phone.
+      styles={{ item: { minHeight: 36 } }}
       // Above any dialog holding the box: a card's sits over the popovers it opens from.
       zIndex={getDefaultZIndex("max")}
       opened={menuOpened}
@@ -230,20 +252,25 @@ export function TextBox({
         openedFrom.current = document.activeElement;
         tools.forEach((tool) => tool.onOpen?.());
       }}
-      // An item that moves focus itself keeps it; otherwise it returns.
+      // An item that moves focus itself keeps it; otherwise it returns, to the text where the menu
+      // opened from it.
       returnFocus={false}
       onClose={() =>
         setTimeout(() => {
           const active = document.activeElement;
+          const from = openedFrom.current;
           if (
             !active ||
             active === document.body ||
-            (ai &&
-              !editing &&
-              openedFrom.current?.tagName !== "TEXTAREA" &&
-              active === openedFrom.current)
+            // The chosen item keeps focus while the menu fades out.
+            active.closest("[data-menu-dropdown]") ||
+            (ai && !editing && from?.tagName !== "TEXTAREA" && active === from)
           )
-            more.current?.focus({ preventScroll: true });
+            (
+              (from?.tagName === "TEXTAREA" && from.isConnected
+                ? from
+                : more.current) as HTMLElement | null
+            )?.focus({ preventScroll: true });
         })
       }
     >
@@ -286,52 +313,57 @@ export function TextBox({
           )}
         </Menu.Target>
       </PopupTooltip>
-      {/* Phones show the menu as a full-screen sheet: its title and Close, then the tools. */}
-      <Menu.Dropdown
-        className={mobile ? classes.sheet : undefined}
-        // Opaque, unlike the glass theme surface, so the editor never shows through.
-        style={
-          mobile
-            ? {
-                background: "var(--mantine-color-body)",
-                backdropFilter: "none",
-                WebkitBackdropFilter: "none",
-                boxShadow: "none",
-              }
-            : { overflowY: "auto" }
-        }
-      >
-        {mobile && (
-          <div className={classes.sheetHeader}>
-            <Text fw={600}>{ai ? "AI" : "More"}</Text>
-            <CloseButton
-              aria-label={`Close ${ai ? "AI" : "More"}`}
-              onClick={() => setMenuOpened(false)}
-            />
-          </div>
-        )}
-        <div className={mobile ? classes.sheetBody : undefined}>
-          {listed.map((tool, index) => (
-            <Fragment key={tool.id}>
-              {index > 0 && <Menu.Divider />}
-              {!tool.menu!.flat().some((option) => option.heading) && (
-                <Menu.Label>{tool.label}</Menu.Label>
+      <Menu.Dropdown style={{ overflowY: "auto" }}>
+        {listed.map((tool, index) => (
+          <Fragment key={tool.id}>
+            {index > 0 && <Menu.Divider />}
+            {!tool.menu!.flat().some((option) => option.heading) && (
+              <Menu.Label>{tool.label}</Menu.Label>
+            )}
+            <ActionMenuItems
+              groups={tool.menu!.map((group) =>
+                group.map((option) => ({
+                  ...option,
+                  disabled: option.disabled || tool.disabled,
+                })),
               )}
-              <ActionMenuItems
-                groups={tool.menu!.map((group) =>
-                  group.map((option) => ({
-                    ...option,
-                    disabled: option.disabled || tool.disabled,
-                  })),
-                )}
-              />
-            </Fragment>
-          ))}
-          {listed.length > 0 && others.length > 0 && <Menu.Divider />}
-          <ActionMenuItems groups={[others]} />
-        </div>
+            />
+          </Fragment>
+        ))}
+        {listed.length > 0 && others.length > 0 && <Menu.Divider />}
+        <ActionMenuItems groups={[others]} />
       </Menu.Dropdown>
     </Menu>
+  );
+  const toolGroup = (
+    <div
+      className={classes.corner}
+      role="group"
+      aria-label={`${title} Tools`}
+      data-text-tools
+      onMouseDown={keepFocus}
+    >
+      {editButtons}
+      {inBar &&
+        others.map(
+          (tool) =>
+            tool.icon && (
+              <Tooltip key={tool.id} label={tool.label}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label={tool.label}
+                  disabled={tool.disabled}
+                  onClick={tool.onClick}
+                >
+                  <tool.icon size={18} />
+                </ActionIcon>
+              </Tooltip>
+            ),
+        )}
+      {menu}
+      {send}
+    </div>
   );
   // A labelled box keeps its tools inside the text's corner, sharing its edge with the form's fields.
   const inside = Boolean(!mobile && !send && !hideTools && props.label && tools);
@@ -456,22 +488,27 @@ export function TextBox({
       {busy && spins && <VisuallyHidden role="status">{busy}</VisuallyHidden>}
       {/* AI tools remain available beside the summary before its phone editor opens. */}
       {mobile && inline ? (
-        // In place, the text fills the surface with its tools as icons in its corner.
-        <div className={classes.editor} data-text-editor>
+        // In place, the text fills the surface with its tools as icons in its corner, or while it
+        // has focus in its form's action bar, with its menu's plain tools (Recent Prompts) beside.
+        <div
+          className={classes.editor}
+          data-text-editor
+          onFocus={(event) => {
+            if (event.target === (field.current as EventTarget | null)) setActive(true);
+          }}
+          // Its tools and their menu, wherever they stand, keep the text active.
+          onBlur={(event) => {
+            const next = event.relatedTarget as Element | null;
+            if (
+              !next ||
+              !(next === field.current || next.closest(`${popupLayer}, [data-text-tools]`))
+            )
+              setActive(false);
+          }}
+        >
           <div className={classes.columned}>
             {textarea}
-            {(tools || send) && (
-              <div
-                className={classes.corner}
-                role="group"
-                aria-label={`${title} Tools`}
-                onMouseDown={keepFocus}
-              >
-                {editButtons}
-                {menu}
-                {send}
-              </div>
-            )}
+            {(tools || send) && (inBar ? createPortal(toolGroup, inBar) : toolGroup)}
           </div>
           {below && <div className={classes.below}>{below}</div>}
           {popups && <div className={classes.anchor}>{popups}</div>}
