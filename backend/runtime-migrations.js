@@ -10,6 +10,7 @@ import { galleryRatings } from "./gallery-ratings.js";
 import { galleryTitles } from "./gallery-titles.js";
 import { imageSizeDefaults } from "./image-size-defaults.js";
 import { legacyShapes } from "./legacy-shapes.js";
+import { localTextAuto } from "./local-text-auto.js";
 import { loraStacks } from "./lora-stacks.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
 import { migrateRadianceQueue } from "./radiance-queue-migration.js";
@@ -104,6 +105,13 @@ const steps = [
   {
     name: "whereWorkRuns",
     run: whereWorkRuns,
+    changes: (plan) => plan.accounts,
+    online: true,
+    reload: reloadAccountPreferences,
+  },
+  {
+    name: "localTextAuto",
+    run: localTextAuto,
     changes: (plan) => plan.accounts,
     online: true,
     reload: reloadAccountPreferences,
