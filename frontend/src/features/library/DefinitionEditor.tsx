@@ -331,7 +331,11 @@ function DefinitionForm({
                             <NumberInput
                               key={key}
                               label={
-                                key === "cfg" ? "Guidance" : key[0].toUpperCase() + key.slice(1)
+                                key === "cfg"
+                                  ? "Guidance"
+                                  : key === "fps"
+                                    ? "FPS"
+                                    : key[0].toUpperCase() + key.slice(1)
                               }
                               value={
                                 typeof (metadata.defaults as Record<string, unknown>)?.[key] ===

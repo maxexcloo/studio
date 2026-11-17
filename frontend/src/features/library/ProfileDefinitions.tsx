@@ -78,7 +78,7 @@ function ProfileUse({ stats }: { stats?: ProfileStats }) {
 function Version({ version, aiDrafted }: { version: number; aiDrafted?: boolean }) {
   return (
     <Group gap="xs" wrap="nowrap">
-      <Text size="sm">{version}</Text>
+      <Text size="sm">v{version}</Text>
       {aiDrafted && <Badge color="orange">AI</Badge>}
     </Group>
   );
