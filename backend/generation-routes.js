@@ -269,6 +269,8 @@ export function createGenerationSubmission({
     const { body } = prepared;
     body.comfyBackend = backend;
     body.ownerId = job.ownerId;
+    // When Studio's queue took the job, so Radiance's Details can say how long it waited there.
+    body.queuedAt = Date.parse(job.createdAt) || undefined;
     // What the prompt assistant did for this run (preset, chosen LoRAs), for Details.
     const assistant = assistantRecord(input.assistant, body.loras);
     if (assistant) body.assistant = assistant;
