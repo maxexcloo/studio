@@ -335,7 +335,6 @@ export function GallerySelectionBar({
     }),
   ];
   const actions = itemActionGroups(selectionActions);
-  const menuActions = itemActionGroups(selectionActions, "menu");
   useEffect(() => {
     if (confirm || pending) return;
     const keys = (event: KeyboardEvent) => {
@@ -433,6 +432,7 @@ export function GallerySelectionBar({
             </Button>
           ))}
         </div>
+        {!phone && <Divider orientation="vertical" className={classes.divider} />}
         <div role="group" aria-label="Selected Item Actions" className={classes.actions}>
           {bar}
         </div>
@@ -463,7 +463,7 @@ export function GallerySelectionBar({
         </Menu.Target>
         <Menu.Dropdown aria-label="Selection Actions">
           <Menu.Label>{selected.length} Selected</Menu.Label>
-          <ActionMenuItems groups={menuActions} />
+          <ActionMenuItems groups={actions} />
         </Menu.Dropdown>
       </Menu>
       <DeleteMediaDialog

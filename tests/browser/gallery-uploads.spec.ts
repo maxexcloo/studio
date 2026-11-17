@@ -24,10 +24,10 @@ test("Import uploads many files or a folder, lists each failure and shows the ne
 
   await page.getByRole("button", { name: "Import", exact: true }).click();
   await expect(page.getByRole("menuitem")).toHaveText([
+    "From Clipboard",
+    "From URL…",
     "Upload Files…",
     "Upload Folder…",
-    "From URL…",
-    "From Clipboard",
   ]);
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("menuitem", { name: "Upload Files…", exact: true }).click();

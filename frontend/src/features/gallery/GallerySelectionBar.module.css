@@ -23,7 +23,6 @@
 .actions {
   display: flex;
   min-width: 0;
-  margin-left: auto;
 }
 
 /* Desktop: the count, quick selects, actions and Clear Selection divided like the bars' groups. */

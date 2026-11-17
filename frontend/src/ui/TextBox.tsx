@@ -1,13 +1,16 @@
 import {
   ActionIcon,
   Button,
+  CloseButton,
   FocusTrap,
   Loader,
   Menu,
   Modal,
   type ModalProps,
+  Text,
   Textarea,
   type TextareaProps,
+  Tooltip,
   VisuallyHidden,
   getDefaultZIndex,
   useProps,
@@ -29,7 +32,7 @@ import {
 
 import { menuWidth } from "../theme";
 import { type Action, ActionMenuItems } from "./ActionBar";
-import { copyText, useCopy } from "./clipboard";
+import { useCopy } from "./clipboard";
 import { icons } from "./icons";
 import { layerAbove, popupLayer } from "./popupClicks";
 import { PopupTooltip } from "./PopupTooltip";
@@ -47,7 +50,6 @@ export function TextBox({
   value,
   onChange,
   tools,
-  copy = true,
   send,
   busy,
   popups,
@@ -64,10 +66,8 @@ export function TextBox({
   ref?: Ref<HTMLTextAreaElement>;
   value: string;
   onChange: (value: string) => void;
-  /** The box's tools menu; AI uses the magic icon, other tools More, alongside Copy and Clear. */
+  /** The box's tools menu; AI uses the magic icon, other tools More. */
   tools?: Action[];
-  /** Omits duplicate Copy where the page offers it; the full-screen editor always offers it. */
-  copy?: boolean;
   /** The send, and a proposal's Undo, which stay beside the text. */
   send?: ReactNode;
   /** Popups its tools open (Recent Prompts), anchored at the box's end where the ⋯ stands. */
@@ -131,22 +131,21 @@ export function TextBox({
           },
         };
   const copier = useCopy();
+  // Phones show Copy and Clear above the keyboard; desktop boxes leave them to the browser, keeping
+  // only Reset and its Undo, beside the text while they can act.
   const edits: Action[] = tools
     ? [
-        ...(copy || phone
-          ? [
-              {
-                id: "copy",
-                label: copier.copied ? "Copied" : "Copy",
-                icon: copier.copied ? Check : icons.copy,
-                disabled: !value,
-                onClick: () => (mobile ? copier.copy(value, title) : void copyText(value, title)),
-              },
-            ]
-          : []),
+        {
+          id: "copy",
+          label: copier.copied ? "Copied" : "Copy",
+          icon: copier.copied ? Check : icons.copy,
+          disabled: !value,
+          onClick: () => copier.copy(value, title),
+        },
         ...(reset === undefined || value !== start || cleared !== null ? [clear] : []),
       ]
     : [];
+  const edit = !mobile && reset !== undefined && !clear.disabled ? clear : undefined;
   const editButtons = edits.map((action) => (
     <Button
       key={action.id}
@@ -201,7 +200,23 @@ export function TextBox({
   // Keep every option under its tool's name, including its later action groups.
   const listed = tools?.filter((action) => action.menu) || [];
   const others = tools?.filter((action) => !action.menu) || [];
-  const menu = tools !== undefined && (
+  // Without tools a desktop box has no menu, and a busy tool spins its Reset instead.
+  const menuless = !mobile && tools?.length === 0;
+  const inlineEdit = (edit || (menuless && busy)) && (
+    <Tooltip label={(menuless && busy) || edit!.label}>
+      <ActionIcon
+        onMouseDown={keepFocus}
+        variant="subtle"
+        color="gray"
+        aria-label={edit?.label ?? busy}
+        loading={Boolean(menuless && busy)}
+        onClick={edit?.onClick}
+      >
+        {edit?.icon && <edit.icon size={16} />}
+      </ActionIcon>
+    </Tooltip>
+  );
+  const menu = !menuless && tools !== undefined && (
     <Menu
       position="top-end"
       width={menuWidth}
@@ -242,7 +257,7 @@ export function TextBox({
               color="gray"
               size="compact-xs"
               aria-label={`More ${title} Actions`}
-              disabled={tools.length === 0 && (mobile || edits.length === 0)}
+              disabled={tools.length === 0}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
               leftSection={busy ? <Loader size={16} /> : undefined}
@@ -256,7 +271,7 @@ export function TextBox({
               variant="subtle"
               color="gray"
               aria-label={`${ai ? "AI" : "More"} ${title} Actions`}
-              disabled={tools.length === 0 && (mobile || edits.length === 0)}
+              disabled={tools.length === 0}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
             >
@@ -271,29 +286,50 @@ export function TextBox({
           )}
         </Menu.Target>
       </PopupTooltip>
-      <Menu.Dropdown style={{ overflowY: "auto" }}>
-        {!mobile && <ActionMenuItems groups={[edits]} />}
-        {!mobile && edits.length > 0 && (listed.length > 0 || others.length > 0) && (
-          <Menu.Divider />
-        )}
-        {listed.map((tool, index) => (
-          <Fragment key={tool.id}>
-            {index > 0 && <Menu.Divider />}
-            {!tool.menu!.flat().some((option) => option.heading) && (
-              <Menu.Label>{tool.label}</Menu.Label>
-            )}
-            <ActionMenuItems
-              groups={tool.menu!.map((group) =>
-                group.map((option) => ({
-                  ...option,
-                  disabled: option.disabled || tool.disabled,
-                })),
-              )}
+      {/* Phones show the menu as a full-screen sheet: its title and Close, then the tools. */}
+      <Menu.Dropdown
+        className={mobile ? classes.sheet : undefined}
+        // Opaque, unlike the glass theme surface, so the editor never shows through.
+        style={
+          mobile
+            ? {
+                background: "var(--mantine-color-body)",
+                backdropFilter: "none",
+                WebkitBackdropFilter: "none",
+                boxShadow: "none",
+              }
+            : { overflowY: "auto" }
+        }
+      >
+        {mobile && (
+          <div className={classes.sheetHeader}>
+            <Text fw={600}>{ai ? "AI" : "More"}</Text>
+            <CloseButton
+              aria-label={`Close ${ai ? "AI" : "More"}`}
+              onClick={() => setMenuOpened(false)}
             />
-          </Fragment>
-        ))}
-        {listed.length > 0 && others.length > 0 && <Menu.Divider />}
-        <ActionMenuItems groups={[others]} />
+          </div>
+        )}
+        <div className={mobile ? classes.sheetBody : undefined}>
+          {listed.map((tool, index) => (
+            <Fragment key={tool.id}>
+              {index > 0 && <Menu.Divider />}
+              {!tool.menu!.flat().some((option) => option.heading) && (
+                <Menu.Label>{tool.label}</Menu.Label>
+              )}
+              <ActionMenuItems
+                groups={tool.menu!.map((group) =>
+                  group.map((option) => ({
+                    ...option,
+                    disabled: option.disabled || tool.disabled,
+                  })),
+                )}
+              />
+            </Fragment>
+          ))}
+          {listed.length > 0 && others.length > 0 && <Menu.Divider />}
+          <ActionMenuItems groups={[others]} />
+        </div>
       </Menu.Dropdown>
     </Menu>
   );
@@ -302,6 +338,7 @@ export function TextBox({
   const boxTools = (
     <div className={classes.tools}>
       {mobile && (!phone || editing) && editButtons}
+      {inlineEdit}
       {menu}
     </div>
   );

@@ -265,17 +265,15 @@ test("Improve Prompt lists its styles alphabetically with descriptions and Custo
     await expect(tools.getByRole("button", { name: "Clear", exact: true })).toBeVisible();
   }
   await expect(menu.getByRole("menuitem")).toHaveText([
-    ...(phone ? [] : ["Copy", "Clear"]),
     "Candid",
     "Enhance",
-    /^Portrait/,
+    "Portrait",
     "Custom…",
     "Write Negative",
     "Recent Prompts",
   ]);
-  await expect(
-    menu.getByRole("menuitem", { name: "Portrait", exact: true }),
-  ).toHaveAccessibleDescription("A person in focus.");
+  // Styles show their names alone.
+  await expect(menu.getByText("A person in focus.", { exact: true })).toHaveCount(0);
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
   await expect(dialog.getByRole("textbox", { name: "Change", exact: true })).toBeVisible();
