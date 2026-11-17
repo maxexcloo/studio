@@ -3,7 +3,6 @@ import {
   Button,
   Checkbox,
   FocusTrap,
-  Group,
   Modal,
   MultiSelect,
   NumberInput,
@@ -235,18 +234,20 @@ function CatalogueForm({
         ))}
         {save.error && <Alert color="red">{save.error.message}</Alert>}
         {undo.error && <Alert color="red">{undo.error.message}</Alert>}
-        <Group>
-          <Button
-            variant="subtle"
-            size="compact-sm"
-            disabled={form.isDirty() || save.isPending}
-            loading={undo.isPending}
-            onClick={() => undo.mutate()}
-          >
-            Undo Last Change
-          </Button>
-        </Group>
-        <DialogFooter onCancel={close} pending={save.isPending}>
+        <DialogFooter
+          onCancel={close}
+          pending={save.isPending}
+          secondary={
+            <Button
+              variant="default"
+              disabled={form.isDirty() || save.isPending}
+              loading={undo.isPending}
+              onClick={() => undo.mutate()}
+            >
+              Undo Last Change
+            </Button>
+          }
+        >
           <Button
             type="submit"
             disabled={!form.isDirty() || undo.isPending}

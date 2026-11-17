@@ -75,12 +75,7 @@ export function LibraryChatBrief({ heading }: { heading: ReactNode }) {
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>{null}</SectionHeader>
-      <SettingRow
-        label="Brief"
-        description={
-          briefSummary(brief) || "Standing rules every chat keeps to, so you needn't repeat them."
-        }
-      >
+      <SettingRow label="Brief" description={briefSummary(brief) || "No rules yet."}>
         <Button size="compact-sm" variant="default" onClick={() => setEditing(true)}>
           Edit
         </Button>

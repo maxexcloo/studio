@@ -1105,16 +1105,16 @@ export async function showUploads(page: Page) {
 }
 
 /**
- * Closes the References popup, leaving the composer open: Apply in the phone sheet's footer,
+ * Closes the References popup, leaving the composer open: Done in the phone sheet's footer,
  * Escape on desktop. A pick filling the last slot closes it already, so it may be fading out.
  */
 export async function closeReferences(page: Page) {
   const references = page.getByRole("dialog", { name: "References", exact: true });
   if (!(await references.isVisible())) return;
-  const apply = references.getByRole("button", { name: "Apply", exact: true });
+  const done = references.getByRole("button", { name: "Done", exact: true });
   await (
-    (await apply.isVisible())
-      ? apply.click({ timeout: 2000 })
+    (await done.isVisible())
+      ? done.click({ timeout: 2000 })
       : references.press("Escape", { timeout: 2000 })
   ).catch(() => {});
   await expect(references).toBeHidden();
@@ -1195,7 +1195,7 @@ export async function openLoraChoices(page: Page) {
 export async function showLoraStack(page: Page) {
   const adding = page.getByRole("dialog", { name: "Add LoRAs", exact: true });
   if (!(await adding.isVisible())) return;
-  await adding.getByRole("button", { name: "Apply", exact: true }).click();
+  await adding.getByRole("button", { name: "Done", exact: true }).click();
   await expect(adding).toBeHidden();
 }
 

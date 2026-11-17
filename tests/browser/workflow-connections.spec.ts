@@ -154,7 +154,7 @@ test("Workflow connections preserve dotted IDs, unknown metadata and reference s
   await page.getByRole("option", { name: "LoadImage #image.two", exact: true }).click();
   await editor.getByRole("combobox", { name: "Reference start.slot Input", exact: true }).click();
   await page.getByRole("option", { name: "image.target", exact: true }).click();
-  await editor.getByRole("button", { name: "Save Profile", exact: true }).click();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   const expected = structuredClone(original);
   expected.studio.controls.prompt.node = "text.two";
@@ -190,7 +190,7 @@ test("Workflow connections preserve dotted IDs, unknown metadata and reference s
   await editor.getByRole("tab", { name: "Connections", exact: true }).click();
   await editor.getByRole("combobox", { name: "Control prompt Input", exact: true }).click();
   await page.getByRole("option", { name: "new.input.with.dots", exact: true }).click();
-  await editor.getByRole("button", { name: "Save Profile", exact: true }).click();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(state.document).toEqual({
     ...changed,
@@ -220,7 +220,7 @@ test("Workflow inspection retry and save conflicts retain the edited connection 
   await page.getByRole("option", { name: "Target Encoder #text.two", exact: true }).click();
   await editor.getByRole("combobox", { name: "Control prompt Input", exact: true }).click();
   await page.getByRole("option", { name: "text.target", exact: true }).click();
-  await editor.getByRole("button", { name: "Save Profile", exact: true }).click();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor.getByRole("alert")).toContainText("changed while you were editing");
   await expect(prompt).toHaveValue("Target Encoder #text.two");
   await expect(

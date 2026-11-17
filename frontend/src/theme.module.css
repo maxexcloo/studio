@@ -37,6 +37,13 @@
   max-height: 100% !important;
 }
 
+/* A full-screen dialog or sheet covers the page, so it takes the page's solid surface rather than
+   glass tinted by the overlay beneath it, matching its pinned footer. Paper's glass is inline. */
+.dialogContent[data-full-screen] {
+  background: var(--mantine-color-body) !important;
+  backdrop-filter: none !important;
+}
+
 /* A phone's full-screen dialog keeps its footer (DialogFooter) at the bottom of the screen, in
    sight while the body scrolls: everything holding the footer fills the body's height. */
 :where([data-phone]) .dialogContent[data-full-screen] .dialogBody:has([data-dialog-footer]) {

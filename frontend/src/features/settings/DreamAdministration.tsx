@@ -31,13 +31,14 @@ export function DreamAdministration() {
   ) => {
     const setting = deployment.data.dream[name];
     return (
-      <SettingRow label={label} description={description + lockedNote(setting)}>
+      <SettingRow wide label={label} description={description + lockedNote(setting)}>
         <SegmentedControl
           role="radiogroup"
           aria-label={`Dream ${label}`}
+          fullWidth
           value={setting.value === null ? "account" : String(setting.value)}
           disabled={setting.locked}
-          data={[{ value: "account", label: "Account's Choice" }, ...choices]}
+          data={[{ value: "account", label: "Per Account" }, ...choices]}
           onChange={(value) =>
             save.mutate({
               key: setting.key,
@@ -52,15 +53,14 @@ export function DreamAdministration() {
     <Stack gap="lg">
       <SettingGroup title="Overrides">
         {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
-        {row("imageBackend", "Images Run On", backendNote, backends)}
-        {row("paused", "Paused", "Hold idle generation.", onOff)}
         {row(
           "spicy",
           "Spicy",
           "Allow explicit themes, only for accounts with Uncensored Models access.",
           onOff,
         )}
-        {row("videoBackend", "Videos Run On", backendNote, backends)}
+        {row("imageBackend", "Images", `Where Dream's images run. ${backendNote}`, backends)}
+        {row("videoBackend", "Videos", `Where Dream's videos run. ${backendNote}`, backends)}
       </SettingGroup>
     </Stack>
   );

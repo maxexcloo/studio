@@ -316,15 +316,16 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
   const stack = page.getByRole("dialog", { name: "LoRAs", exact: true });
   await expect(stack.getByText("Choose LoRAs or a preset.", { exact: true })).toBeVisible();
   await expect(page.getByRole("list", { name: "LoRA Choices", exact: true })).toHaveCount(0);
-  // The footer's actions share one row without overlapping.
-  const [add, clear, apply] = await Promise.all(
-    ["Add LoRAs", "Clear LoRAs", "Apply"].map((name) =>
+  // Clear sits in the header; the footer's Add and Done share one row without overlapping.
+  const [clear, add, done] = await Promise.all(
+    ["Clear LoRAs", "Add LoRAs", "Done"].map((name) =>
       stack.getByRole("button", { name, exact: true }).boundingBox(),
     ),
   );
-  expect(add!.x + add!.width).toBeLessThanOrEqual(clear!.x);
+  expect(clear!.y).toBeLessThan(add!.y);
+  expect(add!.x + add!.width).toBeLessThanOrEqual(done!.x);
   // Within a pixel, as layout rounds to device pixels.
-  expect(Math.abs(apply!.y - add!.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(done!.y - add!.y)).toBeLessThanOrEqual(1);
   await stack.getByRole("button", { name: "Add LoRAs", exact: true }).click();
   const adding = page.getByRole("dialog", { name: "Add LoRAs", exact: true });
   // The search waits for a tap, so the keyboard stays down.
@@ -337,7 +338,7 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
   // The list scrolls inside itself, keeping the search and the footer in sight.
   await adding.getByRole("button", { name: "Extra 9", exact: true }).scrollIntoViewIfNeeded();
   await expect(search).toBeInViewport();
-  await expect(adding.getByRole("button", { name: "Apply", exact: true })).toBeInViewport();
+  await expect(adding.getByRole("button", { name: "Done", exact: true })).toBeInViewport();
   await adding.getByRole("button", { name: "Detail Slider", exact: true }).click();
   await showLoraStack(page);
   // The stack keeps its controls under the sheet's Add LoRAs.

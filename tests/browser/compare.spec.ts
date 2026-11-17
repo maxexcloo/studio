@@ -34,7 +34,7 @@ const axis = async (page: Page, name: string) => {
 };
 const start = async (page: Page) => {
   const setup = page.getByRole("dialog", { name: "Compare", exact: true });
-  await setup.getByRole("button", { name: "Start Comparing", exact: true }).click();
+  await setup.getByRole("button", { name: "Compare", exact: true }).click();
   await expect(setup).toBeHidden();
 };
 const variants = (page: Page) => page.getByRole("radiogroup", { name: "Variant", exact: true });
@@ -191,7 +191,7 @@ test("Compare ▾ builds variants across a LoRA's strengths and across models", 
 
   // Models start over from the variant being edited (A, without the LoRA), keeping its seed.
   const models = await axis(page, "Model");
-  await expect(models.getByRole("button", { name: "Start Comparing", exact: true })).toBeDisabled();
+  await expect(models.getByRole("button", { name: "Compare", exact: true })).toBeDisabled();
   const search = models.getByRole("combobox", { name: "Models", exact: true });
   await search.fill("Fast");
   await page.getByRole("option", { name: "Image Fast", exact: true }).click();
@@ -242,7 +242,7 @@ test("Compare searches a long model list, reaches its last choice and retains th
   await expect(page.getByRole("option")).toHaveText(["Candidate 39 · Quality"]);
   await last.click();
   if (testInfo.project.use.isMobile) {
-    await setup.getByRole("button", { name: "Start Comparing", exact: true }).tap();
+    await setup.getByRole("button", { name: "Compare", exact: true }).tap();
     await expect(page.getByRole("listbox")).toBeHidden();
     await expect(setup).toBeVisible();
     await expect(variants(page)).toHaveCount(0);

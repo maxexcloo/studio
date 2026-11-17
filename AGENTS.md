@@ -87,10 +87,18 @@ recur across features.
   immediately and optimistically, rolling back or refetching after failure;
   checkboxes select records or form options. Number fields commit on blur or
   Enter. Free text, passwords and record editing use a dialog with Save.
-- Dialogs end with one right-aligned `DialogFooter`: Cancel, then the primary
-  action, which stands alone (Done, Close) where there is nothing to cancel.
-  Consequential actions sit in a final Danger Zone or row menu and use
-  `ConfirmDialog`, titled with the action and no question mark.
+  Selects and segmented choices sit in `wide` rows (segmented ones
+  `fullWidth`): one width on desktop, the full row under the label on phones.
+  A row's actions are plain compact buttons named by their verb, never a
+  dropdown.
+- Every dialog, sheet and chip popup ends with one right-aligned
+  `DialogFooter` of real buttons: any default secondary actions, Cancel, then
+  one filled primary, which follows the secondaries alone (Done, Close) where
+  there is nothing to cancel. A primary is its bare verb (Save, Compare,
+  Create), adding a noun only where the verb alone is ambiguous; no other
+  action sits beside or below it. Consequential actions sit in a final Danger
+  Zone or row menu and use `ConfirmDialog`, titled with the action and no
+  question mark.
 - Choose controls by selection semantics: a SegmentedControl or radio group
   selects exactly one choice, a Switch changes one setting, and toggle chips
   or MultiSelect combine options. All and Any are choices, not deselection.
@@ -154,15 +162,18 @@ recur across features.
   dropdowns stay inside their owning Popover with
   `comboboxProps.withinPortal: false` and preserve focus when selected.
 - Shared chip popups (`ChipPopup`) anchor on desktop and open full-screen
-  sheets on phones where the content needs the room. Their heading
-  (`PopupHeading`) holds the title, then compact subtle actions with Clear
-  first. A saved record's name is one `SavedName` combobox.
-- On phones, overlays keep their actions at the bottom and always in sight: a
-  sheet's header holds only the title and Close, its footer stays pinned above
-  the safe area while the content between scrolls, with one scroll owner per
-  form; a full-screen dialog pins its `DialogFooter` the same way. On touch
-  screens, popups and option lists open with the keyboard down; their search
-  waits for a tap.
+  sheets on phones where the content needs the room; small forms stay
+  `floating`. Their heading (`PopupHeading`, or the sheet's header beside
+  Close) holds the title and any count, then compact subtle actions with
+  Clear first and record actions (Save) after. Their footer holds at most one
+  secondary that adds content (Add) and the primary; choices apply as made,
+  so the phone sheet ends with Done where there is no other primary. A saved
+  record's name is one `SavedName` combobox.
+- On phones, overlays keep their actions at the bottom and always in sight:
+  full-screen dialogs and sheets take the page's solid surface and pin their
+  `DialogFooter` above the safe area while the content between scrolls, with
+  one scroll owner per form. On touch screens, popups and option lists open
+  with the keyboard down; their search waits for a tap.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`.
 - Use the shared `TextBox`. Desktop fields with tools expose one menu button

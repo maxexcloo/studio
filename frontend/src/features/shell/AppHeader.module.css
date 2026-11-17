@@ -44,12 +44,19 @@
   font-size: var(--mantine-font-size-lg);
 }
 
+/* Every header control keeps a 44 px touch height; the modes are wider targets than the side
+   controls, sized so four modes fit between them on a 375 px phone. */
 :where(:root[data-phone]) .header :is(button, a):not(.home) {
   width: 32px;
+  height: 44px;
   min-width: 0 !important;
   padding-inline: 0;
 }
 
 :where(:root[data-phone]) .modes {
   padding: 2px;
+}
+
+:where(:root[data-phone]) .header .modes .mode {
+  width: 42px;
 }
