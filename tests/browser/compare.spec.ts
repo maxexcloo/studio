@@ -596,5 +596,5 @@ test("Variants of a result show their numbers, the axis they vary and Undo for t
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   if (testInfo.project.use.isMobile)
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-  await expect(page.getByText(/ · #13$/)).toBeVisible();
+  await expect(page.getByRole("cell", { name: "#13", exact: true })).toBeVisible();
 });

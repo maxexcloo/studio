@@ -71,32 +71,26 @@ const recordedModel = (item: MediaItem, profiles: Profile[]) => {
   );
 };
 
-/** Recorded creation and model metadata, shared by the desktop panel and phone sheet. */
+/** When it was made, its size and a video's length, under the title in the panel and phone sheet. */
 export function MediaDetailsMetadata({ item }: { item: MediaItem }) {
-  const { profiles } = useGenerationActions();
   const source = mediaSource(item);
   const created = time(item.createdAt);
-  const when = [created && `${item.uploaded ? "Uploaded " : ""}${created}`, mediaNumber(item)]
-    .filter(Boolean)
-    .join(" · ");
-  const model = [
-    recordedModel(item, profiles),
-    item.type === "video" ? "Video" : "Image",
+  const settings = item.settings || {};
+  const seconds =
+    Number(settings.duration) || Number(settings.frames) / Number(settings.fps) || undefined;
+  const line = [
+    created && `${item.uploaded ? "Uploaded " : ""}${created}`,
     source.width ? `${source.width} × ${source.height}` : "",
+    item.type === "video" && seconds ? `${Math.round(seconds * 10) / 10}s` : "",
   ]
     .filter(Boolean)
     .join(" · ");
   return (
-    <Stack gap={2}>
-      {when && (
-        <Text size="xs" c="dimmed">
-          {when}
-        </Text>
-      )}
+    line && (
       <Text size="xs" c="dimmed">
-        {model}
+        {line}
       </Text>
-    </Stack>
+    )
   );
 }
 
@@ -134,8 +128,6 @@ function generationDetails(
     entries
       .filter(([, value]) => value !== "" && value !== undefined && value !== null && value !== 0)
       .map(([label, value]) => [label, String(value)]);
-  const sorted = (entries: [string, unknown][]): Row[] =>
-    rows(entries).sort(([a], [b]) => a.localeCompare(b));
   const recorded = profiles.find((profile) => isProfile(profile, settings.profileId));
   const shown = mediaSource(item);
   const inpaint = settings.inpaint as { strength?: number } | undefined;
@@ -179,19 +171,11 @@ function generationDetails(
     unused: settings.maskSkipped
       ? ["Mask: nothing in it was painted, so this ran as an edit of the whole picture."]
       : [],
-    // Every recorded input, A–Z; Copy Settings copies the same rows.
-    settings: sorted([
+    // Every recorded input, the run's own choices before the model's parts; Copy Settings copies
+    // the same rows.
+    settings: rows([
       // The backend a combined profile ran on.
       ["Backend", settings.profileBackend ? backendLabel(String(settings.profileBackend)) : ""],
-      ["Text Encoder", comfyui(fileStem(settings.textEncoder))],
-      ["VAE", comfyui(fileStem(settings.vae))],
-      ["CLIP Type", comfyui(settings.clipType)],
-      ["Weight Type", comfyui(settings.weightDtype)],
-      ["Resolution", settings.resolution || settings.resolutionTier],
-      ["Steps", settings.steps],
-      ["CFG", settings.cfg],
-      ["Sampler", comfyui(settings.sampler)],
-      ["Scheduler", comfyui(settings.scheduler)],
       // A picture's mode, named as the composer's Reference Role chips name it.
       [
         "Mode",
@@ -205,12 +189,21 @@ function generationDetails(
                 ? "Reference"
                 : "Edit",
       ],
+      ["Steps", settings.steps],
+      ["CFG", settings.cfg],
+      ["Sampler", comfyui(settings.sampler)],
+      ["Scheduler", comfyui(settings.scheduler)],
       ["Denoise", !video && staged.length ? settings.denoise : ""],
       ["Inpaint", inpaint?.strength ?? ""],
       ["Seed", settings.seed],
       ["Count", !video && Number(settings.count) > 1 ? settings.count : ""],
+      ["Resolution", settings.resolution || settings.resolutionTier],
+      ["Text Encoder", comfyui(fileStem(settings.textEncoder))],
+      ["VAE", comfyui(fileStem(settings.vae))],
+      ["CLIP Type", comfyui(settings.clipType)],
+      ["Weight Type", comfyui(settings.weightDtype)],
     ]),
-    output: sorted([
+    output: rows([
       ["Dimensions", shown.width ? `${shown.width} × ${shown.height}` : ""],
       // An upscale's size as the model drew it.
       ["Original Size", shown.upscaled && item.width ? `${item.width} × ${item.height}` : ""],
@@ -222,6 +215,7 @@ function generationDetails(
       ["File", item.outputName || item.filename],
       ["File Size", size === null ? pendingValue : formatBytes(size)],
       ["Time", time(item.createdAt)],
+      ["Result", mediaNumber(item)],
     ]),
     // The stages in the order they ran, then their totals.
     timing: rows([
@@ -341,6 +335,15 @@ function DetailSection({
   );
 }
 
+/** A part's name within its section, such as a card's kind under References. */
+function PartLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Text size="xs" c="dimmed">
+      {children}
+    </Text>
+  );
+}
+
 /**
  * Face Check's finding for a result made with a character, naming the character, and whether it is
  * the automatic redo of a result whose face drifted.
@@ -350,14 +353,15 @@ function FaceCheck({ identity, faceRedo }: Pick<MediaItem, "identity" | "faceRed
   const name =
     characters.data?.find((card) => card.id === identity?.characterId)?.name || "the character";
   return (
-    <DetailSection title="Face Check">
+    <Stack gap={2}>
+      <PartLabel>Face Check</PartLabel>
       {faceRedo && <Text size="sm">Redone automatically after the face drifted.</Text>}
       {identity && (
         <Text size="sm" c={identity.drifted ? "orange" : undefined}>
           {identityNote(identity, name)}
         </Text>
       )}
-    </DetailSection>
+    </Stack>
   );
 }
 
@@ -443,12 +447,14 @@ const contextCards = [
   { kind: "scenes", key: "scene", noun: "Scene" },
 ] as const;
 
+const gallerySearch = (item: MediaItem, words: string) =>
+  `${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(words)}`;
+
 /**
- * What the chat said a result shows: its character, outfit and scene, each searching the gallery
- * for the results that share it, with Create where Library has no card of that name, and its
- * series.
+ * The cards the chat said a result shows: its character, outfit and scene, each searching the
+ * gallery for the results that share it, with Create where Library has no card of that name.
  */
-function ChatContext({ item }: { item: MediaItem }) {
+function ContextCards({ item }: { item: MediaItem }) {
   const context = item.resultSet?.context;
   const cards = useGroupFeature("characters") && item.type === "image" && item.status === "done";
   const startCard = useStartCard();
@@ -461,46 +467,34 @@ function ChatContext({ item }: { item: MediaItem }) {
     scenes: useQuery({ ...promptCardsQuery("scenes"), enabled: Boolean(cards && context?.scene) }),
   };
   if (!context) return null;
-  const search = (words: string) =>
-    `${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(words)}`;
-  return (
-    <>
-      {contextCards.map(({ kind, key, noun }) => {
-        const named = context[key];
-        if (!named) return null;
-        const saved = lists[kind].data;
-        const Icon = icons[key];
-        return (
-          <DetailSection key={key} title={noun}>
-            <Anchor component={Link} to={search(named.name)} size="sm">
-              {named.name}
-            </Anchor>
-            {named.description && <DetailText>{named.description}</DetailText>}
-            {cards &&
-              saved &&
-              !saved.some((card) => card.name.toLowerCase() === named.name.toLowerCase()) && (
-                <Button
-                  variant="subtle"
-                  size="compact-sm"
-                  leftSection={<Icon size={14} />}
-                  style={{ alignSelf: "flex-start" }}
-                  onClick={() => startCard(kind, item)}
-                >
-                  Create {noun}
-                </Button>
-              )}
-          </DetailSection>
-        );
-      })}
-      {context.series && (
-        <DetailSection title="Series">
-          <Anchor component={Link} to={search(context.series)} size="sm">
-            {context.series}
-          </Anchor>
-        </DetailSection>
-      )}
-    </>
-  );
+  return contextCards.map(({ kind, key, noun }) => {
+    const named = context[key];
+    if (!named) return null;
+    const saved = lists[kind].data;
+    const Icon = icons[key];
+    return (
+      <Stack key={key} gap={2}>
+        <PartLabel>{noun}</PartLabel>
+        <Anchor component={Link} to={gallerySearch(item, named.name)} size="sm">
+          {named.name}
+        </Anchor>
+        {named.description && <DetailText>{named.description}</DetailText>}
+        {cards &&
+          saved &&
+          !saved.some((card) => card.name.toLowerCase() === named.name.toLowerCase()) && (
+            <Button
+              variant="subtle"
+              size="compact-sm"
+              leftSection={<Icon size={14} />}
+              style={{ alignSelf: "flex-start" }}
+              onClick={() => startCard(kind, item)}
+            >
+              Create {noun}
+            </Button>
+          )}
+      </Stack>
+    );
+  });
 }
 
 /** One gallery item in full: gallery pages leave out its prompt's thinking, which Details reads here. */
@@ -511,7 +505,10 @@ export const galleryItemQuery = (id: string) =>
     retry: false,
   });
 
-/** Details › Prompt with the prompt's thinking, then any Negative Prompt as its own section. */
+/**
+ * Details › Prompt with any Refused Prompt and the prompt's thinking, then any Negative Prompt as its
+ * own section.
+ */
 function DetailsPrompt({ item }: { item: MediaItem }) {
   // A pending tile has no gallery record to read yet.
   const full = useQuery({
@@ -526,12 +523,13 @@ function DetailsPrompt({ item }: { item: MediaItem }) {
         after={<WritingThinking writing={full.data?.item.writing ?? item.writing} />}
       >
         <DetailText>{item.prompt || "No prompt recorded."}</DetailText>
+        {item.refusedPrompt && (
+          <Stack gap={2}>
+            <PartLabel>Refused Prompt</PartLabel>
+            <DetailText>{item.refusedPrompt}</DetailText>
+          </Stack>
+        )}
       </DetailSection>
-      {item.refusedPrompt && (
-        <DetailSection title="Refused Prompt" copy={item.refusedPrompt}>
-          <DetailText>{item.refusedPrompt}</DetailText>
-        </DetailSection>
-      )}
       {item.negative && (
         <DetailSection title="Negative Prompt" copy={item.negative}>
           <DetailText>{item.negative}</DetailText>
@@ -542,7 +540,7 @@ function DetailsPrompt({ item }: { item: MediaItem }) {
 }
 
 /** Label and value rows, the label column dimmed. */
-function Section({ title, rows }: { title: string; rows: Row[] }) {
+function Section({ title, rows }: { title: string; rows: [string, React.ReactNode][] }) {
   if (!rows.length) return null;
   return (
     <DetailSection title={title}>
@@ -584,19 +582,10 @@ function galleryReference(id: string, items: MediaItem[]) {
   return items.find((candidate) => candidate.url === key || candidate.id === key);
 }
 
-/** Links to the results an item was made from or made, opening each in the viewer when it can. */
-function Related({
-  title,
-  items,
-  open,
-}: {
-  title: string;
-  items: MediaItem[];
-  open?: (item: MediaItem) => void;
-}) {
-  if (!items.length) return null;
+/** Links to results an item was made from or made, opening each in the viewer when it can. */
+function RelatedLinks({ items, open }: { items: MediaItem[]; open?: (item: MediaItem) => void }) {
   return (
-    <DetailSection title={title}>
+    <Stack gap={2} align="flex-start">
       {items.map((related) =>
         open ? (
           <Anchor
@@ -615,16 +604,14 @@ function Related({
           </Text>
         ),
       )}
-    </DetailSection>
+    </Stack>
   );
 }
 
 /**
- * Details › Caption (with its tags), From, Prompt, Negative Prompt, Set, the chat's Character,
- * Outfit, Scene and Series, Source, Derived, Model, LoRAs,
- * References, Settings, Output and Timing for one result; From and Derived look among the `loaded`
- * items too, and `open` shows a related result in the
- * viewer.
+ * Details › Caption (with its tags), Model, Prompt, Negative Prompt, Lineage, LoRAs, References,
+ * Settings, Output and Timing for one result. Lineage looks among the `loaded` items too, and `open`
+ * shows a related result in the viewer.
  */
 export function MediaDetails({
   item,
@@ -640,33 +627,45 @@ export function MediaDetails({
   const url = item.status === "done" ? mediaSource(item).url : "";
   const size = useMediaSize(url);
   const details = useGenerationDetails(item, url && size.isPending ? null : size.data);
-  return (
-    <Stack gap="lg" fz="sm">
-      <Caption item={item} />
-      {(item.identity || item.faceRedo) && (
-        <FaceCheck identity={item.identity} faceRedo={item.faceRedo} />
-      )}
-      <Related title="From" items={related.source ? [related.source] : []} open={open} />
-      <DetailsPrompt item={item} />
-      {item.resultSet && (
-        <DetailSection title="Set">
-          <Text size="sm">{item.resultSet.title}</Text>
-        </DetailSection>
-      )}
-      <ChatContext item={item} />
-      {item.source && (
-        <DetailSection title="Source">
+  const context = item.resultSet?.context;
+  // Where it came from, what it is part of, then what was made from it.
+  const lineage = (
+    [
+      ["From", related.source && <RelatedLinks items={[related.source]} open={open} />],
+      [
+        "Source",
+        item.source && (
           <Anchor href={item.source.url} target="_blank" rel="noreferrer" size="sm">
             {item.source.title || item.source.url}
           </Anchor>
-        </DetailSection>
-      )}
-      <Related title="Derived" items={related.derived} open={open} />
+        ),
+      ],
+      ["Set", item.resultSet?.title],
+      [
+        "Series",
+        context?.series && (
+          <Anchor component={Link} to={gallerySearch(item, context.series)} size="sm">
+            {context.series}
+          </Anchor>
+        ),
+      ],
+      [
+        "Derived",
+        related.derived.length > 0 && <RelatedLinks items={related.derived} open={open} />,
+      ],
+    ] as [string, React.ReactNode][]
+  ).filter(([, value]) => Boolean(value));
+  const faceCheck = Boolean(item.identity || item.faceRedo);
+  return (
+    <Stack gap="lg" fz="sm">
+      <Caption item={item} />
       {details.profile && (
         <DetailSection title="Model">
           <Text size="sm">{details.profile}</Text>
         </DetailSection>
       )}
+      <DetailsPrompt item={item} />
+      <Section title="Lineage" rows={lineage} />
       {!!details.loras.length && (
         <DetailSection title="LoRAs">
           {details.loras.map((lora) => (
@@ -681,7 +680,12 @@ export function MediaDetails({
           ))}
         </DetailSection>
       )}
-      {!!(details.references.length || details.unused.length) && (
+      {!!(
+        details.references.length ||
+        details.unused.length ||
+        contextCards.some(({ key }) => context?.[key]) ||
+        faceCheck
+      ) && (
         <DetailSection title="References">
           {details.references.map((reference) => {
             const address = `/api/reference-assets/${encodeURIComponent(reference.id)}`;
@@ -729,6 +733,8 @@ export function MediaDetails({
               Not used: {note}
             </Text>
           ))}
+          <ContextCards item={item} />
+          {faceCheck && <FaceCheck identity={item.identity} faceRedo={item.faceRedo} />}
         </DetailSection>
       )}
       <Section title="Settings" rows={details.settings} />
