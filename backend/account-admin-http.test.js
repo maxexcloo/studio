@@ -136,9 +136,9 @@ test(
     const videos = await call("/api/preferences", {
       method: "PATCH",
       cookie,
-      body: { videos: "quality" },
+      body: { videos: "local" },
     });
-    assert.equal(videos.body.preferences.videos, "quality");
+    assert.equal(videos.body.preferences.videos, "local");
     const wrong = await call("/api/preferences", {
       method: "PATCH",
       cookie,

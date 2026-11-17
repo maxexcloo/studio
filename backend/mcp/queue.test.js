@@ -59,7 +59,7 @@ async function fixture(t, beforeAcknowledgement) {
     dataDir: dir,
     publicUrl: "https://studio.example.test",
     async domainRequest(method, route, body, owner) {
-      if (method === "GET" && route === "/api/models?cached=1") {
+      if (method === "GET" && route === "/api/models?cached=1&preferences=0") {
         prepared.add(owner);
         if (prepared.size === 3) allPrepared.resolve();
         return {

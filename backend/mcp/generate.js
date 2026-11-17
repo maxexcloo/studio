@@ -14,6 +14,7 @@ import {
   identitySlot,
   keepsCharacterFaces,
   keepsIdentity,
+  maxContextNotes,
   maxNewCharacters,
   minCharacterAge,
   startImageSlot,
@@ -120,9 +121,14 @@ const chatContext = z
     outfit: cardContext.optional(),
     scene: cardContext.optional(),
     series: z.string().optional(),
+    notes: z.string().max(maxContextNotes).optional(),
   })
-  .describe("Who and what it shows; series names a story or project.");
+  .describe(
+    "Who and what it shows; series names a story or project; notes: backstory for Studio's writers.",
+  );
 const promptList = z.array(z.string().trim().min(1)).min(1).max(maxSplitJobs);
+// Images the account's chats may have unfinished before generate queues more: a round to review.
+const maxPendingImages = 16;
 /** A JSON array sent as one string, or a single prompt. */
 const promptListText = z.string().transform((text) => {
   try {
@@ -215,7 +221,7 @@ export function registerGenerateTools({
   chatAssistant,
   chatChoices,
 }) {
-  const { owner, refs, conversation } = actor;
+  const { owner, refs, conversation, turn } = actor;
   // A guide goes to each conversation (each MCP session without a conversation header, else the account).
   const guideKey = (refs, profileId) => JSON.stringify([refs, profileId]);
   const review = (refs, profileId) => reviewedGuides.due(guideKey(refs, profileId));
@@ -271,7 +277,7 @@ export function registerGenerateTools({
           },
         ]
       : [];
-    // Several results, or any still running, also get one All Results page that fills in as they finish.
+    // Several results, or any still running, also get one All Results link to watch them in Studio.
     const all = `[All Results](${media.allUrl(owner, refs)})`;
     const pending = [
       ...submission.jobs.map(
@@ -556,7 +562,7 @@ export function registerGenerateTools({
                 }
               : args,
             refs,
-            { ...record, ...(conversation ? { conversation } : {}) },
+            { ...record, ...(conversation ? { conversation, turn } : {}) },
             queueSet,
           )
           .catch((error) => {
@@ -1141,6 +1147,11 @@ export function registerGenerateTools({
       strengths,
       ...args
     } = constrained.args;
+    const unfinished = preview ? 0 : await media.pendingOutputs(owner, signal);
+    if (unfinished > maxPendingImages)
+      throw new Error(
+        `${unfinished} chat images are still unfinished in Studio, so nothing was queued. Tell the user, end the turn, and review finished results before the next round.`,
+      );
     if (args.reference_asset_ids)
       args.reference_asset_ids = await Promise.all(
         args.reference_asset_ids.map((id) => referenceAsset(id, signal)),
@@ -1461,10 +1472,12 @@ export function registerGenerateTools({
                         : {}),
                     }
                   : {}),
-                // Its lead starts each prompt verbatim, as in the composer; shots are written whole.
+                // With its image, its lead starts each prompt verbatim, as in the composer; without,
+                // the chat's prompts run as written, so its own edits to looks hold. Shots are
+                // written whole.
                 ...(parts
                   ? { prompts: shotPrompts(room > 0) }
-                  : card
+                  : card && room
                     ? {
                         prompts: args.prompts.map((prompt) =>
                           withCharacter(prompt, card.description, room > 0),
@@ -1476,7 +1489,7 @@ export function registerGenerateTools({
               };
               const start =
                 card?.referenceIds.length && !room
-                  ? `${profile.label || profile.id} can't take ${card.name}'s image as a reference, so only the description carries the character and the face will change from image to image. Tell the user; ${keeper ? `${keeper.label || keeper.id}` : "a model that edits with references"} keeps the same face in new outfits and scenes. `
+                  ? `${profile.label || profile.id} can't take ${card.name}'s image as a reference, so only your prompts carry the character (write their looks in) and the face will change from image to image. Tell the user; ${keeper ? `${keeper.label || keeper.id}` : "a model that edits with references"} keeps the same face in new outfits and scenes. `
                   : "";
               // A reference on an img2img model is its start image, and the reply says what follows.
               const img2img =

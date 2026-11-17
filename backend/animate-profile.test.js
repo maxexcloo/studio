@@ -32,21 +32,19 @@ const profiles = [
 const choose = (options, list = profiles) =>
   animateProfile(list, { defaultId: "fl-quality", width: 1024, height: 1536, ...options });
 
-test("Animate takes a local first-frame profile, Fast unless Quality is asked, while local video runs", () => {
+test("Animate takes the account's Local default, else a local first-frame profile at Fast unless Quality is asked", () => {
   const choice = choose({ localRunning: true });
   assert.equal(choice.profile.id, "fl-fast");
   assert.deepEqual([choice.cloud, choice.note, choice.tier], [false, "", "fast"]);
   assert.deepEqual(choice.size, { width: 832, height: 1248 });
   assert.equal(choose({ localRunning: true, tier: "quality" }).profile.id, "fl-quality");
-  assert.deepEqual(choice.offers, { cloud: true, fast: true, quality: true });
-  // With one first-frame profile there is no choice: every tier takes it, and only its own is offered.
-  const one = profiles.filter((profile) => profile.id !== "fl-fast");
-  assert.equal(choose({ localRunning: true }, one).profile.id, "fl-quality");
-  assert.deepEqual(choose({ localRunning: true }, one).offers, {
-    cloud: true,
-    fast: false,
-    quality: true,
-  });
+  assert.deepEqual(choice.offers, { cloud: true, local: true });
+  assert.equal(
+    choose({ localRunning: true, preferred: { local: "fl-quality" } }).profile.id,
+    "fl-quality",
+  );
+  // A Local default that can't animate gives way to the usual pick.
+  assert.equal(choose({ localRunning: true, preferred: { local: "gone" } }).profile.id, "fl-fast");
 });
 
 test("Picking Cloud or Local GPU takes only that pool, and Local refuses rather than fall back", () => {
@@ -58,7 +56,7 @@ test("Picking Cloud or Local GPU takes only that pool, and Local refuses rather 
   assert.throws(
     () => choose({ localRunning: false, localParked: true, where: "local" }),
     (error) =>
-      /^Local video is stopped\.$/.test(error.message) && error.offers.fast && error.offers.cloud,
+      /^Local video is stopped\.$/.test(error.message) && error.offers.local && error.offers.cloud,
   );
   const offline = profiles.map((p) => (p.family ? p : { ...p, availability: "offline" }));
   assert.throws(
@@ -67,8 +65,7 @@ test("Picking Cloud or Local GPU takes only that pool, and Local refuses rather 
   );
   assert.throws(
     () => choose({ localRunning: true, where: "local" }, [grok]),
-    (error) =>
-      /No local video model/.test(error.message) && !error.offers.fast && !error.offers.quality,
+    (error) => /No local video model/.test(error.message) && !error.offers.local,
   );
 });
 
@@ -139,13 +136,13 @@ test("A video framed by its start frame draws at the frame's proportions unless 
 test("Dream's videos run only on local GPUs, even for an account that prefers Cloud", () => {
   const dream = (options) =>
     dreamVideoProfile(profiles, { defaultId: "fl-quality", localRunning: true, ...options });
-  assert.equal(dream({ videos: "cloud" }).profile.id, "fl-fast");
-  assert.equal(dream({ videos: "quality" }).profile.id, "fl-quality");
+  assert.equal(dream({ preferred: { side: "cloud", cloud: "grok-video" } }).profile.id, "fl-fast");
+  assert.equal(dream({ preferred: { local: "fl-quality" } }).profile.id, "fl-quality");
   // An Extend keeps a local video's model, but a Grok video's continues locally.
-  assert.equal(dream({ videos: "fast", extend: "fl-quality" }).profile.id, "fl-quality");
-  assert.equal(dream({ videos: "cloud", extend: "grok-video" }).profile.id, "fl-fast");
+  assert.equal(dream({ extend: "fl-quality" }).profile.id, "fl-quality");
+  assert.equal(dream({ extend: "grok-video" }).profile.id, "fl-fast");
   // Without local video it refuses rather than fall back to Grok.
-  assert.throws(() => dream({ videos: "cloud", localRunning: false }), {
+  assert.throws(() => dream({ localRunning: false }), {
     message: "Local video isn't running.",
   });
 });

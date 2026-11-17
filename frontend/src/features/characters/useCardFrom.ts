@@ -55,7 +55,8 @@ export function useStartCard() {
         // The gallery under Library, without its viewer.
         backgroundLocation: location.state?.backgroundLocation || {
           ...location,
-          search: location.search.replace(/[?&]item=[^&]*/, "").replace(/^&/, "?"),
+          pathname: location.pathname.replace(/^(\/(?:images|videos))\/.*/, "$1"),
+          state: { ...location.state, viewer: undefined, ask: undefined },
         },
         cardFrom: item.id,
         cardNamed: item.resultSet?.context?.[cardNoun[kind]],

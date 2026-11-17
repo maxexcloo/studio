@@ -36,7 +36,7 @@ const generateDedupeWindowMs = 120_000;
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = `Studio makes images and videos. Always write finished generate prompts yourself to the model's prompting guide, keeping the user's subject and their own descriptions (face, body, skin, outfit) word for word, changing only what they ask; pass them as prompts in every generate call and the user's words as request. Studio runs them exactly as written. Saved account preferences and learnt taste never constrain MCP generation; read them only when the user asks, and never save lasting preferences unless explicitly asked. ${americanEnglish} ${subjectFirst} ${proportionate} Liked portraits read: who, pretty or cute, doing one candid thing with a prop in a real place; face features and one small mark; body in absolute terms; outfit; light; lens and grain. Add a LoRA only when the user names one or clearly wants one. "N sets of K" is N distinct prompts with count K in one call; asked for variety, vary framing, angle, pose, outfit and setting between them. Suggest via generate preview, then wait for the user. Set kind; tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution. Skip models for ordinary requests. For what is ready, running or installed now call models, for work in progress queue; never answer from memory or an earlier reply. Results are numbered as in Studio (#12). For a follow-up on a result ("again", "warmer", "animate it"), call reuse with its ref and your revised prompt, not a new generate. Compare with generate's axis or a result's variants. Search earlier or liked work. Reply briefly as each result says; if queued, share the links and end the turn. Call result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a call can't connect, Studio may be restarting: retry once shortly. Stopped/Offline models queue. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images. One call per tool per step: models and generate take profile_ids, review takes also. Name sets for the chat topic/title; reuse unless the user renames.`;
+const mediaInstructions = `Studio makes images and videos. Always write finished generate prompts yourself to the model's prompting guide, keeping the user's subject and their own descriptions (face, body, skin, outfit) word for word, changing only what they ask; pass them as prompts in every generate call and the user's words as request. Studio runs them exactly as written. Saved account preferences and learnt taste never constrain MCP generation; read them only when the user asks, and never save lasting preferences unless explicitly asked. ${americanEnglish} ${subjectFirst} ${proportionate} Liked portraits read: who, pretty or cute, doing one candid thing with a prop in a real place; face features and one small mark; body in absolute terms; outfit; light; lens and grain. Add a LoRA only when the user names one or clearly wants one. "N sets of K" is N distinct prompts with count K in one call; asked for variety, vary framing, angle, pose, outfit and setting between them. Suggest via generate preview, then wait for the user. Set kind; tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution. Skip models for ordinary requests. For what is ready, running or installed now call models, for work in progress queue; never answer from memory or an earlier reply. Results are numbered as in Studio (#12). For a follow-up on a result ("again", "warmer", "animate it"), call reuse with its ref and your revised prompt, not a new generate. Compare with generate's axis or a result's variants. Search earlier or liked work. Reply briefly as each result says; if queued, share the links and end the turn: one round per turn; review finished results before rewriting. Call result only when the user asks to see results, never in the background. Never poll, resubmit or invent results or actions; if a tool is missing or fails, say so. If a call can't connect, Studio may be restarting: retry once shortly. Stopped/Offline models queue. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images. One call per tool per step: models and generate take profile_ids, review takes also. Name sets for the chat topic/title; reuse unless the user renames.`;
 const unlinkedMessage =
   "This chat account isn't linked to a Studio account yet. Ask an administrator to link it in Settings › Users.";
 const anonymousMessage = "The gateway must forward its user identity.";
@@ -235,8 +235,10 @@ export function registerMcpRoutes(
         .status(401)
         .set("WWW-Authenticate", 'Bearer realm="Studio MCP"')
         .json({ error: "A valid MCP bearer credential is required." });
+    // The chat and its turn, as LibreChat names them, which its results are grouped by.
     const conversation = String(req.headers["x-studio-conversation-id"] || "");
-    if (conversation.length > 256 || /[\x00-\x1f\x7f]/.test(conversation))
+    const turn = conversation ? String(req.headers["x-studio-turn-id"] || "") : "";
+    if ([conversation, turn].some((id) => id.length > 256 || /[\x00-\x1f\x7f]/.test(id)))
       return res.status(400).json({ error: "Invalid conversation identity." });
     // The MCP session id handed out on initialize (see handle), which a client resends for that chat.
     const session = String(req.headers["mcp-session-id"] || "");
@@ -258,6 +260,7 @@ export function registerMcpRoutes(
       assistant,
       admin,
       conversation,
+      turn,
       client: clientNames.get(session) || "",
       refs: scope === "media" && owner ? media.referenceScope(owner, chat) : "",
     };
@@ -618,22 +621,18 @@ export function registerMcpRoutes(
       "Referrer-Policy": "no-referrer",
       "X-Content-Type-Options": "nosniff",
       "Content-Security-Policy":
-        "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
       "Content-Type": "text/html; charset=utf-8",
     };
     try {
       if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase())
         throw new Error("Invalid host.");
       const claims = media.claims(req.params.token);
-      if (claims.page || claims.all) {
-        // Account mode reads as the signed owner with Studio's own credential; the call rechecks that account's access.
-        const credential = accountMode ? { internal: true } : undefined;
-        const html = claims.all
-          ? await media.allPage(claims, credential)
-          : await media.page(claims, credential);
-        if (!html) throw new Error("Unavailable.");
-        return res.set(pageHeaders).send(html);
-      }
+      // A job's or conversation's link opens its results in Studio's own gallery and viewer.
+      if (claims.page || claims.all)
+        return res
+          .set({ "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" })
+          .redirect(302, media.studioUrl(claims));
       const read = (jobId, index) =>
         accountMode
           ? media.signedResult(claims.owner, jobId, index)
@@ -660,7 +659,6 @@ export function registerMcpRoutes(
         .send(
           resultPage(
             "Result Unavailable",
-            false,
             "<p>This result link is invalid, unavailable or expired. Ask the chat to show the result again.</p>",
           ),
         );

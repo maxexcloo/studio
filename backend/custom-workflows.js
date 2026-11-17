@@ -13,6 +13,7 @@ import { writeJsonFile } from "./json-store.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { isFastH3 } from "./providers/radiance.ts";
 import { chainReferenceSlots } from "./reference-chains.js";
+import { isObject } from "./values.js";
 
 export { profileBackendLabels, sharedProfileFields };
 
@@ -219,10 +220,9 @@ export function detectWorkflowFormat(raw) {
   return "unsupported";
 }
 
-const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 /** A combined profile's backend ids, in file order; empty for a profile with one graph. */
 export const backendIdsOf = (raw) =>
-  isRecord(raw?.studio?.backends) ? Object.keys(raw.studio.backends) : [];
+  isObject(raw?.studio?.backends) ? Object.keys(raw.studio.backends) : [];
 
 /**
  * The single-graph profile a combined one runs on `requested` (else its `backend`, else its first):
@@ -233,10 +233,10 @@ export function profileOnBackend(raw, requested = "") {
   if (!ids.length) return { raw, backend: "", backendIds: [] };
   const { backends, backend: chosen, ...shared } = raw.studio;
   const backend = ids.includes(requested) ? requested : ids.includes(chosen) ? chosen : ids[0];
-  const { graph, ...own } = isRecord(backends[backend]) ? backends[backend] : {};
+  const { graph, ...own } = isObject(backends[backend]) ? backends[backend] : {};
   const studio = { ...shared, ...own };
   // A backend's own prompting fields go over the shared ones, as a profile's go over its guide.
-  if (isRecord(shared.prompting) && isRecord(own.prompting))
+  if (isObject(shared.prompting) && isObject(own.prompting))
     studio.prompting = { ...shared.prompting, ...own.prompting };
   return { raw: { graph: graph || {}, studio }, backend, backendIds: ids };
 }
@@ -300,8 +300,8 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
               ? variant.capabilities || {}
               : { ...sharedCapabilities, ...variant.capabilities },
             // A mode's own prompting fields go over the profile's; without any it has none of its own.
-            prompting: isRecord(variant.prompting)
-              ? { ...(isRecord(meta.prompting) ? meta.prompting : {}), ...variant.prompting }
+            prompting: isObject(variant.prompting)
+              ? { ...(isObject(meta.prompting) ? meta.prompting : {}), ...variant.prompting }
               : undefined,
             imageModes: undefined,
           },

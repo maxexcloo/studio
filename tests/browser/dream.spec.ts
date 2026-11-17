@@ -513,7 +513,7 @@ test("Dream navigation orders its views and History shows retained activity and 
   await expect(history).toBeVisible();
   await expect(history.getByRole("link", { name: "Fox A", exact: true })).toHaveAttribute(
     "href",
-    "/images?item=a",
+    "/images/a",
   );
   await expect(history.getByText("Unavailable Fox B", { exact: true })).toBeVisible();
   await expect(history.getByText("both 20 Steps and 40 Steps", { exact: true })).toBeVisible();
@@ -543,7 +543,7 @@ test("Animate keeps a Dream image and stages it in the Videos composer", async (
   await page.goto("/dream");
   await current(page).getByRole("button", { name: "View", exact: true }).click();
   await dreamAction(page, "Animate");
-  await expect(page).toHaveURL(/\/video/);
+  await expect(page).toHaveURL(/\/videos/);
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Dream prompt fox",
   );

@@ -829,6 +829,24 @@ export class GenerationQueue {
     return abandoned;
   }
 
+  /**
+   * Ends accepted work its worker can no longer be running, as after Settings › Workers' Restart:
+   * cancelled where cancellation was asked, otherwise failed so it can be retried.
+   */
+  async end(ownerId: string, id: string, reason: string): Promise<OwnedJob | undefined> {
+    const job = this.store.job(ownerId, id);
+    if (!job || terminalStatuses.has(job.status)) return job;
+    this.progressSeen.delete(id);
+    const ended = this.store.save({
+      ...job,
+      status: job.cancelRequested ? "cancelled" : "failed",
+      progress: undefined,
+      reason: job.cancelRequested ? "Cancelled." : reason,
+    });
+    await this.adapter.settled?.(ended);
+    return ended;
+  }
+
   retry(ownerId: string, id: string): OwnedJob | undefined {
     const job = this.store.job(ownerId, id);
     if (!job || job.status !== "failed") return;

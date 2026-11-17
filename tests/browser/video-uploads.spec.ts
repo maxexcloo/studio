@@ -68,7 +68,7 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
     recreated.push(route.request().postDataJSON());
     return route.fulfill({ json: { ok: true, sessionId: "session-recreate", jobId: "job-clip" } });
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await showOnly(page, "Uploads");
   await page.locator('[data-media-id="clip"]').click();
   // An upload video's Recreate, its only option, opens its suggested prompt.

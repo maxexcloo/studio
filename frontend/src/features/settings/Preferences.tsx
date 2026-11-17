@@ -1,15 +1,20 @@
 import { Button, SegmentedControl, Select, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
+import { Fragment } from "react";
 
+import { isCloudProfile } from "../../../../shared/profiles";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { titleCase } from "../../ui/titleCase";
+import { titleCase } from "../../../../shared/titles";
+import { modelsQuery } from "../generation/GenerationProvider";
+import { profileName } from "../generation/payload";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import {
   type GalleryWorkPreference,
   type SidePreference,
-  type VideosPreference,
+  type WorkKind,
+  defaultModelKeys,
   preferencesQuery,
   useSavePreferences,
   useTileCaptions,
@@ -62,81 +67,77 @@ function ModelChoices() {
   );
 }
 
-/** The gateway text model for prompt writing, whose `cloud/` and `local/` aliases route themselves. */
-function PromptAssistantModel() {
-  const preferences = useQuery(preferencesQuery).data?.preferences;
-  const assistant = useQuery(assistantQuery).data;
-  const save = useSavePreferences();
-  const models = assistant?.models || [];
-  // A saved pick shows at once; one the account may no longer use shows what its writing asks for.
-  const writingModel =
-    preferences?.writingModel && models.includes(preferences.writingModel)
-      ? preferences.writingModel
-      : assistant?.writingModel;
-  if (!preferences || !writingModel) return null;
-  return (
-    <SettingRow
-      wide
-      label="Prompt Assistant"
-      description="The model that writes and improves prompts."
-    >
-      {/* The gateway's models and those of Studio's workloads serving text, keeping the current one a choice. */}
-      <Select
-        aria-label="Prompt Assistant"
-        data={[...new Set([...models, writingModel])].map((value) => ({
-          value,
-          label: textModelName(value),
-        }))}
-        value={writingModel}
-        onChange={(choice) => choice && save.mutate({ writingModel: choice })}
-        allowDeselect={false}
-        searchable
-        nothingFoundMessage="No Matches"
-      />
-    </SettingRow>
-  );
-}
-
 const sides: { value: SidePreference; label: string }[] = [
   { value: "cloud", label: "Cloud" },
   { value: "local", label: "Local" },
 ];
-/** Videos' choices, as Animate's menu offers them: Cloud, or the local Fast or Quality tier. */
-const videoChoices: { value: VideosPreference; label: string }[] = [
-  { value: "cloud", label: "Cloud" },
-  { value: "fast", label: "Fast" },
-  { value: "quality", label: "Quality" },
+const kinds: { kind: WorkKind; label: string; description: string }[] = [
+  { kind: "images", label: "Images", description: "Where new images run until you pick a model." },
+  {
+    kind: "text",
+    label: "Text",
+    description:
+      "Where prompt writing, titles, captions, suggestions and Dream's writing run. Local shares a GPU with images.",
+  },
+  {
+    kind: "videos",
+    label: "Videos",
+    description: "Where new videos and Animate run until you pick a model.",
+  },
 ];
+
 /**
- * Cloud Models, then where Images, Text and Videos run by default: Cloud or Local, and for Videos
- * Cloud or the local Fast or Quality tier (unsaved, Local, Cloud and Fast). With Cloud Models off,
- * Cloud is no choice, leaving Images and Text none, and a saved Cloud reads as unsaved, as the
- * backend reads it (account-preferences.js).
+ * Cloud Models, then for Images, Text and Videos where each runs by default (unsaved, Local, Cloud
+ * and Local) and its default model on each side, the deployment's until one is chosen. With Cloud
+ * Models off, Cloud is no choice and only the Local defaults remain, as the backend reads it
+ * (account-preferences.js).
  */
 function WhereWorkRuns() {
   const status = useQuery(preferencesQuery).data;
+  const profiles = useQuery(modelsQuery).data?.profiles;
+  const textModels = useQuery(assistantQuery).data?.models;
   const save = useSavePreferences();
   if (!status) return null;
   const { preferences } = status;
   const cloud = preferences.cloudModels;
-  const videos = !cloud && preferences.videos === "cloud" ? undefined : preferences.videos;
-  const row = <T extends string>(
-    label: string,
-    description: string,
-    data: { value: T; label: string }[],
-    value: T,
-    change: (choice: T) => void,
-  ) => (
-    <SettingRow wide label={label} description={description}>
-      <SegmentedControl
-        aria-label={label}
-        fullWidth
-        data={data}
-        value={value}
-        onChange={(choice) => change(choice as T)}
-      />
-    </SettingRow>
-  );
+  const choices = (kind: WorkKind, side: SidePreference) =>
+    kind === "text"
+      ? (textModels || [])
+          .filter((model) => model.startsWith("local/") === (side === "local"))
+          .map((value) => ({ value, label: textModelName(value) }))
+      : (profiles || [])
+          .filter(
+            (profile) =>
+              profile.kind === (kind === "images" ? "image" : "video") &&
+              isCloudProfile(profile) === (side === "cloud"),
+          )
+          .map((profile) => ({ value: profile.id, label: profileName(profile) }));
+  const defaultRow = (kind: WorkKind, label: string, side: SidePreference) => {
+    const key = defaultModelKeys[kind][side];
+    const name = `${label} ${side === "cloud" ? "Cloud" : "Local"} Default`;
+    const data = choices(kind, side);
+    const value = preferences[key];
+    return (
+      <SettingRow
+        key={key}
+        wide
+        label={`${side === "cloud" ? "Cloud" : "Local"} Default`}
+        description={`The ${label.toLowerCase()} model ${side === "cloud" ? "Cloud" : "Local"} uses until you pick one.`}
+      >
+        <Select
+          aria-label={name}
+          placeholder="Studio's Default"
+          // A saved model no longer offered stays a choice, so it reads as what it is.
+          data={value && !data.some((item) => item.value === value) ? [...data, value] : data}
+          value={value ?? null}
+          onChange={(choice) => save.mutate({ [key]: choice })}
+          clearable
+          searchable
+          nothingFoundMessage="No Matches"
+        />
+      </SettingRow>
+    );
+  };
   return (
     <SettingGroup title="Where Work Runs">
       <ModelChoiceRow
@@ -144,29 +145,23 @@ function WhereWorkRuns() {
         label="Cloud Models"
         description="Offer the cloud models you have access to. Off keeps all work local, here and over MCP."
       />
-      {cloud &&
-        row(
-          "Images",
-          "Where new images run until you pick a model.",
-          sides,
-          preferences.images || "local",
-          (images) => save.mutate({ images }),
-        )}
-      {cloud &&
-        row(
-          "Text",
-          "Where titles, captions, suggestions and Dream's writing run. Local shares a GPU with images.",
-          sides,
-          preferences.text || "cloud",
-          (text) => save.mutate({ text }),
-        )}
-      {row(
-        "Videos",
-        "Where new videos run until you pick a model.",
-        cloud ? videoChoices : videoChoices.filter((choice) => choice.value !== "cloud"),
-        videos || "fast",
-        (choice) => save.mutate({ videos: choice }),
-      )}
+      {kinds.map(({ kind, label, description }) => (
+        <Fragment key={kind}>
+          {cloud && (
+            <SettingRow wide label={label} description={description}>
+              <SegmentedControl
+                aria-label={label}
+                fullWidth
+                data={sides}
+                value={preferences[kind] || (kind === "text" ? "cloud" : "local")}
+                onChange={(side) => save.mutate({ [kind]: side as SidePreference })}
+              />
+            </SettingRow>
+          )}
+          {cloud && defaultRow(kind, label, "cloud")}
+          {defaultRow(kind, label, "local")}
+        </Fragment>
+      ))}
     </SettingGroup>
   );
 }
@@ -252,7 +247,6 @@ export function Preferences() {
             onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
           />
         </SettingRow>
-        <PromptAssistantModel />
       </SettingGroup>
       <WhereWorkRuns />
       <SettingGroup title="Danger Zone" danger>

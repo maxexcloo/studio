@@ -93,11 +93,11 @@ test("extending keeps its exact profile or alias on Fast and Quality; Cloud and 
     settings: { profileId: "old-h3" },
   } as MediaItem;
   const own = { ...local, aliases: ["old-h3"] };
-  assert.equal(retainedAnimationProfile([cloud, own], item, "fast"), own);
-  assert.equal(retainedAnimationProfile([cloud, own], item, "quality"), own);
+  assert.equal(retainedAnimationProfile([cloud, own], item, "local"), own);
+  assert.equal(retainedAnimationProfile([cloud, own], item), own);
   assert.equal(retainedAnimationProfile([cloud, own], item, "cloud"), undefined);
-  assert.equal(retainedAnimationProfile([{ ...own, ready: false }], item, "fast"), undefined);
-  assert.equal(retainedAnimationProfile([own], { ...item, type: "image" }, "fast"), undefined);
+  assert.equal(retainedAnimationProfile([{ ...own, ready: false }], item, "local"), undefined);
+  assert.equal(retainedAnimationProfile([own], { ...item, type: "image" }, "local"), undefined);
 });
 
 test("prepared review and queued input share timing, exact reference slots and source lineage", () => {

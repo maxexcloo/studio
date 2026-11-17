@@ -1,6 +1,11 @@
 // Gallery records built from a run: its pending tiles, recorded settings and what ComfyUI's history
 // says it made. Pure functions, so code that only builds records never loads the gallery (store.js).
-import { cardKinds, maxCardDescription, maxCardName } from "../../shared/characters.ts";
+import {
+  cardKinds,
+  maxCardDescription,
+  maxCardName,
+  maxContextNotes,
+} from "../../shared/characters.ts";
 import { titleCase } from "../../shared/titles.ts";
 import { keptTriggers } from "../lora/prompts.js";
 import { videoPattern } from "../media-paths.js";
@@ -43,16 +48,19 @@ export function outputsFrom(worker, history) {
   return urls;
 }
 
-/** The chat that asked for a run: its conversation id, as LibreChat names it (X-Studio-Conversation-Id). */
+/**
+ * The chat that asked for a run: its conversation id and the turn within it, as LibreChat names
+ * them (X-Studio-Conversation-Id, X-Studio-Turn-Id).
+ */
 export function storedChatRecord(value) {
-  const id =
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    typeof value.conversationId === "string"
-      ? value.conversationId.trim()
+  const id = (text) =>
+    typeof text === "string" && text.trim().length <= 256 && !/[\x00-\x1f\x7f]/.test(text)
+      ? text.trim()
       : "";
-  return id && id.length <= 256 && !/[\x00-\x1f\x7f]/.test(id) ? { conversationId: id } : null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const conversationId = id(value.conversationId);
+  const turnId = id(value.turnId);
+  return conversationId ? { conversationId, ...(turnId ? { turnId } : {}) } : null;
 }
 
 const shortText = (value, max) =>
@@ -107,6 +115,8 @@ function storedContext(value) {
   }
   const series = shortText(value.series, 80);
   if (series) context.series = series;
+  const notes = shortText(value.notes, maxContextNotes);
+  if (notes) context.notes = notes;
   return Object.keys(context).length ? context : null;
 }
 
