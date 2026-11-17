@@ -480,7 +480,7 @@ test("The Studio header keeps its home link with modes and account controls on p
   page,
 }) => {
   await fixtures(page);
-  await page.goto("/video");
+  await page.goto("/videos");
   const header = page.getByRole("banner");
   const home = header.getByRole("link", { name: "Studio.", exact: true });
   await expect(home).toBeVisible();

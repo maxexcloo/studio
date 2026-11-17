@@ -54,19 +54,19 @@ test("Nested pickers consume outside presses one layer at a time", async ({ page
   await expect(page.getByRole("button", { name: "Choose LoRAs", exact: true })).toBeHidden();
   await expect(page).toHaveURL(new URL("/images", composerUrl).href);
   await press(videos);
-  await expect(page).toHaveURL(/\/video$/);
+  await expect(page).toHaveURL(/\/videos$/);
 });
 
 test("A click outside an open popup only closes it", async ({ page }) => {
   await fixtures(page);
-  await page.goto("/video");
+  await page.goto("/videos");
   await openTheme(page);
   const theme = page.getByText("Colour Scheme", { exact: true });
   await expect(theme).toBeVisible();
   const home = page.getByRole("link", { name: "Studio.", exact: true });
   await home.click();
   await expect(theme).toHaveCount(0);
-  await expect(page).toHaveURL(/\/video$/);
+  await expect(page).toHaveURL(/\/videos$/);
   await home.click();
   await expect(page).toHaveURL(/\/images$/);
 });

@@ -29,7 +29,7 @@ test("A video's Edit menu reverses it into a new version", async ({ page }) => {
       json: { ok: true, id: "reversed", jobId: "job-reversed" },
     });
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   await viewerAction(page, "Edit");
   await page.getByRole("menuitem", { name: "Reverse", exact: true }).click();
