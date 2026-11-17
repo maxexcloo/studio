@@ -26,6 +26,12 @@
   flex-shrink: 0;
 }
 
+/* A phone's row scrolls sideways where its chips outgrow it, rather than wrapping. */
+:root[data-phone] .mode {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
 .searchOpen {
   flex: 1;
 }

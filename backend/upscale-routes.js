@@ -56,7 +56,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
           payload: {
             ok: false,
             offline: true,
-            error: `${isDefaultBackend(worker) ? "ComfyUI" : workerById(worker)?.name || "The upscale worker"} is offline, so smart upscale isn't available.`,
+            error: `${isDefaultBackend(worker) ? "ComfyUI" : workerById(worker)?.name || "The upscale worker"} is offline.`,
           },
         },
       };

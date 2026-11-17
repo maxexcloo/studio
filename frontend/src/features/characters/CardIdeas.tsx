@@ -9,7 +9,7 @@ import type { ReferenceAsset } from "../../types";
 import { type Action, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
-import { UndoButton, assistMenu } from "../generation/AskChange";
+import { UndoButton, assistMenu, suggested } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
 
 type Field = "name" | "description";
@@ -63,27 +63,22 @@ export function useCardIdeas({
   const options = [...(ideas.data?.options ?? [])].sort((a, b) => a.localeCompare(b));
   const loading = again.isPending || (ideas.isFetching && !options.length);
   const noun = nouns[field];
+  const suggestions = suggested(
+    loading,
+    options.map((idea): Action => ({
+      id: `idea:${idea}`,
+      label: idea,
+      icon: icons.assistant,
+      onClick: () => pick(idea),
+    })),
+    { onClick: () => again.mutate(undefined) },
+  );
   const groups = assistMenu({
     templates: [],
     suggestions: [
       { id: "heading", label: "Suggested", heading: true },
-      ...(loading
-        ? [{ id: "loading", label: "Loading…", disabled: true }]
-        : options.length
-          ? options.map((idea): Action => ({
-              id: `idea:${idea}`,
-              label: idea,
-              icon: icons.assistant,
-              onClick: () => pick(idea),
-            }))
-          : [{ id: "none", label: "No Suggestions", disabled: true }]),
-      {
-        id: "refresh",
-        label: "Refresh…",
-        icon: icons.refresh,
-        keepOpen: true,
-        onClick: () => again.mutate(undefined),
-      },
+      ...suggestions.options,
+      suggestions.again,
     ],
     last: [{ id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) }],
   });

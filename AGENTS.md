@@ -110,7 +110,7 @@ recur across features.
   or leaves it. Menus group related actions with the usual action first and
   Delete last, and share their sizing and item style. An action's settings sit
   in its menu, not a separate dialog. An option whose label alone is ambiguous
-  carries a one-line `description`, except in item action menus.
+  carries a one-line `description`, except in item action and assistant menus.
 - Media categories use Images, Videos, Text. Other unordered peers sort
   alphabetically, except settings first, Like before Dislike, Name A–Z and
   Name Z–A last in sort menus, Refresh and Custom… last and Delete last.
@@ -119,8 +119,8 @@ recur across features.
   verb alone is ambiguous (Stop Upscale, Edit in Composer). One action keeps
   one label everywhere. Clear and Reset turn into Undo until the text next
   changes.
-- Item actions are the same on tiles, context menus, the viewer and the
-  selection bar. `MediaActions.tsx` owns their availability and
+- Item actions are the same, in the same groups and order, on tiles, context
+  menus, the viewer and the selection bar. `MediaActions.tsx` owns their availability and
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
   Submenus match in bar and menu, and assistant menus share `assistMenu`.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
@@ -165,16 +165,18 @@ recur across features.
   waits for a tap.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`.
-- Use the shared `TextBox`. Desktop fields expose one menu button, with Copy
-  and Clear/Reset/Undo alongside the tools in one flat menu, each tool's
-  options under its name. The button is ⋯, or the AI icon when the box has
-  an AI tool; the AI icon (`icons.assistant`) marks everything AI does. The
-  viewer's prompt keeps its AI tools in the bar's AI menu instead.
+- Use the shared `TextBox`. Desktop fields with tools expose one menu button
+  holding them in one flat menu, each tool's options under its name; Copy and
+  Clear are left to the browser, and a box starting from its own text shows
+  Reset, then Undo, as one icon beside it while it can act. The button is ⋯,
+  or the AI icon when the box has an AI tool; the AI icon (`icons.assistant`)
+  marks everything AI does. On desktop the viewer's prompt keeps its AI tools
+  in the bar's AI menu; on phones they stay with the prompt.
   Composer fields edit in place; other phone text boxes open the shared
   full-screen editor, and AI tools stay beside the text before it opens.
   Phone controls show Copy, Clear/Reset/Undo and More above the keyboard,
-  with tools in More and form sends separate. A box without tools has no ⋯,
-  Copy or Clear.
+  with tools in More, a full-screen sheet, and form sends separate. A box
+  without tools has no ⋯, Copy or Clear.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating

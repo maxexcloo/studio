@@ -214,3 +214,33 @@
 .secondarySend :global(.mantine-Button-section) {
   margin: 0;
 }
+
+/* A phone's tools menu fills the screen, over the floating position and size Mantine gives it. */
+.sheet {
+  position: fixed !important;
+  inset: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: max(var(--mantine-spacing-md), env(safe-area-inset-top)) var(--mantine-spacing-md)
+    var(--mantine-spacing-xs);
+}
+
+.sheetBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--mantine-spacing-xs) max(var(--mantine-spacing-md), env(safe-area-inset-bottom));
+}

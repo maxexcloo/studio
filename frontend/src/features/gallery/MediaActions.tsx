@@ -53,7 +53,7 @@ import {
 } from "../taste/suggestions";
 import { AnimateDialog } from "./AnimateDialog";
 import { videoExport } from "./download";
-import { itemAction, itemActionGroups } from "./itemActions";
+import { contextMenuActions, itemAction, itemActionGroups } from "./itemActions";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
 import { galleryKey } from "./queries";
@@ -268,7 +268,7 @@ interface MediaActionOptions {
 
 /**
  * The one media action definition for the viewer bar and tile menus: labels, options and
- * availability, placed in a bar's or a menu's order (itemActions.ts).
+ * availability, placed in their order (itemActions.ts).
  */
 export function useMediaActions(
   item: MediaItem,
@@ -287,7 +287,6 @@ export function useMediaActions(
     onTrim,
     onVersionChange,
   }: MediaActionOptions,
-  layout: "bar" | "menu" = "bar",
 ): ActionGroups {
   const action = useMediaAction(item, onApplied);
   const iteration = useMediaIteration(item);
@@ -761,7 +760,6 @@ export function useMediaActions(
   ];
   return itemActionGroups(
     actions.filter((entry): entry is Action => !!entry).map(withoutLoneOption),
-    layout,
   );
 }
 
@@ -807,7 +805,7 @@ export function MediaActionMenu({
   onSelect,
   ...options
 }: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
-  const groups = useMediaActions(item, options, "menu");
+  const groups = contextMenuActions(useMediaActions(item, options));
   return (
     <ActionMenuItems
       groups={

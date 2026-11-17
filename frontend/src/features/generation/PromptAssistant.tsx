@@ -14,7 +14,6 @@ import { CustomDialog } from "./CustomDialog";
 export interface AssistantOption {
   id: string;
   label: string;
-  description?: string;
 }
 interface AssistantStatus {
   available: boolean;
@@ -327,7 +326,6 @@ export function usePromptAssistant({
       ? styles.map((item) => ({
           id: `style:${item.id}`,
           label: item.label,
-          description: item.description,
           checked: item.id === preset?.id,
           disabled,
           onClick: () => run("rewrite", item.id),

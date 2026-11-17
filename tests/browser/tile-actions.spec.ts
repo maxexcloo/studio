@@ -103,29 +103,15 @@ test("Dislike hides a tile, Disliked shows it and Restore brings it back", async
   await expect.poll(() => state.gallery[0].rating).toBe("disliked");
   // Undo is offered while the dislike's notification shows.
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
-  // Phones keep Disliked in Filters; desktop exposes it beside Liked.
-  if (test.info().project.use.isMobile)
-    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page
-    .getByRole(test.info().project.use.isMobile ? "switch" : "button", {
-      name: "Disliked",
-      exact: true,
-    })
-    .click();
+  // Disliked sits beside Liked in the filter bar.
+  await page.getByRole("button", { name: "Disliked", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(tile).toBeVisible();
   await select();
   await selectionAction(page, "Restore").click();
   await expect(tile).toBeHidden();
   await expect.poll(() => state.gallery[0].rating).toBeUndefined();
-  if (test.info().project.use.isMobile)
-    await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page
-    .getByRole(test.info().project.use.isMobile ? "switch" : "button", {
-      name: "Disliked",
-      exact: true,
-    })
-    .click();
+  await page.getByRole("button", { name: "Disliked", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(tile).toBeVisible();
 });
@@ -138,18 +124,21 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // Select, then AI, Report, Like, Dislike | Animate, Edit, Recreate, Upscale | Share, Delete.
+  // Select, then the bar's order with Share's options in its place: Animate, Edit, Recreate,
+  // Upscale | AI, Copy Details, Copy Prompt, Download | Like, Dislike | Report, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Select",
-    "AI",
-    "Report",
-    "Like",
-    "Dislike",
     "Animate",
     "Edit",
     "Recreate",
     "Upscale",
-    "Share",
+    "AI",
+    "Copy Details",
+    "Copy Prompt",
+    "Download",
+    "Like",
+    "Dislike",
+    "Report",
     "Delete",
   ]);
   await page.keyboard.press("Escape");
@@ -164,7 +153,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("menuitem", { name: "Select", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "AI", exact: true })).toBeFocused();
+  await expect(page.getByRole("menuitem", { name: "Animate", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(more).toBeFocused();
 });
@@ -437,8 +426,8 @@ test("On a phone held sideways, the tile menu fits the screen and expands option
     return box.y + box.height;
   };
   await expect.poll(bottom).toBeLessThanOrEqual(390);
-  await page.getByRole("menuitem", { name: "Share", exact: true }).click();
-  await expect(page.getByRole("group", { name: "Share", exact: true })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  await expect(page.getByRole("group", { name: "Recreate", exact: true })).toBeVisible();
   // Delete, last, is reachable by scrolling inside the menu.
   const remove = page.getByRole("menuitem", { name: "Delete", exact: true });
   await remove.scrollIntoViewIfNeeded();
