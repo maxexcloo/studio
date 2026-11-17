@@ -253,6 +253,8 @@ async function fixture(
       ? res.status(503).json({ error: "Fixture result retrieval offline" })
       : res.json(jobs.get(req.params.id) || { status: "missing" }),
   );
+  let queue = { jobs: [], paused: { mine: false, all: false } };
+  app.get("/api/queue", (_req, res) => res.json(queue));
   app.post("/api/jobs/:id/cancel", (req, res) => {
     const job = jobs.get(req.params.id);
     if (job) job.status = "cancelled";
@@ -514,6 +516,9 @@ async function fixture(
     },
     jobLookupFails: (value) => {
       jobLookupFails = value;
+    },
+    queue: (value) => {
+      queue = value;
     },
     deduplicateUploads: () => {
       deduplicateUploads = true;
@@ -1052,8 +1057,9 @@ test("media and administrator credentials discover only their own friendly tools
   // Slow jobs hand back at once; Result runs only on the user's request.
   assert.match(
     media.getInstructions(),
-    /share the links and end the turn\. Call result only when the user asks to see results, never in the background/,
+    /share the links and end the turn: one round per turn; review finished results before rewriting\. Call result only when the user asks to see results, never in the background/,
   );
+  assert.match(media.getInstructions(), /if a tool is missing or fails, say so/);
   assert.match(tools.find((tool) => tool.name === "result").description, /only when the user asks/);
   // Reuse names one result by its ref or job id; "all" belongs to Result alone, and a link id is only a fallback.
   const reuse = tools.find((tool) => tool.name === "reuse");
@@ -1115,8 +1121,9 @@ test("media and administrator credentials discover only their own friendly tools
     // sets, axis comparisons and the user's brief were then fitted within it; then to 21,900 for
     // cancel_all's chat and account scopes, to 22,050 for writing prompts in American English, and
     // to 22,300 for keeping saved preferences and taste out of MCP generation, and to 22,650 for
-    // backstory notes and characters' stories in cards and rewrite_prompt.
-    JSON.stringify(tools).length + media.getInstructions().length < 22650,
+    // backstory notes and characters' stories in cards and rewrite_prompt, and to 22,850 for
+    // Search's dates and the rules to queue one round per turn and never claim untaken actions.
+    JSON.stringify(tools).length + media.getInstructions().length < 22850,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1689,6 +1696,31 @@ test("Generate accepts prompts sent as one JSON string", async (t) => {
   ])
     assert.match(texts(await call(client, "generate", { kind: "image", prompts })), refusal);
   assert.equal(f.submitted.length, 2);
+});
+
+test("Generate queues nothing more while the account's chats have a round unfinished", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  // Studio's own work doesn't count, only this account's MCP images.
+  const running = () =>
+    f.queue({
+      jobs: [...f.jobs.values(), { id: "composer-job", settings: { count: 4 } }].map((job) => ({
+        id: job.id,
+        status: "running",
+        input: { count: job.settings.count },
+      })),
+      paused: { mine: false, all: false },
+    });
+  await generate(client, { prompts: ["A tree", "A flower"], count: 8 });
+  running();
+  await generate(client, { prompts: ["A pond"], count: 2 });
+  running();
+  const queued = f.submitted.length;
+  assert.match(
+    texts(await call(client, "generate", { kind: "image", prompts: ["A hill"] })),
+    /^18 chat images are still unfinished in Studio, so nothing was queued\./,
+  );
+  assert.equal(f.submitted.length, queued);
 });
 
 test("a call of several results is one titled set, each prompt titled by the chat or left to its prompt", async (t) => {
@@ -4590,6 +4622,17 @@ test("Search finds the account's own finished work through the gallery search, a
   });
   assert.deepEqual(liked.hits, [["studio-waves", 0]]);
   assert.match(texts(liked.result), /\) ♥/);
+  // Dates are whole days, and Studio's cursor passes whatever its length.
+  const cursor = "v2|".padEnd(600, "x");
+  await search(alice, { query: "red", before: "2026-11-10", after: "2026-11-01", cursor });
+  assert.deepEqual(f.requests.findLast((request) => request.path === "/gallery").query, {
+    q: "red",
+    includeFailed: "0",
+    limit: "8",
+    before: "2026-11-10T23:59:59.999Z",
+    since: "2026-11-01",
+    cursor,
+  });
   // A page says how many match and how to get the next, reading past unfinished work.
   const page = await search(alice, { query: "red", limit: 3 });
   assert.match(texts(page.result), /^3 of 6 matches, newest first; pass cursor "4" for more\./);
@@ -6909,6 +6952,7 @@ test("a pending Generate stays deduplicated, then expires from its settled reply
     media: {
       request: async () => ({}),
       addSet: () => 1,
+      pendingOutputs: async () => 0,
       profiles: async () => [imageProfile],
       runProfile: (profile) => profile,
       queue: async () => ({
@@ -7291,27 +7335,25 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   assert.equal(seen.length, before);
 
   // Queue: list unfinished and failed work with refs, then act on one job or the whole queue.
-  f.app.get("/api/queue", (_req, res) =>
-    res.json({
-      jobs: [
-        {
-          id,
-          status: "failed",
-          reason: "Out of memory",
-          input: { kind: "image", prompt: "A landscape" },
-          createdAt: "2026-11-04T00:00:00.000Z",
-        },
-        {
-          id: "composer-job",
-          status: "queued",
-          input: { kind: "image", prompt: "From the composer" },
-          createdAt: "2026-11-04T00:01:00.000Z",
-        },
-        { id: "finished-job", status: "completed", input: {}, createdAt: "" },
-      ],
-      paused: { mine: true, all: false },
-    }),
-  );
+  f.queue({
+    jobs: [
+      {
+        id,
+        status: "failed",
+        reason: "Out of memory",
+        input: { kind: "image", prompt: "A landscape" },
+        createdAt: "2026-11-04T00:00:00.000Z",
+      },
+      {
+        id: "composer-job",
+        status: "queued",
+        input: { kind: "image", prompt: "From the composer" },
+        createdAt: "2026-11-04T00:01:00.000Z",
+      },
+      { id: "finished-job", status: "completed", input: {}, createdAt: "" },
+    ],
+    paused: { mine: true, all: false },
+  });
   f.app.post(
     "/api/queue/:action",
     record("queue", (req) =>
