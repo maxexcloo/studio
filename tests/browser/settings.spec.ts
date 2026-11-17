@@ -306,12 +306,12 @@ test("An administrator turns LoRAs and Uncensored off for itself in Settings ›
   ).toBeChecked();
 });
 
-test("Settings › Preferences saves the Prompt Assistant and where each area runs", async ({
+test("Settings › Preferences saves where each kind runs and its default models", async ({
   page,
 }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "member", role: "user" });
-  state.preferences.preferences.videos = "quality";
+  state.preferences.preferences.videos = "local";
   await page.route("**/api/assistant", (route) =>
     route.fulfill({
       json: {
@@ -323,22 +323,19 @@ test("Settings › Preferences saves the Prompt Assistant and where each area ru
     }),
   );
   await page.goto("/settings#preferences");
-  // The Prompt Assistant, unsaved, reads the account's default.
   const prompts = page.getByRole("region", { name: "Prompts", exact: true });
-  const writing = prompts.getByRole("combobox", { name: "Prompt Assistant", exact: true });
-  await expect(writing).toHaveValue("Uncensored · Cloud");
-  await writing.click();
-  await expect(page.getByRole("option")).toHaveText([
-    "Auto · Cloud",
-    "Uncensored · Cloud",
-    "Auto · Local",
-  ]);
-  await page.getByRole("option", { name: "Auto · Local", exact: true }).click();
-  await expect.poll(() => state.preferences.preferences.writingModel).toBe("local/auto");
-  await expect(writing).toHaveValue("Auto · Local");
   await expect(prompts.getByRole("switch", { name: "Keep Recent Prompts" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Prompt Assistant" })).toHaveCount(0);
 
   const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
+  // Text's defaults offer the gateway's models on their own side, Studio's until one is chosen.
+  const textCloud = where.getByRole("combobox", { name: "Text Cloud Default", exact: true });
+  await expect(textCloud).toHaveValue("");
+  await textCloud.click();
+  await expect(page.getByRole("option")).toHaveText(["Auto · Cloud", "Uncensored · Cloud"]);
+  await page.getByRole("option", { name: "Uncensored · Cloud", exact: true }).click();
+  await expect.poll(() => state.preferences.preferences.textCloud).toBe("cloud/uncensored");
+  await expect(textCloud).toHaveValue("Uncensored · Cloud");
   const area = (name: string) => where.getByRole("radiogroup", { name, exact: true });
   const choose = (name: string, choice: string) =>
     area(name).locator("label").filter({ hasText: choice }).click();
@@ -350,15 +347,13 @@ test("Settings › Preferences saves the Prompt Assistant and where each area ru
   await expect(area("Text").getByRole("radio", { name: "Cloud" })).toBeChecked();
   await choose("Text", "Local");
   await expect.poll(() => state.preferences.preferences.text).toBe("local");
-  // Videos offers Animate's three choices, its saved tier showing.
-  await expect(area("Videos").getByRole("radio")).toHaveCount(3);
-  await expect(area("Videos").getByRole("radio", { name: "Quality" })).toBeChecked();
+  await expect(area("Videos").getByRole("radio", { name: "Local" })).toBeChecked();
   await choose("Images", "Cloud");
   await expect.poll(() => state.preferences.preferences.images).toBe("cloud");
   await choose("Videos", "Cloud");
   await expect.poll(() => state.preferences.preferences.videos).toBe("cloud");
-  await choose("Videos", "Fast");
-  await expect.poll(() => state.preferences.preferences.videos).toBe("fast");
+  await choose("Videos", "Local");
+  await expect.poll(() => state.preferences.preferences.videos).toBe("local");
 });
 
 test("Finish Liked Images in Settings › Preferences saves its switch, quality and face detail", async ({
