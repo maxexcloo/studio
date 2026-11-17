@@ -80,8 +80,10 @@ test("A phone text menu fills the screen and its Close returns to the composer u
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper fox");
   const menu = await promptMenu(page, "Prompt");
   const generate = page.getByRole("button", { name: "Generate Image", exact: true });
-  const box = (await menu.boundingBox())!;
-  expect(box.width).toBe(page.viewportSize()!.width);
+  // Once its opening transition ends, the sheet spans the screen.
+  await expect
+    .poll(async () => Math.round((await menu.boundingBox())!.width))
+    .toBe(page.viewportSize()!.width);
   await menu.getByRole("button", { name: "Close AI", exact: true }).tap();
   await expect(page.getByRole("menu")).toBeHidden();
   expect(state.jobs).toHaveLength(0);
