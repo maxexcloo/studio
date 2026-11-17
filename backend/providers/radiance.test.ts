@@ -90,6 +90,16 @@ test("the API key authenticates model discovery, JSON generation and multipart e
   await local.models();
 });
 
+test("Krea 2 profiles send guidance in the card's terms, where 0 is unguided", () => {
+  const guidance = (cfg: number, family: string) => {
+    const { body } = imageRequest({ ...image, model: "kroma-iq8r", cfg }, [], family);
+    return (body as Record<string, unknown>).guidance_scale;
+  };
+  assert.equal(guidance(1, "krea2"), 0);
+  assert.equal(guidance(4.5, "krea2"), 3.5);
+  assert.equal(guidance(1, "flux3"), 1);
+});
+
 test("a video sized for another model's area shrinks to H3's on the 32-pixel grid", () => {
   const { body } = videoRequest({
     model: "minimax-h3-i8",

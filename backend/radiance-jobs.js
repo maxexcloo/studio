@@ -188,6 +188,7 @@ export async function runRadianceJob(
         body,
         video: node.class_type === radianceVideoNode,
         values: node.inputs,
+        family: getCustomWorkflow(body.workflow, body.profileBackend)?.family,
         outputs: [],
       };
       save();
@@ -214,7 +215,7 @@ export async function runRadianceJob(
         const references = await referenceImages(record.body);
         const request = record.video
           ? videoRequest(record.values, references)
-          : imageRequest(record.values, references);
+          : imageRequest(record.values, references, record.family);
         if (stopping(id)) return cancelledRun(id);
         showProgress(id, "Generating");
         if (marks) marks.sent = Date.now();
