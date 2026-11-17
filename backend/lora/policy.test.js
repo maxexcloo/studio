@@ -5,7 +5,15 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { loraCompatibility, loraName } from "../../shared/profiles.ts";
+import {
+  loraCompatibility,
+  loraDefaultStrength,
+  loraName,
+  loraStrengthChoices,
+  loraStrengthIssue,
+  loraStrengthRange,
+  loraStrengthSweep,
+} from "../../shared/profiles.ts";
 import { enrichLocalLoraInfo, optionalLoraPolicyIssue } from "./catalogue.js";
 import { compatibleLoras, strengthRange } from "./policy.js";
 
@@ -85,7 +93,39 @@ test("only valid explicit publisher strength bounds replace fallback controls", 
     optionalLoraPolicyIssue({ name: "slider", strength: 11 }, info, profile),
     /-3 to 10/,
   );
-  assert.equal(optionalLoraPolicyIssue({ name: "unknown", strength: 10 }, {}, profile), "");
+  assert.equal(optionalLoraPolicyIssue({ name: "unknown", strength: 2 }, {}, profile), "");
+  assert.match(optionalLoraPolicyIssue({ name: "unknown", strength: 10 }, {}, profile), /0 to 2/);
+});
+
+test("every strength a LoRA is offered or given lies within the range the server accepts", () => {
+  const cases = [
+    {},
+    { strengthRange: { min: 0.5, max: 1.2, step: 0.05, default: 0.8 } },
+    { strengthRange: { min: -5, max: 5, step: 0.05 } },
+    { strengthRange: { min: 0, max: 1, step: 0.05 }, recommendedStrength: 1.4 },
+    { recommendedStrength: 3 },
+  ];
+  for (const info of cases) {
+    const { min, max } = loraStrengthRange(info);
+    const label = JSON.stringify(info);
+    const offered = [loraDefaultStrength(info), ...loraStrengthChoices(info)];
+    for (const strength of offered) assert.equal(loraStrengthIssue(info, strength), "", label);
+    assert.ok([0, ...offered].includes(min) && offered.includes(max), label);
+    assert.ok(!loraStrengthChoices(info).includes(0), "Without LoRA is its own choice");
+    assert.ok(loraStrengthChoices(info).length <= 11, label);
+    const sweep = loraStrengthSweep(info);
+    assert.equal(sweep[0], 0, label);
+    assert.ok(sweep.slice(1).includes(Math.round(loraDefaultStrength(info) * 100) / 100), label);
+  }
+  // An unpublished range widens to take in the recommendation; a published one clamps it.
+  assert.deepEqual(loraStrengthRange({ recommendedStrength: 3 }), { min: 0, max: 3, step: 0.05 });
+  assert.equal(loraDefaultStrength(cases[3]), 1);
+  assert.deepEqual(loraStrengthChoices(cases[1]), [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2]);
+  assert.deepEqual(loraStrengthSweep(cases[1]), [0, 0.7, 0.8, 0.9]);
+  assert.equal(
+    loraStrengthIssue({ title: "Glow", ...cases[1] }, 1.3),
+    "Glow supports strength 0.5 to 1.2.",
+  );
 });
 
 test("local and provider policy enrichment retains explicit constraints without fabricating family evidence", () => {

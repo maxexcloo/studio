@@ -165,22 +165,64 @@ export function loraName(file: string, info?: { title?: unknown } | null) {
     .replace(/(^|\s)([a-z])/g, (_, space, letter) => space + letter.toUpperCase());
 }
 
-/** A recommendation does not require complete publisher bounds for the strength control. */
-export const loraDefaultStrength = (
-  info:
-    | {
-        recommendedStrength?: number;
-        strengthRange?: { default?: number; min?: number; max?: number };
-      }
-    | undefined,
-  fallback: number,
-) =>
-  info?.recommendedStrength ??
-  info?.strengthRange?.default ??
-  Math.min(
-    Math.max(fallback, info?.strengthRange?.min ?? fallback),
-    info?.strengthRange?.max ?? fallback,
-  );
+type LoraStrengthInfo =
+  | {
+      title?: string;
+      recommendedStrength?: number;
+      strengthRange?: { default?: number; min?: number; max?: number; step?: number };
+    }
+  | undefined;
+
+/**
+ * The strengths a LoRA accepts, for every control and check: its published range (lora/policy.js
+ * strengthRange), else 0 to 2 widened to take in its recommendation.
+ */
+export function loraStrengthRange(info: LoraStrengthInfo) {
+  const range = info?.strengthRange;
+  if (Number.isFinite(range?.min) && Number.isFinite(range?.max))
+    return { min: range!.min!, max: range!.max!, step: range!.step ?? 0.05 };
+  const recommended = info?.recommendedStrength ?? range?.default ?? 1;
+  return { min: Math.min(0, recommended), max: Math.max(2, recommended), step: 0.05 };
+}
+
+/** A LoRA's starting strength: its recommendation, else 1, within its range. */
+export function loraDefaultStrength(info: LoraStrengthInfo) {
+  const { min, max } = loraStrengthRange(info);
+  const wanted = info?.recommendedStrength ?? info?.strengthRange?.default ?? 1;
+  return Math.min(max, Math.max(min, wanted));
+}
+
+/** Why `strength` can't run for this LoRA, naming its range, or "". */
+export function loraStrengthIssue(info: LoraStrengthInfo, strength: number, name = "This LoRA") {
+  const { min, max } = loraStrengthRange(info);
+  return Number.isFinite(strength) && strength >= min && strength <= max
+    ? ""
+    : `${info?.title || name} supports strength ${min} to ${max}.`;
+}
+
+/**
+ * Strengths to compare a LoRA at: its range's ends, its default and up to eight round steps between,
+ * never 0 (leaving the LoRA out is its own choice).
+ */
+export function loraStrengthChoices(info: LoraStrengthInfo) {
+  const { min, max } = loraStrengthRange(info);
+  const step =
+    [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10].find((each) => (max - min) / each <= 8) ?? 10;
+  const round = (value: number) => Math.round(value * 100) / 100;
+  const values = new Set([min, max, loraDefaultStrength(info)].map(round));
+  for (let index = Math.ceil(min / step - 1e-9); index * step <= max + 1e-9; index++)
+    values.add(round(index * step));
+  values.delete(0);
+  return [...values].sort((a, b) => a - b);
+}
+
+/** A strength sweep's starting picks: without the LoRA, then its default and the choices beside it. */
+export function loraStrengthSweep(info: LoraStrengthInfo) {
+  const choices = loraStrengthChoices(info);
+  const at = choices.indexOf(Math.round(loraDefaultStrength(info) * 100) / 100);
+  const start = Math.max(0, Math.min(at - 1, choices.length - 3));
+  return [0, ...choices.slice(start, start + 3)];
+}
 
 /**
  * A provider-backed cloud profile (Grok): it runs at the provider, not on a worker. Access

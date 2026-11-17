@@ -2,6 +2,8 @@ import {
   guidingRoles,
   loraCompatibility,
   loraDefaultStrength,
+  loraStrengthIssue,
+  loraStrengthRange,
   maxLoras,
 } from "../../shared/profiles.ts";
 import {
@@ -372,15 +374,16 @@ function indexLine({ info, fit }, short) {
 
 /** Everything the studio picker knows about one LoRA, for an explicit lookup. */
 function loraDetail({ info, fit }, short) {
-  const range = strengthRange(info);
+  const { min, max } = loraStrengthRange(info);
   return {
     name: short,
     ...(info?.title ? { title: clip(info.title, 120) } : {}),
     ...(info?.description ? { description: clip(info.description, 280) } : {}),
     ...(info?.triggers?.length ? { trigger_words: info.triggers.slice(0, 12) } : {}),
     strength: {
-      recommended: loraDefaultStrength(info, 0.7),
-      ...(range ? { min: range.min, max: range.max } : {}),
+      recommended: loraDefaultStrength(info),
+      min,
+      max,
     },
     ...(info?.base ? { trained_for: info.base } : {}),
     ...(info?.sourceUrl ? { source_url: info.sourceUrl } : {}),
@@ -576,7 +579,8 @@ const equivalentLora = (candidates, value, profile, info) => {
 
 /**
  * The generate tool's LoRA stack for a profile: each name resolved to its file, and given its
- * recommended strength when none is supplied. A LoRA for another family becomes this profile's
+ * recommended strength when none is supplied; a strength outside its range is refused, naming the
+ * range. A LoRA for another family becomes this profile's
  * equivalent by name, or is left out, each with a line in `notes`; an unknown name is refused with
  * the closest matches.
  */
@@ -617,9 +621,13 @@ export function prepareLoras(profile, infos = {}, loras = [], notes = []) {
       );
     }
     if (stack.some((item) => item.name === entry.name)) continue;
+    const issue = Number.isFinite(strength)
+      ? loraStrengthIssue(entry.info, strength, short(entry.name))
+      : "";
+    if (issue) throw new Error(issue);
     stack.push({
       name: entry.name,
-      strength: Number.isFinite(strength) ? strength : loraDefaultStrength(entry.info, 0.7),
+      strength: Number.isFinite(strength) ? strength : loraDefaultStrength(entry.info),
       // The caller's own strength, which a batch never varies (varyLoras).
       ...(Number.isFinite(strength) ? { fixed: true } : {}),
       // A reused run keeps its Trigger Words choice; MCP callers never set it themselves.
@@ -641,9 +649,10 @@ export function varyLoras(stack, infos = {}, position = 0, liked = {}) {
     .filter((lora) => lora.name !== dropped)
     .map(({ fixed, ...lora }) => {
       if (fixed) return lora;
+      const bounds = loraStrengthRange(infos[lora.name]);
       const range = strengthRange(infos[lora.name]) || {
-        min: Math.max(0, lora.strength - 0.3),
-        max: lora.strength + 0.3,
+        min: Math.max(bounds.min, lora.strength - 0.3),
+        max: Math.min(bounds.max, lora.strength + 0.3),
       };
       const centre = Math.min(range.max, Math.max(range.min, liked[lora.name] ?? lora.strength));
       const target = [centre, (range.min + centre) / 2, (centre + range.max) / 2][position % 3];
