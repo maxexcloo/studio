@@ -113,6 +113,66 @@ test("a video sized for another model's area shrinks to H3's on the 32-pixel gri
   assert.equal((body as Record<string, unknown>).size, "992x992");
 });
 
+test("video references take their slots' roles: H3 frames or references, LTX-2.5 a first frame", () => {
+  const video = { prompt: "Waves", width: 1344, height: 768, frames: 192, steps: 50, seed: 1 };
+  const picture = (role?: string) => ({ bytes: new Uint8Array([1]), role });
+  const fields = (model: string, images: ReturnType<typeof picture>[], extra = {}) => [
+    ...(videoRequest({ ...video, model, ...extra }, images).body as FormData).keys(),
+  ];
+  assert.deepEqual(
+    fields("minimax-h3-i8", [picture("start"), picture("end")], { latent_upscale: 2 }),
+    [
+      "model",
+      "prompt",
+      "seconds",
+      "size",
+      "seed",
+      "num_inference_steps",
+      "latent_upscale",
+      "first_frame",
+      "last_frame",
+    ],
+  );
+  assert.deepEqual(fields("minimax-h3-i8", [picture(), picture("reference")]).slice(-2), [
+    "ref_image_1",
+    "ref_image_2",
+  ]);
+  assert.throws(
+    () => videoRequest({ ...video, model: "minimax-h3-i8" }, [picture("start"), picture()]),
+    /not both/,
+  );
+  // LTX-2.5: its own grid and canvas; the distilled release keeps its eight steps and reaches past
+  // 960 × 544 through its latent upsampler; the base is guided.
+  const ltx = { width: 1920, height: 1088, frames: 121 };
+  assert.deepEqual(fields("ltx-2.5-distilled-iq8r", [picture("start")], ltx), [
+    "model",
+    "prompt",
+    "seconds",
+    "size",
+    "seed",
+    "latent_upscale",
+    "input_reference",
+  ]);
+  const base = videoRequest({
+    ...video,
+    model: "ltx-2.5-iq8r",
+    frames: 121,
+    steps: 30,
+    cfg: 3,
+    width: 960,
+    height: 544,
+  }).body as Record<string, unknown>;
+  assert.deepEqual(
+    [base.seconds, base.size, base.num_inference_steps, base.guidance_scale, base.negative_prompt],
+    ["5.041", "960x544", 30, 3, ""],
+  );
+  assert.throws(() => videoRequest({ ...video, model: "ltx-2.5-iq8r" }), /8n \+ 1/);
+  assert.throws(
+    () => videoRequest({ ...video, model: "ltx-2.5-iq8r", frames: 121 }, [picture("end")]),
+    /first frame only/,
+  );
+});
+
 test("the client reads model states and keeps Radiance's own words on failure", async () => {
   const answers: Record<string, Response> = {
     "/v1/models": Response.json({ data: [{ id: "krea-2-turbo-iq8r", state: "parked", tp: 1 }] }),

@@ -350,6 +350,8 @@ export function sanitizeGenerateBody(
       ? snapInteger(input.duration, profile.defaults.duration, profile.constraints.duration)
       : 0,
     resolution,
+    // A model that makes sound (Grok Imagine Video 1.5) can be asked for a silent video.
+    ...(profile.capabilities.sound && input.sound === false ? { sound: false } : {}),
     // The size tier the run's width and height came from (shared/resolution.ts), kept for reuse.
     ...(isResolution(input.resolutionTier) ? { resolutionTier: input.resolutionTier } : {}),
     frames: kind === "video" ? videoFrames(input.frames, frameRange) : 0,

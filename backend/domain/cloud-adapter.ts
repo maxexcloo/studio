@@ -7,7 +7,7 @@ import { type OwnedJob, Store } from "./store.ts";
 
 interface ProviderRecord {
   state: "submitting" | "running" | "saved" | "failed" | "cancelled";
-  request: Omit<CloudRequest, "reference">;
+  request: Omit<CloudRequest, "reference" | "lastFrame">;
   providerId?: string;
   outputs: QueueMedia[];
   reason?: string;
@@ -149,7 +149,7 @@ export function createCloudQueueAdapter({
       } catch (error) {
         return result(save(job, { ...state, state: "failed", reason: (error as Error).message }));
       }
-      const { reference: _reference, ...request } = input;
+      const { reference: _reference, lastFrame: _lastFrame, ...request } = input;
       return send(
         retrying,
         input,
@@ -331,7 +331,7 @@ export function createCloudQueueAdapter({
       } catch (error) {
         return { status: "failed", reason: (error as Error).message };
       }
-      const { reference: _reference, ...request } = input;
+      const { reference: _reference, lastFrame: _lastFrame, ...request } = input;
       return send(
         job,
         input,
