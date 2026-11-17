@@ -3,6 +3,7 @@ import {
   Bookmark,
   ChevronLeft,
   ChevronRight,
+  CircleCheck,
   CirclePause,
   CirclePlay,
   CircleStop,
@@ -20,7 +21,6 @@ import {
   Flag,
   GalleryHorizontalEnd,
   Gauge,
-  Heart,
   ImageUp,
   ImageUpscale,
   Import,
@@ -105,7 +105,8 @@ export const icons = {
   hide: EyeOff,
   /** Bringing something in from elsewhere: Library › Imports and the gallery's Import ▾. */
   import: Import,
-  keep: Heart,
+  /** Keeping something: Dream's Accept and a comparison's Both. */
+  keep: CircleCheck,
   like: ThumbsUp,
   /** A pasted web link, such as Import › From URL. */
   link: Link,

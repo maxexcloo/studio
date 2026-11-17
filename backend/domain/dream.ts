@@ -2920,6 +2920,35 @@ export function createDream(options: {
       );
       write(ownerId, record);
     },
+    /**
+     * The Deck's Undo: Dream results go back to unseen and unrated, gallery images back to
+     * unjudged, and the taste profile forgets what the judgement taught. A rating given on a
+     * gallery image is taken back through the gallery first.
+     */
+    undo(ownerId: string, ids: string[]) {
+      const items = options.items(ownerId, ids);
+      if (items.length !== ids.length) throw failure("That result is unavailable.", 404);
+      const signals = options.taste.read(ownerId).signals;
+      const jobIds = items.flatMap((item) => (item.jobId ? [String(item.jobId)] : []));
+      // A Dream result's judgement starts when it was decided; a gallery image's when calibration
+      // heard of it.
+      const starts = items.flatMap((item) =>
+        item.dream
+          ? item.dream.decidedAt || []
+          : signals.find(
+              (signal) => signal.jobId === item.jobId && signal.kind.startsWith("calibrate-"),
+            )?.at || [],
+      );
+      for (const item of items)
+        if (item.dream && item.dream.state !== "unseen") {
+          const { decidedAt: _, ...mark } = item.dream;
+          options.mark(ownerId, String(item.id), { ...mark, state: "unseen" }, undefined);
+        }
+      if (starts.length) options.taste.takeBack(ownerId, jobIds, starts.sort()[0]);
+      const record = read(ownerId);
+      record.judged = (record.judged || []).filter((id) => !ids.includes(id));
+      write(ownerId, record);
+    },
     keep: (ownerId: string, itemId: string) => decide(ownerId, itemId, "kept"),
     discard: (ownerId: string, itemId: string) => decide(ownerId, itemId, "discarded"),
     /**
