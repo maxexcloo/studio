@@ -1408,7 +1408,7 @@ test("Details fold only a long caption, keep its tags in sight and copy the prom
   await expect(
     details.getByText(`${formatDateTime(stamp)} · 1024 × 1024`, { exact: true }),
   ).toBeVisible();
-  await expect(details.getByRole("row", { name: "Result #866", exact: true })).toBeVisible();
+  await expect(details.getByRole("cell", { name: "#866", exact: true })).toBeVisible();
   // A long caption folds with Expand on its last line and folds again on Collapse; its tags stay
   // in sight.
   const tags = details.getByLabel("Caption Tags", { exact: true });
