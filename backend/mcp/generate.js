@@ -215,7 +215,7 @@ export function registerGenerateTools({
   chatAssistant,
   chatChoices,
 }) {
-  const { owner, refs, conversation } = actor;
+  const { owner, refs, conversation, turn } = actor;
   // A guide goes to each conversation (each MCP session without a conversation header, else the account).
   const guideKey = (refs, profileId) => JSON.stringify([refs, profileId]);
   const review = (refs, profileId) => reviewedGuides.due(guideKey(refs, profileId));
@@ -271,7 +271,7 @@ export function registerGenerateTools({
           },
         ]
       : [];
-    // Several results, or any still running, also get one All Results page that fills in as they finish.
+    // Several results, or any still running, also get one All Results link to watch them in Studio.
     const all = `[All Results](${media.allUrl(owner, refs)})`;
     const pending = [
       ...submission.jobs.map(
@@ -556,7 +556,7 @@ export function registerGenerateTools({
                 }
               : args,
             refs,
-            { ...record, ...(conversation ? { conversation } : {}) },
+            { ...record, ...(conversation ? { conversation, turn } : {}) },
             queueSet,
           )
           .catch((error) => {

@@ -125,6 +125,7 @@ test("a ready profile runs a generate request to the gallery", async () => {
       negative: "",
       count: 1,
       seed: "42",
+      chat: { conversationId: "chat-a", turnId: "turn-1" },
     },
   });
   assert.equal(generate.status, 200, JSON.stringify(generate.body));
@@ -156,6 +157,20 @@ test("a ready profile runs a generate request to the gallery", async () => {
     set.body.items.some((entry) => entry.jobId === jobId),
     false,
   );
+  // `chat` keeps one chat's results and `turn` one turn of it.
+  for (const [query, listed] of [
+    ["chat=chat-a", true],
+    ["chat=chat-a&turn=turn-1", true],
+    ["chat=chat-a&turn=turn-2", false],
+    ["chat=chat-b", false],
+  ])
+    assert.equal(
+      (await api(`/api/gallery?limit=20&${query}`)).body.items.some(
+        (entry) => entry.jobId === jobId,
+      ),
+      listed,
+      query,
+    );
 });
 
 test("a generate request with no prompt is refused plainly", async () => {
