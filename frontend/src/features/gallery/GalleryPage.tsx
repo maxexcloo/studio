@@ -601,20 +601,6 @@ export function GalleryPage() {
                   }
                 />
               )}
-              {phone && (
-                <Switch
-                  label="Disliked"
-                  labelPosition="left"
-                  checked={filters.rating === "disliked"}
-                  onChange={(event) =>
-                    setFilters({
-                      ...filters,
-                      rating: event.currentTarget.checked ? "disliked" : "",
-                      uploads: false,
-                    })
-                  }
-                />
-              )}
               {view === "grid" && (
                 <Switch
                   label="Originals Only"
