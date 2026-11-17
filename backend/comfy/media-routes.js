@@ -188,7 +188,10 @@ export function registerComfyMediaRoutes(app) {
             `/comfy/view?${new URLSearchParams({ filename, subfolder, type, ...(worker ? { worker } : {}) })}`,
           );
         else if (playback.original)
-          res.sendFile(playback.file, { headers: { "Cache-Control": immutableMediaCache } });
+          res.sendFile(playback.file, {
+            dotfiles: "allow",
+            headers: { "Cache-Control": immutableMediaCache },
+          });
         else sendVideoPreview(req, res, playback.file, cacheControl);
         return;
       }
@@ -317,7 +320,10 @@ export function registerComfyMediaRoutes(app) {
           return;
         }
         if (req.query.download === "1") res.attachment(path.basename(file));
-        res.sendFile(file, { headers: { "Cache-Control": immutableMediaCache } });
+        res.sendFile(file, {
+          dotfiles: "allow",
+          headers: { "Cache-Control": immutableMediaCache },
+        });
         return;
       }
       if (req.query.clean === "1") {
