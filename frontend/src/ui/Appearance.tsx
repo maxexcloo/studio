@@ -24,6 +24,7 @@ import {
 } from "react";
 
 import { type Appearance, appearanceChoices } from "../../../shared/appearance";
+import { titleCase } from "../../../shared/titles";
 import {
   type Background,
   type MotionSpeed,
@@ -34,7 +35,6 @@ import {
   studioTheme,
 } from "../theme";
 import { PopupTooltip } from "./PopupTooltip";
-import { titleCase } from "../../../shared/titles";
 import { usePhone, useSideways, useTouch } from "./usePhone";
 
 const defaults: Appearance = {
