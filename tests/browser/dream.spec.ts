@@ -675,7 +675,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
     ]);
 });
 
-test("Discarded Dream results can be viewed and kept after all, or deleted all at once", async ({
+test("Discarded Dream results can be viewed and accepted after all, or deleted all at once", async ({
   page,
 }) => {
   await fixtures(page);
@@ -686,15 +686,15 @@ test("Discarded Dream results can be viewed and kept after all, or deleted all a
   });
   await page.goto("/dream");
   await showView(page, "Discards");
-  await page.getByRole("button", { name: "Keep Dream prompt gone", exact: true }).click();
+  await page.getByRole("button", { name: "Accept Dream prompt gone", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Keep Dream prompt gone", exact: true }),
+    page.getByRole("button", { name: "Accept Dream prompt gone", exact: true }),
   ).toBeHidden();
   await page.getByRole("button", { name: "View Dream prompt other", exact: true }).click();
   const viewer = page.getByRole("dialog");
   await viewer
     .getByRole("group", { name: "Discard Actions" })
-    .getByRole("button", { name: "Keep", exact: true })
+    .getByRole("button", { name: "Accept", exact: true })
     .click();
   await expect(viewer.getByRole("img", { name: "Dream prompt last" })).toBeVisible();
   await page.keyboard.press("Escape");

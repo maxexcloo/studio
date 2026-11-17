@@ -11,6 +11,7 @@ import {
 import { dataDir } from "./data-dir.js";
 import { writeJsonFile } from "./json-store.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
+import { isFastH3 } from "./providers/radiance.ts";
 import { chainReferenceSlots } from "./reference-chains.js";
 
 export { profileBackendLabels, sharedProfileFields };
@@ -262,7 +263,6 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
   const id = safeId(meta.id || path.basename(file || "", path.extname(file || "")));
   const graph = graphFromJson(raw);
   const controls = meta.controls || {};
-  const loraStack = loraStackConfig(meta);
   const mediaInputs = mediaInputsConfig(meta, controls, graph);
   const promptComposition = promptCompositionConfig(meta);
   const graphDefault = (key) => {
@@ -271,6 +271,14 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
       ? graph?.[mapping.node]?.inputs?.[mapping.input]
       : undefined;
   };
+  const stack = loraStackConfig(meta);
+  // FastH3 has no LoRA slot unless the stack runs LoRA work on another model.
+  const loraStack =
+    stack?.adapter === "radiance-tags-v1" &&
+    !stack.model &&
+    isFastH3(String(graphDefault("model") || ""))
+      ? null
+      : stack;
   // A mode on the profile's own controls keeps the profile's capability choices; its references
   // come from its own inputs.
   const {
