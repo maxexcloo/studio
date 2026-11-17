@@ -3,7 +3,7 @@ import type { KubernetesRequest } from "./kubernetes.ts";
 
 type Environment = Record<string, string | undefined>;
 type Item = Record<string, any>;
-const kinds = ["image", "video", "text"];
+const kinds = ["image", "video"];
 /** The Deployment label that makes it a workload, and the prefix of its annotations. */
 const prefix = "studio.excloo.dev/";
 
@@ -72,7 +72,6 @@ export async function discoverWorkloads(environment: Environment, request: Kuber
       throw new Error(`Deployment ${namespace}/${id} shares its name with another workload.`);
     ids.add(id);
   }
-  if (workloads.some((item) => item.kind === "text")) required(environment, "STUDIO_TEXT_KEY");
   return { pools, workloads };
 }
 
@@ -87,7 +86,7 @@ function workload(
   const id: string = deployment.metadata.name;
   const problem = (detail: string) => new Error(`Deployment ${namespace}/${id} ${detail}.`);
   const kind = deployment.metadata.labels[`${prefix}kind`];
-  if (!kinds.includes(kind)) throw problem(`needs ${prefix}kind image, video or text`);
+  if (!kinds.includes(kind)) throw problem(`needs ${prefix}kind image or video`);
   const annotation = (name: string): string | undefined =>
     deployment.metadata.annotations?.[`${prefix}${name}`];
   const pod = deployment.spec.template;
@@ -134,7 +133,7 @@ function workload(
     pool,
     gpus,
     url: `http://${service.metadata.name}.${namespace}.svc.cluster.local:${service.spec.ports[0].port}`,
-    ...(kind === "text"
+    ...(capabilities?.includes("text")
       ? {
           model: required(environment, "STUDIO_LOCAL_TEXT_MODEL"),
           ...(annotation("vision") === "true" ? { vision: true } : {}),

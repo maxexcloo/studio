@@ -100,7 +100,7 @@ const loras = [
 ];
 registerAssistantRoutes(app, {
   engine,
-  // A stopped text workload's model is offered too, though the gateway lists only running ones.
+  // A stopped workload's text model is offered too, though the gateway lists only running ones.
   workloadModels: () => ["local/auto", "local/stopped"],
   profiles: async (req) =>
     [plain, uncensored].filter(

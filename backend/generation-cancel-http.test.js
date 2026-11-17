@@ -71,7 +71,8 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   await once(text, "listening");
   kube.deployments.get("gpu/text").workload = {
     ...gpu,
-    kind: "text",
+    kind: "image",
+    annotations: { "studio.excloo.dev/capabilities": "text" },
     url: `http://127.0.0.1:${text.address().port}`,
   };
   const launch = () =>
@@ -95,7 +96,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
         STUDIO_KUBERNETES_URL: `http://127.0.0.1:${engine.address().port}`,
         STUDIO_KUBERNETES_NAMESPACES: "gpu",
         STUDIO_LOCAL_TEXT_MODEL: "local/auto",
-        STUDIO_TEXT_KEY: "fixture-text",
       },
       stdio: ["ignore", "ignore", "ignore", "ipc"],
     });

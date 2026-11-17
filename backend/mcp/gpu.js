@@ -8,49 +8,52 @@ export const controlInstructions =
 
 /**
  * The control `mode` tool's preset placement from the configured workloads and their observed
- * phases, by what each media workload runs (its capabilities, else its kind): a running one first,
- * then list order. Workloads in other GPU pools keep running as they are.
+ * phases, by what each workload runs (its capabilities, else its kind): a running one first, then
+ * list order. Workloads in other GPU pools keep running as they are.
  */
-export function presetPlacement(mode, textProfile, configured, observed) {
+export function presetPlacement(mode, configured, observed) {
   const running = (item) => ["running", "starting"].includes(item.phase);
   const up = new Set(observed.filter(running).map((item) => item.id));
+  const runs = {
+    image: "images",
+    text: "images and text",
+    video: "videos",
+  };
   const pick = (capability, gpus, taken = "") => {
-    const fits = configured.filter(
-      (item) =>
-        item.kind !== "text" &&
-        item.gpus === gpus &&
+    const fits = configured.filter((item) => {
+      const capabilities = item.capabilities ?? [item.kind];
+      return (
+        (gpus === undefined || item.gpus === gpus) &&
         item.id !== taken &&
-        (item.capabilities ?? [item.kind]).includes(capability),
-    );
+        capabilities.includes(capability) &&
+        (capability !== "text" || capabilities.includes("image"))
+      );
+    });
     const found = fits.find((item) => up.has(item.id)) ?? fits[0];
     if (!found)
       throw new Error(
-        `No ${taken ? "other " : ""}${gpus}-GPU workload that runs ${capability === "image" ? "images" : "videos"} is configured.`,
+        `No ${taken ? "other " : ""}${gpus ? `${gpus}-GPU ` : ""}workload that runs ${runs[capability]} is configured.`,
       );
     return found;
   };
   // Video is picked first, so a workload that runs both isn't taken for images when it alone runs video.
   const video = mode === "image_video" ? pick("video", 1) : undefined;
-  const anchor = mode === "video" ? pick("video", 2) : pick("image", 1, video?.id);
+  const anchor =
+    mode === "video"
+      ? pick("video", 2)
+      : mode === "image_text"
+        ? pick("text")
+        : pick("image", 1, video?.id);
   const elsewhere = observed
     .filter((item) => item.pool !== anchor.pool && running(item))
     .map((item) => item.id);
-  if (mode === "video") return [anchor.id, ...elsewhere];
-  if (video) return [anchor.id, video.id, ...elsewhere];
-  const fits = configured
-    .filter((item) => item.kind === "text" && item.gpus === 1 && item.pool === anchor.pool)
-    .map((item) => item.id);
-  const current = observed.find((item) => fits.includes(item.id) && running(item))?.id;
-  const text = textProfile || current || "";
-  if (!fits.includes(text))
-    throw new Error(`Name text_profile, a text model that fits one GPU: ${fits.join(", ")}.`);
-  return [text, anchor.id, ...elsewhere];
+  return [anchor.id, ...(video ? [video.id] : []), ...elsewhere];
 }
 
 export function registerGpuTools({ tool, server, runtime, workerStatus }) {
   const workloadList = z.array(z.string().min(1)).max(32);
-  const modePlacement = async (mode, textProfile) =>
-    presetPlacement(mode, textProfile, runtime.workloads, (await runtime.observe()).workloads);
+  const modePlacement = async (mode) =>
+    presetPlacement(mode, runtime.workloads, (await runtime.observe()).workloads);
   tool(
     server,
     "gpu_status",
@@ -64,15 +67,16 @@ export function registerGpuTools({ tool, server, runtime, workerStatus }) {
     server,
     "workloads",
     "list workloads",
-    "List the GPU workloads Studio can run, with their kind, GPU pool and GPU count.",
+    "List the GPU workloads Studio can run, with their kind, what they run (text: local text while running), GPU pool and GPU count.",
     {},
     () =>
       mcpJson({
         pools: runtime.pools,
-        workloads: runtime.workloads.map(({ id, label, kind, pool, gpus }) => ({
+        workloads: runtime.workloads.map(({ id, label, kind, capabilities, pool, gpus }) => ({
           id,
           label,
           kind,
+          capabilities: capabilities ?? [kind],
           pool,
           gpus,
         })),
@@ -109,13 +113,11 @@ export function registerGpuTools({ tool, server, runtime, workerStatus }) {
     server,
     "mode",
     "preview gpu mode",
-    "Preview a preset placement only when the user asks for it: image_text (a one-GPU text model and a one-GPU workload that runs images), image_video (two one-GPU workloads, one running images and one video) or video (a two-GPU workload that runs video). image_text keeps the running text model when it fits one GPU; otherwise pass text_profile. Present the changes for approval, then apply the returned workloads and signature.",
+    "Preview a preset placement only when the user asks for it: image_text (a workload that runs images and serves local text), image_video (two one-GPU workloads, one running images and one video) or video (a two-GPU workload that runs video). Present the changes for approval, then apply the returned workloads and signature.",
     {
       mode: z.enum(["image_text", "image_video", "video"]),
-      text_profile: z.string().min(1).optional(),
     },
-    async ({ mode, text_profile }) =>
-      mcpJson(await runtime.preview(await modePlacement(mode, text_profile))),
+    async ({ mode }) => mcpJson(await runtime.preview(await modePlacement(mode))),
     { readOnlyHint: true },
   );
   tool(
