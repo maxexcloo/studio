@@ -567,6 +567,8 @@ test("The chip composer offers supported sizes and settings, follows the output 
   const aspect = page.getByRole("button", { name: "Aspect", exact: true });
   await aspect.click();
   const resolution = page.getByRole("radiogroup", { name: "Resolution", exact: true });
+  await expect(resolution.getByRole("radio", { name: "1K", exact: true })).toBeChecked();
+  await expect(resolution.getByRole("radio").last()).toHaveAccessibleName("Custom");
   await expect(resolution.getByRole("radio", { name: "4K", exact: true })).toHaveCount(0);
   await resolution.locator("label").filter({ hasText: "2K" }).click();
   await page.getByRole("button", { name: "16:9 2048 × 1152", exact: true }).click();
@@ -875,14 +877,22 @@ test("Image presets draw at the chosen resolution within profile constraints", a
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A wide landscape");
   const aspect = page.getByRole("button", { name: "Aspect", exact: true });
-  await expect(aspect).toHaveText("Square · 1024 × 1024");
+  await expect(aspect).toHaveText("Square · 1K");
   await aspect.click();
+  // The profile's default size opens on its presets; Custom holds only Width and Height.
   const resolution = page.getByRole("radiogroup", { name: "Resolution", exact: true });
-  await expect(resolution.getByRole("radio", { name: "Custom", exact: true })).toBeChecked();
-  await resolution.locator("label").filter({ hasText: "1K" }).click();
+  const width = page.getByRole("textbox", { name: "Width", exact: true });
+  const sizes = page.getByRole("group", { name: "Aspect Presets", exact: true });
+  await expect(resolution.getByRole("radio", { name: "Presets", exact: true })).toBeChecked();
+  await expect(width).toBeHidden();
+  await resolution.locator("label").filter({ hasText: "Custom" }).click();
+  await expect(width).toHaveValue("1024");
+  await expect(sizes).toBeHidden();
+  await resolution.locator("label").filter({ hasText: "Presets" }).click();
   // The preset gives the shape; 1K sets its long edge, rounded to the profile's step.
-  await page.getByRole("button", { name: "Landscape 1024 × 704", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Width", exact: true })).toBeHidden();
+  await sizes.getByRole("button", { name: "Landscape 1024 × 704", exact: true }).click();
+  await expect(width).toBeHidden();
+  await expect(resolution.getByRole("radio", { name: "1K", exact: true })).toHaveCount(0);
   await expect(resolution.getByRole("radio", { name: "2K", exact: true })).toHaveCount(0);
   await expect(resolution.getByRole("radio", { name: "4K", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
