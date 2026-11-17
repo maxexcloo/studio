@@ -342,7 +342,7 @@ export function registerManageTools({
     server,
     "cards",
     "manage cards",
-    "The user's character, outfit and scene cards, when asked. list (one with id); create, or update by id or name: name, description, image_ids (reference_asset_ids or result numbers; a character 1–4, clearest first, an outfit or scene 0–1). describe writes one from the first image; rate scores each 1–5 as a reference.",
+    "The user's character, outfit and scene cards, when asked. list (one with id); create, or update by id or name: name, description, image_ids (reference_asset_ids or result numbers; a character 1–4, clearest first, an outfit or scene 0–1), a character's age and story. describe writes one from the first image; rate scores each 1–5 as a reference.",
     {
       action: z.enum(["list", "create", "update", "describe", "rate"]),
       kind: z.enum(Object.keys(cardKinds)),
@@ -350,8 +350,11 @@ export function registerManageTools({
       name: z.string().trim().min(1).max(maxCardName).optional(),
       description: z.string().trim().max(maxCardDescription).optional(),
       image_ids: z.array(z.string().trim().min(1).max(200)).max(maxCharacterImages).optional(),
+      // A character's own; lengths and the age's range are checked where it is saved (cards.js).
+      age: z.number().int().optional(),
+      ...Object.fromEntries(characterTraits.map((key) => [key, z.string().optional()])),
     },
-    async ({ action, kind, id, name, description, image_ids: named }, signal) => {
+    async ({ action, kind, id, name, description, image_ids: named, ...traits }, signal) => {
       const noun = cardKinds[kind].name;
       const list = async () => (await api("GET", `/api/${kind}`, undefined, signal))[kind] || [];
       if (action === "list") {
@@ -396,6 +399,7 @@ export function registerManageTools({
           name: name ?? current?.name,
           description: description ?? current?.description ?? "",
           ...(current ? story(current) : {}),
+          ...(kind === "characters" ? traits : {}),
           referenceIds: image_ids ?? (current ? imageIds(current) : []),
         },
         signal,

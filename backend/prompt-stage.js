@@ -16,6 +16,7 @@ import { mayUseFeature, promptWriter } from "./account-policy.js";
 import { accountPreferences } from "./account-preferences.js";
 import { promptAssistantOff } from "./assistant-routes.js";
 import { dreamRequest } from "./domain/dream.ts";
+import { storyContext } from "./domain/writing-standard.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { writeSetPrompt } from "./prompt-set.js";
 import { sheetRequest, writeSheetPrompt } from "./prompt-sheet.js";
@@ -73,6 +74,8 @@ export function createPromptStage({
     const profile = (await profiles(access)).find((item) => item.id === job.input.profileId);
     if (!profile) throw new Error("The model is no longer available to this account.");
     const writer = promptWriter(access, accountPreferences(job.ownerId || ""));
+    // The story an MCP chat gave its result set, which its variations and clips keep to.
+    const story = storyContext(job.input.resultSet?.context);
     if (writing.kind === "set")
       return writeSetPrompt({
         engine,
@@ -83,6 +86,7 @@ export function createPromptStage({
         frame: () => frame(access, job.parentItemId),
         caption: () => caption(access, job.parentItemId),
         ...setPrompts(job),
+        story,
         writer,
         signal,
         onThinking,
@@ -108,6 +112,7 @@ export function createPromptStage({
       writing,
       clip: animateClip(job.input, profile),
       explicit: !access || mayUseFeature(access, "uncensoredModels"),
+      story,
       writer,
       frame: () => frame(access, start),
       caption: () => caption(access, start),

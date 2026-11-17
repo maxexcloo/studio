@@ -114,3 +114,23 @@ export function writerGuide(guide: unknown) {
         : value;
   return guide && typeof guide === "object" ? JSON.stringify(prune(guide)) : "";
 }
+
+/**
+ * The story a chat gave its results (gallery/records.js storedContext) as one line a writer keeps
+ * to, or "" without one: its series, who and what it shows, and its backstory or scene notes.
+ */
+export function storyContext(context: unknown) {
+  if (!context || typeof context !== "object") return "";
+  const { series, notes, ...cards } = context as Record<string, any>;
+  const parts = [
+    series && `series ${series}`,
+    ...Object.entries(cards).map(
+      ([kind, card]) =>
+        card?.name && `${kind} ${card.name}${card.description ? ` (${card.description})` : ""}`,
+    ),
+    notes && `notes: ${notes}`,
+  ].filter(Boolean);
+  return parts.length
+    ? `Story context, to stay consistent with; it never overrides the source prompt or adds what the prompt doesn't call for: ${parts.join("; ")}`
+    : "";
+}

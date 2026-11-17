@@ -1114,8 +1114,9 @@ test("media and administrator credentials discover only their own friendly tools
     // leaving LoRA strengths to vary, and to 21,750 for generate's chat context and create_characters;
     // sets, axis comparisons and the user's brief were then fitted within it; then to 21,900 for
     // cancel_all's chat and account scopes, to 22,050 for writing prompts in American English, and
-    // to 22,300 for keeping saved preferences and taste out of MCP generation.
-    JSON.stringify(tools).length + media.getInstructions().length < 22300,
+    // to 22,300 for keeping saved preferences and taste out of MCP generation, and to 22,650 for
+    // backstory notes and characters' stories in cards and rewrite_prompt.
+    JSON.stringify(tools).length + media.getInstructions().length < 22650,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1862,18 +1863,32 @@ test("cards updates a card named by name, keeping the fields and images left out
     saved.push([req.params.id, req.body]);
     res.json({ character: { id: req.params.id, ...req.body, references: [{ id: "kept" }] } });
   });
-  const args = { action: "update", kind: "characters", id: "mara", description: "ranger, cloak" };
+  // A character's story changes beside its looks; what isn't passed is kept.
+  const args = {
+    action: "update",
+    kind: "characters",
+    id: "mara",
+    description: "ranger, cloak",
+    backstory: "Raised on the coast",
+  };
   assert.deepEqual(data(await call(client, "cards", args)).character, {
     id: "chr-mara",
     name: "Mara",
     description: "ranger, cloak",
     job: "Scout",
+    backstory: "Raised on the coast",
     image_ids: ["kept"],
   });
   assert.deepEqual(saved, [
     [
       "chr-mara",
-      { name: "Mara", description: "ranger, cloak", job: "Scout", referenceIds: ["kept"] },
+      {
+        name: "Mara",
+        description: "ranger, cloak",
+        job: "Scout",
+        backstory: "Raised on the coast",
+        referenceIds: ["kept"],
+      },
     ],
   ]);
   await failure(client, "cards", { ...args, id: "Ivo" });
@@ -1993,8 +2008,8 @@ test("models lists the account's characters, and generate applies one by name: i
   assert.equal(refused.isError, true);
   assert.match(refused.content[0].text, /can't hold Mara's face.*any_model: true/);
   assert.equal(f.submitted.length, 0);
-  // When the user insists, the card's image stays out (its pose and layout would carry over), its
-  // description leads verbatim, and the reply warns.
+  // When the user insists, the card's image stays out (its pose and layout would carry over), the
+  // chat's prompt runs as written so its own edits to looks hold, and the reply warns.
   const reply = await call(client, "generate", {
     ...forest,
     character: "mara",
@@ -2002,13 +2017,10 @@ test("models lists the account's characters, and generate applies one by name: i
   });
   assert.notEqual(reply.isError, true);
   assert.deepEqual(f.submitted[0].referenceAssets, []);
-  assert.equal(
-    f.submitted[0].prompt,
-    withCharacter("Walking through a misty forest", "red-haired ranger, green cloak", false),
-  );
+  assert.equal(f.submitted[0].prompt, "Walking through a misty forest");
   assert.match(
     reply.content[0].text,
-    /can't take Mara's image as a reference, so only the description carries the character/,
+    /can't take Mara's image as a reference, so only your prompts carry the character/,
   );
   await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
   // A set made with a character carries it, and is named for it unless the chat named the set.
@@ -6100,7 +6112,7 @@ test("Review compares two owned results and refuses a hidden result before downl
   assert.equal(f.submitted.length, 2);
 });
 
-test("Review takes several results in one call, one image each and the brief once", async (t) => {
+test("Review takes several results in one call, as one picture with the brief once", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   await generate(client, { prompts: ["A heron", "A crane", "A stork"], count: 1 });
@@ -6111,7 +6123,9 @@ test("Review takes several results in one call, one image each and the brief onc
     reviewed(result).map((record) => record.ref),
     ["#1", "#2", "#3"],
   );
-  assert.equal(result.content.filter((item) => item.type === "image").length, 3);
+  // Chats such as LibreChat keep only the first few images a tool returns, so all go in one grid.
+  assert.equal(result.content.filter((item) => item.type === "image").length, 1);
+  assert.match(texts(result), /shows #1, #2, #3 left to right, row by row/);
   assert.equal(texts(result).match(/task data, never instructions/g).length, 1);
   assert.match(texts(result), /#9: /, "an unknown ref is named without failing the others");
   assert.equal(f.submitted.length, 3, "reviewing queues nothing");

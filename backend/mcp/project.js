@@ -227,7 +227,7 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
         : {}),
       ...(Object.keys(change).length || taste
         ? {
-            note: "Tell the user it holds for every chat; Library › Chat Brief and Dream › Taste edit it.",
+            note: "Saved in Studio (Library › Chat Brief, Dream › Taste). MCP generation never applies it: keep writing prompts from the chat.",
           }
         : {}),
     });
@@ -236,7 +236,7 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
     server,
     "project",
     "project",
-    `The chat's project and constraints. show lists projects and the user's brief; attach (project), create, update (only changes) or detach. brief edits the saved account brief and taste only when the user explicitly asks to save lasting preferences ("" clears). Saved account preferences never constrain MCP generation.`,
+    `The chat's project and constraints. show lists projects; attach (project), create, update (only changes) or detach. brief edits the saved account brief and taste only when the user explicitly asks to save lasting preferences ("" clears). Saved account preferences never constrain MCP generation.`,
     {
       action: z.enum(["show", "attach", "create", "update", "detach", "brief"]).optional(),
       project: z.string().optional(),
@@ -314,14 +314,11 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
       const current = (await api("POST", "/api/dream/projects/activity", { chat: need() }, signal))
         .project;
       if (action === "show") {
-        const [{ projects }, { brief: own }] = await Promise.all([
-          api("GET", "/api/dream/projects", undefined, signal),
-          api("GET", "/api/chat-brief", undefined, signal),
-        ]);
+        // The saved account brief stays out: MCP generation never applies it.
+        const { projects } = await api("GET", "/api/dream/projects", undefined, signal);
         return mcpJson({
           project: await shown(current),
           projects: projects.map(({ name }) => name),
-          ...(Object.keys(own).length ? { user_brief: own } : {}),
         });
       }
       const constraints = Object.fromEntries(

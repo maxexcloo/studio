@@ -356,21 +356,38 @@ export function registerResultTools({
       const unfinished = ({ targets = [] }) =>
         targets.filter(({ jobId }) => !jobs.get(jobId).done).map(({ jobId }) => jobId);
       const ready = groups.filter((group) => !group.error && !unfinished(group).length);
-      const replies = await Promise.all(
-        ready.map(async (group, index) => {
-          if (groups.length === 1)
-            return media.review(owner, group.targets, { scope: refs, signal });
-          try {
-            return await media.review(owner, group.targets, {
-              scope: refs,
-              signal,
-              brief: !index,
-            });
-          } catch (error) {
-            return { content: [{ type: "text", text: `${group.label}: ${error.message}` }] };
-          }
-        }),
-      );
+      // Several results go as one picture: chats such as LibreChat keep only the first few images
+      // a tool returns. One that can't be reviewed falls back to an answer each.
+      const together =
+        ready.length > 1
+          ? await media
+              .review(
+                owner,
+                ready.flatMap(({ targets }) => targets),
+                { scope: refs, signal },
+              )
+              .catch((error) => {
+                if (signal.aborted) throw error;
+                return null;
+              })
+          : null;
+      const replies = together
+        ? [together]
+        : await Promise.all(
+            ready.map(async (group, index) => {
+              if (groups.length === 1)
+                return media.review(owner, group.targets, { scope: refs, signal });
+              try {
+                return await media.review(owner, group.targets, {
+                  scope: refs,
+                  signal,
+                  brief: !index,
+                });
+              } catch (error) {
+                return { content: [{ type: "text", text: `${group.label}: ${error.message}` }] };
+              }
+            }),
+          );
       const failed = groups
         .filter((group) => group.error)
         .map(({ label, error }) => ({ type: "text", text: `${label}: ${error}` }));
