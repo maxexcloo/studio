@@ -172,7 +172,7 @@ test("explicit LoKr deferral survives catalogue metadata and rejects enabled sta
   assert.equal((await loraInfos("radiance", [file]))[file].unavailableReason, undefined);
 });
 
-test("Radiance catalogue distinguishes failed models from cold models and exposes one-GPU Qwen size bounds", async () => {
+test("Radiance catalogue keeps offering a model after a failed load and exposes one-GPU Qwen size bounds", async () => {
   const { inferModels } = await import("./model/models.js");
   const model = "qwen-image-2.1-iq8r";
   saveImportedWorkflow({
@@ -200,7 +200,9 @@ test("Radiance catalogue distinguishes failed models from cold models and expose
   const failed = inferModels(nodes, { radiance: [{ id: model, state: "failed" }] }).profiles.find(
     (item) => item.id === "custom:qwen-bounds",
   );
-  assert.equal(failed, undefined, "a failed model is not offered as ready");
+  // Radiance retries a failed load when the model is next requested.
+  assert.ok(failed, "a failed load does not withdraw the profile");
+  assert.notEqual(failed.ready, false);
 });
 
 test("a Radiance profile that loads reference images is offered", async () => {
