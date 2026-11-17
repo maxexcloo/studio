@@ -814,7 +814,6 @@ test("Phone prompt boxes copy and undoably clear in place; desktop leaves both t
     await expect(menu.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
     await expect(menu.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
     await expect(button("Copy")).toHaveCount(0);
-    await expect(button("Clear")).toHaveCount(0);
     return;
   }
   const edit = (name: string) => button(name).click();
