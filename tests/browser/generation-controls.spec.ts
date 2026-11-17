@@ -11,6 +11,7 @@ import {
   image,
   loadSaved,
   openPresets,
+  openReferenceChoices,
   profiles,
   promptMenu,
   renamePreset,
@@ -173,7 +174,7 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
   await page.getByRole("textbox", { name: "Width", exact: true }).fill("1280");
   await page.getByRole("textbox", { name: "Height", exact: true }).fill("768");
   await size.click();
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await openReferenceChoices(page);
   await page
     .getByRole("button", { name: "Use reference: Portrait framing source", exact: true })
     .click();
@@ -313,7 +314,10 @@ test("LoRA presets keep their family, order, strengths and disabled entries thro
   expect(state.presets[1].title).toBe("Other Family");
   await page.reload();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await page.getByRole("button", { name: "Clear LoRAs", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "LoRAs", exact: true })
+    .getByRole("button", { name: "Clear", exact: true })
+    .click();
   await loadSaved(page, "Copper Detail Refined");
   await closeLoras(page);
   await page
@@ -489,7 +493,7 @@ test("Generation actions stay in place while the prompt grows and pickers open",
   await page.setViewportSize({ ...page.viewportSize()!, height: 600 });
   await expect(generate).toBeInViewport();
   expect((await generate.boundingBox())!.y + initial!.height).toBeLessThanOrEqual(600);
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await openReferenceChoices(page);
   await page
     .getByRole("button", {
       name: "Use reference: A reference for the pinned generation actions",
@@ -614,14 +618,14 @@ test("References, masking, settings and runtime presets remain editable", async 
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An amber bird");
   const upload = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await openReferenceChoices(page);
   await showUploads(page);
   await page.getByRole("button", { name: "Upload Reference", exact: true }).click();
   await (
     await upload
   ).setFiles({ name: "reference.png", mimeType: "image/png", buffer: Buffer.from("fixture") });
   await closeReferences(page);
-  await expect(page.getByRole("region", { name: "References", exact: true })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "References", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page
     .getByRole("radiogroup", { name: "Reference Role", exact: true })

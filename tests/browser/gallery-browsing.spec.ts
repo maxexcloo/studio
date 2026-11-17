@@ -6,6 +6,7 @@ import {
   expandComposer,
   fixtures,
   image,
+  openReferenceChoices,
   selectionAction,
   selectionMenuItem,
   showOnly,
@@ -347,8 +348,7 @@ test("Search shortcuts follow the active gallery or reference picker and leave p
   await prompt.fill("Keep typing");
   await prompt.press("/");
   await expect(prompt).toHaveValue("Keep typing/");
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  const picker = page.getByRole("region", { name: "References", exact: true });
+  const picker = await openReferenceChoices(page);
   // The picker's search sits inline and takes focus when it opens.
   const referenceSearch = picker.getByRole("textbox", { name: "Search Gallery", exact: true });
   await referenceSearch.fill("Result 0");

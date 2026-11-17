@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  closeReferences,
   create,
   fixtures,
   image,
+  openReferenceChoices,
   showOnly,
   showUploads,
   stamp,
@@ -38,10 +40,9 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
     });
   });
   await create(page);
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  const picker = await openReferenceChoices(page);
   await showUploads(page);
-  await page
-    .getByRole("region", { name: "References", exact: true })
+  await picker
     .locator('input[type="file"]')
     .setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: clip! });
   await expect.poll(() => uploads.length).toBe(1);
@@ -77,14 +78,13 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(prompt).toHaveValue("A lighthouse at dusk, waves breaking");
   // This video model starts from a picture: the clip's first frame.
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await openReferenceChoices(page);
   await showUploads(page);
-  await page
-    .getByRole("region", { name: "References", exact: true })
+  await picker
     .locator('input[type="file"]')
     .setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: clip! });
   await expect.poll(() => uploads.length).toBe(2);
-  await page.keyboard.press("Escape");
+  await closeReferences(page);
   await page.getByRole("button", { name: "Generate Video", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0]).toMatchObject({

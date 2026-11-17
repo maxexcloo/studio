@@ -7,9 +7,11 @@ import {
   expandComposer,
   fixtures,
   image,
+  openReferenceChoices,
   pickerTab,
   profiles,
   serveProfiles,
+  showReferenceStack,
   showUploads,
   stamp,
 } from "./fixtures";
@@ -49,18 +51,22 @@ test("Reference slots fill by tap, targeted drop and paste, and pasted files lis
 }) => {
   const state = await setup(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  const picker = page.getByRole("region", { name: "References", exact: true });
-  const slots = picker.getByRole("group", { name: "Reference Slots", exact: true });
+  const slots = page.getByRole("group", { name: "Reference Slots", exact: true });
   for (const name of ["Slot 1 · Start · Required", "Slot 2 · Style", "Slot 3 · End"])
     await expect(slots.getByRole("button", { name, exact: true })).toBeVisible();
+  // The stack counts its references against the profile's slots.
+  await expect(page.getByLabel("0 of 4 References", { exact: true })).toBeVisible();
+  const picker = await openReferenceChoices(page);
   await picker.getByRole("button", { name: "Use reference: Alpha", exact: true }).click();
   await expect(
     slots.getByRole("button", { name: "Reference 1 · Start", exact: true }),
   ).toBeVisible();
   const beta = picker.getByRole("button", { name: "Use reference: Beta", exact: true });
   const end = slots.getByRole("button", { name: "Slot 3 · End", exact: true });
-  // Desktop drags onto a specific slot; touch chooses the slot, then taps.
+  // Desktop drags onto a specific slot; touch chooses the slot in the stack, which opens the
+  // choices, then taps.
   if (isMobile) {
+    await showReferenceStack(page);
     await end.click();
     await beta.click();
   } else await beta.dragTo(end);
@@ -77,7 +83,7 @@ test("Reference slots fill by tap, targeted drop and paste, and pasted files lis
   await expect(page.getByRole("img", { name: "Reference 2 · Style", exact: true })).toBeVisible();
   // The pasted file is an uploaded gallery image, shown only under the Uploads filter.
   expect(state.gallery.find((item) => item.id === "upload")?.uploaded).toBe(true);
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await openReferenceChoices(page);
   await expect(picker.getByRole("button", { name: /reference: Alpha$/ })).toBeVisible();
   await expect(picker.getByRole("button", { name: /reference: Upload/ })).toHaveCount(0);
   await showUploads(page);
@@ -101,17 +107,18 @@ test("Escape closes only the innermost reference layer; selection applies at onc
 }) => {
   await setup(page);
   const chip = page.getByRole("button", { name: "Choose References", exact: true });
-  await chip.click();
-  const picker = page.getByRole("region", { name: "References", exact: true });
+  const picker = await openReferenceChoices(page);
+  const popup = page.getByRole("dialog", { name: "References", exact: true });
   await picker.getByRole("button", { name: "Use reference: Alpha", exact: true }).click();
   await expect(page.getByRole("button", { name: "Use References", exact: true })).toHaveCount(0);
   if (isMobile) {
+    await showReferenceStack(page);
     await page.getByRole("button", { name: "Close References", exact: true }).click();
-    await expect(picker).toBeHidden();
+    await expect(popup).toBeHidden();
     await expect(page.getByRole("img", { name: "Reference 1 · Start", exact: true })).toBeVisible();
     return;
   }
-  await picker.getByRole("button", { name: "Reference 1 · Start", exact: true }).click();
+  await popup.getByRole("button", { name: "Reference 1 · Start", exact: true }).click();
   const menu = page.getByRole("menu", { name: "Reference 1 · Start", exact: true });
   await expect(menu).toBeVisible();
   await page.keyboard.press("Escape");
@@ -130,7 +137,7 @@ test("Escape closes only the innermost reference layer; selection applies at onc
   await expect(page.getByRole("dialog", { name: "Filters", exact: true })).toBeHidden();
   await expect(picker).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(picker).toBeHidden();
+  await expect(popup).toBeHidden();
   await expect(chip).toBeFocused();
   await expect(page.getByRole("region", { name: "Generate", exact: true })).toBeVisible();
 });
@@ -159,10 +166,13 @@ test("The compact composer expands on interaction and keeps picked or dragged re
     .fill("Preserve the working direction");
   await expandComposer(page);
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: Picked Study", exact: true }).click();
+  await (
+    await openReferenceChoices(page)
+  )
+    .getByRole("button", { name: "Use reference: Picked Study", exact: true })
+    .click();
   await closeReferences(page);
-  await expect(page.getByRole("region", { name: "References", exact: true })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "References", exact: true })).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Preserve the working direction",
   );
@@ -220,13 +230,20 @@ test("Reference slots preserve optional End-only inputs and reuse one asset in t
     { assetId: "asset-slot-source", slot: "end" },
   ]);
   await expandComposer(page);
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
   // A second tap removes a selected image; choosing a slot first places it there too.
   await expect(
-    page.getByRole("button", { name: "Remove reference: Slot Source", exact: true }),
+    (await openReferenceChoices(page)).getByRole("button", {
+      name: "Remove reference: Slot Source",
+      exact: true,
+    }),
   ).toBeVisible();
+  await showReferenceStack(page);
   await page.getByRole("button", { name: "Slot 1 · Start", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: Slot Source", exact: true }).click();
+  await (
+    await openReferenceChoices(page)
+  )
+    .getByRole("button", { name: "Use reference: Slot Source", exact: true })
+    .click();
   await closeReferences(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -256,7 +273,7 @@ test("Owned uploads can be reused from the Uploads filter without another upload
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Reuse an earlier photograph");
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await openReferenceChoices(page);
   await showUploads(page);
   await page.getByRole("button", { name: "Use reference: Upload 1", exact: true }).click();
   await closeReferences(page);
@@ -295,11 +312,10 @@ test("On touch screens, Paste reads a copied photo from the clipboard into the n
     });
   });
   const state = await setup(page);
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  const picker = page.getByRole("region", { name: "References", exact: true });
+  const picker = await openReferenceChoices(page);
   await picker.getByRole("button", { name: "Paste Reference", exact: true }).click();
   await expect(
-    picker
+    page
       .getByRole("group", { name: "Reference Slots", exact: true })
       .getByRole("button", { name: "Reference 1 · Start", exact: true }),
   ).toBeVisible();
@@ -339,8 +355,7 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   });
   // The picker shares the gallery's loaded pages, so the gallery loads again from these.
   await create(page);
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  const picker = page.getByRole("region", { name: "References", exact: true });
+  const picker = await openReferenceChoices(page);
   const grid = picker.getByRole("list", { name: "References Choices", exact: true });
   await expect(grid.getByRole("button", { name: "Use reference: Result 0" })).toBeVisible();
   const toEnd = () =>
@@ -366,13 +381,10 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   // Only the tiles near the view render.
   await expect(grid.getByRole("button", { name: "Use reference: Result 0" })).toHaveCount(0);
   expect(await grid.getByRole("listitem").count()).toBeLessThan(150);
-  // Choosing stays a tap; Preview opens the image in the bare viewer above the picker, without
-  // details or actions. Space on a tile opens it too
-  // on touch screens; on desktop it shows the image beside the tile, as hovering Preview does.
+  // Preview opens the image in the bare viewer above the picker, without details or actions.
+  // Space on a tile opens it too on touch screens; on desktop it shows the image beside the tile,
+  // as hovering Preview does. Choosing stays a tap.
   const tile = grid.getByRole("button", { name: "Use reference: Result 148", exact: true });
-  await tile.click();
-  const chosen = grid.getByRole("button", { name: "Remove reference: Result 148", exact: true });
-  await expect(chosen).toHaveAttribute("aria-pressed", "true");
   const previewButton = grid
     .getByRole("listitem")
     .filter({
@@ -389,7 +401,7 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();
   await expect(picker).toBeVisible();
-  await chosen.focus();
+  await tile.focus();
   await page.keyboard.press("Space");
   if (test.info().project.use.hasTouch) {
     await expect(preview.getByRole("img", { name: "Result 148", exact: true })).toBeVisible();
@@ -401,9 +413,10 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
     await expect(preview).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(beside("Result 148")).toBeHidden();
-    await expect(chosen).toBeFocused();
+    await expect(tile).toBeFocused();
     await page.mouse.move(0, 0);
-    await previewButton.hover();
+    // Away from where the click opened the preview, which a resting pointer does not peek from.
+    await previewButton.hover({ position: { x: 4, y: 4 } });
     await expect(beside(fullPrompt)).toBeVisible();
     // Pressing Preview while the image shows opens it full screen.
     await previewButton.click();
@@ -412,20 +425,24 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
     await expect(preview).toBeHidden();
   }
   await expect(picker).toBeVisible();
-  await expect(chosen).toHaveAttribute("aria-pressed", "true");
+  await tile.click();
+  await expect(
+    page.getByRole("button", { name: "Reference 1 · Start", exact: true }),
+  ).toBeVisible();
 });
 
 test("The first Uploads tile keeps its target through cancellation and failure, then places the upload", async ({
   page,
 }) => {
   const state = await setup(page);
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  const picker = page.getByRole("region", { name: "References", exact: true });
+  const picker = await openReferenceChoices(page);
   await expect(picker.getByRole("radio", { name: "Liked", exact: true })).toHaveCount(0);
   await expect(picker.getByRole("button", { name: "Upload Reference", exact: true })).toHaveCount(
     0,
   );
-  await picker.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
+  await showReferenceStack(page);
+  await page.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
+  await openReferenceChoices(page);
   await showUploads(page);
   const grid = picker.getByRole("list", { name: "References Choices", exact: true });
   const upload = grid
@@ -447,12 +464,12 @@ test("The first Uploads tile keeps its target through cancellation and failure, 
   await picker.locator('input[type="file"]').setInputFiles(file);
   await expect(page.getByText("Fixture upload unavailable", { exact: true })).toBeVisible();
   await expect(upload).toBeEnabled();
-  await expect(picker.getByRole("button", { name: "Slot 3 · End", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Slot 3 · End", exact: true })).toBeVisible();
   fail = false;
   await picker.locator('input[type="file"]').setInputFiles(file);
-  await expect(
-    picker.getByRole("button", { name: "Reference 3 · End", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reference 3 · End", exact: true })).toBeVisible();
+  // Placing the upload returns to the stack on phones.
+  await openReferenceChoices(page);
   await expect(
     grid
       .getByRole("listitem")
@@ -492,9 +509,8 @@ test("Virtualised uploads retain their asset IDs and numbering after the leading
     })),
   );
   await create(page);
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  const picker = await openReferenceChoices(page);
   await showUploads(page);
-  const picker = page.getByRole("region", { name: "References", exact: true });
   const grid = picker.getByRole("list", { name: "References Choices", exact: true });
   await expect(
     grid
