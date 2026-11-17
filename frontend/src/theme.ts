@@ -97,6 +97,8 @@ const dropdown = {
 // Title rows sit on their surface; dialogs scroll only their body beneath them.
 const overlayHeader = { background: "transparent" } satisfies CSSProperties;
 const overlayTitle = { fontWeight: 600 } satisfies CSSProperties;
+// A closing dialog or drawer lets presses through to what it reveals while it fades out.
+const fading = (opened: boolean): CSSProperties => (opened ? {} : { pointerEvents: "none" });
 
 export function studioTheme({
   primaryColor,
@@ -262,7 +264,14 @@ export function studioTheme({
       // (ComboboxPopover) next, and Select and MultiSelect below.
       Combobox: Combobox.extend({ styles: { option: target } }),
       ComboboxPopover: ComboboxPopover.extend({ styles: { option: target } }),
-      Drawer: Drawer.extend({ styles: { header: overlayHeader, title: overlayTitle } }),
+      Drawer: Drawer.extend({
+        styles: (_theme, props) => ({
+          content: fading(props.opened),
+          header: overlayHeader,
+          overlay: fading(props.opened),
+          title: overlayTitle,
+        }),
+      }),
       // On the parts, so a compound Drawer (a header with its own actions) shares them.
       DrawerOverlay: { defaultProps: { blur: 6, backgroundOpacity: 0.4 } },
       DrawerRoot: { defaultProps: { transitionProps } },
@@ -315,6 +324,7 @@ export function studioTheme({
           content: {
             display: "flex",
             flexDirection: "column",
+            ...fading(props.opened),
             ...(props.fullScreen
               ? {}
               : {
@@ -329,6 +339,7 @@ export function studioTheme({
             overscrollBehavior: "contain",
           },
           header: overlayHeader,
+          overlay: fading(props.opened),
           title: overlayTitle,
         }),
       }),
