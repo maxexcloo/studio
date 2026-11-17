@@ -11,8 +11,8 @@ const onOff = [
   { value: "false", label: "Off" },
 ];
 const backends = [
-  { value: "local", label: "Local" },
   { value: "cloud", label: "Cloud" },
+  { value: "local", label: "Local" },
 ];
 const backendNote =
   "Uses ready models allowed for the account; waits if this backend is unavailable. Cloud needs access to a ready cloud model.";

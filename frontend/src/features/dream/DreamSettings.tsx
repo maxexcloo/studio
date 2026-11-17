@@ -1,6 +1,7 @@
 import {
   ActionIcon,
   Alert,
+  Button,
   Drawer,
   Popover,
   SegmentedControl,
@@ -13,6 +14,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api } from "../../api";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { NumberSetting } from "../../ui/NumberSetting";
 import { SettingRow } from "../../ui/SettingRows";
@@ -92,10 +94,10 @@ function SettingsForm({ dream }: { dream: Dream }) {
         aria-label={`Dream ${label} Run On`}
         fullWidth
         value={settings[key]}
-        disabled={locked(key)}
+        disabled={locked(key) || !settings[key === "imageBackend" ? "images" : "videos"]}
         data={[
-          { value: "local", label: "Local" },
           { value: "cloud", label: "Cloud" },
+          { value: "local", label: "Local" },
         ]}
         onChange={(value) => save.mutate({ [key]: value })}
       />
@@ -161,7 +163,12 @@ export function DreamSettingsButton({ dream }: { dream: Dream }) {
           title="Dream Settings"
           closeButtonProps={{ "aria-label": "Close Dream Settings" }}
         >
-          <SettingsForm dream={dream} />
+          <Stack gap="md">
+            <SettingsForm dream={dream} />
+            <DialogFooter>
+              <Button onClick={() => setOpened(false)}>Done</Button>
+            </DialogFooter>
+          </Stack>
         </Drawer>
       </>
     );

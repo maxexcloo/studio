@@ -96,14 +96,7 @@ export function ReferenceSlots({
                     onClick={() => onChoose(cellTarget)}
                     {...dropProps(`${group.slot}:empty`, cellTarget)}
                   >
-                    <Stack align="center" gap={4}>
-                      <icons.add size={18} aria-hidden />
-                      {emptyLabel && (
-                        <Text size="xs" ta="center">
-                          {emptyLabel}
-                        </Text>
-                      )}
-                    </Stack>
+                    <icons.add size={18} aria-hidden />
                     <Badge className={classes.number} size="xs" circle variant="default">
                       {number}
                     </Badge>
