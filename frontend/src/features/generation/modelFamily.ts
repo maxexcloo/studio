@@ -1,5 +1,5 @@
 import { loraFamilyId } from "../../../../shared/profiles";
-import { titleCase } from "../../ui/titleCase";
+import { titleCase } from "../../../../shared/titles";
 
 // Names the catalogue doesn't define: quantisation formats and older family ids.
 const names: Record<string, string> = {

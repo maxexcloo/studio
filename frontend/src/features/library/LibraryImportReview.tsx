@@ -20,7 +20,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
-import { titleCase } from "../../ui/titleCase";
+import { titleCase } from "../../../../shared/titles";
 import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { type LibraryPreset, inspirationQuery } from "../generation/inspiration";

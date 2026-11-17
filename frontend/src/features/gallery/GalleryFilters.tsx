@@ -21,7 +21,7 @@ import { loraName, profileNameParts } from "../../../../shared/profiles";
 import { api } from "../../api";
 import type { MediaKind, Profile, Rating } from "../../types";
 import { icons } from "../../ui/icons";
-import { titleCase } from "../../ui/titleCase";
+import { titleCase } from "../../../../shared/titles";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { useGenerationActions } from "../generation/GenerationProvider";
