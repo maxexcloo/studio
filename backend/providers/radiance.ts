@@ -46,10 +46,13 @@ const maxVideoBytes = 2 * 1024 ** 3;
 /** FastH3, H3 distilled to eight steps: text to video only, with no LoRA slot. */
 export const isFastH3 = (model: string) => model.toLowerCase().includes("fasth3");
 
-/** The one-GPU Qwen deployment's conditioning/cache limits, shared by its profiles and requests. */
+/**
+ * One-GPU Qwen and Noct conditioning/cache limits, shared by their profiles and requests.
+ * Noct Lightning's 8192-token cache holds only three references.
+ */
 export function radianceImageLimits(model: string) {
   return /^(qwen-image-2\.1-|noctq-)/.test(model)
-    ? { maxSide: 1344, maxReferences: 4 }
+    ? { maxSide: 1344, maxReferences: model.startsWith("noctq-v4-lightning-") ? 3 : 4 }
     : { maxSide: 2048, maxReferences: maxImageReferences };
 }
 
