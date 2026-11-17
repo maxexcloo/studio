@@ -422,6 +422,31 @@ test("FLUX.3 Enhance uses the maker's upsampler prompt verbatim", async () => {
     preset: "cinematic",
   });
   assert.match(seen.calls[2].body.messages[0].content, /Style: Cinematic/);
+  assert.equal(seen.calls[0].body.model, "cloud/auto", "the writer stands in until it's served");
+});
+
+test("FLUX.3 Enhance runs on BFL's upsampler once the gateway lists it", async () => {
+  const seen = fakeGateway(() => json("Full-color outdoor photograph of a cabin."), {
+    models: ["cloud/auto", "local/auto", "local/flux-pup"],
+  });
+  const engine = createAssistant(gateway(), {
+    fetchImpl: seen.fetchImpl,
+    log: quiet,
+    localText: async () => ({ model: "local/auto", vision: false }),
+  });
+  const flux3 = { ...profile, family: "flux3" };
+  const edit = await engine.rewrite({
+    profile: flux3,
+    prompt: "make it red",
+    preset: "enhance",
+    references: [{ mime: "image/jpeg", data: "AAAA" }],
+  });
+  assert.equal(edit.model, "local/flux-pup");
+  assert.equal(edit.referencesRead, true);
+  assert.equal(seen.calls[0].body.temperature, 0);
+  assert.equal(seen.calls[0].body.messages[0].content, flux3Upsampler.edit);
+  await engine.rewrite({ profile: flux3, prompt: "a cabin", preset: "cinematic" });
+  assert.equal(seen.calls[1].body.model, "cloud/auto");
 });
 
 test("Spicy runs on the assistant model", async () => {
