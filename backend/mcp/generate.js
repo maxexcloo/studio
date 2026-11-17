@@ -127,6 +127,8 @@ const chatContext = z
     "Who and what it shows; series names a story or project; notes: backstory for Studio's writers.",
   );
 const promptList = z.array(z.string().trim().min(1)).min(1).max(maxSplitJobs);
+// Images the account's chats may have unfinished before generate queues more: a round to review.
+const maxPendingImages = 16;
 /** A JSON array sent as one string, or a single prompt. */
 const promptListText = z.string().transform((text) => {
   try {
@@ -1145,6 +1147,11 @@ export function registerGenerateTools({
       strengths,
       ...args
     } = constrained.args;
+    const unfinished = preview ? 0 : await media.pendingOutputs(owner, signal);
+    if (unfinished > maxPendingImages)
+      throw new Error(
+        `${unfinished} chat images are still unfinished in Studio, so nothing was queued. Tell the user, end the turn, and review finished results before the next round.`,
+      );
     if (args.reference_asset_ids)
       args.reference_asset_ids = await Promise.all(
         args.reference_asset_ids.map((id) => referenceAsset(id, signal)),

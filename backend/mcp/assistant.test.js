@@ -109,6 +109,7 @@ async function fixture(t, environment = gateway) {
     res.json({ jobId: `job-${submitted.length}` });
   });
   app.get("/api/jobs/:id", (_req, res) => res.json({ status: "running", outputs: [] }));
+  app.get("/api/queue", (_req, res) => res.json({ jobs: [] }));
   let base;
   registerMcpRoutes(app, {
     baseUrl: () => base,

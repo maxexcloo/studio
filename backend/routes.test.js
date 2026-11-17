@@ -171,6 +171,13 @@ test("a ready profile runs a generate request to the gallery", async () => {
       listed,
       query,
     );
+  // `before` keeps what was made by then.
+  const older = async (before) =>
+    (await api(`/api/gallery?limit=20&before=${before}`)).body.items.some(
+      (entry) => entry.jobId === jobId,
+    );
+  assert.equal(await older("2000-01-01T00:00:00Z"), false);
+  assert.equal(await older("2999-01-01T00:00:00Z"), true);
 });
 
 test("a generate request with no prompt is refused plainly", async () => {
