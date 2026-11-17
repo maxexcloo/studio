@@ -71,7 +71,13 @@ export interface Profile {
   encoderBuiltIn?: boolean;
   aspectPolicy?: "manual" | "reference";
   constraints?: Record<string, { min?: number; max?: number; step?: number; offset?: number }>;
-  aspectPresets?: { label: string; w: number; h: number }[];
+  /** `sizes`: what a model with its own resolutions draws at each (`options.resolutions`). */
+  aspectPresets?: {
+    label: string;
+    w: number;
+    h: number;
+    sizes?: Record<string, { w: number; h: number }>;
+  }[];
   /** Output sizes the model draws itself: "yes" or "maybe" per 2K/4K. */
   native?: Partial<Record<"2k" | "4k", "yes" | "maybe">>;
   /** The family edits with its references; otherwise a reference is an img2img start image. */

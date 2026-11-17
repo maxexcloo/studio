@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { aspectPresets } from "../providers/profiles.ts";
 import {
   assertAdjustable,
   cfgIgnoresNegative,
@@ -67,6 +68,32 @@ test("adjustable controls omit fixed, single-option and unsupported Generate arg
   for (const key of ["steps", "cfg", "negative_prompt", "sampler", "scheduler", "loras"])
     assert.equal(turbo[key], undefined, key);
   assert.equal(mcpControls({ ...profile, kind: "video" }).upscale_quality, undefined);
+});
+
+test("Grok's aspects report the size it draws at each resolution, in the standard order", () => {
+  const presets = aspectPresets("grok-imagine-image-2.0");
+  const sixteenNine = presets.find((item) => item.label === "16:9");
+  assert.deepEqual(sixteenNine, {
+    label: "16:9",
+    value: "1280x720",
+    w: 1280,
+    h: 720,
+    sizes: { "1k": { w: 1280, h: 720 }, "2k": { w: 2816, h: 1584 } },
+  });
+  const grok = { ...profile, aspectPresets: presets, options: { resolutions: ["1k", "2k"] } };
+  const { aspect } = mcpControls(grok);
+  assert.deepEqual(Object.keys(aspect.options), [
+    "1:1",
+    "4:3",
+    "3:4",
+    "3:2",
+    "2:3",
+    "16:9",
+    "9:16",
+  ]);
+  assert.equal(aspect.options["3:2"], "1248×832 at 1K, 2496×1664 at 2K");
+  // A video model's sizes are unknown, so its presets keep a megapixel's shape alone.
+  assert.equal(aspectPresets("grok-imagine-video-1.5")[0].sizes, undefined);
 });
 
 test("negative prompts are left out with an explanation where CFG 1 ignores them", () => {
