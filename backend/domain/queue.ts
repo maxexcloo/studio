@@ -152,6 +152,15 @@ const loadKey = (job: OwnedJob) =>
       .map((lora) => `${lora.name}@${lora.strength ?? ""}`)
       .sort(),
   ]);
+/**
+ * What a job would load beside what `warm` jobs hold: 0 when one has its model and LoRAs, 1 its
+ * model alone (a LoRA change, not a model load), 2 neither.
+ */
+const loadCost = (job: OwnedJob, warm: OwnedJob[]) => {
+  if (warm.some((other) => loadKey(other) === loadKey(job))) return 0;
+  const model = modelOf(job.input);
+  return model && warm.some((other) => modelOf(other.input) === model) ? 1 : 2;
+};
 const reuseBypassLimit = 3;
 /** A local video job: on a worker, not a cloud provider. */
 const localVideo = (job: OwnedJob) =>
@@ -429,11 +438,11 @@ export class GenerationQueue {
     );
     // Read again: jobs were added, observed or cancelled while the observations were awaited.
     const all = this.store.schedulable(reuseBypassLimit);
-    const running = new Map<string, number>();
+    const running = new Map<string, OwnedJob[]>();
     for (const job of all)
       if (!terminalStatuses.has(job.status) && this.acceptedIds.has(job.id))
-        running.set(job.resource, (running.get(job.resource) ?? 0) + 1);
-    const free = (resource: string) => this.slots(resource) - (running.get(resource) ?? 0);
+        running.set(job.resource, [...(running.get(job.resource) ?? []), job]);
+    const free = (resource: string) => this.slots(resource) - (running.get(resource)?.length ?? 0);
     // Resources whose every slot runs a job; the rest take work.
     const occupied = new Set([...running.keys()].filter((resource) => free(resource) <= 0));
     const isStarted = (job: OwnedJob) => this.acceptedIds.has(job.id) || started(job);
@@ -466,10 +475,12 @@ export class GenerationQueue {
       }
     }
     // Lower tiers wait while higher ones are queued (no aging); the stable sort keeps FIFO within a tier.
-    // Within a tier, jobs reusing the loaded model and LoRAs go first, unless an older job of that tier
-    // has already been overtaken reuseBypassLimit times; then the tier runs strictly FIFO. Overtakes are
-    // counted from the stored jobs (later jobs of the same resource and tier that started), so the bound
-    // survives restarts. Started work is never pre-empted.
+    // Within a tier, jobs reusing what the resource holds go first: the model and LoRAs of a job
+    // running there or the last one it ran, then its model alone. A resource with several slots
+    // reorders after each start, so its slots share a model rather than load another beside it.
+    // Once an older job of a tier has been overtaken reuseBypassLimit times, the tier runs strictly
+    // FIFO. Overtakes are counted from the stored jobs (later jobs of the same resource and tier that
+    // started), so the bound survives restarts. Started work is never pre-empted.
     const position = new Map(all.map((job, index) => [job.id, index]));
     const tier = (job: OwnedJob) => job.priority ?? queuePriority.manual;
     const overtaken = (job: OwnedJob) =>
@@ -477,22 +488,24 @@ export class GenerationQueue {
         .slice(position.get(job.id)! + 1)
         .filter((later) => later.resource === job.resource && tier(later) === tier(job))
         .filter(isStarted).length;
-    for (const [resource, candidates] of groups) {
-      const fifo = new Set(
-        candidates.filter((job) => overtaken(job) >= reuseBypassLimit).map(rank),
-      );
+    const order = (resource: string, jobs: OwnedJob[], fifo: Set<number>) => {
       const loaded = this.loaded.get(resource);
-      const reuses = (job: OwnedJob) =>
-        fifo.has(rank(job)) || !loaded || loadKey(job) !== loadKey(loaded) ? 1 : 0;
-      candidates.sort((a, b) => rank(a) - rank(b) || reuses(a) - reuses(b));
-    }
+      const warm = [...(running.get(resource) ?? []), ...(loaded ? [loaded] : [])];
+      const cost = (job: OwnedJob) => (fifo.has(rank(job)) ? 0 : loadCost(job, warm));
+      return jobs.sort((a, b) => rank(a) - rank(b) || cost(a) - cost(b));
+    };
     await Promise.all(
       [...groups].map(async ([resource, candidates]) => {
         // Resource groups run independently. A slow cloud request or offline worker cannot hold the scheduler.
         this.scheduling.add(resource);
         let room = free(resource);
+        const fifo = new Set(
+          candidates.filter((job) => overtaken(job) >= reuseBypassLimit).map(rank),
+        );
+        const next = order(resource, [...candidates], fifo);
         try {
-          for (let job of candidates) {
+          while (next.length) {
+            let job = next.shift()!;
             let reason: string | undefined;
             this.checkingEligibility.add(job.id);
             try {
@@ -550,7 +563,11 @@ export class GenerationQueue {
               this.submitting.delete(job.id);
             }
             // A resource with another free slot starts its next candidate in this pass.
-            if (--room > 0) continue;
+            if (--room > 0) {
+              running.set(resource, [...(running.get(resource) ?? []), job]);
+              order(resource, next, fifo);
+              continue;
+            }
             for (const pending of candidates) {
               const latest = this.store.job(pending.ownerId, pending.id)!;
               if (["queued", "waiting"].includes(latest.status) && !this.acceptedIds.has(latest.id))
