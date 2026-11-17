@@ -74,32 +74,36 @@ async function openViewer(page: Page) {
   return state;
 }
 
-test("Suggestions lists ideas for the empty composer prompt from its chip row", async ({
+test("The empty composer prompt's AI menu offers Suggested ideas that fill it with Undo", async ({
   page,
-}, testInfo) => {
+}) => {
   await fixtures(page);
   const asked = await suggest(page);
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  const chip = page
-    .getByRole("group", { name: "Generation Inputs", exact: true })
-    .getByRole("combobox", { name: "Suggestions", exact: true });
-  await expect(chip).toHaveCount(0);
-  expect(asked).toHaveLength(0);
+  await expect(
+    page
+      .getByRole("group", { name: "Generation Inputs", exact: true })
+      .getByRole("combobox", { name: "Suggestions", exact: true }),
+  ).toHaveCount(0);
   await prompt.click();
-  // The phone sheet gives typing the whole screen; its chip row returns as the keyboard drops.
-  if (testInfo.project.use.isMobile) await prompt.blur();
-  await chip.click();
-  await expect(page.getByRole("option")).toHaveText([...ideas].sort((a, b) => a.localeCompare(b)));
-  expect(asked).toEqual([{ surface: "composer", kind: "image" }]);
-  await page.getByRole("option", { name: ideas[1] }).click();
+  expect(asked).toHaveLength(0);
+  let menu = await promptMenu(page, "Prompt");
+  await expect(menu.getByText("Suggested", { exact: true })).toBeVisible();
+  const sorted = [...ideas].sort((a, b) => a.localeCompare(b));
+  await expect(menu.getByRole("menuitem").first()).toHaveText(sorted[0]);
+  for (const idea of sorted)
+    await expect(menu.getByRole("menuitem", { name: idea, exact: true })).toBeVisible();
+  expect(asked).toEqual([{ surface: "composer", kind: "image", fresh: false }]);
+  await menu.getByRole("menuitem", { name: "Refresh…", exact: true }).click();
+  await expect.poll(() => asked.at(-1)?.fresh).toBe(true);
+  await menu.getByRole("menuitem", { name: ideas[1], exact: true }).click();
   await expect(prompt).toHaveValue(ideas[1]);
-  // Phones keep the keyboard down until the text is tapped.
-  if (!testInfo.project.use.isMobile) await expect(prompt).toBeFocused();
-  await expect(chip).toHaveCount(0);
-  await prompt.fill("");
-  await expect(chip).toBeVisible();
-  expect(asked).toHaveLength(1);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(prompt).toHaveValue("");
+  await prompt.fill("A fox");
+  menu = await promptMenu(page, "Prompt");
+  await expect(menu.getByText("Suggested", { exact: true })).toHaveCount(0);
 });
 
 test("The viewer directly offers Suggested and Templates without styles or item descriptions", async ({
@@ -327,11 +331,13 @@ test("No ideas or suggestions show when Studio has none", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   await create(page);
-  await Promise.all([
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  const [, ideas] = await Promise.all([
     page.waitForResponse("**/api/suggestions"),
-    page.getByRole("textbox", { name: "Prompt", exact: true }).click(),
+    promptMenu(page, "Prompt"),
   ]);
-  await expect(page.getByRole("combobox", { name: "Suggestions", exact: true })).toHaveCount(0);
+  await expect(ideas.getByRole("menuitem", { name: "Recent Prompts", exact: true })).toBeVisible();
+  await expect(ideas.getByText("Suggested", { exact: true })).toHaveCount(0);
 });
 
 test("Review stays off after editing and Reset, while an explicit opt-in preserves the current prompt for Undo", async ({

@@ -7,11 +7,15 @@ import type { MediaKind } from "../../types";
 // Studio caches each answer for ten minutes too; a failed ask stays quiet and isn't retried.
 const cached = { staleTime: 10 * 60_000, retry: false } as const;
 
-/** Prompt ideas for an empty composer, from the account's taste profile. */
+/** Prompt ideas for an empty composer, from the account's taste profile; `fresh` asks for others. */
+export const askPromptIdeas = (kind: MediaKind, fresh = false) =>
+  post<Suggestions<string>>("/api/suggestions", { surface: "composer", kind, fresh });
+
+/** The empty composer's prompt ideas, which its prompt's AI menu offers. */
 export const promptIdeasQuery = (kind: MediaKind) =>
   queryOptions({
     queryKey: ["suggestions", "composer", kind],
-    queryFn: () => post<Suggestions<string>>("/api/suggestions", { surface: "composer", kind }),
+    queryFn: () => askPromptIdeas(kind),
     ...cached,
   });
 

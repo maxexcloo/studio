@@ -1,6 +1,6 @@
 // The queue's writing stage writes a variation of the selected image or set source.
 import { maxPromptCharacters } from "../shared/queue.ts";
-import { replyTitle } from "../shared/titles.ts";
+import { replyTitle, titleRule } from "../shared/titles.ts";
 import { AssistantError, cleanPrompt } from "./assistant.js";
 import { userContent } from "./domain/model-content.ts";
 import { americanEnglish, writerGuide } from "./domain/writing-standard.ts";
@@ -50,7 +50,7 @@ export async function writeSetPrompt({
           americanEnglish,
           "The set title is only a label and may be incomplete. Previous variations are only for avoiding repetition: ignore any that drift away from the source; they must never redefine the subject or theme.",
           `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
-          'Reply with JSON only: {"title": "a concise two to four word Title Case label naming the content, without request wording", "prompt": "the finished prompt"}.',
+          `Reply with JSON only: {"title": "${titleRule}", "prompt": "the finished prompt"}.`,
         ]
           .filter(Boolean)
           .join("\n"),

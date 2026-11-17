@@ -9,6 +9,7 @@ import {
   changeActions,
   maxSuggestions,
 } from "../../shared/suggestions.ts";
+import { shortTitle } from "../../shared/titles.ts";
 import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import { type ModelImage, userContent } from "./model-content.ts";
 import type { PromptWriter, Taste, TasteWriter } from "./taste.ts";
@@ -181,12 +182,6 @@ const clean = (value: unknown, limit = Infinity) =>
 /** Cuts at the last word that fits, so an idea never ends mid-word. */
 const fit = (text: string, limit: number) =>
   text.length <= limit ? text : text.slice(0, text.lastIndexOf(" ", limit)).replace(/[,;:]$/, "");
-const titleCase = (text: string) =>
-  text
-    .split(" ")
-    .slice(0, 4)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
 const json = (text: string) => {
   try {
     return JSON.parse(/\{[\s\S]*\}/.exec(text)?.[0] || "");
@@ -418,7 +413,7 @@ export function createSuggestions({
     const requests = new Set<string>();
     const steps = (Array.isArray(reply?.steps) ? reply.steps : [])
       .map((step: Record<string, unknown>) => ({
-        label: titleCase(clean(step?.label, 40)),
+        label: shortTitle(clean(step?.label, 40), 4),
         request: clean(step?.request, 160),
         // A motion idea is itself the instruction Animate's writer takes.
         prompt: clean(surface === "animate" ? step?.request : step?.prompt, maxPromptCharacters),
@@ -589,7 +584,7 @@ export function createSuggestions({
             maxPromptCharacters,
           )
         : clean(reply?.prompt, maxPromptCharacters);
-    const label = titleCase(clean(reply?.label, 40));
+    const label = shortTitle(clean(reply?.label, 40), 4);
     if (!action || !label || (!prompt && action !== "upscale"))
       return empty("The text model's reply was unusable.");
     return { suggestions: [{ action, label, request, prompt }] };

@@ -124,7 +124,6 @@ export function GenerationInputControls({
   mask,
   presets,
   compare,
-  ideas,
   loraPicker,
   settings,
 }: {
@@ -140,8 +139,6 @@ export function GenerationInputControls({
   presets?: ReactNode;
   /** The gallery composer's Compare menu. */
   compare?: ReactNode;
-  /** The prompt's Suggestions chip (`usePromptIdeas`), after References. */
-  ideas?: ReactNode;
   loraPicker: LoraPickerState;
   settings: { opened: boolean; onOpenedChange: (opened: boolean) => void };
 }) {
@@ -168,7 +165,6 @@ export function GenerationInputControls({
       {references && hasReferences && (
         <ReferenceRole input={input} onChange={onChange} mask={mask} />
       )}
-      {ideas}
       {profile?.capabilities.lora && (
         <LoraPicker value={input} onChange={onChange} picker={loraPicker} />
       )}
