@@ -69,7 +69,7 @@ function radianceProfile(studio, model) {
     rebalance: "off",
   };
   const controls = Object.fromEntries(
-    ["count", "height", "model", "prompt", "seed", "steps", "width"].map((input) => [
+    ["count", "height", "model", "prompt", "rebalance", "seed", "steps", "width"].map((input) => [
       input,
       { node: "1", input },
     ]),

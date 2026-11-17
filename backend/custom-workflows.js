@@ -353,6 +353,7 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
       weightDtype: graphDefault("weightDtype") || "",
       sampler: graphDefault("sampler") || "",
       scheduler: graphDefault("scheduler") || "",
+      rebalance: graphDefault("rebalance") || "",
       width: graphDefault("width") || undefined,
       height: graphDefault("height") || undefined,
       steps: graphDefault("steps") || undefined,
@@ -370,6 +371,7 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
     capabilities: {
       cfg: Boolean(controls.cfg),
       lora: Boolean(loraStack),
+      rebalance: Boolean(controls.rebalance),
       sampler: Boolean(controls.sampler),
       scheduler: Boolean(controls.scheduler),
       seed: Boolean(controls.seed),

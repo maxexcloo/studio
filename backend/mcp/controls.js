@@ -96,7 +96,7 @@ export function mcpControls(profile) {
   }
   if (caps.denoise)
     controls.denoise = rangeOf(constraints.denoise, { min: 0, max: 1 }, defaults.denoise);
-  for (const key of ["sampler", "scheduler"]) {
+  for (const key of ["rebalance", "sampler", "scheduler"]) {
     const list = options[`${key}s`];
     if (caps[key] && Array.isArray(list) && list.length > 1)
       controls[key] = { options: list, ...(defaults[key] ? { default: defaults[key] } : {}) };
@@ -169,7 +169,10 @@ function fixedValue(profile, field) {
   const key = { negative_prompt: "negative" }[field] || field;
   const range = profile.constraints?.[key];
   if (fixedRange(range)) return range.min;
-  if (["sampler", "scheduler"].includes(field) && profile.options?.[`${field}s`]?.length === 1)
+  if (
+    ["rebalance", "sampler", "scheduler"].includes(field) &&
+    profile.options?.[`${field}s`]?.length === 1
+  )
     return profile.options[`${field}s`][0];
   return undefined;
 }
@@ -185,7 +188,15 @@ export function listedControls(profile) {
 }
 
 // Controls the profile sets itself: one given anyway is left out, as the request still runs as asked.
-const ignorable = new Set(["seed", "steps", "cfg", "negative_prompt", "sampler", "scheduler"]);
+const ignorable = new Set([
+  "seed",
+  "steps",
+  "cfg",
+  "negative_prompt",
+  "rebalance",
+  "sampler",
+  "scheduler",
+]);
 
 /**
  * The profile's adjustable `controls`, and `args` without the ignorable ones it sets itself, with an
@@ -207,6 +218,7 @@ export function assertAdjustable(profile, request) {
     "cfg",
     "negative_prompt",
     "denoise",
+    "rebalance",
     "sampler",
     "scheduler",
     "loras",
@@ -248,7 +260,7 @@ export function assertAdjustable(profile, request) {
         `Choose ${field} from ${range.min ?? 0} to ${range.max ?? "the profile maximum"} for this profile.`,
       );
   }
-  for (const field of ["sampler", "scheduler"])
+  for (const field of ["rebalance", "sampler", "scheduler"])
     if (
       args[field] !== undefined &&
       controls[field] &&
