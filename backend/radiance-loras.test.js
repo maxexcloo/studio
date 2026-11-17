@@ -182,3 +182,20 @@ test("more references than one card holds move to the model's two-GPU twin where
   assert.equal(run(4, ["noctq-v4-iq8r", "noctq-v4-iq8r-refs"]), "noctq-v4-iq8r-refs");
   assert.equal(run(4, ["noctq-v4-iq8r"]), "noctq-v4-iq8r");
 });
+
+test("rebalance runs at the profile's default where it maps one, and nowhere else", async () => {
+  const profile = raw(undefined, "radiance-rebalance");
+  profile.graph[1].inputs.rebalance = "off";
+  profile.studio.controls.rebalance = { node: "1", input: "rebalance" };
+  profile.studio.defaults = { rebalance: "balanced" };
+  saveImportedWorkflow(profile);
+  const info = radianceInfo([{ id: "krea-2-turbo-iq8r" }]);
+  const run = (workflow, rebalance) =>
+    sanitizeGenerateBody({ workflow, model: workflow, prompt, seed: 1, rebalance }, info);
+  const body = run("custom:radiance-rebalance");
+  assert.equal(body.rebalance, "balanced");
+  assert.equal((await customWorkflowGraph(body))[1].inputs.rebalance, "balanced");
+  assert.equal(run("custom:radiance-rebalance", "legacy").rebalance, "legacy");
+  assert.throws(() => run("custom:radiance-rebalance", "loud"), /supported rebalance/);
+  assert.equal(run("custom:radiance-loras", "legacy").rebalance, "");
+});
