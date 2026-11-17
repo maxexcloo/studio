@@ -187,7 +187,7 @@ test("Use in Composer stages Library cards in the composer, moving to a model th
   await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
   await expect(page.getByRole("menuitem").first()).toHaveText("Edit Character");
   await page.getByRole("menuitem", { name: "Use in Composer", exact: true }).click();
-  await expect(page).toHaveURL(/\/images\?.*compose=1/);
+  await expect(page).toHaveURL(/\/images$/);
   await expect(
     page.getByText(
       "Switched to Keeper Fast, which keeps a character's face and build in new scenes.",
@@ -459,7 +459,7 @@ test("A result's chat character offers Create Character in Details, starting the
     await page.getByRole("button", { name: "Generation Details", exact: true }).click();
   await expect(page.getByRole("link", { name: "Ivo", exact: true })).toHaveAttribute(
     "href",
-    "/images?q=Ivo",
+    "/images",
   );
   await page.getByRole("button", { name: "Create Character", exact: true }).click();
   await expect(page).toHaveURL(/\/library#characters$/);

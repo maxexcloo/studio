@@ -125,7 +125,7 @@ test("The composer compares variants that each change one thing, as one labelled
   expect(run.vote).toBe(run.jobIds[1]);
   expect(state.gallery.find((item) => item.jobId === run.jobIds[1]).rating).toBe("liked");
   await page.getByRole("button", { name: "Use Image Fast · Prompt C", exact: true }).click();
-  await expect(page).toHaveURL(/\/images\?compose=1/);
+  await expect(page).toHaveURL(/\/images$/);
   await expect(prompt(page)).toHaveValue("A silver fox");
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toContainText(
     "Image Fast",
@@ -450,7 +450,7 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
 
   // The run is a set in the gallery that links back to its comparison.
   await page.getByRole("link", { name: "Show in Gallery", exact: true }).click();
-  await expect(page).toHaveURL(/\/images\?set=compare-2/);
+  await expect(page).toHaveURL(/\/images$/);
   await page.getByRole("button", { name: "Open image: Prompt B", exact: true }).click();
   await expect(page.getByTitle("Open Comparison", { exact: true })).toHaveAttribute(
     "href",

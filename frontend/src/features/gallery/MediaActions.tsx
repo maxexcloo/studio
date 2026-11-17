@@ -77,7 +77,7 @@ import { useMediaRating } from "./useMediaRating";
 import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
 import { type VideoEdit, useVideoEdit } from "./videoEdits";
-import { viewerItemId } from "./viewerLink";
+import { type GalleryState, galleryKind, viewerPath } from "./viewerLink";
 import type { PromptAssist, ViewerAsk } from "./ViewerPrompt";
 
 /**
@@ -211,8 +211,8 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
         {
           onSuccess: () => {
             onApplied();
-            if (["/images", "/video"].includes(location.pathname))
-              openComposer(location.pathname === "/video" ? "video" : "image");
+            const kind = galleryKind(location.pathname);
+            if (kind) openComposer(kind);
           },
         },
       );
@@ -460,12 +460,11 @@ export function useMediaActions(
       ]
     : [];
   // Edit asks the assistant for a change: in the viewer's prompt, or elsewhere by opening the
-  // viewer to ask there (GalleryPage's `item`, ViewerPrompt's `ask`).
+  // viewer to ask there (GalleryPage's item path, ViewerPrompt's `ask`).
   const openViewer = (ask: ViewerAsk) => {
     onApplied();
-    const search = new URLSearchParams(location.search);
-    search.set("item", viewerItemId(item));
-    navigate({ search: `?${search}` }, { state: { viewer: true, ask } });
+    const { set, similar } = (location.state as GalleryState | null) || {};
+    navigate(viewerPath(item), { state: { set, similar, viewer: true, ask } });
   };
   const editAsk: EditAsk = edit ?? {
     pending: false,
@@ -496,7 +495,7 @@ export function useMediaActions(
             icon: icons.similar,
             onClick: () => {
               onApplied();
-              navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
+              navigate("/images", { state: { similar: item.id } satisfies GalleryState });
             },
           },
         ]

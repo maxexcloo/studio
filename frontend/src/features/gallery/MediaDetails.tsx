@@ -36,6 +36,7 @@ import { queueQuery } from "../generation/Queue";
 import { mediaNumber, mediaTitle } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { derivations } from "./versions";
+import { type GalleryState, galleryPath } from "./viewerLink";
 
 import classes from "./MediaDetails.module.css";
 
@@ -423,7 +424,7 @@ function Caption({ item }: { item: MediaItem }) {
             <Badge
               key={tag}
               component={Link}
-              to={`${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(tag)}`}
+              {...gallerySearch(item, tag)}
               aria-label={`Search ${tag}`}
               variant="default"
               radius="sm"
@@ -446,8 +447,10 @@ const contextCards = [
   { kind: "scenes", key: "scene", noun: "Scene" },
 ] as const;
 
-const gallerySearch = (item: MediaItem, words: string) =>
-  `${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(words)}`;
+const gallerySearch = (item: MediaItem, words: string) => ({
+  to: galleryPath(item.type),
+  state: { q: words } satisfies GalleryState,
+});
 
 /**
  * The cards the chat said a result shows: its character, outfit and scene, each searching the
@@ -474,7 +477,7 @@ function ContextCards({ item }: { item: MediaItem }) {
     return (
       <Stack key={key} gap={2}>
         <PartLabel>{noun}</PartLabel>
-        <Anchor component={Link} to={gallerySearch(item, named.name)} size="sm">
+        <Anchor component={Link} {...gallerySearch(item, named.name)} size="sm">
           {named.name}
         </Anchor>
         {named.description && <DetailText>{named.description}</DetailText>}
@@ -643,7 +646,7 @@ export function MediaDetails({
       [
         "Series",
         context?.series && (
-          <Anchor key="series" component={Link} to={gallerySearch(item, context.series)} size="sm">
+          <Anchor key="series" component={Link} {...gallerySearch(item, context.series)} size="sm">
             {context.series}
           </Anchor>
         ),
