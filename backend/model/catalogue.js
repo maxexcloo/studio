@@ -20,7 +20,6 @@ import { parkedWorkers } from "../runtime/services.ts";
 import { sharedRequests } from "../shared-requests.js";
 import { profileStats, recentRuns } from "../stats.js";
 import {
-  defaultWorker,
   defaultWorkerId,
   isRadianceWorker,
   listWorkers,
@@ -86,23 +85,6 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     return shareContextRequest(backend, () => fetchComfyContext(backend));
   }
 
-  /**
-   * Worker `backend`'s latest known context without waiting on it: its cached answer, refreshed
-   * in the background once 30 seconds old, else its last stored observation. Only a worker never
-   * seen is waited for. `current` says whether it answered within those 30 seconds.
-   */
-  function latestComfyContext(backend) {
-    const cached = contextFor(backend);
-    if (cached.info && Date.now() - cached.fetchedAt < 30000)
-      return Promise.resolve({ ...cached, current: true });
-    const worker = workerById(backend);
-    const known = cached.info ? cached : worker && store.workerModels(backend, worker.url);
-    if (!known?.info)
-      return loadComfyContext(backend).then((context) => ({ ...context, current: true }));
-    loadComfyContext(backend).catch(() => null);
-    return Promise.resolve({ ...known, current: false });
-  }
-
   async function fetchComfyContext(backend) {
     const signal = AbortSignal.timeout(catalogueReadTimeoutMs);
     const worker = workerById(backend);
@@ -157,22 +139,28 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
   }
 
   /**
-   * The installed LoRAs: the model library worker's latest list, else its last stored one wherever
-   * it was observed. Every worker loads LoRAs from that shared folder, so they stay listed while its
-   * ComfyUI is parked or has moved; nothing here waits on a worker.
+   * The installed model files as the model library worker's node list names them: its latest, else
+   * its last stored one wherever it was observed (null when never). Every worker loads models from
+   * that shared folder, so they stay listed while its ComfyUI is parked or has moved; nothing here
+   * waits on a worker. `current` says whether it answered within 30 seconds; `refresh` asks it
+   * again in the background when it has not.
    */
-  function installedLoras() {
+  function libraryInventory({ refresh = false } = {}) {
     const library = modelLibraryWorker();
-    const info = library && (contextFor(library.id).info || store.workerModels(library.id)?.info);
-    return optionsFor(info, "LoraLoader", "lora_name");
+    if (!library) return { info: null, current: false };
+    const cached = contextFor(library.id);
+    const current = Boolean(cached.info) && Date.now() - cached.fetchedAt < 30000;
+    if (refresh && !current) loadComfyContext(library.id).catch(() => null);
+    return { info: cached.info || store.workerModels(library.id)?.info || null, current };
   }
+  const installedLoras = () => optionsFor(libraryInventory().info, "LoraLoader", "lora_name");
 
   /** What to say when worker `backend`'s ComfyUI does not answer. */
   function comfyDownMessage(backend, detail = "") {
     const worker = workerById(backend);
     if (!worker) return noWorkerMessage("image");
     const name = isDefaultBackend(backend) ? "ComfyUI" : worker.name;
-    return `Can't reach ${name} at ${worker.url}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
+    return `Can't reach ${name}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
   }
 
   /**
@@ -355,7 +343,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
         reason: noWorkerMessage("image"),
         backends: workerAvailability(),
       };
-    return offlineModelResult(defaultWorker()?.url);
+    return offlineModelResult();
   }
 
   /** The media catalogue. */
@@ -374,7 +362,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     catalogueModels,
     comfyDownMessage,
     installedLoras,
-    latestComfyContext,
+    libraryInventory,
     loadComfyContext,
     mediaModels,
     presetModels,

@@ -548,11 +548,8 @@ export function inferModels(
 }
 
 /** No ComfyUI to ask: nothing to offer, and say why instead of blaming missing nodes. */
-export function offlineModelResult(comfyUrl = "") {
-  return {
-    ...inferModels({}, {}),
-    reason: `Can't reach ComfyUI${comfyUrl ? ` at ${comfyUrl}` : ""}.`,
-  };
+export function offlineModelResult() {
+  return { ...inferModels({}, {}), reason: "Can't reach ComfyUI." };
 }
 
 function emptyModelResult(extra = {}) {

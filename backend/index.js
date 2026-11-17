@@ -208,6 +208,8 @@ import {
   defaultWorkerId,
   isRadianceWorker,
   listWorkers,
+  modelLibraryWorker,
+  noWorkerMessage,
   useWorkloadWorkers,
 } from "./workers.js";
 import { flushWorkflowPreferences } from "./workflow-catalogue.js";
@@ -299,7 +301,7 @@ const {
   catalogueModels,
   comfyDownMessage,
   installedLoras,
-  latestComfyContext,
+  libraryInventory,
   loadComfyContext,
   mediaModels,
   presetModels,
@@ -424,7 +426,7 @@ const observeServices = createServicesObserver({
 const discoveredProfiles = async () => {
   const models = await mediaModels(false, { wait: false })
     .then((result) => result.models)
-    .catch(() => offlineModelResult(defaultWorker()?.url));
+    .catch(() => offlineModelResult());
   return models.profiles || [];
 };
 registerMultiUserAuthRoutes(app, {
@@ -470,9 +472,15 @@ const libraryRoutes = registerLibraryRoutes(app, {
   families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
   loraInfo: (names, options) => loraInfos(defaultWorkerId(), names, options),
   installed: async () => installedFiles((await loadComfyContext(defaultWorkerId())).info),
-  // The Library's list: the worker's last known files at once, refreshed in the background.
+  // The Library's list: the model library's last known files at once, refreshed in the background.
   latestInstalled: async () => {
-    const { info, current } = await latestComfyContext(defaultWorkerId());
+    const { info, current } = libraryInventory({ refresh: true });
+    if (!info)
+      throw new Error(
+        modelLibraryWorker()
+          ? "Installed files are unknown until the model library's worker first answers."
+          : noWorkerMessage("models"),
+      );
     return { files: installedFiles(info), current };
   },
   // Lookup says which ready profiles a link's base model fits.
