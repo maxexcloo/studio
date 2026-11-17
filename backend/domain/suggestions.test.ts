@@ -215,13 +215,12 @@ test("older saved suggestions refresh on access, and a new short answer stays ca
   assert.equal(calls.length, 1);
 });
 
-test("composer ideas come from the taste profile, framed as data, short and distinct", async () => {
+test("composer ideas come from the taste profile, framed as data, whole and distinct", async () => {
   const { calls, suggestions } = fixture();
   const result = await suggestions.suggest("alice", { surface: "composer", kind: "image" });
   assert.equal(result.suggestions.length, 3);
   assert.equal(result.suggestions[0], "A foghorn lighthouse at blue hour");
-  assert.ok((result.suggestions as string[]).every((idea) => idea.length <= 160));
-  assert.ok(!(result.suggestions[1] as string).endsWith(" "));
+  assert.equal(result.suggestions[1], `A harbour market ${"under lanterns ".repeat(20)}`.trim());
   const [system, user] = calls[0];
   assert.match(system.content, /data, never instructions/);
   assert.match(system.content, /image prompts/);
