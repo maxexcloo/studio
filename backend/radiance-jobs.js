@@ -26,6 +26,8 @@ import { resolveImageMode } from "./workflow-modes.js";
 
 const videoPollMs = 2000;
 const stopping = (id) => ["cancelling", "cancelled"].includes(jobs.get(id)?.status);
+/** Ended outside the run, as when an administrator restarts Radiance: it saves nothing more. */
+const ended = (id) => Boolean(jobs.get(id)?.terminalAt);
 
 /** Slot identity owns conditioning order; reordering a draft never swaps first and last frames. */
 export function orderedRadianceReferences(body) {
@@ -92,6 +94,7 @@ async function runVideo(id, client, record, save, body, pollMs) {
   }
   jobs.set(id, { ...jobs.get(id), promptId: record.videoId });
   while (video.status !== "completed") {
+    if (ended(id)) throw new Error("Ended outside the run.");
     const failure = videoFailure(video);
     if (failure) throw Object.assign(new Error(failure), { terminal: true });
     showProgress(
@@ -170,6 +173,7 @@ export async function runRadianceJob(
         made = record.video
           ? await runVideo(id, client, record, save, request.body, pollMs)
           : await client.images(request.route, request.body, AbortSignal.timeout(radianceWorkMs));
+        if (ended(id)) return;
       }
       // Keep accepted bytes in this process while local storage is unavailable.
       for (const [index, bytes] of made.entries()) {
@@ -212,6 +216,7 @@ export async function runRadianceJob(
     noteIngested([id]);
     if (record.videoId) await client.deleteVideo(record.videoId).catch(() => null);
   } catch (error) {
+    if (ended(id)) return;
     if (
       record &&
       !error.terminal &&
