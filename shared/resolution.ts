@@ -91,6 +91,16 @@ export function resolutionSize(
   };
 }
 
+const aspectOrder = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"];
+/** Aspect presets as every size control lists them: the standard ratios in order, then the rest. */
+export function orderedAspects<T extends { label: string }>(presets: T[]) {
+  const rank = (preset: T) => {
+    const index = aspectOrder.indexOf(preset.label);
+    return index < 0 ? aspectOrder.length : index;
+  };
+  return [...presets].sort((a, b) => rank(a) - rank(b));
+}
+
 export const isResolution = (value: unknown): value is Resolution =>
   resolutions.includes(value as Resolution);
 

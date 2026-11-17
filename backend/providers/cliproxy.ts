@@ -22,8 +22,8 @@ interface ProviderVideo {
 }
 
 const prefixes = { image: "grok-imagine-image", video: "grok-imagine-video" };
-// The aspect ratios the provider's video models accept.
-const videoAspects = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"];
+// The aspect ratios the provider takes with its own resolution: Grok Imagine Image 2.0 and video.
+export const nativeAspects = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"];
 function gcd(a: number, b: number): number {
   return b ? gcd(b, a % b) : a;
 }
@@ -33,7 +33,9 @@ export function videoAspect(width: number, height: number): string {
     const [w, h] = aspect.split(":").map(Number);
     return Math.abs(Math.log(width / height) - Math.log(w / h));
   };
-  return videoAspects.reduce((best, aspect) => (distance(aspect) < distance(best) ? aspect : best));
+  return nativeAspects.reduce((best, aspect) =>
+    distance(aspect) < distance(best) ? aspect : best,
+  );
 }
 
 /** CLIProxyAPI's Grok image and video wire contracts. */

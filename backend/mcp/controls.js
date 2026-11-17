@@ -4,7 +4,11 @@ import {
   loraDefaultStrength,
   maxLoras,
 } from "../../shared/profiles.ts";
-import { availableResolutions, resolutions as resolutionTiers } from "../../shared/resolution.ts";
+import {
+  availableResolutions,
+  orderedAspects,
+  resolutions as resolutionTiers,
+} from "../../shared/resolution.ts";
 import { upscaleQualities } from "../../shared/upscale.ts";
 // Which generate arguments a profile lets MCP adjust; fixed controls are never advertised.
 import { referenceImageSize } from "../generation-defaults.js";
@@ -46,10 +50,17 @@ export function mcpControls(profile) {
   const controls = {};
   // Sizes are the profile's own presets, as the composer offers them, never a free width and height.
   if (!fixedRange(constraints.width) || !fixedRange(constraints.height)) {
-    const presets = profile.aspectPresets || [];
+    const presets = orderedAspects(profile.aspectPresets || []);
     const fallback = profile.aspectDefault || presets.find((item) => item.default)?.label;
+    // A model with its own resolutions gives the size it draws at each.
+    const size = (item) =>
+      item.sizes
+        ? Object.entries(item.sizes)
+            .map(([tier, { w, h }]) => `${w}×${h} at ${tier.toUpperCase()}`)
+            .join(", ")
+        : `${item.w}×${item.h}`;
     controls.aspect = {
-      options: Object.fromEntries(presets.map((item) => [item.label, `${item.w}×${item.h}`])),
+      options: Object.fromEntries(presets.map((item) => [item.label, size(item)])),
       ...(fallback ? { default: fallback } : {}),
     };
   }
