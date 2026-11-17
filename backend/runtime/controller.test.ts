@@ -472,14 +472,20 @@ test("a Studio restart mid-swap keeps the swap, restores it and still returns to
   await first.controller.settled;
 });
 
-/** A queue whose Radiance work holds `leases` until it ends; `stale` ones go when released. */
+/**
+ * A queue whose Radiance work holds `leases` until it ends; `stale` ones go when released. `tiers`
+ * holds the highest tier waiting on each workload.
+ */
 function fakeQueue(stale: { release(): void }[] = []) {
   const leases: { release(): void }[] = [];
   const calls: string[] = [];
+  const tiers = new Map<string, number>();
   return {
     leases,
     calls,
+    tiers,
     queue: {
+      waitingTier: (id: string) => tiers.get(id) ?? Infinity,
       load: (id: string) =>
         id === "radiance"
           ? {
@@ -560,4 +566,35 @@ test("a switch waiting on Radiance's work drops stale leases and stops waiting o
     "scale comfyui/image 1",
   ]);
   assert.equal(controller.operation(running.id).status, "completed");
+});
+
+test("a swap for ComfyUI work holds while Radiance has work of a higher tier waiting", async () => {
+  const { kube, controller } = fixture(["radiance"], { withRadiance: true });
+  await placeByHand(controller, ["radiance"]);
+  const { tiers, queue } = fakeQueue();
+  controller.useQueue(queue);
+  const accepted = await controller.acquire("radiance");
+  // MCP work waits for Image while manual work waits for Radiance.
+  tiers.set("image", 1).set("radiance", 0);
+  await assert.rejects(controller.acquire("image"), /Studio is switching the GPUs/);
+  accepted.release();
+  await settle();
+  assert.equal(
+    (await controller.observe()).operation!.progress,
+    "Waiting for higher-priority work on Radiance first.",
+  );
+  const manual = await controller.acquire("radiance");
+  tiers.set("radiance", 1);
+  await settle();
+  assert.match((await controller.observe()).operation!.progress, /accepted operation on Radiance/);
+  // Work of the swap's own tier waits for it.
+  await assert.rejects(controller.acquire("radiance"), /Waiting for the runtime change to finish/);
+  assert.deepEqual(kube.log, []);
+  manual.release();
+  await controller.settled;
+  assert.deepEqual(kube.log, [
+    "scale radiance/radiance 0",
+    "gone radiance/radiance",
+    "scale comfyui/image 1",
+  ]);
 });

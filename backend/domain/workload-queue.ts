@@ -1,8 +1,8 @@
-import { activeStatuses, terminalStatuses } from "../../shared/queue.ts";
+import { activeStatuses, pausedReason, terminalStatuses } from "../../shared/queue.ts";
 import type { RuntimeQueueCancel } from "../../shared/runtime.ts";
 import type { WorkloadQueue } from "../runtime/controller.ts";
 import type { GenerationQueue } from "./queue.ts";
-import type { OwnedJob } from "./store.ts";
+import { type OwnedJob, queuePriority } from "./store.ts";
 
 /** Accepted work holds its workload until it finishes, as Studio retains it when it starts. */
 export const acceptedWork = (job: OwnedJob) =>
@@ -50,6 +50,13 @@ export function workloadQueue({
         })),
         queued: jobs.filter((job) => !acceptedWork(job)).length,
       };
+    },
+    waitingTier(workload) {
+      return Math.min(
+        ...on(workload)
+          .filter((job) => !acceptedWork(job) && job.reason !== pausedReason)
+          .map((job) => job.priority ?? queuePriority.manual),
+      );
     },
     async cancel(workload) {
       const counts: RuntimeQueueCancel = { cancelled: 0, cancelling: 0 };

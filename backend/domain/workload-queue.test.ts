@@ -72,6 +72,7 @@ test("Settings › Workers lists a workload's accepted work, drops stale leases 
     ],
   );
   assert.equal(load.queued, 2);
+  assert.deepEqual([work.waitingTier("radiance"), work.waitingTier("comfyui")], [0, Infinity]);
   // A lease for work not yet accepted, or for a job gone from the queue, holds nothing back.
   work.releaseStale();
   assert.deepEqual(released, ["queued", "gone"]);
