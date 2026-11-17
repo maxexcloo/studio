@@ -253,8 +253,8 @@ test("New Character saves a name, description and gallery images from the Refere
     .filter({ has: page.getByRole("button", { name: "Add image: Portrait of a ranger" }) })
     .getByRole("button", { name: "Preview", exact: true })
     .click();
-  const preview = page.getByRole("dialog", { name: /^Portrait of a Ranger/ });
-  await expect(preview).toBeVisible();
+  const preview = page.getByRole("dialog", { name: "Preview", exact: true });
+  await expect(preview.getByRole("img", { name: "Portrait of a ranger" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();
   await expect(picker).toBeVisible();
@@ -547,12 +547,13 @@ test("Make Sheet follows the card's sheet until its views show on the card", asy
     await expect(views.getByRole("img", { name: `Mara ${role}`, exact: true })).toBeVisible();
   // A view opens full size over the page, and Escape closes only it.
   await views.getByRole("button", { name: "Preview Mara Front", exact: true }).click();
-  const preview = page.getByRole("dialog", { name: "Mara Front · 2 of 4", exact: true });
-  await expect(preview).toBeVisible();
-  await preview.getByRole("button", { name: "Next Image", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Mara Side · 3 of 4", exact: true })).toBeVisible();
+  const preview = page.getByRole("dialog", { name: "Preview", exact: true });
+  await expect(preview.getByRole("img", { name: "Mara Front", exact: true })).toBeVisible();
+  await expect(preview.getByText("2 / 4", { exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(preview.getByRole("img", { name: "Mara Side", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: /^Mara Side/ })).toBeHidden();
+  await expect(preview).toBeHidden();
   // Only the Library stays.
   await expect(page.getByRole("dialog")).toHaveCount(1);
   // The editor shows the sheet too, and makes it again.

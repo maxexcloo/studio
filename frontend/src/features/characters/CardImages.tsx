@@ -28,7 +28,7 @@ import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { type PreviewImage, useImagePreview } from "../gallery/ImagePreview";
+import { pictureItem, useMediaPreview } from "../gallery/MediaPreview";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { GalleryChoices } from "../generation/GalleryChoices";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -204,11 +204,11 @@ export function CardThumbnails({
 }: {
   /** Names the row, such as Mara's Sheet. */
   label: string;
-  images: (PreviewImage & { key: string })[];
+  images: { key: string; src: string; thumbnailUrl?: string; alt: string }[];
   /** A sheet's views, in their own shapes rather than squares. */
   views?: boolean;
 }) {
-  const preview = useImagePreview();
+  const preview = useMediaPreview();
   return (
     <Group gap={6} role="group" aria-label={label}>
       {images.map((image, index) => (
@@ -218,7 +218,14 @@ export function CardThumbnails({
           style={{ flexShrink: 0 }}
           onClick={() =>
             preview.open(
-              images.map((image) => ({ ...image, title: image.title || image.alt })),
+              images.map((image) =>
+                pictureItem({
+                  id: image.key,
+                  url: image.src,
+                  thumbnailUrl: image.thumbnailUrl,
+                  name: image.alt,
+                }),
+              ),
               index,
             )
           }
@@ -255,7 +262,7 @@ export function LibraryCard({
   menu: ReactNode;
   children: ReactNode;
 }) {
-  const preview = useImagePreview();
+  const preview = useMediaPreview();
   const [cover] = images;
   return (
     <Card withBorder padding="sm" role="listitem" aria-label={name}>
@@ -266,13 +273,13 @@ export function LibraryCard({
               aria-label={`Preview ${name}`}
               onClick={() =>
                 preview.open(
-                  images.map((asset, index) => ({
-                    src: asset.url || asset.thumbnailUrl,
-                    thumbnailUrl: asset.thumbnailUrl,
-                    alt: `${name} ${index + 1}`,
-                    title: `${name} ${index + 1}`,
-                  })),
-                  0,
+                  images.map((asset, index) =>
+                    pictureItem({
+                      ...asset,
+                      url: asset.url || asset.thumbnailUrl,
+                      name: `${name} ${index + 1}`,
+                    }),
+                  ),
                 )
               }
             >
@@ -352,7 +359,7 @@ function CardImages({
   const pickerId = useId();
   const target = nextReferenceTarget(images, layout, chosen);
   const assistant = useCardAssistant();
-  const preview = useImagePreview();
+  const preview = useMediaPreview();
   // Each image's rating, by its asset id, from the last Rate Images.
   const [ratings, setRatings] = useState<Record<string, Rating>>({});
   const rate = useMutation({
@@ -434,11 +441,13 @@ function CardImages({
           onDrop={drop}
           onView={(asset) =>
             preview.open(
-              images.map((each, index) => ({
-                src: each.url || each.thumbnailUrl,
-                thumbnailUrl: each.thumbnailUrl,
-                alt: `${noun} ${index + 1}`,
-              })),
+              images.map((each, index) =>
+                pictureItem({
+                  ...each,
+                  url: each.url || each.thumbnailUrl,
+                  name: `${noun} ${index + 1}`,
+                }),
+              ),
               images.indexOf(asset),
             )
           }
