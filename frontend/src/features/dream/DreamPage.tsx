@@ -195,11 +195,6 @@ export function DreamPage() {
         </Group>
       </Group>
       {phone && selector}
-      {data?.reason && (
-        <Text size="sm" c="dimmed" ta="center" role="status" aria-label="Dream Status">
-          {data.status === "unavailable" ? `Can't Run: ${data.reason}` : data.reason}
-        </Text>
-      )}
       {view === "discarded" ? (
         <DiscardedDreams key={media} media={media} />
       ) : view === "history" ? (

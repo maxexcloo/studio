@@ -91,11 +91,12 @@
   justify-content: center;
   background: rgb(0 0 0 / 0.18);
 }
+/* The card's media fills it, cropped; View opens it whole. */
 .media img,
 .media video {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   pointer-events: none;
   -webkit-user-drag: none;
 }
@@ -144,6 +145,10 @@
   bottom: 30%;
   opacity: var(--dream-up);
 }
+/* A single card's up is Like. */
+.card:not([data-pair]) .hint[data-hint="up"] {
+  color: var(--mantine-color-pink-5);
+}
 .hint[data-hint="down"] {
   top: 30%;
   color: var(--mantine-color-dimmed);
@@ -154,10 +159,29 @@
 .card[data-pair] .hint[data-hint="right"] {
   color: var(--mantine-primary-color-filled);
 }
-.actions {
+/* The Deck's own look: large round answers floating under the card. */
+.buttons {
   flex-shrink: 0;
-  width: min(100%, var(--studio-composer-width));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mantine-spacing-lg);
   padding-bottom: calc(4px + env(safe-area-inset-bottom));
+}
+.answer {
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  box-shadow: var(--mantine-shadow-md);
+  transition: transform var(--studio-motion-duration) var(--studio-ease-enter);
+}
+.answer:active {
+  transform: scale(0.88);
+}
+:where(:root[data-phone="sideways"]) .answer {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
 }
 .thumb {
   display: block;
