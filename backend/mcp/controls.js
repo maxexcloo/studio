@@ -585,9 +585,11 @@ const equivalentLora = (candidates, value, profile, info) => {
  * the closest matches.
  */
 export function prepareLoras(profile, infos = {}, loras = [], notes = []) {
+  const label = profile.label || profile.id;
+  if (profile.capabilities?.lora === false)
+    throw new Error(`${label} takes no LoRAs; leave loras out or choose another model.`);
   const candidates = loraCandidates(profile, infos);
   const short = shortNames(profile);
-  const label = profile.label || profile.id;
   // Refused, not trimmed: generate's own check keeps only the first ones, which would drop the caller's picks silently.
   const max = Math.max(1, Math.min(maxLoras, Number(profile.maxLoras) || maxLoras));
   if (loras.length > max)

@@ -43,7 +43,8 @@ const maxImageReferences = 10;
 const maxVideoReferences = 9;
 const maxVideoBytes = 2 * 1024 ** 3;
 
-const distilled = (model: string) => model.toLowerCase().includes("fasth3");
+/** FastH3, H3 distilled to eight steps: text to video only, with no LoRA slot. */
+export const isFastH3 = (model: string) => model.toLowerCase().includes("fasth3");
 
 /** The one-GPU Qwen deployment's conditioning/cache limits, shared by its profiles and requests. */
 export function radianceImageLimits(model: string) {
@@ -211,7 +212,7 @@ export function videoRequest(values: Values, images: Uint8Array[] = []) {
   const latentUpscale = Number(values.latent_upscale) || 1;
   const refineSteps = Number(values.upscale_refine_steps) || 0;
   if (!videoTasks.includes(task)) throw new Error(`task must be one of ${videoTasks.join(", ")}.`);
-  if (task !== "t2va" && distilled(model)) throw new Error("FastH3 makes text-to-video only.");
+  if (task !== "t2va" && isFastH3(model)) throw new Error("FastH3 makes text-to-video only.");
   if (!String(values.prompt || "").trim()) throw new Error("Enter a video prompt.");
   if (width % 32 || height % 32) throw new Error("Video dimensions must be multiples of 32.");
   if ((frames - 5) % frameRange.step || frames < frameRange.min || frames > frameRange.max)
@@ -240,8 +241,8 @@ export function videoRequest(values: Values, images: Uint8Array[] = []) {
   const loras = radianceLoras(values.loras);
   if (loras.length) body.loras = loras;
   // FastH3 runs only its trained eight-step schedule; tuning from another profile is left out.
-  const total = distilled(model) ? 8 : Number(values.steps);
-  if (!distilled(model)) body.num_inference_steps = total;
+  const total = isFastH3(model) ? 8 : Number(values.steps);
+  if (!isFastH3(model)) body.num_inference_steps = total;
   // Radiance reads text to video off a request without media.
   if (task !== "t2va") body.task = task;
   if (latentUpscale > 1) {

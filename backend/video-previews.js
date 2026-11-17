@@ -320,7 +320,6 @@ export async function joinClips(source, extension, output, at = "last") {
   return output;
 }
 
-const seconds = (ms) => (Number(ms) / 1000).toFixed(3);
 /** Reversing holds every frame in memory, so it takes clips up to this long. */
 const maxReversedMs = 30_000;
 const reversible = (clip) => {
@@ -337,40 +336,36 @@ const backAndForth =
 const interpolated = (fps) => `minterpolate=fps=${fps}:mi_mode=mci`;
 /**
  * The Edit menu's video edits, each the filters for the picture and for the sound (null drops it):
- * `trim` keeps `start` to `end` milliseconds; `reverse` plays it backwards; `loop` forward then
- * back, without sound as its download has none; `smooth` doubles its frame rate (up to 60) with
- * in-between frames; `slow` plays it at half speed, the missing frames filled in the same way.
+ * `reverse` plays it backwards; `loop` forward then back, without sound as its download has none;
+ * `smooth` doubles its frame rate (up to 60) with in-between frames; `slow` plays it at half speed,
+ * the missing frames filled in the same way.
  */
 const videoEdits = {
-  trim: ({ start, end }) => ({
-    video: `trim=start=${seconds(start)}:end=${seconds(end)},setpts=PTS-STARTPTS`,
-    audio: `atrim=start=${seconds(start)}:end=${seconds(end)},asetpts=PTS-STARTPTS`,
-  }),
-  reverse: (_edit, clip) => {
+  reverse: (clip) => {
     reversible(clip);
     return { video: "reverse", audio: "areverse" };
   },
-  loop: (_edit, clip) => {
+  loop: (clip) => {
     reversible(clip);
     return { video: backAndForth, audio: null };
   },
-  smooth: (_edit, clip) => {
+  smooth: (clip) => {
     const fps = Math.min(60, (clip.fps || 24) * 2);
     if (fps <= clip.fps) throw new Error("This clip already plays at 60 FPS or more.");
     return { video: interpolated(fps), audio: "anull" };
   },
-  slow: (_edit, clip) => ({
+  slow: (clip) => ({
     video: `setpts=2*PTS,${interpolated(clip.fps || 24)}`,
     audio: "atempo=0.5",
   }),
 };
 export const videoEditKinds = Object.keys(videoEdits);
 
-/** A video edit (`videoEdits`) of `source` written to `output`, keeping its sound where the edit allows. */
-export async function editClip(source, output, edit) {
+/** A video edit (`videoEdits` `kind`) of `source` written to `output`, keeping its sound where the edit allows. */
+export async function editClip(source, output, kind) {
   const clip = await probeVideo(source);
   if (!clip) throw new Error("The video couldn't be read.");
-  const { video, audio } = videoEdits[edit.kind](edit, clip);
+  const { video, audio } = videoEdits[kind](clip);
   const sound = clip.audio && audio;
   const graph = [`[0:v]${video},format=yuv420p[v]`, ...(sound ? [`[0:a]${audio}[a]`] : [])];
   const { code, stderr, timedOut } = await queued(() =>

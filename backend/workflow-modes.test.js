@@ -452,3 +452,22 @@ test("optional video Start and End frames keep their slots independently", async
     /Add the preceding reference image/,
   );
 });
+
+test("a FastH3 Radiance profile takes no LoRAs, and MCP generate refuses them", async () => {
+  const { prepareLoras } = await import("./mcp/controls.js");
+  const fast = (model, stack = {}) =>
+    metadataFromJson({
+      graph: { 1: { class_type: "RadianceVideoGenerate", inputs: { model, prompt: "" } } },
+      studio: {
+        id: model,
+        kind: "video",
+        controls: { model: { node: "1", input: "model" }, prompt: { node: "1", input: "prompt" } },
+        loraStack: { adapter: "radiance-tags-v1", node: "1", max: 4, ...stack },
+      },
+    });
+  assert.equal(fast("fasth3-8-step-v2-i8").capabilities.lora, false);
+  assert.equal(fast("h3-v2-i8").capabilities.lora, true);
+  assert.equal(fast("fasth3-8-step-v2-i8", { model: "h3-v2-bf16" }).capabilities.lora, true);
+  const profile = { id: "fast", label: "FastH3", capabilities: { lora: false } };
+  assert.throws(() => prepareLoras(profile, {}, [{ name: "ink" }]), /FastH3 takes no LoRAs/);
+});
