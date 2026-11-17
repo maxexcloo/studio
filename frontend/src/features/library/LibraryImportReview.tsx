@@ -20,6 +20,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
+import { titleCase } from "../../ui/titleCase";
 import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { type LibraryPreset, inspirationQuery } from "../generation/inspiration";
@@ -110,8 +111,7 @@ const stateLabels: Record<string, string> = {
 };
 /** An import state as words, such as Needs Files. */
 export const stateLabel = (state: string) =>
-  stateLabels[state] ||
-  state.replace(/(^|-)([a-z])/g, (_, gap, letter) => `${gap ? " " : ""}${letter.toUpperCase()}`);
+  stateLabels[state] || titleCase(state.replaceAll("-", " "));
 /** An import still resolving or downloading, which polling follows until it settles. */
 export const importBusy = (record: ImportRecord) =>
   ["resolving", "downloading"].includes(record.state);

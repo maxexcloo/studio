@@ -34,6 +34,7 @@ import {
   studioTheme,
 } from "../theme";
 import { PopupTooltip } from "./PopupTooltip";
+import { titleCase } from "./titleCase";
 import { usePhone, useSideways, useTouch } from "./usePhone";
 
 const defaults: Appearance = {
@@ -193,14 +194,11 @@ export function AppearanceControls() {
             }}
           >
             {appearanceChoices.colour.map((colour) => (
-              <Tooltip
-                key={colour}
-                label={colour === "studio" ? "Amber" : colour[0].toUpperCase() + colour.slice(1)}
-              >
+              <Tooltip key={colour} label={colour === "studio" ? "Amber" : titleCase(colour)}>
                 <ActionIcon
                   variant="transparent"
                   size={phone ? undefined : 30}
-                  aria-label={`Use ${colour === "studio" ? "Amber" : colour[0].toUpperCase() + colour.slice(1)} Colour`}
+                  aria-label={`Use ${colour === "studio" ? "Amber" : titleCase(colour)} Colour`}
                   aria-pressed={appearance.colour === colour}
                   onClick={() => setAppearance((previous) => ({ ...previous, colour }))}
                 >

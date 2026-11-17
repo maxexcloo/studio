@@ -198,7 +198,7 @@ test("Sign-in gate keeps account data behind authentication", async ({ page }) =
   );
   await page.goto("/?password=1");
   await expect(page.getByRole("button", { name: "Sign In", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Sign In With Pocket ID" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Sign In with Pocket ID" })).toHaveAttribute(
     "href",
     "/api/accounts/oidc/start",
   );
@@ -226,7 +226,7 @@ test("Signed out with single sign-on goes straight to it, and a failed return sh
   await page.goto("/");
   await expect(page.getByText("Single sign-on did not complete. Try again.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign In", exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Sign In With Pocket ID" }).click();
+  await page.getByRole("link", { name: "Sign In with Pocket ID" }).click();
   await expect(page.getByText("Single sign-on did not sign you in.")).toBeVisible();
   await page.goto("/?sign-in=signed-out");
   await expect(page.getByText("Signed out.", { exact: true })).toBeVisible();

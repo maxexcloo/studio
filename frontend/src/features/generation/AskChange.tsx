@@ -146,7 +146,7 @@ export function SendButton({
 }
 
 /**
- * Suggested options then Refresh…, which reads Loading… in their place while they load, and with
+ * Suggested options then Refresh, which reads Loading… in their place while they load, and with
  * none one No Suggestions line.
  */
 export function suggested(
@@ -163,13 +163,13 @@ export function suggested(
     // Never disabled while it works, only inert: a disabled item drops focus out of the open menu.
     again: loading
       ? { id: "refresh", label: "Loading…", icon: icons.refresh, loading: true, keepOpen: true }
-      : { id: "refresh", label: "Refresh…", icon: icons.refresh, keepOpen: true, ...refresh },
+      : { id: "refresh", label: "Refresh", icon: icons.refresh, keepOpen: true, ...refresh },
   };
 }
 
 /**
  * Suggestions: short changes that fit the image or draft (`query`), asked for as soon as one is
- * picked, as an action whose options are the changes, then Refresh… to ask for different ones
+ * picked, as an action whose options are the changes, then Refresh to ask for different ones
  * (`fresh`) in their place. They load once `enabled` and stay cached per item or prompt.
  */
 export function useChangeSuggestions<K extends QueryKey>({
@@ -222,7 +222,7 @@ export function useChangeSuggestions<K extends QueryKey>({
 
 /**
  * An assistant menu (Animate, Edit, AI): its settings, the suggestions written for this
- * item with Refresh…, Library's templates under their heading with Custom… last, then any other
+ * item with Refresh, Library's templates under their heading with Custom… last, then any other
  * actions, then its own run. While what decides its options is `loading`, one row stands in for
  * them all.
  */

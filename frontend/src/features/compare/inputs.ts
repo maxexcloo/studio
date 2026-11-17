@@ -102,7 +102,7 @@ export function variantLabels(
   const settings: Facet[] = differs(profile)
     ? []
     : [
-        ({ input }) => `${input.steps} Steps`,
+        ({ input }) => `${input.steps} Step${Number(input.steps) === 1 ? "" : "s"}`,
         ({ input }) => `Guidance ${input.cfg}`,
         ({ input }) =>
           typeof input.resolution === "string" && input.resolution
@@ -121,7 +121,7 @@ export function variantLabels(
         .join(", "),
     ...settings,
     (_, index) => `Seed ${seeds[index]}`,
-    ({ references }) => `${references.length} References`,
+    ({ references }) => `${references.length} Reference${references.length === 1 ? "" : "s"}`,
   ];
   const differing = facets.filter(differs);
   return variants.map(

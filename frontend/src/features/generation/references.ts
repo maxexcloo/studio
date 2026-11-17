@@ -9,6 +9,7 @@ import { useRef } from "react";
 import { guidingRoles, slotCapacity } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
+import { titleCase } from "../../ui/titleCase";
 import type { GalleryFilterValues } from "../gallery/GalleryFilters";
 import { galleryKey, galleryQuery } from "../gallery/queries";
 import { useGeneration } from "./GenerationProvider";
@@ -63,7 +64,7 @@ export function referenceCells(references: ReferenceAsset[], profile?: SlotLayou
     return {
       slot: group[0].id,
       // Unlabelled slots read by their ID, such as Start or Image.
-      label: group[0].label || group[0].id.replace(/^\w/, (letter) => letter.toUpperCase()),
+      label: group[0].label || titleCase(group[0].id),
       // What it guides, where the profile names it: Identity, Pose/Layout or Style.
       guides: Object.hasOwn(guidingRoles, group[0].role || "")
         ? guidingRoles[group[0].role!]

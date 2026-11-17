@@ -104,7 +104,7 @@ export function MergeDuplicateProfiles({
           {!!data?.unresolved.length && (
             <>
               <Text size="sm" fw={500}>
-                Duplicates Without an Id to Keep
+                Duplicates Without an ID to Keep
               </Text>
               <List size="sm" spacing={4}>
                 {data.unresolved.map((item) => (

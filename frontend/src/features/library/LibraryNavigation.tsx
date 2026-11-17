@@ -77,7 +77,7 @@ export const librarySections = {
   imports: {
     label: "Imports",
     description:
-      "Shared models and recipes from Civitai, Hugging Face or recipe images, and their downloads. Stopping a download keeps its partial file to resume.",
+      "Shared models and recipes from Civitai, Hugging Face or recipe images, and their downloads.",
     icon: icons.import,
     admin: true,
     apart: true,

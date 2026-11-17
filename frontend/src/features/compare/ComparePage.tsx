@@ -20,7 +20,9 @@ import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { layerAbove } from "../../ui/popupClicks";
+import { titleCase } from "../../ui/titleCase";
 import { usePhone } from "../../ui/usePhone";
 import { projectPath, projectsQuery } from "../dream/queries";
 import { MediaTile } from "../gallery/MediaTile";
@@ -152,7 +154,7 @@ export function ComparePage() {
           </Title>
         </Group>
         <Text size="sm" c="dimmed" ta="right">
-          {[`${variants.length} Variants`, seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
+          {[plural(variants.length, "Variant"), seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
         </Text>
       </Group>
       {(prompt || negative) && (

@@ -20,6 +20,7 @@ import { loraRoles, loraTypes } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
+import { titleCase } from "../../ui/titleCase";
 import { usePhone } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
@@ -159,7 +160,7 @@ function CatalogueForm({
             lora
               ? loraTypes.map((value) => ({
                   value,
-                  label: value[0].toUpperCase() + value.slice(1),
+                  label: titleCase(value),
                 }))
               : [
                   { value: "original", label: "Original" },
@@ -176,7 +177,7 @@ function CatalogueForm({
               clearable
               data={loraRoles.map((value) => ({
                 value,
-                label: value[0].toUpperCase() + value.slice(1),
+                label: titleCase(value),
               }))}
               value={form.values.role || null}
               onChange={(value) => form.setFieldValue("role", value || "")}
@@ -225,7 +226,7 @@ function CatalogueForm({
         {(["description", "note", "guidance"] as const).map((key) => (
           <TextBox
             key={key}
-            label={key[0].toUpperCase() + key.slice(1)}
+            label={titleCase(key)}
             autosize
             minRows={2}
             {...form.getInputProps(key)}
