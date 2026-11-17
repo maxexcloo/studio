@@ -648,9 +648,11 @@ export function registerLibraryRoutes(
     return ok({ import: publicImport(await engine.draft(params.id, { by: by(account), index })) });
   });
   route("GET", "/api/library/items", async () => {
-    const { files, current } = await latestInstalled().catch(() => ({
+    // Unknown installed files are reported as such, not shown as none installed.
+    const { files, current, inventoryError } = await latestInstalled().catch((error) => ({
       files: {},
       current: false,
+      inventoryError: error.message,
     }));
     const [info, definitions] = await Promise.all([
       // A worker that isn't answering is not asked for each LoRA's metadata.
@@ -668,7 +670,11 @@ export function registerLibraryRoutes(
       const applied = state.applied[item.key];
       return { ...item, ...(update ? { update } : {}), ...(applied ? { applied } : {}) };
     });
-    return ok({ items, updates: { checkedAt: state.checkedAt, available: state.available } });
+    return ok({
+      items,
+      updates: { checkedAt: state.checkedAt, available: state.available },
+      ...(inventoryError ? { inventoryError } : {}),
+    });
   });
   route("POST", "/api/library/lookup", async (_account, { body }) => {
     const found = await lookupLibrary(

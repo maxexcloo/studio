@@ -1,4 +1,3 @@
-import { optionsFor } from "../comfy/comfy.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { accountMayUseLoras, loraAllowed } from "../model/catalogue.js";
 import { defaultWorkerId } from "../workers.js";
@@ -6,7 +5,7 @@ import { loraInfos } from "./info.js";
 import { applyLoraOps, loadLoraLibrary } from "./stacks.js";
 
 /** An account's LoRA ratings, and what each installed LoRA was trained for. */
-export function registerLoraRoutes(app, { comfyDownMessage, latestComfyContext }) {
+export function registerLoraRoutes(app, { installedLoras }) {
   directRoute(app, "GET", "/api/loras/library", (account) => {
     if (!accountMayUseLoras({ studioAccount: account }))
       return { status: 200, payload: { found: false, library: { ratings: {} } } };
@@ -34,26 +33,14 @@ export function registerLoraRoutes(app, { comfyDownMessage, latestComfyContext }
     }
   });
 
-  // What each LoRA ComfyUI lists was trained for and its trigger words, from the files themselves.
+  // What each installed LoRA was trained for and its trigger words, from the files themselves.
   directRoute(app, "GET", "/api/loras/info", async (account) => {
     if (!accountMayUseLoras({ studioAccount: account }))
       return { status: 200, payload: { ok: true, loras: {} } };
-    try {
-      const { info } = await latestComfyContext(defaultWorkerId());
-      const names = optionsFor(info, "LoraLoader", "lora_name").filter(loraAllowed(account));
-      return {
-        status: 200,
-        payload: { ok: true, loras: await loraInfos(defaultWorkerId(), names) },
-      };
-    } catch (error) {
-      return {
-        status: 503,
-        payload: {
-          ok: false,
-          loras: {},
-          error: comfyDownMessage(defaultWorkerId(), error?.message),
-        },
-      };
-    }
+    const names = installedLoras().filter(loraAllowed(account));
+    return {
+      status: 200,
+      payload: { ok: true, loras: await loraInfos(defaultWorkerId(), names) },
+    };
   });
 }

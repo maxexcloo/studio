@@ -98,6 +98,33 @@ test("a cold Radiance profile retains installed LoRAs and catalogue triggers wit
   );
 });
 
+test("LoRA info lists the library's last LoRAs while its ComfyUI is parked at a new address", async () => {
+  const { registerLoraRoutes } = await import("./lora/routes.js");
+  const name = "styles/parked.safetensors";
+  loraCatalogue().edit(`loras/${name}`, { families: ["krea2"], triggers: ["parked"] });
+  const installed = { LoraLoader: { input: { required: { lora_name: [[name]] } } } };
+  const store = {
+    workerModels: (id, at) =>
+      id === "primary" && at === undefined ? { info: installed } : undefined,
+    saveWorkerModels: () => {},
+  };
+  const catalogue = createModelCatalogue({ store });
+  const routes = {};
+  registerLoraRoutes({ get: (route, handler) => (routes[route] = handler) }, catalogue);
+  let answer;
+  await routes["/api/loras/info"](
+    { params: {}, query: {} },
+    {
+      status: (status) => ({ json: (payload) => (answer = { status, payload }) }),
+    },
+  );
+  assert.equal(answer.status, 200);
+  assert.deepEqual(answer.payload.loras[name].triggers, ["parked"]);
+  const { info } = await catalogue.loadComfyContext("radiance");
+  assert.deepEqual(info.LoraLoader.input.required.lora_name[0], [name]);
+  assert.ok(!requests.some((request) => request.startsWith("/comfy")));
+});
+
 test("explicit LoKr deferral survives catalogue metadata and rejects enabled stacks without disabling plain adapters", async () => {
   const { optionalLoraPolicyIssue } = await import("./lora/catalogue.js");
   const file = "snofs_krea_v1_6.safetensors";

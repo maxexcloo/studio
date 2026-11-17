@@ -3,7 +3,7 @@ import { mayUseGenerationProfile } from "./account-policy.js";
 import { deleteImportedWorkflow, saveImportedWorkflow } from "./custom-workflows.js";
 import { inferModels, offlineModelResult } from "./model/models.js";
 import { requireAdmin } from "./route-access.js";
-import { defaultWorker, defaultWorkerId } from "./workers.js";
+import { defaultWorkerId } from "./workers.js";
 import {
   loadWorkflowPreferences,
   previewWorkflowImport,
@@ -41,7 +41,7 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
       }));
       const models = Object.keys(info || {}).length
         ? inferModels(info, stats)
-        : offlineModelResult(defaultWorker()?.url);
+        : offlineModelResult();
       const preferences = loadWorkflowPreferences();
       res.json({
         workflows: workflowsForRequest(
@@ -51,7 +51,7 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
         ...preferencesForRequest(req, preferences),
       });
     } catch {
-      const models = offlineModelResult(defaultWorker()?.url);
+      const models = offlineModelResult();
       const preferences = loadWorkflowPreferences();
       res.json({
         workflows: workflowsForRequest(
