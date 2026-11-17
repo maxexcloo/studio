@@ -537,7 +537,6 @@ function CardImages({
                 },
               };
             }}
-            onDeleted={(id) => set(images.filter((asset) => asset.galleryItemId !== id))}
           />
         </Stack>
         <DialogFooter>

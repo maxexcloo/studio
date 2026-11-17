@@ -14,6 +14,8 @@ import {
 import { type LucideIcon, Search } from "lucide-react";
 import { type ComponentPropsWithRef, type ReactNode, useEffect, useRef, useState } from "react";
 
+import { ClearButton } from "./ClearButton";
+import { DialogFooter } from "./ConfirmDialog";
 import { icons } from "./icons";
 import { PopupTooltip } from "./PopupTooltip";
 import { ScrollingSegments } from "./ScrollingSegments";
@@ -101,6 +103,7 @@ export function SectionToolbar({
 }) {
   const phone = usePhone();
   const [searching, setSearching] = useState(false);
+  const [filtering, setFiltering] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -168,7 +171,13 @@ export function SectionToolbar({
             search(false)
           ))}
         {filters && (
-          <Popover position="bottom-end" width={300} trapFocus>
+          <Popover
+            position="bottom-end"
+            width={300}
+            trapFocus
+            opened={filtering}
+            onChange={setFiltering}
+          >
             {/* The Tooltip wraps the target, so the button itself carries aria-expanded. */}
             <PopupTooltip label={`Filter ${label}`}>
               <Popover.Target>
@@ -177,6 +186,7 @@ export function SectionToolbar({
                   variant={filterCount ? "light" : "subtle"}
                   color={filterCount ? undefined : "gray"}
                   pos="relative"
+                  onClick={() => setFiltering(!filtering)}
                 >
                   <icons.filter size={18} />
                   {filterCount > 0 && (
@@ -195,23 +205,27 @@ export function SectionToolbar({
                 </ActionIcon>
               </Popover.Target>
             </PopupTooltip>
-            <Popover.Dropdown aria-label={`${label} Filters`} role="dialog" p="sm">
+            <Popover.Dropdown
+              aria-label={`${label} Filters`}
+              role="dialog"
+              p="sm"
+              onFocusCapture={(event) =>
+                event.target.setAttribute("data-mantine-stop-propagation", "true")
+              }
+            >
               <ScrollArea.Autosize mah="min(60dvh, 420px)">
-                {/* Titled with Clear, as the gallery's and the pickers' Filters popups are. */}
+                {/* Titled and ended with ✕ and Done, as the gallery's and the pickers' Filters are. */}
                 <Stack gap="sm">
-                  <Group justify="space-between" wrap="nowrap" mih={28}>
-                    <Text fw={500}>Filters</Text>
-                    <Button
-                      data-mantine-stop-propagation
-                      variant="subtle"
-                      size="compact-sm"
-                      disabled={!filterCount}
-                      onClick={onClearFilters}
-                    >
-                      Clear
-                    </Button>
-                  </Group>
+                  <Text fw={500} mih={28}>
+                    Filters
+                  </Text>
                   {filters}
+                  <DialogFooter>
+                    {onClearFilters && (
+                      <ClearButton disabled={!filterCount} onClear={onClearFilters} />
+                    )}
+                    <Button onClick={() => setFiltering(false)}>Done</Button>
+                  </DialogFooter>
                 </Stack>
               </ScrollArea.Autosize>
             </Popover.Dropdown>

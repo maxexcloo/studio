@@ -1,5 +1,4 @@
 import {
-  ActionIcon,
   Alert,
   Button,
   Center,
@@ -14,7 +13,7 @@ import { type ReactNode, Suspense, lazy, useLayoutEffect, useRef, useState } fro
 
 import { maxLoras } from "../../../../shared/profiles";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
-import { icons } from "../../ui/icons";
+import { ClearButton } from "../../ui/ClearButton";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { GenerationInputControls } from "./GenerationInputControls";
@@ -380,21 +379,7 @@ export function GenerationEditor({
               }))}
             />
             <Group gap="xs" wrap="nowrap" flex={phone ? 1 : undefined} miw={0} justify="flex-end">
-              {phone ? (
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  size={44}
-                  aria-label={onUndoClear ? "Undo" : "Clear"}
-                  onClick={onUndoClear ?? onClear}
-                >
-                  {onUndoClear ? <icons.undo size={18} /> : <icons.clear size={18} />}
-                </ActionIcon>
-              ) : (
-                <Button variant="subtle" color="gray" size="sm" onClick={onUndoClear ?? onClear}>
-                  {onUndoClear ? "Undo" : "Clear"}
-                </Button>
-              )}
+              <ClearButton onClear={onClear} onUndo={onUndoClear} />
               <Tooltip
                 label={blockedReason}
                 disabled={!blockedReason}
