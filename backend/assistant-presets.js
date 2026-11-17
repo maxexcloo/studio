@@ -261,9 +261,11 @@ export const settingWords = Object.freeze([
 
 /**
  * Families meant to run behind a maker's prompt upsampler: Enhance uses the maker's system prompt
- * verbatim (prompt-upsamplers.js), so the caption matches what the model was trained on.
+ * verbatim (prompt-upsamplers.js), so the caption matches what the model was trained on, and runs
+ * on the maker's upsampler `model` once the gateway lists it.
  */
-const upsamplers = { flux3: flux3Upsampler, flux3_klein: flux3Upsampler };
+const flux3 = { ...flux3Upsampler, model: "local/flux-pup" };
+const upsamplers = { flux3, flux3_klein: flux3 };
 const familyKey = (family) => String(family || "").replace(/-/g, "_");
 
 export function familyUpsampler(profile) {
