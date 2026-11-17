@@ -23,7 +23,7 @@ import { formatBytes } from "../../ui/bytes";
 import { useCopy } from "../../ui/clipboard";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
-import { titleCase } from "../../ui/titleCase";
+import { titleCase } from "../../../../shared/titles";
 import { useGroupFeature } from "../auth/AccountGate";
 import { identityNote } from "../characters/identity";
 import { charactersQuery, promptCardsQuery } from "../characters/queries";

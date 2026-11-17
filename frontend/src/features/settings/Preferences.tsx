@@ -5,7 +5,7 @@ import { Fragment } from "react";
 import { isCloudProfile } from "../../../../shared/profiles";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { titleCase } from "../../ui/titleCase";
+import { titleCase } from "../../../../shared/titles";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
 import { assistantQuery } from "../generation/PromptAssistant";
