@@ -47,13 +47,15 @@ const maxVideoBytes = 2 * 1024 ** 3;
 export const isFastH3 = (model: string) => model.toLowerCase().includes("fasth3");
 
 /**
- * One-GPU Qwen and Noct conditioning/cache limits, shared by their profiles and requests.
- * Noct Lightning's 8192-token cache holds only three references.
+ * Qwen and Noct conditioning/cache limits, shared by their profiles and requests. A one-GPU IQ8R
+ * entry's 8192-token cache holds three references at 1344; its two-GPU `-refs` twin holds four
+ * at 2048, and validation.js moves a run with more references than one card holds there.
  */
 export function radianceImageLimits(model: string) {
-  return /^(qwen-image-2\.1-|noctq-)/.test(model)
-    ? { maxSide: 1344, maxReferences: model.startsWith("noctq-v4-lightning-") ? 3 : 4 }
-    : { maxSide: 2048, maxReferences: maxImageReferences };
+  if (!/^(qwen-image-2\.1-|noctq-)/.test(model))
+    return { maxSide: 2048, maxReferences: maxImageReferences };
+  if (model.endsWith("-refs")) return { maxSide: 2048, maxReferences: 4 };
+  return { maxSide: 1344, maxReferences: model.endsWith("-iq8r") ? 3 : 4 };
 }
 
 /**

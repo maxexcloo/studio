@@ -6,6 +6,7 @@ import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { catalogueLoraInfo } from "./lora/info.js";
 import { keptTriggers, recommendedNegative } from "./lora/prompts.js";
 import { inferModels } from "./model/models.js";
+import { radianceImageLimits } from "./providers/radiance.ts";
 import { hasReferenceImage, resolveImageMode } from "./workflow-modes.js";
 
 function clampNumber(value, fallback, min, max) {
@@ -282,6 +283,20 @@ export function sanitizeGenerateBody(
     limit: customWorkflow?.loraStack?.max,
     adapter: customWorkflow?.loraStack?.adapter,
   });
+  // A run with LoRAs moves to the stack's own model, which graphs.js sends and the item records;
+  // otherwise more references than the model holds move to its `-refs` twin where the worker has one.
+  const model = String(input.modelName || customWorkflow?.defaults?.model || "");
+  const control = customWorkflow.controls?.model;
+  const models = optionsFor(
+    info,
+    customWorkflow.graph?.[control?.node]?.class_type,
+    control?.input,
+  );
+  const twin = `${model}-refs`;
+  const crowded = referenceAssets.length > radianceImageLimits(model).maxReferences;
+  const modelName =
+    (loras.length && customWorkflow.loraStack?.model) ||
+    (crowded && models.includes(twin) ? twin : model);
   const cfg =
     profile.capabilities?.cfg === false
       ? undefined
@@ -301,13 +316,7 @@ export function sanitizeGenerateBody(
     prompt,
     negative: String(input.negative || "").trim() ? String(input.negative) : negative,
     model: String(input.model || ""),
-    // A run with LoRAs moves to the stack's own model, which graphs.js sends and the item records.
-    modelName: String(
-      (loras.length && customWorkflow?.loraStack?.model) ||
-        input.modelName ||
-        customWorkflow?.defaults?.model ||
-        "",
-    ),
+    modelName,
     textEncoder,
     vae,
     clipType: String(input.clipType || ""),
