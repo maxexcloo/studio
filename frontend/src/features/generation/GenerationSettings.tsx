@@ -12,6 +12,7 @@ import {
 import { Dices } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
+import { titleCase } from "../../../../shared/titles";
 import type { GenerationInput, Profile } from "../../types";
 import { icons } from "../../ui/icons";
 import { iconChipProps } from "./chip";
@@ -135,6 +136,23 @@ export function GenerationSettings({
           />
         ),
       });
+  if (profile?.options?.rebalances?.length && capabilities.rebalance)
+    fields.push({
+      label: "Rebalance",
+      control: (
+        <Select
+          label="Rebalance"
+          description="How Krea 2 weighs the prompt's text layers; Legacy follows it hardest"
+          comboboxProps={nested}
+          data={profile.options.rebalances.map((value) => ({ value, label: titleCase(value) }))}
+          value={String(input.rebalance || "")}
+          allowDeselect={false}
+          onChange={(rebalance) => {
+            if (rebalance !== null) onChange({ rebalance });
+          }}
+        />
+      ),
+    });
   encoderSlots.forEach((slot, index) => {
     const label = encoderSlots.length > 1 ? slot.label : "Text Encoder";
     fields.push({

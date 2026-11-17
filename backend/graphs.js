@@ -55,6 +55,7 @@ async function applyMappedInputs(graph, workflow, body) {
     fps: Number(body.fps || 0),
     duration: Number(body.duration || 0),
     resolution: body.resolution || "",
+    rebalance: body.rebalance || "",
   };
   for (const [key, value] of Object.entries(values)) {
     if (value !== "" && value !== undefined && value !== null)

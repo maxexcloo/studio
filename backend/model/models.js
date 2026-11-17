@@ -361,6 +361,13 @@ export function inferModels(
       controls.resolution && Array.isArray(workflow.options?.resolutions)
         ? workflow.options.resolutions.filter((value) => typeof value === "string" && value)
         : [];
+    const rebalances = controls.rebalance
+      ? optionsFor(
+          info,
+          workflow.graph?.[controls.rebalance.node]?.class_type,
+          controls.rebalance.input,
+        )
+      : [];
     if (Number(defaults.width)) widthRange.default = Number(defaults.width);
     if (Number(defaults.height)) heightRange.default = Number(defaults.height);
     if (Number(defaults.count)) countRange.default = Number(defaults.count);
@@ -422,6 +429,9 @@ export function inferModels(
         resolution: resolutions.includes(defaults.resolution)
           ? defaults.resolution
           : resolutions[0] || "",
+        rebalance: rebalances.includes(defaults.rebalance)
+          ? defaults.rebalance
+          : rebalances[0] || "",
         denoise: Number(defaults.denoise || 1),
       },
       aspects: customAspectSet(
@@ -445,6 +455,7 @@ export function inferModels(
         weightDtypes,
         samplers,
         schedulers,
+        rebalances,
         resolutions,
         loras: workflow.capabilities.lora ? loras : [],
       },

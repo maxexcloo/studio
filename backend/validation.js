@@ -279,6 +279,11 @@ export function sanitizeGenerateBody(
     : "";
   if (profile.capabilities.resolution && !resolutions.includes(resolution))
     throw new Error("Choose a supported resolution for this model.");
+  const rebalance = profile.capabilities.rebalance
+    ? String(input.rebalance || profile.defaults.rebalance || "")
+    : "";
+  if (rebalance && !profile.options.rebalances?.includes(rebalance))
+    throw new Error("Choose a supported rebalance for this model.");
   const loras = sanitizeLoras(input, info, profile, kind, {
     limit: customWorkflow?.loraStack?.max,
     adapter: customWorkflow?.loraStack?.adapter,
@@ -350,6 +355,7 @@ export function sanitizeGenerateBody(
       ? snapInteger(input.duration, profile.defaults.duration, profile.constraints.duration)
       : 0,
     resolution,
+    rebalance,
     // A model that makes sound (Grok Imagine Video 1.5) can be asked for a silent video.
     ...(profile.capabilities.sound && input.sound === false ? { sound: false } : {}),
     // The size tier the run's width and height came from (shared/resolution.ts), kept for reuse.

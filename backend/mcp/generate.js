@@ -1015,6 +1015,7 @@ export function registerGenerateTools({
       negative_prompt: z.string().optional(),
       cfg: z.number().finite().optional(),
       denoise: z.number().finite().optional(),
+      rebalance: z.string().optional(),
       sampler: z.string().optional(),
       scheduler: z.string().optional(),
       upscale_quality: z.enum(upscaleQualities).optional(),
