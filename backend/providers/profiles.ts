@@ -3,7 +3,7 @@ import sharp from "sharp";
 import type { GenerationInput } from "../../shared/queue.ts";
 import { modelOf } from "../domain/queue.ts";
 import type { OwnedJob } from "../domain/store.ts";
-import { CliProxyMedia, type CloudRequest } from "./cliproxy.ts";
+import { CliProxyMedia, type CloudRequest, nativeAspects } from "./cliproxy.ts";
 
 type Value = Record<string, any>;
 // Discovery publishes no resolution schemas; an unlisted model takes the provider's default.
@@ -14,15 +14,32 @@ const resolutions: Record<string, string[]> = {
   "grok-imagine-video": ["480p", "720p"],
   "grok-imagine-video-1.5": ["480p", "720p", "1080p"],
 };
-// The aspect ratios offered where the provider takes a ratio and its own resolution, rather than a
-// size: Grok Imagine Image 2.0 and the video models.
-const nativeAspects = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"];
-/** Presets of the exact ratios, about a megapixel, as the size chip lists them. */
-function aspectPresets() {
+// The size a model draws for each ratio at each of its resolutions, where known. xAI publishes
+// none; Grok Imagine Image 2.0's are Runware's model schema, matching sizes returned by xAI.
+const nativeSizes: Record<string, Record<string, Record<string, [number, number]>>> = {
+  "grok-imagine-image-2.0": {
+    "1:1": { "1k": [1024, 1024], "2k": [2048, 2048] },
+    "16:9": { "1k": [1280, 720], "2k": [2816, 1584] },
+    "9:16": { "1k": [720, 1280], "2k": [1584, 2816] },
+    "4:3": { "1k": [1152, 864], "2k": [2368, 1776] },
+    "3:4": { "1k": [864, 1152], "2k": [1776, 2368] },
+    "3:2": { "1k": [1248, 832], "2k": [2496, 1664] },
+    "2:3": { "1k": [832, 1248], "2k": [1664, 2496] },
+  },
+};
+/**
+ * Presets of the exact ratios as the size chip lists them: the model's own 1K size, with its size
+ * per resolution, where known; else about a megapixel.
+ */
+export function aspectPresets(model: string) {
   return nativeAspects.map((label) => {
-    const [w, h] = label.split(":").map(Number);
-    const scale = Math.round(Math.sqrt((1024 * 1024) / (w * h)));
-    return { label, value: `${w * scale}x${h * scale}`, w: w * scale, h: h * scale };
+    const known = nativeSizes[model]?.[label];
+    const [x, y] = label.split(":").map(Number);
+    const scale = Math.round(Math.sqrt((1024 * 1024) / (x * y)));
+    const [w, h] = known?.["1k"] || [x * scale, y * scale];
+    const sizes =
+      known && Object.fromEntries(Object.entries(known).map(([tier, [w, h]]) => [tier, { w, h }]));
+    return { label, value: `${w}x${h}`, w, h, ...(sizes ? { sizes } : {}) };
   });
 }
 // Longest reference edge sent to the provider, which works at 1080p or 2k at most.
@@ -87,7 +104,7 @@ export function studioCloudProfiles(options: ProfileOptions) {
               baseModel: model,
               workflow: workflow.profileId,
               defaults,
-              aspects: resolutions[model]?.length ? aspectPresets() : [],
+              aspects: resolutions[model]?.length ? aspectPresets(model) : [],
               capabilities: { ...workflow.capabilities, inpaint: false, lora: false },
               // The model's own resolutions, which the size chip offers beside its aspects.
               options: {
