@@ -37,8 +37,12 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
     },
     workloads: [
       workload("image", "image", "http://image.invalid"),
-      workload("text", "text", "http://text.invalid", "Direct Text"),
-      workload("gateway", "text", "http://gateway.invalid"),
+      {
+        ...workload("text", "image", "http://text.invalid", "Direct Text"),
+        capabilities: ["image", "text"],
+        backend: "radiance",
+      },
+      { ...workload("gateway", "image", "http://gateway.invalid"), capabilities: ["text"] },
     ],
     pools: { gpu: 2 },
   });
@@ -47,7 +51,10 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
   const calls: string[] = [];
   const observe = createServicesObserver({
     controller,
-    environment: { STUDIO_ASSISTANT_URL: "http://gateway.invalid" },
+    environment: {
+      STUDIO_ASSISTANT_URL: "http://gateway.invalid",
+      STUDIO_RADIANCE_KEY: "fixture-key",
+    },
     workers: () => [
       {
         id: "image-worker",
@@ -75,8 +82,10 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
           devices: [{ name: "Fixture GPU", vram_total: 100, vram_free: 40 }],
           privateJobs: ["foreign-job"],
         });
-      if (url === "http://text.invalid/health")
+      if (url === "http://text.invalid/health") {
+        assert.deepEqual(options?.headers, { Authorization: "Bearer fixture-key" });
         return new Response(null, { status: textOffline ? 503 : 200 });
+      }
       if (url === "http://video.invalid/system_stats")
         throw new Error("connection refused with private details");
       throw new Error("Unexpected request");
@@ -141,7 +150,7 @@ test("workloads stopped on purpose are parked; one Studio's placement should run
     workload("image", "image", "http://image.invalid"),
     workload("video", "video", "http://video.invalid"),
     workload("video-tp2", "video", "http://video.invalid"),
-    workload("text", "text", "http://text.invalid"),
+    { ...workload("text", "image", "http://text.invalid"), capabilities: ["text"] },
   ];
   // Only text was last placed by Studio, so its stop is drift; the media were parked.
   const controller = new RuntimeController({
@@ -232,13 +241,19 @@ test(
     worker.listen(0, "127.0.0.1");
     await once(worker, "listening");
     const workerUrl = `http://127.0.0.1:${(worker.address() as AddressInfo).port}`;
-    // A running text workload is not parked, so its health is probed as usual.
+    // A running workload serving text is not parked, so its health is probed as usual.
     const kube = fakeKubernetes([
       {
         namespace: "text",
         name: "text",
         replicas: 1,
-        workload: { kind: "text", pool: "gpu", gpus: 1, url: workerUrl },
+        workload: {
+          kind: "image",
+          pool: "gpu",
+          gpus: 1,
+          url: workerUrl,
+          annotations: { "studio.excloo.dev/capabilities": "image,text" },
+        },
       },
     ]);
     const kubernetes = createServer(kube.handle);
@@ -256,7 +271,6 @@ test(
         STUDIO_KUBERNETES_NAMESPACES: "text",
         STUDIO_KUBERNETES_URL: `http://127.0.0.1:${(kubernetes.address() as AddressInfo).port}`,
         STUDIO_LOCAL_TEXT_MODEL: "local/auto",
-        STUDIO_TEXT_KEY: "fixture-text",
         STUDIO_WORKERS: "[]",
         STUDIO_FACE_CHECK: "0",
         STUDIO_IMAGE_SEARCH: "0",
@@ -336,11 +350,12 @@ test(
   },
 );
 
-test("the local text route follows the running text workloads, briefly cached", async () => {
+test("the local text route follows the running workloads serving text, briefly cached", async () => {
   const text = (id: string, vision?: boolean): Workload => ({
     id,
     label: id,
-    kind: "text",
+    kind: "image",
+    capabilities: ["image", "text"],
     namespace: "text",
     deployment: id,
     pool: "gpu",

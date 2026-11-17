@@ -166,7 +166,7 @@ function PromptAssistantModel() {
       label="Prompt Assistant"
       description="The model that writes and improves prompts."
     >
-      {/* The gateway's and Studio's text workloads' models, keeping the current one a choice. */}
+      {/* The gateway's models and those of Studio's workloads serving text, keeping the current one a choice. */}
       <Select
         aria-label="Prompt Assistant"
         data={[...new Set([...models, writingModel])].map((value) => ({

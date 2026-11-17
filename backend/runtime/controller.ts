@@ -23,16 +23,20 @@ export interface Workload {
   pool: string;
   gpus: number;
   url: string;
-  /** Text: the gateway model every text workload serves (STUDIO_LOCAL_TEXT_MODEL). */
+  /** With the text capability: the gateway model it serves (STUDIO_LOCAL_TEXT_MODEL). */
   model?: string;
-  /** Text: whether it reads images. */
+  /** With the text capability: whether its text models read images. */
   vision?: boolean;
-  /** A media workload's worker id and what it runs (workers.js), for workers derived from workloads. */
+  /** Its worker id (workers.js), for workers derived from workloads. */
   worker?: string;
+  /** What it runs, else its kind: `image`, `video` and `text` (local text while it runs). */
   capabilities?: string[];
-  /** A media workload's backend (workers.js): comfyui unless it says radiance. */
+  /** Its backend (workers.js): comfyui unless it says radiance. */
   backend?: string;
 }
+
+/** Whether a workload serves local text while it runs. */
+export const servesText = (workload: Workload) => workload.capabilities?.includes("text") === true;
 
 interface RuntimeEngine {
   state(workload: Workload): Promise<DeploymentState>;
@@ -93,7 +97,7 @@ const swapIdleMs = 2 * 60_000;
 /** Waiting work asks for its workload every second; an older ask has moved or gone. */
 const wantedMs = 30_000;
 const isRadiance = (workload: Workload) => workload.backend === "radiance";
-const isComfy = (workload: Workload) => workload.kind !== "text" && !isRadiance(workload);
+const isComfy = (workload: Workload) => !isRadiance(workload);
 const sameSet = (a: string[], b: string[]) =>
   a.length === b.length && a.every((id) => b.includes(id));
 /** A store for a runtime document that lasts only as long as the process. */
@@ -220,9 +224,11 @@ export class RuntimeController {
     return { pods: await this.engine.logs(this.workload(id), lines) };
   }
 
-  /** The workloads of a kind the cluster has scaled up (replicas > 0), ready or not. */
+  /** The workloads running `kind` the cluster has scaled up (replicas > 0), ready or not. */
   async running(kind: ServiceKind) {
-    const workloads = this.workloads.filter((workload) => workload.kind === kind);
+    const workloads = this.workloads.filter((workload) =>
+      (workload.capabilities ?? [workload.kind]).includes(kind),
+    );
     const states = await Promise.all(workloads.map((workload) => this.engine.state(workload)));
     return workloads.filter((_, index) => states[index].replicas > 0);
   }
@@ -297,6 +303,7 @@ export class RuntimeController {
           id: workload.id,
           label: workload.label,
           kind: workload.kind,
+          ...(servesText(workload) ? { text: true as const } : {}),
           pool: workload.pool,
           gpus: workload.gpus,
           acceptedOperations: this.active.get(workload.id) ?? 0,
@@ -602,32 +609,17 @@ export class RuntimeController {
       .reduce((sum, item) => sum + item.gpus, 0);
   }
 
-  /** Running text workloads, which a restore keeps: callers outside Studio use them. */
-  private runningText(states: Map<string, DeploymentState>) {
-    return this.workloads
-      .filter((item) => item.kind === "text" && states.get(item.id)!.replicas > 0)
-      .map((item) => item.id);
-  }
-
   /**
    * The running workloads, those stopped outside Studio (restored with it) and `workload`, stopping
-   * others in its pool to make room: media before text, idle ones first.
+   * others in its pool to make room, idle ones first.
    */
   private placementWith(workload: Workload, states: Map<string, DeploymentState>) {
     const target = this.workloads
       .filter((item) => item.id === workload.id || !this.isParked(item, states.get(item.id)!))
       .map((item) => item.id);
-    const rank = (id: string) => [
-      this.workload(id).kind === "text" ? 1 : 0,
-      this.active.get(id) ?? 0,
-    ];
     const candidates = target
       .filter((id) => id !== workload.id && this.workload(id).pool === workload.pool)
-      .sort((a, b) => {
-        const [kindA, busyA] = rank(a),
-          [kindB, busyB] = rank(b);
-        return kindA - kindB || busyA - busyB;
-      });
+      .sort((a, b) => (this.active.get(a) ?? 0) - (this.active.get(b) ?? 0));
     while (this.usage(target, workload.pool) > this.pools[workload.pool] && candidates.length)
       target.splice(target.indexOf(candidates.shift()!), 1);
     return this.plan(this.validate(target), states);
@@ -635,8 +627,8 @@ export class RuntimeController {
 
   /**
    * An explicit start, such as choosing a parked profile: the first candidate that is running,
-   * else the first that fits beside what runs, else the first, stopping what it needs room from
-   * (text included). Apply the returned placement with its signature.
+   * else the first that fits beside what runs, else the first, stopping what it needs room from.
+   * Apply the returned placement with its signature.
    */
   async previewStart(candidates: string[]): Promise<RuntimePreview> {
     const choices = candidates.map((id) => this.workload(id));
@@ -652,8 +644,7 @@ export class RuntimeController {
 
   /**
    * Restore Studio's last placement after something else stopped a workload, such as a Flux upgrade
-   * (which resets GPU deployments to 0). Running text stays; a restore that needs its GPUs is
-   * skipped until it is stopped in Studio.
+   * (which resets GPU deployments to 0).
    */
   async reconcile() {
     const desired = this.record.desired?.filter((id) =>
@@ -664,14 +655,9 @@ export class RuntimeController {
     try {
       const states = await this.states();
       if (desired.every((id) => holds(states.get(id)!))) return;
-      const target = [...new Set([...desired, ...this.runningText(states)])];
-      if (
-        Object.entries(this.pools).some(([pool, capacity]) => this.usage(target, pool) > capacity)
-      )
-        return;
       this.begin(
         "apply",
-        this.plan(target, states),
+        this.plan(desired, states),
         "restoring the last placement after an outside stop",
       );
     } finally {

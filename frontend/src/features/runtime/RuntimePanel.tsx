@@ -126,7 +126,7 @@ const mediaState = (service: ServiceStatus) => {
 };
 /**
  * The status panel's quiet summary, one line per kind: its health dot, then how many workers or
- * local models serve it and their state. Text without a local model runs in the cloud. Read-only
+ * workers serve it and their state. Text without a local worker runs in the cloud. Read-only
  * and the same for everyone; Settings › Workers holds the controls.
  */
 export function ServiceHealthSummary() {
@@ -152,7 +152,7 @@ export function ServiceHealthSummary() {
         const detail = cloud
           ? "Cloud only"
           : kind === "text"
-            ? `${plural(count, "local model")} · ${healthLabel(service.state)}`
+            ? `${plural(count, "worker")} · ${healthLabel(service.state)}`
             : `${plural(count, "worker")} · ${mediaState(service)}`;
         return (
           <Group key={kind} gap="xs" wrap="nowrap" aria-label={`${label}: ${detail}`}>

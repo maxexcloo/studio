@@ -25,8 +25,9 @@ const workloads = [
   workload("image", "image", "comfyui"),
   workload("video", "video", "comfyui-video"),
   workload("video-tp2", "video", "comfyui-video", 2),
-  workload("text", "text", "text"),
-  workload("gaming", "text", "text", 1, "gaming"),
+  // Workloads that also serve local text.
+  { ...workload("text", "image", "text"), capabilities: ["image", "text"] },
+  { ...workload("gaming", "image", "text", 1, "gaming"), capabilities: ["image", "text"] },
 ];
 
 const radiance: Workload = {
@@ -277,7 +278,7 @@ test("a change doesn't wait on work for a workload without pods, and an administ
   lease.release();
 });
 
-test("an administrator's apply can stop text for media", async () => {
+test("an administrator's apply can stop a workload serving text for media", async () => {
   const { kube, controller } = fixture(["text"]);
   const preview = await controller.preview(["video-tp2"]);
   assert.deepEqual(preview.stop, ["text"]);
@@ -291,7 +292,7 @@ test("an administrator's apply can stop text for media", async () => {
   (await controller.acquire("video-tp2")).release();
 });
 
-test("an explicit start uses a free GPU, else names what it stops, media before text", async () => {
+test("an explicit start uses a free GPU, else names what it stops", async () => {
   const { kube, controller } = fixture(["image", "text"]);
   const preview = await controller.previewStart(["video-tp2"]);
   assert.deepEqual(
@@ -309,29 +310,6 @@ test("an explicit start uses a free GPU, else names what it stops, media before 
   assert.deepEqual([fits.stop, fits.start], [[], ["video"]]);
   await assert.rejects(controller.previewStart([]), { status: 400 });
   assert.deepEqual(kube.log, []);
-});
-
-test("restoring the last placement leaves text started outside Studio running", async () => {
-  const { kube, controller } = fixture(["image", "video"]);
-  const preview = await controller.preview(["image", "video"]);
-  await controller.apply(["image", "video"], preview.signature, "local");
-  await controller.settled;
-  // Something outside Studio stops image and starts text in its place.
-  kube.deployments.get("comfyui/image")!.replicas = 0;
-  for (const pod of kube.deployments.get("comfyui/image")!.pods) pod.deleting = true;
-  kube.deployments.get("text/text")!.replicas = 1;
-  kube.tick();
-  await controller.reconcile();
-  await controller.settled;
-  assert.deepEqual(kube.log, ["gone comfyui/image"]);
-  assert.equal((await controller.observe()).history.length, 1);
-  // Once text is stopped, the placement is restored.
-  kube.deployments.get("text/text")!.replicas = 0;
-  for (const pod of kube.deployments.get("text/text")!.pods) pod.deleting = true;
-  kube.tick();
-  await controller.reconcile();
-  await controller.settled;
-  assert.equal(kube.log.at(-1), "scale comfyui/image 1");
 });
 
 test("a deployment reset outside Studio shows as drift and is restored", async () => {
