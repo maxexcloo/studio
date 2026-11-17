@@ -14,6 +14,7 @@ import {
   identitySlot,
   keepsCharacterFaces,
   keepsIdentity,
+  maxContextNotes,
   maxNewCharacters,
   minCharacterAge,
   startImageSlot,
@@ -120,8 +121,11 @@ const chatContext = z
     outfit: cardContext.optional(),
     scene: cardContext.optional(),
     series: z.string().optional(),
+    notes: z.string().max(maxContextNotes).optional(),
   })
-  .describe("Who and what it shows; series names a story or project.");
+  .describe(
+    "Who and what it shows; series names a story or project; notes: backstory for Studio's writers.",
+  );
 const promptList = z.array(z.string().trim().min(1)).min(1).max(maxSplitJobs);
 /** A JSON array sent as one string, or a single prompt. */
 const promptListText = z.string().transform((text) => {

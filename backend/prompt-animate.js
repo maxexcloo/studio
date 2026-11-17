@@ -171,7 +171,8 @@ export function animateIssue(writing, { allowed }) {
  * Writes the motion prompt for `profile` and a `clip` ({ seconds, fps }), streaming through
  * `onThinking` and `onDelta`. `frame()` loads the frame the clip starts from ({ mime, data },
  * downscaled) and is asked only when the text model reads images; otherwise `caption()` says what
- * it shows in words. `explicit`: the account holds Uncensored Models. `writer`: its prompt writer
+ * it shows in words. `explicit`: the account holds Uncensored Models. `story`: the chat's story
+ * (writing-standard.ts storyContext), if any. `writer`: its prompt writer
  * (assistant.js `writerModel`).
  */
 export async function writeAnimatePrompt({
@@ -181,6 +182,7 @@ export async function writeAnimatePrompt({
   writing,
   clip = {},
   explicit = false,
+  story = "",
   writer,
   frame = async () => null,
   caption = () => "",
@@ -207,6 +209,7 @@ export async function writeAnimatePrompt({
             `${writing.extend ? "The clip so far was made from" : "The first frame was made from"}: ${writing.source || "(no prompt recorded)"}`,
             description ? `What the frame shows: ${description}` : "",
             writing.instruction ? `Instruction: ${writing.instruction}` : "",
+            story,
           ]
             .filter(Boolean)
             .join("\n"),

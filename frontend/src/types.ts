@@ -142,6 +142,8 @@ export interface ResultContext {
   outfit?: { name: string; description?: string };
   scene?: { name: string; description?: string };
   series?: string;
+  /** Backstory or scene notes for Studio's prompt writers. */
+  notes?: string;
 }
 
 export interface MediaItem {

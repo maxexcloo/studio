@@ -1114,8 +1114,9 @@ test("media and administrator credentials discover only their own friendly tools
     // leaving LoRA strengths to vary, and to 21,750 for generate's chat context and create_characters;
     // sets, axis comparisons and the user's brief were then fitted within it; then to 21,900 for
     // cancel_all's chat and account scopes, to 22,050 for writing prompts in American English, and
-    // to 22,300 for keeping saved preferences and taste out of MCP generation.
-    JSON.stringify(tools).length + media.getInstructions().length < 22300,
+    // to 22,300 for keeping saved preferences and taste out of MCP generation, and to 22,650 for
+    // backstory notes and characters' stories in cards and rewrite_prompt.
+    JSON.stringify(tools).length + media.getInstructions().length < 22650,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1862,18 +1863,32 @@ test("cards updates a card named by name, keeping the fields and images left out
     saved.push([req.params.id, req.body]);
     res.json({ character: { id: req.params.id, ...req.body, references: [{ id: "kept" }] } });
   });
-  const args = { action: "update", kind: "characters", id: "mara", description: "ranger, cloak" };
+  // A character's story changes beside its looks; what isn't passed is kept.
+  const args = {
+    action: "update",
+    kind: "characters",
+    id: "mara",
+    description: "ranger, cloak",
+    backstory: "Raised on the coast",
+  };
   assert.deepEqual(data(await call(client, "cards", args)).character, {
     id: "chr-mara",
     name: "Mara",
     description: "ranger, cloak",
     job: "Scout",
+    backstory: "Raised on the coast",
     image_ids: ["kept"],
   });
   assert.deepEqual(saved, [
     [
       "chr-mara",
-      { name: "Mara", description: "ranger, cloak", job: "Scout", referenceIds: ["kept"] },
+      {
+        name: "Mara",
+        description: "ranger, cloak",
+        job: "Scout",
+        backstory: "Raised on the coast",
+        referenceIds: ["kept"],
+      },
     ],
   ]);
   await failure(client, "cards", { ...args, id: "Ivo" });

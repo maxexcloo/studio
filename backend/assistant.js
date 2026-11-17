@@ -1,4 +1,9 @@
-import { cardKinds, maxCardDescription, maxCardName } from "../shared/characters.ts";
+import {
+  cardKinds,
+  maxCardDescription,
+  maxCardName,
+  maxContextNotes,
+} from "../shared/characters.ts";
 import { loraCompatibility, loraName, loraStrengthRange } from "../shared/profiles.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { maxSuggestions } from "../shared/suggestions.ts";
@@ -35,6 +40,7 @@ import {
   matchEffort,
   precedence,
   proportionate,
+  storyContext,
   subjectFirst,
   suggestionChoices,
   writerGuide,
@@ -428,6 +434,7 @@ function rewriteInstructions({
   guide,
   preset,
   instruction,
+  context,
   explicit,
   references,
   vision,
@@ -471,6 +478,7 @@ function rewriteInstructions({
     `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
     `Style: ${override || preset.instruction}`,
     preset.custom ? `Instruction: ${JSON.stringify(instruction)}` : "",
+    storyContext(context ? { notes: context } : null),
     // An uncensored style is offered only with Uncensored Models (assistant-routes.js).
     contentRule(explicit || Boolean(preset.uncensored)),
   ]
@@ -763,6 +771,7 @@ export function createAssistant(
     prompt,
     preset: presetId = promptStyleStore().defaultId(),
     instruction = "",
+    context = "",
     explicit = false,
     references = [],
     stack = [],
@@ -773,6 +782,9 @@ export function createAssistant(
     onDelta,
   } = {}) {
     const preset = promptStyleStore().style("improve", presetId);
+    const notes = String(context || "")
+      .trim()
+      .slice(0, maxContextNotes);
     if (!preset) throw new AssistantError("Choose a known preset.", { status: 400 });
     const asked = String(instruction || "")
       .trim()
@@ -783,7 +795,7 @@ export function createAssistant(
       .trim()
       .slice(0, maxPromptCharacters);
     if (!original) throw new AssistantError("Enter a prompt to rewrite.", { status: 400 });
-    const refusal = minorAgeRefusal(`${original}\n${asked}`);
+    const refusal = minorAgeRefusal(`${original}\n${asked}\n${notes}`);
     if (refusal) throw new AssistantError(refusal, { status: 400 });
     const model = await modelFor("rewrite", explicit, writer);
     const started = now();
@@ -803,6 +815,7 @@ export function createAssistant(
         guide,
         preset,
         instruction: asked,
+        context: notes,
         explicit,
         references: images.length,
         vision,
