@@ -94,6 +94,8 @@ export interface QueueJob {
   queueBatch?: string;
   /** Dream's background work, queued below every account's own work. */
   dream?: true;
+  /** When the gallery lists the job's results: a retry keeps its failed original's place. */
+  galleryAt?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -3,9 +3,9 @@ import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import "./styles.css";
 import { useMantineTheme } from "@mantine/core";
-import { Notifications } from "@mantine/notifications";
+import { Notifications, notifications, useNotifications } from "@mantine/notifications";
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 
@@ -37,9 +37,22 @@ function AppNotifications() {
   const phone = usePhone();
   const theme = useMantineTheme();
   const swipe = useRef<{ close: HTMLButtonElement; id: number; x: number; y: number } | null>(null);
+  // One banner at a time: the newest replaces any still shown, which takes no input or
+  // accessibility focus while it fades out.
+  const { notifications: shown, queue } = useNotifications();
+  useEffect(() => {
+    if (!queue.length) return;
+    for (const { id } of shown) {
+      const banner = document.getElementById(id!);
+      banner?.setAttribute("inert", "");
+      banner?.setAttribute("aria-hidden", "true");
+      notifications.hide(id!);
+    }
+  }, [shown, queue]);
   return (
     <Notifications
       position="top-center"
+      limit={1}
       containerWidth={400}
       transitionDuration={theme.other.motionDuration}
       allowDragDismiss={!phone}

@@ -1122,6 +1122,10 @@ test("pending cancellation avoids submission and failed retries get distinct IDs
     assert.notEqual(retry.id, failed.id);
     assert.equal(retry.input.clientJobId, retry.id);
     assert.equal(retry.sessionId, session.id);
+    // The retry keeps the failed run's place in the gallery, however often it is retried.
+    assert.equal(retry.galleryAt, failed.createdAt);
+    await queue.tick();
+    assert.equal(queue.retry("alice", retry.id)?.galleryAt, failed.createdAt);
     assert.equal(await queue.cancel("bob", retry.id), undefined);
   } finally {
     store.close();

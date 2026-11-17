@@ -654,16 +654,23 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
       status: "failed",
     },
   );
+  // The newest result, so the retry has a place below it to keep.
+  state.gallery.unshift({ ...results(1)[0], id: "newest", prompt: "Newest study" });
   await page.route("**/api/queue/failed-job/retry", async (route) => {
-    const retried = job("retried-job", "queued");
+    const retried = job("retried-job", "queued", { galleryAt: stamp });
     state.jobs.push(retried);
-    state.gallery.unshift({
-      ...results(1)[0],
-      id: "retried",
-      jobId: "retried-job",
-      prompt: "Failed study",
-      status: "pending",
-    });
+    // The retry's tile lists where the failed one did, not first.
+    state.gallery.splice(
+      state.gallery.findIndex((item) => item.id === "failed"),
+      0,
+      {
+        ...results(1)[0],
+        id: "retried",
+        jobId: "retried-job",
+        prompt: "Failed study",
+        status: "pending",
+      },
+    );
     await route.fulfill({ json: { job: retried } });
   });
   await page.goto("/images");
@@ -677,6 +684,62 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
   await expect(page.locator('[data-media-id="failed"]')).toHaveCount(0);
   await expect(page.locator('[data-media-id="retried"]')).toBeVisible();
   expect(state.gallery.map((item) => item.id)).not.toContain("failed");
+  const tiles = await page
+    .locator("[data-media-id]")
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-media-id")));
+  expect(tiles.indexOf("retried")).toBeGreaterThan(tiles.indexOf("newest"));
+});
+
+test("One notification shows at a time: a second dislike replaces the first, with its own Undo", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(2));
+  await page.goto("/images");
+  for (const index of [0, 1]) {
+    await page.getByRole("button", { name: "Select Items", exact: true }).click();
+    await page
+      .getByRole("button", { name: `Select image: Browse Result ${index}`, exact: true })
+      .click();
+    await selectionAction(page, "Dislike").click();
+    await expect.poll(() => state.gallery[index].rating).toBe("disliked");
+  }
+  const banner = page.getByRole("alert").filter({ hasText: "Disliked and hidden" });
+  await expect(banner).toHaveCount(1);
+  await banner.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(() => state.gallery[1].rating).toBeUndefined();
+  expect(state.gallery[0].rating).toBe("disliked");
+  await expect(banner).toHaveCount(0);
+});
+
+test("New results wait behind a pill while the gallery is scrolled, keeping the tiles in view", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(60));
+  await page.goto("/images");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator("[data-gallery-view]")
+    .evaluate((host) =>
+      window.scrollTo(0, host.getBoundingClientRect().top + window.scrollY + 1500),
+    );
+  const scrolled = await page.evaluate(() => window.scrollY);
+  state.gallery.unshift({ ...results(1)[0], id: "fresh", prompt: "Fresh Result" });
+  // Returning to the tab reads the newest results.
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event("visibilitychange", { bubbles: true })),
+  );
+  const pill = page.getByRole("button", { name: "1 New Result", exact: true });
+  await expect(pill).toBeVisible();
+  const fresh = page.getByRole("button", { name: "Open image: Fresh Result", exact: true });
+  await expect(fresh).toHaveCount(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+  await pill.click();
+  await expect(fresh).toBeVisible();
+  await expect(pill).toBeHidden();
 });
 
 test("Selection extends with Shift, picks in-progress or failed work and acts from keys and menus", async ({
@@ -1414,7 +1477,7 @@ test("Desktop gallery controls stay available while scrolling and rating changes
     .toEqual(["", "disliked", false, false]);
 });
 
-test("Incoming results preserve loaded pages, the scroll anchor and selection without a reveal step", async ({
+test("Incoming results wait behind New Results while scrolled, keeping loaded pages, the scroll anchor and selection", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -1488,9 +1551,10 @@ test("Incoming results preserve loaded pages, the scroll anchor and selection wi
     updatedAt: stamp,
   });
   await expect.poll(() => requests.length).toBeGreaterThan(previousReads);
-  await expect
-    .poll(() => page.locator("[data-gallery-view]").evaluate((host) => host.style.height))
-    .not.toBe(heightBefore);
+  await expect(page.getByRole("button", { name: "5 New Results", exact: true })).toBeVisible();
+  expect(await page.locator("[data-gallery-view]").evaluate((host) => host.style.height)).toBe(
+    heightBefore,
+  );
   await expect(
     page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
   ).toHaveText("1 Selected");
@@ -1513,7 +1577,6 @@ test("Incoming results preserve loaded pages, the scroll anchor and selection wi
     "false",
   );
   expect(requests.filter(Boolean)).toEqual(["older"]);
-  await expect(page.getByRole("button", { name: /^\d+ New$/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(
