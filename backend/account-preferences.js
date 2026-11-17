@@ -13,13 +13,12 @@ import {
  * (`preferences:` in single-user mode). Cloud Models, LoRAs and Uncensored Models only narrow
  * what the account's group grants (account-policy.js); they start on wherever the group grants
  * them. Uncensored Models also lets prompt writing word what it offers explicitly.
- * `images` says where images run by default, Cloud or Local, and `videos` where videos and Animate
- * do (Cloud, or the local Fast or Quality tier); unsaved, each is local, and a saved Cloud reads as
- * unsaved while Cloud Models is off. The side that can't run
- * gives way to the other, saying so; a model the person picks always wins (model/catalogue.js,
- * animate-profile.js). `text` says where other text work runs (`textSide`). `writingModel` is the
- * text model prompt writing asks for (assistant.js `writerModel`). `galleryWork` is which unfinished work the gallery shows: none (unsaved), work
- * in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
+ * `images`, `videos` and `text` say where each kind runs by default, Cloud or Local (`sideOf`), and
+ * `<kind>Cloud` and `<kind>Local` its default model on each side: an image or video profile ID, or
+ * a gateway text model. Unsaved, a default is the deployment's (model/catalogue.js,
+ * animate-profile.js, assistant.js). A side that can't run gives way to the other, saying so; a
+ * model the person picks always wins. `galleryWork` is which unfinished work the gallery shows:
+ * none (unsaved), work in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
  * settings (shared/appearance.ts), and `chatBrief` the standing brief chats write to
  * (shared/chat-brief.ts). Keys Studio no longer knows are dropped as the document is read.
  */
@@ -34,12 +33,19 @@ const preferenceChoices = Object.freeze({
   galleryWork: ["none", "running", "queued"],
   images: ["cloud", "local"],
   text: ["cloud", "local"],
-  videos: ["cloud", "fast", "quality"],
+  videos: ["cloud", "local"],
 });
+/** Each kind's default model per side, by the kind's preference key. */
+export const defaultModelKeys = Object.freeze({
+  images: { cloud: "imageCloud", local: "imageLocal" },
+  text: { cloud: "textCloud", local: "textLocal" },
+  videos: { cloud: "videoCloud", local: "videoLocal" },
+});
+const modelKeys = new Set(Object.values(defaultModelKeys).flatMap((sides) => Object.values(sides)));
 const known = (key) =>
   Object.hasOwn(preferenceDefaults, key) ||
   Object.hasOwn(preferenceChoices, key) ||
-  key === "writingModel" ||
+  modelKeys.has(key) ||
   key === "appearance" ||
   key === "chatBrief";
 const cache = new Map();
@@ -63,13 +69,21 @@ export function accountPreferences(ownerId = "") {
 }
 
 /**
- * Where the account's text work other than its prompt writing runs (assistant.js `modelFor`):
- * titles, captions, suggestions, Dream and the like. Unsaved, Cloud, or Local while Cloud Models
- * is off.
+ * Where a kind (`images`, `videos` or `text`) runs by default: the saved side, else Local, except
+ * Text, which runs on Cloud unless Cloud Models is off.
  */
-export function textSide(ownerId = "") {
-  const { cloudModels, text } = accountPreferences(ownerId);
-  return text || (cloudModels ? "cloud" : "local");
+export function sideOf(preferences, kind) {
+  return preferences[kind] || (kind === "text" && preferences.cloudModels ? "cloud" : "local");
+}
+
+/** A kind's chosen side and the default model saved for each side, if any. */
+export function kindDefaults(preferences, kind) {
+  const keys = defaultModelKeys[kind];
+  return {
+    side: sideOf(preferences, kind),
+    cloud: preferences[keys.cloud],
+    local: preferences[keys.local],
+  };
 }
 
 /** Which preferences the account has saved, so a value carried over from a device never replaces one. */
@@ -101,15 +115,18 @@ export function saveAccountPreferences(ownerId, patch) {
       patch = { ...patch, chatBrief: brief };
       continue;
     }
-    if (key === "writingModel") {
-      if (typeof value !== "string" || !value.trim() || value.length > 200)
-        throw new Error("Choose a text model.");
+    if (modelKeys.has(key)) {
+      if (value !== null && (typeof value !== "string" || !value.trim() || value.length > 200))
+        throw new Error(`Choose a model for ${key}.`);
       continue;
     }
     if (!known(key)) throw new Error(`Unknown preference ${key}.`);
     if (typeof value !== "boolean") throw new Error(`Set ${key} to true or false.`);
   }
-  const next = { ...saved(ownerId), ...patch };
+  // A default model set to null goes back to the deployment's.
+  const next = Object.fromEntries(
+    Object.entries({ ...saved(ownerId), ...patch }).filter(([, value]) => value !== null),
+  );
   writeRuntimeDocument(dataDir, documentName(ownerId), next);
   cache.set(ownerId, next);
   return accountPreferences(ownerId);

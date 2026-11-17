@@ -31,14 +31,14 @@ import {
 } from "../generation/payload";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { queueJobQuery, queueQuery } from "../generation/Queue";
-import { type VideosPreference, useVideosPreference } from "../settings/accountPreferences";
+import { type SidePreference, useVideosPreference } from "../settings/accountPreferences";
 import { animationInput, retainedAnimationProfile } from "./animateLength";
 import { galleryKey } from "./queries";
 import { useItemMutation } from "./useItemMutation";
 
 type Operation = "image" | "refine" | "animate" | "extend";
 /** What Animate's Cloud, Fast and Quality offer the account (backend/animate-profile.js). */
-export type AnimateOffers = Record<VideosPreference, boolean>;
+export type AnimateOffers = Record<SidePreference, boolean>;
 
 interface AnimateChoice {
   profileId: string;
@@ -89,8 +89,7 @@ export function useAnimateLengthSetting(item?: MediaItem): Action {
   const switching =
     useIsMutating({
       predicate: (mutation) =>
-        (mutation.state.variables as { videos?: VideosPreference } | undefined)?.videos !==
-        undefined,
+        (mutation.state.variables as { videos?: SidePreference } | undefined)?.videos !== undefined,
     }) > 0;
   const models = useQuery(modelsQuery);
   const retained = item && retainedAnimationProfile(models.data?.profiles || [], item, videos);
@@ -129,7 +128,7 @@ export async function mediaDraft(
   item: MediaItem,
   operation: Operation,
   client: QueryClient,
-  videos?: VideosPreference,
+  videos?: SidePreference,
   seconds?: number | null,
 ) {
   // An action can run before the composer's models load.
@@ -432,10 +431,9 @@ export function useIterate() {
   };
 }
 
-/** The prompt Review Prompt shows, with the video model (Fast or Quality, Cloud) that will run it. */
+/** The prompt Review Prompt shows, with the video model that will run it and whether on Cloud. */
 interface AnimateReview extends WrittenPrompt {
   profileLabel: string;
-  tier?: "fast" | "quality";
   cloud: boolean;
 }
 
@@ -460,7 +458,7 @@ export function useAnimateWriter(item: MediaItem) {
       signal: AbortSignal;
     }): Promise<AnimateReview> => {
       const prepared = await mediaDraft(item, "animate", client, videos, seconds);
-      const { profile, choice, draft } = prepared;
+      const { profile, draft } = prepared;
       // The clip's length paces the beats, as in the queue stage: the run's input as it would queue.
       const { duration, frames, fps } = generationInput(
         draft.input,
@@ -488,13 +486,6 @@ export function useAnimateWriter(item: MediaItem) {
         model: written.model,
         thinking: written.thinking,
         profileLabel: profileName(profile),
-        // The local tier, where the account has both.
-        tier:
-          choice && !choice.cloud && choice.offers.fast && choice.offers.quality
-            ? videos === "quality"
-              ? "quality"
-              : "fast"
-            : undefined,
         cloud: isCloudProfile(profile),
       };
     },

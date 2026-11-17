@@ -39,12 +39,12 @@ export function startFrameSize(profile, body) {
  * The video profile that animates an image when the user named none. `where` picks the pool: `auto`
  * takes the `prefer`red pool (`local` unless asked) while it can run, otherwise the other, with a
  * `note` saying so; `local` and `cloud` (MCP's `runs_on`) take only their own pool and refuse
- * without it. It never waits on a stopped worker. Profiles that take a first frame come first; among them
- * `tier` (Fast unless asked) takes its nearest tier with a profile, preferring the account's default
- * family. `offers` says what Animate's Cloud, Fast and Quality offer the account, also on a refusal:
- * `cloud` with a Grok profile, and `fast` and `quality` for the local tiers (a stopped pool
- * included, so picking it says why it can't run): both when they pick different profiles, otherwise
- * the one its profile is nearer. `profiles` are the account's own. Given the image's `width` and `height`, the
+ * without it. It never waits on a stopped worker. In a pool the account's own default for that side
+ * (`preferred.cloud` or `preferred.local`) wins where it can animate; otherwise profiles that take
+ * a first frame come first, and among them `tier` (Fast unless asked) takes its nearest tier with a
+ * profile, preferring the account's default family. `offers` says which of Animate's Cloud and
+ * Local the account has, also on a refusal (a stopped local pool included, so picking it says why
+ * it can't run). `profiles` are the account's own. Given the image's `width` and `height`, the
  * choice carries the video's `size` (frameSize).
  */
 export function animateProfile(
@@ -54,6 +54,7 @@ export function animateProfile(
     localRunning,
     localParked = false,
     tier = "fast",
+    preferred = {},
     where = "auto",
     prefer = "local",
     width,
@@ -80,20 +81,13 @@ export function animateProfile(
     });
   };
   const anyLocal = usable.filter((profile) => !isCloudProfile(profile));
-  const [fast, quality] = anyLocal.length
-    ? [pick(anyLocal, "fast"), pick(anyLocal, "quality")]
-    : [];
-  const fastTier = ["fast", "turbo"].includes(tierOf(fast));
-  const offers = {
-    cloud: grok.length > 0,
-    fast: Boolean(fast) && (fast !== quality || fastTier),
-    quality: Boolean(quality) && (fast !== quality || !fastTier),
-  };
+  const offers = { cloud: grok.length > 0, local: anyLocal.length > 0 };
   const refuse = (message) => {
     throw Object.assign(new Error(message), { offers });
   };
   const choose = (pool) => {
-    const profile = pick(pool, tier);
+    const own = preferred[isCloudProfile(pool[0]) ? "cloud" : "local"];
+    const profile = pool.find((item) => item.id === own) || pick(pool, tier);
     return { profile, tier: tierOf(profile) };
   };
   const cloudChoice = (note) => {
@@ -131,10 +125,10 @@ export function animateProfile(
 }
 /**
  * The video profile Dream animates or, given `extend` (the video's profile ID), extends with: only
- * local GPUs, never Cloud, at the account's `videos` preference (Quality, otherwise Fast) as
- * animateProfile chooses; an Extend keeps its video's model where that is local and runs.
+ * local GPUs, never Cloud, the account's Local default (`preferred.local`) as animateProfile
+ * chooses; an Extend keeps its video's model where that is local and runs.
  */
-export function dreamVideoProfile(profiles, { videos, extend, ...options }) {
+export function dreamVideoProfile(profiles, { extend, ...options }) {
   const own =
     extend &&
     profiles.find(
@@ -148,11 +142,7 @@ export function dreamVideoProfile(profiles, { videos, extend, ...options }) {
     );
   const choice = own
     ? withSize({ profile: own }, options.width, options.height)
-    : animateProfile(profiles, {
-        ...options,
-        tier: videos === "quality" ? "quality" : "fast",
-        where: "local",
-      });
+    : animateProfile(profiles, { ...options, where: "local" });
   return { profile: choice.profile, size: choice.size };
 }
 const withSize = (choice, width, height) =>
