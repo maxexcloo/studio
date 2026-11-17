@@ -298,28 +298,23 @@ export function inferModels(
     const defaults = workflow.defaults || {};
     const controls = workflow.controls || {};
     const familyStep = workflowFamilyStep(workflow);
-    const widthRange = controls.width
-      ? sizedRange(
-          nodeRange(info, workflow.graph?.[controls.width.node]?.class_type, controls.width.input, {
-            default: Number(defaults.width || 1024),
-            min: 16,
-            max: 16384,
-            step: 8,
-          }),
-          familyStep,
-        )
-      : {};
-    const heightRange = controls.height
-      ? sizedRange(
-          nodeRange(
-            info,
-            workflow.graph?.[controls.height.node]?.class_type,
-            controls.height.input,
-            { default: Number(defaults.height || 1024), min: 16, max: 16384, step: 8 },
-          ),
-          familyStep,
-        )
-      : {};
+    // A profile may size only its generate mode; without a size control the family step still holds.
+    const sizeRange = (key) => {
+      const mode = controls[key] ? workflow : workflow.imageModes?.generate;
+      const control = mode?.controls?.[key];
+      if (!control) return familyStep ? { step: familyStep } : {};
+      return sizedRange(
+        nodeRange(info, mode.graph?.[control.node]?.class_type, control.input, {
+          default: Number(defaults[key] || 1024),
+          min: 16,
+          max: 16384,
+          step: 8,
+        }),
+        familyStep,
+      );
+    };
+    const widthRange = sizeRange("width");
+    const heightRange = sizeRange("height");
     const radianceImage = Object.values(workflow.graph || {}).some(
       (node) => node.class_type === radianceImageNode,
     );
