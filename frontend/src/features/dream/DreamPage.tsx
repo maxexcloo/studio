@@ -69,17 +69,13 @@ function Empty({ dream }: { dream: Dream }) {
       <EmptyState
         fill
         action={
-          dream.locked.includes("paused") ? (
-            <Text size="xs">{lockedByAdministrator}</Text>
-          ) : (
-            <Button
-              leftSection={<icons.resume size={16} />}
-              loading={save.isPending}
-              onClick={() => save.mutate({ paused: false })}
-            >
-              Resume
-            </Button>
-          )
+          <Button
+            leftSection={<icons.resume size={16} />}
+            loading={save.isPending}
+            onClick={() => save.mutate({ paused: false })}
+          >
+            Resume
+          </Button>
         }
       >
         Dream Is Paused
@@ -182,7 +178,7 @@ export function DreamPage() {
         {!phone && selector}
         <div ref={setUndoTarget} style={{ display: "contents" }} />
         <Group gap={4} wrap="nowrap" ml="auto">
-          {data?.settings.enabled && !data.locked.includes("paused") && (
+          {data?.settings.enabled && (
             <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
               <ActionIcon
                 variant="subtle"

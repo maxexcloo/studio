@@ -1,33 +1,23 @@
-/* The phone sheet fills the screen with its header, body and any footer, pinned above the safe
-   area. The body scrolls, unless its content fills it and scrolls itself, as the reference grid
-   does, so the sheet itself never scrolls. A drag on the header is the sheet's own, to pull it
-   closed. */
+/* The phone sheet fills the screen with its header and body, whose DialogFooter the theme pins
+   above the safe area. The body scrolls, unless its content fills it and scrolls itself, as the
+   reference grid does, so the sheet itself never scrolls. A drag on the header is the sheet's own,
+   to pull it closed. */
 .sheetHeader {
   gap: var(--mantine-spacing-xs);
   touch-action: none;
 }
 
-/* A field in the heading or phone footer, such as a name being saved, gives way before its
-   buttons. */
-.heading button,
-.sheetFooter button {
-  flex-shrink: 0;
-}
-
-/* A heading's or phone footer's actions sit at its end; a name being saved takes the rest of the
-   row, the title and any detail (or the footer's start) stepping aside. */
-.actions {
-  flex: 1 1 auto;
+/* The title and its detail take the room before the heading's actions and Close. */
+.sheetTitle {
+  display: flex;
+  flex: 1;
+  gap: var(--mantine-spacing-xs);
+  align-items: center;
   min-width: 0;
 }
 
-.heading:has([data-naming]) {
-  flex-wrap: nowrap;
-}
-
-.heading:has([data-naming]) > :first-child,
-.sheetFooter:has([data-naming]) .footerStart {
-  display: none;
+.heading button {
+  flex-shrink: 0;
 }
 
 .sheetBody {
@@ -36,18 +26,6 @@
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-}
-
-.sheetBody:last-child,
-.sheetFooter {
-  padding-bottom: calc(var(--mantine-spacing-md) + env(safe-area-inset-bottom));
-}
-
-.sheetFooter {
-  flex-shrink: 0;
-  padding-top: var(--mantine-spacing-sm);
-  padding-inline: var(--mantine-spacing-md);
-  border-top: 1px solid var(--studio-glass-border);
 }
 
 /* A popup's aside: a column beside the rest, divided from it to the top, whose own content never

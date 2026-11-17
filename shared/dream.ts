@@ -17,7 +17,6 @@ export type DreamSettings = typeof dreamDefaults;
  */
 export const dreamOverrideKeys = {
   enabled: "STUDIO_DREAM_OVERRIDE_ENABLED",
-  paused: "STUDIO_DREAM_OVERRIDE_PAUSED",
   spicy: "STUDIO_DREAM_OVERRIDE_SPICY",
   imageBackend: "STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND",
   videoBackend: "STUDIO_DREAM_OVERRIDE_VIDEO_BACKEND",

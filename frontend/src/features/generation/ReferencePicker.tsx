@@ -424,7 +424,7 @@ export function ReferencePicker({
         onOpenedChange={setOpened}
         trap={!layer}
         target={trigger}
-        headerEnd={
+        actions={
           <Button
             size="compact-sm"
             variant="subtle"
@@ -438,7 +438,6 @@ export function ReferencePicker({
             Clear
           </Button>
         }
-        footer={{ apply: true }}
       >
         {content}
       </ChipPopup>

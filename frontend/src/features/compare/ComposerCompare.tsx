@@ -2,7 +2,6 @@ import {
   Button,
   Checkbox,
   Chip,
-  Divider,
   Group,
   Input,
   MultiSelect,
@@ -14,7 +13,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import { compareVariants } from "../../../../shared/compare";
@@ -32,6 +31,7 @@ import {
 } from "../../../../shared/resolution";
 import type { GenerationInput } from "../../types";
 import { icons } from "../../ui/icons";
+import { plural } from "../../ui/plural";
 import { TextBox } from "../../ui/TextBox";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "../generation/chip";
@@ -179,13 +179,52 @@ export function CompareMenu() {
           Compare
         </Button>
       }
-      footer={{
-        start: (
-          <Button fullWidth disabled={!fitsComparison(count)} onClick={stage}>
-            Start Comparing
-          </Button>
-        ),
-      }}
+      actions={
+        draft.compare && (
+          <>
+            <Button
+              size="compact-sm"
+              variant="subtle"
+              aria-label="Clear Comparison"
+              onClick={() => {
+                setDraft((value) => ({ ...value, compare: undefined }));
+                close();
+              }}
+            >
+              Clear
+            </Button>
+            <Button
+              size="compact-sm"
+              variant="subtle"
+              aria-label={`Remove Variant ${letter(draft.compare.active)}`}
+              onClick={() => {
+                setDraft(removeVariant);
+                close();
+              }}
+            >
+              Remove
+            </Button>
+          </>
+        )
+      }
+      secondary={
+        <Button
+          variant="default"
+          leftSection={<icons.duplicate size={16} />}
+          disabled={!canAddVariant(draft)}
+          onClick={() => {
+            setDraft(addVariant);
+            close();
+          }}
+        >
+          {draft.compare ? `Duplicate Variant ${letter(draft.compare.active)}` : "Add Variant"}
+        </Button>
+      }
+      primary={
+        <Button disabled={!fitsComparison(count)} onClick={stage}>
+          Compare
+        </Button>
+      }
     >
       <Stack gap="sm">
         <Select
@@ -299,49 +338,9 @@ export function CompareMenu() {
           />
         )}
         <Text size="xs" c="dimmed">
-          {count} variants · choose {compareVariants.min}–{compareVariants.max} to compare.
+          {plural(count, "variant")} · choose {compareVariants.min}–{compareVariants.max} to
+          compare.
         </Text>
-        <Divider />
-        <Group gap="xs">
-          <Button
-            variant="subtle"
-            size="compact-sm"
-            leftSection={<icons.duplicate size={16} />}
-            disabled={!canAddVariant(draft)}
-            onClick={() => {
-              setDraft(addVariant);
-              close();
-            }}
-          >
-            {draft.compare ? `Duplicate Variant ${letter(draft.compare.active)}` : "Add Variant"}
-          </Button>
-          {draft.compare && (
-            <>
-              <Button
-                variant="subtle"
-                size="compact-sm"
-                leftSection={<X size={16} />}
-                onClick={() => {
-                  setDraft(removeVariant);
-                  close();
-                }}
-              >
-                Remove Variant {letter(draft.compare.active)}
-              </Button>
-              <Button
-                variant="subtle"
-                size="compact-sm"
-                leftSection={<icons.clear size={16} />}
-                onClick={() => {
-                  setDraft((value) => ({ ...value, compare: undefined }));
-                  close();
-                }}
-              >
-                Stop Comparing
-              </Button>
-            </>
-          )}
-        </Group>
       </Stack>
     </ChipPopup>
   );

@@ -155,7 +155,7 @@ export function GalleryToolbar({
         onOpenedChange={setFiltering}
         width={340}
         position="bottom-start"
-        headerEnd={
+        actions={
           <>
             {results && (
               <Text size="sm" c="dimmed">

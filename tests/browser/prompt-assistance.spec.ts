@@ -440,7 +440,7 @@ test("Recent Prompts likes and switches at once, and a refused change is undone"
   await panel.getByRole("button", { name: "Like Prompt", exact: true }).click();
   await expect(panel.getByRole("button", { name: "Unlike Prompt", exact: true })).toBeVisible();
   release();
-  const save = panel.getByRole("switch", { name: "Save Recent Prompts", exact: true });
+  const save = panel.getByRole("switch", { name: "Keep Recent Prompts", exact: true });
   await save.click();
   await expect(save).not.toBeChecked();
   await save.click();

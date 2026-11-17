@@ -52,8 +52,8 @@ export function SettingGroup({
 
 /**
  * One setting: its label and description, then its control or value, which wraps below on phones.
- * A `wide` row's control (a Select or a segmented choice) has one width on desktop and the full
- * row on phones, so such rows line up.
+ * A `wide` row's control (a Select, or a full-width segmented choice, which every segmented row
+ * uses) has one width on desktop and the full row on phones, so such rows line up.
  */
 export function SettingRow({
   label,
@@ -84,7 +84,7 @@ export function SettingRow({
           className={wide ? classes.wide : undefined}
           gap="xs"
           wrap="nowrap"
-          w={wide ? (phone ? "100%" : 240) : undefined}
+          w={wide ? (phone ? "100%" : 280) : undefined}
         >
           {children}
         </Group>

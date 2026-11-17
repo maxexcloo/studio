@@ -3,12 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { useAccount } from "../auth/AccountGate";
+import { DeleteFailedItems } from "./DeleteFailedItems";
 import { type Setting, deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
 
-/** Settings › Generation: the default profiles. */
+/** Settings › Generation: the default profiles, and every account's failed items. */
 export function GenerationSettings() {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
+  const multiUser = useAccount().data?.mode === "multi-user";
   if (deployment.isPending) return <LoadingState label="Loading Generation" fill />;
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
   const { defaults } = deployment.data;
@@ -45,6 +48,11 @@ export function GenerationSettings() {
         {profileSelect("image", defaults.image)}
         {profileSelect("video", defaults.video)}
       </SettingGroup>
+      {multiUser && (
+        <SettingGroup title="Danger Zone" danger>
+          <DeleteFailedItems others />
+        </SettingGroup>
+      )}
     </Stack>
   );
 }
