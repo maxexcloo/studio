@@ -199,6 +199,24 @@ test("the client reads model states and keeps Radiance's own words on failure", 
   });
 });
 
+test("Radiance counts as idle only while its live view shows every card free and no work", async () => {
+  const live = (cards: number[], models: object[] = []) =>
+    new RadianceClient("http://radiance:8000", (async (url: string) => {
+      assert.equal(new URL(url).pathname, "/history");
+      return Response.json({ live: { cards: cards.map((busy) => ({ busy })), models } });
+    }) as typeof fetch).idle();
+  assert.equal(
+    await live([0.05, 0.1], [{ id: "krea-2-turbo-iq8r", in_flight: 0, waiting: 0 }]),
+    true,
+  );
+  assert.equal(await live([0.05, 0.6]), false);
+  assert.equal(await live([0, 0], [{ id: "krea-2-turbo-iq8r", in_flight: 0, waiting: 1 }]), false);
+  const failing = new RadianceClient("http://radiance:8000", (async () => {
+    throw new Error("unreachable");
+  }) as typeof fetch);
+  assert.equal(await failing.idle(), false);
+});
+
 test("one-GPU Qwen and Noct fit their actual conditioning limits without constraining FLUX3", () => {
   for (const model of ["qwen-image-2.1-iq8r", "noctq-v4-lightning-iq8r"]) {
     // 1792 × 1024 shrinks to 1344 × 768.

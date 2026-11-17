@@ -88,7 +88,13 @@ export function createGenerationQueue({
     return workerWorkloads(workerById(job.backend));
   }
   const queueAdapter = createGenerationQueueAdapter({
-    submitGeneration: generationRoutes.submitGeneration,
+    // Radiance gives a run both cards only while nothing else runs or waits there (generation-routes.js).
+    submitGeneration: (job, account) =>
+      generationRoutes.submitGeneration(job, account, {
+        alone:
+          isRadianceWorker(workerById(job.backend)) &&
+          !store.openJobs().some((other) => other.id !== job.id && other.resource === job.resource),
+      }),
     jobs,
     items: (job) => galleryItems({ jobId: job.id, ownerId: job.ownerId }),
     accountForOwner: accountAccessForId,
