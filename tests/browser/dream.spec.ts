@@ -330,6 +330,7 @@ test("While Dream is off, the deck compares gallery images in pairs", async ({ p
   await page.goto("/dream");
   await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
   await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Both", exact: true }).click();
   // The image left over makes no card, and Dream's own results wait until it is on.
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
@@ -597,6 +598,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await page.mouse.move(centre.x - box.width / 2, centre.y + 10, { steps: 8 });
   await page.mouse.up();
   // Each answer waits for Undo until the next one.
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
   await page.keyboard.press("ArrowDown");
   await expect.poll(() => dream.requests.length).toBe(1);
   const third = page.getByRole("group", { name: "Which Steps?", exact: true });
