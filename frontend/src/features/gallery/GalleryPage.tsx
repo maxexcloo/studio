@@ -70,7 +70,7 @@ import {
 
 import classes from "./GalleryPage.module.css";
 
-type PageState = GalleryState & OpenComposerState & { viewer?: boolean };
+type PageState = GalleryState & OpenComposerState & { compose?: boolean; viewer?: boolean };
 
 /**
  * Links already shared (in chats too) carried the viewer's item and the gallery's state as query
@@ -86,7 +86,7 @@ function cleanLocation(location: Location) {
     const value = params.get(name);
     if (value) state[name] = value;
   }
-  if (params.get("compose") === "1") state.openComposer = true;
+  if (params.get("compose") === "1") state.compose = true;
   return {
     pathname: item
       ? `${galleryPath(galleryKind(base) || "image")}/${encodeURIComponent(item)}`
@@ -141,11 +141,14 @@ function Gallery() {
   const latest = useRef({ location, state });
   latest.current = { location, state };
   const dropState = useCallback(
-    (name: keyof PageState, replace = true) =>
+    (name: keyof PageState, replace = true) => {
+      // Drops in one commit (the share target's `openComposer` and `shared`) build on each other.
+      latest.current.state = { ...latest.current.state, [name]: undefined };
       void routerNavigate(latest.current.location.pathname, {
         replace,
-        state: { ...latest.current.state, [name]: undefined },
-      }),
+        state: latest.current.state,
+      });
+    },
     [routerNavigate],
   );
   const removeSimilar = useCallback(() => dropState("similar", false), [dropState]);
@@ -157,6 +160,16 @@ function Gallery() {
     setQuery(linkedQuery);
     dropState("q");
   }, [linkedQuery, dropState]);
+  // A request to open the composer is taken once, so a reload doesn't repeat it: `?compose=1`
+  // opens it, and `useOpenComposer` also focuses its prompt.
+  const [opening, setOpening] = useState<{ focus: boolean }>();
+  const openRequest = state?.openComposer ? "focus" : state?.compose ? "open" : "";
+  useEffect(() => {
+    if (!openRequest) return;
+    setOpening({ focus: openRequest === "focus" });
+    dropState("openComposer");
+    dropState("compose");
+  }, [openRequest, dropState]);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const client = useQueryClient();
   // Queue changes (new, finished or failed work) refresh the gallery at once; only active work
@@ -708,7 +721,7 @@ function Gallery() {
       {!selection.selecting && (
         <ComposerDock
           shared={state?.shared || ""}
-          opening={state?.openComposer ? location.key : ""}
+          opening={opening}
           onDropState={dropState}
           onKindChange={switchKind}
           onCompared={showCompared}

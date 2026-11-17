@@ -26,9 +26,9 @@ export const ComposerDock = memo(function ComposerDock({
 }: {
   /** An image shared to the installed app. */
   shared: string;
-  /** The key of a navigation from `useOpenComposer`, asking the composer to open. */
-  opening: string;
-  onDropState: (name: "openComposer" | "shared") => void;
+  /** A request to open the composer, focusing its prompt for `useOpenComposer`. */
+  opening?: { focus: boolean };
+  onDropState: (name: "shared") => void;
   onKindChange: (kind: MediaKind) => void;
   onCompared: (comparisonId: string) => void;
 }) {
@@ -112,9 +112,9 @@ export const ComposerDock = memo(function ComposerDock({
   // when it is already open; phones bring up the sheet and leave the keyboard down.
   useEffect(() => {
     if (!opening) return;
-    focusIntent.current = "[data-expanded-prompt]";
+    if (opening.focus) focusIntent.current = "[data-expanded-prompt]";
     open();
-    if (phone) return;
+    if (phone || !opening.focus) return;
     const frame = requestAnimationFrame(() =>
       dock.current
         ?.querySelector<HTMLElement>("[data-expanded-prompt]")
@@ -136,7 +136,6 @@ export const ComposerDock = memo(function ComposerDock({
     setTappedField(false);
     close();
     setExpanded(false);
-    if (opening) onDropState("openComposer");
   }
   const submitted = () => collapse();
   // A layer over the composer (a dialog, popup or picker) is not outside it, unless it is the
