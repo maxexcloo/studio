@@ -49,7 +49,8 @@ export function StatusAction() {
     void client.invalidateQueries({ queryKey: servicesStatusQuery.queryKey });
   }, [client, runningKey]);
   const title = "Generations";
-  const heading = queue.data ? `${title} (${queueEntries(queue.data.jobs).length})` : title;
+  const count = queue.data ? queueEntries(queue.data.jobs).length : 0;
+  const heading = count ? `${title} (${count})` : title;
   // A sideways touch drag pulls the drawer with the finger; far enough, and it closes.
   const swipe = useSwipeClose("left", close);
   const target = useRef<HTMLButtonElement>(null);
