@@ -38,6 +38,7 @@ import {
   pendingStatuses,
   terminalStatuses,
 } from "../../../../shared/queue";
+import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
@@ -45,7 +46,6 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
-import { titleCase } from "../../../../shared/titles";
 import { usePhone } from "../../ui/usePhone";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";

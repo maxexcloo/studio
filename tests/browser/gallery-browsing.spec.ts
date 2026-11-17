@@ -1477,7 +1477,7 @@ test("Desktop gallery controls stay available while scrolling and rating changes
     .toEqual(["", "disliked", false, false]);
 });
 
-test("Incoming results preserve loaded pages, the scroll anchor and selection without a reveal step", async ({
+test("Incoming results wait behind New Results while scrolled, keeping loaded pages, the scroll anchor and selection", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -1551,9 +1551,10 @@ test("Incoming results preserve loaded pages, the scroll anchor and selection wi
     updatedAt: stamp,
   });
   await expect.poll(() => requests.length).toBeGreaterThan(previousReads);
-  await expect
-    .poll(() => page.locator("[data-gallery-view]").evaluate((host) => host.style.height))
-    .not.toBe(heightBefore);
+  await expect(page.getByRole("button", { name: "5 New Results", exact: true })).toBeVisible();
+  expect(await page.locator("[data-gallery-view]").evaluate((host) => host.style.height)).toBe(
+    heightBefore,
+  );
   await expect(
     page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
   ).toHaveText("1 Selected");
@@ -1576,7 +1577,6 @@ test("Incoming results preserve loaded pages, the scroll anchor and selection wi
     "false",
   );
   expect(requests.filter(Boolean)).toEqual(["older"]);
-  await expect(page.getByRole("button", { name: /^\d+ New$/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(

@@ -2,6 +2,7 @@ import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, ScanFace } from "lucide-react";
 
+import { titleCase } from "../../../../shared/titles";
 import {
   type UpscaleQuality,
   type UpscaleRequest,
@@ -13,7 +14,6 @@ import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import type { Action } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
-import { titleCase } from "../../../../shared/titles";
 import { usePhone } from "../../ui/usePhone";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";

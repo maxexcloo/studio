@@ -17,13 +17,13 @@ import { Check } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
+import { titleCase } from "../../../../shared/titles";
 import { api } from "../../api";
 import type { MediaItem, Profile } from "../../types";
 import { formatBytes } from "../../ui/bytes";
 import { useCopy } from "../../ui/clipboard";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
-import { titleCase } from "../../../../shared/titles";
 import { useGroupFeature } from "../auth/AccountGate";
 import { identityNote } from "../characters/identity";
 import { charactersQuery, promptCardsQuery } from "../characters/queries";
