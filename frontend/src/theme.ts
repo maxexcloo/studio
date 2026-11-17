@@ -515,6 +515,8 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--mantine-color-default": "#ffffff",
       "--mantine-color-default-hover": "#f4f4f5",
       "--mantine-color-default-border": "#e4e4e7",
+      // Links take the primary's text shade, as its light buttons do; the filled shade is too pale.
+      "--mantine-color-anchor": "var(--mantine-primary-color-light-color)",
       ...glassTokens("light", transparency),
     },
   };
