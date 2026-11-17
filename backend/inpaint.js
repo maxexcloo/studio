@@ -101,6 +101,31 @@ export function maskBufferFromDataUrl(dataUrl) {
 }
 
 /**
+ * The painted mask as Radiance takes it: a PNG at the first picture's size whose alpha is 0 where
+ * the picture may change. Null when nothing was painted.
+ */
+export async function radianceMask(sharp, image, maskBuffer) {
+  const { width, height } = await sharp(image).metadata();
+  const painted = await sharp(maskBuffer)
+    .resize(width, height, { fit: "fill", kernel: "linear" })
+    .extractChannel(0)
+    .raw()
+    .toBuffer();
+  const rgba = Buffer.alloc(width * height * 4);
+  let any = false;
+  for (const [index, value] of painted.entries()) {
+    const paint = value >= maskThreshold;
+    any ||= paint;
+    rgba[index * 4 + 3] = paint ? 0 : 255;
+  }
+  return any
+    ? sharp(rgba, { raw: { width, height, channels: 4 } })
+        .png()
+        .toBuffer()
+    : null;
+}
+
+/**
  * The three files an inpaint run loads, from the source image and the painted
  * mask (any size; it is stretched over the image): the crop at working size,
  * the mask it samples with, and the mask that stitches it back at box size.

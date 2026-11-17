@@ -164,9 +164,14 @@ function form(fields: Values, files: RadianceFile[]) {
 
 /**
  * A RadianceImageGenerate node's request for a profile of `family`; references (PNG or JPEG bytes,
- * in order) make it an edit.
+ * in order) make it an edit, and `mask` (alpha below 128 may change) repaints part of the first.
  */
-export function imageRequest(values: Values, references: Uint8Array[] = [], family = "") {
+export function imageRequest(
+  values: Values,
+  references: Uint8Array[] = [],
+  family = "",
+  { mask, transparent = false }: { mask?: Uint8Array | null; transparent?: boolean } = {},
+) {
   const model = String(values.model || "");
   const limits = radianceImageLimits(model);
   if (!String(values.prompt || "").trim()) throw new Error("Enter an image prompt.");
@@ -194,15 +199,16 @@ export function imageRequest(values: Values, references: Uint8Array[] = [], fami
   body.num_inference_steps = Number(values.steps);
   body.guidance_scale = radianceGuidance(Number(values.cfg), family);
   body.negative_prompt = String(values.negative_prompt || "");
+  if (transparent) body.background = "transparent";
   if (!references.length) return { route: "/v1/images/generations", body };
   if (references.length > limits.maxReferences)
     throw new Error(`This Radiance model takes up to ${limits.maxReferences} reference images.`);
   return {
     route: "/v1/images/edits",
-    body: form(
-      body,
-      references.map((bytes) => ({ field: "image[]", bytes })),
-    ),
+    body: form(body, [
+      ...references.map((bytes) => ({ field: "image[]", bytes })),
+      ...(mask ? [{ field: "mask", bytes: mask }] : []),
+    ]),
   };
 }
 
