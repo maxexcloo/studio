@@ -27,7 +27,7 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
-import { titleCase } from "../../ui/titleCase";
+import { titleCase } from "../../../../shared/titles";
 import { chipProps } from "../generation/chip";
 import { CardDialog, CardFields, CardForm, CardThumbnails } from "./CardImages";
 import { type CharacterCard, charactersQuery, useMakeSheet, useSaveCharacter } from "./queries";
