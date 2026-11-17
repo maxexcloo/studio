@@ -34,6 +34,7 @@ import {
 } from "react";
 
 import { menuWidth } from "../../theme";
+import { ClearButton } from "../../ui/ClearButton";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { formatDateTime } from "../../ui/dates";
 import { EmptyState } from "../../ui/EmptyState";
@@ -55,8 +56,8 @@ import classes from "./Picker.module.css";
  */
 
 /**
- * A popup's or column's heading: its title and any `detail`, then its compact subtle actions (Clear
- * first, then record actions such as Save) at the end.
+ * A popup's or column's heading: its title and any `detail`, then its compact subtle record actions
+ * (such as Save) at the end.
  */
 export function PopupHeading({
   title,
@@ -85,13 +86,13 @@ export function PopupHeading({
 }
 
 /**
- * A chip's popup. Its heading holds the title, any `detail` and its compact subtle `actions` (Clear
- * first), on desktop as in the phone sheet's header beside Close. Its footer is the shared
- * `DialogFooter`: at most one `secondary` action that adds content (Add), then the `primary`.
- * Choices apply as they are made, so desktop shows a footer only for a real `primary` or
- * `secondary`, and the phone sheet's footer ends with Done where it has no `primary`.
+ * A chip's popup. Its heading holds the title, any `detail` and its compact subtle record `actions`,
+ * on desktop as in the phone sheet's header beside Close. Its footer is the shared `DialogFooter`:
+ * at most one `secondary` action that adds content (Add), then `onClear` as the shared ✕, then the
+ * `primary`. Choices apply as they are made, so the footer ends with Done where it has no
+ * `primary`, and desktop shows one only where it has an action besides Done.
  * An `aside`, such as the LoRA stack, starts with its own `PopupHeading`: desktop shows it as a
- * column beside everything else, divided to the top; phones leave it out.
+ * column beside everything else, divided to the top, above the footer; phones leave it out.
  * Desktop anchors a Popover to the chip; phones open a full-screen sheet whose content scrolls
  * between the header and the footer, pinned above the safe area, unless the popup is `floating`: a
  * small form, such as Settings or Presets, stays a popover fitted to the screen, as the rail's other
@@ -111,6 +112,8 @@ export function ChipPopup({
   withinPortal = true,
   floating = false,
   secondary,
+  onClear,
+  clearDisabled,
   primary,
   aside,
   children,
@@ -132,6 +135,8 @@ export function ChipPopup({
   /** A popover on phones too, instead of a full-screen sheet. */
   floating?: boolean;
   secondary?: ReactNode;
+  onClear?: () => void;
+  clearDisabled?: boolean;
   primary?: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
@@ -139,6 +144,12 @@ export function ChipPopup({
   const phone = usePhone();
   const touch = useTouch();
   const close = () => onOpenedChange(false);
+  const footer = (
+    <DialogFooter secondary={secondary}>
+      {onClear && <ClearButton disabled={clearDisabled} onClear={onClear} />}
+      {primary || <Button onClick={close}>Done</Button>}
+    </DialogFooter>
+  );
   // Pulling the phone sheet down by its header, or its content from the top, closes it.
   const swipe = useSwipeClose("down", close);
   // The popup handles its own Escape, so the composer's Drawer behind it stays open. A dialog it
@@ -184,9 +195,7 @@ export function ChipPopup({
             </Modal.Header>
             <Modal.Body className={classes.sheetBody}>
               {children}
-              <DialogFooter secondary={secondary}>
-                {primary || <Button onClick={close}>Done</Button>}
-              </DialogFooter>
+              {footer}
             </Modal.Body>
           </Modal.Content>
         </Modal.Root>
@@ -218,14 +227,16 @@ export function ChipPopup({
       >
         {/* Touch screens focus the popup itself, so its first field doesn't raise the keyboard. */}
         {touch && <FocusTrap.InitialFocus />}
-        <div className={aside ? classes.columns : undefined}>
-          <Stack gap="sm">
-            <PopupHeading title={title} detail={detail} actions={actions} />
-            {children}
-            {(secondary || primary) && <DialogFooter secondary={secondary}>{primary}</DialogFooter>}
-          </Stack>
-          {aside && <div className={classes.aside}>{aside}</div>}
-        </div>
+        <Stack gap="sm">
+          <div className={aside ? classes.columns : undefined}>
+            <Stack gap="sm">
+              <PopupHeading title={title} detail={detail} actions={actions} />
+              {children}
+            </Stack>
+            {aside && <div className={classes.aside}>{aside}</div>}
+          </div>
+          {(secondary || onClear || primary) && footer}
+        </Stack>
       </Popover.Dropdown>
     </Popover>
   );
@@ -302,18 +313,8 @@ export function PickerHeader<Tab extends string>({
               width={340}
               position="bottom-end"
               withinPortal={false}
-              actions={
-                onClearFilters && (
-                  <Button
-                    size="compact-sm"
-                    variant="subtle"
-                    disabled={!filterCount}
-                    onClick={onClearFilters}
-                  >
-                    Clear
-                  </Button>
-                )
-              }
+              onClear={onClearFilters}
+              clearDisabled={!filterCount}
               target={
                 <FilterButton
                   label={`Filter ${searched}`}

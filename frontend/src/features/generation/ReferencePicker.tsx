@@ -1,7 +1,16 @@
-import { ActionIcon, Button, FileButton, Image, Stack, Text, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Button,
+  FileButton,
+  Image,
+  ScrollArea,
+  Stack,
+  Text,
+  Tooltip,
+} from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { ChevronDown, ImagePlus } from "lucide-react";
-import { useState } from "react";
+import { type ClipboardEvent, type DragEvent, useState } from "react";
 
 import { startImageSlot } from "../../../../shared/characters";
 import { slotCapacity } from "../../../../shared/profiles";
@@ -17,7 +26,7 @@ import { chipProps, iconChipProps } from "./chip";
 import { GalleryChoices, galleryTabs } from "./GalleryChoices";
 import { draftForProfile, useGeneration } from "./GenerationProvider";
 import { controlRange, referenceDetails, referenceGroup, referenceGroups } from "./payload";
-import { ChipContent, ChipPopup, PickerHeader } from "./Picker";
+import { ChipContent, ChipPopup, PickerHeader, PopupHeading } from "./Picker";
 import {
   type ReferenceTarget,
   galleryReferenceType,
@@ -95,8 +104,10 @@ export function ReferencePicker({
   };
   const charactersOn = useGroupFeature("characters");
   const [cardQuery, setCardQuery] = useState("");
-  // A dialog over the sheet, such as Delete Upload or a card's editor, holds its focus and clicks.
+  // A dialog over the sheet, such as a preview or a card's editor, holds its focus and clicks.
   const [layer, setLayer] = useState(false);
+  // Phones choose in a sheet over the stack.
+  const [adding, setAdding] = useState(false);
   const list = useReferenceList({
     value,
     onChange,
@@ -144,11 +155,18 @@ export function ReferencePicker({
   // A profile taking one reference closes the picker once it is picked, saving the dismissing click.
   const groups = referenceGroups(profile);
   const single = groups.length === 1 && slotCapacity(groups[0]) === 1;
+  const capacity = groups.reduce((total, group) => total + slotCapacity(group), 0);
+  // The phone's choices return to the stack once a pick fills its chosen slot or the last free one.
+  const placed = (into: ReferenceTarget | null, count: number) => {
+    if (into || count >= capacity) setAdding(false);
+  };
   function uploadFiles(files: File[], into: ReferenceTarget | null = chosen) {
     if (!files.length) return;
     const before = list.get().map(referenceKey);
     void placement.uploadFiles(files, into).then(() => {
-      if (list.get().some((asset, index) => referenceKey(asset) !== before[index])) settle();
+      if (!list.get().some((asset, index) => referenceKey(asset) !== before[index])) return;
+      settle();
+      placed(into, list.get().length);
     });
   }
   /** A placed reference dropped on another slot moves there; within its role it swaps places. */
@@ -225,35 +243,44 @@ export function ReferencePicker({
       </Button>
     </Tooltip>
   );
-  const content = (
-    <Stack
-      component="section"
-      aria-label="References"
-      onPaste={(event) => {
-        if (event.defaultPrevented || !event.clipboardData.files.length) return;
-        event.preventDefault();
-        uploadFiles([...event.clipboardData.files]);
-      }}
-      onDragOver={(event) => {
-        if (event.dataTransfer.types.includes("Files")) event.preventDefault();
-      }}
-      onDrop={(event) => {
-        if (event.defaultPrevented || !event.dataTransfer.files.length) return;
-        event.preventDefault();
-        dropData(event.dataTransfer);
-      }}
-      gap="sm"
-      // Phones fill the sheet between its header and footer; the grid owns scrolling and keeps its
-      // position.
-      flex={phone ? 1 : undefined}
-      mih={0}
-      h={phone ? undefined : "min(70dvh, 620px)"}
+  // Pasting or dropping files anywhere in the picker uploads them.
+  const fileProps = {
+    onPaste: (event: ClipboardEvent<HTMLElement>) => {
+      if (event.defaultPrevented || !event.clipboardData.files.length) return;
+      event.preventDefault();
+      uploadFiles([...event.clipboardData.files]);
+    },
+    onDragOver: (event: DragEvent<HTMLElement>) => {
+      if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+    },
+    onDrop: (event: DragEvent<HTMLElement>) => {
+      if (event.defaultPrevented || !event.dataTransfer.files.length) return;
+      event.preventDefault();
+      dropData(event.dataTransfer);
+    },
+  };
+  const count = (
+    <Text
+      span
+      size="xs"
+      c="dimmed"
+      style={{ whiteSpace: "nowrap" }}
+      aria-label={`${references.length} of ${capacity} References`}
     >
+      {references.length}/{capacity}
+    </Text>
+  );
+  // The chosen references and their roles; choosing a slot opens the choices on phones.
+  const stackContent = (
+    <Stack component="section" aria-label="Reference Stack" gap="sm" {...fileProps}>
       <ReferenceSlots
         references={references}
         profile={profile}
         target={target}
-        onChoose={(target) => browse({ target })}
+        onChoose={(target) => {
+          browse({ target });
+          if (phone) setAdding(true);
+        }}
         onChange={(next) => {
           list.set(next);
           settle();
@@ -266,6 +293,29 @@ export function ReferencePicker({
         start={startSlot ? { slot: startSlot, denoise: denoise || undefined } : undefined}
         onChange={list.set}
       />
+    </Stack>
+  );
+  // Desktop heads its column Stack and scrolls it; the phone sheet is the stack itself.
+  const stack = phone ? (
+    stackContent
+  ) : (
+    <>
+      <PopupHeading title="Stack" detail={count} />
+      <ScrollArea flex={1}>{stackContent}</ScrollArea>
+    </>
+  );
+  const choices = (
+    <Stack
+      component="section"
+      aria-label="Reference Choices"
+      gap="sm"
+      // Phones fill the sheet between its header and footer; the grid owns scrolling and keeps its
+      // position.
+      flex={phone ? 1 : undefined}
+      mih={0}
+      h={phone ? undefined : "min(70dvh, 620px)"}
+      {...fileProps}
+    >
       {!target && galleryTab && (
         <Text size="xs" c="dimmed">
           All slots are filled. Choose a reference to replace it, or a selected image to remove it.
@@ -358,13 +408,13 @@ export function ReferencePicker({
                 if (removes) list.set(list.get().filter((asset) => !matches(asset)));
                 else {
                   placement.addGalleryItem(item, chosen);
+                  placed(chosen, references.length + 1);
                   if (single) setOpened(false);
                 }
                 settle();
               },
             };
           }}
-          onDeleted={(id) => list.set(list.get().filter((asset) => asset.galleryItemId !== id))}
           onLayer={setLayer}
         />
       )}
@@ -415,32 +465,63 @@ export function ReferencePicker({
       />
     </Button>
   );
-  return (
-    <>
+  const clear = {
+    onClear: () => {
+      list.set([]);
+      settle();
+    },
+    clearDisabled: !references.length,
+  };
+  // Phones open the stack, with Add opening the choices in a sheet over it, as LoRAs do.
+  if (phone)
+    return (
       <ChipPopup
         title="References"
-        width={560}
+        width="100%"
         opened={opened}
-        onOpenedChange={setOpened}
+        onOpenedChange={(opened) => {
+          setOpened(opened);
+          if (!opened) setAdding(false);
+        }}
         trap={!layer}
         target={trigger}
-        actions={
-          <Button
-            size="compact-sm"
-            variant="subtle"
-            aria-label="Clear References"
-            disabled={!references.length}
-            onClick={() => {
-              list.set([]);
-              settle();
+        detail={count}
+        {...clear}
+        secondary={
+          <ChipPopup
+            title="Add References"
+            width="100%"
+            opened={adding}
+            onOpenedChange={(adding) => {
+              setAdding(adding);
+              if (!adding) settle();
             }}
+            trap={!layer}
+            target={
+              <Button variant="default" aria-label="Add References" onClick={() => setAdding(true)}>
+                Add
+              </Button>
+            }
           >
-            Clear
-          </Button>
+            {choices}
+          </ChipPopup>
         }
       >
-        {content}
+        {stack}
       </ChipPopup>
-    </>
+    );
+  return (
+    <ChipPopup
+      title="References"
+      width="min(56rem, calc(100vw - 2rem))"
+      opened={opened}
+      onOpenedChange={setOpened}
+      trap={!layer}
+      target={trigger}
+      aside={stack}
+      {...clear}
+    >
+      {choices}
+    </ChipPopup>
   );
 }

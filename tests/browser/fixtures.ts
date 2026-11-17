@@ -1105,10 +1105,34 @@ export async function showUploads(page: Page) {
 }
 
 /**
- * Closes the References popup, leaving the composer open: Done in the phone sheet's footer,
- * Escape on desktop. A pick filling the last slot closes it already, so it may be fading out.
+ * Opens the reference choices: the popup on desktop, or Add References over the stack on phones.
+ * Returns them.
+ */
+export async function openReferenceChoices(page: Page) {
+  const choices = page.getByRole("region", { name: "Reference Choices", exact: true });
+  if (await choices.isVisible()) return choices;
+  if (!(await page.getByRole("dialog", { name: "References", exact: true }).isVisible()))
+    await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  if (await page.evaluate(() => "phone" in document.documentElement.dataset))
+    await page.getByRole("button", { name: "Add References", exact: true }).click();
+  await expect(choices).toBeVisible();
+  return choices;
+}
+
+/** Returns from the phone's reference choices to the stack; desktop shows both. */
+export async function showReferenceStack(page: Page) {
+  const adding = page.getByRole("dialog", { name: "Add References", exact: true });
+  if (!(await adding.isVisible())) return;
+  await adding.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(adding).toBeHidden();
+}
+
+/**
+ * Closes the References popup, leaving the composer open: Done in its footer, else Escape. A pick
+ * filling the last slot closes it already, so it may be fading out.
  */
 export async function closeReferences(page: Page) {
+  await showReferenceStack(page);
   const references = page.getByRole("dialog", { name: "References", exact: true });
   if (!(await references.isVisible())) return;
   const done = references.getByRole("button", { name: "Done", exact: true });
