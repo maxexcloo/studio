@@ -8,9 +8,9 @@ import {
 import { useRef } from "react";
 
 import { guidingRoles, slotCapacity } from "../../../../shared/profiles";
+import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
-import { titleCase } from "../../../../shared/titles";
 import type { GalleryFilterValues } from "../gallery/GalleryFilters";
 import { galleryKey, galleryQuery } from "../gallery/queries";
 import { useGeneration } from "./GenerationProvider";

@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Fragment } from "react";
 
 import { isCloudProfile } from "../../../../shared/profiles";
+import { titleCase } from "../../../../shared/titles";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { titleCase } from "../../../../shared/titles";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
 import { assistantQuery } from "../generation/PromptAssistant";
