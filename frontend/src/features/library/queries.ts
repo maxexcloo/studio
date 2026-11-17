@@ -8,9 +8,11 @@ import type { ImportRecord, ImportVision } from "./LibraryImportReview";
 export const catalogueQuery = queryOptions({
   queryKey: ["library"],
   queryFn: () =>
-    api<{ items: LibraryItem[]; updates?: { checkedAt?: string; available: number } }>(
-      "/api/library/items",
-    ),
+    api<{
+      items: LibraryItem[];
+      updates?: { checkedAt?: string; available: number };
+      inventoryError?: string;
+    }>("/api/library/items"),
 });
 
 /** The profiles, guides and guide bindings lists all sit under this key. */

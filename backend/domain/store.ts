@@ -572,8 +572,11 @@ export class Store {
     this.db.close();
   }
 
-  /** A worker's stored observation, shared between callers: treat it as read-only. */
-  workerModels(id: string, url: string): Record<string, any> | undefined {
+  /**
+   * A worker's stored observation, shared between callers: treat it as read-only. With `url`, only
+   * one observed at that address.
+   */
+  workerModels(id: string, url?: string): Record<string, any> | undefined {
     let kept = this.workerModelRecords.get(id);
     if (!kept) {
       const row = this.db
@@ -583,7 +586,7 @@ export class Store {
       kept = { url: row.url as string, record: JSON.parse(row.record as string) };
       this.workerModelRecords.set(id, kept);
     }
-    return kept.url === url ? kept.record : undefined;
+    return url === undefined || kept.url === url ? kept.record : undefined;
   }
 
   saveWorkerModels(id: string, url: string, models: Record<string, any>) {

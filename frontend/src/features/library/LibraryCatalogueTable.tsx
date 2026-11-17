@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Alert, Badge, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
 import { type ReactNode, useState } from "react";
 
 import { copyText } from "../../ui/clipboard";
@@ -125,11 +125,14 @@ export function LibraryCatalogueTable({
   onUpdateAll,
   checkingUpdates = false,
   updateNote,
+  inventoryError,
   onEdit,
   updatePending = false,
 }: {
   heading: ReactNode;
   items: LibraryItem[];
+  /** Why the installed files are unknown, so none reads as unknown rather than not installed. */
+  inventoryError?: string;
   /** The catalogue is still loading: the toolbar shows, the table its loading state. */
   loading?: boolean;
   label: "Files" | "LoRAs";
@@ -263,6 +266,7 @@ export function LibraryCatalogueTable({
           {updateNote}
         </Text>
       )}
+      {inventoryError && <Alert color="red">{inventoryError}</Alert>}
       {unclassified > 0 && (
         <Text c="dimmed" size="xs">
           {unclassified} {unclassified === 1 ? "resource has" : "resources have"} missing or
