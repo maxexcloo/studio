@@ -236,9 +236,15 @@ export interface RadianceReference {
 export function videoRequest(values: Values, images: RadianceReference[] = []) {
   const model = String(values.model || "");
   const limits = radianceVideoLimits(model);
-  const [width, height] = videoSize(Number(values.width), Number(values.height), limits.maxPixels);
+  let [width, height] = videoSize(Number(values.width), Number(values.height), limits.maxPixels);
   const frames = Number(values.frames);
-  const latentUpscale = Number(values.latent_upscale) || 1;
+  let latentUpscale = Number(values.latent_upscale) || 1;
+  // Distilled LTX-2.5 draws 960 × 544 itself and reaches larger sizes (to 1920 × 1088) through its
+  // latent upsampler, whose sides are multiples of 64.
+  if (isDistilledLtx(model) && width * height > 960 * 544) {
+    latentUpscale = 2;
+    [width, height] = [width, height].map((side) => Math.floor(side / 64) * 64);
+  }
   const refineSteps = Number(values.upscale_refine_steps) || 0;
   const { min, max, step, offset } = limits.frames;
   if (!String(values.prompt || "").trim()) throw new Error("Enter a video prompt.");

@@ -141,8 +141,9 @@ test("video references take their slots' roles: H3 frames or references, LTX-2.5
     () => videoRequest({ ...video, model: "minimax-h3-i8" }, [picture("start"), picture()]),
     /not both/,
   );
-  // LTX-2.5: its own grid and canvas; the distilled release keeps its eight steps, the base is guided.
-  const ltx = { width: 1920, height: 1088, frames: 161, latent_upscale: 2 };
+  // LTX-2.5: its own grid and canvas; the distilled release keeps its eight steps and reaches past
+  // 960 × 544 through its latent upsampler; the base is guided.
+  const ltx = { width: 1920, height: 1088, frames: 121 };
   assert.deepEqual(fields("ltx-2.5-distilled-iq8r", [picture("start")], ltx), [
     "model",
     "prompt",
