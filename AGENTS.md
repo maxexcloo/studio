@@ -184,8 +184,8 @@ recur across features.
   Clear are left to the browser, and a box starting from its own text shows
   Reset, then Undo, as one icon beside it while it can act. The button is ⋯,
   or the AI icon when the box has an AI tool; the AI icon (`icons.assistant`)
-  marks everything AI does. On desktop the viewer's prompt keeps its AI tools
-  in the bar's AI menu; on phones they stay with the prompt.
+  marks everything AI does. The viewer's prompt keeps its AI tools in the
+  bar's AI menu and its send beside the text.
   Composer fields edit in place: typing in the phone Generate sheet shows
   only the text, with Copy, Clear/Reset/Undo and its menu button as icons in
   its corner, above the sheet's action bar. Other phone text boxes open the

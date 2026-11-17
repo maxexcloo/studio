@@ -7,12 +7,10 @@ import type { MediaItem } from "../../types";
 import type { Action, ActionGroups } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
-import { usePhone } from "../../ui/usePhone";
 import {
   ProposalLabel,
   SendButton,
   UndoButton,
-  assistMenu,
   proposalText,
   proposedClass,
   useChangeSuggestions,
@@ -25,7 +23,7 @@ import { type EditAsk, type Iteration, typedPrompt, useEditReview } from "./useM
 
 import classes from "./MediaViewer.module.css";
 
-/** The prompt's assistance: the viewer bar's AI menu on desktop, the prompt's own AI tool on phones. */
+/** The prompt's assistance, leading the viewer bar's AI menu. */
 export interface PromptAssist {
   onOpen: () => void;
   settings: Action[];
@@ -111,8 +109,7 @@ export function useViewerPrompt(
     disabled: ask.pending,
     onPick: pick,
   });
-  const phone = usePhone();
-  const assistance: PromptAssist | null = ask.available
+  const assist: PromptAssist | null = ask.available
     ? {
         onOpen: () => setSuggestionSource({ item: item.id, prompt: ask.typed ?? prompt }),
         settings: [
@@ -144,22 +141,7 @@ export function useViewerPrompt(
         ],
       }
     : null;
-  // Desktop's bar AI menu holds these ahead of the item's own (MediaActions); phones keep them with
-  // the prompt, beside its text and in its full-screen editor.
-  const assist = phone ? null : assistance;
-  const tools: Action[] =
-    phone && assistance
-      ? [
-          {
-            id: "assistant",
-            label: "Suggestions",
-            icon: icons.assistant,
-            onOpen: assistance.onOpen,
-            menu: assistMenu({ ...assistance, last: [] }),
-          },
-        ]
-      : [];
-  return { item, original, prompt, setPrompt, field, ask, custom, edit, assist, tools };
+  return { item, original, prompt, setPrompt, field, ask, custom, edit, assist };
 }
 
 export type ViewerPromptState = ReturnType<typeof useViewerPrompt>;
@@ -174,8 +156,7 @@ export function ViewerPrompt({
   iterate: (iteration: Iteration) => void;
   pending?: Iteration;
 }) {
-  const phone = usePhone();
-  const { item, original, prompt, setPrompt, field, ask, custom, tools } = state;
+  const { item, original, prompt, setPrompt, field, ask, custom } = state;
   const change = ask.proposal;
   const video = item.type === "video";
   const running = pending?.kind === "prompt";
@@ -190,7 +171,7 @@ export function ViewerPrompt({
       }
     : {
         label: "Generate",
-        disabled: !prompt.trim() || running,
+        disabled: !prompt.trim() || prompt.trim() === original.trim() || running,
         onSubmit: () => iterate({ kind: "prompt", prompt: prompt.trim(), operation: "image" }),
       };
   function keys(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -204,8 +185,7 @@ export function ViewerPrompt({
       ask.undo();
     }
   }
-  // Phones generate from the editor's send, and a proposal's Undo and Run show there too; at rest,
-  // Undo and Run stand beside the field.
+  // The phone editor offers these above the keyboard; at rest they stand beside the field.
   const sends = change
     ? [
         { label: "Undo", icon: icons.undo, disabled: false, keepOpen: true, onSubmit: ask.undo },
@@ -215,14 +195,12 @@ export function ViewerPrompt({
   const send = (
     <>
       {change && <UndoButton onClick={ask.undo} />}
-      {(change || !phone) && (
-        <SendButton
-          label={submit.label}
-          disabled={submit.disabled}
-          loading={!change && running}
-          onClick={submit.onSubmit}
-        />
-      )}
+      <SendButton
+        label={submit.label}
+        disabled={submit.disabled}
+        loading={!change && running}
+        onClick={submit.onSubmit}
+      />
     </>
   );
   return (
@@ -242,7 +220,7 @@ export function ViewerPrompt({
         readOnly={change?.action === "upscale"}
         onChange={setPrompt}
         onKeyDown={keys}
-        tools={tools}
+        tools={[]}
         reset={original}
         send={send}
         busy={ask.pending ? "Asking for a Change…" : undefined}

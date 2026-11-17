@@ -985,16 +985,16 @@ export async function promptMenu(scope: Page | Locator, box: string) {
   return page.getByRole("menu");
 }
 
-/** The viewer prompt's assistance: the bar's AI on desktop, the prompt's own AI on phones. */
-export async function viewerPromptAssist(page: Page) {
-  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  const phone = await page.evaluate(() => "phone" in document.documentElement.dataset);
-  return viewer.getByRole("button", { name: phone ? "AI Prompt Actions" : "AI", exact: true });
+/** The viewer prompt's assistance: the bar's AI. */
+export function viewerPromptAssist(page: Page) {
+  return page
+    .getByRole("dialog", { name: "Generation", exact: true })
+    .getByRole("button", { name: "AI", exact: true });
 }
 
-/** Opens the viewer prompt's assistance menu (a full-screen sheet on phones). */
+/** Opens the viewer prompt's assistance menu. */
 export async function viewerPromptMenu(page: Page) {
-  await (await viewerPromptAssist(page)).click();
+  await viewerPromptAssist(page).click();
   return page.getByRole("menu");
 }
 

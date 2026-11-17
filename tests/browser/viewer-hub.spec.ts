@@ -91,6 +91,8 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
   const { state, viewer } = await seed(page);
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(field).toHaveValue("An amber bird");
+  // Its send stands beside it on every layout, waiting for a change.
+  await expect(viewer.getByRole("button", { name: "Generate", exact: true })).toBeDisabled();
   await sendField(page, "Prompt", "An amber bird at dusk", "Generate");
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
@@ -216,11 +218,9 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });
 
-test("Report fixes the image as a new version and dislikes the original with the issue", async ({
-  page,
-}) => {
-  const asked: any[] = [];
-  const { state } = await seed(page, {}, (page) =>
+/** Seeds the viewer with an assistant that answers every requested change with a hands fix. */
+async function seedFix(page: Page, asked: any[]) {
+  return seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
       const body = route.request().postDataJSON();
       if (body.surface !== "change") return route.fallback();
@@ -239,7 +239,25 @@ test("Report fixes the image as a new version and dislikes the original with the
       });
     }),
   );
-  await viewerAction(page, "Report");
+}
+
+test("Report's reasons fix the image as a new version and dislike the original", async ({
+  page,
+}) => {
+  const asked: any[] = [];
+  const { state } = await seedFix(page, asked);
+  await viewerAction(page, "Report", "Hands");
+  await expect
+    .poll(() => asked.map((body) => body.request))
+    .toEqual(["Fix what is wrong, keeping everything else: Hands"]);
+  await expect.poll(() => state.jobs.length).toBe(2);
+  await expect.poll(() => state.gallery.find((item) => item.id === "hub")?.rating).toBe("disliked");
+});
+
+test("Report's Custom… fixes what its chips and words name", async ({ page }) => {
+  const asked: any[] = [];
+  const { state } = await seedFix(page, asked);
+  await viewerAction(page, "Report", "Custom…");
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   const fix = report.getByRole("button", { name: "Fix & Recreate", exact: true });
   await expect(fix).toBeDisabled();
@@ -2080,7 +2098,7 @@ test("Phone viewer shows Report beside Delete and Similar under AI", async ({ pa
   const { viewer } = await seed(page);
   const bar = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   await expect(bar.getByRole("button", { name: "Report", exact: true })).toBeVisible();
-  await viewerAction(page, "Report");
+  await viewerAction(page, "Report", "Custom…");
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   await expect(report).toBeVisible();
   await report.getByRole("button", { name: "Cancel", exact: true }).click();

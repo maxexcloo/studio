@@ -57,7 +57,7 @@ import { contextMenuActions, itemAction, itemActionGroups } from "./itemActions"
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
 import { galleryKey } from "./queries";
-import { ReportIssueDialog } from "./ReportIssueDialog";
+import { ReportIssueDialog, issues, useReportIssue } from "./ReportIssueDialog";
 import { useUpscaleAction } from "./UpscaleControls";
 import { useItemMutation } from "./useItemMutation";
 import {
@@ -259,7 +259,7 @@ interface MediaActionOptions {
   /** Opens Animate's dialog: Custom…, or any template or suggested motion under Review Prompt. */
   onAnimate: (choice: AnimateRequest) => void;
   onDelete: () => void;
-  /** Opens Report's dialog. */
+  /** Opens Report's Custom… dialog. */
   onReport: () => void;
   onRetried?: (jobId: string) => void;
   onTrim: () => void;
@@ -335,6 +335,7 @@ export function useMediaActions(
   const location = useLocation();
   const navigate = useNavigate();
   const rating = useMediaRating(item);
+  const report = useReportIssue(item, iterate);
   const ready = item.status === "done" && Boolean(item.url);
   const gif = ready ? videoExport(item, "gif") : null;
   const loop = ready ? videoExport(item, "loop") : null;
@@ -693,7 +694,19 @@ export function useMediaActions(
       !item.uploaded &&
       item.jobId &&
       assisted &&
-      itemAction("report", { onClick: onReport }),
+      itemAction("report", {
+        loading: report.isPending,
+        menu: [
+          issues.map((issue) => ({
+            id: `report:${issue}`,
+            label: issue,
+            icon: icons.assistant,
+            disabled: report.isPending,
+            onClick: () => report.mutate(issue),
+          })),
+          [{ id: "report-custom", label: "Custom…", icon: icons.custom, onClick: onReport }],
+        ],
+      }),
     itemAction("share", {
       menu: [
         [
