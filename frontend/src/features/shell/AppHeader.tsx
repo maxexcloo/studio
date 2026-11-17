@@ -26,7 +26,7 @@ import classes from "./AppHeader.module.css";
 const modes = [
   { to: "/dream", label: "Dream", icon: icons.dream },
   { to: "/images", label: "Images", icon: Image },
-  { to: "/video", label: "Videos", icon: Video },
+  { to: "/videos", label: "Videos", icon: Video },
 ];
 function ModeSwitcher({ mode }: { mode: string }) {
   const phone = usePhone();

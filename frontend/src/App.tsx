@@ -77,9 +77,9 @@ function Workspace() {
           }}
         >
           <Routes location={overlay ? background : location}>
-            <Route path="/images" element={<GalleryPage />} />
+            <Route path="/images/:id?" element={<GalleryPage />} />
+            <Route path="/videos/:id?" element={<GalleryPage />} />
             <Route path="/video" element={<GalleryPage />} />
-            <Route path="/videos" element={<Navigate to="/video" replace />} />
             <Route
               path="/compare/:id"
               element={

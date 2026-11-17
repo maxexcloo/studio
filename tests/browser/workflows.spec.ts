@@ -55,7 +55,7 @@ test("Images and Videos tabs keep an expanding bottom composer", async ({ page }
     fullPage: false,
   });
   await page.getByRole("link", { name: "Videos", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/video$/);
+  await expect(page).toHaveURL(/\/videos$/);
   await expect(page.getByRole("heading", { name: "Videos", exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Generate Video", exact: true })).toBeVisible();
 });
