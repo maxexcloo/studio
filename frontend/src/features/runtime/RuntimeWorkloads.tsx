@@ -407,7 +407,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
                 Restart
               </Menu.Item>
             )}
-            {item.kind === "text" && benchmarks?.configured && (
+            {item.text && benchmarks?.configured && (
               <Menu.Item
                 leftSection={<icons.benchmark size={16} />}
                 disabled={benchmarking || item.phase !== "running"}

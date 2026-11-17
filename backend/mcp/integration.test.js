@@ -36,9 +36,10 @@ function fixtureRuntime(running = ["comfyui-image", "radiance-mxfp4"]) {
     ["comfyui-image", "image", 1],
     ["comfyui-video", "video", 1],
     ["comfyui-video-tp2", "video", 2],
-    ["radiance-mxfp4", "text", 1],
-    ["radiance-flashnext", "text", 2],
-    ["gemma-31b", "text", 1],
+    // Workloads that run images and serve local text.
+    ["radiance-mxfp4", "image", 1, ["image", "text"]],
+    ["radiance-flashnext", "image", 2, ["image", "text"]],
+    ["gemma-31b", "image", 1, ["image", "text"]],
   ];
   const kube = fakeKubernetes(
     catalogue.map(([id]) => ({
@@ -49,10 +50,11 @@ function fixtureRuntime(running = ["comfyui-image", "radiance-mxfp4"]) {
   );
   const runtime = new RuntimeController({
     engine: new KubernetesEngine(kube.request),
-    workloads: catalogue.map(([id, kind, gpus]) => ({
+    workloads: catalogue.map(([id, kind, gpus, capabilities]) => ({
       id,
       label: id,
       kind,
+      ...(capabilities ? { capabilities } : {}),
       namespace: "gpu",
       deployment: id,
       pool: "gpu",
@@ -1142,7 +1144,7 @@ test("control Mode previews preset placements and Restart restarts only a runnin
   const mode = async (args) => data(await call(admin, "mode", args));
   // Modes only preview; applying stays a separate, approved Apply.
   assert.deepEqual((await mode({ mode: "image_video" })).target, [
-    "comfyui-image",
+    "radiance-mxfp4",
     "comfyui-video",
   ]);
   const video = await mode({ mode: "video" });
@@ -1150,20 +1152,14 @@ test("control Mode previews preset placements and Restart restarts only a runnin
   assert.deepEqual(video.stop, ["radiance-mxfp4"]);
   assert.deepEqual(
     (await mode({ mode: "image_text" })).target,
-    ["radiance-mxfp4", "comfyui-image"],
-    "keeps the running text model",
+    ["radiance-mxfp4"],
+    "keeps the running workload serving text",
   );
-  assert.deepEqual((await mode({ mode: "image_text", text_profile: "gemma-31b" })).target, [
-    "gemma-31b",
-    "comfyui-image",
-  ]);
   const flashnext = control.kube.deployments.get("gpu/radiance-flashnext");
   const mxfp4 = control.kube.deployments.get("gpu/radiance-mxfp4");
   [flashnext.replicas, mxfp4.replicas, mxfp4.pods] = [1, 0, []];
   control.kube.tick();
-  const ambiguous = await call(admin, "mode", { mode: "image_text" });
-  assert.equal(ambiguous.isError, true);
-  assert.match(ambiguous.content[0].text, /Name text_profile.*radiance-mxfp4, gemma-31b/);
+  assert.deepEqual((await mode({ mode: "image_text" })).target, ["radiance-flashnext"]);
   assert.deepEqual(control.kube.log, []);
   const restart = data(await call(admin, "restart", { workload: "radiance-flashnext" }));
   assert.equal(restart.type, "restart");
@@ -1190,7 +1186,7 @@ test("Mode maps its presets onto pooled workloads by what they run", () => {
     media("primary", 1, ["image", "video", "upscale"]),
     media("secondary", 1, ["image", "video", "upscale"]),
     { id: "tp2", kind: "video", pool: "gpu", gpus: 2 },
-    { id: "gemma", kind: "text", pool: "gpu", gpus: 1 },
+    media("radiance", 2, ["image", "text", "video"]),
   ];
   const phases = (...running) =>
     configured.map(({ id, pool }) => ({
@@ -1198,19 +1194,18 @@ test("Mode maps its presets onto pooled workloads by what they run", () => {
       pool,
       phase: running.includes(id) ? "running" : "stopped",
     }));
-  assert.deepEqual(presetPlacement("image_video", undefined, configured, phases()), [
-    "secondary",
-    "primary",
-  ]);
+  assert.deepEqual(presetPlacement("image_video", configured, phases()), ["secondary", "primary"]);
+  assert.deepEqual(presetPlacement("image_text", configured, phases("secondary")), ["radiance"]);
   // A running workload is kept where it fits, so the switch stops and starts less.
-  assert.deepEqual(presetPlacement("image_text", "gemma", configured, phases("secondary")), [
-    "gemma",
-    "secondary",
-  ]);
-  assert.deepEqual(presetPlacement("video", undefined, configured, phases("primary")), ["tp2"]);
+  assert.deepEqual(presetPlacement("video", configured, phases("radiance")), ["radiance"]);
+  assert.deepEqual(presetPlacement("video", configured, phases("primary")), ["tp2"]);
   assert.throws(
-    () => presetPlacement("image_video", undefined, configured.slice(0, 1), phases()),
+    () => presetPlacement("image_video", configured.slice(0, 1), phases()),
     /No other 1-GPU workload that runs images/,
+  );
+  assert.throws(
+    () => presetPlacement("image_text", configured.slice(0, 3), phases()),
+    /No workload that runs images and text/,
   );
 });
 

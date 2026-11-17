@@ -80,10 +80,11 @@ test("without STUDIO_WORKERS, the image and video workloads give one worker per 
       label: "Radiance",
       worker: "radiance",
       backend: "radiance",
-      capabilities: ["image", "video"],
+      // Its local text goes through the gateway, so its worker runs only images and videos.
+      capabilities: ["image", "text", "video"],
+      model: "local/auto",
       gpus: 2,
     }),
-    workload("text-qwen", "text", "http://qwen:8000", { model: "local/auto" }),
   ];
   const list = deploymentWorkers({}, workloads);
   assert.deepEqual(list, [

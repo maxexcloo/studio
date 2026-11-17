@@ -21,7 +21,6 @@ const environment = (extra = {}) => ({
   STUDIO_KUBERNETES_NAMESPACES: "comfyui, text",
   STUDIO_KUBERNETES_URL: "http://kubernetes.invalid",
   STUDIO_LOCAL_TEXT_MODEL: "local/auto",
-  STUDIO_TEXT_KEY: "fixture-text",
   ...extra,
 });
 const image = { kind: "image", pool: "gpu", gpus: 1, url: "http://127.0.0.1:8188" };
@@ -81,18 +80,23 @@ function cluster(change: (items: Record<string, any>) => void = () => {}) {
     "text/deployments": [
       deployment(
         "text-gemma-tp2",
-        "text",
+        "image",
         { "text.excloo.dev/model": "gemma" },
         { "node.excloo.dev/dedicated": "gpu" },
         "gpu-2",
+        { "studio.excloo.dev/capabilities": "image,text" },
       ),
       deployment(
         "text-gemma",
-        "text",
+        "image",
         { "text.excloo.dev/model": "gemma" },
         { "node.excloo.dev/dedicated": "gaming" },
         "gpu-1",
-        { "studio.excloo.dev/label": "Gemma", "studio.excloo.dev/vision": "true" },
+        {
+          "studio.excloo.dev/capabilities": "image,text",
+          "studio.excloo.dev/label": "Gemma",
+          "studio.excloo.dev/vision": "true",
+        },
       ),
     ],
     "text/services": [
@@ -128,7 +132,7 @@ test("workloads come from the labelled deployments, their claims and the Service
     {
       id: "text-gemma",
       label: "Gemma",
-      kind: "text",
+      kind: "image",
       namespace: "text",
       deployment: "text-gemma",
       pool: "gaming",
@@ -136,17 +140,19 @@ test("workloads come from the labelled deployments, their claims and the Service
       url: "http://gemma.text.svc.cluster.local:8000",
       model: "local/auto",
       vision: true,
+      capabilities: ["image", "text"],
     },
     {
       id: "text-gemma-tp2",
       label: "text-gemma-tp2",
-      kind: "text",
+      kind: "image",
       namespace: "text",
       deployment: "text-gemma-tp2",
       pool: "gpu",
       gpus: 2,
       url: "http://gemma.text.svc.cluster.local:8000",
       model: "local/auto",
+      capabilities: ["image", "text"],
     },
   ]);
 });

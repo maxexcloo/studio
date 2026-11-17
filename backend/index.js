@@ -197,6 +197,7 @@ import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
 import { adminRefusal, requireAdmin, routeErrors } from "./route-access.js";
 import { registerMigrationRoutes } from "./runtime-migrations.js";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
+import { servesText } from "./runtime/controller.ts";
 import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
 import { loadSharp } from "./sharp-loader.js";
 import { installShutdown } from "./shutdown.js";
@@ -247,7 +248,7 @@ if (runtime) {
   useWorkloadWorkers(runtime.controller.workloads);
   setParkedCheck(async (id) => (await parkedWorkers(runtime.controller, listWorkers())).has(id));
 }
-// The local text route while a local text workload runs; without a runtime, text takes the cloud route.
+// The local text route while a workload serving text runs; without a runtime, text takes the cloud route.
 const localText = runtime ? createLocalText({ controller: runtime.controller }) : undefined;
 const mcp = registerMcpRoutes(app, {
   dataDir,
@@ -553,10 +554,10 @@ registerProfileRoutes(app, {
 // The prompt assistant (assistant-routes.js): account-scoped, behind the Prompt Assistant feature,
 // reading what an account may use (assistant-context.js).
 const assistant = createAssistantContext({ catalogueModels, loadComfyContext });
-// The gateway lists only running models; stopped text workloads' models are choices too.
+// The gateway lists only running models; those of stopped workloads serving text are choices too.
 const workloadModels = () =>
   (runtime?.controller.workloads || [])
-    .filter((item) => item.kind === "text" && item.model)
+    .filter((item) => servesText(item) && item.model)
     .map((item) => item.model);
 const assistantEngine = registerAssistantRoutes(app, {
   localText,
@@ -815,13 +816,6 @@ registerCompareRoutes(app, {
   },
 });
 registerTasteRoutes(app, { taste });
-/** Whether admitted local text work is running now; Dream and captions wait for it. */
-const textBusy = () =>
-  Boolean(
-    runtime?.controller
-      .status()
-      .some((workload) => workload.kind === "text" && workload.acceptedOperations > 0),
-  );
 /** Whether what the owner is offered may be worded explicitly: Uncensored Models, always in single-user mode. */
 const explicitFor = (ownerId) =>
   !ownerId || mayUseFeature(accountAccessForId(ownerId), "uncensoredModels");
@@ -895,7 +889,6 @@ const dream = createDream({
       media: reach(services[kind]?.state),
     };
   },
-  textBusy,
   // One Dream job per image worker, so idle GPUs all take part; background work routes to the free one.
   slots: () =>
     Math.max(1, listWorkers().filter((worker) => worker.capabilities.includes("image")).length),
@@ -1014,9 +1007,9 @@ registerDreamRoutes(app, {
   projects,
   numbered: (items) => resultNumbers.numbered(items),
 });
-// Idle for background work: no live job but Dream's and no text work. Dream yields to all of it,
-// so review, captions and finishing don't wait for Dream to reach its caps.
-const studioIdle = () => !textBusy() && !store.hasOpenOwnWork();
+// Idle for background work: no live job but Dream's. Dream yields to all of it, so review,
+// captions and finishing don't wait for Dream to reach its caps.
+const studioIdle = () => !store.hasOpenOwnWork();
 // Gallery work (captions, image search, titles, suggested prompts, next steps) may run while busy.
 const galleryIdle = () => flagEnabled("STUDIO_GALLERY_WHILE_BUSY") || studioIdle();
 // Finish Liked Images (domain/finishing.ts): idle-time smart upscales of what an account likes.

@@ -168,7 +168,6 @@ export function deploymentWorkers(environment = process.env, kubernetes = worklo
 function workloadWorkers(kubernetes) {
   const groups = new Map();
   for (const workload of kubernetes) {
-    if (workload.kind === "text") continue;
     const url = normalizeWorkerUrl(workload.url);
     const group = groups.get(url) || {
       first: workload.id,
@@ -182,7 +181,10 @@ function workloadWorkers(kubernetes) {
         `Deployment ${workload.namespace}/${workload.id} names worker ${workload.worker}, but its address's worker is ${group.id}.`,
       );
     group.id ||= workload.worker || "";
-    group.capabilities.push(...(workload.capabilities || [workload.kind]));
+    // Text the workload serves goes through the gateway, not its worker.
+    group.capabilities.push(
+      ...(workload.capabilities || [workload.kind]).filter((item) => item !== "text"),
+    );
     // Radiance serves one model per GPU side by side, so it runs a job on each at once.
     if (workload.backend === "radiance") group.slots = Math.max(group.slots ?? 1, workload.gpus);
     groups.set(url, group);

@@ -17,7 +17,10 @@ const noBenchmarks = new Benchmarks({
 });
 
 /** One GPU, shared by every workload given; `running` start with a ready pod. */
-function runtime(workloads: Pick<Workload, "id" | "kind" | "url">[], running: string[]) {
+function runtime(
+  workloads: Pick<Workload, "id" | "kind" | "url" | "capabilities">[],
+  running: string[],
+) {
   const kube = fakeKubernetes(
     workloads.map(({ id }) => ({
       namespace: "gpu",
@@ -47,7 +50,7 @@ function runtime(workloads: Pick<Workload, "id" | "kind" | "url">[], running: st
 test("administrator runtime routes preview, apply and report operations, with plain refusals", async (context) => {
   const { kube, controller } = runtime(
     [
-      { id: "text", kind: "text", url: "http://text.invalid" },
+      { id: "text", kind: "image", url: "http://text.invalid", capabilities: ["image", "text"] },
       { id: "media", kind: "image", url: "http://media.invalid" },
     ],
     ["text"],
@@ -100,7 +103,7 @@ test("administrator runtime routes preview, apply and report operations, with pl
 test("the logs route tails each pod's first container, falling back to its last run, and says plainly when logs aren't permitted", async (context) => {
   const { kube, controller } = runtime(
     [
-      { id: "text", kind: "text", url: "http://text.invalid" },
+      { id: "text", kind: "image", url: "http://text.invalid", capabilities: ["image", "text"] },
       { id: "media", kind: "image", url: "http://media.invalid" },
     ],
     ["text"],

@@ -5,7 +5,7 @@ import type {
   ServicesStatus,
   WorkerStatus,
 } from "../../shared/services.ts";
-import type { RuntimeController } from "./controller.ts";
+import { type RuntimeController, servesText } from "./controller.ts";
 
 interface Worker {
   id: string;
@@ -52,9 +52,9 @@ function directAddress(value: string, path: string) {
 }
 
 /**
- * The local text route while a text workload is scaled up: STUDIO_LOCAL_TEXT_MODEL, such as
- * `local/auto`, and whether it reads images (every running one sets `vision: true`). Null when none runs or the cluster can't be asked. Cached briefly, so a switch
- * shows soon.
+ * The local text route while a workload serving text is scaled up: STUDIO_LOCAL_TEXT_MODEL, such
+ * as `local/auto`, and whether it reads images (every running one sets `vision: true`). Null when
+ * none runs or the cluster can't be asked. Cached briefly, so a switch shows soon.
  */
 export function createLocalText({
   controller,
@@ -91,8 +91,8 @@ export async function parkedWorkers(controller: RuntimeController | undefined, w
   return new Set(
     workers
       .filter((worker) => {
-        const serving = controller.workloads.filter(
-          (workload) => workload.kind !== "text" && sameUrl(workload.url, worker.url),
+        const serving = controller.workloads.filter((workload) =>
+          sameUrl(workload.url, worker.url),
         );
         return serving.length > 0 && serving.every((workload) => parked.has(workload.id));
       })
@@ -121,8 +121,8 @@ export function createServicesObserver({
     if (previous && previous.until > now()) return previous.result;
     const result = (async (): Promise<Probe> => {
       const checkedAt = new Date(now()).toISOString();
-      // Text runtimes take the key the text workloads share; media workers take none.
-      const credential = kind === "text" ? environment.STUDIO_TEXT_KEY : undefined;
+      // Radiance takes the fleet's key; ComfyUI workers take none.
+      const credential = radiance ? environment.STUDIO_RADIANCE_KEY : undefined;
       try {
         const response = await fetchImpl(endpoint, {
           method: "GET",
@@ -265,17 +265,16 @@ export function createServicesObserver({
     };
     await Promise.all(
       allowed.map(async (kind) => {
-        // Text endpoints are the managed text deployments; media endpoints are the workers, matched to theirs by URL.
+        // Text endpoints are the managed deployments serving text; media endpoints are the workers, matched to theirs by URL.
         const targets =
           kind === "text"
-            ? managed
-                .filter((workload) => workload.kind === "text")
-                .map((workload) => ({
-                  id: workload.id,
-                  label: workload.label,
-                  url: workload.url,
-                  workloads: [workload.id],
-                }))
+            ? managed.filter(servesText).map((workload) => ({
+                id: workload.id,
+                label: workload.label,
+                url: workload.url,
+                workloads: [workload.id],
+                ...(workload.backend === "radiance" ? { radiance: true } : {}),
+              }))
             : workers()
                 .filter((worker) => worker.capabilities.includes(kind))
                 .map(mediaTarget);

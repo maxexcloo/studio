@@ -65,7 +65,7 @@ test("settings read the gateway, whose model is the cloud model", async () => {
       "cloud/auto",
     ],
   );
-  // Local while a local text workload runs, else cloud.
+  // Local while a workload serving local text runs, else cloud.
   const environment = gateway();
   let local = null;
   const engine = createAssistant(environment, { localText: async () => local });

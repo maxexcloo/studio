@@ -683,8 +683,6 @@ export function createDream(options: {
   chats(ownerId: string): Chats;
   /** Whether the text model and the worker for a kind are reachable, or parked (stopped on purpose). */
   online(kind: Kind, backend: "local" | "cloud"): Promise<{ text: Reach; media: Reach }>;
-  /** Whether admitted local text work is running now. */
-  textBusy(): boolean;
   /** How many Dream jobs an account may have at once: one per media worker, so every idle GPU dreams. */
   slots(): number;
   writer: DreamWriter | null;
@@ -791,12 +789,12 @@ export function createDream(options: {
   const day = (time: number) => new Date(time).toDateString();
 
   const live = () => store.openJobs();
-  const busy = (jobs = live()) => jobs.some((job) => !dreamJob(job)) || options.textBusy();
+  const busy = (jobs = live()) => jobs.some((job) => !dreamJob(job));
   /**
-   * Someone's own work waits to start, or text work runs: Dream queues nothing. Images may take a
+   * Someone's own work waits to start: Dream queues nothing. Images may take a
    * free worker while other work runs; a video holds its GPU for minutes, so it waits for idle.
    */
-  const pressed = () => live().some((job) => !dreamJob(job) && waiting(job)) || options.textBusy();
+  const pressed = () => live().some((job) => !dreamJob(job) && waiting(job));
   /** The account's Dream jobs not yet finished. */
   const held = (ownerId: string) =>
     live().filter((job) => dreamJob(job) && job.ownerId === ownerId).length;
