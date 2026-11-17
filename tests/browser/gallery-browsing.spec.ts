@@ -207,6 +207,36 @@ test("Removing the Set filter clears selected items while keeping selection mode
   await expect(select).toHaveAttribute("aria-pressed", "true");
 });
 
+test("An MCP result link shows its turn, then the whole chat, then every result", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(
+    ...results(3).map((item, index) => ({
+      ...item,
+      ...(index < 2
+        ? { chat: { conversationId: "chat-a", turnId: index ? "turn-2" : "turn-1" } }
+        : {}),
+    })),
+  );
+  const tile = (index: number) =>
+    page.getByRole("button", { name: `Open image: Browse Result ${index}`, exact: true });
+  await page.goto("/images?chat=chat-a&turn=turn-1");
+  await expect(tile(0)).toBeVisible();
+  await expect(tile(1)).toHaveCount(0);
+  await page.getByRole("button", { name: "This Turn", exact: true }).click();
+  await page
+    .getByRole("radiogroup", { name: "Chat Results", exact: true })
+    .getByText("This Chat", { exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  await expect(tile(1)).toBeVisible();
+  await expect(tile(2)).toHaveCount(0);
+  await page.getByRole("button", { name: "Remove This Chat Filter", exact: true }).click();
+  await expect(page).toHaveURL(/\/images$/);
+  await expect(tile(2)).toBeVisible();
+});
+
 test("Ctrl+scroll zooms the grid around the tile under the pointer and is remembered", async ({
   page,
 }, testInfo) => {
