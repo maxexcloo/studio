@@ -377,8 +377,9 @@ export function createGenerationSubmission({
       }
     }
     // A painted mask becomes a crop, its masks and where to stitch them back (inpaint.js).
-    // The mask itself goes no further: it is never stored with the run.
-    if (body.inpaint) {
+    // The mask itself goes no further: it is never stored with the run. Radiance takes the mask
+    // itself (radiance-jobs.js).
+    if (body.inpaint && !isRadianceWorker(workerById(backend))) {
       try {
         body.inpaint = await prepareInpaint(account, body);
       } catch (error) {

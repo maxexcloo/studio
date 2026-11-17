@@ -122,6 +122,17 @@ export function GenerationSettings({
         />
       ),
     });
+  if (!video && capabilities.transparent === true)
+    fields.push({
+      label: "Transparent Background",
+      control: (
+        <Switch
+          label="Transparent Background"
+          checked={input.transparent === true}
+          onChange={(event) => onChange({ transparent: event.currentTarget.checked })}
+        />
+      ),
+    });
   for (const { options, field, label } of selections)
     if (profile?.options?.[options]?.length && capabilities[field] !== false)
       fields.push({
@@ -207,7 +218,7 @@ export function GenerationSettings({
         />
       ),
     });
-  if (inpaint)
+  if (inpaint && capabilities.inpaintStitch !== false)
     fields.push(
       {
         label: "Mask Strength",

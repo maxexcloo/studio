@@ -4,6 +4,7 @@ import { getCustomWorkflow } from "./custom-workflows.js";
 import { describeFailure } from "./failures.js";
 import { replaceGalleryJob, updateGalleryJob } from "./gallery/store.js";
 import { customWorkflowGraph } from "./graphs.js";
+import { maskBufferFromDataUrl, radianceMask } from "./inpaint.js";
 import { jobs, setTerminalJob } from "./jobs.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { mediaPath, mediaSubfolder, mediaUrls } from "./media-paths.js";
@@ -59,6 +60,15 @@ async function referenceImages(body) {
     images.push({ bytes, role: reference.role });
   }
   return images;
+}
+
+/** The run's painted mask as Radiance takes it, over its first picture. */
+async function paintedMask(body, references) {
+  if (!body.inpaint?.mask || !references.length) return null;
+  const sharp = await loadSharp();
+  if (!sharp)
+    throw new Error("Inpainting needs image resizing, which is off: sharp could not load.");
+  return radianceMask(sharp, references[0].bytes, maskBufferFromDataUrl(body.inpaint.mask));
 }
 
 /** One output into Studio media, as a ComfyUI output moved there would read. */
@@ -224,6 +234,10 @@ export async function runRadianceJob(
               record.values,
               references.map((reference) => reference.bytes),
               record.family,
+              {
+                mask: await paintedMask(record.body, references),
+                transparent: record.body.transparent === true,
+              },
             );
         if (stopping(id)) return cancelledRun(id);
         showProgress(id, "Generating");

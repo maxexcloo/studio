@@ -243,4 +243,8 @@ test("a Radiance profile that loads reference images is offered", async () => {
     (item) => item.id === "custom:qwen-references",
   );
   assert.ok(offered, "LoadImage is a node Studio fills itself");
+  // Radiance's Qwen repaints a mask itself, without ComfyUI's stitch, and draws transparency.
+  assert.equal(offered.capabilities.inpaint, true);
+  assert.equal(offered.capabilities.inpaintStitch, false);
+  assert.equal(offered.capabilities.transparent, true);
 });
