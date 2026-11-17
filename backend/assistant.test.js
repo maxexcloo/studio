@@ -65,24 +65,15 @@ test("settings read the gateway, whose model is the cloud model", async () => {
       "cloud/auto",
     ],
   );
-  // Local while a workload serving local text runs, else cloud.
+  // Calls other than an account's prompt writing use the cloud, even while local text runs.
   const environment = gateway();
-  let local = null;
-  const engine = createAssistant(environment, { localText: async () => local });
-  assert.deepEqual(
-    [await engine.model("rewrite"), await engine.supportsVision()],
-    ["cloud/auto", true],
-  );
-  local = { model: "local/auto", vision: false };
+  const engine = createAssistant(environment, {
+    localText: async () => ({ model: "local/auto", vision: false }),
+  });
   assert.deepEqual(
     [await engine.model("title"), await engine.supportsVision()],
-    ["local/auto", false],
+    ["cloud/auto", true],
   );
-  assert.deepEqual(
-    [await engine.model("rewrite", true), await engine.model("rewrite", false)],
-    ["local/uncensored", "local/auto"],
-  );
-  local = null;
   assert.equal(await engine.model("rewrite", true), "cloud/uncensored");
   environment.STUDIO_ASSISTANT_CLOUD_MODEL = "cloud/vision";
   assert.equal(await engine.model("rewrite", true), "cloud/vision");
@@ -356,7 +347,12 @@ test("references go to a vision model as image parts; a text-only model gets non
     log: quiet,
     localText: async () => ({ model: "local/auto", vision: false }),
   });
-  const unread = await blind.rewrite({ profile, prompt: "a cabin", references });
+  const unread = await blind.rewrite({
+    profile,
+    prompt: "a cabin",
+    references,
+    writer: { picked: "local/auto", uncensored: false },
+  });
   assert.equal(unread.referencesRead, false);
   assert.equal(typeof text.calls[0].body.messages[1].content, "string");
   assert.match(text.calls[0].body.messages[0].content, /not shown to you/);
@@ -570,16 +566,12 @@ test("LoRA matching pre-filters by family, role and words, then ranks with the m
   );
 });
 
-test("describe reads an image with a vision model, writes from a hint without one, and is unavailable otherwise", async () => {
+test("describe reads an image, writes from a hint without one, and is unavailable otherwise", async () => {
   const reply = json(
     '{"prompt": "A red barn at noon.", "negative": "blurry", "profile": "custom:fixture", "loras": ["cabin-style.safetensors", "made-up"]}',
   );
   const seen = fakeGateway(() => reply.clone());
-  const engine = createAssistant(gateway(), {
-    fetchImpl: seen.fetchImpl,
-    log: quiet,
-    localText: async () => ({ model: "local/auto", vision: true }),
-  });
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
   const read = await engine.describe({
     images: [{ mime: "image/png", data: "AAAA" }],
     profiles: [profile],
@@ -590,21 +582,13 @@ test("describe reads an image with a vision model, writes from a hint without on
     [true, true, "A red barn at noon.", "blurry", "custom:fixture", ["cabin-style.safetensors"]],
   );
   assert.equal(seen.calls[0].body.messages[1].content[1].type, "image_url");
-  const blind = createAssistant(gateway(), {
-    fetchImpl: fakeGateway(() => reply.clone()).fetchImpl,
-    log: quiet,
-    localText: async () => ({ model: "local/auto", vision: false }),
-  });
-  assert.deepEqual(await blind.describe({ images: [{ mime: "image/png", data: "AAAA" }] }), {
+  assert.deepEqual(await engine.describe({}), {
     available: false,
     vision: false,
-    model: "local/auto",
-    reason: "The running text model can't read images.",
+    model: "cloud/auto",
+    reason: "Add an image to describe.",
   });
-  const hinted = await blind.describe({
-    images: [{ mime: "image/png", data: "AAAA" }],
-    hint: "red-barn-noon.png",
-  });
+  const hinted = await engine.describe({ hint: "red-barn-noon.png" });
   assert.deepEqual(
     [hinted.available, hinted.vision, hinted.prompt],
     [true, false, "A red barn at noon."],
