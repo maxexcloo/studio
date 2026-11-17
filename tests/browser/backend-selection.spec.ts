@@ -8,6 +8,7 @@ import {
   create,
   fixtures,
   image,
+  openReferenceChoices,
   serveProfiles,
   showUploads,
 } from "./fixtures";
@@ -56,9 +57,8 @@ test("Switching image backends changes reference capacity and preserves an overs
   const backend = page.getByRole("combobox", { name: "Backend", exact: true });
   await backend.click();
   await page.getByRole("option", { name: "ComfyUI", exact: true }).click();
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  const picker = await openReferenceChoices(page);
   await showUploads(page);
-  const picker = page.getByRole("region", { name: "References", exact: true });
   await picker.locator('input[type="file"]').setInputFiles(
     Array.from({ length: 10 }, (_, i) => ({
       name: `reference-${i + 1}.png`,
@@ -70,7 +70,7 @@ test("Switching image backends changes reference capacity and preserves an overs
     })),
   );
   await expect(
-    picker.getByRole("button", { name: "Reference 10 · Reference Image", exact: true }),
+    page.getByRole("button", { name: "Reference 10 · Reference Image", exact: true }),
   ).toBeVisible();
   await closeReferences(page);
   await backend.click();
@@ -110,9 +110,8 @@ test("A text-only Radiance default sends a run with references to ComfyUI", asyn
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText("0/4");
   await closeLoras(page);
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  const picker = await openReferenceChoices(page);
   await showUploads(page);
-  const picker = page.getByRole("region", { name: "References", exact: true });
   await picker.locator('input[type="file"]').setInputFiles({
     name: "reference.png",
     mimeType: "image/png",
@@ -122,7 +121,7 @@ test("A text-only Radiance default sends a run with references to ComfyUI", asyn
     ),
   });
   await expect(
-    picker.getByRole("button", { name: "Reference 1 · Reference Image", exact: true }),
+    page.getByRole("button", { name: "Reference 1 · Reference Image", exact: true }),
   ).toBeVisible();
   await closeReferences(page);
   // The reference moves the run to ComfyUI, with its controls and limits.

@@ -264,7 +264,7 @@ export function registerQueueRoutes(
 }
 
 /**
- * Settings › Gallery › Unfinished Items, for administrators: every account's jobs that have not
+ * Settings › Maintenance › Unfinished Items, for administrators: every account's jobs that have not
  * finished, oldest first, to retry (end it and queue it again), stop or delete (end it and take it
  * out of the queue, keeping its records), one at a time or every listed job at once.
  */

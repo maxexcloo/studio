@@ -179,32 +179,24 @@ export function CompareMenu() {
           Compare
         </Button>
       }
+      onClear={() => {
+        setDraft((value) => ({ ...value, compare: undefined }));
+        close();
+      }}
+      clearDisabled={!draft.compare}
       actions={
         draft.compare && (
-          <>
-            <Button
-              size="compact-sm"
-              variant="subtle"
-              aria-label="Clear Comparison"
-              onClick={() => {
-                setDraft((value) => ({ ...value, compare: undefined }));
-                close();
-              }}
-            >
-              Clear
-            </Button>
-            <Button
-              size="compact-sm"
-              variant="subtle"
-              aria-label={`Remove Variant ${letter(draft.compare.active)}`}
-              onClick={() => {
-                setDraft(removeVariant);
-                close();
-              }}
-            >
-              Remove
-            </Button>
-          </>
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            aria-label={`Remove Variant ${letter(draft.compare.active)}`}
+            onClick={() => {
+              setDraft(removeVariant);
+              close();
+            }}
+          >
+            Remove
+          </Button>
         )
       }
       secondary={

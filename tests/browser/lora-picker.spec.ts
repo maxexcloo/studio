@@ -316,16 +316,19 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
   const stack = page.getByRole("dialog", { name: "LoRAs", exact: true });
   await expect(stack.getByText("Choose LoRAs or a preset.", { exact: true })).toBeVisible();
   await expect(page.getByRole("list", { name: "LoRA Choices", exact: true })).toHaveCount(0);
-  // Clear sits in the header; the footer's Add and Done share one row without overlapping.
-  const [clear, add, done] = await Promise.all(
-    ["Clear LoRAs", "Add LoRAs", "Done"].map((name) =>
+  // The footer's Add, Clear and Done share one row in that order without overlapping.
+  const [add, clear, done] = await Promise.all(
+    ["Add LoRAs", "Clear", "Done"].map((name) =>
       stack.getByRole("button", { name, exact: true }).boundingBox(),
     ),
   );
-  expect(clear!.y).toBeLessThan(add!.y);
-  expect(add!.x + add!.width).toBeLessThanOrEqual(done!.x);
-  // Within a pixel, as layout rounds to device pixels.
-  expect(Math.abs(done!.y - add!.y)).toBeLessThanOrEqual(1);
+  expect(add!.x + add!.width).toBeLessThanOrEqual(clear!.x);
+  expect(clear!.x + clear!.width).toBeLessThanOrEqual(done!.x);
+  // Centred on one row, within a pixel, as layout rounds to device pixels.
+  for (const button of [add!, clear!])
+    expect(
+      Math.abs(button.y + button.height / 2 - (done!.y + done!.height / 2)),
+    ).toBeLessThanOrEqual(1);
   await stack.getByRole("button", { name: "Add LoRAs", exact: true }).click();
   const adding = page.getByRole("dialog", { name: "Add LoRAs", exact: true });
   // The search waits for a tap, so the keyboard stays down.

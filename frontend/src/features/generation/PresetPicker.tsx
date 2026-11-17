@@ -178,26 +178,17 @@ export function PresetPicker({
           <icons.preset size={16} />
         </Button>
       }
+      onClear={() => select()}
+      clearDisabled={!selection.presetId}
       actions={
-        <>
-          <Button
-            size="compact-sm"
-            variant="subtle"
-            aria-label="Clear Preset"
-            disabled={!selection.presetId}
-            onClick={() => select()}
-          >
-            Clear
-          </Button>
-          <SaveButton
-            noun="Preset"
-            naming={naming}
-            current={selected}
-            edited={edited}
-            disabled={!canSave || !presets.isSuccess}
-            onUpdate={(preset) => presets.update(preset, presetInput(current(), preset.parts))}
-          />
-        </>
+        <SaveButton
+          noun="Preset"
+          naming={naming}
+          current={selected}
+          edited={edited}
+          disabled={!canSave || !presets.isSuccess}
+          onUpdate={(preset) => presets.update(preset, presetInput(current(), preset.parts))}
+        />
       }
     >
       <Stack gap="sm" flex={1} mih={0}>

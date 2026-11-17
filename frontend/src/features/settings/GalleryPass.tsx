@@ -53,7 +53,7 @@ const scopeLabels: Record<PassScope, string> = {
 };
 
 /**
- * A Settings › Gallery row that starts or stops a pass at `route` and follows it; with
+ * A Settings › Maintenance row that starts or stops a pass at `route` and follows it; with
  * `scopeLabel` it also chooses the pass's scope (All, Missing or Out of Date, the default).
  */
 export function GalleryPass({

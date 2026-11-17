@@ -988,16 +988,16 @@ export async function promptMenu(scope: Page | Locator, box: string) {
   return page.getByRole("menu");
 }
 
-/** The viewer prompt's assistance: the bar's AI on desktop, the prompt's own AI on phones. */
-export async function viewerPromptAssist(page: Page) {
-  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  const phone = await page.evaluate(() => "phone" in document.documentElement.dataset);
-  return viewer.getByRole("button", { name: phone ? "AI Prompt Actions" : "AI", exact: true });
+/** The viewer prompt's assistance: the bar's AI. */
+export function viewerPromptAssist(page: Page) {
+  return page
+    .getByRole("dialog", { name: "Generation", exact: true })
+    .getByRole("button", { name: "AI", exact: true });
 }
 
 /** Opens the viewer prompt's assistance menu. */
 export async function viewerPromptMenu(page: Page) {
-  await (await viewerPromptAssist(page)).click();
+  await viewerPromptAssist(page).click();
   return page.getByRole("menu");
 }
 
@@ -1105,10 +1105,43 @@ export async function showUploads(page: Page) {
 }
 
 /**
- * Closes the References popup, leaving the composer open: Done in the phone sheet's footer,
- * Escape on desktop. A pick filling the last slot closes it already, so it may be fading out.
+ * Opens the reference choices: the popup on desktop, or Add References over the stack on phones.
+ * Returns them.
+ */
+export async function openReferenceChoices(page: Page) {
+  // The triggers say whether their popups are open, so one fading out after a pick doesn't count.
+  const expanded = async (name: string) => {
+    const trigger = page.getByRole("button", { name, exact: true });
+    return (await trigger.count()) > 0 && (await trigger.getAttribute("aria-expanded")) === "true";
+  };
+  if (!(await expanded("Choose References")))
+    await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  const phone = await page.evaluate(() => "phone" in document.documentElement.dataset);
+  if (phone && !(await expanded("Add References")))
+    await page.getByRole("button", { name: "Add References", exact: true }).click();
+  const choices = page.getByRole("region", { name: "Reference Choices", exact: true });
+  await expect(choices).toBeVisible();
+  return choices;
+}
+
+/**
+ * Returns from the phone's reference choices to the stack, unless a pick returned already; desktop
+ * shows both.
+ */
+export async function showReferenceStack(page: Page) {
+  const add = page.getByRole("button", { name: "Add References", exact: true });
+  const adding = page.getByRole("dialog", { name: "Add References", exact: true });
+  if ((await add.count()) && (await add.getAttribute("aria-expanded")) === "true")
+    await adding.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(adding).toBeHidden();
+}
+
+/**
+ * Closes the References popup, leaving the composer open: Done in its footer, else Escape. A pick
+ * filling the last slot closes it already, so it may be fading out.
  */
 export async function closeReferences(page: Page) {
+  await showReferenceStack(page);
   const references = page.getByRole("dialog", { name: "References", exact: true });
   if (!(await references.isVisible())) return;
   const done = references.getByRole("button", { name: "Done", exact: true });

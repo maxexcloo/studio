@@ -108,8 +108,7 @@ test("The empty composer prompt's AI menu offers Suggested ideas that fill it wi
 
 test("The viewer directly offers Suggested and Templates without styles or item descriptions", async ({
   page,
-}, testInfo) => {
-  const phone = testInfo.project.use.isMobile;
+}) => {
   await openViewer(page);
   const asked: any[] = [];
   const others = [{ label: "Snowfall", request: "add snow", prompt: "An amber bird in snow" }];
@@ -145,7 +144,7 @@ test("The viewer directly offers Suggested and Templates without styles or item 
     "false",
   );
   await page.keyboard.press("Escape");
-  await expect(await viewerPromptAssist(page)).toBeFocused();
+  await expect(viewerPromptAssist(page)).toBeFocused();
   await viewerPromptMenu(page);
   // Refresh reads Loading… while they load, with no placeholder row.
   const thinking = menu.getByRole("menuitem", { name: "Loading…", exact: true });
@@ -157,8 +156,8 @@ test("The viewer directly offers Suggested and Templates without styles or item 
     ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
     "Refresh",
     "Custom…",
-    // Phones keep discovery in the bar's AI menu, apart from the prompt's assistance.
-    ...(phone ? [] : ["More Like This", "Similar"]),
+    "More Like This",
+    "Similar",
   ]);
   expect(asked).toEqual([
     { surface: "viewer", jobId: "job-hub", fresh: false, prompt: "An amber bird", itemId: "hub" },
@@ -223,9 +222,7 @@ test("Custom Animation suggests what could happen from the image, filling the in
   );
 });
 
-test("The prompt offers Library's fixed changes with the image's suggestions", async ({
-  page,
-}, testInfo) => {
+test("The prompt offers Library's fixed changes with the image's suggestions", async ({ page }) => {
   await openViewer(page);
   const asked: any[] = [];
   await page.route("**/api/assistant", (route) =>
@@ -261,7 +258,8 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
     "Refresh",
     "Softer Shadows",
     "Custom…",
-    ...(testInfo.project.use.isMobile ? [] : ["More Like This", "Similar"]),
+    "More Like This",
+    "Similar",
   ]);
   await menu.getByRole("menuitem", { name: "Softer Shadows", exact: true }).click();
   await expect

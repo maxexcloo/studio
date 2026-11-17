@@ -23,7 +23,7 @@ interface TitleWriter {
  * without a call.
  */
 export function createTitler(options: {
-  /** The Settings › Gallery switch (STUDIO_GALLERY_TITLES). */
+  /** The Settings › Maintenance switch (STUDIO_GALLERY_TITLES). */
   enabled(): boolean;
   writer: TitleWriter | null;
   idle(): boolean;

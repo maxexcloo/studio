@@ -6,8 +6,10 @@ import {
   create,
   fixtures,
   image,
+  openReferenceChoices,
   profiles,
   serveProfiles,
+  showReferenceStack,
   showUploads,
   stamp,
 } from "./fixtures";
@@ -57,17 +59,20 @@ test("Multiple owned references preserve order, role identity and capacity throu
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Combine these reference compositions");
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  const picker = page.getByRole("region", { name: "References", exact: true });
-  const slots = picker.getByRole("group", { name: "Reference Slots", exact: true });
-  // Taps fill the next empty slot: both Inputs, then End.
+  const picker = await openReferenceChoices(page);
+  const slots = page.getByRole("group", { name: "Reference Slots", exact: true });
+  // Taps fill the next empty slot: both Inputs, then End, which returns phones to the stack.
   for (const name of ["first", "second", "third"])
     await picker.getByRole("button", { name: `Use reference: ${name} study`, exact: true }).click();
   await expect(slots.getByRole("button", { name: "Reference 3 · End", exact: true })).toBeVisible();
   // With every slot filled, a selected image can still be removed.
   await expect(
-    picker.getByRole("button", { name: "Remove reference: first study", exact: true }),
+    (await openReferenceChoices(page)).getByRole("button", {
+      name: "Remove reference: first study",
+      exact: true,
+    }),
   ).toBeEnabled();
+  await showReferenceStack(page);
   await slots.getByRole("button", { name: "Reference 1 · Inputs", exact: true }).click();
   await page
     .getByRole("menu", { name: "Reference 1 · Inputs", exact: true })
@@ -81,9 +86,13 @@ test("Multiple owned references preserve order, role identity and capacity throu
   await expect(
     slots.getByRole("button", { name: "Reference 3 · End", exact: true }),
   ).toHaveAttribute("data-target", "true");
-  await picker.getByRole("button", { name: "Use reference: first study", exact: true }).click();
+  await (
+    await openReferenceChoices(page)
+  )
+    .getByRole("button", { name: "Use reference: first study", exact: true })
+    .click();
   await closeReferences(page);
-  await expect(page.getByRole("region", { name: "References", exact: true })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "References", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1 · Inputs", exact: true })).toBeVisible();
   await expect(page.getByRole("img", { name: "Reference 3 · End", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
@@ -102,7 +111,7 @@ test("Multiple owned references preserve order, role identity and capacity throu
   ).toEqual(expected);
 });
 
-test("Removing a picked reference keeps its upload; confirmed deletion removes only the owned upload", async ({
+test("Removing a picked reference keeps its upload, one upload fills several slots, and the picker deletes nothing", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -139,69 +148,48 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
       height: 1024,
       createdAt: stamp,
     });
-  const uploads = () => state.gallery.filter((item) => item.uploaded).map((item) => item.id);
-  const deleted: string[] = [];
-  let refuse = true;
-  // An upload is deleted like any gallery item.
-  await page.route("**/api/gallery/owned-upload", (route) => {
-    expect(route.request().method()).toBe("DELETE");
-    deleted.push("owned-upload");
-    if (refuse)
-      return route.fulfill({
-        status: 404,
-        json: { error: "That upload is no longer available to this account." },
-      });
-    return route.fallback();
-  });
   await create(page);
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Keep the gallery reference");
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await page
+  const picker = await openReferenceChoices(page);
+  await picker
     .getByRole("button", { name: "Use reference: Kept gallery result", exact: true })
     .click();
-  await expect(page.getByRole("button", { name: "Delete Upload 1", exact: true })).toHaveCount(0);
+  // Uploads are deleted in the gallery, not here.
   await showUploads(page);
+  await expect(
+    picker.getByRole("button", { name: "Use reference: Upload 1", exact: true }),
+  ).toBeVisible();
+  await expect(picker.getByRole("button", { name: /Delete/ })).toHaveCount(0);
+  await showReferenceStack(page);
   const slots = page.getByRole("group", { name: "Reference Slots", exact: true });
-  await slots.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: Upload 1", exact: true }).click();
-  // One upload can fill several slots: choose the slot, then the selected image.
-  await slots.getByRole("button", { name: "Slot 2 · Inputs", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: Upload 1", exact: true }).click();
+  // One upload can fill several slots: choose the slot, then the image; each pick returns to the
+  // stack on phones.
+  for (const slot of ["Slot 3 · End", "Slot 2 · Inputs"]) {
+    await slots.getByRole("button", { name: slot, exact: true }).click();
+    await (
+      await openReferenceChoices(page)
+    )
+      .getByRole("button", { name: "Use reference: Upload 1", exact: true })
+      .click();
+    await showReferenceStack(page);
+  }
   await expect(slots.getByRole("button", { name: "Reference 3 · End", exact: true })).toBeVisible();
   await slots.getByRole("button", { name: "Reference 2 · Inputs", exact: true }).click();
   await page
     .getByRole("menu", { name: "Reference 2 · Inputs", exact: true })
     .getByRole("menuitem", { name: "Remove", exact: true })
     .click();
-  expect(deleted).toEqual([]);
   await expect(slots.getByRole("button", { name: "Slot 2 · Inputs", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Delete Upload 1", exact: true }).click();
-  const confirmation = page.getByRole("dialog", { name: "Delete Upload", exact: true });
-  await confirmation.getByRole("button", { name: "Cancel", exact: true }).click();
-  expect(deleted).toEqual([]);
-  await page.getByRole("button", { name: "Delete Upload 1", exact: true }).click();
-  await confirmation.getByRole("button", { name: "Delete Upload", exact: true }).click();
-  await expect(confirmation.getByRole("alert")).toContainText(
-    "no longer available to this account",
-  );
-  await expect(confirmation).toBeVisible();
-  expect(uploads()).toHaveLength(2);
-  refuse = false;
-  await confirmation.getByRole("button", { name: "Delete Upload", exact: true }).click();
-  await expect(confirmation).toBeHidden();
-  expect(deleted).toEqual(["owned-upload", "owned-upload"]);
-  expect(uploads()).toEqual(["another-upload"]);
-  await expect(slots.getByRole("button", { name: /^Reference / })).toHaveCount(1);
-  await expect(
-    slots.getByRole("button", { name: "Reference 1 · Inputs", exact: true }),
-  ).toBeVisible();
+  expect(state.gallery.filter((item) => item.uploaded)).toHaveLength(2);
   await closeReferences(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
-  expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "asset-kept", slot: "images" }]);
-  expect(state.gallery.some((item) => item.id === "kept")).toBe(true);
+  expect(state.jobs[0].input.referenceAssets).toEqual([
+    { assetId: "asset-kept", slot: "images" },
+    { assetId: "asset-owned-upload", slot: "end" },
+  ]);
 });
 
 test("Each reference takes one Strength: a guiding one its own, an img2img start image the denoise", async ({
@@ -253,10 +241,14 @@ test("Each reference takes one Strength: a guiding one its own, an img2img start
   });
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A lighthouse at dusk");
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  const picker = page.getByRole("region", { name: "References", exact: true });
+  const choices = await openReferenceChoices(page);
   for (const name of ["first", "second"])
-    await picker.getByRole("button", { name: `Use reference: ${name} study`, exact: true }).click();
+    await choices
+      .getByRole("button", { name: `Use reference: ${name} study`, exact: true })
+      .click();
+  // Filling both slots returns phones to the stack, which holds each reference's Strength.
+  await showReferenceStack(page);
+  const picker = page.getByRole("region", { name: "Reference Stack", exact: true });
   // The test profile doesn't edit with its references, so the first one is where the result starts.
   await expect(picker.getByText("Reference 1 is the start image", { exact: false })).toBeVisible();
   await picker
