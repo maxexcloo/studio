@@ -102,3 +102,37 @@
   --sc-color: rgb(255 255 255 / 0.12);
   background-color: rgb(255 255 255 / 0.05);
 }
+
+/* A banner keeps its message, its action and Close on one centred line. Only a coloured one (a
+   failure) shows its colour, as a small dot rather than Mantine's bar. */
+.notification {
+  align-items: center;
+  min-height: 44px;
+  padding-block: 2px;
+  padding-inline: var(--mantine-spacing-md) 4px;
+}
+
+.notification::before {
+  display: none;
+}
+
+.notification :global(.mantine-Notification-description),
+.notification :global(.mantine-Notification-title) {
+  font-size: var(--mantine-font-size-sm);
+  color: var(--mantine-color-text);
+}
+
+.alert {
+  padding-inline-start: calc(var(--mantine-spacing-md) + 12px);
+}
+
+.alert::before {
+  display: block;
+  top: 50%;
+  bottom: auto;
+  inset-inline-start: var(--mantine-spacing-md);
+  width: 8px;
+  height: 8px;
+  translate: 0 -50%;
+  border-radius: 50%;
+}

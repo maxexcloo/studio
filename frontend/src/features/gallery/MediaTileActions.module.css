@@ -4,6 +4,7 @@
   pointer-events: none;
 }
 
+/* Small, so the media stays in view; the tile's caption marks its rating. */
 .control {
   pointer-events: auto;
   opacity: 0;
@@ -21,8 +22,7 @@
 
 *:hover > .actions .control,
 *:focus-within > .actions .control,
-.actions[data-opened] .control,
-.control[data-liked] {
+.actions[data-opened] .control {
   opacity: 1;
 }
 
@@ -33,6 +33,6 @@
 }
 
 :where(:root[data-phone]) .download,
-:where(:root[data-phone]) .like:not([data-liked]) {
+:where(:root[data-phone]) .like {
   display: none;
 }

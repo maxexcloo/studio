@@ -260,6 +260,9 @@ export function MediaTile({
   const [entering] = useState(
     () => !finished(item) && Date.now() - Date.parse(item.createdAt || "") < 10_000,
   );
+  // The rating sits small at the right of the caption's line, where the caption is.
+  const rated = item.status === "done" && !upscaleShown && !selecting && Boolean(item.rating);
+  const RatingIcon = item.rating === "disliked" ? icons.dislike : icons.like;
   const flips = Boolean(versions && versions.length > 1 && onVersion && !selecting);
   const swipe = useRef<{ x: number; y: number } | null>(null);
   const swiped = useRef(false);
@@ -406,7 +409,11 @@ export function MediaTile({
         ) : null}
         {item.status === "done" && !upscaleShown
           ? caption !== "none" && (
-              <div className={classes.caption} data-pinned={caption === "pinned" || undefined}>
+              <div
+                className={classes.caption}
+                data-pinned={caption === "pinned" || undefined}
+                data-rated={rated || undefined}
+              >
                 {/* A pinned (phone) caption keeps to two lines in all. */}
                 <Text size="sm" fw={500} lineClamp={caption === "pinned" && detail ? 1 : 2}>
                   {title}
@@ -422,6 +429,15 @@ export function MediaTile({
       </UnstyledButton>
       {item.status !== "done" && <TileStatus item={item} onTryAgain={onTryAgain} />}
       {upscaleShown && <TileUpscale item={item} />}
+      {rated && (
+        <div
+          className={classes.rating}
+          role="img"
+          aria-label={item.rating === "liked" ? "Liked" : "Disliked"}
+        >
+          <RatingIcon size={14} fill="currentColor" />
+        </div>
+      )}
       {!selecting && (
         <div className={classes.badges}>
           {versions && versions.length > 1 && (

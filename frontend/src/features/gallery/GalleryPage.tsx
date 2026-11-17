@@ -16,7 +16,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { LayoutGrid, Rows3, SquareCheck } from "lucide-react";
+import { ArrowUp, LayoutGrid, Rows3, SquareCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
@@ -126,6 +126,10 @@ export function GalleryPage() {
     select: (data) => ({
       key: data.jobs.map((job) => `${job.id}:${job.status}`).join(),
       active: data.jobs.some((job) => !terminalStatuses.has(job.status)),
+      retried: data.jobs
+        .filter((job) => job.galleryAt)
+        .map((job) => `${job.id}:${job.status}`)
+        .join(),
     }),
   }).data;
   const listing = useMemo(
@@ -156,6 +160,7 @@ export function GalleryPage() {
     () => [...galleryKey, "refresh", ...listingKey.slice(1)],
     [listingKey],
   );
+  const [incoming, setIncoming] = useState(0);
   const refresh = useQuery({
     queryKey: refreshKey,
     enabled: false,
@@ -176,6 +181,14 @@ export function GalleryPage() {
         first.items.push(...edge.items);
       }
       if (signal.aborted) return first;
+      // Scrolled into the gallery, new results wait behind New Results rather than pushing down
+      // the tiles in view; back at the top they join.
+      const fresh = first.items.findIndex((item) => known.has(mediaIdentity(item)));
+      const top = document.querySelector("[data-gallery-view]")?.getBoundingClientRect().top;
+      if (fresh > 0 && top !== undefined && top < 0) {
+        first.items = first.items.slice(fresh);
+        setIncoming(fresh);
+      } else setIncoming(0);
       client.setQueryData<InfiniteData<GalleryResultsPage, string>>(listingKey, (data) => {
         if (!data) return data;
         const ids = new Set(first.items.map((item) => item.id));
@@ -258,6 +271,26 @@ export function GalleryPage() {
     seenJobs.current = jobs?.key;
     void refreshFirst();
   }, [jobs?.key, refreshFirst]);
+  // Held new results join once the gallery's top is back in view.
+  useEffect(() => {
+    if (!incoming) return;
+    const join = () => {
+      const top = document.querySelector("[data-gallery-view]")?.getBoundingClientRect().top;
+      if (top === undefined || top >= 0) refreshFirst();
+    };
+    window.addEventListener("scroll", join, { passive: true });
+    return () => window.removeEventListener("scroll", join);
+  }, [incoming, refreshFirst]);
+  useEffect(() => setIncoming(0), [listingKey]);
+  // A retry keeps its original's place, which may lie past the first page: its progress rereads
+  // every loaded page.
+  const seenRetries = useRef(jobs?.retried);
+  useEffect(() => {
+    const seen = seenRetries.current;
+    seenRetries.current = jobs?.retried;
+    if (seen === undefined || seen === jobs?.retried) return;
+    void client.invalidateQueries({ queryKey: listingKey, exact: true });
+  }, [jobs?.retried, client, listingKey]);
   const loaded = useMemo(
     () => gallery.data?.pages.flatMap((page) => page.items) || [],
     [gallery.data],
@@ -657,6 +690,22 @@ export function GalleryPage() {
         </Alert>
       ) : items.length ? (
         <div className={classes.results} data-stale={gallery.isPlaceholderData || undefined}>
+          {incoming > 0 && (
+            <div className={classes.incoming}>
+              <Button
+                variant="default"
+                size="compact-sm"
+                radius="xl"
+                leftSection={<ArrowUp size={14} />}
+                onClick={() => {
+                  window.scrollTo({ top: 0 });
+                  refreshFirst();
+                }}
+              >
+                {incoming === 1 ? "1 New Result" : `${incoming} New Results`}
+              </Button>
+            </div>
+          )}
           <View
             items={items}
             results={resultsKey}

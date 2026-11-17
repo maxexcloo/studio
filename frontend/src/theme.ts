@@ -336,13 +336,16 @@ export function studioTheme({
       NavLink: NavLink.extend({
         styles: { root: { borderRadius: "var(--mantine-radius-md)", ...target } },
       }),
-      // A solid card, so the header never shows through a banner over it (styles.css).
+      // A small glass banner on one line; a failure marks its colour with a dot.
       Notification: Notification.extend({
+        classNames: (_theme, props) => ({
+          root: `${classes.notification} ${props.color ? classes.alert : ""}`,
+        }),
         defaultProps: {
           withBorder: true,
           closeButtonProps: { "aria-label": "Dismiss Notification" },
         },
-        styles: { root: { background: "var(--mantine-color-body)" } },
+        styles: { root: { ...glass, boxShadow: "var(--mantine-shadow-md)" } },
       }),
       // Paper also renders Card, Dialog, ActionBar and Modal/Drawer content.
       Paper: Paper.extend({

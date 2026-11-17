@@ -12,6 +12,27 @@
   opacity: 0.6;
 }
 
+/* New results waiting while the gallery is scrolled: a pill that stays in view without taking
+   room from the tiles beneath it, below the sticky toolbar on desktop. */
+.incoming {
+  position: sticky;
+  top: calc(var(--app-shell-header-offset, var(--app-shell-header-height)) + 4.5rem);
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  height: 0;
+}
+
+:root[data-phone] .incoming {
+  top: calc(
+    var(--app-shell-header-offset, var(--app-shell-header-height)) + var(--mantine-spacing-sm)
+  );
+}
+
+.incoming > * {
+  box-shadow: var(--mantine-shadow-md);
+}
+
 .viewLabel {
   gap: 6px;
 }

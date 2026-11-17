@@ -835,8 +835,11 @@ export class GenerationQueue {
     return this.requeue(job);
   }
 
-  /** Queues the job's input again as a new job, in the job's set. */
+  /** Queues the job's input again as a new job, in the job's set and its place in the gallery. */
   requeue(job: OwnedJob): OwnedJob {
+    const listed = job.items.find((item) => typeof item.createdAt === "string")?.createdAt as
+      | string
+      | undefined;
     return this.store.enqueue(
       job.ownerId,
       job.sessionId,
@@ -845,7 +848,11 @@ export class GenerationQueue {
       job.parentJobId,
       job.resource,
       undefined,
-      { parentItemId: job.parentItemId, queueSet: job.queueSet },
+      {
+        parentItemId: job.parentItemId,
+        queueSet: job.queueSet,
+        galleryAt: job.galleryAt || listed || job.createdAt,
+      },
     );
   }
 }
