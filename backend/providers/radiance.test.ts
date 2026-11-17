@@ -142,6 +142,14 @@ test("one-GPU Qwen and Noct fit their actual conditioning limits without constra
       /4 reference/,
     );
   }
+  assert.throws(
+    () =>
+      imageRequest(
+        { ...image, model: "noctq-v4-lightning-iq8r" },
+        Array(4).fill(new Uint8Array([1])),
+      ),
+    /3 reference/,
+  );
   const edit = imageRequest(
     { ...image, model: "flux-3-image-klein-iq8r", width: 1408, height: 1408 },
     Array(10).fill(new Uint8Array([1])),
