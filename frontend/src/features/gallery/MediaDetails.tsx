@@ -194,6 +194,7 @@ function generationDetails(
       ["CFG", settings.cfg],
       ["Sampler", comfyui(settings.sampler)],
       ["Scheduler", comfyui(settings.scheduler)],
+      ["Rebalance", titleCase(String(settings.rebalance || ""))],
       ["Denoise", !video && staged.length ? settings.denoise : ""],
       ["Inpaint", inpaint?.strength ?? ""],
       ["Seed", settings.seed],

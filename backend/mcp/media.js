@@ -633,6 +633,7 @@ export class McpMedia {
       negative_prompt,
       cfg,
       denoise,
+      rebalance,
       sampler,
       scheduler,
       upscale_quality,
@@ -642,7 +643,7 @@ export class McpMedia {
     const controls = {};
     if (negative_prompt !== undefined && adjustable.negative_prompt)
       controls.negative = negative_prompt;
-    for (const [key, value] of Object.entries({ cfg, denoise, sampler, scheduler }))
+    for (const [key, value] of Object.entries({ cfg, denoise, rebalance, sampler, scheduler }))
       if (value !== undefined) controls[key] = value;
     // Names resolve to the profile's files and take their recommended strength unless one is given.
     const infos = loras.length ? await this.loraInfos(owner) : {};
@@ -1714,6 +1715,7 @@ export class McpMedia {
       steps: settings.steps,
       cfg: settings.cfg,
       denoise: settings.denoise,
+      rebalance: settings.rebalance,
       sampler: settings.sampler,
       scheduler: settings.scheduler,
     };
@@ -2042,7 +2044,17 @@ export class McpMedia {
       // What a targeted change needs: the brief and the settings a user adjusts, not runtime detail.
       const saved = item.settings || {};
       const settings = Object.fromEntries(
-        ["profileId", "seed", "steps", "cfg", "sampler", "scheduler", "denoise", "upscaleQuality"]
+        [
+          "profileId",
+          "seed",
+          "steps",
+          "cfg",
+          "rebalance",
+          "sampler",
+          "scheduler",
+          "denoise",
+          "upscaleQuality",
+        ]
           .filter((key) => saved[key] !== undefined)
           .map((key) => [key, saved[key]]),
       );
