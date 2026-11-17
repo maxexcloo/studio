@@ -298,6 +298,7 @@ export function studioTheme({
       Modal: Modal.extend({
         defaultProps: {
           centered: true,
+          closeButtonProps: { "aria-label": "Close" },
           overlayProps: { blur: 8, backgroundOpacity: 0.55 },
           transitionProps: popupTransition,
           radius: "lg",
