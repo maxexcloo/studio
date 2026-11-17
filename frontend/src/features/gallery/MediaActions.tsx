@@ -43,7 +43,7 @@ import { profileForBackend } from "../generation/payload";
 import { type AssistantOption, assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
-import { type VideosPreference, useVideosPreference } from "../settings/accountPreferences";
+import { type SidePreference, useVideosPreference } from "../settings/accountPreferences";
 import {
   askMotionIdeas,
   askNextSteps,
@@ -77,7 +77,7 @@ import { useMediaRating } from "./useMediaRating";
 import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
 import { type VideoEdit, useVideoEdit } from "./videoEdits";
-import { viewerItemId } from "./viewerLink";
+import { type GalleryState, galleryKind, viewerPath } from "./viewerLink";
 import type { PromptAssist, ViewerAsk } from "./ViewerPrompt";
 
 /**
@@ -211,8 +211,8 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
         {
           onSuccess: () => {
             onApplied();
-            if (["/images", "/video"].includes(location.pathname))
-              openComposer(location.pathname === "/video" ? "video" : "image");
+            const kind = galleryKind(location.pathname);
+            if (kind) openComposer(kind);
           },
         },
       );
@@ -395,24 +395,23 @@ export function useMediaActions(
   const offers =
     animation.data?.offers ??
     (animation.error?.cause as { offers?: AnimateOffers } | undefined)?.offers;
-  const offered = (["cloud", "fast", "quality"] as const).filter((value) => offers?.[value]);
-  // Where the account prefers videos to run (also in Settings), where there is more than one place.
-  // Unsaved or no longer offered, it shows Fast where the account has local video, else Cloud.
-  const local = offers?.fast ? "fast" : offers?.quality ? "quality" : "cloud";
+  // Where the account prefers videos to run (also in Settings), where it has both. Unsaved or no
+  // longer offered, it shows Local where the account has local video, else Cloud.
+  const local = offers?.local ? "local" : "cloud";
   const modelChoice =
-    offered.length > 1
+    offers?.cloud && offers.local
       ? [
           {
             id: "animate-model",
-            label: "Cloud, Fast or Quality",
+            label: "Cloud or Local",
             icon: icons.animate,
             choice: {
-              value: videos && offers?.[videos] ? videos : local,
-              options: offered.map((value) => ({
-                value,
-                label: { cloud: "Cloud", fast: "Fast", quality: "Quality" }[value],
-              })),
-              onChange: (value: string) => setVideos(value as VideosPreference),
+              value: videos && offers[videos] ? videos : local,
+              options: [
+                { value: "cloud", label: "Cloud" },
+                { value: "local", label: "Local" },
+              ],
+              onChange: (value: string) => setVideos(value as SidePreference),
             },
           },
         ]
@@ -460,12 +459,11 @@ export function useMediaActions(
       ]
     : [];
   // Edit asks the assistant for a change: in the viewer's prompt, or elsewhere by opening the
-  // viewer to ask there (GalleryPage's `item`, ViewerPrompt's `ask`).
+  // viewer to ask there (GalleryPage's item path, ViewerPrompt's `ask`).
   const openViewer = (ask: ViewerAsk) => {
     onApplied();
-    const search = new URLSearchParams(location.search);
-    search.set("item", viewerItemId(item));
-    navigate({ search: `?${search}` }, { state: { viewer: true, ask } });
+    const { set, similar } = (location.state as GalleryState | null) || {};
+    navigate(viewerPath(item), { state: { set, similar, viewer: true, ask } });
   };
   const editAsk: EditAsk = edit ?? {
     pending: false,
@@ -496,7 +494,7 @@ export function useMediaActions(
             icon: icons.similar,
             onClick: () => {
               onApplied();
-              navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
+              navigate("/images", { state: { similar: item.id } satisfies GalleryState });
             },
           },
         ]

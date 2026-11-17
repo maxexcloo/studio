@@ -156,7 +156,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       };
     },
     slots: () => state.slots,
-    text: () => "cloud",
+    text: () => ({ side: "cloud", uncensored: false }),
     writer: {
       model: async () => "writer",
       chat: async ({ model, messages }) => {
@@ -2132,10 +2132,13 @@ test("Dream routes images to the selected allowed backend and never substitutes 
     label: "Cloud Image",
   };
   const fx = fixture(t, [...profiles, cloud]);
+  // Favourite models that run only locally give way on Cloud, and its note says so.
+  fx.taste.edit("alice", { models: ["flux"] });
   await fx.dream.save("alice", { enabled: true, imageBackend: "cloud" });
   fx.state.online.image = "parked";
   const job = await fx.dreamOnce();
   assert.equal(job?.input.profileId, cloud.id);
+  assert.match(String(job?.dream?.why), /Your favourite models don't run on Cloud/);
   assert.equal(fx.state.onlineCalls.find((call) => call.backend === "cloud")?.kind, "image");
   await fx.dream.save("alice", { imageBackend: "local" });
   assert.equal(await fx.dreamOnce(), undefined);

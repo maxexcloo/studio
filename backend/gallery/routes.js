@@ -204,6 +204,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const words = search && !looksLike ? searchWords(one(query.q)) : [];
     // `since` (an ISO date) keeps items made from then on; work still generating always shows.
     const since = query.since ? Date.parse(String(query.since)) : 0;
+    // `before` (an ISO date) keeps items made by then.
+    const before = query.before ? Date.parse(String(query.before)) : NaN;
     // `similar` (an item id, Find Similar) ranks by likeness to that image, keeping those at least
     // as alike as `strictness` (close, similar or loose); none until it is read.
     const source = query.similar ? galleryItem(String(query.similar)) : null;
@@ -216,9 +218,15 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       : null;
     // `comparisons` keeps results that are in one of the account's comparisons.
     const inComparison = query.comparisons === "1" ? compared(account?.userId || "") : null;
+    // `chat` keeps one MCP conversation's results and `turn` one turn of it (an MCP result link).
+    const chat = one(query.chat);
+    const turn = chat && one(query.turn);
+    const fromChat = (item) =>
+      !chat || (item.chat?.conversationId === chat && (!turn || item.chat.turnId === turn));
     // Unfinished work shows only as the account chooses (Settings › Preferences › Gallery): none,
-    // work in progress, or queued work too; unsaved, none.
-    const work = accountPreferences(account?.userId || "").galleryWork || "none";
+    // work in progress, or queued work too; unsaved, none. A chat's results show all of it, as
+    // its links are opened to watch them.
+    const work = chat ? "queued" : accountPreferences(account?.userId || "").galleryWork || "none";
     const owned = ownedQuery(account);
     const page = owned
       ? pageGallery({
@@ -232,9 +240,12 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
             ...owned,
             // `set` keeps one MCP result set's results.
             ...(query.set && { setId: String(query.set) }),
+            ...(chat && { conversationIds: [chat] }),
+            ...(turn && { turnId: turn }),
             ...(["liked", "disliked"].includes(query.rating) && { rating: query.rating }),
             ...(work === "none" && { notStatus: "pending" }),
             ...(Number.isFinite(since) && since && { since }),
+            ...(Number.isFinite(before) && { before }),
             ...(words.length && { contains: words }),
           },
           // The account and every parameter but the page's own name the filter's count.
@@ -289,6 +300,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
                 (!type || item.type === type) &&
                 recordBelongsToAccount(item, account) &&
                 (!query.set || item.resultSet?.id === query.set) &&
+                fromChat(item) &&
                 (!inComparison || inComparison(item)) &&
                 (!search || search(item)),
             );

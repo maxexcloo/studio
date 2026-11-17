@@ -54,7 +54,7 @@ for (const kind of ["image", "video"] as const) {
         json: { ok: true, upscaleActive: item.upscaleActive, revision: toggles.length },
       });
     });
-    await page.goto(kind === "image" ? "/images" : "/video");
+    await page.goto(kind === "image" ? "/images" : "/videos");
     await page
       .getByRole("button", { name: `Open ${kind}: ${mediaTitle(item)}`, exact: true })
       .click();

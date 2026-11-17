@@ -17,8 +17,11 @@ export function cleanBrief(value: unknown): ChatBrief {
   for (const [key, entry] of Object.entries(value)) {
     if (!(briefTexts as readonly string[]).includes(key))
       throw new Error(`The chat brief has no ${key}.`);
-    if (typeof entry !== "string" || entry.trim().length > maxBriefText)
-      throw new Error(`Keep the brief's ${key} to ${maxBriefText} characters.`);
+    if (typeof entry !== "string") throw new Error(`Give the brief's ${key} as text.`);
+    if (entry.trim().length > maxBriefText)
+      throw new Error(
+        `The brief's ${key} is ${entry.trim().length} characters; shorten it to at most ${maxBriefText}.`,
+      );
     if (entry.trim()) brief[key as (typeof briefTexts)[number]] = entry.trim();
   }
   return brief;

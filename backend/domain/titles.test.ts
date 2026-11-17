@@ -34,7 +34,7 @@ function fixture(items: TitleItem[]) {
     },
     idle: () => state.idle,
     allowed: (ownerId) => ownerId === "alice",
-    text: () => "cloud",
+    text: () => ({ side: "cloud", uncensored: false }),
     items: () => {
       state.walks += 1;
       return state.items;

@@ -29,6 +29,7 @@ import { MediaViewer } from "../gallery/MediaViewer";
 import { galleryKey } from "../gallery/queries";
 import { useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
+import type { GalleryState } from "../gallery/viewerLink";
 import { type Comparison, comparisonQuery } from "./queries";
 import { useStageComparison } from "./variants";
 
@@ -140,7 +141,8 @@ export function ComparePage() {
           <Tooltip label={set ? "Show in Gallery" : "Back to Images"}>
             <ActionIcon
               component={Link}
-              to={set ? `/images?${new URLSearchParams({ set })}` : "/images"}
+              to="/images"
+              state={set ? ({ set } satisfies GalleryState) : undefined}
               variant="subtle"
               color="gray"
               aria-label={set ? "Show in Gallery" : "Back to Images"}

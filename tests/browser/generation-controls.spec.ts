@@ -232,7 +232,7 @@ test("A saved End-only preset restores its explicit slot without creating a Star
     height: 1024,
     createdAt: stamp,
   });
-  await page.goto("/video?compose=1");
+  await page.goto("/videos?compose=1");
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Arrive at the closing frame");
@@ -593,7 +593,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
     .locator("label")
     .filter({ hasText: "Video" })
     .click();
-  await expect(page).toHaveURL(/\/video/);
+  await expect(page).toHaveURL(/\/videos/);
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveText(
     "Motion Quality",
   );

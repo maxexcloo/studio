@@ -109,6 +109,7 @@ async function fixture(t, environment = gateway) {
     res.json({ jobId: `job-${submitted.length}` });
   });
   app.get("/api/jobs/:id", (_req, res) => res.json({ status: "running", outputs: [] }));
+  app.get("/api/queue", (_req, res) => res.json({ jobs: [] }));
   let base;
   registerMcpRoutes(app, {
     baseUrl: () => base,
@@ -175,6 +176,7 @@ test("the tools call the shared engine with the account credential, and Generate
       prompt: "a cabin",
       profile_id: "Fixture Image",
       preset: "cinematic",
+      context: "Mara hid here after the war.",
     }),
   );
   assert.deepEqual(
@@ -182,6 +184,8 @@ test("the tools call the shared engine with the account credential, and Generate
     ["A cinematic cabin at dusk.", "cinematic", profile.id],
   );
   assert.equal(f.asked[0].authorization, "Bearer assistant-token-long-enough-for-the-fixture-0001");
+  // The chat's backstory goes to the writer with the prompt.
+  assert.equal(f.asked[0].body.context, "Mara hid here after the war.");
   assert.deepEqual(
     data(await call(client, "suggest_negative", { prompt: "a cabin", profile_id: profile.id })),
     { negative: "blurry" },

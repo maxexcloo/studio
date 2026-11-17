@@ -14,6 +14,8 @@ import {
 
 // The status and result tools wait briefly at most: a chat waiting on a tool blocks its turn.
 const wait = z.number().int().min(0).max(20).default(0);
+// A YYYY-MM-DD date, without z.iso.date's long pattern in the schema every chat step resends.
+const date = z.string().regex(/^\d{4}-\d\d-\d\d$/);
 export const job = {
   job_id: z.string().min(1).max(200).describe('A ref such as "result 3", or a job_id.'),
 };
@@ -104,7 +106,7 @@ export function registerResultTools({
     server,
     "search",
     "search gallery",
-    "Search the user's whole gallery by words, file name or look, with refs (♥ liked); filter by liked, disliked, model or lora (part of a name) or aspect; cursor pages. summary: what all matches share. uploads: the user's uploads, as reference_asset_ids.",
+    "Search the user's whole gallery by words, file name or look, with refs (♥ liked); filter by liked, disliked, model or lora (part of a name), aspect or before/after a date; cursor pages. summary: what all matches share. uploads: the user's uploads, as reference_asset_ids.",
     {
       query: z.string().trim().max(200).default(""),
       kind: z.enum(["image", "video"]).optional(),
@@ -121,7 +123,9 @@ export function registerResultTools({
         .min(1)
         .max(24, "limit is at most 24; pass the reply's cursor for the next page.")
         .default(8),
-      cursor: z.string().trim().max(400).optional(),
+      before: date.optional(),
+      after: date.optional(),
+      cursor: z.string().trim().optional(),
     },
     async ({ liked, disliked, summary, ...args }, signal) => {
       if (liked && disliked) throw new Error("Pass liked or disliked, not both.");
@@ -356,21 +360,38 @@ export function registerResultTools({
       const unfinished = ({ targets = [] }) =>
         targets.filter(({ jobId }) => !jobs.get(jobId).done).map(({ jobId }) => jobId);
       const ready = groups.filter((group) => !group.error && !unfinished(group).length);
-      const replies = await Promise.all(
-        ready.map(async (group, index) => {
-          if (groups.length === 1)
-            return media.review(owner, group.targets, { scope: refs, signal });
-          try {
-            return await media.review(owner, group.targets, {
-              scope: refs,
-              signal,
-              brief: !index,
-            });
-          } catch (error) {
-            return { content: [{ type: "text", text: `${group.label}: ${error.message}` }] };
-          }
-        }),
-      );
+      // Several results go as one picture: chats such as LibreChat keep only the first few images
+      // a tool returns. One that can't be reviewed falls back to an answer each.
+      const together =
+        ready.length > 1
+          ? await media
+              .review(
+                owner,
+                ready.flatMap(({ targets }) => targets),
+                { scope: refs, signal },
+              )
+              .catch((error) => {
+                if (signal.aborted) throw error;
+                return null;
+              })
+          : null;
+      const replies = together
+        ? [together]
+        : await Promise.all(
+            ready.map(async (group, index) => {
+              if (groups.length === 1)
+                return media.review(owner, group.targets, { scope: refs, signal });
+              try {
+                return await media.review(owner, group.targets, {
+                  scope: refs,
+                  signal,
+                  brief: !index,
+                });
+              } catch (error) {
+                return { content: [{ type: "text", text: `${group.label}: ${error.message}` }] };
+              }
+            }),
+          );
       const failed = groups
         .filter((group) => group.error)
         .map(({ label, error }) => ({ type: "text", text: `${label}: ${error}` }));

@@ -98,6 +98,22 @@ test("administrator runtime routes preview, apply and report operations, with pl
     status: 409,
     body: { error: "text is not running; only a running workload can be restarted." },
   });
+  assert.deepEqual(await send("/restart", { workload: "media", force: true }), {
+    status: 400,
+    body: { error: "Only Radiance restarts without waiting for its work." },
+  });
+  assert.equal((await send("/workloads/media/cancel-queue", {})).status, 503);
+  controller.useQueue({
+    load: () => ({ jobs: [], queued: 0 }),
+    cancel: async () => ({ cancelled: 1, cancelling: 0 }),
+    releaseStale: () => {},
+    end: async () => {},
+  });
+  assert.deepEqual(await send("/workloads/media/cancel-queue", {}), {
+    status: 200,
+    body: { cancelled: 1, cancelling: 0 },
+  });
+  assert.equal((await send("/workloads/missing/cancel-queue", {})).status, 400);
 });
 
 test("the logs route tails each pod's first container, falling back to its last run, and says plainly when logs aren't permitted", async (context) => {

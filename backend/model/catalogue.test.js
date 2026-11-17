@@ -117,7 +117,9 @@ test("default profiles sit on the preferred side while it can run, otherwise the
   assert.deepEqual(local.defaultNotes, {
     video: "No local video model is running, so this runs in the cloud.",
   });
-  const cloud = withPreferredDefaults(models, { images: "cloud", videos: "quality" });
+  // The account's own default for its side wins over the deployment's where it can run.
+  assert.equal(withPreferredDefaults(models, { imageLocal: "krea" }).defaults.imageModel, "krea");
+  const cloud = withPreferredDefaults(models, { images: "cloud", imageLocal: "krea" });
   assert.deepEqual(cloud.defaults, { imageModel: "grok-image", videoModel: "grok-video" });
   // Without a cloud profile for the account, Cloud gives way to the deployment's local default.
   const noCloud = withPreferredDefaults(

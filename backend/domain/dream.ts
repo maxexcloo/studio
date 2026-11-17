@@ -33,7 +33,7 @@ import {
   type Taste,
   type TasteChoice,
   type TasteRecord,
-  type TextSide,
+  type PromptWriter as TextWriter,
   itemValues,
   pairSignal,
   tasteSignal,
@@ -191,7 +191,7 @@ export interface DreamAccess {
 }
 /** The assistant gateway (assistant.js): its models and a chat that returns the reply and its reasoning apart. */
 interface DreamWriter {
-  model(call: string, explicit: boolean, text: TextSide): Promise<string>;
+  model(call: string, explicit: boolean, writer: TextWriter): Promise<string>;
   chat(request: {
     model: string;
     /** The call type, which sets its `reasoning_effort` (assistant.js `reasoningEfforts`). */
@@ -698,11 +698,18 @@ export function createDream(options: {
   taste: Taste;
   owners(): string[];
   access(ownerId: string): DreamAccess | null;
-  /** The account's ready, granted profiles and its default model per kind. */
+  /**
+   * The account's ready, granted profiles, the deployment's default model per kind and the
+   * account's own default per kind and side (account-preferences.js `kindDefaults`).
+   */
   catalogue(
     ownerId: string,
     account?: GenerationAccount,
-  ): Promise<{ profiles: DreamProfile[]; defaults?: { imageModel?: string; videoModel?: string } }>;
+  ): Promise<{
+    profiles: DreamProfile[];
+    defaults?: { imageModel?: string; videoModel?: string };
+    preferred?: Partial<Record<Kind, { cloud?: string; local?: string }>>;
+  }>;
   /** The account's projects, in order; each new idea follows the next one's brief. */
   projects(ownerId: string): Project[];
   /** Each attached chat's project and latest request (domain/projects.ts). */
@@ -712,8 +719,8 @@ export function createDream(options: {
   /** How many Dream jobs an account may have at once: one per media worker, so every idle GPU dreams. */
   slots(): number;
   writer: DreamWriter | null;
-  /** Where the owner runs text (account-preferences.js `textSide`), Dream's writing included. */
-  text(ownerId: string): TextSide;
+  /** The owner's text writer (account-policy.js `promptWriter`), Dream's writing included. */
+  text(ownerId: string): TextWriter;
   guide(profile: DreamProfile): unknown;
   /** The negative prompt the profile's guide recommends for the input, "" where it takes none. */
   negative(profile: DreamProfile, input: GenerationInput): string;
@@ -987,8 +994,10 @@ export function createDream(options: {
     return own ? drawn(own.map((value) => [value, 1])) : drawnValue(taste, prefix);
   };
   /**
-   * A ready profile of the kind drawn by its taste score (evenly among the person's own favourite
-   * models where they set them) less its recent share (`spread`), else the default for the kind.
+   * A ready profile of the kind on Dream's side (`profiles`), drawn by its taste score (evenly
+   * among the person's own favourite models where any of them run there; `offSide` says when none
+   * do) less its recent share (`spread`), else the kind's default there: the account's own for
+   * that side, the catalogue's, or the first.
    */
   function exploitProfile(
     kind: Kind,
@@ -997,26 +1006,32 @@ export function createDream(options: {
     weigh: (key: string) => number,
   ) {
     const profiles = catalogue.profiles.filter((profile) => kindOf(profile) === kind);
-    const own = taste.preferences.models;
+    const own = taste.preferences.models?.filter((id) =>
+      profiles.some((profile) => profile.id === id),
+    );
     const scores = new Map(
-      own
+      own?.length
         ? own.map((id) => [id, 1])
         : [...taste.profiles.image, ...taste.profiles.video].map((entry) => [
             entry.id,
             entry.score,
           ]),
     );
-    const defaultId = catalogue.defaults?.[kind === "video" ? "videoModel" : "imageModel"];
-    return (
+    const side = profiles.some(isCloudProfile) ? "cloud" : "local";
+    const defaultIds = [
+      catalogue.preferred?.[kind]?.[side],
+      catalogue.defaults?.[kind === "video" ? "videoModel" : "imageModel"],
+    ];
+    const profile =
       drawn(
         profiles.map((profile) => [
           profile,
           (scores.get(profile.id) ?? 0) * weigh(`profile:${profile.id}`),
         ]),
       ) ||
-      profiles.find((profile) => profile.id === defaultId) ||
-      profiles[0]
-    );
+      defaultIds.flatMap((id) => profiles.filter((profile) => profile.id === id))[0] ||
+      profiles[0];
+    return { profile, offSide: Boolean(taste.preferences.models?.length && !own?.length) };
   }
   /**
    * Another ready profile of the kind, the one the account ran fewest jobs on lately (unused ones
@@ -1856,10 +1871,11 @@ export function createDream(options: {
       const taste = options.taste.read(ownerId);
       const weigh = spread(ownerId);
       // More Like This keeps its result's profile where it is still ready.
+      const exploited = exploitProfile(kind, catalogue, taste, weigh);
       let profile =
         catalogue.profiles.find(
           (item) => kindOf(item) === "image" && steer && item.id === steer.profileId,
-        ) || exploitProfile(kind, catalogue, taste, weigh);
+        ) || exploited.profile;
       if (!profile) {
         reason = `No ready ${backend} ${kind} model available to this account.`;
         continue;
@@ -1954,6 +1970,10 @@ export function createDream(options: {
         note = "Inspired by an import";
       } else if (inspiration) note = `${note} · Inspired by an import`;
       else if (axis === "prompt") note = "Exploring new ground";
+      if (exploited.offSide && !steer) {
+        const offSide = `Your favourite models don't run on ${backend === "cloud" ? "Cloud" : "Local"}`;
+        note = note ? `${note} · ${offSide}` : offSide;
+      }
       loras ??= exploitLoras(ownerId, profile, taste, weigh);
       // Spicy goes to a share of ideas, so the rest stay plain.
       const spicy = spicyShare(record, access);
