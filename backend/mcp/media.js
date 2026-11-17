@@ -2053,27 +2053,32 @@ export class McpMedia {
         settings,
       });
     }
-    let left = 0;
+    // Side by side, or a near-square grid of equal cells for more than two.
+    const columns = tiles.length > 2 ? Math.ceil(Math.sqrt(tiles.length)) : tiles.length;
+    const cell = {
+      width: Math.max(...tiles.map((tile) => tile.info.width)),
+      height: Math.max(...tiles.map((tile) => tile.info.height)),
+    };
     const sheet = await sharp({
       create: {
-        width: tiles.reduce((sum, tile) => sum + tile.info.width, 0),
-        height: Math.max(...tiles.map((tile) => tile.info.height)),
+        width: cell.width * columns,
+        height: cell.height * Math.ceil(tiles.length / columns),
         channels: 3,
         background: "#fff",
       },
     })
       .composite(
-        tiles.map((tile) => {
-          const placed = { input: tile.data, left, top: 0 };
-          left += tile.info.width;
-          return placed;
-        }),
+        tiles.map((tile, place) => ({
+          input: tile.data,
+          left: (place % columns) * cell.width,
+          top: Math.floor(place / columns) * cell.height,
+        })),
       )
       .jpeg({ quality: 85 })
       .toBuffer();
     const order =
       records.length > 1
-        ? ` The image shows ${records.map((record) => record.ref).join(", ")} from left to right.`
+        ? ` The image shows ${records.map((record) => record.ref).join(", ")} ${columns < records.length ? "left to right, row by row" : "from left to right"}.`
         : "";
     return {
       content: [

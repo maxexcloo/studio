@@ -11,7 +11,7 @@ import { accountPreferences } from "./account-preferences.js";
  *                                       themes (Animate's), changes (fixed AI edits, with their
  *                                       instruction), models, vision, and the
  *                                       profiles whose guide takes no negative (noNegative)
- *   POST /api/assistant/rewrite         { profileId, prompt, preset, instruction?, references?, loras? }
+ *   POST /api/assistant/rewrite         { profileId, prompt, preset, instruction?, context?, references?, loras? }
  *                                       (instruction for Custom) → streamed
  *                                       (text/event-stream: delta, done, error) or JSON
  *   POST /api/assistant/animate         { profileId, theme, instruction?, source, extend?, assetId?,
@@ -305,6 +305,7 @@ export function registerAssistantRoutes(
       prompt: body?.prompt,
       preset: String(body?.preset || promptStyleStore().defaultId()),
       instruction: body?.instruction,
+      context: body?.context,
       explicit: allowed(account, "uncensoredModels"),
       references,
       stack,
