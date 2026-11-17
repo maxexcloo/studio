@@ -639,10 +639,10 @@ export function prepareLoras(profile, infos = {}, loras = [], notes = []) {
 
 /**
  * A batch's LoRA stack for its prompt at `position`. A LoRA whose strength was left to Studio steps
- * through its centre (the strength `liked` gives it, else its default), then lower and higher within
- * its range, and every fourth prompt leaves the last of two or more such LoRAs out.
+ * through its default strength, then lower and higher within its range, and every fourth prompt
+ * leaves the last of two or more such LoRAs out.
  */
-export function varyLoras(stack, infos = {}, position = 0, liked = {}) {
+export function varyLoras(stack, infos = {}, position = 0) {
   const free = stack.filter((lora) => !lora.fixed);
   const dropped = free.length > 1 && position % 4 === 3 ? free.at(-1).name : null;
   return stack
@@ -654,7 +654,7 @@ export function varyLoras(stack, infos = {}, position = 0, liked = {}) {
         min: Math.max(bounds.min, lora.strength - 0.3),
         max: Math.min(bounds.max, lora.strength + 0.3),
       };
-      const centre = Math.min(range.max, Math.max(range.min, liked[lora.name] ?? lora.strength));
+      const centre = Math.min(range.max, Math.max(range.min, lora.strength));
       const target = [centre, (range.min + centre) / 2, (centre + range.max) / 2][position % 3];
       return { ...lora, strength: Math.round(target * 20) / 20 };
     });

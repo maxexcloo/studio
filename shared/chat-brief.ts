@@ -1,6 +1,6 @@
 /**
- * An account's chat brief: the standing rules every chat writes its prompts to, so a new chat
- * needn't be told them again. Its fields follow a Dream project's brief. Library › Chat Brief and
+ * An account's saved chat brief, available when explicitly requested. Its fields follow a Dream
+ * project's brief. Library › Chat Brief and
  * MCP's project tool (action brief) edit it; favourite models and LoRAs and what to avoid stay the
  * taste profile's own Models, LoRAs and Dislikes.
  */

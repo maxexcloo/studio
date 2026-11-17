@@ -127,14 +127,6 @@ export function assertAvoided({ name, brief }, prompts, list = "that avoid list"
         );
 }
 
-/** Refuses prompts that name any of the account's taste Dislikes, learnt or set. */
-export const assertNotDisliked = ({ avoid }, prompts) =>
-  assertAvoided(
-    { name: "the user's taste", brief: { avoid: avoid.join("\n") } },
-    prompts,
-    "their Dislikes in Dream › Taste",
-  );
-
 /**
  * The chosen models under the project's: where it lists profiles of the targets' kind, only those
  * run, the first ready one that takes the references (in the wanted tier first) standing in.
@@ -164,37 +156,6 @@ export function projectTargets({ name, constraints }, targets, known, { referenc
     targets: [{ profile: pick, note: "" }],
     note: `${name} runs only on ${listed.map(label).join(", ")}, so ${label(pick)} ran instead of ${others.join(", ")}. `,
   };
-}
-
-/**
- * The account's chat brief and its taste profile's Dislikes, Models and LoRAs (the person's where
- * they set them, else what Studio learnt), for generate; taste may be unavailable to the account.
- */
-export async function accountBrief(media, owner, signal) {
-  const [brief, taste] = await Promise.all([
-    media.request("GET", "/api/chat-brief", undefined, owner, { signal }),
-    media.request("GET", "/api/taste", undefined, owner, { signal }).catch(() => null),
-  ]);
-  return {
-    brief: brief?.brief || {},
-    avoid: taste?.avoid || [],
-    models: taste?.models || [],
-    loras: taste?.loras || [],
-  };
-}
-
-/** The account's brief and favourites as generate's reply gives them, models by label; "" when there is none. */
-export function accountBriefLine({ brief, avoid, models, loras }, profiles = []) {
-  const label = (id) => profiles.find((profile) => profile.id === id)?.label || id;
-  const summary = [
-    briefSummary(brief),
-    models.length && `favourite models ${models.map(label).join(", ")}`,
-    loras.length && `favourite LoRAs ${loras.join(", ")}`,
-    avoid.length && `avoid ${avoid.join(", ")}`,
-  ]
-    .filter(Boolean)
-    .join("; ");
-  return summary ? `The user's brief: ${summary}. Keep every prompt to it. ` : "";
 }
 
 /** Registers project: a chat attaches to one so generate keeps to its brief and constraints. */
@@ -275,7 +236,7 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
     server,
     "project",
     "project",
-    `The chat's project and constraints. show lists projects and the user's brief; attach (project), create, update (only changes) or detach. brief saves lasting rules for all chats ("" clears) and taste (avoid, profiles, lora_names).`,
+    `The chat's project and constraints. show lists projects and the user's brief; attach (project), create, update (only changes) or detach. brief edits the saved account brief and taste only when the user explicitly asks to save lasting preferences ("" clears). Saved account preferences never constrain MCP generation.`,
     {
       action: z.enum(["show", "attach", "create", "update", "detach", "brief"]).optional(),
       project: z.string().optional(),

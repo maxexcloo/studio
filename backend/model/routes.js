@@ -20,7 +20,7 @@ export function registerModelRoutes(app, { catalogue }) {
     const forAccount = (models) =>
       withPreferredDefaults(
         modelsForAccount(models, req),
-        accountPreferences(ownerIdForRequest(req)),
+        query.preferences === "0" ? {} : accountPreferences(ownerIdForRequest(req)),
       );
     try {
       // MCP submissions reuse backend metadata; the studio's rescan stays fresh.
