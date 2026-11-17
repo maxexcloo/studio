@@ -5,7 +5,6 @@ import {
   Group,
   Input,
   MultiSelect,
-  Popover,
   Scroller,
   SegmentedControl,
   Stack,
@@ -14,7 +13,7 @@ import {
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { ChevronDown, type LucideIcon, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import { galleryOrigins } from "../../../../shared/gallery-origin";
 import { loraName, profileNameParts } from "../../../../shared/profiles";
@@ -27,6 +26,7 @@ import { chipProps, iconChipProps } from "../generation/chip";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { profileName, shownProfileName } from "../generation/payload";
+import { ChipPopup } from "../generation/Picker";
 
 import classes from "./GalleryFilters.module.css";
 
@@ -267,32 +267,7 @@ export function FilterChips({ chips, onClear }: { chips: FilterChip[]; onClear: 
       <Group gap={6} wrap="nowrap" py={4} role="group" aria-label="Active Filters">
         {chips.map((chip) =>
           chip.choice ? (
-            <Popover key={chip.key} position="bottom-start" shadow="md" trapFocus>
-              <Button.Group>
-                <Popover.Target>
-                  <Button {...chipProps} variant="light" rightSection={<ChevronDown size={14} />}>
-                    {chip.label}
-                  </Button>
-                </Popover.Target>
-                <Button
-                  {...chipProps}
-                  variant="light"
-                  aria-label={`Remove ${chip.label} Filter`}
-                  onClick={chip.remove}
-                >
-                  <X size={14} />
-                </Button>
-              </Button.Group>
-              <Popover.Dropdown>
-                <SegmentedControl
-                  aria-label={chip.choice.label}
-                  size="xs"
-                  value={chip.choice.value}
-                  onChange={chip.choice.onChange}
-                  data={chip.choice.options}
-                />
-              </Popover.Dropdown>
-            </Popover>
+            <ChoiceChip key={chip.key} chip={chip} choice={chip.choice} />
           ) : (
             <Button
               key={chip.key}
@@ -319,6 +294,57 @@ export function FilterChips({ chips, onClear }: { chips: FilterChip[]; onClear: 
         )}
       </Group>
     </Scroller>
+  );
+}
+
+/** A chip whose popup changes its choice in place; Clear removes it, as its own ✕ does. */
+function ChoiceChip({
+  chip,
+  choice,
+}: {
+  chip: FilterChip;
+  choice: NonNullable<FilterChip["choice"]>;
+}) {
+  const [opened, setOpened] = useState(false);
+  return (
+    <Button.Group>
+      <ChipPopup
+        title={choice.label}
+        floating
+        position="bottom-start"
+        width="max-content"
+        opened={opened}
+        onOpenedChange={setOpened}
+        onClear={chip.remove}
+        target={
+          <Button
+            {...chipProps}
+            variant="light"
+            aria-expanded={opened}
+            rightSection={<ChevronDown size={14} />}
+            onClick={() => setOpened(!opened)}
+          >
+            {chip.label}
+          </Button>
+        }
+      >
+        <SegmentedControl
+          aria-label={choice.label}
+          size="xs"
+          value={choice.value}
+          onChange={choice.onChange}
+          data={choice.options}
+        />
+      </ChipPopup>
+      <Button
+        {...chipProps}
+        variant="light"
+        aria-label={`Remove ${chip.label} Filter`}
+        onClick={chip.remove}
+      >
+        <X size={14} />
+      </Button>
+    </Button.Group>
   );
 }
 
