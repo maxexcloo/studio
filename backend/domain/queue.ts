@@ -166,6 +166,7 @@ const reuseBypassLimit = 3;
 const localVideo = (job: OwnedJob) =>
   job.resource.startsWith("worker:") && job.input.kind === "video";
 const videoWaitReason = "Waiting for another video to finish.";
+const videoModelReason = "Waiting for the running video to finish before loading another model.";
 /** How long a worker's run may show no progress before it is given up: a video's steps take longer. */
 const stallMinutes = (job: OwnedJob) => (job.input.kind === "video" ? 30 : 10);
 
@@ -506,6 +507,15 @@ export class GenerationQueue {
         try {
           while (next.length) {
             let job = next.shift()!;
+            // While a local video runs, a worker's other slots take only work for its model.
+            const videos = (running.get(resource) ?? []).filter(localVideo);
+            if (
+              videos.length &&
+              !videos.some((video) => modelOf(video.input) === modelOf(job.input))
+            ) {
+              wait(job, videoModelReason);
+              continue;
+            }
             let reason: string | undefined;
             this.checkingEligibility.add(job.id);
             try {

@@ -1008,6 +1008,32 @@ test("a worker with two slots fills them with one model before loading another",
   }
 });
 
+test("beside a running video, a worker's other slot takes only work for the video's model", async () => {
+  const { store, adapter, submitted, observations } = fixture();
+  const queue = new GenerationQueue(store, { ...adapter, slots: () => 2 });
+  try {
+    const session = store.createSession("alice").id;
+    const enqueue = (input: Record<string, unknown>) =>
+      store.enqueue("alice", session, input, "image", undefined, "worker:radiance").id;
+    const video = enqueue({ model: "wan", kind: "video" });
+    const other = enqueue({ model: "flux" });
+    await queue.tick();
+    assert.deepEqual(submitted, [video]);
+    assert.equal(
+      store.job("alice", other)?.reason,
+      "Waiting for the running video to finish before loading another model.",
+    );
+    const same = enqueue({ model: "wan" });
+    await queue.tick();
+    assert.deepEqual(submitted, [video, same]);
+    observations.set(video, { status: "completed", outputs: [] });
+    await queue.tick();
+    assert.deepEqual(submitted, [video, same, other]);
+  } finally {
+    store.close();
+  }
+});
+
 test("a tick reads unfinished work and only the finished jobs it still weighs", () => {
   const store = new Store(openDatabase(":memory:"));
   try {
