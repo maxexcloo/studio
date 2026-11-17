@@ -39,11 +39,15 @@ export function orderedRadianceReferences(body) {
   const references = body.referenceAssets || [];
   const slots = profile?.mediaInputs || [];
   return slots.length
-    ? slots.flatMap((slot) => references.filter((reference) => reference.slot === slot.id))
+    ? slots.flatMap((slot) =>
+        references
+          .filter((reference) => reference.slot === slot.id)
+          .map((reference) => (slot.role ? { ...reference, role: slot.role } : reference)),
+      )
     : references;
 }
 
-/** The run's references as PNGs, in order, sized as ComfyUI's staging would size them. */
+/** The run's references as PNGs with their slots' roles, in order, sized as ComfyUI's staging would size them. */
 async function referenceImages(body) {
   const account = body.ownerId ? accountAccessForId(body.ownerId) : undefined;
   const sharp = await loadSharp();
@@ -51,7 +55,8 @@ async function referenceImages(body) {
   for (const reference of orderedRadianceReferences(body)) {
     if (!reference?.assetId) continue;
     const prepared = await preparedReference(account, reference.assetId, body);
-    images.push(sharp ? await sharp(prepared.buffer).rotate().png().toBuffer() : prepared.buffer);
+    const bytes = sharp ? await sharp(prepared.buffer).rotate().png().toBuffer() : prepared.buffer;
+    images.push({ bytes, role: reference.role });
   }
   return images;
 }
@@ -215,7 +220,11 @@ export async function runRadianceJob(
         const references = await referenceImages(record.body);
         const request = record.video
           ? videoRequest(record.values, references)
-          : imageRequest(record.values, references, record.family);
+          : imageRequest(
+              record.values,
+              references.map((reference) => reference.bytes),
+              record.family,
+            );
         if (stopping(id)) return cancelledRun(id);
         showProgress(id, "Generating");
         if (marks) marks.sent = Date.now();

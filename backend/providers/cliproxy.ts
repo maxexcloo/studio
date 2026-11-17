@@ -8,7 +8,13 @@ export interface CloudRequest {
   resolution: string;
   count: number;
   reference?: Uint8Array;
+  /** A video's last frame, which Grok Imagine Video 1.5 pins. */
+  lastFrame?: Uint8Array;
+  /** False makes a silent video; Grok Imagine Video 1.5 adds sound by default. */
+  sound?: boolean;
 }
+const dataUrl = (bytes: Uint8Array) =>
+  `data:image/jpeg;base64,${Buffer.from(bytes).toString("base64")}`;
 interface ProviderImage {
   b64_json?: string;
   url?: string;
@@ -143,7 +149,7 @@ export class CliProxyMedia {
       if (input.reference)
         fields.image = {
           type: "image_url",
-          url: `data:image/jpeg;base64,${Buffer.from(input.reference).toString("base64")}`,
+          url: dataUrl(input.reference),
         };
     } else if (input.reference) {
       const form = new FormData();
@@ -172,13 +178,9 @@ export class CliProxyMedia {
         aspect_ratio: videoAspect(input.width, input.height),
         duration: input.duration,
         ...(input.resolution ? { resolution: input.resolution } : {}),
-        ...(input.reference
-          ? {
-              image: {
-                url: `data:image/jpeg;base64,${Buffer.from(input.reference).toString("base64")}`,
-              },
-            }
-          : {}),
+        ...(input.reference ? { image: { url: dataUrl(input.reference) } } : {}),
+        ...(input.lastFrame ? { last_frame: { url: dataUrl(input.lastFrame) } } : {}),
+        ...(input.sound === false ? { generate_audio: false } : {}),
       },
       signal,
     );

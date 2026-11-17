@@ -27,24 +27,25 @@ export interface RadianceFile {
 export const radianceImageNode = "RadianceImageGenerate";
 export const radianceVideoNode = "RadianceVideoGenerate";
 
-// H3 makes videos up to the area of 1344 × 768.
-const videoMaxPixels = 1344 * 768;
 const fps = 24;
-// H3 lengths are 17n + 5 frames: 5.17 to 14.4 seconds (124 to 345 frames).
-const frameRange = { min: 124, max: 345, step: 17 };
-// H3's keyframe tasks name the form part of each picture in order; ref2va numbers its references.
-const keyframes: Record<string, string[]> = {
-  i2va: ["first_frame"],
-  l2va: ["last_frame"],
-  fl2va: ["first_frame", "last_frame"],
-};
-const videoTasks = ["t2va", ...Object.keys(keyframes), "ref2va"];
-const maxImageReferences = 10;
+/**
+ * Each video model's canvas and frame grid at 24 fps: H3 makes up to 1344 × 768 of area in 17n + 5
+ * frames (5.17 to 14.4 s); LTX-2.5 makes up to 1920 × 1088 in 8n + 1 frames (0.71 to 6.7 s).
+ */
+export function radianceVideoLimits(model: string) {
+  return isLtx(model)
+    ? { maxPixels: 1920 * 1088, frames: { min: 17, max: 161, step: 8, offset: 1 } }
+    : { maxPixels: 1344 * 768, frames: { min: 124, max: 345, step: 17, offset: 5 } };
+}
 const maxVideoReferences = 9;
+const maxImageReferences = 10;
 const maxVideoBytes = 2 * 1024 ** 3;
 
 /** FastH3, H3 distilled to eight steps: text to video only, with no LoRA slot. */
 export const isFastH3 = (model: string) => model.toLowerCase().includes("fasth3");
+/** LTX-2.5: text or a first frame to video; the distilled release runs only its eight steps. */
+const isLtx = (model: string) => model.toLowerCase().startsWith("ltx-");
+const isDistilledLtx = (model: string) => isLtx(model) && model.toLowerCase().includes("distilled");
 
 /**
  * Qwen and Noct conditioning/cache limits, shared by their profiles and requests. A one-GPU IQ8R
@@ -110,7 +111,8 @@ export function radianceInfo(models: RadianceModel[], loras: string[] = []) {
         prompt: ["STRING", { multiline: true }],
         width: ["INT", { default: 1344, min: 256, max: 2048, step: 32 }],
         height: ["INT", { default: 768, min: 256, max: 2048, step: 32 }],
-        frames: ["INT", { default: 192, ...frameRange }],
+        // Each model's own grid narrows this (radianceVideoLimits).
+        frames: ["INT", { default: 192, min: 17, max: 345, step: 1 }],
         steps: ["INT", { default: 50, min: 1, max: 65 }],
         latent_upscale: ["INT", { default: 1, min: 1, max: 4 }],
         upscale_refine_steps: ["INT", { default: 0, min: 0, max: 65 }],
@@ -119,7 +121,8 @@ export function radianceInfo(models: RadianceModel[], loras: string[] = []) {
       {
         ...references(maxVideoReferences),
         loras: ["STRING", { default: "[]" }],
-        task: [videoTasks, { default: "t2va" }],
+        negative_prompt: ["STRING", { default: "", multiline: true }],
+        cfg: ["FLOAT", { default: 1, min: 1, max: 10, step: 0.1 }],
       },
       ["VIDEO", "AUDIO"],
     ),
@@ -211,43 +214,60 @@ function seconds(frames: number) {
 }
 
 /**
- * A video size within H3's area on the 32-pixel grid, keeping its shape: a preset sized for another
- * model's area (1:1 as 1024 × 1024) shrinks to fit rather than being refused.
+ * A video size within the model's area on the 32-pixel grid, keeping its shape: a preset sized for
+ * another model's area (1:1 as 1024 × 1024 on H3) shrinks to fit rather than being refused.
  */
-function videoSize(width: number, height: number) {
-  if (width * height <= videoMaxPixels) return [width, height];
-  const scale = Math.sqrt(videoMaxPixels / (width * height));
+function videoSize(width: number, height: number, maxPixels: number) {
+  if (width * height <= maxPixels) return [width, height];
+  const scale = Math.sqrt(maxPixels / (width * height));
   return [width, height].map((side) => Math.floor((side * scale) / 32) * 32);
 }
 
-/** A RadianceVideoGenerate node's request: its fields and media parts, `images` in input order. */
-export function videoRequest(values: Values, images: Uint8Array[] = []) {
+/** A reference picture and the role its slot gives it: start, end or (otherwise) reference. */
+export interface RadianceReference {
+  bytes: Uint8Array;
+  role?: string;
+}
+
+/**
+ * A RadianceVideoGenerate node's request: its fields and media parts. Radiance reads the task off
+ * the parts: H3 takes a first and last frame or up to nine references, LTX-2.5 a first frame.
+ */
+export function videoRequest(values: Values, images: RadianceReference[] = []) {
   const model = String(values.model || "");
-  const task = String(values.task || "t2va");
-  const [width, height] = videoSize(Number(values.width), Number(values.height));
+  const limits = radianceVideoLimits(model);
+  const [width, height] = videoSize(Number(values.width), Number(values.height), limits.maxPixels);
   const frames = Number(values.frames);
   const latentUpscale = Number(values.latent_upscale) || 1;
   const refineSteps = Number(values.upscale_refine_steps) || 0;
-  if (!videoTasks.includes(task)) throw new Error(`task must be one of ${videoTasks.join(", ")}.`);
-  if (task !== "t2va" && isFastH3(model)) throw new Error("FastH3 makes text-to-video only.");
+  const { min, max, step, offset } = limits.frames;
   if (!String(values.prompt || "").trim()) throw new Error("Enter a video prompt.");
   if (width % 32 || height % 32) throw new Error("Video dimensions must be multiples of 32.");
-  if ((frames - 5) % frameRange.step || frames < frameRange.min || frames > frameRange.max)
-    throw new Error("Video frames must follow the 17n + 5 frame grid, from 124 to 345.");
-  if (![1, 2, 4].includes(latentUpscale))
-    throw new Error("Latent upscale must be 1 (off), 2 or 4.");
-  let files: RadianceFile[] = [];
-  if (keyframes[task]) {
-    if (images.length !== keyframes[task].length)
-      throw new Error(`${task} takes ${keyframes[task].length} image(s).`);
-    if (latentUpscale > 1) throw new Error("Keyframe videos take no latent upscale.");
-    files = keyframes[task].map((field, index) => ({ field, bytes: images[index] }));
-  } else if (task === "ref2va") {
-    if (!images.length || images.length > maxVideoReferences)
-      throw new Error(`ref2va takes 1 to ${maxVideoReferences} reference images.`);
-    files = images.map((bytes, index) => ({ field: `ref_image_${index + 1}`, bytes }));
-  } else if (images.length)
-    throw new Error("t2va takes no images; choose a keyframe or reference task.");
+  if ((frames - offset) % step || frames < min || frames > max)
+    throw new Error(
+      `Video frames must follow the ${step}n + ${offset} grid, from ${min} to ${max}.`,
+    );
+  if (![1, 2, 4].includes(latentUpscale) || (isLtx(model) && latentUpscale > 2))
+    throw new Error(`Latent upscale must be 1 (off) or 2${isLtx(model) ? "" : " or 4"}.`);
+  const start = images.filter((image) => image.role === "start");
+  const end = images.filter((image) => image.role === "end");
+  const references = images.filter((image) => !["start", "end"].includes(image.role || ""));
+  if (images.length && isFastH3(model)) throw new Error("FastH3 makes text-to-video only.");
+  if (start.length > 1 || end.length > 1) throw new Error("Choose one start and one end frame.");
+  if (isLtx(model) && (end.length || references.length))
+    throw new Error("LTX-2.5 starts from a first frame only.");
+  if ((start.length || end.length) && references.length)
+    throw new Error("Use start and end frames or references, not both.");
+  if (references.length > maxVideoReferences)
+    throw new Error(`H3 takes up to ${maxVideoReferences} reference images.`);
+  const files: RadianceFile[] = [
+    ...start.map(({ bytes }) => ({
+      field: isLtx(model) ? "input_reference" : "first_frame",
+      bytes,
+    })),
+    ...end.map(({ bytes }) => ({ field: "last_frame", bytes })),
+    ...references.map(({ bytes }, index) => ({ field: `ref_image_${index + 1}`, bytes })),
+  ];
   const body: Values = {
     model,
     prompt: values.prompt,
@@ -257,11 +277,15 @@ export function videoRequest(values: Values, images: Uint8Array[] = []) {
   };
   const loras = radianceLoras(values.loras);
   if (loras.length) body.loras = loras;
-  // FastH3 runs only its trained eight-step schedule; tuning from another profile is left out.
-  const total = isFastH3(model) ? 8 : Number(values.steps);
-  if (!isFastH3(model)) body.num_inference_steps = total;
-  // Radiance reads text to video off a request without media.
-  if (task !== "t2va") body.task = task;
+  // FastH3 and distilled LTX-2.5 run only their trained schedules; tuning from another profile is left out.
+  const fixed = isFastH3(model) ? 8 : isDistilledLtx(model) ? 8 : 0;
+  const total = fixed || Number(values.steps);
+  if (!fixed) body.num_inference_steps = total;
+  // Only LTX-2.5's base model is guided; the others refuse a guidance scale and negative.
+  if (isLtx(model) && !fixed) {
+    body.guidance_scale = Number(values.cfg);
+    body.negative_prompt = String(values.negative_prompt || "");
+  }
   if (latentUpscale > 1) {
     body.latent_upscale = latentUpscale;
     if (refineSteps) {

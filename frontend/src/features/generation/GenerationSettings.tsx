@@ -4,6 +4,7 @@ import {
   NumberInput,
   Select,
   Stack,
+  Switch,
   Text,
   TextInput,
   Tooltip,
@@ -106,6 +107,17 @@ export function GenerationSettings({
               </Tooltip>
             )
           }
+        />
+      ),
+    });
+  if (video && capabilities.sound === true)
+    fields.push({
+      label: "Sound",
+      control: (
+        <Switch
+          label="Sound"
+          checked={input.sound !== false}
+          onChange={(event) => onChange({ sound: event.currentTarget.checked })}
         />
       ),
     });
