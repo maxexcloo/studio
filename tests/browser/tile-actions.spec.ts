@@ -204,7 +204,7 @@ for (const operation of ["Edit", "Animate"] as const) {
     await expect.poll(() => state.referenceRequests.length).toBe(1);
     expect(state.referenceRequests[0]).toEqual({ galleryItemId: "tile-bird" });
     // An Animate draft opens the Videos composer, an Edit draft stays in Images.
-    await expect(page).toHaveURL(operation === "Animate" ? /\/video\?compose=1/ : /\/images/);
+    await expect(page).toHaveURL(operation === "Animate" ? /\/videos$/ : /\/images$/);
     // Either way the composer opens on the staged draft.
     await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
@@ -468,6 +468,5 @@ test("Similar ranks the gallery by an image from its tile menu or the viewer, as
   );
 
   await chip("Close to Paper Moth").click();
-  await expect(page).not.toHaveURL(/similar=/);
   await expect(chip("Close to Paper Moth")).toBeHidden();
 });

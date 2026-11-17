@@ -134,7 +134,7 @@ test("A video's prompt field runs its edited prompt again as a video", async ({ 
     height: 1024,
     createdAt: stamp,
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
@@ -1138,7 +1138,7 @@ test("A video's Animate template continues it from its last frame, and Edit make
     height: 1024,
     createdAt: stamp,
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
@@ -1170,7 +1170,7 @@ test("With local video stopped, Animate in Composer pre-selects Grok", async ({ 
   const { state, viewer } = await seed(page, {}, offline);
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Animate in Composer", exact: true }).click();
-  await expect(page).toHaveURL(/\/video\?compose=1/);
+  await expect(page).toHaveURL(/\/videos$/);
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toContainText(
     grok.label,
   );
@@ -1279,7 +1279,7 @@ test("An opened video plays with sound and reveals its controls on pointer movem
     height: 720,
     createdAt: stamp,
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).played)).toEqual({ muted: false });
   // Its controls stay hidden until a pointer moves over it.
@@ -1309,7 +1309,7 @@ test("An opened video the browser won't play shows its still and its controls", 
     height: 720,
     createdAt: stamp,
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const video = page.getByRole("dialog", { name: "Generation", exact: true }).locator("video");
   await expect(video).toHaveAttribute("poster", image);
@@ -1338,7 +1338,7 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
     height: 720,
     createdAt: stamp,
   });
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).hover();
   await expect
     .poll(() => page.evaluate(() => (window as any).played))
@@ -1706,7 +1706,7 @@ test("Work still generating and videos take the same swipes as a picture", async
       createdAt: stamp,
     },
   );
-  await page.goto("/video");
+  await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Live Study", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const status = viewer.getByRole("status", { name: "Generation Status", exact: true });
@@ -2086,5 +2086,5 @@ test("Phone viewer shows Report beside Delete and Similar under AI", async ({ pa
   await report.getByRole("button", { name: "Cancel", exact: true }).click();
   await viewerAction(page, "AI", "Similar");
   await expect(viewer).toBeHidden();
-  await expect(page).toHaveURL(/similar=hub/);
+  await expect(page).toHaveURL(/\/images$/);
 });
