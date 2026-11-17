@@ -23,6 +23,9 @@ export interface GalleryListing {
   similar?: string;
   strictness?: string;
   setId?: string;
+  /** One MCP chat's results (its conversation id), or one turn of it. */
+  chat?: string;
+  turn?: string;
 }
 export function galleryPage(
   listing: GalleryListing,
@@ -42,6 +45,8 @@ export function galleryPage(
     params.set("strictness", listing.strictness || "");
   }
   if (listing.setId) params.set("set", listing.setId);
+  if (listing.chat) params.set("chat", listing.chat);
+  if (listing.chat && listing.turn) params.set("turn", listing.turn);
   return api<GalleryResultsPage>(`/api/gallery?${params}`, { signal });
 }
 /** A gallery listing a page at a time; `limit` sizes each page after the first. */
@@ -58,6 +63,7 @@ export const galleryQuery = (
       listing.filters,
       listing.similar ? [listing.similar, listing.strictness] : null,
       listing.setId || null,
+      listing.chat ? [listing.chat, listing.turn || null] : null,
     ],
     initialPageParam: "",
     queryFn: ({ pageParam, signal }) => galleryPage(listing, pageParam, limit(pageParam), signal),

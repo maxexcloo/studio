@@ -3379,7 +3379,7 @@ test("MCP advertises native sizing and submits tiled 2K with an explicit referen
   assert.equal(f.submitted.length, 2);
 });
 
-test("Generate returns per-conversation refs with signed watch pages that tools accept in place of job IDs", async (t) => {
+test("Generate returns per-conversation refs with result links that tools accept in place of job IDs", async (t) => {
   const f = await fixture(t);
   const conversation = async (user, id) => {
     const client = new Client(
@@ -3443,30 +3443,20 @@ test("Generate returns per-conversation refs with signed watch pages that tools 
   // Bob's conversation with the same identifier cannot reach Alice's numbers.
   await failure(await conversation("bob", "conversation-a"), "status", { job_id: "#1" });
 
-  // The watch page works without the chat: progress first, then the outputs through their own signed links.
+  // A job's link opens it in Studio's viewer among its chat's results; Studio's sign-in decides
+  // who sees them.
   const page = localLink(f, secondJob.link);
-  const pending = await fetch(page);
-  assert.equal(pending.status, 200);
-  assert.match(pending.headers.get("content-type"), /^text\/html/);
-  assert.match(pending.headers.get("content-security-policy"), /default-src 'none'/);
-  assert.match(await pending.text(), /Still generating/);
-  Object.assign(f.jobs.get(secondJob.job_id), {
-    status: "done",
-    outputs: [{ url: "/comfy/view?filename=watched.png" }],
-  });
-  const html = await (await fetch(page)).text();
-  const [, output] = /<img src="([A-Za-z0-9]{10})"/.exec(html);
-  assert.match(html, /View Original/);
-  const image = await fetch(new URL(output, page));
-  assert.equal(image.status, 200);
-  assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
-  // A watch page has no preview, and an unknown id opens nothing.
+  const opened = await fetch(page, { redirect: "manual" });
+  assert.equal(opened.status, 302);
+  assert.equal(
+    opened.headers.get("location"),
+    "https://studio.example.test/images/2?chat=conversation-a",
+  );
+  // A job's link has no preview, and an unknown id opens nothing.
   assert.equal((await fetch(`${page}.jpg`)).status, 404);
   const unknown = await fetch(page.replace(/[A-Za-z0-9]{10}$/, "AAAAAAAAAA"));
   assert.equal(unknown.status, 404);
   assert.match(await unknown.text(), /<h1>Result Unavailable<\/h1>/);
-  f.jobs.get(secondJob.job_id).gallery = [];
-  assert.equal((await fetch(page)).status, 404, "hiding the output ends the watch page");
 });
 
 test("a conversation keeps its LoRAs off and count where a later generate leaves them out", async (t) => {
@@ -3555,29 +3545,32 @@ test("a client without a conversation header gets its MCP session's own results;
   assert.match(await handover(first), new RegExp(one));
   assert.doesNotMatch(await handover(first), new RegExp(two));
   assert.doesNotMatch(await handover(second), new RegExp(one));
-  // Each chat's All Results page lists only that chat's results.
-  const allPage = async (reply) => {
+  // Each chat's All Results link opens only that chat's results; a chat without a conversation
+  // header opens the account's gallery.
+  const allLink = async (reply) => {
     const [, link] = /\[All Results\]\((https?:\/\/[^)]+)\)/.exec(texts(reply));
-    return [
-      ...(await (await fetch(localLink(f, link))).text()).matchAll(/<h2>(#\d+) · [^<]+<\/h2>/g),
-    ].map((match) => match[1]);
+    return (await fetch(localLink(f, link), { redirect: "manual" })).headers.get("location");
   };
-  assert.deepEqual(await allPage(other), ["#3"]);
-  assert.deepEqual(
-    await allPage(
-      await call(first, "generate", { profile_id: imageProfile.id, prompts: ["A hill"], count: 1 }),
-    ),
-    ["#1", "#2", "#4"],
-  );
+  assert.equal(await allLink(other), "https://studio.example.test/images");
   // LibreChat's conversation header scopes by itself, whatever session carries it.
   const [left, right] = [await connect("conversation-x"), await connect("conversation-x")];
   assert.deepEqual(
     (await generate(left)).jobs.map((job) => job.ref),
-    ["#5"],
+    ["#4"],
   );
   assert.deepEqual(
     (await generate(right)).jobs.map((job) => job.ref),
-    ["#6"],
+    ["#5"],
+  );
+  assert.equal(
+    await allLink(
+      await call(right, "generate", {
+        profile_id: imageProfile.id,
+        prompts: ["A field"],
+        count: 1,
+      }),
+    ),
+    "https://studio.example.test/images?chat=conversation-x&show=chat",
   );
 });
 test("the Result wait ends promptly when the client cancels or disconnects, without cancelling the generation", async (t) => {
@@ -3942,10 +3935,10 @@ test("prompts run as sent with LoRAs, and a guide's recommended negative fills i
   assert.equal(f.submitted.at(-1).negative, undefined);
 });
 
-test("account watch pages read as the signed owner through the loopback credential, not a stored bearer", async (t) => {
-  const token = "account-mcp-token-for-watch-page-fixture";
+test("an account token reads LoRA metadata with the account's own credential", async (t) => {
+  const token = "account-mcp-token-for-lora-fixture";
   const account = {
-    userId: "stable-account-watch",
+    userId: "stable-account-loras",
     role: "user",
     authenticated: true,
     generationProfiles: [imageProfile.id],
@@ -3956,20 +3949,11 @@ test("account watch pages read as the signed owner through the loopback credenti
     accountMode: true,
     authenticateAccountToken: (value) => (value === token ? account : null),
   });
-  const client = await f.client("", token);
-  const [queued] = (await generate(client)).jobs;
+  await generate(await f.client("", token));
   assert.equal(
     f.requests.find((request) => request.path === "/loras/info")?.authorization,
     `Bearer ${token}`,
-    "LoRA metadata is read with the account's own credential",
   );
-  const before = f.requests.length;
-  const response = await fetch(localLink(f, queued.link));
-  assert.equal(response.status, 200);
-  const lookup = f.requests
-    .slice(before)
-    .find((request) => request.path === `/jobs/${queued.job_id}`);
-  assert.deepEqual([lookup.authorization, lookup.account], [undefined, account.userId]);
 });
 
 const tiered = (id, label, extra = {}) => ({
@@ -5075,7 +5059,7 @@ test("video stays local while the worker is up, and a plain request never reache
 });
 
 /** A client in one LibreChat conversation, named by the header the gateway forwards. */
-async function chat(t, f, user, conversation) {
+async function chat(t, f, user, conversation, turn) {
   const client = new Client(
     { name: "studio-chat-fixture", version: "1.0.0" },
     { capabilities: {} },
@@ -5088,6 +5072,7 @@ async function chat(t, f, user, conversation) {
           Authorization: `Bearer ${mediaKey}`,
           "x-ai-user-id": user,
           ...(conversation ? { "x-studio-conversation-id": conversation } : {}),
+          ...(turn ? { "x-studio-turn-id": turn } : {}),
         },
       },
     }),
@@ -5771,9 +5756,9 @@ test("a vague generate runs two images on its family's fastest profile at the de
   assert.equal((await run({ count: 1 })).count, 1);
 });
 
-test('replies label links Result N with one All Results page, and Result "all" shows the conversation', async (t) => {
+test('replies label links Result N with one All Results link, and Result "all" shows the conversation', async (t) => {
   const f = await fixture(t);
-  const client = await chat(t, f, "alice", "plush-chat");
+  const client = await chat(t, f, "alice", "plush-chat", "turn-1");
   const queued = await call(client, "generate", {
     kind: "image",
     prompts: ["A bear", "A fox", "An owl"],
@@ -5788,53 +5773,31 @@ test('replies label links Result N with one All Results page, and Result "all" s
     ["#1", "#2", "#3"],
   );
   assert.equal(text.match(/All Results/g).length, 1);
-  // The All Results page lists every result and fills in as they finish.
+  // Its runs record the chat and turn, which the links open in Studio's gallery: the whole chat
+  // from All Results, a result in its turn's.
+  assert.deepEqual(f.submitted.at(-1).chat, { conversationId: "plush-chat", turnId: "turn-1" });
   const page = localLink(f, allLink);
-  let html = await (await fetch(page)).text();
-  assert.match(html, /<meta http-equiv="refresh"/);
-  assert.equal(html.match(/Still generating/g).length, 3);
-  const [first, second] = queued.structuredContent.jobs;
-  Object.assign(f.jobs.get(first.job_id), {
-    status: "done",
-    outputs: [{ url: "/comfy/view?filename=bear.png" }],
-  });
-  html = await (await fetch(page)).text();
-  // One call's results sit under its set title, each under its own or its prompt's.
-  assert.match(
-    html,
-    /<h2>Woodland<\/h2><h3>#1 · Bear Hug<\/h3><figure id="result-1"><a href="#view-1"[^>]*><img src="[A-Za-z0-9]{10}"/,
+  const opened = (link) =>
+    fetch(link, { redirect: "manual" }).then((reply) => reply.headers.get("location"));
+  assert.equal(
+    await opened(page),
+    "https://studio.example.test/images?chat=plush-chat&turn=turn-1&show=chat",
   );
-  assert.match(html, /<h3>#2 · Fox<\/h3>/);
-  assert.equal(html.match(/<h2>/g).length, 1);
-  assert.equal(html.match(/Still generating/g).length, 2);
-  // One set's page is titled by it, and a result's page by its set and its own title; prompts fold.
-  assert.match(html, /<title>Woodland<\/title>.*<h1>Woodland<\/h1>/);
-  assert.match(html, /<details class="prompt"><summary>Prompt<\/summary><p>A bear<\/p><\/details>/);
-  assert.match(
-    await (await fetch(localLink(f, first.link))).text(),
-    /<title>Woodland › Bear Hug<\/title>.*<h1>Woodland › Bear Hug<\/h1>/,
+  const [first, second] = queued.structuredContent.jobs;
+  assert.equal(
+    await opened(localLink(f, first.link)),
+    "https://studio.example.test/images/1?chat=plush-chat&turn=turn-1",
   );
   assert.equal((await fetch(`${page}.jpg`)).status, 404);
   // "show me all": one call returns every finished result under its header, plus links for the rest.
-  Object.assign(f.jobs.get(second.job_id), {
-    status: "done",
-    outputs: [{ url: "/comfy/view?filename=fox.png" }],
-  });
-  // Each finished result opens large in a viewer that flips through them in place, without script.
-  html = await (await fetch(page)).text();
-  assert.match(
-    html,
-    /<figure id="result-1"><a href="#view-1" aria-label="Open Woodland › Bear Hug Large">/,
-  );
-  assert.match(
-    html,
-    /<section class="slide" id="view-1" tabindex="-1" aria-label="Woodland › Bear Hug \(1 of 2\)">.*?<a href="#result-1">Close<\/a>.*?<a class="step next" href="#view-2" aria-label="Next Result">/,
-  );
-  assert.match(
-    html,
-    /id="view-2"[^>]*aria-label="Woodland › Fox \(2 of 2\)">.*?href="#view-1" aria-label="Previous Result"/,
-  );
-  assert.doesNotMatch(html, /<script/);
+  for (const [job, file] of [
+    [first, "bear.png"],
+    [second, "fox.png"],
+  ])
+    Object.assign(f.jobs.get(job.job_id), {
+      status: "done",
+      outputs: [{ url: `/comfy/view?filename=${file}` }],
+    });
   const shown = await call(client, "result", { job_id: "all" });
   const body = texts(shown);
   assert.match(
@@ -6035,10 +5998,6 @@ test("a cloud quota refusal reads as cloud video unavailable and pauses cloud vi
   assert.match(
     texts(await call(client, "result", { job_id: "#1" })),
     /^Cloud video unavailable \(quota\)\. #1 did not run/,
-  );
-  assert.match(
-    await (await fetch(localLink(f, first.jobs[0].link))).text(),
-    /Cloud video unavailable \(quota\)\. This generation did not run\./,
   );
   // Images are unaffected, and cloud video queues again once the pause has passed; rereading the old failure does not extend it.
   data(await call(client, "generate", { kind: "image", prompts: ["An egg"] }));

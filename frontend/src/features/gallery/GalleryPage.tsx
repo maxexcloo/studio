@@ -82,7 +82,7 @@ function cleanLocation(location: Location) {
   const base = location.pathname === "/video" ? "/videos" : location.pathname;
   const item = params.get("item");
   const state: PageState = { ...location.state };
-  for (const name of ["q", "set", "shared", "similar"] as const) {
+  for (const name of ["chat", "q", "set", "shared", "show", "similar", "turn"] as const) {
     const value = params.get(name);
     if (value) state[name] = value;
   }
@@ -132,6 +132,11 @@ function Gallery() {
   const itemId = useParams().id || "";
   // A set link shows that MCP result set alone until its chip is removed.
   const setId = state?.set || "";
+  // An MCP result link shows that chat's turn, or the whole chat (`show` "chat"), until its chip
+  // is removed.
+  const chat = state?.chat || "";
+  const chatTurn = state?.turn || "";
+  const turn = state?.show === "chat" ? "" : chatTurn;
   // Similar shows the gallery ranked by likeness to that image, within the filters, until its
   // chip is removed.
   const similar = state?.similar || "";
@@ -181,8 +186,8 @@ function Gallery() {
     }),
   }).data;
   const listing = useMemo(
-    () => ({ search, kind, filters, similar, strictness, setId }) as const,
-    [search, kind, filters, similar, strictness, setId],
+    () => ({ search, kind, filters, similar, strictness, setId, chat, turn }) as const,
+    [search, kind, filters, similar, strictness, setId, chat, turn],
   );
   // The listing key (as JSON) whose every match a quick select is loading: its later pages,
   // refetches included, then come 500 at a time.
@@ -405,7 +410,7 @@ function Gallery() {
   }, [listingKey, gallery]);
   const selection = useGallerySelection(
     items,
-    JSON.stringify([kind, search, filters, similar, strictness, setId]),
+    JSON.stringify([kind, search, filters, similar, strictness, setId, chat, turn]),
     {
       complete: !gallery.hasNextPage,
       load: loadEveryMatch,
@@ -435,8 +440,10 @@ function Gallery() {
   // The composer's output toggle switches the gallery; the route restores that output's draft.
   const switchKind = useCallback(
     (next: MediaKind) => {
-      const { set, similar } = latest.current.state || {};
-      void routerNavigate(galleryPath(next), { state: { set, similar } satisfies PageState });
+      const { chat, set, show, similar, turn } = latest.current.state || {};
+      void routerNavigate(galleryPath(next), {
+        state: { chat, set, show, similar, turn } satisfies PageState,
+      });
     },
     [routerNavigate],
   );
@@ -573,6 +580,39 @@ function Gallery() {
                     key: "set",
                     label: `Set: ${loaded[0]?.resultSet?.title || "Results"}`,
                     remove: () => dropState("set"),
+                  },
+                ]
+              : []),
+            ...(chat
+              ? [
+                  {
+                    key: "chat",
+                    label: turn ? "This Turn" : "This Chat",
+                    remove: () => {
+                      dropState("show");
+                      dropState("turn");
+                      dropState("chat");
+                    },
+                    ...(chatTurn
+                      ? {
+                          choice: {
+                            label: "Chat Results",
+                            value: turn ? "turn" : "chat",
+                            options: [
+                              { value: "turn", label: "This Turn" },
+                              { value: "chat", label: "This Chat" },
+                            ],
+                            onChange: (value: string) =>
+                              void routerNavigate(location.pathname, {
+                                replace: true,
+                                state: {
+                                  ...location.state,
+                                  show: value === "chat" ? "chat" : undefined,
+                                } satisfies PageState,
+                              }),
+                          },
+                        }
+                      : {}),
                   },
                 ]
               : []),
