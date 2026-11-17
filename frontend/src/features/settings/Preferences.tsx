@@ -230,7 +230,6 @@ export function Preferences() {
       </SettingGroup>
       <ModelChoices />
       <SettingGroup title="Prompts">
-        <PromptAssistantModel />
         <SettingRow
           label="Keep Recent Prompts"
           description="Offer your recent prompts in the composer's history. Pinned prompts stay either way."
@@ -244,6 +243,7 @@ export function Preferences() {
             onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
           />
         </SettingRow>
+        <PromptAssistantModel />
       </SettingGroup>
       <WhereWorkRuns />
       <SettingGroup title="Danger Zone" danger>
