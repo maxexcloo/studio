@@ -90,7 +90,7 @@ import { createTitler } from "./domain/titles.ts";
 import { routeLabel, track, tracked, watchEventLoop } from "./event-loop.js";
 import { registerGalleryImportRoute } from "./gallery/import.js";
 import { registerLinkImportRoute } from "./gallery/links.js";
-import { makePendingItems } from "./gallery/records.js";
+import { listedRecord, makePendingItems } from "./gallery/records.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
 import {
   registerGalleryDeleteRoute,
@@ -774,11 +774,10 @@ registerQueueRoutes(app, {
   store,
   queue: generationQueue,
   admit: admitGeneration,
-  // Next steps are asked for in the viewer (`/api/suggestions`), not carried in every queue poll.
   media: (ownerId, jobId) =>
     galleryJobItems(jobId)
       .filter((item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item))
-      .map(({ nextSteps: _steps, ...item }) => item),
+      .map(listedRecord),
   ownsItem: (ownerId, id) => {
     const item = galleryItem(id);
     return Boolean(item && (item.ownerId || "") === ownerId && !isGalleryHidden(item));
@@ -1041,7 +1040,7 @@ const dream = createDream({
 registerDreamRoutes(app, {
   dream,
   projects,
-  numbered: (items) => resultNumbers.numbered(items),
+  listed: (items) => resultNumbers.numbered(items).map(listedRecord),
 });
 // Idle for background work: no live job but Dream's. Dream yields to all of it, so review,
 // captions and finishing don't wait for Dream to reach its caps.
