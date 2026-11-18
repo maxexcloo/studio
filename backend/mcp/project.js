@@ -180,7 +180,7 @@ export async function converging(media, owner, signal) {
 /** The rules as generate's reply gives them, or "" when there are none. */
 export const rulesLine = (rules) =>
   rules.length
-    ? `The user's rules, limits every prompt keeps unless they lift one in this chat (never a look to aim for; vary what they leave open): ${rules.join("; ")}. `
+    ? `The user's rules, limits every prompt keeps unless they lift one in this chat (never a look to aim for; vary what they leave open): ${rules.join("; ")}. Studio runs the submitted prompts as written. If a preview misses a rule, tell the user what needs to change before offering to queue it. `
     : "";
 
 /** Registers project: a chat attaches to one so generate keeps to its brief and constraints. */

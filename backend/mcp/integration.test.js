@@ -7941,8 +7941,15 @@ test("MCP generation follows supplied prompts independently of saved taste", asy
   // Rules are the exception: limits a chat hears with its first generate and again when they
   // change, while the prompts still run as written.
   taste.rules = ["always photographic, never CGI"];
-  const ruled = await call(client, "generate", { prompts: ["A linen coat"] });
+  const submitted = f.submitted.length;
+  const ruled = await call(client, "generate", { prompts: ["A linen coat"], preview: true });
   assert.match(texts(ruled), /The user's rules[^:]*: always photographic, never CGI\./);
+  assert.match(
+    texts(ruled),
+    /Studio runs the submitted prompts as written\. If a preview misses a rule/,
+  );
+  assert.equal(f.submitted.length, submitted);
+  await call(client, "generate", { prompts: ["A linen coat"] });
   assert.equal(f.submitted.at(-1).prompt, "A linen coat");
   assert.doesNotMatch(
     texts(await call(client, "generate", { prompts: ["A silk coat"] })),
