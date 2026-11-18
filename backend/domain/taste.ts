@@ -4,6 +4,7 @@ import {
   type TastePreferences,
   type TasteWords,
   maxTastePhrase,
+  maxTasteRule,
   maxTasteSummary,
   shapeOf,
   tasteLimits,
@@ -596,6 +597,9 @@ function tasteChoice(jobId: unknown, values: ChoiceValues = {}): TasteChoice {
 
 /** The longest model profile id or LoRA name a taste field holds, in characters. */
 const maxName = 400;
+/** The longest entry a taste list field holds, in characters. */
+const longestIn = (key: string) =>
+  key === "models" || key === "loras" ? maxName : key === "rules" ? maxTasteRule : maxTastePhrase;
 /** Up to `limit` distinct, trimmed phrases of at most `longest` characters from a list. */
 const phrases = (value: unknown, limit: number, longest = maxTastePhrase) =>
   [
@@ -656,6 +660,7 @@ export function createTaste({
       avoid: taste.avoid,
       styles: taste.styles,
       note: taste.note,
+      rules: [],
       models: [...out.profiles.image, ...out.profiles.video]
         .filter((entry) => entry.score > 0)
         .sort(byScore)
@@ -846,6 +851,7 @@ export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
       avoid: record.avoid,
       styles: record.styles,
       note: record.note,
+      rules: record.rules,
       models: record.models,
       loras: record.loras,
       shapes: record.shapes,
@@ -861,7 +867,7 @@ export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
     if (!Object.hasOwn(tasteLimits, key)) return false;
     if (value === null) return true;
     if (key === "note") return typeof value === "string" && value.length <= tasteLimits.note;
-    const longest = key === "models" || key === "loras" ? maxName : maxTastePhrase;
+    const longest = longestIn(key);
     return (
       Array.isArray(value) &&
       value.length <= tasteLimits[key as Exclude<keyof TasteFields, "note">] &&
@@ -894,7 +900,7 @@ export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
               : phrases(
                   key === "tags" ? value.map((tag) => tag.toLowerCase()) : value,
                   value.length,
-                  key === "models" || key === "loras" ? maxName : maxTastePhrase,
+                  longestIn(key),
                 ),
         ],
       ),

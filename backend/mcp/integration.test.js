@@ -7955,4 +7955,19 @@ test("MCP generation follows supplied prompts independently of saved account bri
     data(await call(client, "project", { action: "brief", subjects: "" })).user_brief.subjects,
     undefined,
   );
+  // Rules are the exception: limits a chat hears with its first generate and again when they
+  // change, while the prompts still run as written.
+  taste.rules = ["always photographic, never CGI"];
+  const ruled = await call(client, "generate", { prompts: ["A linen coat"] });
+  assert.match(texts(ruled), /The user's rules[^:]*: always photographic, never CGI\./);
+  assert.equal(f.submitted.at(-1).prompt, "A linen coat");
+  assert.doesNotMatch(
+    texts(await call(client, "generate", { prompts: ["A silk coat"] })),
+    /The user's rules/,
+  );
+  taste.rules = ["no visible text"];
+  assert.match(
+    texts(await call(client, "generate", { prompts: ["A wax coat"] })),
+    /The user's rules[^:]*: no visible text\./,
+  );
 });

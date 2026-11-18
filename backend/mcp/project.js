@@ -158,6 +158,23 @@ export function projectTargets({ name, constraints }, targets, known, { referenc
   };
 }
 
+/**
+ * The account's rules (Dream › Taste): limits every prompt keeps. Learnt taste stays out of MCP;
+ * an account without taste has none.
+ */
+export async function accountRules(media, owner, signal) {
+  const taste = await media
+    .request("GET", "/api/taste", undefined, owner, { signal })
+    .catch(() => null);
+  return taste?.rules || [];
+}
+
+/** The rules as generate's reply gives them, or "" when there are none. */
+export const rulesLine = (rules) =>
+  rules.length
+    ? `The user's rules, limits every prompt keeps unless they lift one in this chat (never a look to aim for; vary what they leave open): ${rules.join("; ")}. `
+    : "";
+
 /** Registers project: a chat attaches to one so generate keeps to its brief and constraints. */
 export function registerProjectTool({ tool, server, media, owner, chat, namedInTier }) {
   const api = (method, route, body, signal) =>
