@@ -43,6 +43,7 @@ export type OwnedJob = Omit<QueueJob, "dream"> &
     resource: string;
     cancelRequested?: boolean;
     cleared?: boolean;
+    replacementJobId?: string;
     /** Queued again automatically after its first run failed (queue.ts `again`); it isn't again. */
     retried?: true;
   };
@@ -54,6 +55,7 @@ export interface QueuedCopy {
   resource?: string;
   requestedId?: string;
   origin?: QueueOrigin;
+  replaces?: OwnedJob;
 }
 interface UserPreset {
   id: string;
@@ -189,9 +191,10 @@ export class Store {
     resource?: string,
     requestedId?: string,
     origin?: QueuedCopy["origin"],
+    replaces?: QueuedCopy["replaces"],
   ): OwnedJob {
     return this.enqueueAll(ownerId, () => sessionId, [
-      { input, operation, parentJobId, resource, requestedId, origin },
+      { input, operation, parentJobId, resource, requestedId, origin, replaces },
     ])[0];
   }
 
@@ -205,7 +208,15 @@ export class Store {
       const sessionId = session();
       if (!this.session(ownerId, sessionId)) throw new Error("Session not found.");
       const jobs = copies.map(
-        ({ input, operation, parentJobId, resource = "local-media", requestedId, origin = {} }) => {
+        ({
+          input,
+          operation,
+          parentJobId,
+          resource = "local-media",
+          requestedId,
+          origin = {},
+          replaces,
+        }) => {
           if (parentJobId && !this.job(ownerId, parentJobId))
             throw new Error("Parent generation not found.");
           const stamp = now();
@@ -244,6 +255,7 @@ export class Store {
           this.db
             .prepare("INSERT INTO studio_queue VALUES (?, ?, ?, ?, ?, ?)")
             .run(id, ownerId, sessionId, stamp, job.status, JSON.stringify(job));
+          if (replaces) this.save({ ...replaces, replacementJobId: id });
           return job;
         },
       );
@@ -743,6 +755,7 @@ export function publicJob({
   resource: _resource,
   cancelRequested: _cancelRequested,
   cleared: _cleared,
+  replacementJobId: _replacementJobId,
   priority,
   dream: _dream,
   faceRedo: _faceRedo,

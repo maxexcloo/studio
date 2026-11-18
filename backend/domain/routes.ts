@@ -3,8 +3,10 @@ import {
   type QueueCancelAllResponse,
   type QueueMedia,
   type QueueResponse,
+  type QueueRetryResponse,
   type UnfinishedJob,
 } from "../../shared/queue.ts";
+import { logWarning } from "../crash-log.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import { type RouteAccount, directRoute } from "./direct-route.ts";
 import { GenerationQueue } from "./queue.ts";
@@ -37,6 +39,7 @@ export function registerQueueRoutes(
     admit,
     media,
     ownsItem,
+    removeRetryTiles = () => {},
   }: {
     store: Store;
     queue: GenerationQueue;
@@ -54,6 +57,7 @@ export function registerQueueRoutes(
     media: (ownerId: string, jobId: string) => QueueMedia[];
     /** Whether the owner has this gallery item, which a run may then be made from. */
     ownsItem: (ownerId: string, id: string) => boolean;
+    removeRetryTiles?: (ownerId: string, jobIds: ReadonlySet<string>) => void;
   },
 ) {
   const shown = (ownerId: string, jobs: OwnedJob[]) =>
@@ -262,6 +266,29 @@ export function registerQueueRoutes(
     if (!job) return { status: 409, payload: { error: "Only failed generations can be retried." } };
     void queue.tick();
     return { status: 202, payload: { job: publicJob(job) } };
+  });
+  directRoute(app, "POST", "/api/queue/retry", (account, { body }) => {
+    const ids = body?.ids;
+    if (!Array.isArray(ids) || !ids.length || !ids.every((id) => typeof id === "string"))
+      return refused("Specify the failed generations to retry.");
+    const ownerId = ownerOf(account);
+    const accepted = new Set<string>();
+    const outcomes = [...new Set<string>(ids)].map((id) => {
+      try {
+        const job = queue.retry(ownerId, id, true);
+        if (!job) return { id, error: "Only your failed generations can be retried." };
+        accepted.add(id);
+        return { id, replacement: job.id };
+      } catch (error) {
+        logWarning(`Could not retry generation ${id}: ${(error as Error).message}`);
+        return { id, error: "Could not queue the retry." };
+      }
+    });
+    if (accepted.size) {
+      void queue.tick();
+      removeRetryTiles(ownerId, accepted);
+    }
+    return { status: 202, payload: { outcomes } satisfies QueueRetryResponse };
   });
 }
 

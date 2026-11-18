@@ -10,6 +10,7 @@ import {
   profiles,
   selectionAction,
   serveProfiles,
+  serveRetries,
   stamp,
   touch,
   viewerAction,
@@ -322,7 +323,7 @@ test("A failed tile retries its owned durable job and refreshes the gallery", as
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route("**/api/queue/owned-job/retry", async (route) => {
+  await serveRetries(page, state, async ([id]) => {
     attempts++;
     await held;
     const job = { ...state.jobs[0], id: "retry-job", status: "queued" };
@@ -334,7 +335,7 @@ test("A failed tile retries its owned durable job and refreshes the gallery", as
       prompt: "Retried copper bird",
       status: "pending",
     });
-    await route.fulfill({ json: { job } });
+    return [{ id, replacement: job.id }];
   });
   try {
     await page.reload();

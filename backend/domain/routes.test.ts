@@ -5,7 +5,11 @@ import test from "node:test";
 
 import express from "express";
 
-import type { QueueCancelAllResponse, UnfinishedJob } from "../../shared/queue.ts";
+import type {
+  QueueCancelAllResponse,
+  QueueRetryResponse,
+  UnfinishedJob,
+} from "../../shared/queue.ts";
 import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import { GenerationQueue, type JobObservation } from "./queue.ts";
@@ -144,6 +148,101 @@ test("Clearing takes only the owner's failed jobs out of the queue and keeps the
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    store.close();
+  }
+});
+
+test("Retry admits distinct owned failures in order and leaves refused jobs available", async (t) => {
+  const store = new Store(openDatabase(":memory:"));
+  const alice = store.createSession("alice");
+  const bob = store.createSession("bob");
+  const failed = (id: string, owner = "alice", session = alice.id) =>
+    store.save({
+      ...store.enqueue(owner, session, { prompt: id }, "image", undefined, undefined, id),
+      status: "failed",
+    });
+  const first = failed("first");
+  const second = failed("second");
+  const blocked = failed("blocked");
+  const foreign = failed("foreign", "bob", bob.id);
+  const waiting = store.enqueue("alice", alice.id, {}, "image");
+  store.db.exec(`
+    CREATE TRIGGER refuse_retry BEFORE UPDATE ON studio_queue WHEN OLD.id = 'blocked'
+    BEGIN SELECT RAISE(ABORT, 'Cannot update blocked job'); END;
+  `);
+  const queue = new GenerationQueue(store, {} as never);
+  const tick = t.mock.method(queue, "tick", async () => {});
+  const removeRetryTiles = t.mock.fn();
+  const app = express();
+  app.use(express.json());
+  app.use((req, res, next) => {
+    const account = { userId: "alice", role: "user" };
+    Object.assign(req, { studioAccount: account });
+    enforceMultiUserRequest(req, res, next, { accountForRequest: () => account });
+  });
+  registerQueueRoutes(app, { store, queue, ...unused, removeRetryTiles });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/queue`;
+  const request = (path: string, body = {}) =>
+    fetch(base + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  const retry = async (ids: string[]) => {
+    const response = await request("/retry", { ids });
+    assert.equal(response.status, 202);
+    return ((await response.json()) as QueueRetryResponse).outcomes;
+  };
+  try {
+    const outcomes = await retry([
+      second.id,
+      blocked.id,
+      second.id,
+      foreign.id,
+      first.id,
+      waiting.id,
+    ]);
+    const [, nextSecond, nextFirst] = store.openJobs("alice");
+    assert.deepEqual(
+      store.openJobs("alice").map((job) => job.id),
+      [waiting.id, nextSecond.id, nextFirst.id],
+    );
+    assert.deepEqual(outcomes, [
+      { id: second.id, replacement: nextSecond.id },
+      { id: blocked.id, error: "Could not queue the retry." },
+      { id: foreign.id, error: "Only your failed generations can be retried." },
+      { id: first.id, replacement: nextFirst.id },
+      { id: waiting.id, error: "Only your failed generations can be retried." },
+    ]);
+    assert.equal(nextSecond.input.prompt, second.input.prompt);
+    assert.equal(nextFirst.galleryAt, first.createdAt);
+    assert.equal(tick.mock.callCount(), 1);
+    assert.deepEqual(removeRetryTiles.mock.calls[0].arguments, [
+      "alice",
+      new Set([second.id, first.id]),
+    ]);
+    assert.equal(store.job("alice", first.id)?.cleared, true);
+    assert.equal(store.job("alice", blocked.id)?.cleared, undefined);
+    assert.equal(store.job("bob", foreign.id)?.cleared, undefined);
+
+    store.db.exec("DROP TRIGGER refuse_retry");
+    const [batch, overlap, single] = await Promise.all([
+      retry([blocked.id, first.id]),
+      retry([blocked.id, second.id]),
+      request(`/${first.id}/retry`),
+    ]);
+    assert.deepEqual(batch[0], overlap[0]);
+    assert.deepEqual(batch[1], outcomes[3]);
+    assert.deepEqual(overlap[1], outcomes[0]);
+    assert.equal((await single.json()).job.id, nextFirst.id);
+    assert.equal(store.openJobs("alice").length, 4);
+    assert.equal(store.job("alice", blocked.id)?.cleared, true);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    queue.stop();
     store.close();
   }
 });
