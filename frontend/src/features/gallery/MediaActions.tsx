@@ -484,8 +484,8 @@ export function useMediaActions(
   });
   // The assistant and the animate offers decide every option, so they show together.
   const optionsLoading = assistant.isPending || animation.isPending;
-  // Comparing this image and discovery from it, A–Z: More Like This, the gallery ranked by
-  // likeness to it (GalleryPage reads `similar`), and its comparisons.
+  // Discovery from this image, A–Z: More Like This, the gallery ranked by likeness to it
+  // (GalleryPage reads `similar`), and its comparisons.
   const discovery: Action[] = [
     ...moreLike,
     ...(image
@@ -498,15 +498,6 @@ export function useMediaActions(
               onApplied();
               navigate("/images", { state: { similar: item.id } satisfies GalleryState });
             },
-          },
-          // Stages this image's prompt across models in the composer.
-          {
-            id: "compare-models",
-            label: "Compare in Composer",
-            icon: icons.compare,
-            disabled: variants.isPending,
-            loading: variants.isPending,
-            onClick: () => variants.mutate(),
           },
         ]
       : []),
@@ -627,7 +618,7 @@ export function useMediaActions(
     // upload has only its suggested prompt; unfinished work opens its prompt.
     itemAction("recreate", {
       disabled: !ready && action.isPending,
-      loading: running === "regenerate" || running === "repeat",
+      loading: running === "regenerate" || running === "repeat" || variants.isPending,
       onClick: ready ? undefined : () => action.mutate("image"),
       menu: ready
         ? [
@@ -647,7 +638,22 @@ export function useMediaActions(
                     onClick: () => run({ kind: "repeat" }),
                   },
                 ],
-            [recreateAction],
+            [
+              // Stages this image's prompt across models in the composer.
+              ...(image && !item.uploaded
+                ? [
+                    {
+                      id: "compare-models",
+                      label: "Compare in Composer",
+                      icon: icons.compare,
+                      disabled: variants.isPending,
+                      loading: variants.isPending,
+                      onClick: () => variants.mutate(),
+                    },
+                  ]
+                : []),
+              recreateAction,
+            ],
           ]
         : undefined,
     }),
@@ -656,7 +662,6 @@ export function useMediaActions(
     (assist || discovery.length > 0) &&
       itemAction("ai", {
         onOpen: assist?.onOpen,
-        loading: variants.isPending,
         menu: assistMenu({
           loading: Boolean(assist) && assistant.isPending,
           settings: assist?.settings,
