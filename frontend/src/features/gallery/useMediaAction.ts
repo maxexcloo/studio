@@ -221,11 +221,9 @@ export async function mediaDraft(
           }),
         );
   const preparedReferences = asset ? [{ ...asset, slot: firstSlot }] : references;
-  // A combined profile reruns on the backend that ran (an old per-backend id names its own) while
-  // the profile still has it; otherwise on its current one, and the note says so.
-  const ran = String(
-    item.settings?.profileBackend || saved.profileBackend || profile.aliasBackends?.[priorId] || "",
-  );
+  // A combined profile reruns on the backend that ran while the profile still has it; otherwise on
+  // its current one, and the note says so.
+  const ran = String(item.settings?.profileBackend || saved.profileBackend || "");
   const rerun = operation === "image" && profile.backend && ran;
   const profileBackend =
     rerun && profile.backendOptions?.some((option) => option.id === ran) ? ran : undefined;

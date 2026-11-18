@@ -1,4 +1,5 @@
 import { reloadAccountPreferences } from "./account-preferences.js";
+import { reloadAccountStore } from "./account-store.js";
 import { characterGenerated } from "./character-generated.js";
 import { chatBriefFavourites } from "./chat-brief-favourites.js";
 import { logger } from "./crash-log.js";
@@ -9,9 +10,11 @@ import { dreamOwnership } from "./dream-ownership.js";
 import { galleryRatings } from "./gallery-ratings.js";
 import { imageSizeDefaults } from "./image-size-defaults.js";
 import { legacyShapes } from "./legacy-shapes.js";
+import { importStore } from "./library/imports.js";
 import { localTextAuto } from "./local-text-auto.js";
 import { loraStacks } from "./lora-stacks.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
+import { profileAliases } from "./profile-aliases.js";
 import { migrateRadianceQueue } from "./radiance-queue-migration.js";
 import { runtimeSettings } from "./runtime-settings.js";
 import { spicyPrompts } from "./spicy-prompts.js";
@@ -108,6 +111,18 @@ const steps = [
     changes: (plan) => plan.accounts,
     online: true,
     reload: reloadAccountPreferences,
+  },
+  {
+    name: "profileAliases",
+    run: profileAliases,
+    changes: (plan) => plan.aliases + plan.records,
+    online: true,
+    // Gallery, queue, Dream and MCP copies go with the restart that follows (profile-aliases.js).
+    reload: (dataDir) => {
+      reloadAccountStore();
+      reloadAccountPreferences();
+      importStore({ dataDir }).reload();
+    },
   },
   {
     name: "runtimeSettings",

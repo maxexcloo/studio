@@ -8,9 +8,8 @@ import {
 import { selectedResolution, withResolution } from "../../../../shared/resolution.ts";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 
-/** Whether `profile` is the one a recorded id names, including an id merged into it. */
-export const isProfile = (profile: Profile, id: unknown) =>
-  profile.id === id || (typeof id === "string" && Boolean(profile.aliases?.includes(id)));
+/** Whether `profile` is the one a recorded id names. */
+export const isProfile = (profile: Profile, id: unknown) => profile.id === id;
 
 /** Whether a run on `profile` takes a negative prompt. */
 export const usesNegative = (profile?: Profile) =>
@@ -36,8 +35,6 @@ export function profileForBackend(
   return profile && option?.profile
     ? {
         ...option.profile,
-        aliases: profile.aliases,
-        aliasBackends: profile.aliasBackends,
         backendOptions: profile.backendOptions,
         failing: profile.failing,
         workerIds: profile.workerIds,

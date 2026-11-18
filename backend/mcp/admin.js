@@ -9,7 +9,7 @@
  *
  * Nothing irreversible is exposed: edits are new versions, Cancel only stops a download (its
  * partial file stays for Resume), an update keeps the old file until the new one verifies, Combine
- * Backends and Merge Duplicate Profiles keep the replaced ids as aliases and their versions, only
+ * Backends and Merge Duplicate Profiles keep the replaced profiles' versions, only
  * an empty group can be deleted, a model file goes only with its catalogue entry (catalogue_edit
  * remove, when no profile uses it) and no tool touches a GPU. The maintenance tool runs Settings'
  * upkeep; ending another account's unfinished job is the one step that cannot be undone, so that

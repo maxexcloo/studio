@@ -20,7 +20,6 @@ import { compatibleLoras } from "../lora/policy.js";
 import { recommendedNegative } from "../lora/prompts.js";
 import { mcpLinkKey, mcpOwnership } from "../persistence/mcp-ownership.ts";
 import { runtimeDatabase, savedDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
-import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
 import { imageMimes } from "../reference-names.js";
 import {
   assertAdjustable,
@@ -398,26 +397,14 @@ export class McpMedia {
   profileForBackend(profile, backend) {
     const option = profile.backendOptions?.find((option) => option.id === backend);
     if (!option?.profile) return profile;
-    const {
-      aliases,
-      aliasBackends,
-      backendOptions,
-      failing,
-      workerIds,
-      availability,
-      readiness,
-      namedBackend,
-    } = profile;
+    const { backendOptions, failing, workerIds, availability, readiness } = profile;
     return this.profileWithPrompting({
       ...option.profile,
-      aliases,
-      aliasBackends,
       backendOptions,
       failing,
       workerIds,
       availability,
       readiness,
-      namedBackend,
       ready: option.ready,
       readyReason: option.reason,
     });
@@ -971,7 +958,7 @@ export class McpMedia {
       ) {
         outputs.set(index, { url: item.url, rating: item.rating || "unrated" });
         kind = item.type;
-        profileId ||= canonicalProfileId(item.settings?.profileId);
+        profileId ||= item.settings?.profileId;
         prompt ||= item.prompt;
       }
     }
@@ -1678,14 +1665,14 @@ export class McpMedia {
   async rerun(owner, item, { prompt, count = 1 } = {}) {
     const settings = item.settings;
     const base = (await this.profiles(item.type === "video" ? "video" : "image", owner)).find(
-      (profile) => profile.id === canonicalProfileId(settings.profileId),
+      (profile) => profile.id === settings.profileId,
     );
     if (!base)
       throw new Error(
         "The profile behind this result is no longer available to this account. Call generate instead.",
       );
     // A saved run keeps its backend's controls and limits as well as its backend id.
-    const backend = settings.profileBackend || profileAliasBackend(settings.profileId);
+    const backend = settings.profileBackend;
     const selected = this.profileForBackend(base, backend);
     const references = (settings.referenceAssets || [])
       .map((asset) => asset?.assetId)
@@ -1754,13 +1741,11 @@ export class McpMedia {
   }
   /** Generate arguments that run a finished output on another profile of its kind, at its proportions and with its references. */
   retarget(item, profile, { count = 1 } = {}) {
-    profile = this.profileForBackend(profile, profile.namedBackend);
     const references = (item.settings?.referenceAssets || [])
       .map((asset) => asset?.assetId)
       .filter(Boolean);
     const args = {
       profile_id: profile.id,
-      ...(profile.namedBackend ? { profile_backend: profile.namedBackend } : {}),
       prompts: [item.prompt],
       count,
       ...(references.length ? { reference_asset_ids: references } : {}),
@@ -1826,7 +1811,7 @@ export class McpMedia {
       where !== "cloud" &&
       videos.find(
         (profile) =>
-          profile.id === canonicalProfileId(item.settings.profileId) &&
+          profile.id === item.settings.profileId &&
           profile.mediaInputs?.length &&
           !(where === "local" && isCloudProfile(profile)) &&
           !["offline", "parked"].includes(profile.availability),
@@ -2169,7 +2154,7 @@ export class McpMedia {
     const [{ job }] = entries;
     const profile = job.profileId
       ? (await this.profiles("all", owner).catch(() => [])).find(
-          (item) => item.id === canonicalProfileId(job.profileId),
+          (item) => item.id === job.profileId,
         )
       : undefined;
     // The profile's short name, as its label reads before the first ' · '.

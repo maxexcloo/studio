@@ -10,11 +10,10 @@
  *
  * Applying writes the combined profile (`studio.backend` and
  * `studio.backends.<id>`, custom-workflows.js) as a new profile with its own version history, gives
- * it the default backend's guide binding and negatives and drops both old ids' guide entries,
- * records each old id as an alias `{to, backend}` (profile/store.js), so records that name it run
- * again on the backend they ran on, then removes the old files; their version history stays, so a
- * seed never brings them back. Workflow preferences and run timings (per backend) move to the
- * combined profile. Owner records are left as they are.
+ * it the default backend's guide binding and negatives and drops both old ids' guide entries, then
+ * removes the old files; their version history stays, so a seed never brings them back. Workflow
+ * preferences and run timings (per backend) move to the combined profile. Owner records are left
+ * as they are and report the old profiles as missing, as after Remove Profile.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -209,11 +208,9 @@ export function combineBackends({ hash, selections = [], by = "" } = {}) {
     // The same combined file is an apply that stopped part way: this one finishes it.
     const file = path.join(userWorkflowsDir, `${pair.id}.json`);
     pick.written = fs.existsSync(file) && fs.readFileSync(file, "utf8") === pick.text;
-    if ((fs.existsSync(file) && !pick.written) || Object.hasOwn(store.aliases(), pair.id))
-      throw conflict(`A profile named ${pair.id} already exists or was merged away.`);
+    if (fs.existsSync(file) && !pick.written)
+      throw conflict(`A profile named ${pair.id} already exists.`);
   }
-
-  const at = new Date().toISOString();
 
   const guides = guideStore();
   const timingKeys = {};
@@ -249,16 +246,6 @@ export function combineBackends({ hash, selections = [], by = "" } = {}) {
       const kind = raws[key].studio?.kind === "video" ? "video" : "image";
       timingKeys[`${kind}:custom:${from}`] = `${kind}:custom:${pair.id}@${key}`;
     }
-    // Aliases before removal: an interrupted apply leaves the old files, and applying again finishes it.
-    store.addAliases(
-      ["radiance", "comfyui"].map((key) => ({
-        from: pair[key].id,
-        to: pair.id,
-        backend: key,
-        reason: "combined",
-      })),
-      { by, at },
-    );
     for (const key of ["radiance", "comfyui"])
       fs.rmSync(path.join(userWorkflowsDir, `${pair[key].id}.json`));
     combined.push({
@@ -268,7 +255,10 @@ export function combineBackends({ hash, selections = [], by = "" } = {}) {
       from: [pair.radiance.id, pair.comfyui.id],
     });
   }
-  repointWorkflowPreferences((id) => store.canonical(id));
+  const kept = new Map(
+    combined.flatMap(({ id, from }) => from.map((old) => [`custom:${old}`, `custom:${id}`])),
+  );
+  repointWorkflowPreferences((id) => kept.get(id) ?? id);
   renameTimingKeys(timingKeys);
   return { combined };
 }
