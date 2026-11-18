@@ -624,7 +624,12 @@ export function MediaViewer({
         returnFocus={false}
         removeScrollProps={{ allowPinchZoom: true }}
         fullScreen
-        classNames={{ content: classes.content, body: classes.body, header: classes.header }}
+        classNames={{
+          content: classes.content,
+          body: classes.body,
+          header: classes.header,
+          overlay: classes.overlay,
+        }}
         onKeyDownCapture={(event) => {
           // A hovered control's open tooltip would otherwise take the first Escape for itself.
           const target = event.target as Element;

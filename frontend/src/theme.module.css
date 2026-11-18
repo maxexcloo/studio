@@ -58,13 +58,8 @@
   -webkit-backdrop-filter: none !important;
 }
 
-/* It also reaches past the screen's edges, so nothing behind shows while iOS bounces, the keyboard
-   moves it or it lags the visual viewport: a dialog by its edge, which fades with it, and a drawer,
-   which slides in, by its backdrop. */
-.dialogContent[data-full-screen] {
-  box-shadow: 0 0 0 100vh var(--mantine-color-body) !important;
-}
-
+/* Its backdrop is that surface too and reaches past the screen's edges, so nothing behind shows
+   while iOS bounces, the keyboard moves it or it lags the visual viewport. */
 .fullScreenOverlay {
   inset: -100vh 0 !important;
   background: var(--mantine-color-body) !important;
