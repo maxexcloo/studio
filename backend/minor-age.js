@@ -89,6 +89,6 @@ export function minorAgeRefusal(text) {
   const found = minorMatch(text);
   if (!found) return "";
   return found.sexual
-    ? `Studio makes no sexual or suggestive images or videos of anyone who reads as under 18, and this prompt pairs "${found.words}" with "${found.sexual}", whatever age it states. Describe only adults, without teen, school or child framing.`
-    : `Studio makes no images or videos of anyone under 18, and this prompt says "${found.words}". Describe only adults, 18 or older.`;
+    ? `Studio makes no sexual or suggestive images or videos of anyone who reads as under 18, and this prompt pairs "${found.words}" with "${found.sexual}", whatever age it states. Drop that teen, school or child framing; a woman or man needs no added "adult" or age.`
+    : `Studio makes no images or videos of anyone under 18, and this prompt says "${found.words}". Drop it; a woman or man needs no added "adult" or age.`;
 }

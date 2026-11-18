@@ -19,6 +19,7 @@ import {
   type TastePreferences,
   commonShapes,
   maxTastePhrase,
+  maxTasteRule,
   shapeName,
   tasteLimits,
 } from "../../../../shared/taste";
@@ -60,6 +61,7 @@ const learnt = (taste: Taste) =>
 const fieldLabels: Record<keyof TasteFields, string> = {
   likes: "Likes",
   avoid: "Dislikes",
+  rules: "Rules",
   styles: "Styles",
   note: "Summary",
   models: "Models",
@@ -68,6 +70,8 @@ const fieldLabels: Record<keyof TasteFields, string> = {
   tags: "Tags",
 };
 const fieldKeys = Object.keys(fieldLabels) as (keyof TasteFields)[];
+/** Rules are only ever the person's: Studio learns none, so they have no learnt version. */
+const own = (key: keyof TasteFields) => key === "rules";
 /** How many of the favourites Studio learnt the profile shows; the person's own show whole. */
 const learntShown: Partial<Record<keyof TasteFields, number>> = {
   models: 3,
@@ -202,6 +206,18 @@ function TasteEditor({
             .map((shape) => ({ value: shape, label: shapeName(shape) }))}
         />
       );
+    if (key === "rules")
+      return (
+        <TagsInput
+          label={label}
+          description='Limits every prompt keeps in Dream and chats, such as "always photographic, never CGI". Not a look to aim for.'
+          value={draft.rules}
+          onChange={set("rules")}
+          maxTags={tasteLimits.rules}
+          maxLength={maxTasteRule}
+          splitChars={[]}
+        />
+      );
     return (
       <TagsInput
         label={label}
@@ -227,20 +243,21 @@ function TasteEditor({
         {fieldKeys.map((key) => (
           <Stack key={key} gap={4}>
             {input(key)}
-            {((Object.hasOwn(data.preferences, key) && !resets.has(key)) ||
-              !same(draft[key], fields.learnt(data, key))) && (
-              <Button
-                size="compact-sm"
-                variant="subtle"
-                w="fit-content"
-                onClick={() => {
-                  setDraft({ ...draft, [key]: fields.learnt(data, key) });
-                  setResets(new Set([...resets, key]));
-                }}
-              >
-                Use Learnt {fieldLabels[key]}
-              </Button>
-            )}
+            {!own(key) &&
+              ((Object.hasOwn(data.preferences, key) && !resets.has(key)) ||
+                !same(draft[key], fields.learnt(data, key))) && (
+                <Button
+                  size="compact-sm"
+                  variant="subtle"
+                  w="fit-content"
+                  onClick={() => {
+                    setDraft({ ...draft, [key]: fields.learnt(data, key) });
+                    setResets(new Set([...resets, key]));
+                  }}
+                >
+                  Use Learnt {fieldLabels[key]}
+                </Button>
+              )}
           </Stack>
         ))}
         {save.error && <Alert color="red">{save.error.message}</Alert>}
@@ -321,7 +338,7 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
                 {fieldKeys.map((key) => (
                   <SettingRow
                     key={key}
-                    label={`${fieldLabels[key]}${Object.hasOwn(data.preferences, key) ? " · Your Edit" : ""}`}
+                    label={`${fieldLabels[key]}${!own(key) && Object.hasOwn(data.preferences, key) ? " · Your Edit" : ""}`}
                     description={
                       <Text span size="sm" c="text" style={{ overflowWrap: "anywhere" }}>
                         {text(data, key) || "None"}

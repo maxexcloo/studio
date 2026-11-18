@@ -146,6 +146,7 @@ test("taste routes read, set avoids for and forget only the caller's own profile
     avoid: [],
     styles: [],
     note: "",
+    rules: [],
     models: [],
     loras: [],
     shapes: [],
@@ -193,6 +194,12 @@ test("taste routes read, set avoids for and forget only the caller's own profile
   assert.deepEqual(edited.body.preferences.styles, []);
   assert.match(edited.body.summary, /Likes lighthouses/);
   assert.match(edited.body.summary, /Quiet shores/);
+  // Rules are whole sentences, commas included, and stay out of the summary's look.
+  const rule = "always photographic, never CGI or a doll-like face, whatever the scene";
+  assert.equal((await request("PUT", { preferences: { rules: ["x".repeat(161)] } })).status, 400);
+  const ruled = await request("PUT", { preferences: { rules: [rule] } });
+  assert.deepEqual([ruled.body.rules, ruled.body.learnt.rules], [[rule], []]);
+  assert.doesNotMatch(ruled.body.summary, /photographic/);
   const restored = await request("PUT", { preferences: { likes: null } });
   assert.deepEqual(restored.body.likes, []);
   assert.equal(Object.hasOwn(restored.body.preferences, "likes"), false);

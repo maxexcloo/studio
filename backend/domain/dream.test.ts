@@ -1752,13 +1752,30 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
   // The same image never starts a second comparison.
   assert.deepEqual(dream.read("alice").compared, ["base"]);
 
-  // More Like This keeps the result and steers the next ideas toward it.
+  // More Like This keeps the result and steers the next ideas toward it, the only idea that
+  // follows the learnt look; every idea keeps the person's rules.
+  taste.edit("alice", { likes: ["lighthouses"], rules: ["no visible text"] });
   const [next] = dream.unseen("alice");
   assert.equal((await request(`/${next.id}/more`, {})).status, 200);
   const steered = (await dreamOnce())!;
   assert.equal((steered.input.writing as { like?: string }).like, next.prompt);
   assert.match(state.calls.at(-1)!.user, new RegExp(`More like this one: ${next.prompt}`));
+  assert.match(
+    state.calls.at(-1)!.user,
+    /Taste profile: Likes lighthouses[\s\S]*Their rules:\n- no visible text/,
+  );
   assert.equal(dream.read("alice").steer?.remaining, 1);
+  // Past the steer's last run, ideas no longer read the learnt look.
+  const before = state.calls.length;
+  for (let run = 0; run < 4; run++) await dreamOnce();
+  const later = state.calls
+    .slice(before)
+    .filter((call) => !call.user.includes("More like this one"));
+  assert.ok(later.length);
+  for (const call of later) {
+    assert.doesNotMatch(call.user, /Taste profile|lighthouses/);
+    assert.match(call.user, /Their rules:\n- no visible text/);
+  }
 });
 
 test("A Dream job's writing request keeps its own fields through admission", () => {
