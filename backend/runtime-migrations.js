@@ -7,7 +7,6 @@ import { dreamAnimationStars } from "./dream-animation-stars.js";
 import { dreamDefaultChoices } from "./dream-default-choices.js";
 import { dreamOwnership } from "./dream-ownership.js";
 import { galleryRatings } from "./gallery-ratings.js";
-import { galleryTitles } from "./gallery-titles.js";
 import { imageSizeDefaults } from "./image-size-defaults.js";
 import { legacyShapes } from "./legacy-shapes.js";
 import { localTextAuto } from "./local-text-auto.js";
@@ -89,12 +88,6 @@ const steps = [
     changes: (plan) => plan.accounts,
     online: true,
     reload: reloadAccountPreferences,
-  },
-  {
-    name: "galleryTitles",
-    run: galleryTitles,
-    changes: (plan) => plan.titles + plan.cleared + plan.setItems,
-    online: true,
   },
   {
     name: "imageSizeDefaults",
