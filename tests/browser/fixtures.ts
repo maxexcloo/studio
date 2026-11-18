@@ -1022,9 +1022,10 @@ export async function viewerPromptMenu(page: Page) {
 
 /** Returns from the shared phone text editor when a test continues on its parent surface. */
 export async function closeTextEditor(page: Page, title: string) {
-  const editor = page.getByRole("dialog", { name: title, exact: true });
-  if (await editor.isVisible())
+  const editor = page.getByRole("dialog", { name: title, exact: true, includeHidden: true });
+  if (await editor.count())
     await editor.getByRole("button", { name: `Close ${title}`, exact: true }).click();
+  await expect(editor).toHaveCount(0);
 }
 
 /** Opens a tool's options in a box's phone editor through its flat More menu. */
@@ -1146,17 +1147,22 @@ export async function openReferenceChoices(page: Page) {
  * shows both.
  */
 export async function showReferenceStack(page: Page) {
-  // A successful placement may return to the stack before its Done button can be clicked.
-  await expect(
-    page
-      .getByRole("region", { name: "Reference Choices", exact: true })
-      .and(page.locator('[aria-busy="true"]')),
-  ).toHaveCount(0);
+  const picking = page
+    .getByRole("region", { name: "Reference Choices", exact: true, includeHidden: true })
+    .and(page.locator('[aria-busy="true"]'));
+  await expect(picking).toHaveCount(0);
   const add = page.getByRole("button", { name: "Add References", exact: true, expanded: true });
-  const adding = page.getByRole("dialog", { name: "Add References", exact: true });
-  if (await add.isVisible())
-    await adding.getByRole("button", { name: "Done", exact: true }).click();
-  await expect(adding).toBeHidden();
+  const adding = page.getByRole("dialog", {
+    name: "Add References",
+    exact: true,
+    includeHidden: true,
+  });
+  // A successful pick can close the choices as the Done button is being clicked.
+  await expect(async () => {
+    if (await add.count())
+      await adding.getByRole("button", { name: "Done", exact: true }).click({ timeout: 1000 });
+    await expect(adding).toHaveCount(0, { timeout: 1000 });
+  }).toPass({ timeout: 5000 });
 }
 
 /**
