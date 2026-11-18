@@ -198,17 +198,13 @@ for (const operation of ["Edit", "Animate"] as const) {
     const state = await galleryFixture(page);
     await tileMenu(page);
     await page.getByRole("menuitem", { name: operation, exact: true }).click();
-    // Animate's options show once the assistant answers.
+    // Animate's suggestions answer, so the list stops growing under the press.
     if (operation === "Animate")
-      await expect(
-        page.getByRole("menuitem", { name: "Review Prompt", exact: true }),
-      ).toBeVisible();
-    await page
-      .getByRole("menuitem", {
-        name: operation === "Animate" ? "Animate in Composer" : "Edit in Composer",
-        exact: true,
-      })
-      .click();
+      await expect(page.getByRole("menuitem", { name: "Refresh", exact: true })).toBeVisible();
+    // Phones slide the options open in place, clipping them until the slide ends.
+    const compose = page.getByRole("menuitem", { name: `${operation} in Composer`, exact: true });
+    await expect(compose).toBeInViewport({ ratio: 1 });
+    await compose.click();
     await expect.poll(() => state.referenceRequests.length).toBe(1);
     expect(state.referenceRequests[0]).toEqual({ galleryItemId: "tile-bird" });
     // An Animate draft opens the Videos composer, an Edit draft stays in Images.

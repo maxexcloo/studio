@@ -406,7 +406,12 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   await page.keyboard.press("Space");
   if (test.info().project.use.hasTouch) {
     await expect(preview.getByRole("img", { name: "Result 148", exact: true })).toBeVisible();
+    // The viewer takes focus a moment after it opens, and Escape only from inside it.
+    await expect
+      .poll(() => preview.evaluate((element) => element.contains(document.activeElement)))
+      .toBe(true);
     await page.keyboard.press("Escape");
+    await expect(preview).toBeHidden();
   } else {
     const beside = (name: string) =>
       page.locator("[data-popup]").getByRole("img", { name, exact: true });
