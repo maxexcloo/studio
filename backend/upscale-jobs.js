@@ -11,7 +11,7 @@ import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
 import { ingestRunResults, removeComfyFiles } from "./media-store.js";
 import { recordUpscale, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
-import { faceDetailSource, upscaleGraph, upscalePlan } from "./upscale.js";
+import { faceDetailSource, noteWorkerUpscale, upscaleGraph, upscalePlan } from "./upscale.js";
 
 export function findUpscaleTarget(id) {
   return findGalleryItem({ named: [id] }) || null;
@@ -102,7 +102,7 @@ export async function runUpscaleJob(
   worker,
   jobId,
   body,
-  info,
+  { info, stats },
   target = galleryTarget(body.galleryItemId),
   recorded = {},
 ) {
@@ -112,7 +112,7 @@ export async function runUpscaleJob(
   try {
     const { graph: built, plan } = recorded.promptId
       ? { graph: null, plan: recorded.plan }
-      : upscaleGraph(body, info);
+      : upscaleGraph(body, info, { worker, stats });
     // An account's upscale is saved beside its other outputs, in the owner's folder.
     const graph =
       built &&
@@ -202,6 +202,7 @@ export async function runUpscaleJob(
             providerFailed: true,
           });
         }
+        noteWorkerUpscale(worker);
         // ComfyUI as a worker: the upscale moves into Studio media beside its source.
         const moved = await ingestRunResults(worker, [{ output }], body.ownerId || "", {
           strict: true,

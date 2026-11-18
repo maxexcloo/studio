@@ -15,7 +15,7 @@ import { api } from "../../api";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
 import { useRememberedKey } from "../auth/useRemembered";
 import { setFamilyLabels } from "./modelFamily";
-import { isProfile, profileForBackend, referencePatch } from "./payload";
+import { isProfile, profileForBackend, profileShape, referencePatch } from "./payload";
 
 export async function fetchModels(cached: boolean) {
   const models = await api<Models>(cached ? "/api/models?cached=1" : "/api/models");
@@ -44,13 +44,7 @@ export const initialInput: GenerationInput = {
   referenceAssets: [],
 };
 export function inputForProfile(previous: GenerationInput, profile: Profile): GenerationInput {
-  // Another model of the same output keeps the picked shape at its own preset for it.
-  const shape =
-    previous.profileId && previous.kind === profile.kind && previous.width && previous.height
-      ? profile.aspectPresets?.find(
-          (preset) => preset.w * previous.height === preset.h * previous.width,
-        )
-      : undefined;
+  const shape = profileShape(previous, profile);
   return {
     ...initialInput,
     ...profile.defaults,

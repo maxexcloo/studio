@@ -29,7 +29,7 @@ export function outputsFrom(worker, history) {
       : [];
     for (const [item, collectionType] of [...imageItems, ...videoItems]) {
       const filename = typeof item?.filename === "string" ? item.filename : "";
-      if (!filename) continue;
+      if (!filename || item.type === "input") continue;
       const params = new URLSearchParams({
         filename,
         subfolder: item.subfolder || "",
