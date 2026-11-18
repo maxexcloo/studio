@@ -20,7 +20,7 @@ import { galleryStats } from "../stats.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
 import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
 import { compareGalleryItems } from "./order.js";
-import { makePendingItems } from "./records.js";
+import { listedRecord, makePendingItems } from "./records.js";
 import {
   cleanupGalleryState,
   eachGalleryItem,
@@ -267,13 +267,6 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
           revision: galleryRevisionValue(),
           totalApprox: 0,
         };
-    // Next steps are asked for in the viewer (`/api/suggestions`) and the prompt's thinking (up to
-    // 20,000 characters) in Details (`/api/gallery/items/:id`), not carried in every page.
-    const listed = ({ nextSteps: _steps, ...item }) => {
-      if (!item.writing?.thinking) return item;
-      const { thinking: _thinking, ...writing } = item.writing;
-      return { ...item, writing };
-    };
     // Work the queue holds has no tiles until it starts; with queued work shown, the first page
     // leads with them. Dream's stays in its own pool; an upscale has no tile.
     const retried = new Set();
@@ -320,7 +313,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       status: 200,
       payload: {
         ...page,
-        items: resultNumbers.numbered([...leading, ...items]).map(listed),
+        items: resultNumbers.numbered([...leading, ...items]).map(listedRecord),
       },
     };
   });

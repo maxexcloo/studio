@@ -10,12 +10,12 @@ export function registerDreamRoutes(
   {
     dream,
     projects,
-    numbered,
+    listed,
   }: {
     dream: Dream;
     projects: Projects;
-    /** The results with their numbers (domain/result-numbers.ts). */
-    numbered: <T extends object>(items: T[]) => T[];
+    /** The results as lists carry them, numbered (domain/result-numbers.ts) and without what Details reads. */
+    listed: <T extends object>(items: T[]) => T[];
   },
 ) {
   const owner = (account: RouteAccount) => account?.userId || "";
@@ -32,7 +32,7 @@ export function registerDreamRoutes(
   const show = (ownerId: string) => {
     const access = dream.access(ownerId);
     const record = dream.read(ownerId);
-    const unseen = numbered(dream.unseen(ownerId));
+    const unseen = listed(dream.unseen(ownerId));
     return {
       settings: record.settings,
       unseen,

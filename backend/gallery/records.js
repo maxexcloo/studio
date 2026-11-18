@@ -121,6 +121,17 @@ function storedContext(value) {
 }
 
 /**
+ * An item as lists carry it. Next steps are asked for in the viewer (`/api/suggestions`) and the
+ * prompt's thinking (up to 20,000 characters) in Details (`/api/gallery/items/:id`), not carried
+ * in every list.
+ */
+export function listedRecord({ nextSteps: _steps, ...item }) {
+  if (!item.writing?.thinking) return item;
+  const { thinking: _thinking, ...writing } = item.writing;
+  return { ...item, writing };
+}
+
+/**
  * How the queue's writing stage wrote a result's prompt (prompt-stage.js): its kind, text model
  * and thinking; null for anything else.
  */
