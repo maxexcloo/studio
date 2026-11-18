@@ -257,6 +257,35 @@ test("direct image refinement uses advertised provider model and saves real owne
   }
 });
 
+test("Grok Imagine Image 2.0 sends its chosen resolution and quality", async () => {
+  const remote = fixture();
+  const node = { class_type: "GrokMedia", inputs: { model: "grok-imagine-image-2.0" } };
+  const cloud = studioCloudProfiles({
+    provider: remote.provider,
+    workflows: () => [
+      { profileId: "custom:grok", name: "Grok", kind: "image", graph: { 1: node }, defaults: {} },
+    ],
+    buildProfile: (profile) => profile,
+    accountForOwner: () => null,
+    mayUseProfile: () => true,
+    reference: async () => image,
+    composePrompt: (_mode, prompt) => prompt,
+  });
+  const landscape = { profileId: "custom:grok", prompt: "A white bird", width: 1280, height: 720 };
+  const resolved = (extra: Record<string, unknown>) =>
+    cloud.resolve({ ownerId: "", input: { ...landscape, ...extra } });
+
+  const fallback = await resolved({});
+  assert.deepEqual([fallback.resolution, fallback.quality], ["1k", undefined]);
+  await remote.provider.image(
+    await resolved({ resolution: "2k", quality: "medium" }),
+    AbortSignal.timeout(1000),
+  );
+  const body = remote.calls.find((call) => call.path === "/v1/images/generations")!.body!;
+  assert.deepEqual([body.aspect_ratio, body.resolution, body.quality], ["16:9", "2k", "medium"]);
+  await assert.rejects(resolved({ quality: "high" }), /supports auto, low, medium quality/);
+});
+
 test("confirmed provider refusal can be retried with a distinct durable generation ID", async () => {
   const store = new Store(openDatabase(":memory:"));
   const remote = fixture();

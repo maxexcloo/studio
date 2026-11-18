@@ -223,6 +223,7 @@ export function createGenerationQueue({
             height: outputs[0]?.height || request.height,
             duration: request.duration,
             resolution: request.resolution,
+            quality: request.quality,
           },
           jobs,
         );
