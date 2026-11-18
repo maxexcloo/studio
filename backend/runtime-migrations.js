@@ -7,6 +7,7 @@ import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
 import { dreamDefaultChoices } from "./dream-default-choices.js";
 import { dreamOwnership } from "./dream-ownership.js";
+import { flux2Records } from "./flux2-records.js";
 import { galleryRatings } from "./gallery-ratings.js";
 import { imageSizeDefaults } from "./image-size-defaults.js";
 import { legacyShapes } from "./legacy-shapes.js";
@@ -29,6 +30,13 @@ import { whereWorkRuns } from "./where-work-runs.js";
  * the running server read what it wrote. Any other step writes state the server holds and cannot
  * reload, so it needs Studio stopped.
  */
+// Gallery, queue, Dream and MCP copies go with the restart that follows (profile-aliases.js).
+function reloadProfileRecords(dataDir) {
+  reloadAccountStore();
+  reloadAccountPreferences();
+  importStore({ dataDir }).reload();
+}
+
 // Applied steps are removed once the live data folder has them; Git history keeps them.
 const steps = [
   {
@@ -117,12 +125,14 @@ const steps = [
     run: profileAliases,
     changes: (plan) => plan.aliases + plan.records,
     online: true,
-    // Gallery, queue, Dream and MCP copies go with the restart that follows (profile-aliases.js).
-    reload: (dataDir) => {
-      reloadAccountStore();
-      reloadAccountPreferences();
-      importStore({ dataDir }).reload();
-    },
+    reload: reloadProfileRecords,
+  },
+  {
+    name: "flux2Records",
+    run: flux2Records,
+    changes: (plan) => plan.records,
+    online: true,
+    reload: reloadProfileRecords,
   },
   {
     name: "runtimeSettings",
