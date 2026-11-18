@@ -211,9 +211,8 @@ const NegativePrompt = memo(function NegativePrompt({
         variant="unstyled"
         aria-label="Negative Prompt"
         placeholder="Negative prompt: what to leave out"
-        // In the phone sheet it keeps two rows until edited, when it takes the room left.
+        // In the phone sheet it shares the room left with the prompt instead of growing.
         autosize={!fill}
-        rows={fill ? 2 : undefined}
         minRows={1}
         maxRows={phone ? 2 : 4}
         inline={fill}

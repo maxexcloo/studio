@@ -335,14 +335,8 @@ export const ComposerDock = memo(function ComposerDock({
             body: classes.sheetBody,
           }}
           styles={{
-            // The page never shows around the sheet while the keyboard moves it either.
-            overlay: { background: "var(--mantine-color-body)", backdropFilter: "none" },
-            // Opaque, like the phone text editor, so the page never shows through the prompt; it
-            // follows the visible viewport, so the keyboard lifts its bottom bar.
+            // It follows the visible viewport, so the keyboard lifts its bottom bar.
             content: {
-              background: "var(--mantine-color-body)",
-              backdropFilter: "none",
-              WebkitBackdropFilter: "none",
               translate: keyboard.top ? `0 ${keyboard.top}px` : undefined,
               "--keyboard-inset": `${keyboard.inset}px`,
             } as CSSProperties,

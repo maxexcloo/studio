@@ -49,11 +49,27 @@
   backdrop-filter: none !important;
 }
 
-/* A full-screen dialog or sheet covers the page, so it takes the page's solid surface, matching its
-   pinned footer. */
-.dialogContent[data-full-screen] {
+/* A full-screen dialog, sheet or drawer covers the page, so it takes the page's solid surface,
+   matching its pinned footer. */
+.dialogContent[data-full-screen],
+.fullScreen {
   background: var(--mantine-color-body) !important;
   backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* It also reaches past the screen's edges, so nothing behind shows while iOS bounces, the keyboard
+   moves it or it lags the visual viewport: a dialog by its edge, which fades with it, and a drawer,
+   which slides in, by its backdrop. */
+.dialogContent[data-full-screen] {
+  box-shadow: 0 0 0 100vh var(--mantine-color-body) !important;
+}
+
+.fullScreenOverlay {
+  inset: -100vh 0 !important;
+  background: var(--mantine-color-body) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* A phone's full-screen dialog keeps its footer (DialogFooter) at the bottom of the screen, in
