@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { withCatalogueSources } from "../catalogue-downloads.js";
 import { closeRuntimeDatabase, readRuntimeDocument } from "../persistence/runtime.ts";
+import { modelFiles } from "../upscale.js";
 import { civitaiAvailability } from "./availability.js";
 import { createCatalogueStore } from "./catalogue.js";
 import { civitaiUpdate, createUpdateChecker, hfUpdate, publicUpdate } from "./updates.js";
@@ -149,6 +150,22 @@ test("an installed catalogue download is checked at its pinned commit and update
   // A file of the same name from another source keeps its own entry.
   const other = { file: "pony-v7-pile-t5xl.fp16.safetensors", sha256: sha("f") };
   assert.equal(withCatalogueSources({ [key]: other })[key], other);
+});
+
+test("the SeedVR2 weights and the face detector are checked at their Hugging Face sources", () => {
+  const mixed = "SEEDVR2/seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors";
+  const detector = "ultralytics_bbox/face_yolov8m.pt";
+  const entries = withCatalogueSources({});
+  assert.deepEqual(entries[mixed].source, {
+    provider: "hf",
+    repo: "AInVFX/SeedVR2_comfyUI",
+    path: "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+  });
+  assert.equal(entries[mixed].sha256, modelFiles[path.posix.basename(mixed)].sha256);
+  assert.deepEqual(
+    [entries[detector].source.repo, entries[detector].source.path],
+    ["Bingsu/adetailer", "face_yolov8m.pt"],
+  );
 });
 
 function harness(t, { references = async () => [], repoint } = {}) {

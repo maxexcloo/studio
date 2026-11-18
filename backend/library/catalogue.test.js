@@ -78,7 +78,7 @@ function fixture(t) {
     },
     { path: "models/comfyui/checkpoints/base.safetensors", sha256: hex("e"), size: 9 },
     { path: "models/comfyui/unet/transformer.safetensors", sha256: hex("c"), size: 5 },
-    { path: "models/comfyui/SEEDVR2/upscaler.safetensors", sha256: hex("f"), size: 9 },
+    { path: "models/comfyui/upscale_models/upscaler.safetensors", sha256: hex("f"), size: 9 },
   ]);
   const environment = { STUDIO_MODEL_MANIFEST_PREFIX: "models/comfyui/" };
   return {
@@ -119,7 +119,7 @@ test("the catalogue merges every layer by folder/file with provenance, the more 
       "loras/style.safetensors",
       "vae/ae.safetensors",
     ],
-    "only model folders, unet/ as diffusion_models/; SEEDVR2 stays in the manifest; lora-catalogue.json is ignored",
+    "only model folders, unet/ as diffusion_models/; upscale_models/ stays in the manifest; lora-catalogue.json is ignored",
   );
   const style = entries["loras/style.safetensors"];
   assert.deepEqual(

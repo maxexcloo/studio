@@ -461,6 +461,13 @@ const installedFiles = (info) => ({
   ),
   vae: optionsFor(info, "VAELoader", "vae_name"),
   clip_vision: optionsFor(info, "CLIPVisionLoader", "clip_name"),
+  SEEDVR2: unique(
+    optionsFor(info, "SeedVR2LoadDiTModel", "model"),
+    optionsFor(info, "SeedVR2LoadVAEModel", "model"),
+  ),
+  ultralytics_bbox: optionsFor(info, "UltralyticsDetectorProvider", "model_name")
+    .filter((name) => name.startsWith("bbox/"))
+    .map((name) => name.slice("bbox/".length)),
 });
 const libraryRoutes = registerLibraryRoutes(app, {
   presets: presetRoutes,

@@ -34,6 +34,7 @@ const allowedFolders = new Map([
   ["clip_vision", weights],
   ["diffusion_models", weights],
   ["loras", weights],
+  ["SEEDVR2", weights],
   ["text_encoders", weights],
   ["ultralytics_bbox", /\.pt$/i],
   ["vae", weights],
