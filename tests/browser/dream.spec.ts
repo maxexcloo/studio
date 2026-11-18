@@ -136,16 +136,16 @@ test("Undo steps back through Dislike, Like and Accept, taking back each", async
   await expect(undo).toBeDisabled();
   const sent = () =>
     dream.requests.map((request) => `${request.path} ${JSON.stringify(request.body)}`);
-  await expect.poll(sent).toEqual([
-    "/api/dream/one/discard {}",
-    `/api/gallery/favorite {"ids":["two"],"rating":"liked"}`,
-    "/api/dream/three/keep {}",
-    `/api/dream/undo {"ids":["three"]}`,
-    // Undoing a Like takes its rating back first.
-    `/api/gallery/favorite {"ids":["two"],"rating":null}`,
-    `/api/dream/undo {"ids":["two"]}`,
-    `/api/dream/undo {"ids":["one"]}`,
-  ]);
+  await expect
+    .poll(sent)
+    .toEqual([
+      "/api/dream/one/discard {}",
+      `/api/gallery/favorite {"ids":["two"],"rating":"liked"}`,
+      "/api/dream/three/keep {}",
+      `/api/dream/undo {"ids":["three"]}`,
+      `/api/dream/undo {"ids":["two"],"rating":null}`,
+      `/api/dream/undo {"ids":["one"]}`,
+    ]);
 });
 
 test("While You Were Away ranks each project's results, folds its misses and judges them", async ({

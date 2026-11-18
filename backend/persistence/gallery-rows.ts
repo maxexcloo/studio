@@ -19,6 +19,7 @@ const field = (name: string) => `json_extract(value, '$.${name}')`;
 export const dreamState = field("dream.state");
 export const dreamArm = field("dream.arm");
 export const dreamPair = field("dream.pair");
+export const dreamProject = field("dream.projectId");
 
 /**
  * Columns derived from each row's JSON, so queries filter and order the gallery in SQL. `created_ms`
@@ -81,6 +82,7 @@ const galleryIndexes: [string, string][] = [
   ["studio_gallery_status", "status"],
   ["studio_gallery_upscale", "upscale_status"],
   ["studio_gallery_dream", `${dreamState}, owner_id, ${dreamArm}, ${dreamPair}`],
+  ["studio_gallery_dream_project", `owner_id, ${dreamProject}`],
   ["studio_gallery_prompt", "owner_id, json_extract(value, '$.prompt')"],
   ["studio_gallery_created", "created_ms"],
   [

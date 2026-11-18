@@ -245,7 +245,7 @@ export function registerDreamRoutes(
     };
   });
   route("POST", "/api/dream/calibration", (account, { body }) => {
-    const { liked = [], passed = [] } = body || {};
+    const { liked = [], passed = [], rating } = body || {};
     const ids = [liked, passed].flat();
     if (
       !Array.isArray(liked) ||
@@ -253,14 +253,17 @@ export function registerDreamRoutes(
       !ids.length ||
       ids.length > 2 ||
       ids.some((id) => typeof id !== "string") ||
-      new Set(ids).size < ids.length
+      new Set(ids).size < ids.length ||
+      (rating !== undefined &&
+        (ids.length !== 1 ||
+          (rating === "liked" ? !liked.length : rating !== "disliked" || !passed.length)))
     )
       return {
         status: 400,
         payload: { ok: false, error: "Like or pass one image, or answer a pair." },
       };
     try {
-      dream.calibrate(owner(account), { liked, passed });
+      dream.calibrate(owner(account), { liked, passed, rating });
       return { status: 200, payload: { ok: true } };
     } catch (error) {
       return refuse(error);
@@ -299,16 +302,19 @@ export function registerDreamRoutes(
     }
   });
   route("POST", "/api/dream/undo", (account, { body }) => {
-    const ids = body?.ids;
+    const { ids, calibration, rating } = body || {};
     if (
       !Array.isArray(ids) ||
       !ids.length ||
       ids.length > 2 ||
-      ids.some((id) => typeof id !== "string")
+      ids.some((id) => typeof id !== "string") ||
+      (calibration !== undefined && typeof calibration !== "boolean") ||
+      (rating !== undefined &&
+        (ids.length !== 1 || (rating !== "liked" && rating !== "disliked" && rating !== null)))
     )
       return { status: 400, payload: { ok: false, error: "Undo one result or one pair." } };
     try {
-      dream.undo(owner(account), ids);
+      dream.undo(owner(account), ids, { calibration, rating });
       return { status: 200, payload: { ok: true } };
     } catch (error) {
       return refuse(error);
