@@ -87,7 +87,8 @@ test("settings read the gateway, whose model is the cloud model", async () => {
     ["local/auto", false],
   );
   assert.equal(await engine.supportsVision(), true);
-  assert.equal(await engine.model("caption", true, onLocal), "local/uncensored");
+  // local/auto is uncensored itself.
+  assert.equal(await engine.model("caption", true, onLocal), "local/auto");
   local = null;
   assert.equal(await engine.model("rewrite", true), "cloud/uncensored");
   environment.STUDIO_ASSISTANT_CLOUD_MODEL = "cloud/vision";
@@ -107,13 +108,13 @@ test("text asks for the default on the account's Text side, uncensored only wher
   assert.deepEqual(
     [
       await write({ cloud: "cloud/vision", uncensored: false }),
-      await write({ side: "local", local: "local/uncensored", uncensored: true }),
+      await write({ side: "local", local: "local/qwen3.8-27b-uncensored", uncensored: true }),
     ],
-    ["cloud/vision", "local/uncensored"],
+    ["cloud/vision", "local/qwen3.8-27b-uncensored"],
   );
   // An uncensored default the account may no longer use gives way.
   assert.equal(
-    await write({ side: "local", local: "local/uncensored", uncensored: false }),
+    await write({ side: "local", local: "local/qwen3.8-27b-uncensored", uncensored: false }),
     "local/auto",
   );
   // Local's default waits for a running local text workload; until then Cloud's is used.
