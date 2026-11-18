@@ -83,7 +83,7 @@ test("a cold Radiance profile retains installed LoRAs and catalogue triggers wit
   assert.equal(body.loras.length, 1);
   assert.equal(body.loras[0].name, name);
   assert.equal(body.loras[0].enabled, true);
-  assert.ok(Math.abs(body.loras[0].strength - 0.8) < 1e-10);
+  assert.equal(body.loras[0].strength, 0.8);
   const infos = await loraInfos("radiance", [name]);
   body.prompt = withLoraTriggers(body.prompt, body.loras, infos);
   assert.equal(body.prompt, "ink, A lighthouse");
