@@ -1069,6 +1069,7 @@ test("Typing in either prompt in the phone Generate sheet gives it the screen ab
     return Math.round(box.y + box.height);
   };
   // At rest the text keeps only its AI menu, and the bar holds the output and Generate.
+  await expect(page.locator("[data-composer-dock]")).toBeHidden();
   await expect.poll(bottom).toBeLessThanOrEqual(page.viewportSize()!.height);
   const resting = await bottom();
   await expect(output).toBeVisible();

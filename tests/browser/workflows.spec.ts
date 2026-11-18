@@ -62,7 +62,10 @@ test("Images and Videos tabs keep an expanding bottom composer", async ({ page }
   await expect(page.getByRole("button", { name: "Generate Video", exact: true })).toBeVisible();
 });
 
-test("Retry pending state holds while unrelated jobs remain cancellable", async ({ page }) => {
+test("Retry pending state holds while unrelated jobs remain cancellable", async ({
+  isMobile,
+  page,
+}) => {
   const state = await fixtures(page);
   const input = {
     ...profiles[0].defaults,
@@ -98,6 +101,11 @@ test("Retry pending state holds while unrelated jobs remain cancellable", async 
     await page.goto("/images");
     await page.getByRole("button", { name: "Open Status", exact: true }).click();
     const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+    // WebKit can click a row while the phone drawer is still sliding to its final position.
+    if (isMobile)
+      await expect
+        .poll(() => queue.evaluate((drawer) => drawer.getBoundingClientRect().left))
+        .toBe(0);
     const retry = queue.getByRole("button", { name: "Retry", exact: true });
     await retry.click();
     await expect.poll(() => calls).toBe(1);
