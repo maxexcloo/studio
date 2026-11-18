@@ -5,7 +5,7 @@ import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 
 import { closingPopup } from "../../ui/popupClicks";
 import { MediaZoomControls, useMediaZoom } from "./MediaZoom";
-import { type SwipeDirection, swipeDirection } from "./swipe";
+import { type SwipeGesture, dragAxis, swipeDirection } from "./swipe";
 
 import classes from "./ZoomImage.module.css";
 
@@ -18,7 +18,6 @@ export function ZoomImage({
   height,
   placeholder,
   swipe,
-  arrive,
   onTap,
 }: {
   mediaId?: string;
@@ -30,10 +29,8 @@ export function ZoomImage({
   placeholder?: string;
   width?: number;
   height?: number;
-  /** Touch swipes at Fit: left/right navigate, down closes, up reveals details. */
-  swipe?: (direction: SwipeDirection) => void;
-  /** A picture reached by swiping slides in from the side it was pulled from. */
-  arrive?: "next" | "previous";
+  /** Touch drags at Fit, which the viewer follows: sideways navigates, down closes, up shows details. */
+  swipe?: SwipeGesture;
   /** A lone touch tap on the picture, once it is plainly not the first of a double tap. */
   onTap?: () => void;
 }) {
@@ -104,6 +101,13 @@ export function ZoomImage({
       current = false;
     };
   }, [wanted, displayedSrc, versionRetry, mediaId]);
+  // A picture already decoded (the viewer keeps its neighbours so) shows in the first frame.
+  useLayoutEffect(() => {
+    if (wanted === displayedSrc) return;
+    const ready = new window.Image();
+    ready.src = wanted;
+    if (ready.complete && ready.naturalWidth) setDisplayed({ src: wanted, mediaId, alt });
+  }, [wanted, mediaId]);
   // Sharpening is quiet: the copy stays in view until the original has decoded, and stays if it fails.
   const sharpening = wanted !== src;
 
@@ -146,13 +150,8 @@ export function ZoomImage({
     };
   }, []);
 
-  // The library owns all transforms; Studio only recognises clicks and Fit-only navigation.
-  // At Fit the picture follows a swiping finger, then slides back if the swipe goes nowhere.
-  function follow(transform: string) {
-    const node = zoom.viewport.current!;
-    node.style.transition = transform ? "none" : "";
-    node.style.transform = transform;
-  }
+  // The library owns all transforms; Studio only recognises clicks and Fit-only navigation, which
+  // the viewer's strip follows.
   function down(event: PointerEvent<HTMLDivElement>) {
     suppressClick.current = false;
     clearTimeout(pendingTap.current);
@@ -161,7 +160,7 @@ export function ZoomImage({
     if (gesture.current) {
       gesture.current.multiple = true;
       suppressClick.current = true;
-      follow("");
+      if (gesture.current.drag) swipe?.release();
       return;
     }
     gesture.current = {
@@ -184,33 +183,30 @@ export function ZoomImage({
     if (Math.hypot(dx, dy) > (start.touch ? 10 : 5)) suppressClick.current = true;
     if (!swipe || !start.touch || start.multiple || !start.fit || zoom.modeRef.current !== "Fit")
       return;
-    start.drag ??=
-      Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)
-        ? "x"
-        : dy > 10 && dy > Math.abs(dx)
-          ? "y"
-          : undefined;
-    if (start.drag === "x") follow(`translateX(${dx}px)`);
-    else if (start.drag === "y")
-      follow(
-        `translateY(${Math.max(0, dy)}px) scale(${1 - Math.min(Math.max(0, dy), 400) / 2000})`,
-      );
+    start.drag ??= dragAxis(dx, dy);
+    if (start.drag) swipe.move(start.drag === "x" ? dx : 0, start.drag === "y" ? dy : 0);
   }
   function up(event: PointerEvent<HTMLDivElement>) {
     const start = gesture.current;
     if (!start || start.id !== event.pointerId) return;
     gesture.current = null;
-    if (start.drag) follow("");
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
+    const direction = swipeDirection(dx, dy);
+    const swiped =
+      event.type !== "pointercancel" &&
+      start.touch &&
+      !start.multiple &&
+      start.fit &&
+      zoom.modeRef.current === "Fit" &&
+      direction;
+    if (swiped || start.drag) swipe?.release(swiped || undefined);
     if (event.type === "pointercancel" || !start.touch || start.multiple) {
       if (event.type === "pointercancel") suppressClick.current = true;
       return;
     }
-    const direction = swipeDirection(dx, dy);
-    if (swipe && start.fit && zoom.modeRef.current === "Fit" && direction) {
+    if (swipe && swiped) {
       suppressClick.current = true;
-      swipe(direction);
       return;
     }
     // A double tap on the picture zooms in at that point, or back to Fit. The gap is timed from
@@ -234,7 +230,6 @@ export function ZoomImage({
       ref={zoom.viewport}
       className={classes.zoom}
       data-zoom-mode={zoom.mode}
-      data-arrive={arrive}
       onPointerDownCapture={down}
       onPointerMoveCapture={move}
       onPointerUpCapture={up}

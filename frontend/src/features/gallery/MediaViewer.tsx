@@ -22,6 +22,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -30,6 +31,7 @@ import { Link, useLocation } from "react-router";
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
 import { ActionBarSurface, type ActionGroups, findAction, usualAction } from "../../ui/ActionBar";
+import { useMotionDuration } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop, closingPopup, layerAbove } from "../../ui/popupClicks";
@@ -44,7 +46,7 @@ import { mediaSource, playbackUrl } from "./mediaSource";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, type QueuedRun, useRunFamily } from "./MediaViewerDock";
 import { setMembers, setPosition } from "./resultSets";
-import { type SwipeDirection, swipeDirection } from "./swipe";
+import { type SwipeDirection, type SwipeGesture, dragAxis, swipeDirection } from "./swipe";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { useMediaRating } from "./useMediaRating";
 import { useVideoSound } from "./useVideoSound";
@@ -148,7 +150,11 @@ function ViewerVideo({
       loop
       playsInline
       className={classes.video}
-      onPointerMove={reveal}
+      onPointerMove={(event) => {
+        reveal();
+        swipe.onPointerMove(event);
+      }}
+      onPointerCancel={swipe.onPointerCancel}
       onPointerDown={(event) => {
         controlsShown.current = controls || refused;
         reveal();
@@ -167,14 +173,28 @@ function ViewerVideo({
  * Touch swipes over media that has no zoom of its own: running work and videos. Lifting reports
  * whether the touch was a tap: short, and barely moving.
  */
-function useTouchSwipe(swipe: (direction: SwipeDirection) => void) {
-  const start = useRef<{ id: number; at: number; x: number; y: number } | null>(null);
+function useTouchSwipe(swipe: SwipeGesture) {
+  const start = useRef<{
+    id: number;
+    at: number;
+    x: number;
+    y: number;
+    drag?: "x" | "y";
+  } | null>(null);
   return {
     onPointerDown(event: PointerEvent) {
       start.current =
         event.pointerType === "touch"
           ? { id: event.pointerId, at: event.timeStamp, x: event.clientX, y: event.clientY }
           : null;
+    },
+    onPointerMove(event: PointerEvent) {
+      const from = start.current;
+      if (from?.id !== event.pointerId) return;
+      const dx = event.clientX - from.x;
+      const dy = event.clientY - from.y;
+      from.drag ??= dragAxis(dx, dy);
+      if (from.drag) swipe.move(from.drag === "x" ? dx : 0, from.drag === "y" ? dy : 0);
     },
     onPointerUp(event: PointerEvent) {
       const from = start.current;
@@ -183,13 +203,125 @@ function useTouchSwipe(swipe: (direction: SwipeDirection) => void) {
       const dx = event.clientX - from.x;
       const dy = event.clientY - from.y;
       const direction = swipeDirection(dx, dy);
-      if (direction) swipe(direction);
+      if (direction || from.drag) swipe.release(direction);
       return !direction && Math.hypot(dx, dy) < 10 && event.timeStamp - from.at < 500;
+    },
+    onPointerCancel(event: PointerEvent) {
+      if (start.current?.id !== event.pointerId) return;
+      if (start.current.drag) swipe.release();
+      start.current = null;
     },
   };
 }
 
-/** Decodes the display copies two either side of the current one, so navigation lands on a picture. */
+/**
+ * The strip the current media sits in between its neighbours, which follows a dragging finger a
+ * frame at a time without rendering. Lifting settles it onto the neighbour it was pulled towards,
+ * then `swipe` moves there (true when it did); past the first or last item it resists and slides
+ * back. A drag down shrinks the media towards closing, and stays as the viewer closes.
+ */
+function useStrip(
+  ends: { previous: boolean; next: boolean },
+  swipe: (direction: SwipeDirection) => boolean,
+) {
+  const ref = useRef<HTMLDivElement>(null);
+  const motion = useMotionDuration();
+  const latest = useRef({ ends, swipe, motion });
+  latest.current = { ends, swipe, motion };
+  const frame = useRef(0);
+  const settling = useRef(false);
+  const landed = useRef(false);
+  const place = (transform: string, animate: boolean) => {
+    const node = ref.current;
+    if (!node) return;
+    node.style.transition = animate ? "" : "none";
+    node.style.transform = transform;
+  };
+  const gesture = useMemo<SwipeGesture>(
+    () => ({
+      move(dx, dy) {
+        if (settling.current) return;
+        cancelAnimationFrame(frame.current);
+        frame.current = requestAnimationFrame(() => {
+          const { ends } = latest.current;
+          const x = (dx < 0 ? ends.next : ends.previous) ? dx : dx / 3;
+          place(
+            dy
+              ? `translateY(${dy > 0 ? dy : dy / 3}px) scale(${1 - Math.min(Math.max(0, dy), 400) / 2000})`
+              : `translateX(${x}px)`,
+            false,
+          );
+        });
+      },
+      release(direction) {
+        cancelAnimationFrame(frame.current);
+        if (settling.current) return;
+        const { ends, swipe, motion } = latest.current;
+        const side =
+          (direction === "left" && ends.next && "next") ||
+          (direction === "right" && ends.previous && "previous");
+        const node = ref.current;
+        if (side && node) {
+          settling.current = true;
+          let timer = 0;
+          const settled = (event?: TransitionEvent) => {
+            if (event && event.target !== node) return;
+            node.removeEventListener("transitionend", settled);
+            clearTimeout(timer);
+            settling.current = false;
+            landed.current = swipe(direction!);
+            if (!landed.current) place("", true);
+          };
+          node.addEventListener("transitionend", settled);
+          // Reduced motion, or a transform that hardly moves, may end without the event.
+          timer = window.setTimeout(settled, motion + 100);
+          place(
+            `translateX(calc(${side === "next" ? "-100% - " : "100% + "}var(--mantine-spacing-md)))`,
+            true,
+          );
+          return;
+        }
+        if (direction === "down") swipe(direction);
+        else {
+          place("", true);
+          if (direction === "up") swipe(direction);
+        }
+      },
+    }),
+    [],
+  );
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  /** Once the neighbour it settled on is the current item, the strip returns to centre unseen. */
+  const arrived = () => {
+    if (!landed.current) return;
+    landed.current = false;
+    place("", false);
+  };
+  return { ref, gesture, arrived };
+}
+
+/** A neighbour waiting beside the current media: its display copy, or a video's still. */
+function Neighbour({ item, side }: { item?: MediaItem; side: "previous" | "next" }) {
+  if (!item?.url) return null;
+  const source = mediaSource(item);
+  return (
+    <div className={classes.neighbour} data-side={side} aria-hidden>
+      <img
+        src={item.type === "video" ? source.thumbnailUrl : source.displayUrl}
+        alt=""
+        decoding="async"
+        draggable={false}
+        width={source.width}
+        height={source.height}
+      />
+    </div>
+  );
+}
+
+/**
+ * Decodes the display copies (a video's still) two either side of the current one, so navigation
+ * lands on a picture.
+ */
 function useNeighbourPrefetch(items: MediaItem[], index: number) {
   const held = useRef(new Map<string, HTMLImageElement>());
   const urls =
@@ -197,8 +329,11 @@ function useNeighbourPrefetch(items: MediaItem[], index: number) {
       ? []
       : [1, -1, 2, -2]
           .map((offset) => items[index + offset])
-          .filter((item) => item?.type === "image" && item.status === "done")
-          .map((item) => mediaSource(item).displayUrl);
+          .filter((item) => item?.url && item.status === "done")
+          .map((item) =>
+            item.type === "video" ? mediaSource(item).thumbnailUrl : mediaSource(item).displayUrl,
+          )
+          .filter((url) => url !== undefined);
   const key = urls.join("\n");
   useEffect(() => {
     const keep = new Map<string, HTMLImageElement>();
@@ -392,7 +527,6 @@ export function MediaViewer({
   const iteration = useMediaIteration(item);
   // An accepted retry removes the failed item; the viewer follows its replacement once listed.
   const [replacement, setReplacement] = useState("");
-  const [arrival, setArrival] = useState<{ id: string; from: "next" | "previous" }>();
   useEffect(() => {
     const next = replacement && items.find((candidate) => candidate.jobId === replacement);
     if (!next) return;
@@ -417,7 +551,6 @@ export function MediaViewer({
     const next = canNavigate && viewable[currentIndex + direction];
     if (!next) return;
     setCompare(false);
-    setArrival(undefined);
     navigate!(next);
     return next;
   }
@@ -465,16 +598,18 @@ export function MediaViewer({
     });
     if (direction === "down") close();
     else if (direction === "up") {
-      if (bare) return;
+      if (bare) return false;
       setSheet(phone);
       if (phone) setChromeHidden(false);
-    } else {
-      const next = move(direction === "left" ? 1 : -1);
-      if (next) setArrival({ id: next.id, from: direction === "left" ? "next" : "previous" });
-    }
+    } else return Boolean(move(direction === "left" ? 1 : -1));
+    return false;
   }
+  const previous = canNavigate ? viewable[currentIndex - 1] : undefined;
+  const next = canNavigate ? viewable[currentIndex + 1] : undefined;
+  const strip = useStrip({ previous: Boolean(previous), next: Boolean(next) }, swipe);
+  useLayoutEffect(() => strip.arrived(), [item.id]);
   // Running, failed and cancelled work and videos take the same touch swipes as a picture at Fit.
-  const touchSwipe = useTouchSwipe(swipe);
+  const touchSwipe = useTouchSwipe(strip.gesture);
   return (
     <>
       <Modal
@@ -727,48 +862,51 @@ export function MediaViewer({
                       </Tooltip>
                     </Group>
                   )}
-                  {!item.url ? (
-                    <div className={classes.status} {...touchSwipe}>
-                      <MediaJobStatus item={item} onRetried={setReplacement} />
-                    </div>
-                  ) : item.type === "video" ? (
-                    <ViewerVideo
-                      key={`${item.id}:${source.url}`}
-                      id={item.id}
-                      src={playbackUrl(source.url)}
-                      poster={source.thumbnailUrl}
-                      width={source.width}
-                      height={source.height}
-                      swipe={touchSwipe}
-                      onTap={toggleChrome}
-                    />
-                  ) : compare && item.upscale?.url ? (
-                    <div className={classes.comparison}>
-                      <Suspense fallback={<LoadingState label="Loading Comparison" fill />}>
-                        <MediaComparison
-                          original={item.url}
-                          upscale={item.upscale.url}
-                          width={item.width}
-                          height={item.height}
-                        />
-                      </Suspense>
-                    </div>
-                  ) : (
-                    <Suspense fallback={<LoadingState label="Loading Image" fill />}>
-                      <ZoomImage
-                        mediaId={item.id}
-                        src={source.displayUrl}
-                        original={source.url}
-                        alt={item.prompt || "Generated Image"}
-                        placeholder={source.thumbnailUrl}
+                  <div ref={strip.ref} className={classes.strip}>
+                    <Neighbour item={previous} side="previous" />
+                    {!item.url ? (
+                      <div className={classes.status} {...touchSwipe}>
+                        <MediaJobStatus item={item} onRetried={setReplacement} />
+                      </div>
+                    ) : item.type === "video" ? (
+                      <ViewerVideo
+                        key={`${item.id}:${source.url}`}
+                        id={item.id}
+                        src={playbackUrl(source.url)}
+                        poster={source.thumbnailUrl}
                         width={source.width}
                         height={source.height}
-                        swipe={swipe}
-                        arrive={arrival?.id === item.id ? arrival.from : undefined}
+                        swipe={touchSwipe}
                         onTap={toggleChrome}
                       />
-                    </Suspense>
-                  )}
+                    ) : compare && item.upscale?.url ? (
+                      <div className={classes.comparison}>
+                        <Suspense fallback={<LoadingState label="Loading Comparison" fill />}>
+                          <MediaComparison
+                            original={item.url}
+                            upscale={item.upscale.url}
+                            width={item.width}
+                            height={item.height}
+                          />
+                        </Suspense>
+                      </div>
+                    ) : (
+                      <Suspense fallback={<LoadingState label="Loading Image" fill />}>
+                        <ZoomImage
+                          mediaId={item.id}
+                          src={source.displayUrl}
+                          original={source.url}
+                          alt={item.prompt || "Generated Image"}
+                          placeholder={source.thumbnailUrl}
+                          width={source.width}
+                          height={source.height}
+                          swipe={strip.gesture}
+                          onTap={toggleChrome}
+                        />
+                      </Suspense>
+                    )}
+                    <Neighbour item={next} side="next" />
+                  </div>
                 </>
               )}
             </div>
