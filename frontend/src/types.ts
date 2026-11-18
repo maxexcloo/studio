@@ -27,10 +27,6 @@ export interface Profile {
   aiDrafted?: boolean;
   /** Most of its runs in the last week failed (backend stats.js). */
   failing?: boolean;
-  /** Merged profile ids that now resolve to this one; older records may still name them. */
-  aliases?: string[];
-  /** The backend each merged per-backend id ran on, so reruns of its records keep it. */
-  aliasBackends?: Record<string, string>;
   /** A combined profile: the backend it runs on now, and every backend it has. */
   backend?: string;
   backendOptions?: {

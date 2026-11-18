@@ -182,9 +182,7 @@ function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues
       return [file, sharedName(using) || (label && shownProfileName(label)) || modelKeyName(file)];
     }),
   );
-  for (const profile of profiles)
-    for (const id of [profile.id, ...(profile.aliases || [])])
-      modelNames.set(id, profileName(profile));
+  for (const profile of profiles) modelNames.set(profile.id, profileName(profile));
   const keys = (key: "model" | "lora") => [
     ...new Set([
       ...(key === "model" ? facets.data?.models || [] : facets.data?.loras || []),

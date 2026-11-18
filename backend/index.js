@@ -172,12 +172,7 @@ import { registerProfileEditorRoutes, repointProfiles } from "./profile/editor.j
 import { draftCheckpointProfile } from "./profile/import-draft.js";
 import { registerProfileRoutes } from "./profile/routes.js";
 import { seedSamples } from "./profile/seed.js";
-import {
-  canonicalProfileId,
-  guideStore,
-  profileStore,
-  withCanonicalProfile,
-} from "./profile/store.js";
+import { guideStore, profileStore } from "./profile/store.js";
 import { registerPromptHistoryRoutes } from "./prompt-history-routes.js";
 import { createPromptStage } from "./prompt-stage.js";
 import { promptStyleStore } from "./prompt-styles.js";
@@ -613,24 +608,13 @@ const textWriter = (ownerId = "") =>
 // Text takes the cloud route whenever no local text worker runs (assistant.js), so a configured
 // gateway is always reachable; a stopped or parked local worker never makes text unavailable.
 const textOnline = async () => Boolean(assistantEngine);
-const tasteStore = createTaste({
+const taste = createTaste({
   dataDir,
   writer: tasteWriter,
   promptWriter: textWriter,
   online: textOnline,
   updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
 });
-// Signals name a merged profile by the id it goes by now (profile/merge.js).
-const taste = {
-  ...tasteStore,
-  record: (ownerId, signals) =>
-    tasteStore.record(
-      ownerId,
-      signals.map((signal) =>
-        signal.profileId ? { ...signal, profileId: canonicalProfileId(signal.profileId) } : signal,
-      ),
-    ),
-};
 /**
  * Hears which of an account's items were rated, by hand or by animating a photo: each with its
  * new `rating` and the one it had (`was`). A dislike with an `issue` came from Report Issue.
@@ -935,10 +919,9 @@ const dream = createDream({
         (input.loras || []).map(({ name }) => [name, catalogueLoraInfo(name)]),
       ),
     }),
-  gallery: (ownerId, query) => galleryItems({ ownerId, ...query }).map(withCanonicalProfile),
+  gallery: (ownerId, query) => galleryItems({ ownerId, ...query }),
   count: (ownerId, query) => countGalleryItems({ ownerId, ...query }),
-  items: (ownerId, ids) =>
-    resultNumbers.numbered(galleryItems({ ownerId, ids })).map(withCanonicalProfile),
+  items: (ownerId, ids) => resultNumbers.numbered(galleryItems({ ownerId, ids })),
   visible: filterVisibleGallery,
   likeness: (a, b) => imageSearch.likeness(a, b),
   // Only the owner's own record: updateGalleryJob alone matches any account's item.
@@ -1009,12 +992,10 @@ const dream = createDream({
     const profiles = dreamCatalogue(models).profiles.filter(
       (profile) => isCloudProfile(profile) === (backend === "cloud"),
     );
-    if (extend && !profiles.some((profile) => profile.id === canonicalProfileId(extend)))
+    if (extend && !profiles.some((profile) => profile.id === extend))
       throw new Error("The source video's model isn't ready.");
     if (backend === "cloud") {
-      const pool = extend
-        ? profiles.filter((profile) => profile.id === canonicalProfileId(extend))
-        : profiles;
+      const pool = extend ? profiles.filter((profile) => profile.id === extend) : profiles;
       return animateProfile(pool, {
         where: "cloud",
         preferred: kindDefaults(accountPreferences(ownerId), "videos"),
@@ -1025,7 +1006,7 @@ const dream = createDream({
     }
     return dreamVideoProfile(profiles, {
       preferred: kindDefaults(accountPreferences(ownerId), "videos"),
-      extend: extend && canonicalProfileId(extend),
+      extend,
       defaultId: models.defaults?.videoModel,
       localRunning: models.backends?.video?.available !== false,
       localParked: models.backends?.video?.parked === true,

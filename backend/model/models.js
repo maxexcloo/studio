@@ -9,7 +9,6 @@ import {
 } from "../custom-workflows.js";
 import { families } from "../family-catalogue.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
-import { canonicalProfileId } from "../profile/store.js";
 import {
   radianceImageLimits,
   radianceImageNode,
@@ -554,9 +553,7 @@ export function inferModels(
   // A ready model is the better first pick than one still waiting on files.
   const firstReady = (list, setting) =>
     (
-      list.find(
-        (profile) => profile.id === canonicalProfileId(setting) && profile.ready !== false,
-      ) ||
+      list.find((profile) => profile.id === setting && profile.ready !== false) ||
       list.find((profile) => profile.ready !== false) ||
       list[0]
     )?.id || "";

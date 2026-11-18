@@ -4,13 +4,7 @@ import { animateProfile } from "../animate-profile.js";
 import { logger } from "../crash-log.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { step } from "../event-loop.js";
-import {
-  familyLabels,
-  modelsForAccount,
-  withFailing,
-  withPreferredDefaults,
-  withProfileAliases,
-} from "./catalogue.js";
+import { familyLabels, modelsForAccount, withFailing, withPreferredDefaults } from "./catalogue.js";
 
 /** The catalogue for the browser (/api/models) and Animate's model choice. `catalogue` is model/catalogue.js. */
 export function registerModelRoutes(app, { catalogue }) {
@@ -30,9 +24,7 @@ export function registerModelRoutes(app, { catalogue }) {
       return {
         status: 200,
         payload: {
-          ...(await step("models: account", () =>
-            withFailing(withProfileAliases(forAccount(models))),
-          )),
+          ...(await step("models: account", () => withFailing(forAccount(models)))),
           familyLabels,
         },
       };
@@ -46,7 +38,7 @@ export function registerModelRoutes(app, { catalogue }) {
       return {
         status: 200,
         payload: {
-          ...withFailing(withProfileAliases(forAccount(catalogue.unavailableModels()))),
+          ...withFailing(forAccount(catalogue.unavailableModels())),
           familyLabels,
         },
       };

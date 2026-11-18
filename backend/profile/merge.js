@@ -10,11 +10,10 @@
  * single id does is listed, not merged. Same-named profiles that differ are listed with what
  * differs.
  *
- * Applying records each removed id as an alias of the kept one (profile/store.js), then removes the
- * removed files. Version history stays, so a seed never brings
- * a merged id back. Workflow preferences move to the kept id and the removed ids'
- * guide bindings go (the kept one has the same); gallery records, presets, jobs and taste
- * signals keep the ids they hold, and readers resolve them through the aliases.
+ * Applying removes the removed files. Version history stays, so a seed never brings a merged id
+ * back. Workflow preferences move to the kept id and the removed ids' guide bindings go (the kept
+ * one has the same); gallery records, presets, jobs and taste signals keep the ids they hold and
+ * report the profile as missing, as after Remove Profile.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -155,19 +154,14 @@ export function mergeDuplicateProfiles({ hash, by = "" } = {}) {
       { status: 409 },
     );
   const store = profileStore({ workflowsDir: userWorkflowsDir });
-  const at = new Date().toISOString();
   for (const { from } of plan.merges) {
     const { text } = readEditableProfile(from);
     // History keeps the removed definition, and marks the id as one Studio held.
     store.record(from, text, { by, origin: "studio", note: "Before merging as a duplicate" });
   }
-  // Aliases first: an interrupted merge leaves both files, and previewing again finishes it.
-  store.addAliases(
-    plan.merges.map(({ from, to }) => ({ from, to, reason: "duplicate" })),
-    { by, at },
-  );
   for (const { from } of plan.merges) fs.rmSync(path.join(userWorkflowsDir, `${from}.json`));
-  repointWorkflowPreferences((id) => store.canonical(id));
+  const kept = new Map(plan.merges.map(({ from, to }) => [`custom:${from}`, `custom:${to}`]));
+  repointWorkflowPreferences((id) => kept.get(id) ?? id);
   guideStore().moveProfileBindings(
     { remove: plan.merges.map(({ from }) => `custom:${from}`) },
     { by, note: "Merged duplicate profiles" },

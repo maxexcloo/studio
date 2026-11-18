@@ -104,8 +104,7 @@ function PairRow({
 
 /**
  * Library › Profiles › Combine Backends: previews a model's Radiance and ComfyUI profiles, then
- * makes each picked pair one profile with both backends, keeping the old ids as aliases that run
- * on their own backend (profile/backends.js).
+ * makes each picked pair one profile with both backends (profile/backends.js).
  */
 export function CombineBackends({ opened, onClose }: { opened: boolean; onClose: () => void }) {
   const client = useQueryClient();
@@ -169,8 +168,8 @@ export function CombineBackends({ opened, onClose }: { opened: boolean; onClose:
           {pairs.length ? (
             <>
               <Text size="sm">
-                Each pair becomes one profile on its default backend, switchable in the profile. Old
-                IDs stay as aliases, so their results rerun where they ran.
+                Each pair becomes one profile on its default backend, switchable in the profile.
+                Results made with the old profiles show them as missing.
               </Text>
               {pairs.map((pair) => (
                 <PairRow

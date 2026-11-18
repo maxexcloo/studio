@@ -1,6 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
 
-import { dreamItem, fixtures, profiles, section, serveDream, stamp } from "./fixtures";
+import { dreamItem, fixtures, section, serveDream, stamp } from "./fixtures";
 
 /** Opens a route-backed Dream view from its menu. */
 async function showView(page: Page, name: string) {
@@ -393,24 +393,13 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   page,
 }, testInfo) => {
   await fixtures(page);
-  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({
-      json: {
-        profiles: profiles.map((profile) =>
-          profile.id === "image:test"
-            ? { ...profile, aliases: ["custom:image-p-h3-image-fast"] }
-            : profile,
-        ),
-      },
-    }),
-  );
   const dream = await serveDream(page, {
     taste: {
       likes: ["misty harbours", "foxes in snow", "lighthouses", "quiet streets", "old boats"],
       styles: ["film grain", "muted colour", "long exposure"],
       avoid: ["crowds"],
       note: "Quiet coastal scenes in soft, misty light.",
-      models: ["custom:image-p-h3-image-fast", "gone"],
+      models: ["image:test", "gone"],
       loras: ["detail.safetensors"],
       loraScores: [{ name: "detail.safetensors", strength: 0.8, score: 2 }],
       shapes: ["0.67", "1.78"],

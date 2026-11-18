@@ -5,11 +5,6 @@
  * change becomes an immutable version under `<data>/history/profiles/<id>/<n>.json`, and
  * `<data>/workflows/.studio-meta.json` records each profile's current version, origin, AI-Drafted
  * marker and who saved it.
- * `<data>/workflows/.studio-aliases.json` maps a removed profile id to the profile that replaced it
- * (`{"<old id>": {"to": "<kept id>", "backend"?, "at", "by", "reason"}}`, written by profile/merge.js
- * and profile/backends.js, and by renames migrate-runtime applied), so records that still name the old id resolve to the kept profile
- * through `canonical`, and a per-backend id merged into a combined profile runs on its own backend
- * (`aliasBackend`).
  *
  * Guides live in `<data>/guides/prompting.json`: the prompting.json schema (families, packs,
  * profiles, variants, negatives) plus `meta.<packId>`. Pack versions go under
@@ -79,7 +74,6 @@ export function createProfileStore({
   workflowsDir = path.join(dataDir, "workflows"),
 } = {}) {
   const metaFile = path.join(workflowsDir, ".studio-meta.json");
-  const aliasFile = path.join(workflowsDir, ".studio-aliases.json");
   const historyDir = (id) => path.join(dataDir, "history", "profiles", id);
   const readMeta = () => readObject(metaFile);
 
@@ -174,88 +168,13 @@ export function createProfileStore({
     if (changed) writeJsonFile(metaFile, meta);
   }
 
-  // Read on every lookup, so it is cached on the file's size and modification time.
-  let aliasCache = { signature: "", value: {} };
-  function aliases() {
-    let signature = "";
-    try {
-      const stat = fs.statSync(aliasFile);
-      signature = `${stat.size}:${stat.mtimeMs}`;
-    } catch {
-      return {};
-    }
-    if (aliasCache.signature !== signature)
-      aliasCache = { signature, value: readObject(aliasFile) };
-    return aliasCache.value;
-  }
-
-  /**
-   * The id a profile goes by now: an alias's kept id (following later merges), else the id as
-   * given. Takes `custom:<id>` or a bare id and answers in the same form.
-   */
-  function canonical(value) {
-    if (typeof value !== "string" || !value) return value;
-    const prefixed = value.startsWith("custom:");
-    let id = prefixed ? value.slice(7) : value;
-    const map = aliases();
-    for (const seen = new Set([id]); typeof map[id]?.to === "string"; seen.add(id)) {
-      if (seen.has(map[id].to)) break;
-      id = map[id].to;
-    }
-    return prefixed ? `custom:${id}` : id;
-  }
-
-  /**
-   * The backend an old id ran on, when it was merged into a combined profile: the first alias on
-   * its way to the kept id that names one. Takes `custom:<id>` or a bare id; "" otherwise.
-   */
-  function aliasBackend(value) {
-    if (typeof value !== "string" || !value) return "";
-    let id = value.startsWith("custom:") ? value.slice(7) : value;
-    const map = aliases();
-    for (const seen = new Set([id]); typeof map[id]?.to === "string"; seen.add(id)) {
-      if (typeof map[id].backend === "string" && map[id].backend) return map[id].backend;
-      if (seen.has(map[id].to)) break;
-      id = map[id].to;
-    }
-    return "";
-  }
-
-  /** Records `{from, to, backend?, reason}` aliases: `from` now resolves to `to` (on `backend`). */
-  function addAliases(entries, { by = "", at = stamp() } = {}) {
-    const next = { ...aliases() };
-    for (const { from, to, backend = "", reason = "" } of entries) {
-      if (!validId(from) || !validId(to) || from === to) throw new Error("Choose two profile ids.");
-      next[from] = {
-        to,
-        ...(backend ? { backend: String(backend) } : {}),
-        at,
-        by: String(by || ""),
-        ...(reason ? { reason } : {}),
-      };
-    }
-    writeJsonFile(aliasFile, next);
-    return next;
-  }
-
   const meta = (id) => readMeta()[id] || null;
 
-  /**
-   * Whether Studio has ever held this profile (any version) or merged it into another, so a seed
-   * never brings back one it removed.
-   */
-  const known = (id) =>
-    versionsIn(historyDir(id)).length > 0 ||
-    Boolean(readMeta()[id]) ||
-    Object.hasOwn(aliases(), id);
+  /** Whether Studio has ever held this profile (any version), so a seed never brings back one it removed. */
+  const known = (id) => versionsIn(historyDir(id)).length > 0 || Boolean(readMeta()[id]);
 
   return {
     metaFile,
-    aliasFile,
-    aliases,
-    canonical,
-    aliasBackend,
-    addAliases,
     record,
     versions,
     version,
@@ -685,16 +604,6 @@ export function profileStore(options = {}) {
   if (!profileStores.has(key))
     profileStores.set(key, createProfileStore({ ...options, dataDir: key }));
   return profileStores.get(key);
-}
-/** The id a profile goes by now in the current data folder (profile ids merged away resolve to the kept one). */
-export const canonicalProfileId = (id) => profileStore().canonical(id);
-/** The backend a merged per-backend profile id ran on ("" for any other id). */
-export const profileAliasBackend = (id) => profileStore().aliasBackend(id);
-/** A record whose settings name a merged profile, as a copy with the kept id; otherwise the record itself. */
-export function withCanonicalProfile(item) {
-  const id = item?.settings?.profileId;
-  const kept = canonicalProfileId(id);
-  return kept === id ? item : { ...item, settings: { ...item.settings, profileId: kept } };
 }
 export function guideStore(options = {}) {
   const key = options.dataDir || currentDataDir();

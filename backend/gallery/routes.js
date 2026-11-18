@@ -14,7 +14,6 @@ import { directRoute } from "../domain/direct-route.ts";
 import { similarThresholds } from "../domain/image-search.ts";
 import { queuePriority } from "../domain/store.ts";
 import { galleryKey } from "../persistence/gallery-rows.ts";
-import { canonicalProfileId } from "../profile/store.js";
 import { adminRefusal } from "../route-access.js";
 import { galleryStats } from "../stats.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
@@ -146,9 +145,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
         for (const lora of Array.isArray(row.loras) ? row.loras : []) loras.push(lora?.name);
         if (row.tags) tagged.push({ caption: { tags: row.tags } });
       }
-      // Each recorded model resolves once: resolving reads the alias file's state.
       return {
-        models: unique([...[...models].map(canonicalProfileId), ...names]),
+        models: unique([...models, ...names]),
         loras: unique(loras),
         tags: topCaptionTags(tagged),
       };
