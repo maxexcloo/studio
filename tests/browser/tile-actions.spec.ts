@@ -137,10 +137,10 @@ test("The same tile menu opens by context click and More, with keyboard navigati
     "Recreate",
     "Upscale",
     "AI",
-    "Share",
     "Like",
     "Dislike",
     "Report",
+    "Share",
     "Delete",
   ]);
   await page.keyboard.press("Escape");

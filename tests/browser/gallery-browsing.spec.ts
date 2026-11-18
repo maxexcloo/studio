@@ -921,9 +921,11 @@ test("Download takes a selection of any size as one archive", async ({ page }, t
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
   await expect(status).toHaveText("700 Selected");
-  const download = page.waitForEvent("download");
-  await (await selectionMenuItem(page, "Share", "Download")).click();
-  expect((await download).url()).toMatch(/\/api\/gallery\/export\?selection=token$/);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    selectionAction(page, "Download").click(),
+  ]);
+  expect(download.url()).toMatch(/\/api\/gallery\/export\?selection=token$/);
   expect(posted).toHaveLength(700);
   await expect(status).toHaveCount(0);
 });
