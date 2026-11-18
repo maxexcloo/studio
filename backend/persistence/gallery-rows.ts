@@ -47,6 +47,19 @@ const galleryColumns: [string, string][] = [
   ],
 ];
 
+/**
+ * What the account summaries (the filter menu and LoRA previews) read of each row, as named
+ * columns: the `studio_gallery_summary` index holds them, so a summary reads no records.
+ */
+export const summaryFields = {
+  createdAt: field("createdAt"),
+  loras: "value -> '$.settings.loras'",
+  model: field("model"),
+  modelName: field("settings.modelName"),
+  tags: "value -> '$.caption.tags'",
+  thumbnailUrl: field("thumbnailUrl"),
+};
+
 // The gallery's order, then the columns pages filter on, so a page's count reads only the index.
 const galleryOrder =
   "uploaded, unlisted, bucket, created_ms DESC, job_id DESC, item_index, item_id DESC, status, type, rating";
@@ -69,6 +82,10 @@ const galleryIndexes: [string, string][] = [
   [
     "studio_gallery_runs",
     "created_ms, key, unlisted, status, rating, json_extract(value, '$.settings.profileId'), json_extract(value, '$.timing.runMs')",
+  ],
+  [
+    "studio_gallery_summary",
+    `owner_id, unlisted, type, status, key, ${Object.values(summaryFields).join(", ")}`,
   ],
 ];
 

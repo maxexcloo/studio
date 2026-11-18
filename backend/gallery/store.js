@@ -10,7 +10,13 @@ import { dataDir } from "../data-dir.js";
 import { createResultNumbers } from "../domain/result-numbers.ts";
 import { generationRecord } from "../generation-record.js";
 import { mediaFile, mediaParams, mediaPath, mediaUrls } from "../media-paths.js";
-import { dreamArm, dreamPair, dreamState, galleryKey } from "../persistence/gallery-rows.ts";
+import {
+  dreamArm,
+  dreamPair,
+  dreamState,
+  galleryKey,
+  summaryFields,
+} from "../persistence/gallery-rows.ts";
 import {
   readRuntimeDocument,
   runtimeDatabase,
@@ -289,6 +295,26 @@ export function* eachGalleryItem(query = {}, after) {
       );
       for (const row of rows) yield parse(row);
     }
+}
+
+/**
+ * The `summaryFields` of each item the query matches that the gallery lists (filterVisibleGallery),
+ * read from the summary index alone. A row's key stands in for its URL: it is the URL where the
+ * item has one.
+ */
+export function gallerySummaryRows(query = {}) {
+  const { sql, params } = where({ ...query, unlisted: false });
+  const columns = Object.entries(summaryFields).map(([name, value]) => `${value} AS ${name}`);
+  return statement(
+    `SELECT key, ${columns.join(", ")} FROM studio_gallery INDEXED BY studio_gallery_summary ${sql}`,
+  )
+    .all(...params)
+    .filter((row) => hasGalleryMedia({ url: row.key, createdAt: row.createdAt }))
+    .map((row) => ({
+      ...row,
+      loras: JSON.parse(row.loras ?? "null"),
+      tags: JSON.parse(row.tags ?? "null"),
+    }));
 }
 
 export function countGalleryItems(query = {}) {
