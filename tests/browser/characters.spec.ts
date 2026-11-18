@@ -69,7 +69,7 @@ test("Library card ratings hide with Undo and feed the References sort", async (
   await rate("Dislike");
   await expect.poll(names).toEqual(["Ada"]);
   await page.getByRole("button", { name: "Filter Characters", exact: true }).click();
-  const filters = page.getByRole("dialog", { name: "Characters Filters", exact: true });
+  const filters = page.getByRole("dialog", { name: "Filter Characters", exact: true });
   await filters.getByText("Disliked", { exact: true }).click();
   await filters.getByRole("button", { name: "Done", exact: true }).click();
   await expect.poll(names).toEqual(["Mara"]);

@@ -60,7 +60,7 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
     .toEqual(["Soft Style", "Detail Slider"]);
   // Sorting by name sets the ratings aside.
   await page.getByRole("button", { name: "Sort", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Name A–Z", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "Name A–Z", exact: true }).click();
   await expect
     .poll(() =>
       choices
@@ -76,7 +76,7 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
     "Name A–Z",
     "Name Z–A",
   ]);
-  await page.getByRole("menuitem", { name: "Most Used", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "Most Used", exact: true }).click();
   await expect
     .poll(() =>
       choices
@@ -150,7 +150,7 @@ test("Escape inside the LoRA picker closes only its innermost layer", async ({
   const sort = controls.getByRole("button", { name: "Sort", exact: true });
   await sort.click();
   await expect(sort).toHaveAttribute("aria-expanded", "true");
-  await expect(controls.getByRole("menuitem", { name: "Name A–Z" })).toBeVisible();
+  await expect(controls.getByRole("menuitemradio", { name: "Name A–Z" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(sort).toHaveAttribute("aria-expanded", "false");
   await expect(controls).toBeVisible();
