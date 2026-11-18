@@ -312,13 +312,14 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
   const stack = page.getByRole("dialog", { name: "LoRAs", exact: true });
   await expect(stack.getByText("Choose LoRAs or a preset.", { exact: true })).toBeVisible();
   await expect(page.getByRole("list", { name: "LoRA Choices", exact: true })).toHaveCount(0);
-  // The footer's Add, Clear and Done share one row in that order without overlapping.
+  // The footer's Add, Clear and Done share one row in that order, Add at the left edge.
   const [add, clear, done] = await Promise.all(
     ["Add LoRAs", "Clear", "Done"].map((name) =>
       stack.getByRole("button", { name, exact: true }).boundingBox(),
     ),
   );
-  expect(add!.x + add!.width).toBeLessThanOrEqual(clear!.x);
+  expect(add!.x).toBeLessThan(page.viewportSize()!.width / 4);
+  expect(add!.x + add!.width).toBeLessThan(clear!.x - 40);
   expect(clear!.x + clear!.width).toBeLessThanOrEqual(done!.x);
   // Centred on one row, within a pixel, as layout rounds to device pixels.
   for (const button of [add!, clear!])

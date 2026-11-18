@@ -191,7 +191,7 @@ export function usePromptHistory({
       target={<span />}
       onClear={() => edit.mutate({ action: "clear" })}
       clearDisabled={!history.data?.prompts.some((entry) => !entry.liked)}
-      secondary={
+      leading={
         <Button
           variant="default"
           disabled={!value.trim() || currentLiked}
