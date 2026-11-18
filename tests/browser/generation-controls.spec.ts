@@ -625,6 +625,8 @@ test("References, masking, settings and runtime presets remain editable", async 
   await (
     await upload
   ).setFiles({ name: "reference.png", mimeType: "image/png", buffer: Buffer.from("fixture") });
+  // Placing the upload can return phones to the stack by itself.
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true }).first()).toBeVisible();
   await closeReferences(page);
   await expect(page.getByRole("dialog", { name: "References", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();

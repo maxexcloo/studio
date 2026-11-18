@@ -14,6 +14,8 @@ test("Mask zoom and Hand pan preserve painting history and saved masks", async (
   await (
     await upload
   ).setFiles({ name: "reference.png", mimeType: "image/png", buffer: Buffer.from("fixture") });
+  // Placing the upload can return phones to the stack by itself.
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true }).first()).toBeVisible();
   await closeReferences(page);
   await page
     .getByRole("radiogroup", { name: "Reference Role", exact: true })
