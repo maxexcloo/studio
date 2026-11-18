@@ -1297,6 +1297,7 @@ test("An opened video plays with sound and reveals its controls on pointer movem
     type: "video",
     status: "done",
     url: "/test-media/clip.mp4",
+    thumbnailUrl: image,
     prompt: "A rolling wave",
     width: 1280,
     height: 720,
@@ -1490,7 +1491,7 @@ test("Phone swipes reveal details and close the viewer", async ({ page }, testIn
     });
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   }
-  // A drag too short to navigate follows the finger, then settles back.
+  // A drag past the last image moves against resistance, then settles back.
   const start = (await picture.boundingBox())!;
   const x = start.x + start.width / 2;
   const y = start.y + start.height / 2;
@@ -1499,7 +1500,7 @@ test("Phone swipes reveal details and close the viewer", async ({ page }, testIn
     type: "touchMove",
     touchPoints: [{ x: x - 40, y }],
   });
-  await expect.poll(async () => Math.round((await picture.boundingBox())!.x - start.x)).toBe(-40);
+  await expect.poll(async () => (await picture.boundingBox())!.x - start.x).toBeLessThan(-1);
   await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await expect.poll(async () => Math.round((await picture.boundingBox())!.x - start.x)).toBe(0);
   await swipe(-120);
@@ -1710,6 +1711,7 @@ test("Work still generating and videos take the same swipes as a picture", async
       type: "video",
       status: "done",
       url: "/test-media/clip.mp4",
+      thumbnailUrl: image,
       prompt: "A rolling wave",
       width: 1280,
       height: 720,
@@ -1720,6 +1722,7 @@ test("Work still generating and videos take the same swipes as a picture", async
       type: "video",
       status: "done",
       url: "/test-media/clip-2.mp4",
+      thumbnailUrl: image,
       prompt: "A breaking wave",
       width: 1280,
       height: 720,
