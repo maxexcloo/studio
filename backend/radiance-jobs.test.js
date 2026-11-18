@@ -110,6 +110,27 @@ test("an image run records its queue wait, model load, sampling and save for Det
   assert.equal(timing.downloadMs, undefined, "an image has no separate download");
 });
 
+test("an image is saved even if the model timing lookup has not answered", async () => {
+  const id = "image-without-model-timing";
+  const body = bodyFor(id);
+  pending(id, body);
+  let signal;
+  await runRadianceJob(id, body, worker, {
+    store,
+    client: {
+      models: (reading) => {
+        signal = reading;
+        return new Promise(() => {});
+      },
+      images: async () => [png],
+    },
+  });
+  const [output] = galleryItems({ jobId: id });
+  assert.equal(output.status, "done");
+  assert.equal(output.timing.loadMs, undefined);
+  assert.equal(signal.aborted, true);
+});
+
 test("a run ended by a forced Radiance restart keeps its ending when the dropped request fails", async () => {
   const id = "ended-by-restart";
   const body = bodyFor(id);
