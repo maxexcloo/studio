@@ -282,6 +282,7 @@ const unreachable = (what: string, reach: Reach) =>
     ? `${what} is stopped: an administrator can start it in Settings › Workers.`
     : `${what} is offline.`;
 export type DreamStatus = "off" | "paused" | "waiting" | "generating" | "capped" | "unavailable";
+type DreamAttempt = { status: DreamStatus; reason?: string; imagesDone?: boolean };
 interface DreamRecord {
   settings: DreamSettings;
   /** Dream's hidden session for its jobs. */
@@ -898,7 +899,7 @@ export function createDream(options: {
         .map(([id]) => id),
     );
   }
-  /** The kinds Dream may still make today, the one it is behind on first. */
+  /** The kinds still due today, the one it is behind on first, and whether images reached their cap. */
   function kinds(settings: DreamSettings, counts: { images: number; videos: number }) {
     const image = settings.images && counts.images < settings.dailyImages;
     const video = settings.videos && counts.videos < settings.dailyVideos;
@@ -907,11 +908,14 @@ export function createDream(options: {
       video &&
       (!image ||
         (counts.videos + 1) * settings.dailyImages <= counts.images * settings.dailyVideos);
-    return [
-      ...(videoDue ? (["video"] as Kind[]) : []),
-      ...(image ? (["image"] as Kind[]) : []),
-      ...(video && !videoDue ? (["video"] as Kind[]) : []),
-    ];
+    return {
+      due: [
+        ...(videoDue ? (["video"] as Kind[]) : []),
+        ...(image ? (["image"] as Kind[]) : []),
+        ...(video && !videoDue ? (["video"] as Kind[]) : []),
+      ],
+      imagesDone: settings.dailyImages > 0 && settings.images && !image,
+    };
   }
   /** What stands in the way before counting today's work. */
   function blockedBySettings(ownerId: string, { settings }: DreamRecord) {
@@ -922,6 +926,8 @@ export function createDream(options: {
     return null;
   }
   const capped = { status: "capped" as const, reason: "Dream has made today's share." };
+  const capReason = (reason: string | undefined, imagesDone?: boolean) =>
+    reason && imagesDone ? `Dream has made today's images. ${reason}` : reason;
 
   /** One of the entries drawn by its weight, among those weighing more than nothing. */
   function drawn<T>(entries: [T, number][]) {
@@ -1834,12 +1840,12 @@ export function createDream(options: {
   }
 
   /** Tries to queue one Dream job for the owner; says what happened. */
-  async function consider(ownerId: string): Promise<{ status: DreamStatus; reason?: string }> {
+  async function consider(ownerId: string): Promise<DreamAttempt> {
     const record = read(ownerId);
     const blocked = blockedBySettings(ownerId, record);
     if (blocked) return blocked;
     const counts = today(ownerId);
-    const due = kinds(record.settings, counts);
+    const { due, imagesDone } = kinds(record.settings, counts);
     if (!due.length) return capped;
     if (now() < (failures.get(ownerId)?.until ?? 0))
       return {
@@ -2116,7 +2122,7 @@ export function createDream(options: {
       return { status: "generating" };
     }
     if (idle) return { status: "waiting", reason: idle };
-    return { status: "unavailable", reason };
+    return { status: "unavailable", reason, imagesDone };
   }
 
   /** Whether a job is Spicy: a share of them, where the setting and Uncensored Models allow. */
@@ -2507,15 +2513,16 @@ export function createDream(options: {
     return { status: "generating" };
   }
 
-  const states = new Map<string, { status: DreamStatus; reason?: string }>();
+  const states = new Map<string, DreamAttempt>();
   const noted = new Map<string, string>();
   /**
    * Each account's reason Dream doesn't run (paused, capped, unavailable or failing) is logged once,
    * until another reason replaces it; work generated in between keeps it.
    */
-  function note(ownerId: string, state: { status: DreamStatus; reason?: string }) {
+  function note(ownerId: string, state: DreamAttempt) {
     if (state.status === "generating") return;
-    const text = state.reason || (state.status === "paused" ? "Paused." : "");
+    const text =
+      capReason(state.reason, state.imagesDone) || (state.status === "paused" ? "Paused." : "");
     if (text && noted.get(ownerId) !== text)
       log.info(`Dream skips ${ownerId ? `account ${ownerId}` : "Studio"}: ${text}`);
     noted.set(ownerId, text);
@@ -2570,7 +2577,7 @@ export function createDream(options: {
           const index = (next + step) % owners.length;
           const ownerId = owners[index];
           if (held(ownerId) >= options.slots()) continue;
-          let state: { status: DreamStatus; reason?: string };
+          let state: DreamAttempt;
           try {
             considering = { ownerId };
             state = await tracked(`Dream: consider ${index}`, () => consider(ownerId));
@@ -2736,9 +2743,14 @@ export function createDream(options: {
       const record = read(ownerId);
       const blocked = blockedBySettings(ownerId, record);
       if (blocked) return blocked;
-      if (!kinds(record.settings, today(ownerId)).length) return capped;
+      const { due, imagesDone } = kinds(record.settings, today(ownerId));
+      if (!due.length) return capped;
       const last = states.get(ownerId);
-      if (last && ["unavailable", "waiting"].includes(last.status)) return last;
+      if (last && ["unavailable", "waiting"].includes(last.status))
+        return {
+          status: last.status,
+          reason: capReason(last.reason, imagesDone && last.imagesDone),
+        };
       return busy()
         ? { status: "waiting", reason: "Waiting for other work to finish." }
         : { status: "waiting" };

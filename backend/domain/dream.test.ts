@@ -2404,6 +2404,23 @@ test("Dream videos animate liked stills for most videos and Dream's keeps for th
   assert.deepEqual(walks(), [], "Dream never walks the whole gallery");
 });
 
+test("Dream reports today's finished images alongside the video refusal", async (t) => {
+  const { dream, state, dreamOnce } = fixture(t, profiles);
+  await dream.save("alice", { enabled: true, dailyImages: 1, videos: true, dailyVideos: 1 });
+  const image = await dreamOnce();
+  assert.ok(image);
+  dream.keep("alice", String(dream.unseen("alice")[0].id));
+  state.videoRefusal = "No video model can animate images.";
+
+  assert.equal(await dreamOnce(), undefined);
+  assert.deepEqual(dream.status("alice"), {
+    status: "unavailable",
+    reason: "Dream has made today's images. No video model can animate images.",
+  });
+  state.clock += 86_400_000;
+  assert.equal(dream.status("alice").reason, state.videoRefusal);
+});
+
 test("A Dream video skips a source that left the gallery and animates the next", async (t) => {
   const { dream, state, dreamOnce, finish, live, generated } = fixture(t, profiles);
   await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
