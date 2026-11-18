@@ -221,6 +221,15 @@ test("Unfinished Items in Settings › Maintenance retry, stop and clear any acc
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("dialog", { name: /^Settings/ })).toBeVisible();
+
+  await page.goto("/settings#workers");
+  const unfinished = page.getByRole("button", { name: "Unfinished Items", exact: true });
+  await unfinished.focus();
+  await page.keyboard.press("Enter");
+  await expect(dialog.getByText("No Unfinished Items", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(unfinished).toBeFocused();
 });
 
 test("Tile Captions in Settings › Preferences pin phone tile captions", async ({
