@@ -88,10 +88,10 @@ for (const { model, family, step, size, maxWidth } of [
 ]) {
   test(`Radiance image defaults, presets and requests use the ${step}-pixel grid for ${model}`, async () => {
     const workflow = `custom:radiance-size-${step}`;
-    const defaults = { width: 1040, height: 752 };
-    const inputs = { ...defaults, model, cfg: 1, steps: 8, seed: 7, count: 1 };
+    const defaults = { cfg: 3.5, width: 1040, height: 752 };
+    const inputs = { ...defaults, model, steps: 8, seed: 7, count: 1 };
     const controls = Object.fromEntries(
-      ["model", "prompt", "width", "height"].map((input) => [input, { node: "1", input }]),
+      ["cfg", "model", "prompt", "width", "height"].map((input) => [input, { node: "1", input }]),
     );
     const graph = { 1: { class_type: "RadianceImageGenerate", inputs } };
     saveImportedWorkflow({
@@ -125,6 +125,7 @@ for (const { model, family, step, size, maxWidth } of [
     const input = { workflow, model: workflow, prompt: "A lighthouse", ...defaults };
     const body = sanitizeGenerateBody(input, info);
     assert.deepEqual([body.width, body.height], size);
+    assert.equal(body.cfg, 3.5);
     for (const available of [true, false]) {
       const routes = createGenerationSubmission({
         loadComfyContext: async () => ({ info }),
@@ -138,7 +139,9 @@ for (const { model, family, step, size, maxWidth } of [
     }
     for (const queued of [body, input, { ...input, width: undefined, height: undefined }]) {
       const built = await customWorkflowGraph(queued);
-      assert.equal(imageRequest(built[1].inputs).body.size, size.join("x"));
+      const request = imageRequest(built[1].inputs).body;
+      assert.equal(request.size, size.join("x"));
+      assert.equal(request.guidance_scale, 3.5);
     }
     assert.throws(
       () => imageRequest({ ...inputs, width: 1041, prompt: input.prompt }),
