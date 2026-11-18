@@ -34,6 +34,7 @@ COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certifica
 RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
     && apt-get -o Acquire::https::CaInfo=/etc/ssl/certs/ca-certificates.crt --error-on=any update \
     && apt-get -o Acquire::https::CaInfo=/etc/ssl/certs/ca-certificates.crt --no-install-recommends --yes upgrade \
+    && apt-get -o Acquire::https::CaInfo=/etc/ssl/certs/ca-certificates.crt --no-install-recommends --yes install ffmpeg \
     && rm -rf /var/lib/apt/lists/* /usr/local/lib/node_modules/npm /opt/yarn* \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg \
     && mkdir /data && chown node:node /data

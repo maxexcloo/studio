@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -15,12 +14,7 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-warmup-"));
 process.env.STUDIO_DATA_DIR = dataDir;
 const media = path.join(dataDir, "media", "studio");
 fs.mkdirSync(media, { recursive: true });
-let encoder;
-try {
-  encoder = createRequire(import.meta.url)("ffmpeg-static");
-} catch {
-  encoder = "ffmpeg";
-}
+const encoder = "ffmpeg";
 let canEncode = true;
 try {
   execFileSync(encoder, ["-version"], { stdio: "ignore" });

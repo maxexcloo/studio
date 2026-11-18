@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test, { after } from "node:test";
@@ -19,12 +18,7 @@ const [{ registerVideoEditRoutes }, { Store }, media, previews] = await Promise.
 ]);
 const { setGallery, gallery: galleryRows } = await import("../fixtures/gallery.js");
 after(() => fs.rmSync(temporary, { recursive: true, force: true }));
-let encoder;
-try {
-  encoder = createRequire(import.meta.url)("ffmpeg-static");
-} catch {
-  encoder = "ffmpeg";
-}
+const encoder = "ffmpeg";
 let available = true;
 try {
   execFileSync(encoder, ["-version"], { stdio: "ignore" });

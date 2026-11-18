@@ -1,6 +1,9 @@
 [env]
 _.path = ["node_modules/.bin"]
 
+[tools]
+ffmpeg = "latest"
+
 # Development
 [tasks.build]
 run = "npm run build"
