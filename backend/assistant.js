@@ -1125,8 +1125,8 @@ export function createAssistant(
   }
 
   /**
-   * How a Dream result fits its project's brief (domain/review.ts); the caller checks the model
-   * reads images. Throws AssistantError on a reply without a score.
+   * How a result keeps its brief, its owner's rules and any project's (domain/review.ts); the
+   * caller checks the model reads images. Throws AssistantError on a reply without a score.
    */
   async function review({ image, brief, explicit = false, signal, writer } = {}) {
     const model = await modelFor("review", explicit, writer);

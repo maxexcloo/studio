@@ -37,13 +37,15 @@ export const maxProjectBrief = 600;
 export const maxProjectProfiles = 20;
 export const maxProjectLoras = 8;
 
-/** How a Dream result fits its project's brief, from 1 to 10 (backend/domain/review.ts). */
+/** How a result keeps its owner's rules and any project's brief, from 1 to 10 (backend/domain/review.ts). */
 export interface Review {
   score: number;
   /** What misses the brief; empty when the result fits it. */
   miss: string;
   model: string;
   at: string;
+  /** A short hash of the brief it was checked against: a changed brief makes it due again. */
+  brief?: string;
 }
 /** One project's unseen Dream results in While You Were Away. */
 export interface DigestGroup<Item> {
