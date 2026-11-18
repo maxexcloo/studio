@@ -11,27 +11,6 @@ import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 /** Whether `profile` is the one a recorded id names. */
 export const isProfile = (profile: Profile, id: unknown) => profile.id === id;
 
-/** Keep the closest shape when switching models of the same output kind. */
-export function profileShape(
-  previous: Pick<GenerationInput, "profileId" | "kind" | "width" | "height">,
-  profile: Profile,
-) {
-  const { width, height } = previous;
-  const presets = profile.aspectPresets;
-  if (
-    !previous.profileId ||
-    previous.kind !== profile.kind ||
-    !width ||
-    !height ||
-    !presets?.length
-  )
-    return undefined;
-  // Log distance treats reciprocal ratios symmetrically.
-  const distance = ({ w, h }: (typeof presets)[number]) =>
-    Math.abs(Math.log((w * height) / (h * width)));
-  return presets.reduce((best, preset) => (distance(preset) < distance(best) ? preset : best));
-}
-
 /** Whether a run on `profile` takes a negative prompt. */
 export const usesNegative = (profile?: Profile) =>
   Boolean(profile && profile.capabilities.negativePrompt !== false);
