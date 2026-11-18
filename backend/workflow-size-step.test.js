@@ -53,9 +53,6 @@ test("imported workflows take their model family's size step, so off-step sizes 
     0,
   );
   assert.deepEqual(sizedRange({ step: 8, min: 16 }, 0), { step: 8, min: 16 });
-  // A Radiance node takes multiples of 32 where the family allows 16 (FLUX.3).
-  const radiance = { family: "flux3", graph: { 1: { class_type: "RadianceImageGenerate" } } };
-  assert.equal(workflowFamilyStep(radiance), 32);
 });
 
 test("imported workflows take their model family's native sizes, so chat can ask for 2K", () => {
@@ -73,63 +70,85 @@ test("imported workflows take their model family's native sizes, so chat can ask
   assert.equal(workflowFamilyValue({ family: "custom", graph: {} }, "native"), undefined);
 });
 
-test("Radiance image defaults, presets, inherited sizes and graph inputs use the 32-pixel grid", async () => {
-  const workflow = "custom:radiance-size";
-  const model = "flux-3-klein";
-  const defaults = { width: 1040, height: 752 };
-  const inputs = { ...defaults, model, cfg: 1, steps: 8, seed: 7, count: 1 };
-  const controls = Object.fromEntries(
-    ["model", "prompt", "width", "height"].map((input) => [input, { node: "1", input }]),
-  );
-  const graph = { 1: { class_type: "RadianceImageGenerate", inputs } };
-  saveImportedWorkflow({
-    studio: {
-      id: "radiance-size",
-      family: "flux3",
-      controls,
-      imageModes: { generate: { defaults } },
-    },
-    graph,
-  });
-  const info = {
-    ...radianceInfo([{ id: model }]),
-    EmptyLatentImage: {
-      input: {
-        required: { width: ["INT", { min: 16, step: 8 }], height: ["INT", { min: 16, step: 8 }] },
+for (const { model, family, step, size, maxWidth } of [
+  {
+    model: "flux-3-image-klein-base-iq8r-fast",
+    family: "flux3_klein",
+    step: 16,
+    size: [1040, 752],
+    maxWidth: 2048,
+  },
+  {
+    model: "qwen-image-2.1-iq8r",
+    family: "qwen_image_21",
+    step: 32,
+    size: [1056, 768],
+    maxWidth: 1344,
+  },
+]) {
+  test(`Radiance image defaults, presets and requests use the ${step}-pixel grid for ${model}`, async () => {
+    const workflow = `custom:radiance-size-${step}`;
+    const defaults = { cfg: 3.5, width: 1040, height: 752 };
+    const inputs = { ...defaults, model, steps: 8, seed: 7, count: 1 };
+    const controls = Object.fromEntries(
+      ["cfg", "model", "prompt", "width", "height"].map((input) => [input, { node: "1", input }]),
+    );
+    const graph = { 1: { class_type: "RadianceImageGenerate", inputs } };
+    saveImportedWorkflow({
+      studio: {
+        id: `radiance-size-${step}`,
+        family,
+        controls,
+        imageModes: { generate: { defaults } },
       },
-    },
-  };
-  const profile = inferModels(info).profiles.find(({ id }) => id === workflow);
-  assert.deepEqual([profile.defaults.width, profile.defaults.height], [1056, 768]);
-  assert.deepEqual(profile.imageModes.generate.defaults.width, 1056);
-  for (const { w, h } of profile.aspectPresets) {
-    assert.equal(w % 32, 0);
-    assert.equal(h % 32, 0);
-  }
-  const aspect = mcpSize(profile, { aspect: "13:6" });
-  const tier = resolutionSize(aspect, "2K", profile);
-  assert.equal(tier.width, 2048);
-  assert.equal(tier.height % 32, 0);
-  const input = { workflow, model: workflow, prompt: "A lighthouse", ...defaults };
-  const body = sanitizeGenerateBody(input, info);
-  assert.deepEqual([body.width, body.height], [1056, 768]);
-  for (const available of [true, false]) {
-    const routes = createGenerationSubmission({
-      loadComfyContext: async () => ({ info }),
-      mediaModels: async () => ({
-        models: { profiles: [profile], workers: [{ id: "radiance", available }] },
-      }),
+      graph,
     });
-    const draft = { ...input, profileId: profile.id };
-    assert.equal((await routes.validateInput(draft)).status, 200);
-    assert.deepEqual([draft.width, draft.height], [1056, 768]);
-  }
-  for (const queued of [body, input, { ...input, width: undefined, height: undefined }]) {
-    const built = await customWorkflowGraph(queued);
-    assert.equal(imageRequest(built[1].inputs).body.size, "1056x768");
-  }
-  assert.throws(() => imageRequest({ ...inputs, prompt: input.prompt }), /multiples of 32/);
-});
+    const info = {
+      ...radianceInfo([{ id: model }]),
+      EmptyLatentImage: {
+        input: {
+          required: { width: ["INT", { min: 16, step: 8 }], height: ["INT", { min: 16, step: 8 }] },
+        },
+      },
+    };
+    const profile = inferModels(info).profiles.find(({ id }) => id === workflow);
+    assert.deepEqual([profile.defaults.width, profile.defaults.height], size);
+    assert.deepEqual(profile.imageModes.generate.defaults.width, size[0]);
+    for (const { w, h } of profile.aspectPresets) {
+      assert.equal(w % step, 0);
+      assert.equal(h % step, 0);
+    }
+    const aspect = mcpSize(profile, { aspect: "13:6" });
+    const tier = resolutionSize(aspect, "2K", profile);
+    assert.equal(tier.width, maxWidth);
+    assert.equal(tier.height % step, 0);
+    const input = { workflow, model: workflow, prompt: "A lighthouse", ...defaults };
+    const body = sanitizeGenerateBody(input, info);
+    assert.deepEqual([body.width, body.height], size);
+    assert.equal(body.cfg, 3.5);
+    for (const available of [true, false]) {
+      const routes = createGenerationSubmission({
+        loadComfyContext: async () => ({ info }),
+        mediaModels: async () => ({
+          models: { profiles: [profile], workers: [{ id: "radiance", available }] },
+        }),
+      });
+      const draft = { ...input, profileId: profile.id };
+      assert.equal((await routes.validateInput(draft)).status, 200);
+      assert.deepEqual([draft.width, draft.height], size);
+    }
+    for (const queued of [body, input, { ...input, width: undefined, height: undefined }]) {
+      const built = await customWorkflowGraph(queued);
+      const request = imageRequest(built[1].inputs).body;
+      assert.equal(request.size, size.join("x"));
+      assert.equal(request.guidance_scale, 3.5);
+    }
+    assert.throws(
+      () => imageRequest({ ...inputs, width: 1041, prompt: input.prompt }),
+      new RegExp(`multiples of ${step}`),
+    );
+  });
+}
 
 test("Radiance video sizes snap before sizing a first frame or planning latent upscale", async () => {
   const workflow = "custom:radiance-video-size";

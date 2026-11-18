@@ -1249,7 +1249,8 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
   const existing = galleryJobItems(id, ownerId);
   const completed = await Promise.all(
     outputs.map(async (output, index) => {
-      let item = output;
+      const { seed, ...saved } = output;
+      let item = saved;
       // The saved file's own size: a graph can draw at its reference's size rather than the one asked for.
       let size = null;
       if (typeof item.url === "string" && item.url.startsWith("/comfy/view?")) {
@@ -1307,7 +1308,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         width: Number(size?.width || body.inpaint?.image?.width || body.width || 0),
         height: Number(size?.height || body.inpaint?.image?.height || body.height || 0),
         model: body.model || "",
-        settings: generationSettings(body),
+        settings: generationSettings(seed == null ? body : { ...body, seed }),
         ...(body.assistant ? { assistant: body.assistant } : {}),
         ...(storedWritingRecord(body.writing)
           ? { writing: storedWritingRecord(body.writing) }

@@ -281,19 +281,25 @@ export async function runRadianceJob(
       }
     }
     showProgress(id, "Saving");
-    await writeCivitaiParameters(outputs, record.body);
+    // Radiance derives each image's seed from its position in the request.
+    const seed = Number(record.values?.seed);
+    const imageSeed = !record.video && Number.isInteger(seed) ? BigInt(seed) : null;
+    const delivered = outputs.map((output, index) => ({
+      ...output,
+      ...(imageSeed === null ? {} : { seed: String(imageSeed + BigInt(index)) }),
+      ...(record.body.autoUpscale
+        ? {
+            upscale: {
+              status: "failed",
+              quality: record.body.autoUpscale.quality,
+              progress: null,
+              error: "Smart upscale needs a separate ComfyUI run. Choose Upscale on this result.",
+            },
+          }
+        : {}),
+    }));
+    await writeCivitaiParameters(delivered, record.body);
     warmNewOutputs(outputs);
-    const delivered = record.body.autoUpscale
-      ? outputs.map((output) => ({
-          ...output,
-          upscale: {
-            status: "failed",
-            quality: record.body.autoUpscale.quality,
-            progress: null,
-            error: "Smart upscale needs a separate ComfyUI run. Choose Upscale on this result.",
-          },
-        }))
-      : outputs;
     if (marks?.received) {
       marks.saved = Date.now();
       jobs.set(id, { ...jobs.get(id), timing: radianceTiming(record.body, marks) });

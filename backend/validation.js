@@ -297,11 +297,7 @@ export function sanitizeGenerateBody(
     min: 1,
     max: 10000,
   });
-  const cfgRange = nodeRange(info, "KSampler", "cfg", {
-    default: kind === "video" ? 5 : 1,
-    min: 0,
-    max: 100,
-  });
+  const cfgRange = profile.constraints.cfg;
   const denoiseRange = nodeRange(info, "KSampler", "denoise", { default: 1, min: 0, max: 1 });
   // A missing value takes the profile's default, never ComfyUI's generic node default (CFG 8, denoise 1).
   const fallback = (key, range) => profile.defaults[key] ?? range.default;
