@@ -389,6 +389,26 @@ export class RadianceClient {
     }));
   }
 
+  /**
+   * Whether Radiance's live view, as Bifrost's local/auto reads it, shows every card under a fifth
+   * busy and no model running or waiting on work; false when it can't tell within two seconds.
+   */
+  async idle() {
+    try {
+      const route = `/history?since=${Date.now() / 1000}`;
+      const { live } = await (
+        await this.call("GET", route, undefined, AbortSignal.timeout(2000))
+      ).json();
+      return (
+        Boolean(live?.cards?.length) &&
+        live.cards.every((card: Values) => card.busy < 0.2) &&
+        !(live.models || []).some((model: Values) => model.in_flight || model.waiting)
+      );
+    } catch {
+      return false;
+    }
+  }
+
   /** Every picture an image request made, as bytes. */
   async images(route: string, body: object | FormData, signal: AbortSignal) {
     const answer = await (await this.call("POST", route, body, signal)).json();

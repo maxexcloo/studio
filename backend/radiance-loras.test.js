@@ -10,7 +10,7 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const { metadataFromJson, saveImportedWorkflow } = await import("./custom-workflows.js");
 const { customWorkflowGraph } = await import("./graphs.js");
 const { radianceInfo } = await import("./providers/radiance.ts");
-const { sanitizeGenerateBody } = await import("./validation.js");
+const { fastTwin, sanitizeGenerateBody } = await import("./validation.js");
 
 const prompt = "A lighthouse at dusk";
 const raw = (loraStack, id = "radiance-loras") => ({
@@ -186,6 +186,26 @@ test("a size and references one card can't hold move to the model's two-GPU twin
   assert.equal(run(4, twin), "noctq-v4-iq8r-refs");
   assert.equal(run(0, twin, 2048), "noctq-v4-iq8r-refs");
   assert.equal(run(4, ["noctq-v4-iq8r"]), "noctq-v4-iq8r");
+});
+
+test("three or more pictures may take the model's two-GPU copy where the worker lists one", () => {
+  const profile = raw(undefined, "fast");
+  profile.studio.controls.model = { node: "1", input: "model" };
+  profile.studio.defaults = { model: "krea-2-turbo-iq8r" };
+  saveImportedWorkflow(profile);
+  const twin = (count, models) => {
+    const info = radianceInfo(models.map((id) => ({ id })));
+    const body = sanitizeGenerateBody(
+      { workflow: "custom:fast", model: "custom:fast", prompt, seed: 1, count },
+      info,
+    );
+    return fastTwin(body, info);
+  };
+  const listed = ["krea-2-turbo-iq8r", "krea-2-turbo-iq8r-fast"];
+  assert.equal(twin(3, listed), "krea-2-turbo-iq8r-fast");
+  assert.equal(twin(2, listed), "");
+  assert.equal(twin(4, ["krea-2-turbo-iq8r"]), "");
+  assert.equal(twin(4, ["krea-2-turbo-iq8r", "krea-2-turbo-iq8r-refs"]), "krea-2-turbo-iq8r-refs");
 });
 
 test("rebalance runs at the profile's default where it maps one, and nowhere else", async () => {
