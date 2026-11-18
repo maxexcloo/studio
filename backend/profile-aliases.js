@@ -64,55 +64,100 @@ function repoint(value, renames) {
 }
 
 /**
- * The migration that retires profile aliases (`workflows/.studio-aliases.json`, written by Merge
- * Duplicate Profiles, Combine Backends and retiring a profile into another): every runtime record
- * naming an old id names the profile it became, and a run on a combined profile's per-backend id
- * records that backend as `profileBackend`. It runs online: the server's copies of these records
- * are reloaded where it can (runtime-migrations.js) and otherwise dropped by a restart, which can
- * write a stale copy back first, so the alias file stays until an applied run finds nothing left to
- * rewrite. Plans by default; `apply` writes.
+ * `custom:<id>-<backend>` → `{to, backend}` for each backend of a combined profile in `workflows`
+ * whose per-backend profile is gone, for records no alias repoints.
+ * FLUX.2 [klein] ids stay: those return as their own profiles.
  */
-export function profileAliases(dataDir, { apply = false } = {}) {
-  const file = path.join(dataDir, "workflows", ".studio-aliases.json");
+function combinedRenames(ids) {
+  const renames = new Map();
+  for (const [id, backends] of ids)
+    for (const backend of backends)
+      if (!ids.has(`${id}-${backend}`) && !id.includes("flux2-klein"))
+        renames.set(`custom:${id}-${backend}`, { to: `custom:${id}`, backend });
+  return renames;
+}
+
+/** Each profile in `workflows` by id, with its backends when it is combined. */
+function profileBackends(dir) {
+  const ids = new Map();
+  if (!fs.existsSync(dir)) return ids;
+  for (const name of fs
+    .readdirSync(dir)
+    .filter((file) => file.endsWith(".json") && !file.startsWith("."))) {
+    const raw = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
+    ids.set(raw?.studio?.id || name.slice(0, -5), Object.keys(raw?.studio?.backends || {}));
+  }
+  return ids;
+}
+
+// Rows read and rewritten per event loop turn, so a run never holds the server up for long.
+const batchSize = 200;
+
+/**
+ * The migration that retires profile aliases (`workflows/.studio-aliases.json`, written by Merge
+ * Duplicate Profiles, Combine Backends and retiring a profile into another) and the per-backend ids
+ * of combined profiles: every runtime record naming an old id names the profile it became, and a
+ * run on a combined profile's per-backend id records that backend as `profileBackend`. It runs
+ * online, a batch at a time with each batch read and written in one turn: the server's copies of
+ * these records are reloaded where it can (runtime-migrations.js) and otherwise dropped by a
+ * restart, which can write a stale copy back first, so the alias file stays until an applied run
+ * finds nothing left to rewrite. `unmatched` counts gallery runs whose profile is gone and has no
+ * rename. Plans by default; `apply` writes.
+ */
+export async function profileAliases(dataDir, { apply = false } = {}) {
+  const dir = path.join(dataDir, "workflows");
+  const file = path.join(dir, ".studio-aliases.json");
   const aliases = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
-  const renames = renamesOf(aliases);
-  const changed = [];
-  if (renames.size && fs.existsSync(databaseFile(dataDir))) {
+  const profiles = profileBackends(dir);
+  const renames = new Map([...combinedRenames(profiles), ...renamesOf(aliases)]);
+  let rewritten = 0;
+  const unmatched = {};
+  if (fs.existsSync(databaseFile(dataDir))) {
     const db = runtimeDatabase(dataDir);
     for (const [table, column] of records) {
       const exists = db
         .prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?")
         .get(table);
       if (!exists) continue;
-      const rows = db
-        .prepare(`SELECT rowid, ${column} AS value FROM ${table} WHERE instr(${column}, 'custom:')`)
-        .all();
-      for (const row of rows) {
-        const value = JSON.parse(row.value);
-        const next = repoint(value, renames);
-        if (next !== value) changed.push({ table, column, rowid: row.rowid, value: next });
-      }
-    }
-    if (apply && changed.length) {
-      db.exec("BEGIN IMMEDIATE");
-      try {
-        for (const { table, column, rowid, value } of changed)
-          db.prepare(`UPDATE ${table} SET ${column} = ? WHERE rowid = ?`).run(
-            JSON.stringify(value),
-            rowid,
-          );
-        db.exec("COMMIT");
-      } catch (error) {
-        db.exec("ROLLBACK");
-        throw error;
+      const read = db.prepare(
+        `SELECT rowid, ${column} AS value FROM ${table}
+         WHERE rowid > ? AND instr(${column}, 'custom:') ORDER BY rowid LIMIT ${batchSize}`,
+      );
+      const write = db.prepare(`UPDATE ${table} SET ${column} = ? WHERE rowid = ?`);
+      for (let after = 0; ;) {
+        const rows = read.all(after);
+        const changed = [];
+        for (const row of rows) {
+          const value = JSON.parse(row.value);
+          const next = repoint(value, renames);
+          if (next !== value) changed.push([JSON.stringify(next), row.rowid]);
+          const id = next?.settings?.profileId;
+          if (table === "studio_gallery" && id?.startsWith("custom:") && !profiles.has(id.slice(7)))
+            unmatched[id] = (unmatched[id] || 0) + 1;
+        }
+        rewritten += changed.length;
+        if (apply && changed.length) {
+          db.exec("BEGIN IMMEDIATE");
+          try {
+            for (const change of changed) write.run(...change);
+            db.exec("COMMIT");
+          } catch (error) {
+            db.exec("ROLLBACK");
+            throw error;
+          }
+        }
+        if (rows.length < batchSize) break;
+        after = rows.at(-1).rowid;
+        await new Promise((resolve) => setImmediate(resolve));
       }
     }
   }
-  if (apply && !changed.length && fs.existsSync(file)) fs.rmSync(file);
+  if (apply && !rewritten && fs.existsSync(file)) fs.rmSync(file);
   return {
     applied: apply,
     aliases: Object.keys(aliases).length,
-    records: changed.length,
+    records: rewritten,
     renames: Object.fromEntries([...renames].map(([from, { to }]) => [from, to])),
+    unmatched,
   };
 }
