@@ -293,6 +293,19 @@ export function createGenerationQueue({
       slots: (resource) =>
         (resource.startsWith("worker:") && workerById(resource.slice("worker:".length))?.slots) ||
         1,
+      async slotWait(job, running) {
+        if (!isRadianceWorker(workerById(job.backend))) return;
+        const wait = "Waiting for Radiance to finish before loading another model.";
+        if (running.some((active) => modelOf(active.input) !== modelOf(job.input))) return wait;
+        const models = running.map(
+          (active) => store.providerRecord(active.ownerId, active.id)?.values?.model,
+        );
+        const [model] = models;
+        if (!model || models.some((active) => active !== model)) return wait;
+        const account = job.ownerId ? accountAccessForId(job.ownerId) : undefined;
+        const next = await generationRoutes.radianceModel(job, account).catch(() => undefined);
+        if (next !== model) return wait;
+      },
       settled: async (job) => {
         if (job.status === "failed")
           logWarning("Job failed", {

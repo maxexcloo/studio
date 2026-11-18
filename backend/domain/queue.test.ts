@@ -1032,6 +1032,37 @@ test("a worker with two slots fills them with one model before loading another",
   }
 });
 
+test("Radiance fills spare slots with the comparison's warm model and drains before switching", async () => {
+  const { store, adapter, submitted, observations } = fixture();
+  const queue = new GenerationQueue(store, {
+    ...adapter,
+    slots: () => 2,
+    async slotWait(job, active) {
+      if (active.some((other) => other.input.model !== job.input.model)) return "Finish first.";
+    },
+  });
+  try {
+    const enqueue = loading(store, store.createSession("alice").id);
+    const comparison = { queueSet: "comparison" };
+    const [first, other, same] = [
+      enqueue("base", comparison),
+      enqueue("klein", comparison),
+      enqueue("base", comparison),
+    ];
+    await queue.tick();
+    assert.deepEqual(submitted, [first, same]);
+    observations.set(first, { status: "completed" });
+    await queue.tick();
+    assert.deepEqual(submitted, [first, same]);
+    assert.equal(store.job("alice", other)?.reason, "Finish first.");
+    observations.set(same, { status: "completed" });
+    await queue.tick();
+    assert.deepEqual(submitted, [first, same, other]);
+  } finally {
+    store.close();
+  }
+});
+
 test("beside a running video, a worker's other slot takes only work for the video's model", async () => {
   const { store, adapter, submitted, observations } = fixture();
   const queue = new GenerationQueue(store, { ...adapter, slots: () => 2 });
