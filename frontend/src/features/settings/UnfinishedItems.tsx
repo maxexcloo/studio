@@ -1,17 +1,17 @@
 import { Badge, Button, Group, Menu, Modal, Stack, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ListRestart } from "lucide-react";
 import { useState } from "react";
 
 import type { UnfinishedJob } from "../../../../shared/queue";
 import { api, post } from "../../api";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingRow } from "../../ui/SettingRows";
+import { usePhone } from "../../ui/usePhone";
 import { useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
 import { queueQuery, statusLabels } from "../generation/Queue";
@@ -40,17 +40,39 @@ const bulk = {
 } as const;
 type Bulk = keyof typeof bulk;
 
-/**
- * Settings › Maintenance › Queue › Unfinished Items, for administrators: every account's generations that
- * have not finished, to retry, stop or clear one that is stuck, or every listed one at once.
- */
-export function UnfinishedItems() {
+export function UnfinishedItemsRow({ onOpen }: { onOpen: () => void }) {
+  const unfinished = useQuery({ ...unfinishedQuery, refetchInterval: 60_000 });
+  const jobs = unfinished.data?.jobs || [];
+  return (
+    <SettingRow
+      label="Unfinished Items"
+      description={[
+        "Unfinished generations from every account, to retry, stop or clear stuck ones.",
+        unfinished.data && `${count(jobs.length)} now.`,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <Button
+        size="compact-sm"
+        variant="default"
+        leftSection={<icons.unfinished size={16} />}
+        onClick={onOpen}
+      >
+        Review
+      </Button>
+    </SettingRow>
+  );
+}
+
+/** Administrators can retry, stop or clear unfinished generations from any account. */
+export function UnfinishedItems({ opened, onClose }: { opened: boolean; onClose: () => void }) {
   const client = useQueryClient();
-  const [opened, setOpened] = useState(false);
+  const phone = usePhone();
   const [deleting, setDeleting] = useState<UnfinishedJob | null>(null);
   const [confirming, setConfirming] = useState<Exclude<Bulk, "retry-all">>();
   const multiUser = useAccount().data?.mode === "multi-user";
-  const unfinished = useQuery({ ...unfinishedQuery, refetchInterval: opened ? 5_000 : 60_000 });
+  const unfinished = useQuery({ ...unfinishedQuery, enabled: opened, refetchInterval: 5_000 });
   const accounts = useQuery({ ...accountAdminQuery, enabled: multiUser && opened });
   const ownerName = (job: UnfinishedJob) =>
     accounts.data?.accounts.find((entry) => entry.id === job.ownerId)?.username || job.ownerId;
@@ -79,29 +101,15 @@ export function UnfinishedItems() {
   const title = (job: UnfinishedJob) =>
     String(job.input.prompt || "").trim() || `Untitled ${job.operation}`;
   return (
-    <SettingRow
-      label="Unfinished Items"
-      description={[
-        "Unfinished generations from every account, to retry, stop or clear stuck ones.",
-        unfinished.data && `${count(jobs.length)} now.`,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
-      <Button
-        size="compact-sm"
-        variant="default"
-        leftSection={<ListRestart size={16} />}
-        onClick={() => setOpened(true)}
-      >
-        Review
-      </Button>
+    <>
       <Modal.Root
         id="unfinished"
         opened={opened}
-        onClose={closeWhenTop("unfinished", () => setOpened(false))}
+        onClose={closeWhenTop("unfinished", onClose)}
         size="xl"
         centered
+        fullScreen={phone}
+        styles={{ content: { overflow: "hidden" }, header: { flexShrink: 0 } }}
       >
         <Modal.Overlay />
         <Modal.Content>
@@ -198,6 +206,9 @@ export function UnfinishedItems() {
                 </>
               )}
             />
+            <DialogFooter>
+              <Button onClick={onClose}>Done</Button>
+            </DialogFooter>
           </Modal.Body>
         </Modal.Content>
       </Modal.Root>
@@ -222,6 +233,6 @@ export function UnfinishedItems() {
       >
         {confirming && bulk[confirming].text}
       </ConfirmDialog>
-    </SettingRow>
+    </>
   );
 }

@@ -5,10 +5,10 @@ import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { type Flag, deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
 import { GalleryPass } from "./GalleryPass";
-import { UnfinishedItems } from "./UnfinishedItems";
+import { UnfinishedItemsRow } from "./UnfinishedItems";
 
 /** Settings › Maintenance: Background AI switches, gallery passes and unfinished items. */
-export function MaintenanceSettings() {
+export function MaintenanceSettings({ onOpenUnfinished }: { onOpenUnfinished: () => void }) {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
   if (deployment.isPending) return <LoadingState label="Loading Maintenance" fill />;
@@ -63,7 +63,7 @@ export function MaintenanceSettings() {
         {whileBusy && flagRow(whileBusy)}
       </SettingGroup>
       <SettingGroup title="Queue">
-        <UnfinishedItems />
+        <UnfinishedItemsRow onOpen={onOpenUnfinished} />
       </SettingGroup>
     </Stack>
   );

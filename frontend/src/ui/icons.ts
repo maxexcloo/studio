@@ -31,6 +31,7 @@ import {
   LayoutDashboard,
   Link,
   ListFilter,
+  ListRestart,
   ListX,
   type LucideIcon,
   MapPinned,
@@ -170,6 +171,7 @@ export const icons = {
   /** Stopping work: a stop sign rather than a bare square, which reads as a checkbox. */
   stop: CircleStop,
   undo: Undo2,
+  unfinished: ListRestart,
   upload: Upload,
   /** The uploaded images: the gallery's Uploads toggle, apart from the Upload action. */
   uploads: ImageUp,
