@@ -905,14 +905,19 @@ export class GenerationQueue {
     return ended;
   }
 
-  retry(ownerId: string, id: string): OwnedJob | undefined {
+  retry(ownerId: string, id: string, clear = false): OwnedJob | undefined {
     const job = this.store.job(ownerId, id);
     if (!job || job.status !== "failed") return;
-    return this.requeue(job);
+    const original = clear && !job.cleared ? { ...job, cleared: true } : job;
+    if (job.replacementJobId) {
+      if (original !== job) this.store.save(original);
+      return this.store.job(ownerId, job.replacementJobId);
+    }
+    return this.requeue(job, original);
   }
 
   /** Queues the job's input again as a new job, in the job's set and its place in the gallery. */
-  requeue(job: OwnedJob): OwnedJob {
+  requeue(job: OwnedJob, replaces?: OwnedJob): OwnedJob {
     const listed = job.items.find((item) => typeof item.createdAt === "string")?.createdAt as
       | string
       | undefined;
@@ -929,6 +934,7 @@ export class GenerationQueue {
         queueSet: job.queueSet,
         galleryAt: job.galleryAt || listed || job.createdAt,
       },
+      replaces,
     );
   }
 }

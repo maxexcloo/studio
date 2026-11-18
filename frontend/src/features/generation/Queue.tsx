@@ -100,7 +100,7 @@ export const queueJobQuery = (id: string) =>
 export function useQueue() {
   return useQuery(queueQuery);
 }
-const queueActionKey = ["queue-action"];
+export const queueActionKey = ["queue-action"];
 /**
  * An empty `id` acts on the whole queue (`cancel-all`, `clear-failed`, `pause` and the like), or
  * with `set` on that set's waiting work (`move`).
@@ -111,7 +111,6 @@ type QueueAction = {
   action:
     | "cancel"
     | "clear"
-    | "retry"
     | "move"
     | "cancel-all"
     | "clear-failed"
@@ -126,8 +125,10 @@ export function useQueueAction(jobId?: string) {
   const client = useQueryClient();
   const pending = useIsMutating({
     mutationKey: queueActionKey,
-    predicate: (mutation) =>
-      jobId !== undefined && (mutation.state.variables as QueueAction)?.id === jobId,
+    predicate: (mutation) => {
+      const pending = mutation.state.variables as QueueAction & { ids?: string[] };
+      return jobId !== undefined && (pending?.id === jobId || !!pending?.ids?.includes(jobId));
+    },
   });
   const action = useMutation({
     mutationKey: queueActionKey,
@@ -165,7 +166,7 @@ export function useQueueAction(jobId?: string) {
     [client],
   );
   const { mutate, mutateAsync } = action;
-  // Stable, so callbacks built on them (`useTryAgain`) keep memoised gallery tiles from rendering.
+  // Stable, so consumers' callbacks keep memoised gallery tiles from rendering.
   return {
     isPending: action.isPending || pending > 0,
     mutate: useCallback(
@@ -174,7 +175,7 @@ export function useQueueAction(jobId?: string) {
       },
       [matching, mutate],
     ),
-    /** Resolves to the response (a retry's new job), or `undefined` when already in flight. */
+    /** Resolves to the response, or `undefined` when already in flight. */
     mutateAsync: useCallback(
       async (value: QueueAction) => (matching(value) ? undefined : mutateAsync(value)),
       [matching, mutateAsync],
