@@ -655,7 +655,11 @@ export function RuntimeHistory() {
                   title={`${entry.error || entry.progress} · ${who(entry.requestedBy)}`}
                 >
                   {change(entry)}
-                  {entry.error && ` · ${entry.error}`}
+                  {entry.error
+                    ? ` · ${entry.error}`
+                    : // Studio's own changes say why.
+                      entry.requestedBy.startsWith("automatic: ") &&
+                      ` · ${entry.requestedBy.slice("automatic: ".length)}`}
                 </Text>
               ),
             },

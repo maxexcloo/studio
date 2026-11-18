@@ -54,6 +54,7 @@ function fixture(
     })),
   );
   let clock = Date.parse("2026-10-27T00:00:00Z");
+  const radianceBusy = { value: false };
   const controller = new RuntimeController({
     engine: new KubernetesEngine(kube.request),
     workloads: configured,
@@ -67,8 +68,10 @@ function fixture(
       await new Promise((resolve) => setImmediate(resolve));
     },
     timeouts: { drain: 60 * 60_000, stop: 60_000, start: 60_000 },
+    // A fake Radiance's live view: busy while it serves text Studio doesn't admit.
+    radianceIdle: async () => !radianceBusy.value,
   });
-  return { kube, controller, advance: (ms: number) => (clock += ms) };
+  return { kube, controller, advance: (ms: number) => (clock += ms), radianceBusy };
 }
 
 /** A store a test can read, which a controller "lost in a restart" no longer writes. */
@@ -597,4 +600,59 @@ test("a swap for ComfyUI work holds while Radiance has work of a higher tier wai
     "gone radiance/radiance",
     "scale comfyui/image 1",
   ]);
+});
+
+test("Radiance short of host memory restarts once idle and quiet, then queues the failed work again", async () => {
+  const { kube, controller, advance, radianceBusy } = fixture(["radiance"], {
+    withRadiance: true,
+  });
+  let waiting = 1;
+  const retried: string[] = [];
+  controller.useQueue({
+    waitingTier: () => Infinity,
+    load: () => ({ jobs: [], queued: waiting }),
+    cancel: async () => ({ cancelled: 0, cancelling: 0 }),
+    releaseStale: () => {},
+    end: async () => {},
+  });
+  const failed = await controller.acquire("radiance");
+  const reason =
+    "Radiance: tables placed in host memory cannot be pinned: 39.20 GiB available, the fleet keeps 8.00 GiB free";
+  controller.restartForMemory("radiance", reason, () => retried.push("job-1"));
+  failed.release();
+  // Work waits on Radiance, then has only just finished: no restart yet.
+  advance(120_000);
+  await controller.restartWhenIdle();
+  waiting = 0;
+  const next = await controller.acquire("radiance");
+  next.release();
+  await controller.restartWhenIdle();
+  assert.deepEqual([kube.log, retried], [[], []]);
+  advance(60_000);
+  // Radiance still answers text outside Studio's queue.
+  radianceBusy.value = true;
+  await controller.restartWhenIdle();
+  assert.deepEqual(kube.log, []);
+  radianceBusy.value = false;
+  await controller.restartWhenIdle();
+  await controller.settled;
+  assert.deepEqual(kube.log, [
+    "scale radiance/radiance 0",
+    "gone radiance/radiance",
+    "scale radiance/radiance 1",
+  ]);
+  const [restart] = (await controller.observe()).history;
+  assert.deepEqual(
+    [restart.type, restart.status, restart.requestedBy],
+    [
+      "restart",
+      "completed",
+      "automatic: freeing host memory after tables placed in host memory cannot be pinned: 39.20 GiB available, the fleet keeps 8.00 GiB free",
+    ],
+  );
+  assert.deepEqual(retried, ["job-1"]);
+  // Done once: a later pass restarts nothing.
+  advance(120_000);
+  await controller.restartWhenIdle();
+  assert.equal(kube.log.length, 3);
 });
