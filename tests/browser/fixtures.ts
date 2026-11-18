@@ -1146,6 +1146,12 @@ export async function openReferenceChoices(page: Page) {
  * shows both.
  */
 export async function showReferenceStack(page: Page) {
+  // A successful placement may return to the stack before its Done button can be clicked.
+  await expect(
+    page
+      .getByRole("region", { name: "Reference Choices", exact: true })
+      .and(page.locator('[aria-busy="true"]')),
+  ).toHaveCount(0);
   const add = page.getByRole("button", { name: "Add References", exact: true, expanded: true });
   const adding = page.getByRole("dialog", { name: "Add References", exact: true });
   if (await add.isVisible())
@@ -1415,9 +1421,15 @@ export async function serveDream(
     if (path === "/api/dream/undo") {
       for (const id of body.ids) {
         state.judged.delete(id);
+        if (body.calibration) {
+          const item = state.calibration.find((entry) => entry.id === id);
+          if (item && body.rating !== undefined) item.rating = body.rating ?? undefined;
+          continue;
+        }
         const item = state.known.get(id);
         if (!item) continue;
         state.discarded = state.discarded.filter((entry) => entry !== item);
+        item.rating = undefined;
         item.dream = { ...item.dream, state: "unseen" };
         if (!state.unseen.includes(item)) state.unseen.push(item);
       }
@@ -1457,7 +1469,11 @@ export async function serveDream(
             ),
           },
         });
-      for (const id of [...(body.liked || []), ...(body.passed || [])]) state.judged.add(id);
+      for (const id of [...(body.liked || []), ...(body.passed || [])]) {
+        state.judged.add(id);
+        const item = state.calibration.find((entry) => entry.id === id);
+        if (item && body.rating !== undefined) item.rating = body.rating;
+      }
       return route.fulfill({ json: { ok: true } });
     }
     if (path === "/api/dream/discarded") {

@@ -186,6 +186,7 @@ export interface MediaItem {
   /** Self-review against its owner's rules and any project's brief (backend/domain/review.ts). */
   review?: Review;
   createdAt?: string;
+  galleryAt?: string;
   /** Liked, or disliked and so hidden from the gallery but its Disliked view. */
   rating?: Rating;
   /** An uploaded image or video (references.js), listed under the gallery's Uploads filter. */

@@ -114,4 +114,13 @@ test("profileAliases names each record's current profile, also for a combined pr
     renames: { "custom:image-fineporn-fast-comfyui": "custom:image-fineporn-fast" },
     unmatched: plan.unmatched,
   });
+  const broken = path.join(path.dirname(file), "unreadable.json");
+  fs.writeFileSync(broken, "{");
+  fs.writeFileSync(file, JSON.stringify({ "video-old": { to: "video-new" } }));
+  writeRuntimeDocument(dataDir, "preferences:x", { images: "custom:video-old" });
+  const partial = await profileAliases(dataDir, { apply: true });
+  assert.deepEqual(partial.unreadable, ["unreadable.json"]);
+  assert.deepEqual(partial.renames, { "custom:video-old": "custom:video-new" });
+  assert.deepEqual(readRuntimeDocument(dataDir, "preferences:x"), { images: "custom:video-new" });
+  assert.equal(fs.readFileSync(broken, "utf8"), "{");
 });

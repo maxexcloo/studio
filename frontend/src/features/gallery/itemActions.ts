@@ -45,16 +45,3 @@ export const itemActionGroups = (actions: (Action | null | false | undefined)[])
   sections.map((ids) =>
     ids.flatMap((id) => actions.filter((action): action is Action => !!action && action.id === id)),
   );
-
-/**
- * Context menus list AI's options (comparing and discovery) as a section of their own, then Share's
- * in its place, rather than as submenus.
- */
-export const contextMenuActions = (groups: ActionGroups): ActionGroups =>
-  groups.flatMap((group) => {
-    const ai = group.find((action) => action.id === "ai" && action.menu);
-    const rest = group.flatMap((action) =>
-      action === ai ? [] : action.id === "share" && action.menu ? action.menu.flat() : action,
-    );
-    return ai ? [ai.menu!.flat(), rest] : [rest];
-  });

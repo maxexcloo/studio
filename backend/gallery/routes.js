@@ -284,7 +284,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
               return makePendingItems(job.id, {
                 ...job.input,
                 ownerId: account?.userId || "",
-                createdAt: job.galleryAt || job.createdAt,
+                createdAt: job.createdAt,
+                galleryAt: job.galleryAt,
               });
             })
             .filter(
@@ -292,6 +293,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
                 (!type || item.type === type) &&
                 recordBelongsToAccount(item, account) &&
                 (!query.set || item.resultSet?.id === query.set) &&
+                (!Number.isFinite(before) || Date.parse(item.createdAt) <= before) &&
                 fromChat(item) &&
                 (!inComparison || inComparison(item)) &&
                 (!search || search(item)),
@@ -341,7 +343,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
         item = makePendingItems(job.id, {
           ...job.input,
           ownerId,
-          createdAt: job.galleryAt || job.createdAt,
+          createdAt: job.createdAt,
+          galleryAt: job.galleryAt,
         })[found.index];
     }
     return item && recordBelongsToAccount(item, account)

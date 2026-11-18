@@ -6,27 +6,30 @@ import { mediaSource, playbackUrl } from "../gallery/mediaSource";
 /** A card's picture, or while `playing` its video, muted; `useInSync` plays a card's videos. */
 export function DeckMedia({ item, playing = false }: { item: MediaItem; playing?: boolean }) {
   const source = mediaSource(item);
-  const [failed, setFailed] = useState(false);
-  if (failed) return null;
-  if (item.type === "video" && playing)
+  const [failedVideo, setFailedVideo] = useState<string>();
+  const [failedImage, setFailedImage] = useState<string>();
+  const video = item.type === "video" ? playbackUrl(source.url) : undefined;
+  if (video && playing && failedVideo !== video)
     return (
       <video
-        src={playbackUrl(source.url)}
+        src={video}
         poster={source.thumbnailUrl}
         aria-label={item.prompt || "Dream video"}
         muted
         playsInline
         preload="auto"
-        onError={() => setFailed(true)}
+        onError={() => setFailedVideo(video)}
       />
     );
+  const image = video ? source.thumbnailUrl : source.displayUrl;
+  if (!image || failedImage === image) return null;
   return (
     <img
-      src={item.type === "video" ? source.thumbnailUrl || source.url : source.displayUrl}
+      src={image}
       alt={item.prompt || (item.type === "video" ? "Dream video" : "Dream image")}
       draggable={false}
       decoding="async"
-      onError={() => setFailed(true)}
+      onError={() => setFailedImage(image)}
     />
   );
 }
@@ -40,40 +43,54 @@ export function useInSync(root: RefObject<HTMLElement | null>, playing: boolean)
   useEffect(() => {
     const videos = [...(root.current?.querySelectorAll("video") ?? [])];
     if (!playing || !videos.length) return;
+    const failed = new Set<HTMLVideoElement>();
+    const playable = () =>
+      videos.filter((video) => video.isConnected && !video.error && !failed.has(video));
     let started = false;
-    const start = () => {
+    const start = (active: HTMLVideoElement[]) => {
       started = true;
-      for (const video of videos) {
+      for (const video of active) {
         video.currentTime = 0;
         video.play().catch(() => undefined);
       }
     };
-    const ready = () => {
+    const advance = () => {
+      if (document.hidden) return;
+      const active = playable();
       if (
-        !started &&
-        videos.every((video) => video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA)
+        active.length &&
+        (started
+          ? active.every((video) => video.ended)
+          : active.every((video) => video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA))
       )
-        start();
+        start(active);
     };
-    const ended = () => {
-      if (videos.every((video) => video.ended)) start();
+    const error = (event: Event) => {
+      failed.add(event.currentTarget as HTMLVideoElement);
+      advance();
     };
     const visibility = () => {
-      for (const video of videos)
-        if (document.hidden) video.pause();
-        else if (started && !video.ended) video.play().catch(() => undefined);
+      if (document.hidden) {
+        videos.forEach((video) => video.pause());
+        return;
+      }
+      if (started)
+        for (const video of playable()) if (!video.ended) video.play().catch(() => undefined);
+      advance();
     };
     for (const video of videos) {
-      video.addEventListener("canplay", ready);
-      video.addEventListener("ended", ended);
+      video.addEventListener("canplay", advance);
+      video.addEventListener("ended", advance);
+      video.addEventListener("error", error);
     }
     document.addEventListener("visibilitychange", visibility);
-    ready();
+    advance();
     return () => {
       document.removeEventListener("visibilitychange", visibility);
       for (const video of videos) {
-        video.removeEventListener("canplay", ready);
-        video.removeEventListener("ended", ended);
+        video.removeEventListener("canplay", advance);
+        video.removeEventListener("ended", advance);
+        video.removeEventListener("error", error);
         video.pause();
       }
     };

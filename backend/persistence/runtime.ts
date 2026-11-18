@@ -193,11 +193,20 @@ export function writeRuntimeDocuments(
   dataDir: string,
   documents: Iterable<readonly [string, unknown]>,
 ): void {
+  runtimeTransaction(dataDir, () => {
+    for (const [name, value] of documents) writeRuntimeDocument(dataDir, name, value);
+  });
+}
+
+/** Groups synchronous writes, including those made by helpers sharing this connection. */
+export function runtimeTransaction<T>(dataDir: string, write: () => T): T {
   const db = runtimeDatabase(dataDir);
+  if (db.isTransaction) return write();
   db.exec("BEGIN IMMEDIATE");
   try {
-    for (const [name, value] of documents) writeRuntimeDocument(dataDir, name, value);
+    const result = write();
     db.exec("COMMIT");
+    return result;
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;

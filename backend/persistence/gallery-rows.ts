@@ -19,6 +19,7 @@ const field = (name: string) => `json_extract(value, '$.${name}')`;
 export const dreamState = field("dream.state");
 export const dreamArm = field("dream.arm");
 export const dreamPair = field("dream.pair");
+export const dreamProject = field("dream.projectId");
 
 /**
  * Columns derived from each row's JSON, so queries filter and order the gallery in SQL. `created_ms`
@@ -42,6 +43,10 @@ const galleryColumns: [string, string][] = [
   ["set_id", field("resultSet.id")],
   ["created_ms", `CAST(round(unixepoch(${field("createdAt")}, 'subsec') * 1000) AS INTEGER)`],
   [
+    "gallery_ms",
+    `CAST(round(unixepoch(coalesce(${field("galleryAt")}, ${field("createdAt")}), 'subsec') * 1000) AS INTEGER)`,
+  ],
+  [
     "bucket",
     `CASE WHEN ${field("status")} IS 'done' AND ${field("civitai.imageId")} IS NULL AND trim(coalesce(${field("prompt")}, ''), char(9, 10, 11, 12, 13, 32, 160, 5760, 8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199, 8200, 8201, 8202, 8232, 8233, 8239, 8287, 12288, 65279)) = '' THEN 1 ELSE 0 END`,
   ],
@@ -62,7 +67,7 @@ export const summaryFields = {
 
 // The gallery's order, then the columns pages filter on, so a page's count reads only the index.
 const galleryOrder =
-  "uploaded, unlisted, bucket, created_ms DESC, job_id DESC, item_index, item_id DESC, status, type, rating";
+  "uploaded, unlisted, bucket, gallery_ms DESC, job_id DESC, item_index, item_id DESC, status, type, rating";
 
 /** The indexes over `galleryColumns`: gallery order with and without an owner, jobs, ids, sets,
  * states, Dream states (with arms and comparison sides, so Dream's counts read the index alone),
@@ -77,6 +82,7 @@ const galleryIndexes: [string, string][] = [
   ["studio_gallery_status", "status"],
   ["studio_gallery_upscale", "upscale_status"],
   ["studio_gallery_dream", `${dreamState}, owner_id, ${dreamArm}, ${dreamPair}`],
+  ["studio_gallery_dream_project", `owner_id, ${dreamProject}`],
   ["studio_gallery_prompt", "owner_id, json_extract(value, '$.prompt')"],
   ["studio_gallery_created", "created_ms"],
   [

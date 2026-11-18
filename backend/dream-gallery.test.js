@@ -5,12 +5,18 @@ import { temporaryFolder } from "./fixtures/temporary.js";
 
 // Each test file runs in its own process, so this folder stays here.
 process.env.STUDIO_DATA_DIR = temporaryFolder("studio-dream-gallery-");
-const { filterVisibleGallery, galleryItems, hasGalleryMedia, pageGallery, updateGalleryJob } =
-  await import("./gallery/store.js");
+const {
+  filterVisibleGallery,
+  galleryItems,
+  hasGalleryMedia,
+  pageGallery,
+  setGalleryRatings,
+  updateGalleryJob,
+} = await import("./gallery/store.js");
 const { setGallery } = await import("./fixtures/gallery.js");
 const { makePendingItems } = await import("./gallery/records.js");
 const { galleryJobResponse } = await import("./gallery/routes.js");
-const { openDatabase } = await import("./persistence/runtime.ts");
+const { openDatabase, runtimeTransaction } = await import("./persistence/runtime.ts");
 const { Store } = await import("./domain/store.ts");
 const queue = new Store(openDatabase(":memory:"));
 
@@ -69,10 +75,12 @@ test("Dream results stay out of the gallery, its delta and MCP job reads until k
 });
 
 test("Dream reads its results, an owner's liked items and a chat's items by query", () => {
+  const projectItem = item("kept", "kept");
+  projectItem.dream.projectId = "coast";
   setGallery([
     item("plain"),
     { ...item("liked"), rating: "liked" },
-    item("kept", "kept"),
+    projectItem,
     item("unseen", "unseen"),
     item("gone", "discarded"),
     { ...item("asked"), chat: { conversationId: "chat-1" } },
@@ -85,6 +93,7 @@ test("Dream reads its results, an owner's liked items and a chat's items by quer
       .sort();
   assert.deepEqual(ids({ dreamState: "unseen" }), ["unseen"]);
   assert.deepEqual(ids({ dreamState: ["kept", "discarded"] }), ["gone", "kept"]);
+  assert.deepEqual(ids({ dreamProject: "coast", dreamState: "kept", status: "done" }), ["kept"]);
   assert.deepEqual(ids({ liked: true }), ["kept", "liked"]);
   assert.deepEqual(ids({ conversationIds: ["chat-1"] }), ["asked"]);
   // Calibration's random pick of older records.
@@ -98,4 +107,20 @@ test("Dream reads its results, an owner's liked items and a chat's items by quer
   );
   assert.deepEqual(ids({ before: 0 }), []);
   assert.equal(ids({ sample: 2 }).length, 2);
+});
+
+test("A gallery rating rolls back with its enclosing judgement", () => {
+  const saved = item("rated");
+  setGallery([saved]);
+  const rating = () => galleryItems({ ids: [saved.id] })[0].rating;
+  assert.throws(
+    () =>
+      runtimeTransaction(process.env.STUDIO_DATA_DIR, () => {
+        assert.equal(setGalleryRatings([saved.id], "liked", "alice").length, 1);
+        assert.equal(rating(), "liked");
+        throw new Error("Judgement could not be saved.");
+      }),
+    /Judgement could not be saved/,
+  );
+  assert.equal(rating(), undefined);
 });

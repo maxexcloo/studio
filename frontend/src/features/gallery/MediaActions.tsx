@@ -53,7 +53,7 @@ import {
 } from "../taste/suggestions";
 import { AnimateDialog } from "./AnimateDialog";
 import { videoGif } from "./download";
-import { contextMenuActions, itemAction, itemActionGroups } from "./itemActions";
+import { itemAction, itemActionGroups } from "./itemActions";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
 import { galleryKey } from "./queries";
@@ -652,8 +652,7 @@ export function useMediaActions(
         : undefined,
     }),
     upscale,
-    // The viewer prompt's assistance, then comparing and discovery; tile menus list the latter as
-    // a section of their own (contextMenuActions).
+    // The viewer prompt's assistance, when present, precedes comparing and discovery.
     (assist || discovery.length > 0) &&
       itemAction("ai", {
         onOpen: assist?.onOpen,
@@ -787,7 +786,7 @@ export function MediaActionMenu({
   onSelect,
   ...options
 }: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
-  const groups = contextMenuActions(useMediaActions(item, options));
+  const groups = useMediaActions(item, options);
   return (
     <ActionMenuItems
       groups={

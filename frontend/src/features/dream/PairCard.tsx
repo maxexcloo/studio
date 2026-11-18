@@ -34,11 +34,13 @@ function useSideBySide(ratio: number) {
 export function PairContent({
   card,
   top,
+  playing,
   picked,
   view,
 }: {
   card: PairDeckCard;
   top: boolean;
+  playing: boolean;
   picked?: 0 | 1;
   view: (index: 0 | 1) => void;
 }) {
@@ -83,7 +85,7 @@ export function PairContent({
                     view(side);
                   }}
                 >
-                  <DeckMedia item={item} playing={top} />
+                  <DeckMedia item={item} playing={playing} />
                 </div>
                 <UnstyledButton
                   className={classes.side}

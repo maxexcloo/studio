@@ -10,7 +10,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 
 import type { Project } from "../../../../shared/projects";
 import { api } from "../../api";
@@ -52,6 +52,7 @@ function ProjectEditor({ project, onClose }: { project?: Project; onClose: () =>
 export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement | null }) {
   const client = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
   const { projectId } = useParams();
   const projects = useQuery(projectsQuery);
   const inbox = useQuery(inboxQuery);
@@ -136,7 +137,11 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
         projects={list}
         profileLabel={profileLabel}
         onEdit={(project) => setEditing({ project })}
-        onClose={() => navigate("/dream/projects")}
+        onClose={() =>
+          location.state?.fromProjects
+            ? navigate(-1)
+            : navigate("/dream/projects", { replace: true })
+        }
       />
       <CardDialog
         opened={editing !== undefined}

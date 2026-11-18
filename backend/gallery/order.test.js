@@ -69,6 +69,26 @@ test("a removed cursor continues through the bucket boundary and descending id t
   assert.deepEqual(ids(pageGallery({ cursor, limit: 2 }).items), ["a", "import"]);
 });
 
+test("A retry keeps its gallery position but date filters use when it was created", () => {
+  const items = [
+    item("newer", "2026-01-03"),
+    item("retry", "2026-01-04", { galleryAt: "2026-01-02" }),
+    item("older", "2026-01-01"),
+  ];
+  assert.deepEqual(ids(sorted(items)), ["newer", "retry", "older"]);
+  setGallery(items);
+  const first = pageGallery({ limit: 2 });
+  assert.deepEqual(ids(first.items), ["newer", "retry"]);
+  assert.deepEqual(ids(pageGallery({ cursor: first.nextCursor }).items), ["older"]);
+  assert.deepEqual(ids(pageGallery({ query: { before: Date.parse("2026-01-03") } }).items), [
+    "newer",
+    "older",
+  ]);
+  assert.deepEqual(ids(pageGallery({ query: { since: Date.parse("2026-01-04") } }).items), [
+    "retry",
+  ]);
+});
+
 test("valid dates precede missing and invalid dates, retaining batch indices and id ties", () => {
   const items = [
     item("invalid", "bad"),
