@@ -80,7 +80,7 @@
 }
 
 /* The current media between its neighbours, which wait a gap beyond either edge. */
-.strip {
+.mediaStrip {
   position: relative;
   display: flex;
   align-items: center;
@@ -121,6 +121,7 @@
   width: auto;
   height: auto;
   object-fit: contain;
+  touch-action: none;
 }
 
 /* Running work's status fills the stage, so a swipe anywhere on it navigates. */

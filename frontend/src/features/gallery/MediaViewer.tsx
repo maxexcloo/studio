@@ -122,7 +122,6 @@ function ViewerVideo({
 }) {
   const sound = useVideoSound();
   const [controls, setControls] = useState(false);
-  const controlsShown = useRef(false);
   const [refused, setRefused] = useState(false);
   const play = useCallback(
     (media: HTMLVideoElement | null) =>
@@ -151,17 +150,15 @@ function ViewerVideo({
       playsInline
       className={classes.video}
       onPointerMove={(event) => {
-        reveal();
+        if (event.pointerType !== "touch") reveal();
         swipe.onPointerMove(event);
       }}
       onPointerCancel={swipe.onPointerCancel}
-      onPointerDown={(event) => {
-        controlsShown.current = controls || refused;
-        reveal();
-        swipe.onPointerDown(event);
-      }}
+      onPointerDown={swipe.onPointerDown}
       onPointerUp={(event) => {
-        if (swipe.onPointerUp(event) && !controlsShown.current && !closingPopup()) onTap();
+        if (!swipe.onPointerUp(event)) return;
+        if (!controls && !refused && !closingPopup()) onTap();
+        reveal();
       }}
       onFocus={reveal}
       onClick={(event) => event.stopPropagation()}
@@ -862,7 +859,7 @@ export function MediaViewer({
                       </Tooltip>
                     </Group>
                   )}
-                  <div ref={strip.ref} className={classes.strip}>
+                  <div ref={strip.ref} className={classes.mediaStrip}>
                     <Neighbour item={previous} side="previous" />
                     {!item.url ? (
                       <div className={classes.status} {...touchSwipe}>
