@@ -160,6 +160,7 @@ recur across features.
 
 ### Layers, Focus & Phones
 
+- Suppress iOS edge history swipes once at the document, preserving native control touches and Back navigation.
 - The phone layout covers screens below Mantine's `sm` breakpoint and phones
   held sideways (short touch screens up to 1000 px wide); iPads in landscape
   keep the tablet layout. `ui/usePhone.ts` owns phone detection: components use
