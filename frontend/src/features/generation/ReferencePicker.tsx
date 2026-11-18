@@ -134,7 +134,6 @@ export function ReferencePicker({
   const tab = referenceTabs.flat().some((item) => item.value === browser.state.tab)
     ? browser.state.tab
     : "gallery";
-  const galleryTab = galleryTabs.some((item) => item.value === tab);
   const target = nextReferenceTarget(references, profile, chosen);
   function browse(patch: Partial<ReferenceBrowser["state"]>) {
     if (!("target" in patch)) browser.scroll.current = 0;
@@ -299,11 +298,6 @@ export function ReferencePicker({
       h={phone ? undefined : "min(70dvh, 620px)"}
       {...fileProps}
     >
-      {!target && galleryTab && (
-        <Text size="xs" c="dimmed">
-          All slots are filled. Choose a reference to replace it, or a selected image to remove it.
-        </Text>
-      )}
       {tab === "outfits" || tab === "scenes" ? (
         <>
           <PickerHeader
@@ -376,6 +370,14 @@ export function ReferencePicker({
           browser={browser}
           enabled={opened}
           actions={pasteButton}
+          notice={
+            !target && (
+              <Text size="xs" c="dimmed">
+                All slots are filled. Choose a reference to replace it, or a selected image to
+                remove it.
+              </Text>
+            )
+          }
           uploadTile={uploadTile}
           tile={(item, name) => {
             const matches = (reference: ReferenceAsset) => reference.galleryItemId === item.id;
