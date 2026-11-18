@@ -118,7 +118,7 @@ test("Stopping held assistance retains the draft and unblocks generation", async
 
 test("Assistance Undo restores only its changes while keeping later edits and LoRAs", async ({
   page,
-}) => {
+}, testInfo) => {
   const state = await fixtures(page);
   await page.route("**/api/assistant", (route) =>
     route.fulfill({
@@ -165,14 +165,27 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await prompt.fill("My later direction");
   await undoAssistance(page, "Prompt improved");
   await expect(prompt).toHaveValue("My later direction");
+  const negative = page.getByRole("textbox", { name: "Negative Prompt", exact: true });
+  await expect(negative).toBeVisible();
+  const promptBox = (await prompt.boundingBox())!;
+  const negativeBox = (await negative.boundingBox())!;
+  expect(negativeBox.y).toBeGreaterThanOrEqual(promptBox.y + promptBox.height);
+  expect(negativeBox.height).toBeLessThan(promptBox.height);
+  if (testInfo.project.use.isMobile) {
+    await prompt.click();
+    await expect(negative).toBeHidden();
+  }
   await assist(page, "Write Negative");
-  // The phone sheet keeps typing the prompt through its menu, with the negative prompt hidden.
-  await finishTyping(page);
-  await expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
-    "poor quality",
-  );
+  await expect(negative).toBeVisible();
+  await expect(negative).toHaveValue("poor quality");
+  await expect(prompt).toBeVisible();
+  if (testInfo.project.use.isMobile) {
+    await expect(prompt).not.toBeFocused();
+    await expect(page.getByRole("button", { name: "Close Generate", exact: true })).toBeVisible();
+  }
   await prompt.fill("My later direction in warm light");
   await undoAssistance(page, "Negative prompt written");
+  await expect(negative).toHaveValue("");
   await expect(prompt).toHaveValue("My later direction in warm light");
   await assist(page, "Suggest LoRAs");
   await page.getByRole("button", { name: "Apply Detail Slider", exact: true }).click();

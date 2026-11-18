@@ -92,6 +92,7 @@ export const ComposerDock = memo(function ComposerDock({
   }
   const controlsId = useId();
   const sheet = useRef<HTMLElement | null>(null);
+  const sheetFocus = useRef<HTMLSpanElement>(null);
   // Tapping a text box flips the sheet's typing layout at once, rather than once iOS reports the
   // keyboard after its animation, and holds it while the keyboard animates and iOS scrolls to the
   // text; it ends as the text loses focus or the keyboard drops (Android's Back keeps focus, so the
@@ -354,7 +355,7 @@ export const ComposerDock = memo(function ComposerDock({
           onExitTransitionEnd={focusCompact}
         >
           {/* Initial focus lands here rather than on Close or the prompt, so the keyboard waits for a tap. */}
-          <FocusTrap.InitialFocus />
+          <FocusTrap.InitialFocus ref={sheetFocus} />
           <div
             ref={(panel) => {
               sheet.current = panel?.closest<HTMLElement>(".mantine-Drawer-content") ?? null;
@@ -388,6 +389,11 @@ export const ComposerDock = memo(function ComposerDock({
           >
             <GenerationForm
               fill
+              onNegativeWritten={() => {
+                if (typing !== "prompt" || layerAbove(sheet.current)) return;
+                sheetFocus.current?.focus({ preventScroll: true });
+                setTyping(undefined);
+              }}
               onSubmitted={submitted}
               onKindChange={onKindChange}
               onCompared={onCompared}

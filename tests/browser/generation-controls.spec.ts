@@ -1051,7 +1051,7 @@ test("The phone Generate sheet fits the screen and keeps its action bar above th
   await expect(sheet).toBeHidden();
 });
 
-test("Typing in the phone Generate sheet gives the prompt the screen above one bar of its tools and Done", async ({
+test("Typing in either prompt in the phone Generate sheet gives it the screen above its tools and Done", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Phones only");
@@ -1060,6 +1060,7 @@ test("Typing in the phone Generate sheet gives the prompt the screen above one b
   await page.locator("[data-composer-prompt]").click();
   const sheet = page.getByRole("dialog", { name: "Generate", exact: true });
   const prompt = sheet.getByRole("textbox", { name: "Prompt", exact: true });
+  const negative = sheet.getByRole("textbox", { name: "Negative Prompt", exact: true });
   const bar = sheet.getByRole("group", { name: "Generation Actions", exact: true });
   const tools = sheet.getByRole("group", { name: "Prompt Tools", exact: true });
   const output = sheet.getByRole("radiogroup", { name: "Generation Output", exact: true });
@@ -1071,6 +1072,7 @@ test("Typing in the phone Generate sheet gives the prompt the screen above one b
   await expect.poll(bottom).toBeLessThanOrEqual(page.viewportSize()!.height);
   const resting = await bottom();
   await expect(output).toBeVisible();
+  await expect(negative).toBeVisible();
   await expect(tools).toHaveCount(0);
   // The menu opens from the text's corner and leaves the keyboard down.
   await sheet.getByRole("button", { name: "AI Prompt Actions", exact: true }).click();
@@ -1127,6 +1129,17 @@ test("Typing in the phone Generate sheet gives the prompt the screen above one b
   await expect(tools).toHaveCount(0);
   const close = sheet.getByRole("button", { name: "Close Generate", exact: true });
   await expect(close).toBeInViewport({ ratio: 1 });
+  await negative.click();
+  await negative.fill("Blurry feathers");
+  await expect(prompt).toBeHidden();
+  await expect(
+    bar.getByRole("group", { name: "Negative Prompt Tools", exact: true }),
+  ).toBeVisible();
+  await done.click();
+  await expect(negative).not.toBeFocused();
+  await expect(negative).toHaveValue("Blurry feathers");
+  await expect(prompt).toBeVisible();
+  await expect(prompt).toHaveValue("A copper fox");
   // Escape closes the sheet while typing too.
   await prompt.click();
   await expect(prompt).toBeFocused();
