@@ -91,7 +91,8 @@
 }
 
 /* A phone bar's unnamed controls take equal shares at their touch height, their icons centred and
-   any ▾ small in the corner, outside the flow; the theme's touch minimum width is an inline style. */
+   any ▾ small beside the icon's lower corner, outside the flow; the theme's touch minimum width is
+   an inline style. */
 .actions[data-stacked] .action:not(.stacked) {
   position: relative;
   flex: 1 1 0;
@@ -101,9 +102,14 @@
   padding-inline: 0;
 }
 
+/* Clear of the 20 px touch icon, however narrow the control, so it may overhang its edge. */
+.actions[data-stacked] .options {
+  overflow: visible;
+}
+
 .actions[data-stacked] .chevron {
   position: absolute;
-  inset-inline-end: 2px;
+  inset-inline-start: calc(50% + 11px);
   bottom: 6px;
   margin: 0;
 }
