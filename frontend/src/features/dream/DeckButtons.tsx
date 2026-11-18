@@ -15,7 +15,7 @@ const looks: Record<string, { glyph: ReactNode; color: MantineColor }> = {
   neither: { glyph: <X size={30} strokeWidth={2.5} />, color: "red" },
   a: {
     glyph: (
-      <Text fw={700} fz={22}>
+      <Text fw={700} fz={28}>
         A
       </Text>
     ),
@@ -23,7 +23,7 @@ const looks: Record<string, { glyph: ReactNode; color: MantineColor }> = {
   },
   b: {
     glyph: (
-      <Text fw={700} fz={22}>
+      <Text fw={700} fz={28}>
         B
       </Text>
     ),
@@ -61,6 +61,10 @@ export function DeckButtons({
             variant="light"
             color={looks[id].color}
             radius="xl"
+            // A comparison's sides stand out from Neither and Both.
+            data-size={
+              card.kind !== "pair" ? undefined : id === "a" || id === "b" ? "large" : "small"
+            }
             aria-label={label}
             onClick={() => act(choice)}
           >

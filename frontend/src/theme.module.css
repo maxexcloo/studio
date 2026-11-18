@@ -19,6 +19,21 @@
   color: var(--input-color);
 }
 
+/* A compact button's icon sits as far from its edge as from its label; Mantine halves the edge's
+   padding and keeps a wider gap, which leaves the icon hugging a pill's rounded end. */
+.compact[data-with-left-section] {
+  padding-inline-start: var(--button-padding-x);
+}
+.compact[data-with-right-section] {
+  padding-inline-end: var(--button-padding-x);
+}
+.compact :global(.mantine-Button-section[data-position="left"]) {
+  margin-inline-end: var(--button-padding-x);
+}
+.compact :global(.mantine-Button-section[data-position="right"]) {
+  margin-inline-start: var(--button-padding-x);
+}
+
 /* Touch screens raise bar and form controls to 44 px touch targets; their icons grow to match. A
    button's ▾ in its right section keeps its size. */
 .phoneIcons :global(svg.lucide):not(:global(.mantine-Button-section[data-position="right"] *)) {
