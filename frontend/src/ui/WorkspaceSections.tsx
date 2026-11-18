@@ -11,7 +11,7 @@ import {
   Title,
 } from "@mantine/core";
 import type { LucideIcon } from "lucide-react";
-import { type ReactNode, Suspense, useState } from "react";
+import { type ReactNode, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { LoadingState } from "./LoadingState";
@@ -135,6 +135,24 @@ export function WorkspaceSections({
   const { location, active } = useWorkspaceSection(sections);
   const [visited, setVisited] = useState(() => new Set([active]));
   if (!visited.has(active)) setVisited(new Set([...visited, active]));
+  // Sections share the workspace modal's scrolling body (the grid's parent), so each keeps its own
+  // place there: a newly opened section starts at its top, a revisited one where it was left.
+  const grid = useRef<HTMLDivElement>(null);
+  const places = useRef(new Map<string, number>());
+  const shown = useRef(active);
+  useEffect(() => {
+    const body = grid.current?.parentElement;
+    if (!body) return;
+    const remember = () => places.current.set(shown.current, body.scrollTop);
+    body.addEventListener("scroll", remember, { passive: true });
+    return () => body.removeEventListener("scroll", remember);
+  }, []);
+  useLayoutEffect(() => {
+    const body = grid.current?.parentElement;
+    if (!body || shown.current === active) return;
+    shown.current = active;
+    body.scrollTop = places.current.get(active) ?? 0;
+  }, [active]);
   const link = (section: WorkspaceSection) => (
     <NavLink
       key={section.value}
@@ -151,7 +169,7 @@ export function WorkspaceSections({
   const apart = sections.filter((section) => section.apart);
   return (
     // Fills the modal body, so a section's loading and empty states centre in what it leaves.
-    <Grid gap="xl" classNames={{ root: classes.grid, inner: classes.inner }}>
+    <Grid ref={grid} gap="xl" classNames={{ root: classes.grid, inner: classes.inner }}>
       {!phone && (
         <Grid.Col span={3}>
           <Stack component="nav" aria-label={`${label} Sections`} gap={4} className={classes.nav}>
