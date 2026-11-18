@@ -33,13 +33,18 @@
   box-shadow: var(--mantine-shadow-md);
 }
 
+/* A block flex row, so the icon centres on the text rather than the label's baseline. */
 .viewLabel {
   gap: 6px;
 }
 
-:root:not([data-phone]) .toolbar {
-  position: sticky;
-  top: var(--app-shell-header-offset, var(--app-shell-header-height));
+.viewLabel > svg {
+  flex: none;
+}
+
+/* The toolbar and any selection bar under it, sticky on desktop, and on phones while a search,
+   filter or selection applies. */
+.toolbar {
   z-index: 5;
   margin-inline: calc(-1 * var(--app-shell-padding));
   padding: var(--mantine-spacing-xs) var(--app-shell-padding);
@@ -47,4 +52,16 @@
   backdrop-filter: var(--studio-glass-filter);
   -webkit-backdrop-filter: var(--studio-glass-filter);
   border-bottom: 1px solid var(--studio-glass-border);
+}
+
+:root:not([data-phone]) .toolbar,
+.toolbar[data-pinned] {
+  position: sticky;
+  top: var(--app-shell-header-offset, var(--app-shell-header-height));
+}
+
+/* A phone held sideways keeps its controls clear of the notch. */
+:root[data-phone] .toolbar {
+  padding-inline: max(var(--app-shell-padding), env(safe-area-inset-left))
+    max(var(--app-shell-padding), env(safe-area-inset-right));
 }

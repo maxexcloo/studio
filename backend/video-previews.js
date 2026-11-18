@@ -325,7 +325,7 @@ const backAndForth =
 const interpolated = (fps) => `minterpolate=fps=${fps}:mi_mode=mci`;
 /**
  * The Edit menu's video edits, each the filters for the picture and for the sound (null drops it):
- * `reverse` plays it backwards; `loop` forward then back, without sound as its download has none;
+ * `reverse` plays it backwards; `loop` forward then back, without sound;
  * `smooth` doubles its frame rate (up to 60) with in-between frames; `slow` plays it at half speed,
  * the missing frames filled in the same way.
  */
@@ -421,45 +421,6 @@ export async function getComfyVideoGif(filename, subfolder, type) {
     ),
   );
   if (code !== 0 || !stdout.length) throw new Error("The GIF couldn't be made.");
-  return stdout;
-}
-
-/** A Studio video played forward then back (`backAndForth`) to download; its first 15 seconds. */
-export async function getComfyVideoLoop(filename, subfolder, type) {
-  const local = localOutputFile(filename, subfolder, type);
-  if (!local) throw new Error("Source video is unavailable.");
-  const { code, stdout } = await queued(() =>
-    run(
-      [
-        "-loglevel",
-        "error",
-        "-t",
-        "15",
-        "-i",
-        local,
-        "-an",
-        "-filter_complex",
-        `[0:v]${backAndForth},format=yuv420p[v]`,
-        "-map",
-        "[v]",
-        "-c:v",
-        "libx264",
-        "-threads",
-        "2",
-        "-preset",
-        "veryfast",
-        "-crf",
-        "20",
-        "-movflags",
-        "frag_keyframe+empty_moov+default_base_moof",
-        "-f",
-        "mp4",
-        "pipe:1",
-      ],
-      { timeout: 300_000, limit: 256 * 1024 * 1024, low: true },
-    ),
-  );
-  if (code !== 0 || !stdout.length) throw new Error("The loop couldn't be made.");
   return stdout;
 }
 

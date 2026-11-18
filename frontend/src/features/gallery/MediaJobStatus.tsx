@@ -54,7 +54,12 @@ export function MediaJobStatus({
                 : "Generation Unavailable"}
       </Text>
       {(job?.reason || savedError) && (
-        <Text size="sm" c={failed ? "red" : "dimmed"} ta="center">
+        <Text
+          size="sm"
+          c={failed ? "red" : "dimmed"}
+          ta="center"
+          style={{ overflowWrap: "anywhere" }}
+        >
           {job?.reason || savedError}
         </Text>
       )}

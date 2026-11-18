@@ -1205,13 +1205,13 @@ test("Copy ▾ lists Details then Prompt, and each copies its text", async ({ pa
         "Negative Prompt: blurry",
         `Created: ${formatDateTime(stamp)}`,
         "Profile: Image Quality",
-        "Mode: Generate",
-        "Steps: 28",
         "CFG: 4",
+        "Dimensions: 1024 × 1024",
+        "Mode: Generate",
         "Sampler: euler",
         "Seed: 1234567",
+        "Steps: 28",
         "VAE: ae",
-        "Dimensions: 1024 × 1024",
       ].join("\n"),
     );
 });
@@ -1331,21 +1331,18 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
     "src",
     "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=play",
   );
-  await viewerAction(page, "Share", "Download");
-  await expect(page.getByRole("menuitem", { name: "Video", exact: true })).toHaveAttribute(
+  await viewerAction(page, "Share");
+  await expect(page.getByRole("menuitem", { name: "Download Video", exact: true })).toHaveAttribute(
     "href",
     "/comfy/view?filename=clip.mp4&subfolder=&type=studio",
   );
-  const gif = page.getByRole("menuitem", { name: "GIF", exact: true });
+  const gif = page.getByRole("menuitem", { name: "Download GIF", exact: true });
   await expect(gif).toHaveAttribute(
     "href",
     "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=gif",
   );
   await expect(gif).toHaveAttribute("download", /\.gif$/);
-  await expect(page.getByRole("menuitem", { name: "Back & Forth", exact: true })).toHaveAttribute(
-    "href",
-    "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=loop",
-  );
+  await expect(page.getByRole("menuitem", { name: /Back & Forth/ })).toHaveCount(0);
 });
 
 test("Details fold only a long caption, keep its tags in sight and copy the prompts", async ({
