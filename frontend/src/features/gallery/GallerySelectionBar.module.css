@@ -23,10 +23,18 @@
   max-width: 100%;
 }
 
+/* Its borderless touch targets hold their own space below, standing in for the toolbar's padding,
+   so the row sits as far from the rule as from the row above. */
 :root[data-phone] .header {
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
+  margin-bottom: calc(-1 * var(--mantine-spacing-xs));
+}
+
+/* One gap between every control, the toolbar's own, so the icons line up with its buttons above. */
+:root[data-phone] :is(.header, .quick, .actions > *) {
+  column-gap: var(--mantine-spacing-xs);
 }
 
 :root[data-phone] .actions {
@@ -42,20 +50,22 @@
 }
 
 /* The shared phone bar's controls share its width; on this row, sized to its content, they would
-   collapse onto their icons, so each takes a fixed width, its ▾ clear in its corner. A width rather
-   than a flex basis, so WebKit counts it when sizing the row. */
+   collapse onto their icons, so each is as wide as its touch target is tall. A width rather than a
+   flex basis, so WebKit counts it when sizing the row. */
 :root[data-phone]
   .header
   .actions
   :is(:global(.mantine-ActionIcon-root), :global(.mantine-Button-root)) {
   flex: none;
-  width: 36px;
+  width: var(--ai-size, var(--button-height));
 }
 
-.divider {
+/* Every divider as tall as the row's icons and text, spaced only by the row's gap. */
+.divider,
+:root[data-phone] .header .actions :global(.mantine-Divider-root) {
   align-self: stretch;
   flex-shrink: 0;
-  margin-block: 10px;
+  margin: var(--mantine-spacing-xs) 0;
 }
 
 .quick {
