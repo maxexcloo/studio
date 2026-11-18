@@ -29,7 +29,9 @@ function snapNumber(value, fallback, range = {}) {
   const base = clampNumber(value, fallback, min, max);
   // Steps count from the minimum, as ComfyUI's own inputs do (H3: 124, 141, … 345).
   const offset = Number(range.offset ?? (Number.isFinite(Number(range.min)) ? range.min : 0));
-  const snapped = Math.round((base - offset) / step) * step + offset;
+  // Rounded to the step's and offset's decimals, dropping float noise (0.6, not 0.6000000000000085).
+  const places = Math.max(...[step, offset].map((n) => String(n).split(".")[1]?.length ?? 0));
+  const snapped = Number((Math.round((base - offset) / step) * step + offset).toFixed(places));
   return Math.max(min, Math.min(max, snapped));
 }
 
