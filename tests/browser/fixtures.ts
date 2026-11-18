@@ -990,15 +990,20 @@ export async function compareUpscale(page: Page) {
 
 /** Chooses a text box's tool from its ⋯ menu, such as Recent Prompts from the Prompt's. */
 export async function promptTool(scope: Page | Locator, box: string, label: string) {
-  await scope.getByRole("button", { name: new RegExp(`^(AI|More) ${box} Actions$`) }).click();
-  const page = "page" in scope ? scope.page() : scope;
-  await page.getByRole("menuitem", { name: label, exact: true }).click();
+  const menu = await promptMenu(scope, box);
+  await menu.getByRole("menuitem", { name: label, exact: true }).click();
 }
 
 /** Opens a text box's ⋯ menu, which lists each tool's options under its name, one level deep. */
 export async function promptMenu(scope: Page | Locator, box: string) {
-  await scope.getByRole("button", { name: new RegExp(`^(AI|More) ${box} Actions$`) }).click();
   const page = "page" in scope ? scope.page() : scope;
+  const button = scope.getByRole("button", { name: new RegExp(`^(AI|More) ${box} Actions$`) });
+  // The phone Generate sheet shows a box's tools only while it is being typed in.
+  const text = page
+    .getByRole("dialog", { name: "Generate", exact: true })
+    .getByRole("textbox", { name: box, exact: true });
+  if (!(await button.isVisible()) && (await text.isVisible())) await text.click();
+  await button.click();
   return page.getByRole("menu");
 }
 
