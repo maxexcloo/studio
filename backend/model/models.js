@@ -1,4 +1,4 @@
-import { loraFamilyId, maxLoras } from "../../shared/profiles.ts";
+import { loraFamilyId, maxLoras, runBackend } from "../../shared/profiles.ts";
 import { snapDimension } from "../../shared/resolution.ts";
 import { missingNodes, nodeRange, optionsFor, textRange } from "../comfy/comfy.js";
 import {
@@ -581,7 +581,22 @@ export function inferModels(
     });
     // Keep the chosen backend explicit; its alternatives carry their own controls and limits.
     if (profile.ready === false && !backendOptions.some((option) => option.ready)) continue;
-    profiles.push({ ...profile, ...(profile.backend ? { backendOptions } : {}) });
+    // A run with LoRAs may move to another backend (runBackend), so the listing offers its LoRAs.
+    const loraRun =
+      profile.backend &&
+      variants.get(runBackend(backendOptions, workflow.backend, undefined, false, true));
+    const loraFields =
+      loraRun && loraRun !== profile
+        ? {
+            capabilities: { ...profile.capabilities, lora: loraRun.capabilities.lora },
+            options: { ...profile.options, loras: loraRun.options.loras },
+            maxLoras: loraRun.maxLoras,
+            loraAdapter: loraRun.loraAdapter,
+            loraBase: loraRun.loraBase,
+            loraNote: loraRun.loraNote,
+          }
+        : {};
+    profiles.push({ ...profile, ...loraFields, ...(profile.backend ? { backendOptions } : {}) });
   }
 
   const imageProfiles = profiles.filter((profile) => profile.kind === "image");

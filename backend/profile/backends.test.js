@@ -292,6 +292,33 @@ test("backend choices include their own reference slots, controls and defaults",
   }
 });
 
+test("a combined profile lists the LoRAs of the backend its LoRA runs move to", () => {
+  const raw = combinedRaw();
+  raw.studio.backends.radiance.graph[1].inputs.model = "krea-2-turbo-iq8r";
+  raw.studio.backends.radiance.capabilities = { lora: true };
+  raw.studio.backends.radiance.loraStack = { adapter: "radiance-tags-v1", node: "1", max: 4 };
+  const comfy = raw.studio.backends.comfyui;
+  comfy.graph[5] = { class_type: "Power Lora Loader (rgthree)", inputs: {} };
+  comfy.capabilities = { lora: true };
+  comfy.loraStack = { adapter: "rgthree-power-v1", node: "5" };
+  write("combined", JSON.stringify(raw));
+  try {
+    const nodes = {
+      ...allNodes,
+      "Power Lora Loader (rgthree)": { input: { required: {} } },
+      LoraLoader: { input: { required: { lora_name: [["style.safetensors"]] } } },
+    };
+    const listed = inferModels(nodes).profiles.find((profile) => profile.id === "custom:combined");
+    const radiance = listed.backendOptions.find((option) => option.id === "radiance").profile;
+    assert.equal(radiance.capabilities.lora, false);
+    assert.equal(listed.capabilities.lora, true);
+    assert.equal(listed.loraAdapter, "rgthree-power-v1");
+    assert.deepEqual(listed.options.loras, ["style.safetensors"]);
+  } finally {
+    fs.rmSync(path.join(userWorkflowsDir, "combined.json"));
+  }
+});
+
 test("the preview pairs one model's Radiance and ComfyUI profiles and says what differs", () => {
   const preview = backendCandidates();
   assert.equal(preview.pairs.length, 1);
