@@ -158,7 +158,8 @@ test("Select All takes every match across pages, and the search and Liked stay w
     await page.evaluate(() => window.scrollBy(0, 800));
     await expect(status).toBeInViewport({ ratio: 1 });
     const unlike = actions.getByRole("button", { name: "Unlike", exact: true });
-    await unlike.scrollIntoViewIfNeeded();
+    // Scroll the row itself sideways; the page stays where it is.
+    await unlike.evaluate((el) => el.scrollIntoView({ block: "nearest", inline: "center" }));
     await expect(unlike).toBeInViewport({ ratio: 1 });
     expect((await unlike.boundingBox())!.y).toBeLessThan((await status.boundingBox())!.y + 20);
     // Phones end the selection with Select, which stays in sight while it applies.
