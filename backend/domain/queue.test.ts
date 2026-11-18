@@ -104,11 +104,16 @@ test("conflicting work waits until outputs save; independent cloud work proceeds
     const refine = store.enqueue("alice", session.id, {}, "refine", image.id);
     const cloud = store.enqueue("alice", session.id, {}, "image", undefined, "cloud");
     await queue.tick();
+    const admittedAt = store.job("alice", image.id)?.admittedAt;
+    assert.equal(typeof admittedAt, "number");
     assert.deepEqual(submitted, [image.id, cloud.id]);
     assert.equal(store.job("alice", refine.id)?.status, "waiting");
     observations.set(image.id, { status: "completed", outputs: [{ url: "/media/bird.png" }] });
     await queue.tick();
-    assert.equal(store.job("alice", image.id)?.status, "completed");
+    const completed = store.job("alice", image.id)!;
+    assert.equal(completed.status, "completed");
+    assert.equal(completed.admittedAt, admittedAt);
+    assert.ok(completed.savingAt! >= admittedAt!);
     assert.deepEqual(events, [`saved:${image.id}`, `released:${image.id}`]);
     assert.deepEqual(submitted, [image.id, cloud.id, refine.id]);
   } finally {

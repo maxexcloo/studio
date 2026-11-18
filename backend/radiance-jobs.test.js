@@ -96,11 +96,12 @@ test("Stop keeps accepted Radiance images and saves each with its own seed", asy
   }
 });
 
-test("an image run records its queue wait, model load, sampling and save for Details", async () => {
+test("an image run records its queue wait, observed model load, sampling and save", async (t) => {
   const id = "timed-image";
   const body = { ...bodyFor(id), queuedAt: Date.now() - 5000 };
   pending(id, body);
-  let state = "parked";
+  const log = t.mock.method(console, "log", () => {});
+  let state = "loading";
   await runRadianceJob(id, body, worker, {
     store,
     client: {
@@ -120,6 +121,18 @@ test("an image run records its queue wait, model load, sampling and save for Det
   assert.equal(timing.loadMs + timing.samplingMs, timing.runMs);
   for (const stage of ["setupMs", "saveMs"]) assert.ok(Number.isFinite(timing[stage]), stage);
   assert.equal(timing.downloadMs, undefined, "an image has no separate download");
+  const lines = log.mock.calls.map((call) => call.arguments[0]);
+  const [line] = lines.filter((entry) => entry.includes("Radiance job timing "));
+  assert.ok(line);
+  const measured = JSON.parse(line.split("Radiance job timing ")[1]);
+  assert.equal(measured.job, id);
+  assert.equal(measured.model, "krea-2-turbo-iq8r");
+  assert.equal(measured.initialModelState, "loading");
+  assert.ok(measured.modelResidentAt >= measured.modelLoadingAt);
+  assert.equal(measured.providerWaitMs, measured.modelResidentAt - measured.sentAt);
+  assert.equal(measured.modelLoadMs, measured.modelResidentAt - measured.modelLoadingAt);
+  assert.ok(measured.saveMs >= timing.saveMs);
+  assert.equal(line.includes(body.prompt), false);
 });
 
 test("an image is saved even if the model timing lookup has not answered", async () => {

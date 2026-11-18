@@ -17,6 +17,46 @@ const image = {
   loras: JSON.stringify([{ name: "styles/ink.safetensors", strength: 0.6 }]),
 };
 
+test("card history keeps aligned busy samples and excludes previous timestamps", async () => {
+  const client = new RadianceClient("http://radiance:8000", async (url) => {
+    const since = Number(new URL(String(url)).searchParams.get("since"));
+    assert.ok(since === 100 || since === 102);
+    return Response.json({
+      t: [100, 101.25, 102],
+      c: {
+        busy0: [1, 0, 0.5],
+        busy1: [0, null, 1],
+        busy2: [],
+        free0: [1, 2, 3],
+        "s:model": [0, 1, 2],
+      },
+    });
+  });
+  assert.deepEqual(await client.cardHistory(100), {
+    at: [101.25, 102],
+    cards: [
+      { card: 0, busy: [0, 0.5] },
+      { card: 1, busy: [null, 1] },
+    ],
+  });
+  assert.equal(await client.cardHistory(102), undefined);
+});
+
+test("shutdown aborts a utilisation sample in flight", async () => {
+  const shutdown = new AbortController();
+  const client = new RadianceClient(
+    "http://radiance:8000",
+    async (_url, options) =>
+      new Promise<Response>((_resolve, reject) => {
+        const signal = options?.signal;
+        signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+      }),
+  );
+  const sample = client.cardHistory(100, shutdown.signal);
+  shutdown.abort();
+  await assert.rejects(sample, { name: "AbortError" });
+});
+
 test("an image request sends its exact schedule, guidance and LoRAs", () => {
   assert.deepEqual(imageRequest(image), {
     route: "/v1/images/generations",
