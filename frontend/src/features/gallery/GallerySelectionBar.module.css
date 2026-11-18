@@ -32,9 +32,9 @@
   margin-bottom: calc(-1 * var(--mantine-spacing-xs));
 }
 
-/* One gap between every control, the toolbar's own, so the icons line up with its buttons above. */
+/* One narrow gap between every control, so more of the row fits a phone's width. */
 :root[data-phone] :is(.header, .quick, .actions > *) {
-  column-gap: var(--mantine-spacing-xs);
+  column-gap: 6px;
 }
 
 :root[data-phone] .actions {
@@ -50,14 +50,20 @@
 }
 
 /* The shared phone bar's controls share its width; on this row, sized to its content, they would
-   collapse onto their icons, so each is as wide as its touch target is tall. A width rather than a
-   flex basis, so WebKit counts it when sizing the row. */
+   collapse onto their icons, so each takes a fixed width narrower than its touch height, still
+   clear of its ▾. A width rather than a flex basis, so WebKit counts it when sizing the row. */
 :root[data-phone]
   .header
   .actions
   :is(:global(.mantine-ActionIcon-root), :global(.mantine-Button-root)) {
   flex: none;
-  width: var(--ai-size, var(--button-height));
+  width: 36px;
+}
+
+/* The quick selects match: their names closer to their edges, no narrower than an action. */
+:root[data-phone] .quick > * {
+  min-width: 36px !important;
+  padding-inline: 6px;
 }
 
 /* Every divider as tall as the row's icons and text, spaced only by the row's gap. */
