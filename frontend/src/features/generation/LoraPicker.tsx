@@ -1,7 +1,6 @@
 import {
   ActionIcon,
   Alert,
-  Anchor,
   Button,
   Chip,
   Group,
@@ -12,6 +11,7 @@ import {
   Stack,
   Switch,
   Text,
+  Tooltip,
 } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
@@ -692,6 +692,21 @@ function StackEntry({
           checked={enabled}
           onChange={(event) => onChange({ enabled: event.currentTarget.checked })}
         />
+        {info?.sourceUrl && (
+          <Tooltip label="View Source">
+            <ActionIcon
+              component="a"
+              href={info.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="subtle"
+              color="gray"
+              aria-label="View Source"
+            >
+              <icons.external size={16} />
+            </ActionIcon>
+          </Tooltip>
+        )}
         <ActionIcon variant="subtle" color="gray" aria-label={`Remove ${title}`} onClick={onRemove}>
           <icons.clear size={16} />
         </ActionIcon>
@@ -706,27 +721,9 @@ function StackEntry({
           mark={loraDefaultStrength(info)}
           onChange={(strength) => onChange({ strength })}
         />
-        {/* The strength's advice and the source share one line. */}
-        {(strengthIssue || range || info?.sourceUrl) && (
-          <Text size="xs" c="dimmed">
-            {strengthIssue ? (
-              <Text span c="red" inherit>
-                {strengthIssue}
-              </Text>
-            ) : (
-              range && (
-                <span>
-                  Suggested {range.min} to {range.max}
-                  {range.default !== undefined && `, default ${range.default}`}
-                </span>
-              )
-            )}
-            {(strengthIssue || range) && info?.sourceUrl && " · "}
-            {info?.sourceUrl && (
-              <Anchor inherit href={info.sourceUrl} target="_blank" rel="noopener noreferrer">
-                View Source
-              </Anchor>
-            )}
+        {strengthIssue && (
+          <Text size="xs" c="red">
+            {strengthIssue}
           </Text>
         )}
         {!compatible && (
@@ -747,13 +744,7 @@ function StackEntry({
             }}
           >
             <Scroller controlSize={28} edgeGradientColor="var(--mantine-color-body)">
-              <Group
-                gap={6}
-                wrap="nowrap"
-                py={4}
-                role="group"
-                aria-label={`${title} Trigger Words`}
-              >
+              <Group gap={6} wrap="nowrap" role="group" aria-label={`${title} Trigger Words`}>
                 <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
                   Trigger Words
                 </Text>
@@ -766,9 +757,17 @@ function StackEntry({
             </Scroller>
           </Chip.Group>
         )}
-        {info?.description && (
+        {/* The suggested range leads the description's line. */}
+        {(range || info?.description) && (
           <Text size="xs" c="dimmed" lineClamp={2}>
-            {info.description}
+            {range && (
+              <Text span inherit fw={500}>
+                Suggested {range.min} to {range.max}
+                {range.default !== undefined && `, default ${range.default}`}
+              </Text>
+            )}
+            {range && info?.description && " · "}
+            {info?.description}
           </Text>
         )}
       </Stack>
