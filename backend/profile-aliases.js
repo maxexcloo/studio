@@ -4,7 +4,7 @@ import path from "node:path";
 import { databaseFile, runtimeDatabase } from "./persistence/runtime.ts";
 
 // The runtime records that hold JSON, by table and column.
-const records = [
+export const records = [
   ["studio_documents", "value"],
   ["studio_gallery", "value"],
   ["studio_library_imports", "value"],
