@@ -182,3 +182,31 @@
 .touchTooltip {
   display: none !important;
 }
+
+/* The status bar sits over a solid inset, above the glass header row. */
+.shellHeader {
+  background: transparent;
+  padding-top: env(safe-area-inset-top);
+}
+
+.shellHeader::before,
+.shellHeader::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.shellHeader::before {
+  top: 0;
+  height: env(safe-area-inset-top);
+  background: var(--mantine-color-body);
+}
+
+.shellHeader::after {
+  inset-block: env(safe-area-inset-top) 0;
+  background: var(--studio-glass-chrome);
+  -webkit-backdrop-filter: var(--studio-glass-filter);
+  backdrop-filter: var(--studio-glass-filter);
+}
