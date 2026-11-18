@@ -169,6 +169,14 @@ export async function accountRules(media, owner, signal) {
   return taste?.rules || [];
 }
 
+/** Whether the account's recent results are converging on one look (domain/reflection.ts). */
+export async function converging(media, owner, signal) {
+  const reflection = await media
+    .request("GET", "/api/taste/reflection", undefined, owner, { signal })
+    .catch(() => null);
+  return Boolean(reflection?.sameness?.made?.converging);
+}
+
 /** The rules as generate's reply gives them, or "" when there are none. */
 export const rulesLine = (rules) =>
   rules.length

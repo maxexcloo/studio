@@ -70,6 +70,7 @@ import { registerIdlePassRoutes } from "./domain/idle-work.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
 import { createIssues, registerIssueRoutes } from "./domain/issues.ts";
 import { createProjects, stylesWithChoice } from "./domain/projects.ts";
+import { createReflection, registerReflectionRoutes } from "./domain/reflection.ts";
 import { createReview } from "./domain/review.ts";
 import { registerMaintenanceRoutes, registerQueueRoutes } from "./domain/routes.ts";
 import { Store, queuePriority } from "./domain/store.ts";
@@ -835,6 +836,14 @@ registerIssueRoutes(app, {
     updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
   }),
 });
+// Image Search is built further down; requests reach it only once Studio has started.
+registerReflectionRoutes(app, {
+  reflection: createReflection({
+    gallery: (ownerId, query) => galleryItems({ ownerId, ...query }),
+    likeness: (a, b) => imageSearch.likeness(a, b),
+  }),
+});
+
 /** Whether what the owner is offered may be worded explicitly: Uncensored Models, always in single-user mode. */
 const explicitFor = (ownerId) =>
   !ownerId || mayUseFeature(accountAccessForId(ownerId), "uncensoredModels");

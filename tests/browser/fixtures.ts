@@ -1364,6 +1364,10 @@ export async function serveDream(
       Object.entries(fields).map(([key, none]) => [key, options.taste?.[key] ?? none]),
     ),
   };
+  const none = { recent: null, earlier: null, converging: false, examples: [] };
+  await page.route(/\/api\/taste\/reflection(?:\?.*)?$/, (route) =>
+    route.fulfill({ json: { sameness: { made: none, liked: none }, days: [] } }),
+  );
   let issues = options.issues ?? [];
   await page.route(/\/api\/taste\/issues(?:\/\w+)?$/, (route) => {
     const request = route.request();

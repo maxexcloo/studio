@@ -7970,4 +7970,11 @@ test("MCP generation follows supplied prompts independently of saved account bri
     texts(await call(client, "generate", { prompts: ["A wax coat"] })),
     /The user's rules[^:]*: no visible text\./,
   );
+  // Converging results ask the chat for variety, once.
+  f.app.get("/api/taste/reflection", (_req, res) =>
+    res.json({ sameness: { made: { converging: true } } }),
+  );
+  const varied = /Recent results are converging on one look/;
+  assert.match(texts(await call(client, "generate", { prompts: ["A tweed coat"] })), varied);
+  assert.doesNotMatch(texts(await call(client, "generate", { prompts: ["A suede coat"] })), varied);
 });
