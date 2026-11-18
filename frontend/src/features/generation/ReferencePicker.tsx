@@ -1,13 +1,4 @@
-import {
-  ActionIcon,
-  Button,
-  FileButton,
-  Image,
-  ScrollArea,
-  Stack,
-  Text,
-  Tooltip,
-} from "@mantine/core";
+import { ActionIcon, Button, Image, ScrollArea, Stack, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { ChevronDown, ImagePlus } from "lucide-react";
 import { type ClipboardEvent, type DragEvent, useState } from "react";
@@ -26,7 +17,7 @@ import { chipProps, iconChipProps } from "./chip";
 import { GalleryChoices, galleryTabs } from "./GalleryChoices";
 import { draftForProfile, useGeneration } from "./GenerationProvider";
 import { controlRange, referenceDetails, referenceGroup, referenceGroups } from "./payload";
-import { ChipContent, ChipPopup, PickerHeader, PopupHeading } from "./Picker";
+import { ChipContent, ChipPopup, PickerHeader, PopupHeading, UploadTile } from "./Picker";
 import {
   type ReferenceTarget,
   galleryReferenceType,
@@ -35,14 +26,11 @@ import {
   placeReference,
   referenceKey,
   referenceLabel,
-  uploadTypes,
   useReferenceList,
   useReferencePlacement,
 } from "./references";
 import { ReferenceRoles, ReferenceSlots, referenceCellType } from "./ReferenceSlots";
 import { type ReferenceBrowser, useReferenceBrowser } from "./useReferenceBrowser";
-
-import classes from "./ReferencePicker.module.css";
 
 /** The Library's cards, after the gallery's tabs, with Characters. */
 const cardTabs: typeof galleryTabs = [
@@ -203,25 +191,12 @@ export function ReferencePicker({
     settle();
   }
   const uploadTile = (
-    <div role="listitem" className={classes.uploadTile}>
-      <FileButton accept={uploadTypes.join(",")} multiple onChange={(files) => uploadFiles(files)}>
-        {(props) => (
-          <Button
-            {...props}
-            className={classes.upload}
-            variant="default"
-            aria-label="Upload Reference"
-            loading={placement.uploading}
-            disabled={!target || placement.uploading}
-          >
-            <Stack align="center" gap="xs">
-              <icons.upload size={22} aria-hidden />
-              <span>Upload</span>
-            </Stack>
-          </Button>
-        )}
-      </FileButton>
-    </div>
+    <UploadTile
+      label="Upload Reference"
+      disabled={!target}
+      loading={placement.uploading}
+      onFiles={uploadFiles}
+    />
   );
   // Touch screens have no paste key, and iOS no paste event outside a text field: Paste reads the
   // clipboard on a tap instead.

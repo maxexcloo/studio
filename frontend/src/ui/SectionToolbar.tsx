@@ -2,8 +2,10 @@ import {
   ActionIcon,
   Badge,
   Button,
+  Chip,
   Divider,
   Group,
+  Input,
   Menu,
   Popover,
   ScrollArea,
@@ -68,6 +70,39 @@ interface ToolbarMoreAction {
 }
 
 const link = (href?: string) => (href ? { component: "a" as const, href, download: true } : {});
+
+/**
+ * One filter's choices, inline in a toolbar's Filter popover: All, then each option; exactly one
+ * is chosen, and All (`null`) filters nothing.
+ */
+export function FilterChoices({
+  label,
+  data,
+  value,
+  onChange,
+}: {
+  label: string;
+  data: (string | { value: string; label: string })[];
+  value: string | null;
+  onChange: (value: string | null) => void;
+}) {
+  const options = data.map((option) =>
+    typeof option === "string" ? { value: option, label: option } : option,
+  );
+  return (
+    <Input.Wrapper label={label} labelElement="div">
+      <Chip.Group value={value ?? ""} onChange={(next) => onChange(next || null)}>
+        <Group gap={6} mt={4} role="radiogroup" aria-label={label}>
+          {[{ value: "", label: "All" }, ...options].map((option) => (
+            <Chip key={option.value} value={option.value} size="xs" variant="light">
+              {option.label}
+            </Chip>
+          ))}
+        </Group>
+      </Chip.Group>
+    </Input.Wrapper>
+  );
+}
 
 /**
  * Library and Settings lists share one toolbar: segmented views on the left, then search (a field,

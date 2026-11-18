@@ -10,6 +10,7 @@ import {
   fixtures,
   image,
   openReferenceChoices,
+  pickerTab,
   profiles,
   promptMenu,
   section,
@@ -247,6 +248,13 @@ test("New Character saves a name, description and gallery images from the Refere
   await expect(picker).toBeHidden();
   await expect(editor).toBeVisible();
   await editor.getByRole("button", { name: "Add Images", exact: true }).click();
+  // Upload is the Uploads tab's first tile, as in References, rather than a toolbar button.
+  await expect(picker.getByRole("button", { name: "Upload Image", exact: true })).toHaveCount(0);
+  await pickerTab(page, "Images", "Uploads");
+  await expect(
+    picker.getByRole("listitem").first().getByRole("button", { name: "Upload Image" }),
+  ).toBeEnabled();
+  await pickerTab(page, "Images", "Gallery");
   // Preview opens above the popup, and Escape closes only the preview.
   await picker
     .getByRole("listitem")

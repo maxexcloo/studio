@@ -27,7 +27,6 @@ import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
 import { useFlash } from "../../ui/useFlash";
 import { inspirationQuery } from "../generation/inspiration";
-import { ImportDownloads } from "./ImportDownloads";
 import {
   type ImportRecord,
   LibraryImportReview,
@@ -83,7 +82,7 @@ interface SubstituteRow {
 
 /**
  * Library › Imports: shared model and recipe imports grouped by what they need, with Download
- * Missing, substitutes to accept or reject, Clear Stale and the model downloads.
+ * Missing, substitutes to accept or reject and Clear Stale; Library › Downloads follows the files.
  */
 export function LibraryImports({
   heading,
@@ -201,7 +200,7 @@ export function LibraryImports({
   const importActions = (record: ImportRecord) => (
     <>
       <Menu.Item leftSection={<icons.details size={16} />} onClick={() => setReviewId(record.id)}>
-        Review Import
+        Review
       </Menu.Item>
       {downloadable(record) && (
         <Menu.Item
@@ -218,7 +217,7 @@ export function LibraryImports({
         leftSection={<icons.delete size={16} />}
         onClick={() => setDeleting(record)}
       >
-        Delete Import
+        Delete
       </Menu.Item>
     </>
   );
@@ -427,7 +426,7 @@ export function LibraryImports({
                         leftSection={<icons.details size={16} />}
                         onClick={() => setReviewId(row.record.id)}
                       >
-                        Review Import
+                        Review
                       </Menu.Item>
                     </>
                   )}
@@ -459,7 +458,6 @@ export function LibraryImports({
           );
         })
       )}
-      <ImportDownloads active={active} query={query} />
       {reviewId && (
         <LibraryImportReview
           id={reviewId}

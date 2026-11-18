@@ -74,23 +74,23 @@ const sides: { value: SidePreference; label: string }[] = [
 const kinds: { kind: WorkKind; label: string; description: string }[] = [
   { kind: "images", label: "Images", description: "Where new images run until you pick a model." },
   {
+    kind: "videos",
+    label: "Videos",
+    description: "Where new videos and Animate run until you pick a model.",
+  },
+  {
     kind: "text",
     label: "Text",
     description:
       "Where prompt writing, titles, captions, suggestions and Dream's writing run. Local shares a GPU with images.",
   },
-  {
-    kind: "videos",
-    label: "Videos",
-    description: "Where new videos and Animate run until you pick a model.",
-  },
 ];
 
 /**
- * Cloud Models, then for Images, Text and Videos where each runs by default (unsaved, Local, Cloud
- * and Local) and its default model on each side, the deployment's until one is chosen. With Cloud
- * Models off, Cloud is no choice and only the Local defaults remain, as the backend reads it
- * (account-preferences.js).
+ * Cloud Models, then for Images, Videos and Text where each runs by default (unsaved, Local, Cloud
+ * and Local) and its default model on each side, the deployment's until one is chosen; each row
+ * leads with its kind, so they read in order. With Cloud Models off, Cloud is no choice and only
+ * the Local defaults remain, as the backend reads it (account-preferences.js).
  */
 function WhereWorkRuns() {
   const status = useQuery(preferencesQuery).data;
@@ -114,15 +114,16 @@ function WhereWorkRuns() {
           .map((profile) => ({ value: profile.id, label: profileName(profile) }));
   const defaultRow = (kind: WorkKind, label: string, side: SidePreference) => {
     const key = defaultModelKeys[kind][side];
-    const name = `${label} ${side === "cloud" ? "Cloud" : "Local"} Default`;
+    const sideLabel = side === "cloud" ? "Cloud" : "Local";
+    const name = `${label} Default ${sideLabel} Model`;
     const data = choices(kind, side);
     const value = preferences[key];
     return (
       <SettingRow
         key={key}
         wide
-        label={`${side === "cloud" ? "Cloud" : "Local"} Default`}
-        description={`The ${label.toLowerCase()} model ${side === "cloud" ? "Cloud" : "Local"} uses until you pick one.`}
+        label={name}
+        description={`The ${label.toLowerCase()} model ${sideLabel} uses until you pick one.`}
       >
         <Select
           aria-label={name}
@@ -148,9 +149,9 @@ function WhereWorkRuns() {
       {kinds.map(({ kind, label, description }) => (
         <Fragment key={kind}>
           {cloud && (
-            <SettingRow wide label={label} description={description}>
+            <SettingRow wide label={`${label} Default`} description={description}>
               <SegmentedControl
-                aria-label={label}
+                aria-label={`${label} Default`}
                 fullWidth
                 data={sides}
                 value={preferences[kind] || (kind === "text" ? "cloud" : "local")}

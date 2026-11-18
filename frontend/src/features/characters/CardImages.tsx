@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   Card,
-  FileButton,
   FocusTrap,
   Group,
   Image,
@@ -13,7 +12,6 @@ import {
   Stack,
   Text,
   TextInput,
-  Tooltip,
   UnstyledButton,
   getDefaultZIndex,
 } from "@mantine/core";
@@ -29,15 +27,15 @@ import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { pictureItem, useMediaPreview } from "../gallery/MediaPreview";
-import { chipProps, iconChipProps } from "../generation/chip";
+import { chipProps } from "../generation/chip";
 import { GalleryChoices } from "../generation/GalleryChoices";
+import { UploadTile } from "../generation/Picker";
 import { assistantQuery } from "../generation/PromptAssistant";
 import {
   type ReferenceTarget,
   galleryReferenceType,
   nextReferenceTarget,
   referenceKey,
-  uploadTypes,
   useReferencePlacement,
 } from "../generation/references";
 import { ReferenceSlots, referenceCellType } from "../generation/ReferenceSlots";
@@ -322,10 +320,10 @@ type Rating = { rating: number; note: string };
 
 /**
  * A card's images as numbered slots, reordered by drag or each slot's menu, whose Preview shows one
- * full size. An empty slot opens the References sheet's gallery choices in their
- * own popup (tabs, search, Filter ▾, Upload and tiles), so the form stays short; a tap fills the
- * chosen slot, else the next empty one, and a chosen image's tile removes it. Rate Images scores
- * each as the kind's reference.
+ * full size. An empty slot opens the References sheet's gallery choices in their own popup (tabs,
+ * search, Filter ▾ and tiles, Uploads starting with Upload), so the form stays short; a tap fills
+ * the chosen slot, else the next empty one, and a chosen image's tile removes it. Rate Images
+ * scores each as the kind's reference.
  */
 function CardImages({
   kind,
@@ -385,30 +383,16 @@ function CardImages({
     else if (data.files.length) void placement.uploadFiles([...data.files], into);
     setChosen(null);
   }
-  const upload = (
-    <FileButton
-      accept={uploadTypes.join(",")}
-      multiple
-      onChange={(files) => {
+  const uploadTile = (
+    <UploadTile
+      label="Upload Image"
+      disabled={!target}
+      loading={placement.uploading}
+      onFiles={(files) => {
         void placement.uploadFiles(files, chosen);
         setChosen(null);
       }}
-    >
-      {(props) => (
-        <Tooltip label="Upload" disabled={!phone}>
-          <Button
-            {...props}
-            {...(phone ? iconChipProps : chipProps)}
-            aria-label="Upload Image"
-            loading={placement.uploading}
-            disabled={!target}
-            leftSection={phone ? undefined : <icons.upload size={15} />}
-          >
-            {phone ? <icons.upload size={16} /> : "Upload"}
-          </Button>
-        </Tooltip>
-      )}
-    </FileButton>
+    />
   );
   const rated = images.filter((asset) => ratings[asset.id]);
   const noun = max > 1 ? "Images" : "Image";
@@ -522,7 +506,7 @@ function CardImages({
             label="Images"
             browser={browser}
             enabled={picking}
-            actions={upload}
+            uploadTile={uploadTile}
             tile={(item, name) => {
               const selected = images.some((asset) => asset.galleryItemId === item.id);
               const removes = selected && !chosen?.replace;

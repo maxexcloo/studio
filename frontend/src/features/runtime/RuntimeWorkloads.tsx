@@ -420,37 +420,35 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
             },
           },
         ]}
+        // Every workload lists the same actions, those its state doesn't allow disabled: running
+        // it, then looking at it, then ending its work.
         rowActions={(item) => (
           <>
-            {item.phase === "parked" || item.phase === "down" ? (
-              <Menu.Item
-                leftSection={<icons.resume size={16} />}
-                disabled={Boolean(operation)}
-                onClick={() => starting.mutate(item.id)}
-              >
-                Start
-              </Menu.Item>
-            ) : (
-              <Menu.Item
-                leftSection={<icons.retry size={16} />}
-                disabled={
-                  item.phase !== "running" ||
-                  (Boolean(operation) && !(item.radiance && operation?.stop.includes(item.id)))
-                }
-                onClick={() => setRestarting(item.id)}
-              >
-                {stopsNow(item) ? "Stop Now" : "Restart"}
-              </Menu.Item>
-            )}
-            {item.radiance && (
-              <Menu.Item
-                leftSection={<icons.stop size={16} />}
-                disabled={!item.jobs && !item.queued}
-                onClick={() => setQueueId(item.id)}
-              >
-                Cancel Queue
-              </Menu.Item>
-            )}
+            <Menu.Item
+              leftSection={<icons.retry size={16} />}
+              disabled={
+                item.phase !== "running" ||
+                (Boolean(operation) && !(item.radiance && operation?.stop.includes(item.id)))
+              }
+              onClick={() => setRestarting(item.id)}
+            >
+              {stopsNow(item) ? "Stop Now" : "Restart"}
+            </Menu.Item>
+            <Menu.Item
+              leftSection={<icons.resume size={16} />}
+              disabled={Boolean(operation) || (item.phase !== "parked" && item.phase !== "down")}
+              onClick={() => starting.mutate(item.id)}
+            >
+              Start
+            </Menu.Item>
+            <Menu.Item
+              leftSection={<icons.stop size={16} />}
+              disabled={Boolean(operation) || !running.includes(item.id)}
+              onClick={() => previewing.mutate(running.filter((id) => id !== item.id))}
+            >
+              Stop
+            </Menu.Item>
+            <Menu.Divider />
             {item.text && benchmarks?.configured && (
               <Menu.Item
                 leftSection={<icons.benchmark size={16} />}
@@ -465,6 +463,15 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
               onClick={() => setWorkloadLogId(item.id)}
             >
               View Log
+            </Menu.Item>
+            <Menu.Divider />
+            <Menu.Item
+              color="red"
+              leftSection={<icons.clear size={16} />}
+              disabled={!item.jobs && !item.queued}
+              onClick={() => setQueueId(item.id)}
+            >
+              Cancel Queue
             </Menu.Item>
           </>
         )}

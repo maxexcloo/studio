@@ -14,7 +14,7 @@ import {
   toolbarSearch,
 } from "./fixtures";
 
-test("The Library groups AI, Cards and Generation, sets Files and Imports apart and opens on the Chat Brief", async ({
+test("The Library groups AI, Cards and Generation, sets Downloads, Files and Imports apart and opens on the Chat Brief", async ({
   page,
 }) => {
   await fixtures(page);
@@ -24,7 +24,7 @@ test("The Library groups AI, Cards and Generation, sets Files and Imports apart 
     Cards: ["Characters", "Outfits", "Scenes"],
     Generation: ["Guides", "LoRAs", "Profiles", "Prompt Styles"],
   };
-  const order = [...Object.values(groups).flat(), "Files", "Imports"];
+  const order = [...Object.values(groups).flat(), "Downloads", "Files", "Imports"];
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
     await expect(select).toHaveValue("Chat Brief");
@@ -143,7 +143,7 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
   await page.goto("/images");
   await openNav(page, "Library");
   const readsBeforeDownloads = modelReads;
-  await section(page, "Library", "Imports");
+  await section(page, "Library", "Downloads");
   const table = page.getByRole("table", { name: "Model Downloads" });
   await expect(table.getByRole("row").filter({ hasText: active.file })).toContainText(
     "Downloading",
@@ -158,17 +158,17 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
     await page.getByRole("menuitem", { name: action, exact: true }).click();
     await expect(page.getByRole("menu")).toBeHidden();
   };
-  await actions(active.file, "Stop Download");
+  await actions(active.file, "Stop");
   await expect(page.getByText("Worker is reconnecting. Try again.", { exact: true })).toBeVisible();
   await expect(table.getByRole("row").filter({ hasText: active.file })).toContainText(
     "Downloading",
   );
-  await actions(active.file, "Stop Download");
+  await actions(active.file, "Stop");
   await expect(table.getByRole("row").filter({ hasText: active.file })).toContainText("Paused");
   await expect(table.getByRole("row").filter({ hasText: queued.file })).toContainText("Queued");
-  await actions(paused.file, "Resume Download");
+  await actions(paused.file, "Resume");
   await expect(table.getByRole("row").filter({ hasText: paused.file })).toContainText("Queued");
-  await actions(failed.file, "Retry Download");
+  await actions(failed.file, "Retry");
   await expect(table.getByRole("row").filter({ hasText: failed.file })).toContainText("Queued");
   expect(requests).toEqual([
     { path: "/api/models/downloads/cancel", id: active.id },
@@ -334,10 +334,11 @@ test("Update All applies every free update in one request", async ({ page }) => 
   const loras = page.getByRole("region", { name: "Library: LoRAs", exact: true });
   await loras.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   const filters = page.getByRole("dialog", { name: "Filter LoRAs", exact: true });
-  const family = filters.getByRole("combobox", { name: "Family", exact: true });
-  await expect(family).toHaveValue("");
-  await family.click();
-  await page.getByRole("option", { name: "SDXL", exact: true }).click();
+  // Families are inline choices, All until one is chosen.
+  const family = filters.getByRole("radiogroup", { name: "Family", exact: true });
+  await expect(family.getByRole("radio", { name: "All", exact: true })).toBeChecked();
+  await family.getByText("SDXL", { exact: true }).click();
+  await expect(family.getByRole("radio", { name: "SDXL", exact: true })).toBeChecked();
   const table = loras.getByRole("table", { name: "Library LoRAs", exact: true });
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("Detail");
@@ -398,7 +399,7 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   await openNav(page, "Library");
   await section(page, "Library", "Imports");
   await page.getByRole("button", { name: "Actions for Imported Checkpoint", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Review Import", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Review", exact: true }).click();
   const button = page.getByRole("button", { name: "Draft Profile", exact: true });
   await button.click();
   await expect(
@@ -514,7 +515,7 @@ test("Imports group by what they need: Download All Missing, substitutes to acce
   await expect(page.getByText("Blocked Model", { exact: true })).toBeHidden();
   await expect(page.getByRole("button", { name: "Clear Stale", exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Actions for Kept Model", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Delete Import", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Delete Import", exact: true })
     .getByRole("button", { name: "Delete", exact: true })
@@ -555,8 +556,10 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(name).toHaveAttribute("aria-sort", "descending");
   await expect(names).toHaveText(["XL Base", "Flux Base"]);
   await page.getByRole("button", { name: "Filter Files", exact: true }).click();
-  await page.getByRole("combobox", { name: "Family", exact: true }).click();
-  await page.getByRole("option", { name: "SDXL", exact: true }).click();
+  await page
+    .getByRole("radiogroup", { name: "Family", exact: true })
+    .getByText("SDXL", { exact: true })
+    .click();
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("XL Base");
   await page
