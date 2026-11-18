@@ -86,20 +86,26 @@ export function useVisibleRect(active: boolean) {
   return rect;
 }
 
-/** While `active`, whether a text field that `within` accepts has focus. */
-export function useTypingIn(active: boolean, within: (field: Element) => boolean) {
-  const [typing, setTyping] = useState(false);
+/** While `active`, the owner of the focused field, or false for a field it does not own. */
+export function useTypingIn<T>(active: boolean, ownerOf: (field: Element) => T | false) {
+  const [typing, setTyping] = useState<T | false>(false);
   useEffect(() => {
     if (!active) return setTyping(false);
+    let frame = 0;
     const check = () => {
       const field = document.activeElement;
-      setTyping(Boolean(field?.matches("input, textarea") && within(field)));
+      setTyping(field?.matches("input, textarea") ? ownerOf(field) : false);
     };
     // Moving between fields blurs one before focusing the next; check once focus has settled.
-    const settled = () => requestAnimationFrame(check);
+    const settled = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(check);
+    };
+    check();
     document.addEventListener("focusin", check);
     document.addEventListener("focusout", settled);
     return () => {
+      cancelAnimationFrame(frame);
       document.removeEventListener("focusin", check);
       document.removeEventListener("focusout", settled);
     };
@@ -108,18 +114,24 @@ export function useTypingIn(active: boolean, within: (field: Element) => boolean
 }
 
 /**
- * While a phone types in a centred dialog's field, fits every dialog to the visible viewport
- * (`--studio-dialog-top` and `--studio-dialog-inset`, read by the theme's Modal), so its footer
- * stays reachable above the keyboard instead of behind it.
+ * While a phone types in a centred dialog or chip sheet, fit that dialog above the keyboard.
+ * The full-screen text editor follows the viewport itself.
  */
 export function useDialogKeyboard() {
-  const typing = useTypingIn(usePhone(), (field) =>
-    Boolean(field.closest(".mantine-Modal-content:not([data-full-screen])")),
-  );
-  const keyboard = useKeyboard(typing);
+  const owner = useTypingIn(usePhone(), (field) => {
+    const dialog = field.closest(".mantine-Modal-content");
+    return dialog?.matches(":not([data-full-screen]), [data-chip-popup]")
+      ? dialog.parentElement || false
+      : false;
+  });
+  const keyboard = useKeyboard(Boolean(owner));
   useEffect(() => {
-    const root = document.documentElement.style;
-    root.setProperty("--studio-dialog-top", `${keyboard.top}px`);
-    root.setProperty("--studio-dialog-inset", `${keyboard.inset}px`);
-  }, [keyboard.top, keyboard.inset]);
+    if (!owner) return;
+    owner.style.setProperty("--studio-dialog-top", `${keyboard.top}px`);
+    owner.style.setProperty("--studio-dialog-inset", `${keyboard.inset}px`);
+    return () => {
+      owner.style.removeProperty("--studio-dialog-top");
+      owner.style.removeProperty("--studio-dialog-inset");
+    };
+  }, [owner, keyboard.top, keyboard.inset]);
 }

@@ -356,7 +356,7 @@ export function studioTheme({
           title: overlayTitle,
         }),
       }),
-      // Compound modals (phone chip popups) skip the Modal defaults above.
+      // Compound modals share the Modal styles and take their default props from their own Root.
       ModalRoot: { defaultProps: { transitionProps: popupTransition } },
       NavLink: NavLink.extend({
         styles: { root: { borderRadius: "var(--mantine-radius-md)", ...target } },

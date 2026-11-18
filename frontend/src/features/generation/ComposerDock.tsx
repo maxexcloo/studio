@@ -92,7 +92,10 @@ export const ComposerDock = memo(function ComposerDock({
   }
   const controlsId = useId();
   const sheet = useRef<HTMLElement | null>(null);
-  const keyboard = useKeyboard(phone && opened, sheet);
+  const typingInSheet = useTypingIn(phone && opened, (field) =>
+    Boolean(sheet.current?.contains(field)),
+  );
+  const keyboard = useKeyboard(typingInSheet, sheet);
   // Tapping a text box flips the sheet's typing layout at once, rather than once iOS reports the
   // keyboard after its animation, and holds it while the keyboard animates and iOS scrolls to the
   // text; it ends as the text loses focus or the keyboard drops (Android's Back keeps focus, so the
