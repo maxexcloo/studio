@@ -101,16 +101,16 @@ test("flux2Records gives FLUX.2 runs back their profile by model file, profile n
   const rows = Object.fromEntries(
     readGalleryRows(runtimeDatabase(dataDir)).map((row) => [row.id, row]),
   );
-  assert.equal(rows.kv.model, "custom:image-flux2-klein-9b-kv-fast");
-  assert.equal(rows.kv.settings.profileId, "custom:image-flux2-klein-9b-kv-fast");
-  assert.equal(rows.base.model, "custom:image-flux2-klein-9b-base-quality");
-  assert.equal(rows.base.settings.profileId, "custom:image-flux2-klein-9b-base-quality");
+  assert.equal(rows.kv.model, "custom:image-flux2-klein-9b-fast");
+  assert.equal(rows.kv.settings.profileId, "custom:image-flux2-klein-9b-fast");
+  assert.equal(rows.base.model, "custom:image-flux2-klein-9b-base-50");
+  assert.equal(rows.base.settings.profileId, "custom:image-flux2-klein-9b-base-50");
   assert.equal(rows.flux3.settings.profileId, quality);
-  assert.equal(rows["named-kv"].model, "custom:image-flux2-klein-9b-kv-fast");
-  assert.equal(rows["named-base"].settings.profileId, "custom:image-flux2-klein-9b-base-quality");
+  assert.equal(rows["named-kv"].model, "custom:image-flux2-klein-9b-fast");
+  assert.equal(rows["named-base"].settings.profileId, "custom:image-flux2-klein-9b-base-50");
   assert.equal(rows["named-flux3"].settings.profileId, fast);
-  assert.equal(rows["encoder-kv"].settings.profileId, "custom:image-flux2-klein-9b-kv-fast");
-  assert.equal(rows["encoder-base"].model, "custom:image-flux2-klein-9b-base-quality");
+  assert.equal(rows["encoder-kv"].settings.profileId, "custom:image-flux2-klein-9b-fast");
+  assert.equal(rows["encoder-base"].model, "custom:image-flux2-klein-9b-base-50");
   assert.equal(rows.unknown.settings.profileId, fast);
   assert.deepEqual(readRuntimeDocument(dataDir, "preferences:x"), { images: fast });
 

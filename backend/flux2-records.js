@@ -4,8 +4,8 @@ import path from "node:path";
 import { databaseFile, runtimeDatabase } from "./persistence/runtime.ts";
 import { records } from "./profile-aliases.js";
 
-const kv = "custom:image-flux2-klein-9b-kv-fast";
-const base = "custom:image-flux2-klein-9b-base-quality";
+const kv = "custom:image-flux2-klein-9b-fast";
+const base = "custom:image-flux2-klein-9b-base-50";
 // The FLUX.2 [klein] 9B model files, by the profile that ran them.
 const flux2Files = new Map([
   ["flux-2-klein-9b-kv-fp8.safetensors", kv],
