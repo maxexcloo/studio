@@ -199,8 +199,8 @@ recur across features.
   marks everything AI does. The viewer's prompt keeps its AI tools in the
   bar's AI menu and its send beside the text.
   Composer fields edit in place: at rest the phone Generate sheet shows only
-  the text, filling the room between its heading and the chips, with no
-  tools. Typing gives the text the top of the
+  the text, filling the room between its heading and the chips (one row
+  that scrolls sideways), with no tools. Typing gives the text the top of the
   screen, without the sheet's header, above one action bar: the box's menu,
   Copy and Clear/Reset/Undo as icons, then Done, which returns to the sheet,
   in place of the output, Clear and Generate. There Reset returns

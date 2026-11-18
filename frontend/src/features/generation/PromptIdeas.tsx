@@ -9,6 +9,7 @@ import { icons } from "../../ui/icons";
 import { useGroupFeature } from "../auth/AccountGate";
 import { askPromptIdeas, promptIdeasQuery } from "../taste/suggestions";
 import { UndoButton, suggested } from "./AskChange";
+import { assistantQuery } from "./PromptAssistant";
 
 /**
  * Taste-led prompt ideas for an empty prompt: a Suggested tool, first in the prompt's AI menu, asked
@@ -27,8 +28,10 @@ export function usePromptIdeas({
   const client = useQueryClient();
   const [asked, setAsked] = useState(false);
   const [picked, setPicked] = useState<{ before: string; after: string } | null>(null);
-  // A group without Prompt Assistant gets no ideas, so they are never asked for.
-  const offered = useGroupFeature("promptAssistant");
+  // A group without Prompt Assistant, or a Studio without its model, gets no ideas, so they are
+  // never asked for.
+  const assistant = useQuery(assistantQuery);
+  const offered = useGroupFeature("promptAssistant") && !!assistant.data?.available;
   const query = promptIdeasQuery(kind);
   const ideas = useQuery({ ...query, enabled: asked && offered });
   const refresh = useMutation({
