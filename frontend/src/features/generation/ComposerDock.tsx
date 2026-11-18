@@ -100,9 +100,13 @@ export const ComposerDock = memo(function ComposerDock({
   // keeps the screen while the box's tools or their menu have focus.
   const [typing, setTyping] = useState<string>();
   const tapping = useRef(false);
-  useKeyboardDrop(typing !== undefined, () => setTyping(undefined));
-  const sheetField = (panel: HTMLElement, target: unknown) =>
+  const sheetField = (panel: HTMLElement, target: unknown): target is HTMLTextAreaElement =>
     target instanceof HTMLTextAreaElement && panel.contains(target);
+  useKeyboardDrop(typing !== undefined, () => {
+    const field = document.activeElement;
+    if (sheet.current && sheetField(sheet.current, field)) field.blur();
+    setTyping(undefined);
+  });
   const textBox = (target: EventTarget) =>
     (target as Element).closest<HTMLElement>("[data-text-box]")?.dataset.textBox;
   // Phones type in the Generate sheet instead, so the dock stays put there. On other touch screens
