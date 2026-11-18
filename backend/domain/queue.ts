@@ -441,6 +441,7 @@ export class GenerationQueue {
           }
         }),
     );
+    if (this.stopped) return;
     // Read again: jobs were added, observed or cancelled while the observations were awaited.
     const all = this.store.schedulable(reuseBypassLimit);
     const running = new Map<string, OwnedJob[]>();
@@ -509,7 +510,7 @@ export class GenerationQueue {
         );
         const next = order(resource, [...candidates], fifo);
         try {
-          while (next.length) {
+          while (!this.stopped && next.length) {
             let job = next.shift()!;
             // While a local video runs, a worker's other slots take only work for its model.
             const videos = (running.get(resource) ?? []).filter(localVideo);
@@ -523,6 +524,7 @@ export class GenerationQueue {
             const active = running.get(resource);
             if (active?.length && this.adapter.slotWait) {
               const reason = await this.adapter.slotWait(job, active);
+              if (this.stopped) return;
               if (reason) {
                 const latest = this.store.job(job.ownerId, job.id);
                 if (latest && waitingNow(latest)) wait(latest, reason);
@@ -541,6 +543,7 @@ export class GenerationQueue {
             } finally {
               this.checkingEligibility.delete(job.id);
             }
+            if (this.stopped) return;
             job = this.store.job(job.ownerId, job.id)!;
             if (job.status === "cancelled") {
               await this.adapter.settled?.(job);

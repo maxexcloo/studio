@@ -837,19 +837,23 @@ export class RuntimeController {
    * has no accepted or waiting work, none has started or finished for quietMs and Radiance itself
    * shows none. One already stopped needs none.
    */
-  async restartWhenIdle() {
+  async restartWhenIdle(signal?: AbortSignal) {
     for (const [id, due] of this.memoryRestarts) {
-      if (this.current || this.claimed) return;
+      if (signal?.aborted || this.current || this.claimed) return;
       const load = this.queue?.load(id);
       if (this.active.get(id) || load?.queued || this.now() - (this.usedAt.get(id) ?? 0) < quietMs)
         continue;
       const workload = this.workload(id);
-      if ((await this.engine.state(workload)).replicas === 0) {
+      const state = await this.engine.state(workload);
+      if (signal?.aborted) return;
+      if (state.replicas === 0) {
         this.memoryRestarts.delete(id);
         for (const retry of due.retries) retry();
         continue;
       }
-      if (!(await this.radianceIdle(workload)) || this.current || this.claimed) continue;
+      const idle = await this.radianceIdle(workload);
+      if (signal?.aborted) return;
+      if (!idle || this.current || this.claimed) continue;
       await this.restart(
         id,
         `automatic: freeing host memory after ${due.reason.replace(/^Radiance: /, "")}`,

@@ -163,10 +163,14 @@ function warmGalleryNow() {
  * skipped by name.
  */
 export function startMediaWarmup({ delayMs = 10_000, everyMs = 15_000 } = {}) {
-  setTimeout(() => void tracked("Media warmup", warmGalleryNow), delayMs).unref?.();
-  setInterval(() => {
+  const first = setTimeout(() => void tracked("Media warmup", warmGalleryNow), delayMs).unref();
+  const changes = setInterval(() => {
     if (galleryRevisionValue() !== warmedRevision) void tracked("Media warmup", warmGalleryNow);
-  }, everyMs).unref?.();
+  }, everyMs).unref();
+  return () => {
+    clearTimeout(first);
+    clearInterval(changes);
+  };
 }
 
 /**

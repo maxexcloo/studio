@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { fork, spawnSync } from "node:child_process";
+import { once } from "node:events";
 import fs from "node:fs";
+import http from "node:http";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
+import { recordedObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
+import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 import { readGalleryRows } from "./persistence/gallery-rows.ts";
 
 /** The gallery a stopped fixture saved. */
@@ -77,6 +82,84 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     },
   );
 }
+
+test(
+  "Studio ends an assistant stream and disconnects an unfinished upload on SIGTERM",
+  { timeout: 15000 },
+  async (t) => {
+    const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-http-shutdown-"));
+    t.after(() => fs.rmSync(data, { recursive: true, force: true }));
+    writeTestWorkflows(data);
+    const objectInfo = recordedObjectInfo();
+    objectInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
+    const worker = await startFakeComfy({ objectInfo });
+    t.after(() => worker.close());
+    const gateway = http.createServer(async (req, res) => {
+      if (req.url.endsWith("/models")) {
+        res.setHeader("Content-Type", "application/json");
+        return res.end(JSON.stringify({ data: [{ id: "cloud/auto" }] }));
+      }
+      await Array.fromAsync(req);
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      res.write('data: {"choices":[{"delta":{"content":"A cabin"}}]}\n\n');
+    });
+    gateway.listen(0, "127.0.0.1");
+    await once(gateway, "listening");
+    t.after(() => {
+      gateway.closeAllConnections();
+      gateway.close();
+    });
+    const child = fork(new URL("./index.js", import.meta.url), [], {
+      env: {
+        PATH: process.env.PATH,
+        HOST: "127.0.0.1",
+        PORT: "0",
+        STUDIO_DATA_DIR: data,
+        STUDIO_ENV_FILE: "/dev/null",
+        STUDIO_WORKERS: JSON.stringify([
+          { id: "chosen", url: worker.url, capabilities: ["image"] },
+        ]),
+        STUDIO_ASSISTANT_URL: `http://127.0.0.1:${gateway.address().port}`,
+        STUDIO_ASSISTANT_KEY: "fixture-key",
+        STUDIO_ASSISTANT_CLOUD_MODEL: "cloud/auto",
+      },
+      stdio: ["ignore", "ignore", "ignore", "ipc"],
+    });
+    const exited = once(child, "exit");
+    t.after(async () => {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      await exited;
+    });
+    const [{ url }] = await Promise.race([
+      once(child, "message"),
+      exited.then(() => {
+        throw new Error("Shutdown fixture exited before listening.");
+      }),
+    ]);
+    const response = await fetch(`${url}/api/assistant/rewrite`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId: "custom:test-image", prompt: "A cabin", stream: true }),
+    });
+    assert.match(response.headers.get("Content-Type"), /text\/event-stream/);
+
+    const upload = net.connect(Number(new URL(url).port), "127.0.0.1");
+    t.after(() => upload.destroy());
+    const disconnected = once(upload, "close");
+    await once(upload, "connect");
+    // 100 Continue confirms the server is waiting for the declared body.
+    upload.write(
+      "POST /api/generate HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 50\r\nExpect: 100-continue\r\n\r\n",
+    );
+    const [acknowledged] = await once(upload, "data");
+    assert.match(acknowledged.toString(), /100 Continue/);
+
+    child.kill("SIGTERM");
+    assert.match(await response.text(), /event: error\ndata: .*Studio is stopping/);
+    await disconnected;
+    assert.deepEqual(await exited, [0, null]);
+  },
+);
 
 test("an uncaught exception logs its cause, with gallery changes already saved", () => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-crash-"));
