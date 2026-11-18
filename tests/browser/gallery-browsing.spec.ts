@@ -706,6 +706,11 @@ test("One notification shows at a time: a second dislike replaces the first, wit
       .click();
     await selectionAction(page, "Dislike").click();
     await expect.poll(() => state.gallery[index].rating).toBe("disliked");
+    // The selection ends as the dislike's notification shows.
+    await expect(page.getByRole("button", { name: "Select Items", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   }
   const banner = page.getByRole("alert").filter({ hasText: "Disliked and hidden" });
   await expect(banner).toHaveCount(1);

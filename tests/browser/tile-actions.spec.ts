@@ -18,6 +18,9 @@ async function tileMenu(page: Page) {
   await page
     .getByRole("button", { name: "Open image: Copper Bird", exact: true })
     .click({ button: "right" });
+  // Off the menu, so no submenu opens under the pointer and takes the next click as outside it.
+  await page.mouse.move(0, 0);
+  await expect(page.getByRole("menu")).toHaveCount(1);
 }
 
 async function galleryFixture(page: Page) {
@@ -125,8 +128,6 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   test.skip(!!testInfo.project.use.isMobile, "Phones without captions hide More (tested below)");
   await galleryFixture(page);
   await tileMenu(page);
-  // Off the menu, so no submenu opens under the pointer.
-  await page.mouse.move(0, 0);
   // Select, then the bar's order with AI's and Share's options in their place: Animate, Edit,
   // Recreate, Upscale | comparing and discovery A–Z | Copy Details, Copy Prompt, Download | Like,
   // Dislike | Report, Delete.

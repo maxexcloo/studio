@@ -412,6 +412,9 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   await page
     .getByRole("button", { name: "Open image: Amber Bird", exact: true })
     .click({ button: "right" });
+  // Off the menu, so no submenu opens under the pointer and takes the next click as outside it.
+  await page.mouse.move(0, 0);
+  await expect(page.getByRole("menu")).toHaveCount(1);
   // The tile menu lists comparing in a section of its own, not under Recreate.
   await page.getByRole("menuitem", { name: "Compare in Composer", exact: true }).click();
   await expect(variants(page).getByRole("radio", { name: "B", exact: true })).toBeChecked();
