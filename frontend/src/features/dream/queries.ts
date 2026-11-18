@@ -2,7 +2,7 @@ import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 import type { CardKind } from "../../../../shared/characters";
 import type { DreamSettings } from "../../../../shared/dream";
-import type { DigestGroup, Project, Review } from "../../../../shared/projects";
+import type { DigestGroup, Project } from "../../../../shared/projects";
 import type { DreamActivity } from "../../../../shared/taste";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
@@ -23,7 +23,6 @@ export type DreamItem = MediaItem & {
     pair?: { id: string; side: 0 | 1; question: string; label: string };
     projectId?: string;
   };
-  review?: Review;
 };
 /** A comparison's answer: side A or B, both or neither. */
 export type PairAnswer = "a" | "b" | "both" | "neither";
