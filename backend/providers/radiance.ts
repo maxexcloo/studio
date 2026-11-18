@@ -17,6 +17,8 @@ interface RadianceVideo {
   id: string;
   status: string;
   progress?: number;
+  steps_done?: number;
+  steps_total?: number;
   error?: { message?: string } | string;
 }
 export interface RadianceFile {

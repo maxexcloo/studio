@@ -5,12 +5,14 @@ import {
   type QueueResponse,
   type QueueRetryResponse,
   type UnfinishedJob,
+  pendingStatuses,
 } from "../../shared/queue.ts";
 import { logEvent, logWarning } from "../crash-log.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import { type RouteAccount, directRoute } from "./direct-route.ts";
 import { GenerationQueue } from "./queue.ts";
 import { type OwnedJob, Store, everyone, publicJob, queuePriority } from "./store.ts";
+import { acceptedWork } from "./workload-queue.ts";
 
 const ownerOf = (account: RouteAccount) => account?.userId || "";
 /**
@@ -203,9 +205,28 @@ export function registerQueueRoutes(
     );
     const listedAt = performance.now();
     const since = typeof query.since === "string" ? query.since : undefined;
+    const queuePositions: Record<string, number> = Object.create(null);
+    const waitingResources: string[] = [];
+    const byResource = new Map<string, string[]>();
+    for (const job of jobs) {
+      if (!pendingStatuses.has(job.status)) continue;
+      const position = queue.queuePosition(job.id);
+      if (position === undefined) continue;
+      queuePositions[job.id] = position;
+      const resource = job.status === "writing" ? "writing" : job.resource;
+      const ids = byResource.get(resource) ?? [];
+      ids.push(job.id);
+      byResource.set(resource, ids);
+      waitingResources.push(resource);
+    }
+    // Each resource keeps its slots in the saved list. Their jobs run in parallel without a shared rank.
+    for (const ids of byResource.values())
+      ids.sort((a, b) => queuePositions[b] - queuePositions[a]);
     const payload = {
       jobs: queued(ownerId, since ? jobs.filter((job) => job.updatedAt >= since) : jobs),
       ...(since ? { ids: jobs.map((job) => job.id) } : {}),
+      queuePositions,
+      queueOrder: waitingResources.map((resource) => byResource.get(resource)!.pop()!),
       paused: { mine: pauses.has(ownerId), all: pauses.has(everyone) },
       clearableFailedSets,
     } satisfies QueueResponse;
@@ -249,9 +270,10 @@ export function registerQueueRoutes(
     if (typeof to !== "number" || !Number.isInteger(to) || to < 0)
       return { status: 400, payload: { error: "Move to a place in the queue." } };
     if (!store.job(ownerOf(account), params.id)) return notFound;
-    return store.move(ownerOf(account), [params.id], to)
-      ? { status: 200, payload: { ok: true } }
-      : { status: 409, payload: { error: "Only waiting generations can be moved." } };
+    if (!store.move(ownerOf(account), [params.id], to))
+      return { status: 409, payload: { error: "Only waiting generations can be moved." } };
+    void queue.tick();
+    return { status: 200, payload: { ok: true } };
   });
   // A set's waiting items move together, keeping their order; its started ones stay.
   directRoute(app, "POST", "/api/queue/sets/:set/move", (account, { params, body }) => {
@@ -265,6 +287,7 @@ export function registerQueueRoutes(
     if (!ids.length)
       return { status: 409, payload: { error: "Only waiting generations can be moved." } };
     store.move(ownerOf(account), ids, to);
+    void queue.tick();
     return { status: 200, payload: { ok: true } };
   });
   // A conversationId narrows Stop All to the work that chat submitted (MCP's cancel_all).
@@ -369,9 +392,9 @@ export function registerQueueRoutes(
 }
 
 /**
- * Settings › Maintenance › Unfinished Items, for administrators: every account's jobs that have not
- * finished, oldest first, to retry (end it and queue it again), stop or delete (end it and take it
- * out of the queue, keeping its records), one at a time or every listed job at once.
+ * Settings › Maintenance › Unfinished Items lists every account's jobs for administrators.
+ * Working jobs come first, then queued jobs in queue order. Administrators can retry, stop or
+ * clear a job, or act on every listed job at once.
  */
 export function registerMaintenanceRoutes(
   app: object,
@@ -407,11 +430,17 @@ export function registerMaintenanceRoutes(
   directRoute(app, "GET", "/api/maintenance/unfinished", (account) => {
     const refusal = adminRefusal(account);
     if (refusal) return refusal;
-    const jobs: UnfinishedJob[] = store
-      .openJobs()
-      .filter((job) => !job.cleared)
-      .map((job) => ({ ...publicJob(job), ownerId: job.ownerId }));
-    return { status: 200, payload: { jobs } };
+    const working: UnfinishedJob[] = [];
+    const queued: UnfinishedJob[] = [];
+    const remaining: UnfinishedJob[] = [];
+    for (const job of store.openJobs()) {
+      if (job.cleared) continue;
+      const row = { ...publicJob(job), ownerId: job.ownerId };
+      if (acceptedWork(job) || queue.isWriting(job.id)) working.push(row);
+      else if (job.status === "queued" || job.status === "waiting") queued.push(row);
+      else remaining.push(row);
+    }
+    return { status: 200, payload: { jobs: [...working, ...queued, ...remaining] } };
   });
   directRoute(app, "POST", "/api/maintenance/unfinished/retry", async (account, { body }) => {
     const refusal = adminRefusal(account);

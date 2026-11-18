@@ -14,6 +14,7 @@ const { makePendingItems } = await import("./gallery/records.js");
 const { putGalleryItems, galleryItems } = await import("./gallery/store.js");
 const { readImageMetadata } = await import("./image-metadata.js");
 const { mediaFile } = await import("./media-paths.js");
+const { recordGeneration } = await import("./timings.js");
 const sharp = (await import("sharp")).default;
 const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: "blue" } })
   .png()
@@ -173,7 +174,43 @@ test("a run ended by a forced Radiance restart keeps its ending when the dropped
   assert.equal(galleryItems({ jobId: id })[0].failure, undefined);
 });
 
-test("a recorded video reconnects by exact ID and is deleted only after durable output publication", async () => {
+test("an image shows estimated steps once its model is resident without polling during sampling", async () => {
+  const id = "estimated-image";
+  const body = bodyFor(id);
+  pending(id, body);
+  for (let index = 0; index < 3; index++)
+    recordGeneration({
+      body: { ...body, model: "krea-2-turbo-iq8r", steps: 8 },
+      result: { runMs: 8000, stepMs: 1000, steps: 8, setupMs: 0, tailMs: 0 },
+      radiance: true,
+      warm: true,
+    });
+  let modelReads = 0;
+  await runRadianceJob(id, body, worker, {
+    store,
+    client: {
+      models: async () => {
+        modelReads += 1;
+        return [{ id: "krea-2-turbo-iq8r", state: "resident" }];
+      },
+      images: async () => {
+        assert.equal(jobs.get(id).progress.phase, "Waiting for Model");
+        await new Promise((resolve) => setImmediate(resolve));
+        const { value, max, steps, estimated, endsAt } = jobs.get(id).progress;
+        assert.ok(value < max);
+        assert.equal(max, 8);
+        assert.equal(steps, true);
+        assert.equal(estimated, true);
+        assert.ok(endsAt > Date.now());
+        return [png];
+      },
+    },
+  });
+  assert.equal(modelReads, 1);
+  assert.equal(jobs.get(id).status, "done");
+});
+
+test("a recorded video reconnects by exact ID and is deleted only after durable output publication", async (t) => {
   const id = "recover-video";
   const body = { ...bodyFor(id), kind: "video", frames: 192 };
   pending(id, body);
@@ -193,16 +230,29 @@ test("a recorded video reconnects by exact ID and is deleted only after durable 
     outputs: [],
   });
   const calls = [];
+  const phases = [];
+  let now = Date.now();
+  t.mock.method(Date, "now", () => now);
   await runRadianceJob(id, body, worker, {
     store,
     recovered: true,
     pollMs: 1,
     client: {
       video: async (videoId) => {
+        now += 1000;
         calls.push(["read", videoId]);
-        return { id: videoId, status: "completed" };
+        if (jobs.get(id).progress) phases.push(jobs.get(id).progress);
+        const sample = [
+          { status: "queued" },
+          { status: "in_progress", steps_done: 2, steps_total: 10, progress: 18 },
+          { status: "in_progress", steps_done: 4, steps_total: 10, progress: 36 },
+          { status: "in_progress", steps_done: 10, steps_total: 10, progress: 92 },
+          { status: "completed" },
+        ][calls.length - 1];
+        return { id: videoId, ...sample };
       },
       videoContent: async (videoId) => {
+        phases.push(jobs.get(id).progress);
         calls.push(["content", videoId]);
         return new Uint8Array([1, 2, 3]);
       },
@@ -216,10 +266,21 @@ test("a recorded video reconnects by exact ID and is deleted only after durable 
     },
   });
   assert.deepEqual(calls, [
-    ["read", "video-fixture"],
+    ...Array.from({ length: 5 }, () => ["read", "video-fixture"]),
     ["content", "video-fixture"],
     ["delete", "video-fixture"],
   ]);
+  assert.deepEqual(
+    phases.map((entry) => [entry.phase, entry.value, entry.max, entry.steps]),
+    [
+      ["Waiting for Execution", 0, 0, false],
+      ["Generating", 2, 10, true],
+      ["Generating", 4, 10, true],
+      ["Decoding", 92, 100, false],
+      ["Saving", 0, 0, false],
+    ],
+  );
+  assert.equal(typeof phases[2].endsAt, "number");
   assert.equal(jobs.get(id).status, "done");
 });
 

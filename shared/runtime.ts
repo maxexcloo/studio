@@ -1,4 +1,4 @@
-import type { QueueStatus } from "./queue.ts";
+import type { QueueProgress, QueueStatus } from "./queue.ts";
 import type { ServiceKind } from "./services.ts";
 
 /**
@@ -22,22 +22,29 @@ interface RuntimeWorkload {
   acceptedOperations: number;
   /** It runs Radiance, which an administrator can restart without waiting for its work. */
   radiance?: true;
-  /** The accepted jobs it runs, oldest first. */
+  /** Accepted jobs followed by a preview of the waiting queue. */
   jobs?: RuntimeJob[];
   /** How many jobs routed to it wait to start. */
   queued?: number;
 }
 
-/** An accepted job a workload runs, which a change stopping it waits for. */
+/** Work running or waiting on a GPU workload. */
 export interface RuntimeJob {
   id: string;
   /** The start of its prompt. */
   title: string;
   status: QueueStatus;
-  /** When its status last changed. */
+  /** When the job was admitted, or created if still waiting. */
   since: string;
+  reason?: string;
+  queuePosition?: number;
+  progress?: QueueProgress;
   /** Its cancellation was asked; it ends once its worker confirms or restarts. */
   cancelling?: true;
+}
+
+export interface RuntimeQueueStatus {
+  workloads: Record<string, { jobs: RuntimeJob[]; queued: number }>;
 }
 
 /** What Cancel Queue ended at once, and what stays running until its worker confirms or restarts. */

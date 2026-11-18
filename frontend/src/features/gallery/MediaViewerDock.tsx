@@ -1,11 +1,10 @@
 import { Group, Image, Loader, ScrollArea, UnstyledButton } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
 import { CircleAlert, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem, QueueJob } from "../../types";
-import { queueQuery } from "../generation/Queue";
+import { JobProgressBar, jobReason, jobStatus } from "../generation/JobProgress";
 import { mediaTitle } from "./mediaLabels";
 import { derivation, knownResults, versionGroups, versionSources, versionTree } from "./versions";
 
@@ -14,6 +13,7 @@ import classes from "./MediaViewer.module.css";
 interface Entry {
   key: string;
   item?: MediaItem;
+  jobId?: string;
   /** The key of the entry it was made from. */
   source?: string;
   depth?: number;
@@ -33,8 +33,12 @@ export interface QueuedRun {
  * queued from one of them or that made one of them. Work still queued from one of them shows as
  * placeholders before them.
  */
-export function useRunFamily(item: MediaItem, runs: QueuedRun[], related: MediaItem[]): Entry[] {
-  const jobs = useQuery(queueQuery).data?.jobs;
+export function useRunFamily(
+  item: MediaItem,
+  runs: QueuedRun[],
+  related: MediaItem[],
+  jobs: QueueJob[] | undefined,
+): Entry[] {
   return useMemo(() => {
     const all = [...(jobs ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     const results = (job?: QueueJob) => (job?.items?.length ? job.items : job?.outputs || []);
@@ -76,6 +80,7 @@ export function useRunFamily(item: MediaItem, runs: QueuedRun[], related: MediaI
       .flatMap((job) =>
         Array.from({ length: Number(job.input.count) || 1 }, (_, index) => ({
           key: `${job.id}:${index}`,
+          jobId: job.id,
         })),
       );
     return [
@@ -99,12 +104,14 @@ export function useRunFamily(item: MediaItem, runs: QueuedRun[], related: MediaI
 export function MediaViewerDock({
   item,
   family,
+  jobs,
   set,
   choose,
   actions,
 }: {
   item: MediaItem;
   family: Entry[];
+  jobs?: QueueJob[];
   /** The MCP result set's loaded results, in order (`setMembers`). */
   set: MediaItem[];
   choose?: (item: MediaItem) => void;
@@ -155,6 +162,7 @@ export function MediaViewerDock({
         <ResultStrip
           label={set.length > 1 ? `Set: ${item.resultSet?.title}` : "Versions"}
           entries={entries}
+          jobs={jobs}
           current={item}
           depths={branched}
           entering={(key) => versionKeys.has(key) && shown.root === root && !shown.keys.has(key)}
@@ -170,6 +178,7 @@ export function MediaViewerDock({
 function ResultStrip({
   label,
   entries,
+  jobs,
   current,
   entering,
   depths,
@@ -177,6 +186,7 @@ function ResultStrip({
 }: {
   label: string;
   entries: StripEntry[];
+  jobs?: QueueJob[];
   current: MediaItem;
   entering?: (key: string) => boolean;
   /** Marks each version's generations from the original. */
@@ -187,6 +197,13 @@ function ResultStrip({
   // at once on opening, smoothly after unless motion is reduced.
   const viewport = useRef<HTMLDivElement>(null);
   const placed = useRef(false);
+  const active = useMemo(
+    () =>
+      new Map(
+        (jobs ?? []).filter((job) => !terminalStatuses.has(job.status)).map((job) => [job.id, job]),
+      ),
+    [jobs],
+  );
   useEffect(() => {
     const element = viewport.current;
     const shown = element?.querySelector<HTMLElement>("[data-current]");
@@ -215,12 +232,13 @@ function ResultStrip({
         px={2}
         py={2}
       >
-        {entries.map(({ key, item: result, depth, label, version }) => {
+        {entries.map(({ key, item: result, jobId, depth, label, version }) => {
           const shown = result?.id === current.id;
           return (
             <Thumbnail
               key={key}
               result={result}
+              job={active.get(jobId ?? result?.jobId ?? "")}
               shown={shown}
               entering={entering?.(key)}
               version={version}
@@ -237,6 +255,7 @@ function ResultStrip({
 
 function Thumbnail({
   result,
+  job,
   shown,
   entering,
   version,
@@ -245,6 +264,7 @@ function Thumbnail({
   onClick,
 }: {
   result?: MediaItem;
+  job?: QueueJob;
   shown?: boolean;
   entering?: boolean;
   /** A version standing in a set result's place. */
@@ -254,6 +274,7 @@ function Thumbnail({
   onClick: () => void;
 }) {
   const thumbnail = result?.thumbnailUrl || (result?.type === "image" ? result.url : "");
+  const status = job && [jobStatus(job), jobReason(job)].filter(Boolean).join(" · ");
   return (
     <UnstyledButton
       role="listitem"
@@ -263,6 +284,8 @@ function Thumbnail({
       data-version={version || undefined}
       aria-current={shown || undefined}
       aria-label={label}
+      aria-description={status}
+      title={status}
       disabled={!result}
       onClick={onClick}
     >
@@ -273,6 +296,7 @@ function Thumbnail({
       ) : (
         <Loader size="xs" color="gray" />
       )}
+      {job && <JobProgressBar job={job} className={classes.variationProgress} />}
       {!!depth && (
         <span
           className={classes.variationDepth}

@@ -395,6 +395,39 @@ test("The queue hydrates full and changed results and logs one aggregate poll pr
   }
 });
 
+test("A queue delta updates positions of unchanged rows without listing other accounts' jobs", async (t) => {
+  const store = new Store(openDatabase(":memory:"));
+  t.after(() => store.close());
+  const enqueue = (owner: string) =>
+    store.enqueue(owner, store.createSession(owner).id, {}, "image");
+  const first = enqueue("bob");
+  const second = enqueue("alice");
+  const queue = new GenerationQueue(store, {
+    eligible: async () => "Waiting for the worker.",
+  } as never);
+  const app = express();
+  app.use((req, _res, next) => {
+    Object.assign(req, { studioAccount: { userId: "alice" } });
+    next();
+  });
+  registerQueueRoutes(app, { store, queue, ...unused });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/queue`;
+  const get = async (suffix = "") => (await (await fetch(base + suffix)).json()) as QueueResponse;
+  await queue.tick();
+  const full = await get();
+  assert.deepEqual(full.queuePositions, { [second.id]: 2 });
+  assert.deepEqual(full.queueOrder, [second.id]);
+  await queue.cancel("bob", first.id);
+  await queue.tick();
+  const delta = await get("?since=2099-01-01");
+  assert.deepEqual(delta.jobs, []);
+  assert.deepEqual(delta.queuePositions, { [second.id]: 1 });
+  assert.deepEqual(delta.queueOrder, [second.id]);
+});
+
 test("A run from an item records it as its source, only when the item is the owner's", async () => {
   const store = new Store(openDatabase(":memory:"));
   const session = store.createSession("alice");
@@ -456,17 +489,34 @@ test("A run from an item records it as its source, only when the item is the own
   }
 });
 
-test("Unfinished Items lists every account's unfinished jobs and ends stuck ones for administrators", async () => {
+test("Unfinished Items puts working jobs first, keeps queue order and lets administrators end stuck jobs", async (t) => {
   const store = new Store(openDatabase(":memory:"));
   const alice = store.createSession("alice"),
     bob = store.createSession("bob");
+  const awaitingPrompt = store.enqueue(
+    "alice",
+    alice.id,
+    { prompt: "awaiting a prompt", writing: { kind: "animate" } },
+    "animate",
+  );
+  const queued = store.enqueue("bob", bob.id, { prompt: "a hare" }, "image");
   // Accepted by a worker that is gone: nothing observes it and cancelling never confirms.
   const stuck = store.save({
     ...store.enqueue("alice", alice.id, { prompt: "a fox" }, "image", undefined, "gone"),
     status: "running",
     providerJobId: "lost",
   });
-  const queued = store.enqueue("bob", bob.id, { prompt: "a hare" }, "image");
+  const waiting = store.save({
+    ...store.enqueue("bob", bob.id, { prompt: "an owl" }, "image"),
+    status: "waiting",
+  });
+  assert.equal(store.move("bob", [waiting.id], 0), true);
+  const writing = store.enqueue(
+    "alice",
+    alice.id,
+    { prompt: "writing a prompt", writing: { kind: "animate" } },
+    "animate",
+  );
   const done = store.save({ ...store.enqueue("bob", bob.id, {}, "image"), status: "completed" });
   const settled: string[] = [];
   const queue = new GenerationQueue(store, {
@@ -474,6 +524,7 @@ test("Unfinished Items lists every account's unfinished jobs and ends stuck ones
     cancel: async () => undefined,
     settled: async (job: { id: string }) => void settled.push(job.id),
   } as never);
+  t.mock.method(queue, "isWriting", (id: string) => id === writing.id);
   let admin = false;
   const app = express();
   app.use(express.json());
@@ -505,6 +556,15 @@ test("Unfinished Items lists every account's unfinished jobs and ends stuck ones
     assert.equal((await pauseAll()).status, 403);
     assert.equal(store.pauses().size, 0);
     admin = true;
+    assert.deepEqual(await listed(), [
+      ["alice", "a fox", "running"],
+      ["alice", "writing a prompt", "writing"],
+      ["bob", "an owl", "waiting"],
+      ["bob", "a hare", "queued"],
+      ["alice", "awaiting a prompt", "writing"],
+    ]);
+    for (const job of [waiting, writing, awaitingPrompt])
+      store.save({ ...job, status: "cancelled" });
     assert.equal((await pauseAll()).status, 200);
     assert.deepEqual([...store.pauses()], [everyone]);
     store.setPaused(everyone, false);

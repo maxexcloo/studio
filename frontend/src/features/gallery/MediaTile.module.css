@@ -157,6 +157,16 @@
   inset: auto 0 var(--mantine-spacing-sm);
   display: flex;
   justify-content: center;
+  pointer-events: none;
+}
+
+.statusAction button {
+  pointer-events: auto;
+}
+
+.upscaleStatus {
+  text-align: center;
+  pointer-events: none;
 }
 
 /* Badges sit between the tile's corner actions. */
