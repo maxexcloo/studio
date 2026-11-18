@@ -781,8 +781,8 @@ export function createTaste({
     refresh,
     /** Whether the text model may write this account's profile. */
     writable: (ownerId: string) => Boolean(writer(ownerId)),
-    /** Adds one action's signals newest first; a failure is logged, never passed to the request that caused it. */
-    record(ownerId: string, all: Omit<TasteSignal, "at">[]) {
+    /** Adds one action's signals newest first. An atomic judgement requires the write to succeed. */
+    record(ownerId: string, all: Omit<TasteSignal, "at">[], strict = false) {
       const signals = all.slice(0, maxPerCall);
       if (!signals.length) return;
       try {
@@ -807,6 +807,7 @@ export function createTaste({
         )
           void refresh(ownerId).catch(() => undefined);
       } catch (error) {
+        if (strict) throw error;
         logWarning(`A taste signal was not saved: ${(error as Error).message}`);
       }
     },

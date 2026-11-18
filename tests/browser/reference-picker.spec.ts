@@ -496,6 +496,66 @@ test("The first Uploads tile keeps its target through cancellation and failure, 
   ]);
 });
 
+test("A failed gallery pick keeps the chosen phone reference slot for retry", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "Phone reference sheet");
+  await setup(page);
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await page.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
+  const choices = page.getByRole("dialog", { name: "Add References", exact: true });
+  const alpha = choices.getByRole("button", { name: "Use reference: Alpha", exact: true });
+  await page.route(
+    "**/api/reference-assets/from-gallery",
+    (route) => route.fulfill({ status: 503, json: { error: "Fixture reference unavailable" } }),
+    { times: 1 },
+  );
+  await alpha.click();
+  await expect(page.getByText("Fixture reference unavailable", { exact: true })).toBeVisible();
+  await expect(alpha).toBeEnabled();
+  await alpha.click();
+  await expect(choices).toBeHidden();
+  await expect(page.getByRole("button", { name: "Reference 3 · End", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Slot 1 · Start · Required", exact: true }),
+  ).toBeVisible();
+});
+
+test("The phone reference sheet keeps Done above its keyboard while Generate stays put", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "Phone reference sheet");
+  await setup(page);
+  await openReferenceChoices(page);
+  const generate = page.getByRole("dialog", { name: "Generate", exact: true });
+  const choices = page.getByRole("dialog", { name: "Add References", exact: true });
+  const search = choices.getByRole("textbox", { name: "Search Gallery", exact: true });
+  await expect(search).not.toBeFocused();
+  const originalTop = (await generate.boundingBox())!.y;
+  await search.click();
+  await expect(search).toBeFocused();
+  const bottom = await page.evaluate(() => {
+    const height = window.innerHeight - 250;
+    const offsetTop = 80;
+    Object.defineProperties(window.visualViewport!, {
+      height: { get: () => height, configurable: true },
+      offsetTop: { get: () => offsetTop, configurable: true },
+    });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+    return height + offsetTop;
+  });
+  const done = choices.getByRole("button", { name: "Done", exact: true });
+  await expect
+    .poll(async () => {
+      const box = (await done.boundingBox())!;
+      return box.y + box.height;
+    })
+    .toBeLessThanOrEqual(bottom);
+  expect((await generate.boundingBox())!.y).toBeCloseTo(originalTop);
+});
+
 test("Virtualised uploads retain their asset IDs and numbering after the leading upload tile", async ({
   page,
 }) => {

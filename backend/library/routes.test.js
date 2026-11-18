@@ -334,17 +334,15 @@ test("a recorded file matches its catalogue checksum first, then the exact name,
   assert.deepEqual([none.unsourced, none.want.folder, none.want.file], [true, "vae", ""]);
 });
 
-test("a wanted file is known installed by its catalogue checksum under any name, else by its own name", () => {
+test("a wanted file needs its own folder and filename in the last installed inventory", () => {
   const installed = { loras: ["renamed.safetensors", "other.safetensors"] };
   const entries = {
     "loras/renamed.safetensors": { sha256: "aa" },
     "loras/other.safetensors": { sha256: "bb" },
   };
   const status = (want) => knownInstalled(want, { installed, entries }).status;
-  assert.equal(
-    status({ folder: "loras", file: "original.safetensors", sha256: "aa" }),
-    "installed",
-  );
+  assert.equal(status({ folder: "loras", file: "original.safetensors", sha256: "aa" }), "missing");
+  assert.equal(status({ folder: "loras", file: "renamed.safetensors", sha256: "aa" }), "installed");
   assert.equal(status({ folder: "loras", file: "other.safetensors", sha256: "cc" }), "conflict");
   assert.equal(status({ folder: "loras", file: "missing.safetensors", sha256: "cc" }), "missing");
   assert.equal(status({ folder: "loras", file: "other.safetensors", sha256: "" }), "installed");

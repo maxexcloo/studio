@@ -136,16 +136,16 @@ test("Undo steps back through Dislike, Like and Accept, taking back each", async
   await expect(undo).toBeDisabled();
   const sent = () =>
     dream.requests.map((request) => `${request.path} ${JSON.stringify(request.body)}`);
-  await expect.poll(sent).toEqual([
-    "/api/dream/one/discard {}",
-    `/api/gallery/favorite {"ids":["two"],"rating":"liked"}`,
-    "/api/dream/three/keep {}",
-    `/api/dream/undo {"ids":["three"]}`,
-    // Undoing a Like takes its rating back first.
-    `/api/gallery/favorite {"ids":["two"],"rating":null}`,
-    `/api/dream/undo {"ids":["two"]}`,
-    `/api/dream/undo {"ids":["one"]}`,
-  ]);
+  await expect
+    .poll(sent)
+    .toEqual([
+      "/api/dream/one/discard {}",
+      `/api/gallery/favorite {"ids":["two"],"rating":"liked"}`,
+      "/api/dream/three/keep {}",
+      `/api/dream/undo {"ids":["three"]}`,
+      `/api/dream/undo {"ids":["two"],"rating":null}`,
+      `/api/dream/undo {"ids":["one"]}`,
+    ]);
 });
 
 test("While You Were Away ranks each project's results, folds its misses and judges them", async ({
@@ -519,15 +519,17 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   await page.getByRole("button", { name: "View B", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "B", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  // Calibration hears of a disliked image before the rating hides it.
-  await expect.poll(() => dream.requests.length).toBe(5);
-  expect(dream.requests.map((request) => request.body)).toEqual([
-    { liked: ["g1"] },
-    { passed: ["g2"] },
-    { ids: ["g2"], rating: "disliked" },
-    { liked: ["g3"] },
-    { liked: ["g5"], passed: ["g4"] },
-  ]);
+  // Dislike applies its rating in the same calibration request.
+  await expect
+    .poll(() => dream.requests)
+    .toEqual(
+      [
+        { liked: ["g1"] },
+        { passed: ["g2"], rating: "disliked" },
+        { liked: ["g3"] },
+        { liked: ["g5"], passed: ["g4"] },
+      ].map((body) => ({ method: "POST", path: "/api/dream/calibration", body })),
+    );
 });
 
 test("A Dream comparison asks its question and answers with swipes, keys and buttons", async ({
@@ -772,6 +774,11 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   await detail.getByRole("button", { name: "Close", exact: true }).last().click();
   await expect(detail).toBeHidden();
   await expect(page).toHaveURL(/\/dream\/projects$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/dream$/);
+  await page.goForward();
+  await expect(page).toHaveURL(/\/dream\/projects$/);
+  await expect(detail).toBeHidden();
 
   await page.getByRole("button", { name: "New Project", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "New Project", exact: true });
@@ -944,9 +951,16 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   await pair.getByRole("button", { name: "View A", exact: true }).click();
   const viewer = page.getByRole("dialog");
   await expect(viewer).toBeVisible();
+  const player = viewer.locator("video");
+  const close = viewer.getByRole("button", { name: "Close Preview", exact: true });
+  await expect(player).toHaveCount(1);
+  await player.dispatchEvent("keydown", { key: "ArrowRight" });
+  await expect(player).toHaveAttribute("aria-label", "Dream prompt video-a");
+  await close.press("ArrowRight");
+  await expect(player).toHaveAttribute("aria-label", "Dream prompt video-b");
   expect(dream.requests).toEqual([]);
-  await viewer.getByRole("button", { name: "Close Preview", exact: true }).click();
-  await expect(pair.getByRole("button", { name: "View A", exact: true })).toBeFocused();
+  await close.click();
+  await expect(pair.getByRole("button", { name: "View B", exact: true })).toBeFocused();
   await showView(page, "History");
   await expect(page.getByText("Video History", { exact: true })).toBeVisible();
   await expect(page.getByText("Image History", { exact: true })).toBeHidden();

@@ -92,13 +92,19 @@ export const ComposerDock = memo(function ComposerDock({
   }
   const controlsId = useId();
   const sheet = useRef<HTMLElement | null>(null);
-  const keyboard = useKeyboard(phone && opened, sheet);
   // Tapping a text box flips the sheet's typing layout at once, rather than once iOS reports the
   // keyboard after its animation, and holds it while the keyboard animates and iOS scrolls to the
   // text; it ends as the text loses focus or the keyboard drops (Android's Back keeps focus, so the
   // drop lets the text go). The bar's lift still follows the viewport. It names the box being typed
   // in (`data-text-box`), which keeps the screen while the box's tools or their menu have focus.
   const [typing, setTyping] = useState<string>();
+  const focusedField = useTypingIn(phone && opened, (field) => field);
+  const keyboard = useKeyboard(
+    phone &&
+      opened &&
+      (focusedField ? Boolean(sheet.current?.contains(focusedField)) : typing !== undefined),
+    sheet,
+  );
   const tapping = useRef(false);
   const sheetField = (panel: HTMLElement, target: unknown): target is HTMLTextAreaElement =>
     target instanceof HTMLTextAreaElement && panel.contains(target);

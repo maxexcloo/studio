@@ -149,6 +149,13 @@ export function ReferencePicker({
   const placed = (into: ReferenceTarget | null, count: number) => {
     if (into || count >= capacity) setAdding(false);
   };
+  function addGalleryItem(item: Parameters<typeof placement.addGalleryItem>[0], into = chosen) {
+    placement.addGalleryItem(item, into, (count) => {
+      settle();
+      placed(into, count);
+      if (single) setOpened(false);
+    });
+  }
   function uploadFiles(files: File[], into: ReferenceTarget | null = chosen) {
     if (!files.length) return;
     const before = list.get().map(referenceKey);
@@ -185,9 +192,10 @@ export function ReferencePicker({
     const cell = data.getData(referenceCellType);
     const gallery = data.getData(galleryReferenceType);
     if (data.files.length && !cell && !gallery) return uploadFiles([...data.files], into);
+    if (gallery && !cell) return addGalleryItem(JSON.parse(gallery), into);
     if (cell) {
       if (into) moveReference(cell, into);
-    } else if (gallery) placement.addGalleryItem(JSON.parse(gallery), into);
+    }
     settle();
   }
   const uploadTile = (
@@ -284,6 +292,7 @@ export function ReferencePicker({
     <Stack
       component="section"
       aria-label="Reference Choices"
+      aria-busy={placement.adding || placement.uploading || undefined}
       gap="sm"
       // Phones fill the sheet between its header and footer; the grid owns scrolling and keeps its
       // position.
@@ -379,14 +388,10 @@ export function ReferencePicker({
             return {
               label: `${removes ? "Remove" : "Use"} reference: ${name}`,
               selected,
-              disabled: !target,
+              disabled: !target || placement.adding,
               onToggle: () => {
-                if (removes) list.set(list.get().filter((asset) => !matches(asset)));
-                else {
-                  placement.addGalleryItem(item, chosen);
-                  placed(chosen, references.length + 1);
-                  if (single) setOpened(false);
-                }
+                if (!removes) return addGalleryItem(item);
+                list.set(list.get().filter((asset) => !matches(asset)));
                 settle();
               },
             };

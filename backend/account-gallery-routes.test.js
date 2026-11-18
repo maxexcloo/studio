@@ -566,5 +566,7 @@ test("queued work leads the first page, but a retry waits in its original's plac
     page.items.map((row) => row.jobId),
     [waiting.id, "newer", retry.id, "older"],
   );
+  assert.equal(page.items[2].createdAt, retry.createdAt);
+  assert.equal(page.items[2].galleryAt, retry.galleryAt);
   for (const job of [waiting, retry]) queue.save({ ...job, status: "cancelled" });
 });

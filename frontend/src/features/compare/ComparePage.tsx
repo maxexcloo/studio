@@ -112,7 +112,7 @@ export function ComparePage() {
   const again = items
     .filter((item) => item.status === "done")
     .sort((a, b) => Number(b === winner) - Number(a === winner));
-  // The tallest variant fits the viewport, so every one does.
+  // The tallest variant sets the shared width in Side by Side.
   const aspects = items.flatMap((item) =>
     item.width && item.height ? [item.width / item.height] : [],
   );
@@ -254,8 +254,8 @@ export function ComparePage() {
 type Layout = "side" | "scroll";
 
 /**
- * The variants side by side in the gallery's columns, every row fitting the viewport, or one at a
- * time in a swiped row; phones start with the row.
+ * The variants side by side in the gallery's columns, or one at a time in a swiped row. Phones
+ * start with the swiped row. Layouts can scroll vertically when the viewport is short.
  */
 function Variants({
   count,

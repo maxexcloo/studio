@@ -30,13 +30,20 @@ function resized(value) {
 export function imageSizeDefaults(dataDir, { apply = false } = {}) {
   const dir = path.join(dataDir, "workflows");
   const files = fs.existsSync(dir)
-    ? fs.readdirSync(dir).filter((name) => name.endsWith(".json"))
+    ? fs.readdirSync(dir).filter((name) => name.endsWith(".json") && !name.startsWith("."))
     : [];
   const profiles = [];
+  const unreadable = [];
   for (const name of files) {
     const file = path.join(dir, name);
-    const raw = JSON.parse(fs.readFileSync(file, "utf8"));
-    const profile = raw.studio;
+    let raw;
+    try {
+      raw = JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch {
+      unreadable.push(name);
+      continue;
+    }
+    const profile = raw?.studio;
     if (profile?.kind !== "image" || profile.family !== "krea2" || !resized(raw)) continue;
     profiles.push(profile.id);
     if (!apply) continue;
@@ -50,5 +57,5 @@ export function imageSizeDefaults(dataDir, { apply = false } = {}) {
       note: "Default size 1K",
     });
   }
-  return { applied: apply, profiles };
+  return { applied: apply, profiles, ...(unreadable.length ? { unreadable } : {}) };
 }

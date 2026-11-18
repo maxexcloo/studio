@@ -90,6 +90,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     /** The local video profile Dream would choose, or why none can. */
     video: "wan",
     videoRefusal: "",
+    ratingRefused: false,
     /** The negative prompt each profile's guide recommends. */
     negatives: {} as Record<string, string>,
     /** Gallery items deleted or hidden since Dream listed them, which can't be referenced. */
@@ -152,6 +153,7 @@ function fixture(t: TestContext, catalogue = profiles) {
             [query.dreamArm].flat().some((arm) => item.dream?.arm?.startsWith(arm))) &&
           (query.notDreamArm === undefined || item.dream?.arm !== query.notDreamArm) &&
           (query.dreamPair !== false || !item.dream?.pair) &&
+          (query.dreamProject === undefined || item.dream?.projectId === query.dreamProject) &&
           (!query.liked || item.rating === "liked" || item.dream?.state === "kept") &&
           (!query.rating || item.rating === query.rating) &&
           (query.unlisted === undefined ||
@@ -210,6 +212,11 @@ function fixture(t: TestContext, catalogue = profiles) {
       const item = state.items.find((entry) => entry.ownerId === ownerId && entry.id === itemId)!;
       item.dream = mark;
       item.rating = rating;
+    },
+    rate: (ownerId, itemId, rating) => {
+      if (state.ratingRefused) throw new Error("Rating could not be saved.");
+      const item = state.items.find((entry) => entry.ownerId === ownerId && entry.id === itemId)!;
+      item.rating = rating ?? undefined;
     },
     remove: (ownerId, itemIds) => {
       state.items = state.items.filter(
@@ -1459,6 +1466,38 @@ test("Discard pagination counts only the chosen media and retains owner scope", 
   assert.ok([...first.items, ...second.items].every((item) => item.ownerId === "alice"));
 });
 
+test("Project results and stats use the project's own finished results window", async (t) => {
+  const fx = fixture(t);
+  const { projects, state } = fx;
+  const busy = projects.create("alice", { name: "City" });
+  const quiet = projects.create("alice", { name: "Coast", paused: true });
+  const image = (id: string, projectId: string): DreamItem => ({
+    id,
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    dream: { state: "kept", prompt: "A scene", why: "", at: "", projectId },
+  });
+  state.items.push(
+    ...Array.from({ length: 1_000 }, (_, index) => image(`city-${index}`, busy.id)),
+    { ...image("waiting", quiet.id), status: "pending" },
+    { ...image("foreign", quiet.id), ownerId: "bob" },
+    image("coast", quiet.id),
+  );
+  const request = await serve(t, fx);
+  const { items } = (await request(`/projects/${quiet.id}/results`)).body;
+  assert.deepEqual(
+    items.map((item: DreamItem) => item.id),
+    ["coast"],
+  );
+  const { stats } = (await request("/projects")).body;
+  assert.equal(stats[quiet.id].kept, 1);
+  assert.deepEqual(
+    stats[quiet.id].results.map((item: DreamItem) => item.id),
+    ["coast"],
+  );
+});
+
 test("Undo returns judged results and gallery images and takes back what they taught", async (t) => {
   const fx = fixture(t);
   const { dream, state, taste, dreamOnce, generated } = fx;
@@ -1573,6 +1612,52 @@ test("Calibration offers the account's older Studio generations, unjudged first,
     state.items.filter((item) => item.dream).map((item) => [item.id, item.dream?.state]),
     [["unseen", "unseen"]],
   );
+});
+
+test("Deck calibration and its rating are saved or undone together", async (t) => {
+  const fx = fixture(t);
+  const { dream, generated, state, taste } = fx;
+  const at = new Date(state.clock - 2 * 86_400_000).toISOString();
+  generated({
+    id: "gallery",
+    jobId: "job-gallery",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    createdAt: at,
+    dream: { prompt: "A gull", why: "", at, state: "kept" },
+  });
+  const request = await serve(t, fx);
+  const item = state.items.find((entry) => entry.id === "gallery")!;
+  state.ratingRefused = true;
+  assert.notEqual(
+    (await request("/calibration", { passed: ["gallery"], rating: "disliked" })).status,
+    200,
+  );
+  assert.equal(dream.read("alice").judged?.length ?? 0, 0);
+  assert.equal(taste.read("alice").signals.length, 0);
+  assert.equal(item.rating, undefined);
+
+  state.ratingRefused = false;
+  assert.equal(
+    (await request("/calibration", { passed: ["gallery"], rating: "disliked" })).status,
+    200,
+  );
+  assert.deepEqual(dream.read("alice").judged, ["gallery"]);
+  assert.equal(item.rating, "disliked");
+  state.ratingRefused = true;
+  const undo = { ids: ["gallery"], calibration: true, rating: null };
+  assert.notEqual((await request("/undo", undo)).status, 200);
+  assert.deepEqual(dream.read("alice").judged, ["gallery"]);
+  assert.equal(taste.read("alice").signals.length, 1);
+  assert.equal(item.rating, "disliked");
+
+  state.ratingRefused = false;
+  assert.equal((await request("/undo", undo)).status, 200);
+  assert.deepEqual(dream.read("alice").judged, []);
+  assert.equal(taste.read("alice").signals.length, 0);
+  assert.equal(item.rating, undefined);
+  assert.equal(item.dream?.state, "kept");
 });
 
 test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and explores untried ones", async (t) => {
@@ -1987,9 +2072,18 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
     ["Mara"],
   );
   assert.equal(state.items.filter((item) => item.dream?.state === "draft").length, 0);
-  // Undo takes the accepted project back.
+  // Undo preserves attached chats and keeps the promoted media once its project is removed.
+  projects.attach("alice", "chat", made.id);
+  assert.equal((await request(`/inbox/${rooftops.id}/undo`, {})).status, 409);
+  assert.equal(projects.chats("alice").chat.projectId, made.id);
+  projects.attach("alice", "chat", null);
+  const promoted = dream.unseen("alice").filter((item) => item.dream?.projectId === made.id);
   assert.equal((await request(`/inbox/${rooftops.id}/undo`, {})).status, 200);
   assert.deepEqual(projects.list("alice"), []);
+  for (const item of promoted) {
+    assert.equal(item.dream?.projectId, undefined);
+    assert.equal(item.dream?.state, "unseen");
+  }
   assert.equal((await request(`/inbox/${rooftops.id}/undo`, {})).status, 409);
   // A card proposal makes the card from the results it recurs in.
   await request(`/inbox/${mara.id}/accept`, {
@@ -2003,6 +2097,9 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
       referenceIds: ["asset-1", "asset-2"],
     },
   ]);
+  state.cards!.characters[0].description = "red hair, freckles, glasses";
+  assert.equal((await request(`/inbox/${mara.id}/undo`, {})).status, 409);
+  assert.equal(state.cards!.characters[0].description, "red hair, freckles, glasses");
   // A batch waits six hours; then a dismissed idea stays snoozed and the writer hears why.
   await dream.tick();
   assert.equal(state.calls.filter((call) => call.system.startsWith("You find")).length, 1);
@@ -2014,6 +2111,12 @@ test("The Inbox proposes from likes while idle; a proposed project runs draft sa
     proposals().map((proposal) => proposal.title),
     ["Rooftops"],
   );
+  const [againRooftops] = proposals();
+  await request(`/inbox/${againRooftops.id}/accept`, {});
+  const [edited] = projects.list("alice");
+  projects.update("alice", edited.id, { name: "Terraces" }, "you");
+  assert.equal((await request(`/inbox/${againRooftops.id}/undo`, {})).status, 409);
+  assert.equal(projects.list("alice")[0].name, "Terraces");
   // Clear Inbox dismisses everything.
   assert.deepEqual((await request("/inbox/clear", {})).body.proposals, []);
 });

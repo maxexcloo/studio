@@ -178,9 +178,7 @@ export function ChipPopup({
           trapFocus={trap}
           closeOnEscape={false}
           returnFocus
-          // A column of header, body and footer. Inline, since Paper's `display: block` has a
-          // module class's specificity and Modal.Content's own class lands on its wrapper too.
-          styles={{ content: { display: "flex", flexDirection: "column" } }}
+          classNames={{ content: classes.sheet, body: classes.sheetBody }}
         >
           <Modal.Overlay />
           {/* Modal.Content drops onKeyDown, so the phone popup listens in the capture phase. */}
@@ -196,10 +194,8 @@ export function ChipPopup({
               {actions}
               <Modal.CloseButton aria-label={`Close ${title}`} />
             </Modal.Header>
-            <Modal.Body className={classes.sheetBody}>
-              {children}
-              {footer}
-            </Modal.Body>
+            <Modal.Body>{children}</Modal.Body>
+            {footer}
           </Modal.Content>
         </Modal.Root>
       </>

@@ -222,7 +222,11 @@ export function useReferencePlacement(list: ReferenceList) {
     const { get, profile, set } = latest.current;
     const references = get();
     const target = nextReferenceTarget(references, profile, chosen);
-    if (target) set(placeReference(references, asset, profile, target));
+    if (!target) return;
+    const next = placeReference(references, asset, profile, target);
+    if (next === references) return;
+    set(next);
+    return next.length;
   }
   async function uploadFiles(files: File[], chosen?: ReferenceTarget | null) {
     for (const file of files.filter((file) => uploadTypes.includes(file.type))) {
@@ -236,12 +240,12 @@ export function useReferencePlacement(list: ReferenceList) {
   function addGalleryItem(
     item: GalleryReference,
     chosen?: ReferenceTarget | null,
-    onAdded?: () => void,
+    onAdded?: (count: number) => void,
   ) {
     gallery.mutate(item, {
       onSuccess: ({ asset }) => {
-        place(asset, chosen);
-        onAdded?.();
+        const count = place(asset, chosen);
+        if (count !== undefined) onAdded?.(count);
       },
     });
   }

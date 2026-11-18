@@ -629,7 +629,7 @@ const taste = createTaste({
  * Hears which of an account's items were rated, by hand or by animating a photo: each with its
  * new `rating` and the one it had (`was`). A dislike with an `issue` came from Report Issue.
  */
-const itemsRated = (ownerId, items, issue = "") => {
+const itemsRated = (ownerId, items, issue = "", strict = false) => {
   dream.rated(ownerId, items);
   const liked = items.filter((item) => item.rating === "liked");
   finishing.liked(
@@ -644,21 +644,25 @@ const itemsRated = (ownerId, items, issue = "") => {
   );
   const undone = { liked: "unlike", disliked: "undislike" };
   const done = { liked: "like", disliked: issue ? "report" : "dislike" };
-  taste.record(ownerId, [
-    ...items.flatMap((item) =>
-      [undone[item.was], done[item.rating]].filter(Boolean).map((kind) => ({
-        ...tasteSignal(kind, item.jobId, itemValues(item)),
-        ...(kind === "report" && { issue }),
-      })),
-    ),
-    ...setPreferenceSignals(
-      liked,
-      [...new Set(liked.map((item) => item.resultSet?.id).filter(Boolean))].flatMap((setId) =>
-        galleryItems({ setId }),
+  taste.record(
+    ownerId,
+    [
+      ...items.flatMap((item) =>
+        [undone[item.was], done[item.rating]].filter(Boolean).map((kind) => ({
+          ...tasteSignal(kind, item.jobId, itemValues(item)),
+          ...(kind === "report" && { issue }),
+        })),
       ),
-      itemValues,
-    ),
-  ]);
+      ...setPreferenceSignals(
+        liked,
+        [...new Set(liked.map((item) => item.resultSet?.id).filter(Boolean))].flatMap((setId) =>
+          galleryItems({ setId }),
+        ),
+        itemValues,
+      ),
+    ],
+    strict,
+  );
 };
 // Every admitted job teaches the taste profile (iterations, chat reruns included) and makes a waiting finishing upscale step aside.
 // Animating one of the account's photos, from the app or MCP but not Dream, likes that photo.
@@ -958,6 +962,8 @@ const dream = createDream({
     if (!galleryItem(itemId, ownerId)) throw new Error("That Dream result is unavailable.");
     updateGalleryJob(itemId, { dream: mark, rating });
   },
+  rate: (ownerId, itemId, rating) =>
+    itemsRated(ownerId, setGalleryRatings([itemId], rating, ownerId), "", true),
   remove: (ownerId, itemIds) => deleteOwnedGalleryItems(ownerId, itemIds),
   loraLibrary: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;

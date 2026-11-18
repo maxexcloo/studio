@@ -13,6 +13,7 @@ import { mediaFile, mediaParams, mediaPath, mediaUrls } from "../media-paths.js"
 import {
   dreamArm,
   dreamPair,
+  dreamProject,
   dreamState,
   galleryKey,
   summaryFields,
@@ -20,6 +21,7 @@ import {
 import {
   readRuntimeDocument,
   runtimeDatabase,
+  runtimeTransaction,
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
 import { loadSharp } from "../sharp-loader.js";
@@ -50,18 +52,6 @@ function statement(sql) {
     statements.prepared.set(sql, prepared);
   }
   return prepared;
-}
-
-function transaction(write) {
-  const db = runtimeDatabase(dataDir);
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    write();
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
 }
 
 // Bumped on every change clients should see, live progress included.
@@ -115,7 +105,7 @@ const parse = (row) => withLive(JSON.parse(row.value));
 
 /* ----------------------------------------------------------------- Queries */
 
-const order = "bucket, created_ms DESC, job_id DESC, item_index, item_id DESC";
+const order = "bucket, gallery_ms DESC, job_id DESC, item_index, item_id DESC";
 const list = (values) => JSON.stringify([...values].map(String));
 
 /**
@@ -153,6 +143,7 @@ function where(query = {}) {
     const states = [query.dreamState].flat();
     add(`${dreamState} IN (${states.map(() => "?").join(", ")})`, ...states);
   }
+  if (query.dreamProject !== undefined) add(`${dreamProject} = ?`, query.dreamProject);
   if (query.dreamArm !== undefined) {
     const prefixes = [query.dreamArm].flat();
     add(
@@ -211,6 +202,7 @@ function where(query = {}) {
  * status is common (most items are done), and for Dream states the Dream index.
  */
 function indexFor(query) {
+  if (query.dreamProject !== undefined) return "INDEXED BY studio_gallery_dream_project";
   if (query.dreamState !== undefined) return "INDEXED BY studio_gallery_dream";
   const unfinished = query.status !== undefined && ![query.status].flat().includes("done");
   return unfinished ? "INDEXED BY studio_gallery_status" : "";
@@ -240,10 +232,10 @@ export function galleryItems(query = {}, { ordered = true } = {}) {
     .map(parse);
 }
 
-const keyColumns = "key, value, bucket, created_ms, job_id, item_index, item_id";
+const keyColumns = "key, value, bucket, gallery_ms, job_id, item_index, item_id";
 const rowKey = (row) => ({
   bucket: row.bucket,
-  time: row.created_ms,
+  time: row.gallery_ms,
   jobId: row.job_id,
   index: row.item_index,
   id: row.item_id,
@@ -359,7 +351,7 @@ export function putGalleryItems(items, { enriched = false } = {}) {
   const upsert = statement(
     "INSERT INTO studio_gallery (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
   );
-  transaction(() => {
+  runtimeTransaction(dataDir, () => {
     for (const item of items) {
       const key = galleryKey(item);
       if (!key) continue;
@@ -617,10 +609,10 @@ export function galleryFilter({
  * Rates finished gallery items by id, URL or key: "liked", "disliked" or null to clear. Returns the
  * items that changed, each with the rating it had as `was`.
  */
-export function setGalleryRatings(keys, rating) {
+export function setGalleryRatings(keys, rating, ownerId) {
   const wanted = keys.map(String).filter(Boolean);
   if (!wanted.length) return [];
-  const changed = galleryItems({ named: wanted }).filter(
+  const changed = galleryItems({ named: wanted, ownerId }).filter(
     (item) => item.status === "done" && (item.rating || null) !== rating,
   );
   putGalleryItems(
@@ -678,14 +670,14 @@ function afterKey(key) {
   }
   return [
     {
-      sql: ["bucket = ?", time === null ? "created_ms IS NULL" : "created_ms = ?", tie],
+      sql: ["bucket = ?", time === null ? "gallery_ms IS NULL" : "gallery_ms = ?", tie],
       params: [bucket, ...(time === null ? [] : [time]), ...tieParams],
     },
     ...(time === null
       ? []
       : [
-          { sql: ["bucket = ?", "created_ms < ?"], params: [bucket, time] },
-          { sql: ["bucket = ?", "created_ms IS NULL"], params: [bucket] },
+          { sql: ["bucket = ?", "gallery_ms < ?"], params: [bucket, time] },
+          { sql: ["bucket = ?", "gallery_ms IS NULL"], params: [bucket] },
         ]),
     { sql: ["bucket > ?"], params: [bucket] },
   ];
@@ -1259,6 +1251,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         ...(body.refusedPrompt ? { refusedPrompt: body.refusedPrompt } : {}),
         filename: title || item.filename,
         createdAt: existing[index]?.createdAt || new Date().toISOString(),
+        ...(body.galleryAt ? { galleryAt: body.galleryAt } : {}),
         durationMs,
         // How long ComfyUI itself took, without waiting in its queue.
         ...(job.timing ? { timing: job.timing } : {}),

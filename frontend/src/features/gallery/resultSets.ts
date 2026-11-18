@@ -9,7 +9,8 @@ export const runKey = (item: MediaItem) => item.resultSet?.id || item.jobId;
 
 // Work without a time yet is the newest.
 const setOrder = (a: MediaItem, b: MediaItem) =>
-  (b.createdAt || "~").localeCompare(a.createdAt || "~") || (a.index ?? 0) - (b.index ?? 0);
+  (b.galleryAt || b.createdAt || "~").localeCompare(a.galleryAt || a.createdAt || "~") ||
+  (a.index ?? 0) - (b.index ?? 0);
 
 /** The loaded results of `item`'s set, `item` included, in the set's order; none outside a set. */
 export function setMembers(items: MediaItem[], item: MediaItem) {

@@ -230,6 +230,13 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
   );
   const tile = (index: number) =>
     page.getByRole("button", { name: `Open image: Browse Result ${index}`, exact: true });
+  state.gallery.push({
+    ...results(1)[0],
+    id: "chat-video",
+    type: "video",
+    prompt: "Chat Video",
+    chat: { conversationId: "chat-a", turnId: "turn-2" },
+  });
   await page.goto("/images?chat=chat-a&turn=turn-1");
   await expect(tile(0)).toBeVisible();
   await expect(tile(1)).toHaveCount(0);
@@ -245,6 +252,15 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByText(/^[12] \/ 2$/)).toBeVisible();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  const media = page.getByRole("radiogroup", { name: "Chat Media", exact: true });
+  await media.getByText("Videos", { exact: true }).click();
+  await expect(page).toHaveURL(/\/videos$/);
+  await expect(
+    page.getByRole("button", { name: "Open video: Chat Video", exact: true }),
+  ).toBeVisible();
+  await media.getByText("Images", { exact: true }).click();
+  await expect(tile(1)).toBeVisible();
+  await expect(tile(2)).toHaveCount(0);
   await page.getByRole("button", { name: "Remove This Chat Filter", exact: true }).click();
   await expect(page).toHaveURL(/\/images$/);
   await expect(tile(2)).toBeVisible();
@@ -492,7 +508,9 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
   }
 });
 
-test("Runs fan a stacked run out in place and open it to flip through", async ({ page }) => {
+test("Runs fan a stacked run out in place and open it to flip through", async ({
+  page,
+}, testInfo) => {
   const state = await fixtures(page);
   state.gallery.push(
     ...results(3).map((item, index) => ({
@@ -500,6 +518,7 @@ test("Runs fan a stacked run out in place and open it to flip through", async ({
       id: `run-${index}`,
       jobId: "run-job",
       prompt: `Bird study ${index}`,
+      ...(index === 2 ? { parentItemId: "browse-0", derived: true } : {}),
     })),
     ...results(1),
   );
@@ -517,6 +536,17 @@ test("Runs fan a stacked run out in place and open it to flip through", async ({
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   // A run's result flips through that run alone, as Open All does from its first.
   await expect(viewer.getByText(/^\d \/ 3$/)).toBeVisible();
+  if (!testInfo.project.use.isMobile) {
+    // Following a source is a separate history step. Back returns to the run's own neighbours.
+    await viewer
+      .getByRole("complementary", { name: "Generation Details", exact: true })
+      .getByRole("link", { name: "Browse Result 0", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/images\/browse-0$/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/images\/run-2$/);
+    await expect(viewer.getByText(/^\d \/ 3$/)).toBeVisible();
+  }
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await run.getByRole("button", { name: "Open All", exact: true }).click();
   await expect(viewer.getByRole("img", { name: "Bird study 0", exact: true })).toBeVisible();
@@ -1570,13 +1600,19 @@ test("Incoming results wait behind New Results while scrolled, keeping loaded pa
     updatedAt: stamp,
   });
   await expect.poll(() => requests.length).toBeGreaterThan(previousReads);
-  await expect(page.getByRole("button", { name: "5 New Results", exact: true })).toBeVisible();
+  const pill = page.getByRole("button", { name: "5 New Results", exact: true });
+  const selection = page.getByRole("group", { name: "Gallery Selection", exact: true });
+  await expect(pill).toBeInViewport();
+  await expect
+    .poll(async () => {
+      const [banner, controls] = await Promise.all([pill.boundingBox(), selection.boundingBox()]);
+      return Boolean(banner && controls && banner.y >= controls.y + controls.height);
+    })
+    .toBe(true);
   expect(await page.locator("[data-gallery-view]").evaluate((host) => host.style.height)).toBe(
     heightBefore,
   );
-  await expect(
-    page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
-  ).toHaveText("1 Selected");
+  await expect(selection.getByRole("status")).toHaveText("1 Selected");
   await expect(selectedTile).toHaveAttribute("aria-pressed", "true");
   await expect
     .poll(async () => Math.abs((await selectedTile.boundingBox())!.y - before!.y))

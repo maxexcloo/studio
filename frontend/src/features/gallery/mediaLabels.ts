@@ -47,8 +47,9 @@ export function mediaDetail(item: MediaItem, profiles: Profile[], withTime: bool
 }
 
 /** The local day an item was made, as `YYYY-MM-DD`, or "" when it has no date. */
-export function mediaDay(item: Pick<MediaItem, "createdAt">) {
-  const created = item.createdAt ? new Date(item.createdAt) : null;
+export function mediaDay(item: Pick<MediaItem, "createdAt" | "galleryAt">) {
+  const time = item.galleryAt || item.createdAt;
+  const created = time ? new Date(time) : null;
   if (!created || Number.isNaN(created.getTime())) return "";
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${created.getFullYear()}-${pad(created.getMonth() + 1)}-${pad(created.getDate())}`;

@@ -119,19 +119,13 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
       }
       const { item } = judgement.card;
       const verdict = judgement.verdict as Verdict;
-      if (judgement.card.kind === "calibration") {
-        // Calibration first: a disliked image leaves the pool calibration reads.
-        await post(
+      if (judgement.card.kind === "calibration")
+        return post(
           "/api/dream/calibration",
-          verdict === "discard" ? { passed: [item.id] } : { liked: [item.id] },
+          verdict === "discard"
+            ? { passed: [item.id], rating: "disliked" }
+            : { liked: [item.id], ...(verdict === "like" && { rating: "liked" }) },
         );
-        if (verdict === "like" || verdict === "discard")
-          await post("/api/gallery/favorite", {
-            ids: [item.id],
-            rating: verdict === "like" ? "liked" : "disliked",
-          });
-        return;
-      }
       if (verdict === "discard") return post(dreamItemPath(item, "discard"));
       if (verdict === "more") return post(dreamItemPath(item, "more"));
       if (verdict === "variations") {
@@ -170,8 +164,7 @@ const refresh = (client: QueryClient) =>
   );
 
 /**
- * Takes a judgement back: a rating it gave returns to what the item had, then Dream returns the
- * card to unseen or unjudged and forgets what it taught. `onFailed` takes the card off again.
+ * Takes a judgement and any rating it gave back together. `onFailed` takes the card off again.
  */
 function useUndo(onFailed: (judgement: Judgement) => void, onGone: (card: DeckCard) => void) {
   const client = useQueryClient();
@@ -180,12 +173,12 @@ function useUndo(onFailed: (judgement: Judgement) => void, onGone: (card: DeckCa
       const rated =
         card.kind !== "pair" &&
         (verdict === "like" || (card.kind === "calibration" && verdict === "discard"));
-      if (rated)
-        await post("/api/gallery/favorite", {
-          ids: [card.item.id],
-          rating: card.item.rating ?? null,
-        });
-      await post("/api/dream/undo", { ids: cardIds(card) });
+      const calibration = card.kind === "calibration" || (card.kind === "pair" && !card.pairId);
+      await post("/api/dream/undo", {
+        ids: cardIds(card),
+        ...(calibration && { calibration }),
+        ...(rated && { rating: card.item.rating ?? null }),
+      });
     },
     scope: { id: "dream-judgements" },
     meta: { inlineError: true },
@@ -359,11 +352,11 @@ export function DreamDeck({
     <DreamPreview
       card={top}
       side={side}
-      close={() => {
+      close={(itemId) => {
         // The preview mounts open, so Mantine has no opening to return focus from.
         flushSync(() => setViewing(null));
         document
-          .querySelector<HTMLElement>(`[data-depth="0"] [data-preview-id="${viewing}"]`)
+          .querySelector<HTMLElement>(`[data-depth="0"] [data-preview-id="${CSS.escape(itemId)}"]`)
           ?.focus({ preventScroll: true });
       }}
       act={(choice) => {
@@ -419,6 +412,7 @@ export function DreamDeck({
               <SwipeCard
                 key={card.key}
                 depth={card === top ? 0 : 1}
+                paused={!!viewing}
                 fly={fly}
                 pair={card.kind === "pair"}
                 label={cardLabel(card, card === top)}
@@ -451,13 +445,14 @@ export function DreamDeck({
                   <PairContent
                     card={card}
                     top={card === top}
+                    playing={card === top && !viewing}
                     picked={picked?.key === card.key ? picked.side : undefined}
                     view={(side) => setViewing(card.items[side].id)}
                   />
                 ) : (
                   <>
                     <div className={classes.media}>
-                      <DeckMedia item={card.item} playing={card === top} />
+                      <DeckMedia item={card.item} playing={card === top && !viewing} />
                       {card.kind === "calibration" && (
                         <Badge className={classes.label} variant="default">
                           From Your Gallery
