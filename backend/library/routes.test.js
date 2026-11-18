@@ -87,14 +87,15 @@ test("an import from chat goes through the same pipeline, records chat as its or
     next();
   });
   const forgotten = [];
+  let inventoryUnknown = false;
   const store = createImportStore({ dataDir, log: {} });
   registerLibraryRoutes(app, {
     presets: {},
     installed: async () => ({}),
-    latestInstalled: async () => ({
-      files: { loras: ["parked-kept.safetensors"] },
-      current: false,
-    }),
+    latestInstalled: async () => {
+      if (inventoryUnknown) throw new Error("No installed-file inventory");
+      return { files: { loras: ["parked-kept.safetensors"] }, current: false };
+    },
     loraInfo: async () => ({}),
     catalogue: () => catalogue,
     json,
@@ -243,7 +244,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
   assert.equal(savedOnly.ok, true, "saved presets may be cleaned up once file removal succeeds");
   assert.deepEqual(forgotten, ["watercolour-v2.safetensors", "saved-only.safetensors"]);
 
-  // While ComfyUI is parked the entry goes; a file it last listed stays, and one already gone is forgotten.
+  // When ComfyUI cannot confirm removal, preserve account LoRA state.
   catalogue.edit("loras/parked-kept.safetensors", { title: "Parked Kept" });
   catalogue.edit("loras/parked-gone.safetensors", { title: "Parked Gone" });
   const parkedKept = await call("POST", "/api/library/catalogue/remove", {
@@ -257,12 +258,20 @@ test("an import from chat goes through the same pipeline, records chat as its or
     [true, false, true],
   );
   assert.deepEqual(
-    [parkedGone.ok, parkedGone.fileRemoved, parkedGone.note],
-    [true, false, undefined],
+    [parkedGone.ok, parkedGone.fileRemoved, /could not be checked/.test(parkedGone.note)],
+    [true, false, true],
   );
   assert.equal(catalogue.entry("loras/parked-kept.safetensors"), null);
   assert.equal(catalogue.entry("loras/parked-gone.safetensors"), null);
-  assert.equal(forgotten.at(-1), "parked-gone.safetensors");
+  assert.equal(forgotten.includes("parked-gone.safetensors"), false);
+  inventoryUnknown = true;
+  catalogue.edit("loras/parked-unchecked.safetensors", { title: "Parked Unchecked" });
+  const unchecked = await call("POST", "/api/library/catalogue/remove", {
+    key: "loras/parked-unchecked.safetensors",
+  });
+  assert.equal(unchecked.ok, true);
+  assert.match(unchecked.note, /could not be checked/);
+  assert.equal(forgotten.includes("parked-unchecked.safetensors"), false);
 });
 
 test("dropped images arrive as data URLs, PNG, WebP or JPEG only", () => {
