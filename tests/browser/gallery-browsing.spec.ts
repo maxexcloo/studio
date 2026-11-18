@@ -1100,8 +1100,9 @@ test("Gallery filters submit repeated models and origins together with LoRA, siz
   await pick("Models", "Studio Image");
   await pick("Models", "Motion Quality");
   await pick("LoRAs", "Detail Slider");
-  await pick("Origin", "Dream");
-  await pick("Origin", "Chat");
+  const origin = page.getByRole("group", { name: "Origin", exact: true });
+  await origin.getByRole("button", { name: "Dream", exact: true }).click();
+  await origin.getByRole("button", { name: "Chat", exact: true }).click();
   await page.getByRole("button", { name: "Up to 1K", exact: true }).click();
   await page.getByRole("button", { name: "Square", exact: true }).click();
   await page.getByText("Week", { exact: true }).click();

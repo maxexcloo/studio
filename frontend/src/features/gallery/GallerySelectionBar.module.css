@@ -41,6 +41,15 @@
   overflow-x: visible;
 }
 
+/* The shared phone bar's controls share its width; on this row, sized to its content, they would
+   collapse onto their icons, so each takes a fixed width, its ▾ clear in its corner. */
+:root[data-phone]
+  .header
+  .actions
+  :is(:global(.mantine-ActionIcon-root), :global(.mantine-Button-root)) {
+  flex: 0 0 36px;
+}
+
 .divider {
   align-self: stretch;
   flex-shrink: 0;
