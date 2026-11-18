@@ -85,6 +85,7 @@ test("each saved picture carries its own upscale; upscales are not pictures of t
   const done = pairRunOutputs(
     "primary",
     {
+      1: { images: [{ filename: "reference.png", type: "input" }] },
       9: { images: [image("a.png").images[0], image("b.png").images[0]] },
       studio_up0_9: { images: [image("a-up.png").images[0], image("b-up.png").images[0]] },
     },
@@ -102,6 +103,17 @@ test("each saved picture carries its own upscale; upscales are not pictures of t
   assert.equal(stopped.length, 1);
   assert.equal(stopped[0].paired, true);
   assert.equal(stopped[0].upscale, null);
+});
+
+test("embedded upscales share one set of SeedVR2 loaders", () => {
+  const run = runGraph();
+  run["10"] = run["9"];
+  const { graph } = planRunUpscale(run, body, info);
+  for (const input of ["dit", "vae"]) {
+    const link = graph.studio_up0_5.inputs[input];
+    assert.deepEqual(graph.studio_up1_5.inputs[input], link);
+    assert.equal(graph[link[0]].inputs.cache_model, false);
+  }
 });
 
 test("the upscale reads as part of the run, and its time is not the model's", () => {

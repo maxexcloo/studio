@@ -30,6 +30,11 @@ const snap = 16;
 // Past this share of the picture, cropping saves nothing: work on the whole image.
 const wholeImageShare = 0.7;
 
+function edgeGrow(bounds) {
+  const feather = Math.max(32, Math.hypot(bounds.width, bounds.height) * 0.1);
+  return Math.round(4 + feather / 2);
+}
+
 /** The painted pixels' bounding box in a one-channel buffer, or null when nothing was painted. */
 export function maskBounds(data, width, height, threshold = maskThreshold) {
   let left = width;
@@ -60,8 +65,9 @@ function snapUp(value, step = snap) {
  * scaled to the pixel count the user picked, also on the 16 grid.
  */
 export function inpaintGeometry({ imageWidth, imageHeight, bounds, targetPixels }) {
+  const grow = edgeGrow(bounds);
   const sideFor = (painted, limit) => {
-    const grown = Math.max(painted * contextFactor, Math.min(minContext, limit));
+    const grown = Math.max(painted * contextFactor, painted + 2 * grow, minContext);
     return Math.min(limit, snapUp(grown));
   };
   let width = sideFor(bounds.width, imageWidth);
@@ -84,11 +90,24 @@ export function inpaintGeometry({ imageWidth, imageHeight, bounds, targetPixels 
   return { box: { x, y, width, height }, work: { width: workWidth, height: workHeight } };
 }
 
-/** How far the seam fades, from the 0–1 "edge softness" setting, for a box this size. */
-export function featherSigma(softness, box) {
-  const side = Math.min(box.width, box.height);
-  // Narrow on purpose: an edit model shifts things a little, and a wide blend shows that as ghosting.
-  return Math.max(0.6, Math.min(1, Math.max(0, Number(softness) || 0)) * side * 0.02);
+// Two sliding windows apply square morphology in linear time even for a large brush area.
+function spreadMask(data, { width, height }, radius, match) {
+  const pass = (source, lines, length, lineStride, pixelStride) => {
+    const result = Buffer.alloc(source.length, 255 - match);
+    for (let line = 0; line < lines; line += 1) {
+      const start = line * lineStride;
+      let hits = 0;
+      for (let i = -radius; i < length; i += 1) {
+        const entering = i + radius;
+        const leaving = i - radius - 1;
+        if (entering < length && source[start + entering * pixelStride] === match) hits += 1;
+        if (leaving >= 0 && source[start + leaving * pixelStride] === match) hits -= 1;
+        if (i >= 0 && hits) result[start + i * pixelStride] = match;
+      }
+    }
+    return result;
+  };
+  return pass(pass(data, height, width, width, 1), width, height, 1, width);
 }
 
 export function maskBufferFromDataUrl(dataUrl) {
@@ -163,27 +182,24 @@ export async function inpaintFiles(sharp, sourceBuffer, maskBuffer, { targetPixe
     .png()
     .toBuffer();
   const boxMask = await rawGray(gray(mask, imageWidth, imageHeight).extract(region));
-  // Sampling: hard and grown a little past the paint. A soft sampling mask (differential
-  // diffusion) gives its edge only the last step or two, which few-step and edit models
-  // leave half-denoised: grey grain and a ghost of the original. Softness belongs to the stitch.
-  const workMask = await rawGray(
-    gray(boxMask, box.width, box.height).resize(work.width, work.height, { fit: "fill" }),
+  const grow = edgeGrow(bounds);
+  const paint = boxMask.map((value) => (value >= maskThreshold ? 255 : 0));
+  const grown = spreadMask(paint, box, grow, 255);
+  const samplingMask = await pngGray(
+    gray(grown, box.width, box.height)
+      .resize(work.width, work.height, { fit: "fill", kernel: "linear" })
+      .threshold(128),
   );
-  const grown = await rawGray(
-    gray(workMask, work.width, work.height).blur(
-      Math.max(1, Math.min(work.width, work.height) * 0.012),
-    ),
-  );
-  const samplingMask = await pngGray(gray(grown, work.width, work.height).threshold(12));
-  // Stitching: at the box's own size, feathered by the edge-softness setting.
-  // The solid core grows a little past the paint, so the soft band sits on repainted pixels (the sampling mask is grown too).
-  const compositeMask = await pngGray(
-    gray(
-      await rawGray(gray(boxMask, box.width, box.height).blur(featherSigma(feather, box))),
-      box.width,
-      box.height,
-    ).linear(1.6, 0),
-  );
+  // Erode before blurring so the seam fades inside the area the sampler repaints.
+  const blend = Math.round(grow * 1.25 * Math.min(1, Math.max(0, Number(feather) || 0)));
+  if (blend) {
+    const core = spreadMask(grown, box, Math.round(blend * 0.8), 0);
+    const soft = await rawGray(gray(core, box.width, box.height).blur(Math.max(0.3, blend / 2.5)));
+    for (let i = 0; i < paint.length; i += 1) {
+      if (grown[i]) paint[i] = Math.max(paint[i], soft[i]);
+    }
+  }
+  const compositeMask = await pngGray(gray(paint, box.width, box.height));
   return {
     box,
     work,
