@@ -48,15 +48,26 @@ const isLtx = (model: string) => model.toLowerCase().startsWith("ltx-");
 const isDistilledLtx = (model: string) => isLtx(model) && model.toLowerCase().includes("distilled");
 
 /**
- * Qwen and Noct conditioning/cache limits, shared by their profiles and requests. A one-GPU IQ8R
- * entry's 8192-token cache holds three references at 1344; its two-GPU `-refs` twin holds four
- * at 2048, and validation.js moves a run with more references than one card holds there.
+ * Qwen and Noct limits, shared by their profiles and requests. A one-GPU IQ8R entry's 8192-token
+ * cache holds three references at 1344; its two-GPU `-refs` twin holds four at the native 2048,
+ * and validation.js moves a run one card can't hold there where the worker lists it.
  */
 export function radianceImageLimits(model: string) {
   if (!/^(qwen-image-2\.1-|noctq-)/.test(model))
     return { maxSide: 2048, maxReferences: maxImageReferences };
   if (model.endsWith("-refs")) return { maxSide: 2048, maxReferences: 4 };
   return { maxSide: 1344, maxReferences: model.endsWith("-iq8r") ? 3 : 4 };
+}
+
+/** Whether an entry draws this size with these references without shrinking or refusing them. */
+export function radianceImageFits(
+  model: string,
+  width: number,
+  height: number,
+  references: number,
+) {
+  const { maxSide, maxReferences } = radianceImageLimits(model);
+  return Math.max(width, height) <= maxSide && references <= maxReferences;
 }
 
 /**
