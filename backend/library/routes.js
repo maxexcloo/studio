@@ -165,12 +165,19 @@ export async function matchImageResource(item, { installed = {}, entries = {}, j
   };
 }
 
-/** Removes an installed model file, only when it is still the one recorded (by checksum when known). */
+/**
+ * Removes an installed model file, only when it is still the one recorded (by checksum when known);
+ * `reachable` is false when the model library's worker didn't answer, so nothing was removed.
+ */
 async function removeInstalled(want) {
   if (!want?.file || !Object.hasOwn(catalogueKinds, want.folder))
     throw new Error("That isn't a model file Studio manages.");
   const names = subfolders[want.folder] || [want.folder];
-  await refreshWorkerModels({ force: true });
+  const reachable = await refreshWorkerModels({ force: true }).then(
+    () => true,
+    () => false,
+  );
+  if (!reachable) return { removed: false, reachable };
   const file = workerInventory().files.find((item) =>
     names.some((folder) => item.path === `${folder}/${want.file}`),
   );
@@ -740,7 +747,7 @@ export function registerLibraryRoutes(
     return ok({ key, entry: catalogue().undo(key, { by: by(account) }) });
   });
   // Removes an entry and its installed file, unless a profile still uses it; a LoRA leaves every
-  // account's stacks, strengths, ratings, recents and presets after file removal succeeds.
+  // account's stacks, strengths, ratings, recents and presets once its file is gone.
   route("POST", "/api/library/catalogue/remove", async (account, { body }) => {
     const key = String(body?.key || "");
     const entry = catalogue().entry(key);
@@ -753,10 +760,26 @@ export function registerLibraryRoutes(
         status: 409,
         payload: { ok: false, error: `Still used by ${users.join(", ")}.`, users },
       };
-    const { removed } = await removeFile({ folder, file, sha256: entry.sha256 || "" });
-    if (folder === "loras") forget(file);
+    const { removed, reachable = true } = await removeFile({
+      folder,
+      file,
+      sha256: entry.sha256 || "",
+    });
+    // While ComfyUI is parked the entry still goes; a file the last known inventory lists stays.
+    const kept =
+      !reachable &&
+      Boolean((await latestInstalled().catch(() => ({ files: {} }))).files[folder]?.includes(file));
+    if (folder === "loras" && !kept) forget(file);
     catalogue().edit(key, { removed: true }, { by: by(account), origin: origin(account, "admin") });
-    return ok({ key, fileRemoved: removed });
+    return ok({
+      key,
+      fileRemoved: removed,
+      ...(kept
+        ? {
+            note: "ComfyUI isn't running, so the file can't be deleted; the entry is removed and the file stays. Start it in Settings › Workers, undo and remove again to delete the file.",
+          }
+        : {}),
+    });
   });
   route("GET", "/api/library/updates", async () =>
     ok(await updates.settle().catch(() => updates.summary())),
