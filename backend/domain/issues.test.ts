@@ -4,7 +4,6 @@ import os from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
 
-import { tasteLimits } from "../../shared/taste.ts";
 import { closeRuntimeDatabase } from "../persistence/runtime.ts";
 import { type IssueItem, createIssues } from "./issues.ts";
 import { type TasteWriter, createTaste } from "./taste.ts";
@@ -55,7 +54,7 @@ function fixture(t: TestContext, reply: unknown) {
   return { issues, taste, asked };
 }
 
-test("issues group recurring complaints, suggest a rule and drop out once accepted or dismissed", async (t) => {
+test("issues group recurring complaints, suggest a rule and drop out once it is a rule", async (t) => {
   const { issues, taste, asked } = fixture(t, {
     issues: [
       { issue: "Waist too wide", entries: [1, 2, 3], rule: "always a clearly narrow waist" },
@@ -88,16 +87,11 @@ test("issues group recurring complaints, suggest a rule and drop out once accept
     read.issues[0].examples.map((example) => example.id),
     ["a", "b", "c"],
   );
-  // Nothing is a rule until the person accepts one.
+  // Nothing is a rule until the person accepts one (domain/inbox.ts); then its issue drops out.
   assert.deepEqual(taste.read("alice").rules, []);
-  const accepted = issues.accept("alice", "always a clearly narrow waist");
-  assert.deepEqual(taste.read("alice").rules, ["always a clearly narrow waist"]);
+  taste.edit("alice", { rules: ["Always a clearly narrow waist"] });
   assert.deepEqual(
-    accepted.issues.map((issue) => issue.issue),
+    issues.read("alice").issues.map((issue) => issue.issue),
     ["Extra fingers"],
   );
-  assert.deepEqual(issues.dismiss("alice", "Extra fingers").issues, []);
-  // A full list refuses another rule.
-  taste.edit("alice", { rules: Array.from({ length: tasteLimits.rules }, (_, n) => `rule ${n}`) });
-  assert.throws(() => issues.accept("alice", "no visible text"), /Rules are full/);
 });

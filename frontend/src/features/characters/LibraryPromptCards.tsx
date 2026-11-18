@@ -7,7 +7,6 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { LibraryCard } from "./CardImages";
-import { CardSuggestions } from "./CardSuggestions";
 import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCardDialogs";
 import { type PromptCardKind, promptCardsQuery } from "./queries";
 import { useCardFrom } from "./useCardFrom";
@@ -48,7 +47,6 @@ export function LibraryPromptCards({
         />
       </SectionHeader>
       {start.error && <Alert color="red">{start.error.message}</Alert>}
-      {!words && <CardSuggestions kind={kind} />}
       {listing.isPending ? (
         <LoadingState fill label={`Loading ${label}`} />
       ) : listing.error ? (

@@ -5547,7 +5547,7 @@ test("variants offers lettered options of a result, records the pick and takes l
       vote: req.body.jobId,
       axis: "lighting",
       variants: [{ jobId: req.body.jobId, label: "B · Golden Dusk" }],
-      brief: { projectId: "foxes", name: "Foxes", styles: "lighting: Golden Dusk" },
+      proposal: { projectId: "foxes", name: "Foxes" },
     });
   });
   const offered = await call(client, "variants", {
@@ -5583,11 +5583,10 @@ test("variants offers lettered options of a result, records the pick and takes l
   assert.deepEqual(votes, [["fox-options", { jobId: "variant-1", by: "chat" }]]);
   data(await call(client, "reuse", { job_id: "B" }));
   assert.equal(votes.length, 1);
-  // pick records a choice by number too, and says what changed in the project's brief.
+  // pick records a choice by number too, and says Dream proposes it for the project's brief.
   const picked = data(await call(client, "variants", { pick: "#3" }));
   assert.equal(picked.picked, "B · Golden Dusk");
-  assert.equal(picked.brief.styles, "lighting: Golden Dusk");
-  assert.match(picked.note, /undo it on Studio's Dream page/);
+  assert.match(picked.note, /proposes this lighting for Foxes's brief/);
   await failure(client, "variants", { pick: "D" });
   // generate takes a result's number or letter as a reference image.
   const uploads = f.requests.filter(

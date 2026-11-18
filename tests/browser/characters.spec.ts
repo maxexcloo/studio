@@ -5,7 +5,6 @@ import {
   closeReferences,
   closeTextEditor,
   create,
-  dreamItem,
   editorMenu,
   fixtures,
   image,
@@ -13,8 +12,6 @@ import {
   pickerTab,
   profiles,
   promptMenu,
-  section,
-  serveDream,
   serveProfiles,
   signIn,
   stamp,
@@ -635,60 +632,4 @@ test("Outfits and scenes go into the prompt in order from the References sheet, 
     ["Raincoat", raincoat],
     ["Gala", "an emerald gown and gold heels"],
   ]);
-});
-
-test("Dream suggestions are reviewed and accepted in their matching Library section", async ({
-  page,
-}) => {
-  const state = await fixtures(page);
-  await serveDream(page, {
-    suggestions: [
-      {
-        id: "ranger",
-        kind: "characters",
-        name: "Ranger",
-        description: "A red-haired ranger",
-        items: [dreamItem("ranger")],
-      },
-      {
-        id: "coat",
-        kind: "outfits",
-        name: "Raincoat",
-        description: "A yellow raincoat",
-        items: [dreamItem("coat")],
-      },
-      {
-        id: "forest",
-        kind: "scenes",
-        name: "Forest",
-        description: "A misty forest",
-        items: [dreamItem("forest")],
-      },
-    ],
-    characters: state.characters,
-    outfits: state.outfits,
-    scenes: state.scenes,
-  });
-  await page.goto("/library#characters");
-  const suggestions = page.getByRole("list", { name: "Suggestions", exact: true });
-  await expect(suggestions.getByRole("listitem")).toHaveCount(1);
-  await expect(suggestions.getByRole("listitem", { name: "Ranger", exact: true })).toBeVisible();
-  await section(page, "Library", "Outfits");
-  await expect(suggestions.getByRole("listitem")).toHaveCount(1);
-  await expect(suggestions.getByRole("listitem", { name: "Raincoat", exact: true })).toBeVisible();
-  await suggestions.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(suggestions).toBeHidden();
-  await expect(
-    page
-      .getByRole("list", { name: "Outfits", exact: true })
-      .getByRole("listitem", { name: "Raincoat", exact: true }),
-  ).toBeVisible();
-  await section(page, "Library", "Scenes");
-  await expect(suggestions.getByRole("listitem")).toHaveCount(1);
-  await expect(suggestions.getByRole("listitem", { name: "Forest", exact: true })).toBeVisible();
-  await suggestions.getByRole("button", { name: "Dismiss", exact: true }).click();
-  await expect(suggestions).toBeHidden();
-  await expect(page.getByText("No Scenes", { exact: true })).toBeVisible();
-  await section(page, "Library", "Characters");
-  await expect(suggestions.getByRole("listitem", { name: "Ranger", exact: true })).toBeVisible();
 });

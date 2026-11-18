@@ -1,6 +1,5 @@
-import { maxTasteRule, tasteLimits } from "../../shared/taste.ts";
+import { maxTasteRule } from "../../shared/taste.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
-import { type RouteAccount, directRoute } from "./direct-route.ts";
 import type { PromptWriter, Taste, TasteWriter } from "./taste.ts";
 import { americanEnglish } from "./writing-standard.ts";
 
@@ -26,8 +25,6 @@ export interface Issue {
 interface StoredIssues {
   updatedAt: string;
   issues: Issue[];
-  /** Issues the person dismissed, lower case, so they don't come back. */
-  dismissed: string[];
 }
 interface Entry {
   source: Source;
@@ -56,8 +53,8 @@ const failure = (message: string, status: number) => Object.assign(new Error(mes
 /**
  * Per-account recurring issues in the runtime document store, as `issues:<ownerId>`: the text model
  * groups the last two weeks' Reports, review misses and chat requests, and suggests a rule for each.
- * They rewrite on request, and on a read when older than `staleMs` while `updates` allows. Nothing
- * becomes a rule until the person accepts one.
+ * They rewrite on a read when older than `staleMs` while `updates` allows. Dream's Inbox
+ * (domain/inbox.ts) proposes their rules; nothing becomes a rule until the person accepts one.
  */
 export function createIssues({
   dataDir,
@@ -70,7 +67,7 @@ export function createIssues({
   now = Date.now,
 }: {
   dataDir: string;
-  taste: Pick<Taste, "read" | "edit">;
+  taste: Pick<Taste, "read">;
   /** The owner's finished images made since `since` (ms), newest first. */
   recent: (ownerId: string, since: number) => IssueItem[];
   /** What the chat asked for when it queued the job, or "". */
@@ -84,7 +81,6 @@ export function createIssues({
   const load = (ownerId: string): StoredIssues => ({
     updatedAt: "",
     issues: [],
-    dismissed: [],
     ...(readRuntimeDocument(dataDir, name(ownerId)) as Partial<StoredIssues> | undefined),
   });
   const save = (ownerId: string, stored: StoredIssues) =>
@@ -199,17 +195,13 @@ export function createIssues({
     }
     return job;
   }
-  /** The issues the person hasn't dismissed or already made a rule of. */
+  /** The issues the person hasn't already made a rule of. */
   function read(ownerId: string) {
     const stored = load(ownerId);
     const rules = new Set(taste.read(ownerId).rules.map(key));
-    const dismissed = new Set(stored.dismissed);
     return {
       updatedAt: stored.updatedAt,
-      issues: stored.issues.filter(
-        (issue) => !dismissed.has(key(issue.issue)) && !(issue.rule && rules.has(key(issue.rule))),
-      ),
-      writer: Boolean(writer(ownerId)),
+      issues: stored.issues.filter((issue) => !(issue.rule && rules.has(key(issue.rule)))),
     };
   }
   return {
@@ -226,59 +218,6 @@ export function createIssues({
       return read(ownerId);
     },
     refresh,
-    dismiss(ownerId: string, issue: string) {
-      const stored = load(ownerId);
-      save(ownerId, { ...stored, dismissed: [...new Set([...stored.dismissed, key(issue)])] });
-      return read(ownerId);
-    },
-    /** Makes `rule` one of the person's rules; the issue it came from then drops out. */
-    accept(ownerId: string, rule: string) {
-      const words = clean(rule, maxTasteRule);
-      const { rules } = taste.read(ownerId);
-      if (!rules.some((saved) => key(saved) === key(words))) {
-        if (rules.length >= tasteLimits.rules)
-          throw failure(`Rules are full at ${tasteLimits.rules}: remove one first.`, 400);
-        taste.edit(ownerId, { rules: [...rules, words] });
-      }
-      return read(ownerId);
-    },
   };
 }
 export type Issues = ReturnType<typeof createIssues>;
-
-const owner = (account: RouteAccount) => account?.userId || "";
-
-/** The caller's own issues: read, refresh, dismiss one, or accept a rule from one. */
-export function registerIssueRoutes(app: object, { issues }: { issues: Issues }) {
-  const text = (value: unknown, longest: number) =>
-    typeof value === "string" && value.trim() && value.length <= longest ? value : "";
-  const failed = (error: unknown) => {
-    const { status = 500, message } = error as Error & { status?: number };
-    return { status, payload: { ok: false, error: message } };
-  };
-  directRoute(app, "GET", "/api/taste/issues", (account) => ({
-    status: 200,
-    payload: issues.read(owner(account)),
-  }));
-  directRoute(app, "POST", "/api/taste/issues/refresh", async (account) => {
-    try {
-      return { status: 200, payload: await issues.refresh(owner(account)) };
-    } catch (error) {
-      return failed(error);
-    }
-  });
-  directRoute(app, "POST", "/api/taste/issues/dismiss", (account, { body }) => {
-    const issue = text(body?.issue, 80);
-    if (!issue) return { status: 400, payload: { ok: false, error: "Name the issue to dismiss." } };
-    return { status: 200, payload: issues.dismiss(owner(account), issue) };
-  });
-  directRoute(app, "POST", "/api/taste/issues/accept", (account, { body }) => {
-    const rule = text(body?.rule, maxTasteRule);
-    if (!rule) return { status: 400, payload: { ok: false, error: "Write the rule to add." } };
-    try {
-      return { status: 200, payload: issues.accept(owner(account), rule) };
-    } catch (error) {
-      return failed(error);
-    }
-  });
-}

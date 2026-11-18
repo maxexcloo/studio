@@ -67,7 +67,7 @@ test("compare runs queue one seeded set, read back per owner and record the star
       votes.push([ownerId, winner.id!, ...others.map((item) => item.id!)]),
     picked: ({ projectId, axis }, choice, by) => {
       picks.push([projectId!, axis!, choice, by]);
-      return { projectId: projectId!, name: "Foxes", styles: `${axis}: ${choice}` };
+      return { projectId: projectId!, name: "Foxes" };
     },
   });
   const server = app.listen(0, "127.0.0.1");
@@ -163,9 +163,9 @@ test("compare runs queue one seeded set, read back per owner and record the star
   ];
   const voted = await request(`/${run.body.id}/vote`, { jobId: winner.jobId, by: "chat" }, "PUT");
   assert.equal(voted.body.vote, winner.jobId);
-  // A pick on an axis goes to the project's brief, which answers what changed.
+  // A pick on an axis is proposed for the project's brief, which answers the project.
   assert.deepEqual(picks, [["foxes", "steps", "Steps 20", "chat"]]);
-  assert.equal(voted.body.brief.styles, "steps: Steps 20");
+  assert.deepEqual(voted.body.proposal, { projectId: "foxes", name: "Foxes" });
   assert.equal(records[0].vote, winner.jobId);
   assert.ok(records[0].votedAt);
   // The winner is a taste signal, preferred over each other finished variant; a refused vote is not.
