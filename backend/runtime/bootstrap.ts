@@ -58,16 +58,24 @@ export async function loadRuntime(
   });
   // Restores the last placement after an outside stop, then swaps for ComfyUI work or back, then
   // restarts an idle Radiance short of host memory.
-  setInterval(
+  const shutdown = new AbortController();
+  const reconcile = setInterval(
     () =>
       void controller
         .reconcile()
-        .then(() => controller.swapOnDemand())
-        .then(() => controller.restartWhenIdle())
+        .then(() => (shutdown.signal.aborted ? undefined : controller.swapOnDemand()))
+        .then(() => controller.restartWhenIdle(shutdown.signal))
         .catch(() => {}),
     30_000,
   ).unref();
-  return { controller, benchmarks };
+  return {
+    controller,
+    benchmarks,
+    stop() {
+      clearInterval(reconcile);
+      shutdown.abort();
+    },
+  };
 }
 
 /** Mount after account middleware with the existing administrator requirement. */

@@ -1284,6 +1284,65 @@ test("cancellation while readiness is pending releases its acquired runtime admi
   }
 });
 
+test("stopping while readiness is pending leaves the job queued for restart", async () => {
+  const { store, queue, adapter, submitted } = fixture();
+  const checking = deferred();
+  const ready = deferred();
+  try {
+    const session = store.createSession("alice");
+    const job = store.enqueue("alice", session.id, {}, "image");
+    adapter.eligible = async () => {
+      checking.resolve();
+      await ready.promise;
+      return undefined;
+    };
+    const tick = queue.tick();
+    await checking.promise;
+    queue.stop();
+    ready.resolve();
+    await tick;
+    assert.deepEqual(submitted, []);
+    assert.equal(store.job("alice", job.id)?.status, "queued");
+  } finally {
+    ready.resolve();
+    store.close();
+  }
+});
+
+test("stopping while a spare slot is checked skips worker admission", async () => {
+  const { store, queue, adapter, submitted } = fixture();
+  const checking = deferred();
+  const ready = deferred();
+  try {
+    const session = store.createSession("alice");
+    adapter.slots = () => 2;
+    const first = store.enqueue("alice", session.id, {}, "image");
+    await queue.tick();
+    const next = store.enqueue("alice", session.id, {}, "image");
+    adapter.slotWait = async () => {
+      checking.resolve();
+      await ready.promise;
+      return undefined;
+    };
+    const eligibility = [] as string[];
+    adapter.eligible = async (job) => {
+      eligibility.push(job.id);
+      return undefined;
+    };
+    const tick = queue.tick();
+    await checking.promise;
+    queue.stop();
+    ready.resolve();
+    await tick;
+    assert.deepEqual(eligibility, []);
+    assert.deepEqual(submitted, [first.id]);
+    assert.equal(store.job("alice", next.id)?.status, "queued");
+  } finally {
+    ready.resolve();
+    store.close();
+  }
+});
+
 test("editable user presets are independent from profiles and owner scoped", () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "studio-presets-"));
   const filename = path.join(directory, "studio.sqlite");

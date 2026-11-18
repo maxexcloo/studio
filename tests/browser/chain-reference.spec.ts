@@ -31,6 +31,7 @@ const slots = declared.map((slot, index) => ({
 }));
 
 test("A linked ten-reference stack fills declared slots and keeps Start/End independent", async ({
+  isMobile,
   page,
 }) => {
   const state = await fixtures(page);
@@ -110,6 +111,8 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
   ).toBeVisible();
   expect(uploaded).toBe(12);
   // Filling the stack returns the phone to it.
+  const adding = page.getByRole("dialog", { name: "Add References", exact: true });
+  if (isMobile) await expect(adding).toBeHidden();
   await expect(
     (await openReferenceChoices(page)).getByRole("button", {
       name: "Upload Reference",
@@ -136,6 +139,7 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
     )
       .getByRole("button", { name: "Use reference: Shared frame", exact: true })
       .click();
+    if (isMobile) await expect(adding).toBeHidden();
   }
   await closeReferences(page);
   await pressGenerate(page);

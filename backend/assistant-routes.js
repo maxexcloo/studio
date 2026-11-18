@@ -167,6 +167,7 @@ export function registerAssistantRoutes(
     liked = async () => ({ examples: [], loras: [] }),
     frame = async () => null,
     caption = () => "",
+    shutdown,
   } = {},
 ) {
   const failure = (error) => {
@@ -327,18 +328,29 @@ export function registerAssistantRoutes(
   app.post("/api/assistant/rewrite", async (req, res, next) => {
     if (req.body?.stream !== true && !/text\/event-stream/i.test(String(req.headers.accept || "")))
       return next();
-    const signal = req.stop;
+    const signal = shutdown ? AbortSignal.any([req.stop, shutdown]) : req.stop;
+    const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    const stop = () => {
+      if (res.destroyed) return;
+      const error = "Studio is stopping.";
+      if (!res.headersSent) return res.status(503).set("Connection", "close").json({ error });
+      send("error", { error });
+      res.end();
+    };
+    if (signal.aborted) return stop();
+    signal.addEventListener("abort", stop, { once: true });
+    res.once("close", () => signal.removeEventListener("abort", stop));
     const account = req.studioAccount;
     const context = await ready(account, req.body);
     if (signal.aborted) return;
     if (context.refusal) return res.status(context.refusal.status).json(context.refusal.payload);
     const refused = uncensoredRefusal(account, req.body);
     if (refused) return res.status(403).json(refused);
-    const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     try {
       const result = await rewrite(account, req.body, context, {
         signal,
         begin: () => {
+          if (signal.aborted) return;
           res.writeHead(200, {
             "Content-Type": "text/event-stream; charset=utf-8",
             "Cache-Control": "no-store",
@@ -347,14 +359,17 @@ export function registerAssistantRoutes(
           });
           res.flushHeaders?.();
         },
-        onDelta: (text) => send("delta", { text }),
+        onDelta: (text) => {
+          if (!signal.aborted) send("delta", { text });
+        },
       });
+      if (signal.aborted) return;
       send("done", result);
       res.end();
     } catch (error) {
-      if (signal.aborted) return res.end();
+      if (signal.aborted) return;
       if (res.headersSent) {
-        res.write(`event: error\ndata: ${JSON.stringify({ error: error.message })}\n\n`);
+        send("error", { error: error.message });
         res.end();
         return;
       }
