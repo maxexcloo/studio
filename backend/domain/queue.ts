@@ -51,6 +51,8 @@ export interface QueueAdapter {
   alternatives?(job: OwnedJob): string[];
   /** How many jobs a resource runs at once; one unless it says more (a worker's `slots`). */
   slots?(resource: string): number;
+  /** Why a job must wait despite a free slot beside accepted work on its resource. */
+  slotWait?(job: OwnedJob, running: OwnedJob[]): Promise<string | undefined>;
 }
 
 /** One adapter that hands each job to the adapter `pick` chooses for it. */
@@ -517,6 +519,18 @@ export class GenerationQueue {
             ) {
               wait(job, videoModelReason);
               continue;
+            }
+            const active = running.get(resource);
+            if (active?.length && this.adapter.slotWait) {
+              const reason = await this.adapter.slotWait(job, active);
+              if (reason) {
+                const latest = this.store.job(job.ownerId, job.id);
+                if (latest && waitingNow(latest)) wait(latest, reason);
+                break;
+              }
+              const latest = this.store.job(job.ownerId, job.id);
+              if (!latest || !waitingNow(latest) || this.held()(latest)) continue;
+              job = latest;
             }
             let reason: string | undefined;
             this.checkingEligibility.add(job.id);

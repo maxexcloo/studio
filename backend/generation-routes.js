@@ -23,6 +23,7 @@ import {
   galleryRevisionValue,
   putGalleryItems,
 } from "./gallery/store.js";
+import { customWorkflowGraph } from "./graphs.js";
 import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
 import { jobs, runJob } from "./jobs.js";
 import { optionalLoraIssue, optionalLoraPolicyIssue } from "./lora/catalogue.js";
@@ -31,7 +32,7 @@ import { withLoraTriggers } from "./lora/prompts.js";
 import { workflowLoraBase } from "./lora/radiance.js";
 import { loraAllowed } from "./model/catalogue.js";
 import { recordPrompt } from "./prompt-history.js";
-import { RadianceClient, radianceSizeStep } from "./providers/radiance.ts";
+import { RadianceClient, isRadianceNode, radianceSizeStep } from "./providers/radiance.ts";
 import { referenceExistsForAccount, stageReferenceAssetsForAccount } from "./references.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { upscaleTargets } from "./upscale.js";
@@ -509,6 +510,15 @@ export function createGenerationSubmission({
   }
   return {
     submitGeneration,
+    async radianceModel(job, account) {
+      const input = { ...job.input, clientJobId: job.id };
+      const routed = await routeGeneration(input, account, job.backend);
+      if (routed.payload || routed.backend !== job.backend) return undefined;
+      const { body } = await prepareGenerationBody(routed.backend, input);
+      if (!body) return undefined;
+      const graph = await customWorkflowGraph(body);
+      return Object.values(graph).find((node) => isRadianceNode(node?.class_type))?.inputs?.model;
+    },
     async validateInput(input, account) {
       const routed = await routeGeneration(input, account, undefined, true);
       if (routed.payload) return routed;
