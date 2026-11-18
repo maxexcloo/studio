@@ -12,7 +12,7 @@ const server = http.createServer((req, res) => {
   requests.push(req.url);
   res.setHeader("content-type", "application/json");
   if (req.url === "/v1/models")
-    res.end(JSON.stringify({ data: [{ id: "krea-2-turbo-iq8r", state: "cold" }] }));
+    res.end(JSON.stringify({ data: [{ id: "krea-2-turbo-bf16", state: "cold" }] }));
   else {
     res.statusCode = 404;
     res.end("{}");
@@ -40,7 +40,7 @@ const { sanitizeGenerateBody } = await import("./validation.js");
 
 test("a cold Radiance profile retains installed LoRAs and catalogue triggers without waking another model or worker", async () => {
   const name = "styles/ink.safetensors";
-  const model = "krea-2-turbo-iq8r";
+  const model = "krea-2-turbo-bf16";
   const defaults = { model, width: 1024, height: 1024, steps: 8, cfg: 1, count: 1 };
   saveImportedWorkflow({
     studio: {
@@ -161,7 +161,7 @@ test("explicit LoKr deferral survives catalogue metadata and rejects enabled sta
     prompt: "A lighthouse",
     loras: [{ name: file, strength: 1 }],
   };
-  const nodes = radianceInfo([{ id: "krea-2-turbo-iq8r", state: "cold" }], [file]);
+  const nodes = radianceInfo([{ id: "krea-2-turbo-bf16", state: "cold" }], [file]);
   assert.throws(() => sanitizeGenerateBody(input, nodes), /Deferred pending exact LoKr/);
   assert.deepEqual(
     sanitizeGenerateBody({ ...input, loras: [{ name: file, enabled: false, strength: 1 }] }, nodes)

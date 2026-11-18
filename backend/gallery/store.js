@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { setImmediate as yieldTurn } from "node:timers/promises";
 
 import { replyTitle } from "../../shared/titles.ts";
 import { recordBelongsToAccount } from "../account-ownership.js";
@@ -133,6 +134,13 @@ function where(query = {}) {
   if (query.type) add("type = ?", query.type);
   if (query.jobId !== undefined) add("job_id = ?", String(query.jobId));
   if (query.jobIds) add("job_id IN (SELECT value FROM json_each(?))", list(query.jobIds));
+  if (query.ownGeneration) {
+    const profiles = query.promptedProfiles;
+    add(
+      `EXISTS (SELECT 1 FROM studio_queue AS job WHERE job.id = studio_gallery.job_id AND job.owner_id = studio_gallery.owner_id${profiles ? " AND job.prompted AND job.profile_id IN (SELECT value FROM json_each(?))" : ""})`,
+      ...(profiles ? [list(profiles)] : []),
+    );
+  }
   if (query.setId) add("set_id = ?", query.setId);
   if (query.rating) add("rating = ?", query.rating);
   if (query.status !== undefined)
@@ -143,6 +151,8 @@ function where(query = {}) {
     const states = [query.dreamState].flat();
     add(`${dreamState} IN (${states.map(() => "?").join(", ")})`, ...states);
   }
+  if (query.dreamDraft !== undefined)
+    add("json_extract(value, '$.dream.draft') = ?", query.dreamDraft);
   if (query.dreamProject !== undefined) add(`${dreamProject} = ?`, query.dreamProject);
   if (query.dreamArm !== undefined) {
     const prefixes = [query.dreamArm].flat();
@@ -153,10 +163,10 @@ function where(query = {}) {
   }
   if (query.notDreamArm !== undefined) add(`${dreamArm} IS NOT ?`, query.notDreamArm);
   if (query.dreamPair === false) add(`${dreamPair} IS NULL`);
-  // Liked rows read only the owner's order index, kept ones the Dream index.
+  // Liked and kept rows are each read through their own index.
   if (query.liked)
     add(
-      `rowid IN (SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_owner_order WHERE owner_id = ? AND rating = 'liked' UNION ALL SELECT rowid FROM studio_gallery WHERE ${dreamState} = 'kept' AND owner_id = ?)`,
+      `rowid IN (SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_owner_rating WHERE owner_id = ? AND rating = 'liked' UNION ALL SELECT rowid FROM studio_gallery WHERE ${dreamState} = 'kept' AND owner_id = ?)`,
       String(query.ownerId),
       String(query.ownerId),
     );
@@ -204,6 +214,8 @@ function where(query = {}) {
 function indexFor(query) {
   if (query.dreamProject !== undefined) return "INDEXED BY studio_gallery_dream_project";
   if (query.dreamState !== undefined) return "INDEXED BY studio_gallery_dream";
+  if (query.ownGeneration && query.rating && !query.ids)
+    return "INDEXED BY studio_gallery_owner_rating";
   const unfinished = query.status !== undefined && ![query.status].flat().includes("done");
   return unfinished ? "INDEXED BY studio_gallery_status" : "";
 }
@@ -218,7 +230,7 @@ export function galleryItems(query = {}, { ordered = true } = {}) {
     const { sample, ...rest } = query;
     const { sql, params } = where(rest);
     return statement(
-      `SELECT value FROM studio_gallery WHERE rowid IN (SELECT rowid FROM studio_gallery ${sql} ORDER BY random() LIMIT ?)`,
+      `SELECT value FROM studio_gallery WHERE rowid IN (SELECT rowid FROM studio_gallery ${indexFor(query)} ${sql} ORDER BY random() LIMIT ?)`,
     )
       .all(...params, sample)
       .map(parse);
@@ -488,6 +500,42 @@ export function filterVisibleGallery(items, { disliked = false } = {}) {
     (item) =>
       (!isUnlisted(item) || (disliked && item.rating === "disliked")) && hasGalleryMedia(item),
   );
+}
+
+/** Reads Dream's visible seed candidates in bounded batches and checks their media asynchronously. */
+export async function visibleGenerationItems(query) {
+  const visible = async (item) => {
+    if (isUnlisted(item) || isGalleryHidden(item)) return false;
+    const media = isComfyOutputItem(item) && mediaParams(item.url);
+    if (!media) return true;
+    const file = mediaPath(media.filename, media.subfolder);
+    return Boolean(
+      file &&
+      (await fs.promises.stat(file).then(
+        (info) => info.isFile(),
+        () => false,
+      )),
+    );
+  };
+  const result = [];
+  const add = async (items) => {
+    const keep = await Promise.all(items.map(visible));
+    for (const [i, item] of items.entries()) if (keep[i]) result.push(item);
+  };
+  if (query.sample !== undefined || query.limit !== undefined || query.ids) {
+    await add(galleryItems(query));
+  } else {
+    const batch = [];
+    for (const row of galleryRows(query)) {
+      batch.push(parse(row));
+      if (batch.length !== 200) continue;
+      await add(batch);
+      batch.length = 0;
+      await yieldTurn();
+    }
+    await add(batch);
+  }
+  return result;
 }
 
 /** The visible items (filterVisibleGallery) the query matches, in gallery order. */

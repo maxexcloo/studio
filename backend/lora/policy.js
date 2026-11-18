@@ -1,8 +1,8 @@
-import { loraCompatibility } from "../../shared/profiles.ts";
+import { loraRejection } from "../../shared/profiles.ts";
 
 /**
  * A LoRA stack without the entries that cannot run on this profile ('other': trained for another
- * family, or a variant its publisher excludes). Unverified ('unknown') entries stay. `infos` maps a
+ * family, a variant its publisher excludes, or an unverified Radiance adapter). `infos` maps a
  * LoRA name to its info, or is a function from name to info. Entries keep their shape and order.
  * For reused settings: the server refuses 'other' LoRAs on submit, so drop them first and say how many.
  */
@@ -15,7 +15,7 @@ export function compatibleLoras(loras, infos, profile) {
   const droppedNames = [];
   for (const item of Array.isArray(loras) ? loras : []) {
     const name = typeof item === "string" ? item : item?.name;
-    if (name && loraCompatibility(infoOf(name), profile) === "other") droppedNames.push(name);
+    if (name && loraRejection(infoOf(name), profile)) droppedNames.push(name);
     else kept.push(item);
   }
   return { loras: kept, dropped: droppedNames.length, droppedNames };

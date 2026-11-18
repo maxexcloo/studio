@@ -210,15 +210,7 @@ test("The LoRA list starts on the profile's family and filters by family", async
   await family.click();
   await page.getByRole("option", { name: "Other", exact: true }).click();
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toHaveCount(0);
-  await choices.getByRole("button", { name: "Other Detail", exact: true }).click();
-  await showLoraStack(page);
-  await expect(
-    page.getByRole("switch", { name: "Enable Other Detail", exact: true }),
-  ).toBeChecked();
-  // A LoRA for another family is flagged in the stack.
-  await expect(
-    page.getByText("This profile can't use this LoRA. Disable or remove it.", { exact: true }),
-  ).toBeVisible();
+  await expect(choices.getByRole("button", { name: "Other Detail", exact: true })).toBeDisabled();
 });
 
 test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, testInfo) => {

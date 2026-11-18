@@ -6,8 +6,8 @@ import sharp from "sharp";
 
 import {
   isCloudProfile,
-  loraCompatibility,
   loraName,
+  loraRejection,
   profileBackendLabels,
   runBackend,
 } from "../../shared/profiles.ts";
@@ -453,16 +453,22 @@ export class McpMedia {
       // Named LoRAs narrow the choice to profiles that can use every one of them; where none can,
       // the usual pick maps or leaves them out as it queues (prepareLoras).
       const infos = await this.loraInfos(owner);
-      const usable = (profile) =>
-        profile.capabilities?.lora !== false &&
-        loras.every(({ name }) => {
-          const file = resolveLoraName(profile, name);
-          return (
-            file &&
-            !["acceleration", "supporting"].includes(infos[file]?.role) &&
-            loraCompatibility(infos[file], profile) !== "other"
-          );
-        });
+      const usable = (listed) => {
+        const backend = this.runProfile(listed, { references: Boolean(references), loras: true });
+        const profile = references ? { ...backend, ...backend.imageModes?.reference } : backend;
+        return (
+          profile.capabilities?.lora !== false &&
+          loras.every(({ name }) => {
+            const file = resolveLoraName(profile, name);
+            return (
+              file &&
+              !["acceleration", "supporting"].includes(infos[file]?.role) &&
+              !(profile.loraAdapter === "radiance-tags-v1" && infos[file]?.unavailableReason) &&
+              !loraRejection(infos[file], profile)
+            );
+          })
+        );
+      };
       if (profiles.some(usable)) profiles = profiles.filter(usable);
     }
     const options = { kind, tier, references };

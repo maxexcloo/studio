@@ -76,6 +76,7 @@ const galleryOrder =
 const galleryIndexes: [string, string][] = [
   ["studio_gallery_order", galleryOrder],
   ["studio_gallery_owner_order", `owner_id, ${galleryOrder}`],
+  ["studio_gallery_owner_rating", "owner_id, rating, unlisted, uploaded, type, status, job_id"],
   ["studio_gallery_job", "job_id"],
   ["studio_gallery_item", "item_id"],
   ["studio_gallery_set", "set_id"],

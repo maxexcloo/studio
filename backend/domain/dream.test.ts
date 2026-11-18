@@ -141,6 +141,17 @@ function fixture(t: TestContext, catalogue = profiles) {
     ],
     revision: () => 0,
   });
+  const eligibleJob = (ownerId: string, item: DreamItem, query: Record<string, any>) => {
+    if (!query.ownGeneration) return true;
+    const input = item.jobId && store.jobInput(ownerId, item.jobId);
+    return Boolean(
+      input &&
+      (!query.promptedProfiles ||
+        (typeof input.prompt === "string" &&
+          input.prompt.trim() &&
+          query.promptedProfiles.includes(input.profileId))),
+    );
+  };
   // Narrows as gallery/store.js's queries do, so each read takes only what it asks for.
   const matching = (ownerId: string, query: Record<string, any>) =>
     state.items
@@ -164,11 +175,16 @@ function fixture(t: TestContext, catalogue = profiles) {
           (!query.conversationIds || query.conversationIds.includes(item.chat?.conversationId)) &&
           (!query.ids || query.ids.includes(String(item.id))) &&
           !query.notIds?.includes(String(item.id)) &&
-          (!query.jobIds || query.jobIds.includes(item.jobId)) &&
+          (query.dreamDraft === undefined || item.dream?.draft === query.dreamDraft) &&
+          eligibleJob(ownerId, item, query) &&
           (query.uploaded === undefined || Boolean(item.uploaded) === query.uploaded) &&
           (query.before === undefined || Date.parse(item.createdAt || "") <= query.before),
       )
       .slice(0, query.sample ?? query.limit);
+  const visible = (items: DreamItem[]) =>
+    items.filter(
+      (item) => item.rating !== "disliked" && (!item.dream || item.dream.state === "kept"),
+    );
   const dream = createDream({
     dataDir,
     overrides: () => state.overrides,
@@ -203,10 +219,11 @@ function fixture(t: TestContext, catalogue = profiles) {
     },
     items: (ownerId, ids) =>
       state.items.filter((item) => item.ownerId === ownerId && ids.includes(String(item.id))),
-    visible: (items) =>
-      items.filter(
-        (item) => item.rating !== "disliked" && (!item.dream || item.dream.state === "kept"),
-      ),
+    visible,
+    visibleGenerations: async (ownerId, query) => {
+      state.reads.push(query);
+      return visible(matching(ownerId, query));
+    },
     likeness: (a, b) => state.likeness(a, b),
     mark: (ownerId, itemId, mark, rating) => {
       const item = state.items.find((entry) => entry.ownerId === ownerId && entry.id === itemId)!;
