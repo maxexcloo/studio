@@ -198,7 +198,7 @@ function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues
       size: facets.data?.sizes || [],
       aspect: facets.data?.aspects || [],
       tag: facets.data?.tags || [],
-      origin: galleryOrigins,
+      origin: galleryOrigins as GalleryFilterOption[],
     } satisfies Record<Facet, GalleryFilterOption[]>,
   };
 }
@@ -490,7 +490,7 @@ export function GalleryFilterPanel({
       comboboxProps={{ withinPortal: false }}
     />
   );
-  const choices = (key: "size" | "aspect", label: string) => (
+  const choices = (key: "aspect" | "origin" | "size", label: string) => (
     <Input.Wrapper label={label}>
       <Group gap={6} mt={4} role="group" aria-label={label}>
         {options[key].map((option) => {
@@ -553,7 +553,7 @@ export function GalleryFilterPanel({
       </Input.Wrapper>
       <Divider />
       <Stack gap="md">
-        {many("origin", "Origin")}
+        {choices("origin", "Origin")}
         {lists.tag.length > 0 && many("tag", "Tags")}
       </Stack>
       <Divider />

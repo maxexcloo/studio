@@ -8,9 +8,11 @@
   box-shadow: none;
 }
 
-/* The viewer sits over the blurred page, unlike other full-screen dialogs, which take the page's
-   solid surface (theme.module.css); the repeated class outranks that rule. */
+/* The viewer sits over the blurred page, edge to edge under the notch, unlike other full-screen
+   dialogs, which take the page's solid surface and safe-area padding (theme.module.css); the
+   repeated class outranks that rule. Its controls offset themselves. */
 .content.content[data-full-screen] {
+  padding: 0;
   background: transparent !important;
 }
 

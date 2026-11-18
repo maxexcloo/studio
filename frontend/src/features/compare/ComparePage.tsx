@@ -112,8 +112,11 @@ export function ComparePage() {
   const again = items
     .filter((item) => item.status === "done")
     .sort((a, b) => Number(b === winner) - Number(a === winner));
-  const sized = items.find((item) => item.width && item.height);
-  const aspect = sized ? sized.width! / sized.height! : 1;
+  // The tallest variant fits the viewport, so every one does.
+  const aspects = items.flatMap((item) =>
+    item.width && item.height ? [item.width / item.height] : [],
+  );
+  const aspect = aspects.length ? Math.min(...aspects) : 1;
   return (
     <Stack gap="md" className={classes.page}>
       <Group justify="space-between" wrap="nowrap" gap="sm">
@@ -161,6 +164,12 @@ export function ComparePage() {
               gap={6}
               className={classes.variant}
               data-winner={won || undefined}
+              // Scroll fits each variant to the view by its own shape.
+              style={
+                item?.width && item.height
+                  ? ({ "--compare-aspect": item.width / item.height } as CSSProperties)
+                  : undefined
+              }
             >
               <Text size="sm" fw={600} truncate title={label}>
                 {label}
