@@ -92,13 +92,19 @@ test("Stopping held assistance retains the draft and unblocks generation", async
     await expect.poll(() => started).toBe(true);
     await finishTyping(page);
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeDisabled();
-    // The ⋯ spins and says what it is doing until it finishes or its Stop is chosen.
+    // The ⋯ spins and says what it is doing until it finishes or its Stop is chosen. The phone
+    // sheet's resting prompt says it instead, and its tools return with typing.
     const more = page.getByRole("button", { name: "AI Prompt Actions", exact: true });
+    if (!(await more.isVisible())) {
+      await expect(page.getByRole("status").filter({ hasText: "Improving Prompt…" })).toBeVisible();
+      await prompt.click();
+    }
     await expect(more).toHaveAccessibleDescription("Improving Prompt…");
     await more.click();
     await page.getByRole("menuitem", { name: "Stop Assistance", exact: true }).click();
     // A press while the menu fades out only closes it.
     await expect(page.getByRole("menu")).toHaveCount(0);
+    await finishTyping(page);
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeEnabled();
     await expect(prompt).toHaveValue("Keep my original bird");
     release();
