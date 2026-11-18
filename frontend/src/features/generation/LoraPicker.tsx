@@ -202,7 +202,7 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
         detail={<StackCount value={value} onChange={onChange} picker={picker} />}
         actions={<StackSave value={value} onChange={onChange} picker={picker} />}
         {...clear}
-        secondary={
+        leading={
           <ChipPopup
             title="Add LoRAs"
             width="100%"
