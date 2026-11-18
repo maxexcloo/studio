@@ -9,6 +9,7 @@ import {
   Text,
   Tooltip,
   localStorageColorSchemeManager,
+  useComputedColorScheme,
   useMantineColorScheme,
   useMantineTheme,
 } from "@mantine/core";
@@ -116,18 +117,29 @@ export function AppearanceProvider({
         defaultColorScheme="auto"
         colorSchemeManager={colourSchemeManager}
       >
-        <ColourScheme value={resolved.colourScheme} />
+        <ColourScheme value={resolved.colourScheme} background={resolved.background} />
         {children}
       </MantineProvider>
     </Context.Provider>
   );
 }
 /** Mantine keeps the colour scheme itself; this keeps it on the appearance's. */
-function ColourScheme({ value }: { value: Appearance["colourScheme"] }) {
+function ColourScheme({
+  value,
+  background,
+}: {
+  value: Appearance["colourScheme"];
+  background: Background;
+}) {
   const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const scheme = useComputedColorScheme("light", { getInitialValueInEffect: false });
+  const themeColour = backgrounds[background][scheme];
   useEffect(() => {
     if (colorScheme !== value) setColorScheme(value);
   }, [colorScheme, value, setColorScheme]);
+  useLayoutEffect(() => {
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')!.content = themeColour;
+  }, [themeColour]);
   return null;
 }
 export const useAppearance = () => useContext(Context);
