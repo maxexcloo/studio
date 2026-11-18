@@ -48,6 +48,7 @@ import {
   accountRules,
   assertAvoided,
   briefLine,
+  converging,
   keptChoices,
   projectArgs,
   projectTargets,
@@ -1126,9 +1127,10 @@ export function registerGenerateTools({
     );
   };
   const generateOnce = async (input, signal, accepted) => {
-    const [project, rules] = await Promise.all([
+    const [project, rules, alike] = await Promise.all([
       attachedProject(signal),
       accountRules(media, owner, signal),
+      converging(media, owner, signal),
     ]);
     const choices = chatChoices.read(owner, conversation);
     const remembered = keptChoices(choices, structuredClone(input));
@@ -1392,6 +1394,8 @@ export function registerGenerateTools({
     // The rules come back with a chat's first generate, when they change, and again as a guide would.
     if (rules.length && review(refs, `rules:${JSON.stringify(rules)}`))
       projectNote = `${rulesLine(rules)}${projectNote}`;
+    if (alike && review(refs, "converging"))
+      projectNote = `Recent results are converging on one look; vary face, setting, light and pose between prompts while keeping the user's rules. ${projectNote}`;
     if (axis && targets.some(({ profile }) => !mcpControls(profile).seed))
       throw new Error("These models cannot hold a seed for a controlled comparison.");
     if (axis && several && targets.length < compareVariants.min)
