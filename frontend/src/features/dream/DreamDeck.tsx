@@ -366,11 +366,13 @@ export function DreamDeck({
   const swipeCard = (card: DeckCard, full: boolean) => {
     const isTop = card === top;
     const playing = isTop && (full || !viewing);
+    const side = isTop && viewing ? viewing.side : 0;
     return (
       <SwipeCard
         key={card.key}
         depth={isTop ? 0 : 1}
         paused={!playing}
+        previewSide={full && card.kind === "pair" ? side : undefined}
         // A comparison's preview swipes between its sides, and answers with its buttons.
         still={full && card.kind === "pair"}
         full={full}
@@ -394,11 +396,7 @@ export function DreamDeck({
       >
         {card.kind === "pair" ? (
           full ? (
-            <PreviewSides
-              card={card}
-              side={isTop && viewing ? viewing.side : 0}
-              setSide={(side) => open(card, side)}
-            />
+            <PreviewSides card={card} side={side} setSide={(side) => open(card, side)} />
           ) : (
             <PairContent
               card={card}

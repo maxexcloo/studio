@@ -59,7 +59,11 @@ export function DeckMedia({ item, playing = false }: { item: MediaItem; playing?
  * waits at its end until the last ends, so they loop from the start in step. They pause while the
  * tab is hidden.
  */
-export function useInSync(root: RefObject<HTMLElement | null>, playing: boolean) {
+export function useInSync(
+  root: RefObject<HTMLElement | null>,
+  playing: boolean,
+  previewSide?: number,
+) {
   useEffect(() => {
     const videos = [...(root.current?.querySelectorAll("video") ?? [])];
     if (!playing || !videos.length) return;
@@ -114,5 +118,5 @@ export function useInSync(root: RefObject<HTMLElement | null>, playing: boolean)
         video.pause();
       }
     };
-  }, [root, playing]);
+  }, [root, playing, previewSide]);
 }

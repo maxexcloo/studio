@@ -32,6 +32,7 @@ export function SwipeCard({
   children,
   depth,
   paused = false,
+  previewSide,
   still = false,
   full = false,
   fly,
@@ -46,6 +47,7 @@ export function SwipeCard({
   /** 0 for the top card, 1 for the one waiting beneath it. */
   depth: number;
   paused?: boolean;
+  previewSide?: number;
   still?: boolean;
   /** Edge to edge, filling the preview. */
   full?: boolean;
@@ -75,7 +77,7 @@ export function SwipeCard({
   const dragged = useRef(false);
   const holding = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(holding.current), []);
-  useInSync(card, !depth && !paused);
+  useInSync(card, !depth && !paused, previewSide);
   /** Ends the press as a hold: the card settles and the release opens nothing. */
   function hold() {
     clearTimeout(holding.current);

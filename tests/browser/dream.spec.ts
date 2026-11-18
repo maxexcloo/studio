@@ -1057,10 +1057,12 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   await expect(player).toHaveAttribute("aria-label", "Dream prompt video-a");
   await expect(player).toHaveAttribute("src", /#video-a$/);
   await expect(player).toHaveJSProperty("videoWidth", 32);
+  await expect(player).toHaveJSProperty("paused", false);
   await close.press("ArrowRight");
   await expect(player).toHaveAttribute("aria-label", "Dream prompt video-b");
   await expect(player).toHaveAttribute("src", /#video-b$/);
   await expect(player).toHaveJSProperty("videoWidth", 32);
+  await expect(player).toHaveJSProperty("paused", false);
   expect(dream.requests).toEqual([]);
   await close.click();
   await expect(pair.getByRole("button", { name: "View B", exact: true })).toBeFocused();
