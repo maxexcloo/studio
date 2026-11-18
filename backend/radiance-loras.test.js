@@ -9,6 +9,9 @@ process.env.STUDIO_DATA_DIR = scratch;
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const { metadataFromJson, saveImportedWorkflow } = await import("./custom-workflows.js");
 const { customWorkflowGraph } = await import("./graphs.js");
+const { loraCatalogue } = await import("./lora/info.js");
+const { prepareLoras } = await import("./mcp/controls.js");
+const { inferModels } = await import("./model/models.js");
 const { radianceInfo } = await import("./providers/radiance.ts");
 const { fastTwin, sanitizeGenerateBody } = await import("./validation.js");
 
@@ -18,7 +21,7 @@ const raw = (loraStack, id = "radiance-loras") => ({
     1: {
       class_type: "RadianceImageGenerate",
       inputs: {
-        model: "krea-2-turbo-iq8r",
+        model: "krea-2-turbo-bf16",
         prompt: "",
         seed: 0,
         width: 1024,
@@ -128,10 +131,17 @@ test("LoRAs the profile names stay ahead of the request stack", async () => {
 
 test("a run with LoRAs moves to the stack's model, records it, and takes the adapters that model needs first", async () => {
   const lightning = { name: "speed/lightning.safetensors", strength: 1 };
-  const stack = { adapter: "radiance-tags-v1", node: "1", model: "noctq-bf16", loras: [lightning] };
+  const stack = {
+    adapter: "radiance-tags-v1",
+    node: "1",
+    model: "krea-2-turbo-bf16",
+    loras: [lightning],
+  };
   const profile = raw(stack, "radiance-bf16");
   profile.studio.controls.model = { node: "1", input: "model" };
   profile.studio.defaults = { model: "krea-2-turbo-iq8r" };
+  profile.graph[1].inputs.model = "krea-2-turbo-iq8r";
+  loraCatalogue().edit("loras/a.safetensors", { families: ["krea2"] });
   saveImportedWorkflow(profile);
   const info = radianceInfo([{ id: "krea-2-turbo-iq8r" }], ["a.safetensors"]);
   const run = async (loras) => {
@@ -146,11 +156,111 @@ test("a run with LoRAs moves to the stack's model, records it, and takes the ada
   assert.equal(plain.graph[1].inputs.model, "krea-2-turbo-iq8r");
   assert.equal(plain.graph[1].inputs.loras, "[]");
   const { body, graph: styled } = await run([{ name: "a.safetensors", strength: 0.5 }]);
-  assert.equal(body.modelName, "noctq-bf16");
-  assert.equal(styled[1].inputs.model, "noctq-bf16");
+  assert.equal(body.modelName, "krea-2-turbo-bf16");
+  assert.equal(styled[1].inputs.model, "krea-2-turbo-bf16");
   assert.deepEqual(JSON.parse(styled[1].inputs.loras), [
     lightning,
     { name: "a.safetensors", strength: 0.5 },
+  ]);
+});
+
+test("Noct profiles refuse optional LoRAs and discard their fixed adapters, even with a model override", async () => {
+  const id = "custom:noct-adapter";
+  const lightning = { name: "qwen-image-2.1-lightning-4step", strength: 1 };
+  const profile = raw(
+    {
+      adapter: "radiance-tags-v1",
+      node: "1",
+      model: "qwen-image-2.1-bf16",
+      loras: [lightning],
+    },
+    "noct-adapter",
+  );
+  profile.studio.family = "qwen_image_21";
+  profile.studio.controls.model = { node: "1", input: "model" };
+  profile.graph[1].inputs.model = "noctq-v4-iq8r";
+  profile.graph[1].inputs.loras = JSON.stringify([lightning]);
+  saveImportedWorkflow(profile);
+  const info = radianceInfo(
+    [{ id: "noctq-v4-iq8r" }, { id: "qwen-image-2.1-bf16" }],
+    ["slider.safetensors"],
+  );
+  const [listed] = inferModels(info).profiles.filter((entry) => entry.id === id);
+  assert.equal(listed.capabilities.lora, false);
+  assert.deepEqual(listed.options.loras, []);
+  const body = {
+    workflow: id,
+    model: id,
+    prompt,
+    loras: [{ name: "slider.safetensors", strength: 1 }],
+  };
+  assert.throws(() => sanitizeGenerateBody(body, info), /takes no LoRAs on noctq-v4-iq8r/);
+  assert.throws(
+    () => sanitizeGenerateBody({ ...body, modelName: "qwen-image-2.1-bf16" }, info),
+    /takes no LoRAs on noctq-v4-iq8r/,
+  );
+  const graph = await customWorkflowGraph(body);
+  assert.equal(graph[1].inputs.model, "noctq-v4-iq8r");
+  assert.equal(graph[1].inputs.loras, "[]");
+  const overridden = await customWorkflowGraph({ ...body, modelName: "qwen-image-2.1-bf16" });
+  assert.equal(overridden[1].inputs.loras, "[]");
+});
+
+test("Radiance checks catalogue families and exact base constraints against the model that runs the stack", async () => {
+  const id = "custom:actual-base";
+  const model = "flux-2-klein-9b-bf16";
+  const zimage = "z-image-turbo-style.safetensors";
+  const klein4b = "klein-4b-style.safetensors";
+  const wrongBase = "klein-base-only.safetensors";
+  const unknown = "unclassified.safetensors";
+  const fits = "klein-compatible.safetensors";
+  const infos = {
+    [zimage]: { families: ["zimage"] },
+    [klein4b]: { families: ["flux2_klein_4b"] },
+    [wrongBase]: {
+      families: ["flux2_klein_9b"],
+      compatibility: { baseModels: ["flux-2-klein-9b-base-bf16"], unlisted: "other" },
+    },
+    [fits]: {
+      compatibility: { baseModels: [model], unlisted: "other" },
+    },
+    [unknown]: {},
+  };
+  for (const [file, metadata] of Object.entries(infos))
+    loraCatalogue().edit(`loras/${file}`, metadata);
+  const profile = raw(
+    {
+      adapter: "radiance-tags-v1",
+      node: "1",
+      model,
+      loras: [zimage, klein4b, wrongBase].map((name) => ({ name, strength: 1 })),
+    },
+    "actual-base",
+  );
+  profile.studio.family = "flux2_klein_9b";
+  profile.studio.controls.model = { node: "1", input: "model" };
+  profile.graph[1].inputs.model = "flux-2-klein-9b-iq8r";
+  saveImportedWorkflow(profile);
+  const info = radianceInfo(
+    [{ id: profile.graph[1].inputs.model }, { id: model }],
+    Object.keys(infos),
+  );
+  const body = (name) => ({ workflow: id, model: id, prompt, loras: [{ name, strength: 1 }] });
+  for (const name of [zimage, klein4b])
+    assert.throws(
+      () => sanitizeGenerateBody(body(name), info),
+      /Remove it from the optional LoRA stack/,
+    );
+  assert.throws(() => sanitizeGenerateBody(body(wrongBase), info), /does not support this model/);
+  assert.throws(() => sanitizeGenerateBody(body(unknown), info), /no verified compatibility/);
+  const listed = inferModels(info).profiles.find((entry) => entry.id === id);
+  const notes = [];
+  assert.deepEqual(prepareLoras(listed, infos, [{ name: wrongBase }], notes), []);
+  assert.match(notes[0], /does not support .*base model/);
+  const candidate = sanitizeGenerateBody(body(fits), info);
+  assert.equal(candidate.modelName, model);
+  assert.deepEqual(JSON.parse((await customWorkflowGraph(candidate))[1].inputs.loras), [
+    { name: fits, strength: 1 },
   ]);
 });
 
@@ -192,6 +302,7 @@ test("three or more pictures may take the model's two-GPU copy where the worker 
   const profile = raw(undefined, "fast");
   profile.studio.controls.model = { node: "1", input: "model" };
   profile.studio.defaults = { model: "krea-2-turbo-iq8r" };
+  profile.graph[1].inputs.model = "krea-2-turbo-iq8r";
   saveImportedWorkflow(profile);
   const twin = (count, models) => {
     const info = radianceInfo(models.map((id) => ({ id })));
@@ -214,7 +325,7 @@ test("rebalance runs at the profile's default where it maps one, and nowhere els
   profile.studio.controls.rebalance = { node: "1", input: "rebalance" };
   profile.studio.defaults = { rebalance: "balanced" };
   saveImportedWorkflow(profile);
-  const info = radianceInfo([{ id: "krea-2-turbo-iq8r" }]);
+  const info = radianceInfo([{ id: "krea-2-turbo-bf16" }]);
   const run = (workflow, rebalance) =>
     sanitizeGenerateBody({ workflow, model: workflow, prompt, seed: 1, rebalance }, info);
   const body = run("custom:radiance-rebalance");

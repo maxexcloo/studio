@@ -1,9 +1,12 @@
 import crypto from "node:crypto";
 
+import { snapDimension } from "../shared/resolution.ts";
 import { accountOutputSubfolder } from "./account-ownership.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { outputFolderName } from "./data-names.js";
 import { inpaintGraph } from "./inpaint.js";
+import { radianceLorasForBase, workflowLoraBase } from "./lora/radiance.js";
+import { isRadianceNode, radianceSizeStep } from "./providers/radiance.ts";
 import { selectImageMode } from "./workflow-modes.js";
 
 export function composeWorkflowPrompt(workflow, userPrompt = "") {
@@ -41,8 +44,8 @@ async function applyMappedInputs(graph, workflow, body) {
     vae: body.vae || defaults.vae || "",
     clipType: body.clipType || defaults.clipType || "",
     weightDtype: body.weightDtype || defaults.weightDtype || "default",
-    width: Number(body.width || 0),
-    height: Number(body.height || 0),
+    width: body.width != null ? Number(body.width) : undefined,
+    height: body.height != null ? Number(body.height) : undefined,
     // A fixed-step or distilled profile sends no steps or CFG (validation.js), so its graph keeps its own.
     steps: body.steps == null || body.steps === "" ? undefined : Number(body.steps),
     cfg: body.cfg == null || body.cfg === "" ? undefined : Number(body.cfg),
@@ -60,6 +63,14 @@ async function applyMappedInputs(graph, workflow, body) {
   for (const [key, value] of Object.entries(values)) {
     if (value !== "" && value !== undefined && value !== null)
       setMappedInput(graph, controls[key], value);
+  }
+  for (const node of Object.values(graph)) {
+    if (!isRadianceNode(node.class_type)) continue;
+    for (const key of ["width", "height"]) {
+      const side = Number(node.inputs?.[key]);
+      if (Number.isFinite(side) && side > 0)
+        node.inputs[key] = snapDimension(side, { step: radianceSizeStep });
+    }
   }
   // Flux 2's schedule depends on the dimensions of the latent being sampled.
   for (const sampler of Object.values(graph)) {
@@ -139,21 +150,31 @@ function applyRgthreeLoraStack(graph, body, config) {
 
 // Radiance takes the stack as one JSON string, sent as its request's `loras` (providers/radiance.ts), so the prompt text stays as written.
 // LoRAs the profile itself names (a speed LoRA such as Lightning) stay first; the request's stack follows.
-function applyRadianceLoraStack(graph, body, config) {
-  const node = graph[config.node];
-  if (!node) throw new Error("The configured Radiance node is missing from this workflow.");
-  const inputs = (node.inputs ||= {});
-  const fixed = JSON.parse(inputs.loras || "[]");
-  const chosen = enabledLoras(body, config.max);
-  // A run with LoRAs moves to the stack's own model (recorded by validation.js), with the adapters
-  // that model needs first (a speed LoRA its default model has baked in).
-  const swapped = chosen.length && config.model;
-  if (swapped) inputs.model = config.model;
-  inputs.loras = JSON.stringify([
-    ...fixed,
-    ...(swapped ? config.loras || [] : []),
-    ...chosen.map((lora) => ({ name: lora.name, strength: Number(lora.strength ?? 0.7) })),
-  ]);
+function applyRadianceLoraStacks(graph, body, workflow) {
+  const stack = workflow.loraStack?.adapter === "radiance-tags-v1" ? workflow.loraStack : null;
+  if (stack && !isRadianceNode(graph[stack.node]?.class_type))
+    throw new Error("The configured Radiance node is missing from this workflow.");
+  for (const [id, node] of Object.entries(graph)) {
+    if (!isRadianceNode(node?.class_type)) continue;
+    const inputs = (node.inputs ||= {});
+    const fixed = JSON.parse(inputs.loras || "[]");
+    const loraBase = id === stack?.node && workflowLoraBase(workflow, inputs.model);
+    const chosen = loraBase?.accepts
+      ? enabledLoras(body, stack.max).map(({ name, strength }) => ({
+          name,
+          strength: strength ?? 0.7,
+        }))
+      : [];
+    const swapped = chosen.length && stack.model;
+    if (swapped) inputs.model = stack.model;
+    inputs.loras = JSON.stringify(
+      radianceLorasForBase(
+        [...fixed, ...(swapped ? stack.loras : []), ...chosen],
+        workflow,
+        inputs.model,
+      ).map(({ name, strength }) => ({ name, strength: Number(strength ?? 1) })),
+    );
+  }
 }
 
 /**
@@ -230,8 +251,8 @@ export async function customWorkflowGraph(body) {
         });
   if (workflow.loraStack?.adapter === "rgthree-stack-v1")
     applyRgthreeLoraStack(graph, body, workflow.loraStack);
-  else if (workflow.loraStack?.adapter === "radiance-tags-v1")
-    applyRadianceLoraStack(graph, body, workflow.loraStack);
-  else applyPowerLoraStack(graph, body, workflow.loraStack);
+  else if (workflow.loraStack?.adapter === "rgthree-power-v1")
+    applyPowerLoraStack(graph, body, workflow.loraStack);
+  applyRadianceLoraStacks(graph, body, workflow);
   return body.ownerId ? saveIntoStudioFolder(graph, body.ownerId) : graph;
 }

@@ -17,6 +17,7 @@ import { storedWritingRecord } from "./gallery/records.js";
 import { galleryItem, galleryItems, replaceGalleryJob, updateGalleryJob } from "./gallery/store.js";
 import { jobs, setTerminalJob } from "./jobs.js";
 import { writeBytesFileAsync } from "./json-store.js";
+import { workflowLoraBase } from "./lora/radiance.js";
 import { mediaRoot, mediaSubfolder } from "./media-paths.js";
 import { ingestRunResults, removeComfyFiles } from "./media-store.js";
 import { minorAgeRefusal } from "./minor-age.js";
@@ -376,7 +377,7 @@ export function createGenerationQueue({
           return {
             id,
             references: own.mediaInputs?.length || 0,
-            loras: Boolean(own.loraStack?.model),
+            loras: Boolean(own.loraStack?.model && workflowLoraBase(own)?.accepts),
           };
         }),
         combined.backend,

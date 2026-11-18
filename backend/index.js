@@ -132,6 +132,7 @@ import {
   setGalleryRatings,
   updateGalleryJob,
   visibleGallery,
+  visibleGenerationItems,
 } from "./gallery/store.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { gatedPath } from "./gated-path.js";
@@ -956,6 +957,7 @@ const dream = createDream({
   count: (ownerId, query) => countGalleryItems({ ownerId, ...query }),
   items: (ownerId, ids) => resultNumbers.numbered(galleryItems({ ownerId, ids })),
   visible: filterVisibleGallery,
+  visibleGenerations: (ownerId, query) => visibleGenerationItems({ ownerId, ...query }),
   likeness: (a, b) => imageSearch.likeness(a, b),
   // Only the owner's own record: updateGalleryJob alone matches any account's item.
   mark: (ownerId, itemId, mark, rating) => {

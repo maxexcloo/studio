@@ -38,7 +38,7 @@ import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "../generation/chip";
 import { useGeneration } from "../generation/GenerationProvider";
 import { compatibleLoras, loraInfoQuery } from "../generation/LoraPicker";
-import { profileForBackend, profileName } from "../generation/payload";
+import { profileForBackend, profileForLoras, profileName } from "../generation/payload";
 import { ChipPopup } from "../generation/Picker";
 import { profileOptions } from "../generation/ProfilePicker";
 import {
@@ -97,7 +97,8 @@ export function CompareMenu() {
       displayName: modelName(profileName(each)),
     })),
   );
-  const compatible = effective?.capabilities.lora ? compatibleLoras(effective, info) : [];
+  const loraProfile = profileForLoras(profile, input.profileBackend, draft.references.length > 0);
+  const compatible = loraProfile?.capabilities.lora ? compatibleLoras(loraProfile, info) : [];
   const loraOptions = compatible
     .map((file) => ({ value: file, label: loraName(file, info[file]) }))
     .sort((a, b) => compareNames(a.label, b.label));

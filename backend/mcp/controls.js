@@ -2,6 +2,7 @@ import {
   guidingRoles,
   loraCompatibility,
   loraDefaultStrength,
+  loraRejection,
   loraStrengthIssue,
   loraStrengthRange,
   maxLoras,
@@ -336,8 +337,9 @@ function loraCandidates(profile, infos, ratings = {}) {
     const info = infos[name];
     // Infrastructure weights cannot enter the optional stack, and other architectures never fit.
     if (["acceleration", "supporting"].includes(info?.role) || info?.hidden) continue;
-    const fit = loraCompatibility(info, profile);
-    if (fit !== "other") entries.push({ name, info, fit });
+    if (profile.loraAdapter === "radiance-tags-v1" && info?.unavailableReason) continue;
+    if (!loraRejection(info, profile))
+      entries.push({ name, info, fit: loraCompatibility(info, profile) });
   }
   return entries.sort(
     (left, right) =>
@@ -615,13 +617,23 @@ export function prepareLoras(profile, infos = {}, loras = [], notes = []) {
         throw new Error(`${value} is applied by Studio itself; leave it out of loras.`);
       if (name && infos[name]?.hidden)
         throw new Error(`${value} is hidden in Studio's Library; choose another LoRA.`);
+      if (name && profile.loraAdapter === "radiance-tags-v1" && infos[name]?.unavailableReason) {
+        notes.push(`Left out ${value}: ${infos[name].unavailableReason}`);
+        continue;
+      }
       const equivalent = equivalentLora(candidates, value, profile, name && infos[name]);
       if (equivalent) {
         notes.push(`Used ${short(equivalent.name)} for ${value}, its ${label} equivalent.`);
         entry = equivalent;
       } else if (name) {
+        const info = infos[name];
+        const otherFamily = loraCompatibility({ families: info?.families }, profile) === "other";
         notes.push(
-          `Left out ${value}: it is for ${infos[name]?.base || "another model family"} and ${label} has no equivalent.`,
+          loraRejection(info, profile) === "unknown"
+            ? `Left out ${value}: its compatibility with ${label}'s Radiance base is unverified.`
+            : otherFamily
+              ? `Left out ${value}: it is for ${info?.base || "another model family"} and ${label} has no equivalent.`
+              : `Left out ${value}: it does not support ${label}'s base model or conditioning.`,
         );
         continue;
       }

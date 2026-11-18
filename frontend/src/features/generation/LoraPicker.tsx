@@ -19,10 +19,10 @@ import { useState } from "react";
 
 import {
   type LoraConstraints,
-  loraCompatibility,
   loraDefaultStrength,
   loraFamilyId,
   loraName,
+  loraRejection,
   loraStrengthIssue,
   loraStrengthRange,
 } from "../../../../shared/profiles";
@@ -39,7 +39,7 @@ import { chipProps } from "./chip";
 import { useGeneration } from "./GenerationProvider";
 import { type LoraLibrary, loraLibraryQuery } from "./loraLibrary";
 import { modelFamilyLabel } from "./modelFamily";
-import { isProfile, profileForBackend } from "./payload";
+import { isProfile, profileForLoras } from "./payload";
 import {
   ChipContent,
   ChipPopup,
@@ -94,9 +94,7 @@ const fitsFamily = (families: string[], family: string) =>
 /** The profile's LoRAs that submitting accepts. */
 export const compatibleLoras = (profile: Profile | undefined, metadata: Record<string, LoraInfo>) =>
   (profile?.options?.loras || []).filter(
-    (file) =>
-      loraCompatibility(metadata[file], profile) !== "other" &&
-      !unavailableFor(profile, metadata[file]),
+    (file) => !loraRejection(metadata[file], profile) && !unavailableFor(profile, metadata[file]),
   );
 /** Why a LoRA can't run on this profile: its deferral covers only Radiance's composed adapter. */
 export const unavailableFor = (profile: Profile | undefined, info?: LoraInfo) =>
@@ -295,12 +293,12 @@ export function LoraRatings({ file, title }: { file: string; title: string }) {
 function useLoraDraft({ value, onChange }: Omit<LoraPickerProps, "picker">) {
   const context = useGeneration();
   const input = value || context.input;
-  const profile = profileForBackend(
+  const profile = profileForLoras(
     value
       ? context.profiles.find((profile) => isProfile(profile, value.profileId))
       : context.profile,
     input.profileBackend,
-    Boolean(input.referenceAssets?.length),
+    Boolean(input.referenceAssets?.length || input.referenceDetails?.length),
   );
   const update = (loras: Lora[]) =>
     onChange ? onChange({ ...input, loras }) : context.update({ loras });
@@ -341,7 +339,12 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   );
   // The profile's family until another is chosen; All Families when no LoRA lists it.
   const ownFamily = loraFamilyId(profile?.family || "");
-  const family = picker.family ?? (families.includes(ownFamily) ? ownFamily : "all");
+  const family =
+    picker.family === "all" || (picker.family && families.includes(picker.family))
+      ? picker.family
+      : families.includes(ownFamily)
+        ? ownFamily
+        : "all";
   const terms = picker.query.trim().toLowerCase();
   const shown = available
     .filter(
@@ -388,32 +391,42 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
     // A list on every breakpoint, so names, families and types scan down one column; clicking a
     // row adds or removes its LoRA, and Like and Dislike beside it rate without toggling it.
     <PickerGrid label="LoRA Choices" rows>
-      {shown.map((file) => (
-        <PickerTile
-          key={file}
-          label={title(file)}
-          title={title(file)}
-          detail={
-            unavailableFor(profile, metadata[file]) ||
-            [
-              familiesOf(file)
-                .map((key) => modelFamilyLabel(key))
-                .join(", "),
-              typeNames[typeOf(file)] || typeOf(file),
-            ]
-              .filter(Boolean)
-              .join(" · ") ||
-            undefined
-          }
-          image={previews.data?.previews[file]}
-          placeholder={icons.loras}
-          disabled={Boolean(unavailableFor(profile, metadata[file])) && !selected.has(file)}
-          selected={selected.has(file)}
-          row
-          onToggle={() => toggle(file)}
-          action={<LoraRatings file={file} title={title(file)} />}
-        />
-      ))}
+      {shown.map((file) => {
+        const rejection = loraRejection(metadata[file], profile);
+        const reason =
+          unavailableFor(profile, metadata[file]) ||
+          (rejection === "unknown"
+            ? "Unverified on Radiance"
+            : rejection === "other"
+              ? "Doesn't fit this model"
+              : "");
+        return (
+          <PickerTile
+            key={file}
+            label={title(file)}
+            title={title(file)}
+            detail={
+              reason ||
+              [
+                familiesOf(file)
+                  .map((key) => modelFamilyLabel(key))
+                  .join(", "),
+                typeNames[typeOf(file)] || typeOf(file),
+              ]
+                .filter(Boolean)
+                .join(" · ") ||
+              undefined
+            }
+            image={previews.data?.previews[file]}
+            placeholder={icons.loras}
+            disabled={Boolean(reason) && !selected.has(file)}
+            selected={selected.has(file)}
+            row
+            onToggle={() => toggle(file)}
+            action={<LoraRatings file={file} title={title(file)} />}
+          />
+        );
+      })}
     </PickerGrid>
   );
   const header = (

@@ -7,6 +7,15 @@ export type Resolution = (typeof resolutions)[number];
 const longEdges: Record<Resolution, number> = { "1K": 1024, "2K": 2048, "4K": 4096 };
 
 type Range = { min?: number; max?: number; step?: number };
+
+/** Round to a multiple even when a declared dimension limit falls between grid points. */
+export function snapDimension(value: number, range: Range = {}) {
+  const step = Number(range.step) || 16;
+  const min = Math.ceil((Number(range.min) || step) / step) * step;
+  const max = Math.floor((Number(range.max) || 16384) / step) * step;
+  return Math.max(min, Math.min(max, Math.round(value / step) * step));
+}
+
 interface SizedProfile {
   kind?: string;
   aspectPolicy?: string;
@@ -79,15 +88,9 @@ export function resolutionSize(
   profile?: SizedProfile,
 ) {
   const scale = longEdges[resolution] / Math.max(size.width, size.height);
-  const snap = (value: number, range: Range = {}) => {
-    const step = Number(range.step) || 16;
-    const min = Math.ceil((Number(range.min) || step) / step) * step;
-    const max = Math.floor((Number(range.max) || 16384) / step) * step;
-    return Math.max(min, Math.min(max, Math.round((value * scale) / step) * step));
-  };
   return {
-    width: snap(size.width, profile?.constraints?.width),
-    height: snap(size.height, profile?.constraints?.height),
+    width: snapDimension(size.width * scale, profile?.constraints?.width),
+    height: snapDimension(size.height * scale, profile?.constraints?.height),
   };
 }
 

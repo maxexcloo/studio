@@ -1,4 +1,5 @@
 import { loraFamilyId, maxLoras } from "../../shared/profiles.ts";
+import { snapDimension } from "../../shared/resolution.ts";
 import { missingNodes, nodeRange, optionsFor, textRange } from "../comfy/comfy.js";
 import {
   loadCustomWorkflows,
@@ -9,23 +10,18 @@ import {
 } from "../custom-workflows.js";
 import { families } from "../family-catalogue.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
+import { workflowLoraBase } from "../lora/radiance.js";
 import {
+  isRadianceNode,
   radianceImageLimits,
   radianceImageNode,
+  radianceSizeStep,
   radianceVideoLimits,
 } from "../providers/radiance.ts";
 import { classifyModel } from "./families.js";
 
 function modelBasename(name = "") {
   return String(name).split(/[\\/]/).pop() || name;
-}
-
-function snapDimension(value, meta = {}) {
-  const step = Number(meta.step || 1) || 1;
-  const min = Number(meta.min || step) || step;
-  const max = Number(meta.max || 16384) || 16384;
-  const snapped = Math.round(value / step) * step;
-  return Math.max(min, Math.min(max, snapped));
 }
 
 function detectedDefault(meta = {}, fallback) {
@@ -39,8 +35,8 @@ function aspectSet(defaults, ratios, ranges = {}) {
   return ratios
     .map(([label, ratioW, ratioH]) => {
       const scale = Math.sqrt(defaultArea / Math.max(1, ratioW * ratioH));
-      const w = snapDimension(ratioW * scale, ranges.width);
-      const h = snapDimension(ratioH * scale, ranges.height);
+      const w = snapDimension(ratioW * scale, { step: 1, ...ranges.width });
+      const h = snapDimension(ratioH * scale, { step: 1, ...ranges.height });
       const value = `${w}x${h}`;
       if (seen.has(value)) return null;
       seen.add(value);
@@ -97,6 +93,8 @@ export function buildProfile({
   mediaInputs = [],
   aspectPolicy = "manual",
   maxLoras: loras = maxLoras,
+  loraAdapter,
+  loraBase,
   imageModes: modes = {},
   native = {},
   editReferences = false,
@@ -108,16 +106,24 @@ export function buildProfile({
   backend = "",
   backendOptions = [],
 }) {
+  const profileLoraAdapter = modes.generate ? modes.generate.loraStack?.adapter : loraAdapter;
+  const profileLoraBase = modes.generate ? workflowLoraBase(modes.generate) : loraBase;
   // A mode overrides only these: a mode's own id, media slots or graph must never replace the profile's.
   const imageModes = Object.fromEntries(
-    Object.entries(modes).map(([name, mode]) => [
-      name,
-      {
-        capabilities: mode.capabilities,
-        defaults: mode.defaults,
-        ...(mode.prompting ? { prompting: mode.prompting } : {}),
-      },
-    ]),
+    Object.entries(modes).map(([name, mode]) => {
+      const adapter = mode.loraStack?.adapter;
+      const base = name === "generate" ? profileLoraBase : workflowLoraBase(mode);
+      return [
+        name,
+        {
+          capabilities: mode.capabilities,
+          defaults: mode.defaults,
+          ...(adapter || profileLoraAdapter ? { loraAdapter: adapter ?? null } : {}),
+          ...(base || profileLoraBase ? { loraBase: base ?? null } : {}),
+          ...(mode.prompting ? { prompting: mode.prompting } : {}),
+        },
+      ];
+    }),
   );
   const profile = {
     id,
@@ -138,6 +144,8 @@ export function buildProfile({
     baseModel: baseModel ?? modelBasename(model),
     workflow,
     family,
+    loraAdapter: profileLoraAdapter,
+    loraBase: profileLoraBase,
     ...(recipe &&
     typeof recipe.modelLabel === "string" &&
     typeof recipe.label === "string" &&
@@ -197,6 +205,16 @@ export function buildProfile({
     },
   };
   // How many LoRAs the workflow's loader accepts (rgthree stacks take 4).
+  if (profile.loraBase?.accepts === false) {
+    profile.capabilities.lora = false;
+    if (
+      imageModes.reference?.capabilities?.lora !== true ||
+      imageModes.reference.loraBase?.accepts === false
+    )
+      profile.options = { ...profile.options, loras: [] };
+  }
+  for (const mode of Object.values(imageModes))
+    if (mode.loraBase?.accepts === false) mode.capabilities = { ...mode.capabilities, lora: false };
   if (profile.capabilities.lora !== false)
     profile.maxLoras = Math.max(1, Math.min(maxLoras, Number(loras) || maxLoras));
   return profile;
@@ -209,10 +227,10 @@ export function buildProfile({
  * anything but multiples of 32, also while their worker's node list hasn't arrived.
  */
 export function workflowFamilyStep(workflow) {
-  const radiance = Object.values(workflow.graph || {}).some((node) =>
-    String(node?.class_type).startsWith("Radiance"),
+  const radiance = [workflow, ...Object.values(workflow.imageModes || {})].some((mode) =>
+    Object.values(mode.graph || {}).some((node) => isRadianceNode(node?.class_type)),
   );
-  return Math.max(workflowFamilyValue(workflow, "sizeStep") || 0, radiance ? 32 : 0);
+  return Math.max(workflowFamilyValue(workflow, "sizeStep") || 0, radiance ? radianceSizeStep : 0);
 }
 
 /** A family catalogue value for an imported workflow: its declared family's, else its model file's family's. */
@@ -240,13 +258,13 @@ export function workflowFamilyValue(workflow, key) {
 /** A width or height range on the stricter of the node's and the model family's steps. */
 export function sizedRange(range, familyStep) {
   const step = Math.max(Number(range.step) || 1, familyStep || 0);
-  if (step === range.step) return range;
-  const onStep = (value) => Math.max(step, Math.round(Number(value) / step) * step);
+  if (!familyStep && step === range.step) return range;
   return {
     ...range,
     step,
-    ...(range.default ? { default: onStep(range.default) } : {}),
+    ...(range.default ? { default: snapDimension(Number(range.default), { ...range, step }) } : {}),
     ...(range.min ? { min: Math.max(step, Math.ceil(range.min / step) * step) } : {}),
+    ...(range.max ? { max: Math.floor(range.max / step) * step } : {}),
   };
 }
 
@@ -374,8 +392,17 @@ export function inferModels(
           controls.rebalance.input,
         )
       : [];
-    if (Number(defaults.width)) widthRange.default = Number(defaults.width);
-    if (Number(defaults.height)) heightRange.default = Number(defaults.height);
+    const dimensions = { width: widthRange, height: heightRange };
+    const dimensionDefaults = (source) =>
+      Object.fromEntries(
+        Object.entries(dimensions)
+          .filter(([key]) => Number(source[key]))
+          .map(([key, range]) => [key, snapDimension(Number(source[key]), { step: 1, ...range })]),
+      );
+    const defaultDimensions = dimensionDefaults(defaults);
+    for (const [key, range] of Object.entries(dimensions)) {
+      if (defaultDimensions[key]) range.default = defaultDimensions[key];
+    }
     if (Number(defaults.count)) countRange.default = Number(defaults.count);
     if (Number(defaults.frames)) frameRange.default = Number(defaults.frames);
     if (Number(defaults.fps)) fpsRange.default = Number(defaults.fps);
@@ -446,7 +473,7 @@ export function inferModels(
           height: detectedDefault(heightRange, Number(defaults.height || 1024)),
         },
         workflow.aspectRatios,
-        { width: widthRange, height: heightRange },
+        dimensions,
       ),
       aspectDefault: families[loraFamilyId(workflow.family)]?.aspectDefault || "",
       // Whether the model family draws 2K/4K itself, so MCP's size applies to imported workflows too.
@@ -476,7 +503,15 @@ export function inferModels(
         duration: durationRange,
         ...samplerRange,
       },
-      imageModes: workflow.imageModes,
+      imageModes: Object.fromEntries(
+        Object.entries(workflow.imageModes || {}).map(([mode, variant]) => {
+          const { width, height, ...defaults } = variant.defaults;
+          return [
+            mode,
+            { ...variant, defaults: { ...defaults, ...dimensionDefaults({ width, height }) } },
+          ];
+        }),
+      ),
       capabilities: {
         ...workflow.capabilities,
         // A mask needs an image the graph takes in and, on ComfyUI, a saved image to stitch into
@@ -502,6 +537,7 @@ export function inferModels(
       aspectPolicy: workflow.aspectPolicy,
       maxLoras: workflow.loraStack?.max,
       loraAdapter: workflow.loraStack?.adapter,
+      loraBase: workflowLoraBase(workflow),
       backend: workflow.backend,
       // Radiance composes the stack into a rank-limited adapter.
       ...(workflow.loraStack?.adapter === "radiance-tags-v1"
@@ -537,7 +573,7 @@ export function inferModels(
         id,
         label: profileBackendLabels[id] || id,
         references: own.mediaInputs?.length || 0,
-        ...(workflow.loraStack?.model ? { loras: true } : {}),
+        ...(workflow.loraStack?.model && own.loraBase?.accepts ? { loras: true } : {}),
         ...(configuredOnly ? {} : { ready: own.ready !== false }),
         ...(reason ? { reason } : {}),
         profile: own,

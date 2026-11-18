@@ -10,6 +10,7 @@ process.env.STUDIO_MEDIA_DIR = outputDir;
 const dataDir = temporaryFolder("studio-data-");
 process.env.STUDIO_DATA_DIR = dataDir;
 const { galleryKey, readGalleryRows } = await import("../persistence/gallery-rows.ts");
+const { Store } = await import("../domain/store.ts");
 const { runtimeDatabase } = await import("../persistence/runtime.ts");
 const {
   eachGalleryItem,
@@ -20,6 +21,7 @@ const {
   galleryRuns,
   pageGallery,
   updateGalleryJob,
+  visibleGenerationItems,
 } = await import("./store.js");
 const { setGallery, gallery: galleryRows } = await import("../fixtures/gallery.js");
 
@@ -275,5 +277,37 @@ test("a walk resumes after any record, across the gallery, Dream's pool and uplo
   assert.deepEqual(
     [...eachGalleryItem({}, "gone")].map((item) => item.id),
     walk,
+  );
+});
+
+test("Dream draws ready, prompted seeds from the owner's generation records with present media", async () => {
+  const store = new Store(runtimeDatabase(dataDir));
+  const alice = store.createSession("alice").id;
+  const bob = store.createSession("bob").id;
+  const job = (owner, session, profileId = "ready", prompt = "harbour") =>
+    store.enqueue(owner, session, { profileId, prompt }, "image").id;
+
+  fs.writeFileSync(path.join(outputDir, "dream-seed.png"), "png");
+  const base = { ...output("dream-seed.png"), ownerId: "alice", rating: "liked" };
+  const existing = (id, jobId) => ({ ...base, id, url: undefined, jobId });
+  setGallery([
+    { ...base, jobId: job("alice", alice) },
+    existing("wrong-profile", job("alice", alice, "unavailable")),
+    existing("blank-prompt", job("alice", alice, "ready", " ")),
+    existing("wrong-owner", job("bob", bob)),
+    existing("import", "not-a-job"),
+    { ...base, ...output("missing.png"), jobId: job("alice", alice) },
+  ]);
+  const candidates = await visibleGenerationItems({
+    ownerId: "alice",
+    ownGeneration: true,
+    promptedProfiles: ["ready"],
+    rating: "liked",
+    unlisted: false,
+    sample: 6,
+  });
+  assert.deepEqual(
+    candidates.map((item) => item.id),
+    ["dream-seed.png"],
   );
 });

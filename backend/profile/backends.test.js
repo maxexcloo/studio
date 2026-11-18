@@ -270,6 +270,7 @@ test("backend choices include their own reference slots, controls and defaults",
       control: { node: "3", input: "image" },
     }));
   }
+  raw.studio.backends.radiance.graph[1].inputs.model = "krea-2-turbo-bf16";
   raw.studio.backends.radiance.loraStack = { adapter: "radiance-tags-v1", node: "1", max: 4 };
   write("combined", JSON.stringify(raw));
   try {
