@@ -91,6 +91,10 @@ test("an import from chat goes through the same pipeline, records chat as its or
   registerLibraryRoutes(app, {
     presets: {},
     installed: async () => ({}),
+    latestInstalled: async () => ({
+      files: { loras: ["parked-kept.safetensors"] },
+      current: false,
+    }),
     loraInfo: async () => ({}),
     catalogue: () => catalogue,
     json,
@@ -108,6 +112,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
           : [],
     removeFile: async ({ file }) => {
       if (file === "failed.safetensors") throw new Error("Worker unavailable");
+      if (file.startsWith("parked-")) return { removed: false, reachable: false };
       return { removed: true };
     },
     forget: (file) => forgotten.push(file),
@@ -237,6 +242,27 @@ test("an import from chat goes through the same pipeline, records chat as its or
   });
   assert.equal(savedOnly.ok, true, "saved presets may be cleaned up once file removal succeeds");
   assert.deepEqual(forgotten, ["watercolour-v2.safetensors", "saved-only.safetensors"]);
+
+  // While ComfyUI is parked the entry goes; a file it last listed stays, and one already gone is forgotten.
+  catalogue.edit("loras/parked-kept.safetensors", { title: "Parked Kept" });
+  catalogue.edit("loras/parked-gone.safetensors", { title: "Parked Gone" });
+  const parkedKept = await call("POST", "/api/library/catalogue/remove", {
+    key: "loras/parked-kept.safetensors",
+  });
+  const parkedGone = await call("POST", "/api/library/catalogue/remove", {
+    key: "loras/parked-gone.safetensors",
+  });
+  assert.deepEqual(
+    [parkedKept.ok, parkedKept.fileRemoved, /isn't running/.test(parkedKept.note)],
+    [true, false, true],
+  );
+  assert.deepEqual(
+    [parkedGone.ok, parkedGone.fileRemoved, parkedGone.note],
+    [true, false, undefined],
+  );
+  assert.equal(catalogue.entry("loras/parked-kept.safetensors"), null);
+  assert.equal(catalogue.entry("loras/parked-gone.safetensors"), null);
+  assert.equal(forgotten.at(-1), "parked-gone.safetensors");
 });
 
 test("dropped images arrive as data URLs, PNG, WebP or JPEG only", () => {
