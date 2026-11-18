@@ -3,8 +3,10 @@
   overflow: clip;
 }
 
-/* A drag on the header belongs to the sheet and can pull it closed. */
+/* A drag on the header belongs to the sheet and can pull it closed. Tall content scrolls in the body
+   rather than squeezing the header. */
 .sheetHeader {
+  flex-shrink: 0;
   gap: var(--mantine-spacing-xs);
   touch-action: none;
 }
