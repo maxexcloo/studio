@@ -257,21 +257,12 @@ export async function inspectInstalled(want, { verify = false } = {}) {
 
 /**
  * Whether a wanted file is among the last known installed files (`installed`: {folder: names}),
- * for when the model library's worker isn't answering: an installed catalogue entry with its
- * checksum, whatever its name, else its own name unless the catalogue records another checksum.
+ * for when the model library's worker isn't answering: the import needs that folder and filename,
+ * and the catalogue must not record a different checksum there.
  */
 export function knownInstalled(want, { installed = {}, entries = {} } = {}) {
-  const has = (key) => {
-    const { folder, file } = splitCatalogueKey(key);
-    return (installed[folder] || []).includes(file);
-  };
-  if (
-    want?.sha256 &&
-    Object.keys(entries).some((key) => entries[key]?.sha256 === want.sha256 && has(key))
-  )
-    return { status: "installed", unverified: true };
+  if (!want?.file || !installed[want.folder]?.includes(want.file)) return { status: "missing" };
   const key = `${want?.folder}/${want?.file}`;
-  if (!want?.file || !has(key)) return { status: "missing" };
   const recorded = entries[key]?.sha256;
   return want.sha256 && recorded && recorded !== want.sha256
     ? { status: "conflict" }
@@ -470,15 +461,14 @@ export function registerLibraryRoutes(
     store,
     detect: detectLink,
     // ComfyUI's model library is parked while Radiance holds the GPUs: its last known files answer then.
-    inspect: async (want, options) => {
-      const found = await inspect(want, options).catch(() => ({ status: "missing" }));
-      if (found.status !== "missing") return found;
-      const { files } = await latestInstalled().catch(() => ({ files: {} }));
-      return knownInstalled(want, {
-        installed: files,
-        entries: catalogue().entries({ throttleMs: 5000 }),
-      });
-    },
+    inspect: (want, options) =>
+      inspect(want, options).catch(async () => {
+        const { files } = await latestInstalled().catch(() => ({ files: {} }));
+        return knownInstalled(want, {
+          installed: files,
+          entries: catalogue().entries({ throttleMs: 5000 }),
+        });
+      }),
     downloads,
     startDownload,
     catalogue: { edit: (...args) => catalogue().edit(...args) },
