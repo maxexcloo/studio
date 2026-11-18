@@ -1,6 +1,7 @@
 import { Text, UnstyledButton } from "@mantine/core";
 import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 
+import { useSideways } from "../../ui/usePhone";
 import type { PairDeckCard } from "./deck";
 import { DeckMedia } from "./DeckMedia";
 
@@ -42,14 +43,15 @@ export function PairContent({
   view: (index: 0 | 1) => void;
 }) {
   const [first] = card.items;
+  const sideways = useSideways();
   const { pair, beside } = useSideBySide((first.width || 1) / (first.height || 1));
   return (
     <>
       <div className={classes.caption}>
-        <Text fw={500} ta="center" lineClamp={1}>
+        <Text fw={500} ta="center" lineClamp={sideways ? undefined : 1}>
           {card.question}
         </Text>
-        <Text size="xs" c="dimmed" ta="center" lineClamp={1}>
+        <Text size="xs" c="dimmed" ta="center" lineClamp={sideways ? undefined : 1}>
           {card.pairId ? "Alike but for one thing" : "From your gallery"} · Tap to Look Closer
         </Text>
       </div>

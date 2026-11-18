@@ -12,10 +12,10 @@ import {
 } from "@mantine/core";
 import { useNavigate } from "react-router";
 
-import { type Project, type ProjectStats, briefSummary } from "../../../../shared/projects";
+import type { Project, ProjectStats } from "../../../../shared/projects";
 import { menuWidth } from "../../theme";
 import { icons } from "../../ui/icons";
-import { aspectLabel, useSaveProject } from "./ProjectForm";
+import { aspectLabel, briefFields, useSaveProject } from "./ProjectForm";
 import type { DreamItem } from "./queries";
 
 const resultsShown = 8;
@@ -39,30 +39,25 @@ export function ProjectStatsLine({
     : [];
   return (
     <Stack gap={6}>
-      {chips.length > 0 && (
+      {(chips.length > 0 || project.paused) && (
         <Group gap={6}>
+          {project.paused && <Badge color="yellow">Paused</Badge>}
           {chips.map((chip) => (
-            <Badge key={chip} color="gray" variant="light">
+            <Badge key={chip} color="gray">
               {chip}
             </Badge>
           ))}
         </Group>
       )}
-      {project.paused ? (
-        <Badge color="yellow" variant="light">
-          Paused
-        </Badge>
-      ) : (
-        stats && (
-          <Group gap="xs" wrap="nowrap">
-            <Progress.Root flex={1} size="sm">
-              <Progress.Section value={share} aria-label={`${share}% of turns`} />
-            </Progress.Root>
-            <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-              {share}% of turns
-            </Text>
-          </Group>
-        )
+      {!project.paused && stats && (
+        <Group gap="xs" wrap="nowrap">
+          <Progress.Root flex={1} size="sm">
+            <Progress.Section value={share} aria-label={`${share}% of turns`} />
+          </Progress.Root>
+          <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+            {share}% of turns
+          </Text>
+        </Group>
       )}
     </Stack>
   );
@@ -99,11 +94,14 @@ export function ProjectCard({
   const navigate = useNavigate();
   const pause = useSaveProject(project.id);
   const open = () => navigate(`/dream/projects/${encodeURIComponent(project.id)}`);
-  const summary = briefSummary(project.brief);
+  const summary = briefFields
+    .filter(([key]) => key !== "avoid" && project.brief[key])
+    .map(([key, label]) => `${label}: ${project.brief[key]}`)
+    .join(" · ");
   const badges = constraintBadges(project, profileLabel);
   const results = (stats?.results || []).slice(0, resultsShown);
   return (
-    <Paper withBorder p="md" radius="md" component="section" aria-label={project.name}>
+    <Paper withBorder p="sm" radius="md" component="section" aria-label={project.name}>
       <Stack gap="xs">
         <Group justify="space-between" wrap="nowrap" gap="xs">
           <UnstyledButton onClick={open} miw={0} aria-label={`Open ${project.name}`}>

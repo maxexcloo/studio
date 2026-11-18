@@ -8,7 +8,7 @@ import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { layerAbove } from "../../ui/popupClicks";
-import { usePhone, useTouch } from "../../ui/usePhone";
+import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
 import { mediaSource } from "../gallery/mediaSource";
 import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
@@ -221,6 +221,8 @@ export function DreamDeck({
 }) {
   const phone = usePhone();
   const touch = useTouch();
+  // A phone held sideways gives the caption its own scrolling column, so it shows in full.
+  const sideways = useSideways();
   const [current, setCurrent] = useState<DeckCard>();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
   const [judged, setJudged] = useState(0);
@@ -464,10 +466,10 @@ export function DreamDeck({
                       {card === top && view(card.item)}
                     </div>
                     {card.kind === "dream" ? (
-                      <Caption item={card.item} />
+                      <Caption item={card.item} full={sideways} />
                     ) : (
                       <div className={classes.caption}>
-                        <Text size="xs" c="dimmed" lineClamp={2}>
+                        <Text size="xs" c="dimmed" lineClamp={sideways ? undefined : 2}>
                           {card.item.prompt}
                         </Text>
                       </div>

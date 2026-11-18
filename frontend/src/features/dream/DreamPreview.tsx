@@ -101,7 +101,11 @@ export function DreamPreview({
       padding={0}
       title={<VisuallyHidden>Preview</VisuallyHidden>}
       removeScrollProps={{ allowPinchZoom: true }}
-      classNames={{ header: classes.previewHeader, body: classes.preview }}
+      classNames={{
+        content: classes.previewContent,
+        header: classes.previewHeader,
+        body: classes.preview,
+      }}
       onKeyDown={(event) => {
         if (card.kind !== "pair" || (event.key !== "ArrowLeft" && event.key !== "ArrowRight"))
           return;

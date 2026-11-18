@@ -198,7 +198,7 @@ export function DreamDigest({
   );
   return (
     <ScrollArea flex={1} mih={0}>
-      <Stack gap="lg" pb="md" maw={1200} mx="auto">
+      <Stack gap="lg" pb="md">
         <div>
           <Title order={2}>While You Were Away</Title>
           <Text size="sm" c="dimmed">
