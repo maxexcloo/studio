@@ -294,7 +294,7 @@ function useStrip(
     landed.current = false;
     place("", false);
   };
-  return { ref, gesture, arrived };
+  return { ref, gesture, arrived, settling };
 }
 
 /** A neighbour waiting beside the current media: its display copy, or a video's still. */
@@ -387,6 +387,8 @@ export function MediaViewer({
   const noun = bare ? "Image" : "Generation";
   const [together, setTogether] = useState(false);
   const [version, setVersion] = useState<{ id: string; active: boolean } | null>(null);
+  // An accepted retry follows its replacement only while the failed item is still shown.
+  const [replacement, setReplacement] = useState<{ from: string; job: string } | null>(null);
   const displayed = version?.id === item.id ? { ...item, upscaleActive: version.active } : item;
   const source = mediaSource(displayed);
   const rating = useMediaRating(displayed);
@@ -436,7 +438,7 @@ export function MediaViewer({
   useEffect(() => {
     const regain = (event: KeyboardEvent) => {
       const view = stage.current;
-      if (event.target !== document.body || !view) return;
+      if (event.target !== document.body || !view || layerAbove(view)) return;
       view.focus();
       const { key, code, altKey, ctrlKey, metaKey, shiftKey, repeat } = event;
       const again = new KeyboardEvent("keydown", {
@@ -457,8 +459,12 @@ export function MediaViewer({
   }, []);
   const shownId = useRef(item.id);
   useLayoutEffect(() => {
-    if (shownId.current !== item.id && document.activeElement === document.body)
-      stage.current?.focus({ preventScroll: true });
+    if (shownId.current !== item.id) {
+      setReplacement(null);
+      setVersion(null);
+      if (document.activeElement === document.body && !layerAbove(stage.current))
+        stage.current?.focus({ preventScroll: true });
+    }
     shownId.current = item.id;
   }, [item.id]);
   // The phone details sheet opens above the action bar, which stays in reach without its prompt.
@@ -477,7 +483,7 @@ export function MediaViewer({
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [phone, sheet]);
+  }, [phone, sheet, item.id]);
   const [ZoomImage] = useState(() => zoomImage || LazyZoomImage);
   const [deleting, setDeleting] = useState(false);
   const shortcutActions = useRef<ActionGroups>([]);
@@ -504,18 +510,11 @@ export function MediaViewer({
       : item.resultSet && setPosition(item, members),
   } as const;
   const iteration = useMediaIteration(item);
-  // An accepted retry removes the failed item; the viewer follows its replacement once listed.
-  const [replacement, setReplacement] = useState("");
-  useEffect(() => {
-    const next = replacement && items.find((candidate) => candidate.jobId === replacement);
-    if (!next) return;
-    setReplacement("");
-    navigate?.(next);
-  }, [replacement, items, navigate]);
   // The run belongs to the item it started on, even once the viewer has moved on.
   function iterate(next: Iteration) {
     // A phone's prompt editor runs and returns to the gallery; desktop keeps the run in the strip.
-    const closing = phone && next.kind === "prompt";
+    const closing =
+      phone && next.kind === "prompt" && shownId.current === item.id && !strip.settling.current;
     if (closing) close();
     void iteration.mutateAsync(next).then(
       (job) => {
@@ -526,6 +525,7 @@ export function MediaViewer({
   }
   const pending = iteration.variables;
   function move(direction: -1 | 1) {
+    if (deleting || layerAbove(stage.current)) return;
     // Navigation stops at either end rather than wrapping round.
     const next = canNavigate && viewable[currentIndex + direction];
     if (!next) return;
@@ -570,6 +570,7 @@ export function MediaViewer({
   // Escape brings hidden chrome back before it closes the viewer.
   const escape = () => (chromeHidden ? setChromeHidden(false) : close());
   function swipe(direction: SwipeDirection) {
+    if (deleting || layerAbove(stage.current)) return false;
     // A swipe replaces the media before its compatibility click arrives.
     gestureClick.current = true;
     requestAnimationFrame(() => {
@@ -587,6 +588,17 @@ export function MediaViewer({
   const next = canNavigate ? viewable[currentIndex + 1] : undefined;
   const strip = useStrip({ previous: Boolean(previous), next: Boolean(next) }, swipe);
   useLayoutEffect(() => strip.arrived(), [item.id]);
+  const onRetried = (job: string) => {
+    if (shownId.current === item.id && !strip.settling.current)
+      setReplacement({ from: item.id, job });
+  };
+  useEffect(() => {
+    if (replacement?.from !== item.id || deleting) return;
+    const retried = related.find((candidate) => candidate.jobId === replacement.job);
+    if (!retried) return;
+    setReplacement(null);
+    if (!strip.settling.current) navigate?.(retried);
+  }, [replacement, item.id, related, navigate, deleting, strip.settling]);
   // Running, failed and cancelled work and videos take the same touch swipes as a picture at Fit.
   const touchSwipe = useTouchSwipe(strip.gesture);
   return (
@@ -850,7 +862,7 @@ export function MediaViewer({
                     <Neighbour item={previous} side="previous" />
                     {!item.url ? (
                       <div className={classes.status} {...touchSwipe}>
-                        <MediaJobStatus item={item} onRetried={setReplacement} />
+                        <MediaJobStatus key={item.id} item={item} onRetried={onRetried} />
                       </div>
                     ) : item.type === "video" ? (
                       <ViewerVideo
@@ -935,14 +947,17 @@ export function MediaViewer({
                     </ActionBarSurface>
                   ) : (
                     <MediaViewerActions
+                      key={displayed.id}
                       item={displayed}
                       compare={compare}
                       iterate={iterate}
                       pending={pending}
                       onCompare={() => setCompare((value) => !value)}
                       onDelete={() => setDeleting(true)}
-                      onRetried={setReplacement}
-                      onVersionChange={(id, active) => setVersion({ id, active })}
+                      onRetried={onRetried}
+                      onVersionChange={(id, active) => {
+                        if (shownId.current === id) setVersion({ id, active });
+                      }}
                       shortcuts={shortcutActions}
                       ref={bar}
                       promptHidden={phone && sheet}
