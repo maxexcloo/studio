@@ -1122,8 +1122,9 @@ test("media and administrator credentials discover only their own friendly tools
     // cancel_all's chat and account scopes, to 22,050 for writing prompts in American English, and
     // to 22,300 for keeping saved preferences and taste out of MCP generation, and to 22,650 for
     // backstory notes and characters' stories in cards and rewrite_prompt, and to 22,850 for
-    // Search's dates and the rules to queue one round per turn and never claim untaken actions.
-    JSON.stringify(tools).length + media.getInstructions().length < 22850,
+    // Search's dates and the rules to queue one round per turn and never claim untaken actions, and
+    // to 22,900 for never rerunning a refused generate.
+    JSON.stringify(tools).length + media.getInstructions().length < 22900,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });

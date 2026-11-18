@@ -1155,7 +1155,7 @@ export function registerGenerateTools({
     const unfinished = preview ? 0 : await media.pendingOutputs(owner, signal);
     if (unfinished > maxPendingImages)
       throw new Error(
-        `${unfinished} chat images are still unfinished in Studio, so nothing was queued. Tell the user, end the turn, and review finished results before the next round.`,
+        `${unfinished} chat images are still unfinished in Studio, so nothing was queued. Do not call generate again in this turn, not even after waiting: tell the user the images are still running and stop. The next round starts only when the user asks.`,
       );
     if (args.reference_asset_ids)
       args.reference_asset_ids = await Promise.all(
