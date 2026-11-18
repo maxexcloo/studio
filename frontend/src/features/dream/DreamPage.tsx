@@ -22,6 +22,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
+import { TasteIssues } from "../taste/TasteIssues";
 import { TasteProfile } from "../taste/TasteProfile";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamDeck } from "./DreamDeck";
@@ -203,7 +204,12 @@ export function DreamPage() {
         <DreamProjects />
       ) : view === "taste" ? (
         phone ? (
-          <TasteProfile fill />
+          <ScrollArea flex={1} mih={0} w="100%">
+            <Stack gap="lg">
+              <TasteIssues />
+              <TasteProfile />
+            </Stack>
+          </ScrollArea>
         ) : (
           <ScrollArea
             flex={1}
@@ -213,7 +219,10 @@ export function DreamPage() {
             mx="auto"
             classNames={{ viewport: classes.taste }}
           >
-            <TasteProfile />
+            <Stack gap="lg">
+              <TasteIssues />
+              <TasteProfile />
+            </Stack>
           </ScrollArea>
         )
       ) : dream.isPending ? (
