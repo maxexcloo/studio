@@ -352,11 +352,11 @@ export function DreamDeck({
     <DreamPreview
       card={top}
       side={side}
-      close={() => {
+      close={(itemId) => {
         // The preview mounts open, so Mantine has no opening to return focus from.
         flushSync(() => setViewing(null));
         document
-          .querySelector<HTMLElement>(`[data-depth="0"] [data-preview-id="${viewing}"]`)
+          .querySelector<HTMLElement>(`[data-depth="0"] [data-preview-id="${CSS.escape(itemId)}"]`)
           ?.focus({ preventScroll: true });
       }}
       act={(choice) => {
@@ -412,6 +412,7 @@ export function DreamDeck({
               <SwipeCard
                 key={card.key}
                 depth={card === top ? 0 : 1}
+                paused={!!viewing}
                 fly={fly}
                 pair={card.kind === "pair"}
                 label={cardLabel(card, card === top)}
@@ -444,13 +445,14 @@ export function DreamDeck({
                   <PairContent
                     card={card}
                     top={card === top}
+                    playing={card === top && !viewing}
                     picked={picked?.key === card.key ? picked.side : undefined}
                     view={(side) => setViewing(card.items[side].id)}
                   />
                 ) : (
                   <>
                     <div className={classes.media}>
-                      <DeckMedia item={card.item} playing={card === top} />
+                      <DeckMedia item={card.item} playing={card === top && !viewing} />
                       {card.kind === "calibration" && (
                         <Badge className={classes.label} variant="default">
                           From Your Gallery

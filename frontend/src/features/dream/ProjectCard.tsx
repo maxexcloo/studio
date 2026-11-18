@@ -93,7 +93,10 @@ export function ProjectCard({
 }) {
   const navigate = useNavigate();
   const pause = useSaveProject(project.id);
-  const open = () => navigate(`/dream/projects/${encodeURIComponent(project.id)}`);
+  const open = () =>
+    navigate(`/dream/projects/${encodeURIComponent(project.id)}`, {
+      state: { fromProjects: true },
+    });
   const summary = briefFields
     .filter(([key]) => key !== "avoid" && project.brief[key])
     .map(([key, label]) => `${label}: ${project.brief[key]}`)

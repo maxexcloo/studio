@@ -772,6 +772,11 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   await detail.getByRole("button", { name: "Close", exact: true }).last().click();
   await expect(detail).toBeHidden();
   await expect(page).toHaveURL(/\/dream\/projects$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/dream$/);
+  await page.goForward();
+  await expect(page).toHaveURL(/\/dream\/projects$/);
+  await expect(detail).toBeHidden();
 
   await page.getByRole("button", { name: "New Project", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "New Project", exact: true });
@@ -944,9 +949,16 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   await pair.getByRole("button", { name: "View A", exact: true }).click();
   const viewer = page.getByRole("dialog");
   await expect(viewer).toBeVisible();
+  const player = viewer.locator("video");
+  const close = viewer.getByRole("button", { name: "Close Preview", exact: true });
+  await expect(player).toHaveCount(1);
+  await player.dispatchEvent("keydown", { key: "ArrowRight" });
+  await expect(player).toHaveAttribute("aria-label", "Dream prompt video-a");
+  await close.press("ArrowRight");
+  await expect(player).toHaveAttribute("aria-label", "Dream prompt video-b");
   expect(dream.requests).toEqual([]);
-  await viewer.getByRole("button", { name: "Close Preview", exact: true }).click();
-  await expect(pair.getByRole("button", { name: "View A", exact: true })).toBeFocused();
+  await close.click();
+  await expect(pair.getByRole("button", { name: "View B", exact: true })).toBeFocused();
   await showView(page, "History");
   await expect(page.getByText("Video History", { exact: true })).toBeVisible();
   await expect(page.getByText("Image History", { exact: true })).toBeHidden();
