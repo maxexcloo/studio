@@ -22,6 +22,7 @@ import { api } from "../../api";
 import type { MediaItem, Profile } from "../../types";
 import { formatBytes } from "../../ui/bytes";
 import { useCopy } from "../../ui/clipboard";
+import { compareNames } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { useGroupFeature } from "../auth/AccountGate";
@@ -420,7 +421,7 @@ function CaptionText({ text }: { text: string }) {
 function Caption({ item }: { item: MediaItem }) {
   const caption = item.caption;
   if (!caption?.text && !caption?.tags?.length) return null;
-  const tags = [...(caption.tags || [])].sort((a, b) => a.localeCompare(b));
+  const tags = [...(caption.tags || [])].sort(compareNames);
   return (
     <DetailSection title="Caption">
       {caption.text && <CaptionText text={caption.text} />}

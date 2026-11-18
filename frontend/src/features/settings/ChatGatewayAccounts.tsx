@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { post } from "../../api";
+import { compareNames } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { accountAdminQuery } from "./AccountAdmin";
@@ -47,7 +48,7 @@ export function ChatGateway({
 }) {
   const [choices, setChoices] = useState<Record<string, string>>({});
   const options = [...accounts]
-    .sort((a, b) => a.username.localeCompare(b.username))
+    .sort((a, b) => compareNames(a.username, b.username))
     .map((account) => ({ value: account.id, label: account.username }));
   return (
     <>
