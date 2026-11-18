@@ -1,5 +1,4 @@
 import { Alert, Button, Chip, Group, Modal, Stack } from "@mantine/core";
-import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { MediaItem } from "../../types";
@@ -7,6 +6,7 @@ import { DialogFooter } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { askChange } from "../taste/suggestions";
+import { useItemMutation } from "./useItemMutation";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { showDisliked, useRatings } from "./useMediaRating";
 
@@ -27,7 +27,7 @@ export function useReportIssue(
   const iteration = useMediaIteration(item);
   const ratings = useRatings();
   const video = item.type === "video";
-  return useMutation({
+  return useItemMutation(item.id, "report", {
     meta: { inlineError },
     mutationFn: async (issue: string) => {
       const answer = await askChange(
