@@ -38,8 +38,9 @@ import { closeWhenTop, closingPopup, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
+import { useGenerationActions } from "../generation/GenerationProvider";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { MediaDetails, MediaDetailsMetadata } from "./MediaDetails";
+import { MediaDetails, MediaDetailsMetadata, recordedModel } from "./MediaDetails";
 import { MediaJobStatus } from "./MediaJobStatus";
 import { mediaTitle } from "./mediaLabels";
 import { mediaSource, playbackUrl } from "./mediaSource";
@@ -496,14 +497,18 @@ export function MediaViewer({
   const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
   const comparisonPath = comparison && `/compare/${comparison}`;
   const pathname = useLocation().pathname;
-  const setBadge = {
+  const { profiles } = useGenerationActions();
+  const model = bare ? "" : recordedModel(displayed, profiles);
+  const badge = {
     variant: "default",
     size: "lg",
     radius: "xl",
     style: glass,
     fw: 500,
     miw: 0,
-    className: classes.setPosition,
+  } as const;
+  const setBadge = {
+    ...badge,
     // Phones show only the place; Details names the set.
     children: phone
       ? `${members.findIndex((member) => member.id === item.id) + 1} / ${members.length}`
@@ -728,31 +733,38 @@ export function MediaViewer({
             <Group
               className={classes.topBar}
               data-chrome
+              role="group"
+              aria-label="Viewer Header"
               justify="space-between"
               wrap="nowrap"
               onClick={(event) => event.stopPropagation()}
             >
-              {canNavigate && itemLabel ? (
-                <Badge {...setBadge}>{itemLabel(item)}</Badge>
-              ) : item.resultSet ? (
-                comparisonPath && comparisonPath !== pathname ? (
-                  <Badge
-                    component={Link}
-                    to={comparisonPath}
-                    title="Open Comparison"
-                    {...setBadge}
-                  />
-                ) : (
-                  <Badge {...setBadge} />
-                )
-              ) : canNavigate ? (
-                <Badge variant="default" size="lg" radius="xl" style={glass} fw={500}>
-                  {currentIndex + 1} / {Math.max(total ?? 0, viewable.length)}
-                </Badge>
-              ) : (
-                <span />
-              )}
-              <Group gap={6} wrap="nowrap">
+              <Group gap={6} wrap="nowrap" miw={0}>
+                {canNavigate && itemLabel ? (
+                  <Badge {...badge}>{itemLabel(item)}</Badge>
+                ) : item.resultSet ? (
+                  comparisonPath && comparisonPath !== pathname ? (
+                    <Badge
+                      component={Link}
+                      to={comparisonPath}
+                      title="Open Comparison"
+                      {...setBadge}
+                    />
+                  ) : (
+                    <Badge {...setBadge} />
+                  )
+                ) : canNavigate ? (
+                  <Badge {...badge}>
+                    {currentIndex + 1} / {Math.max(total ?? 0, viewable.length)}
+                  </Badge>
+                ) : null}
+                {model && (
+                  <Badge {...badge} className={classes.modelBadge} title={model}>
+                    {model}
+                  </Badge>
+                )}
+              </Group>
+              <Group gap={6} wrap="nowrap" className={classes.topActions}>
                 {!bare && (
                   <Tooltip label={phone ? "Details" : details ? "Hide Details" : "Show Details"}>
                     <ActionIcon
