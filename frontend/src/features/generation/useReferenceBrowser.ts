@@ -8,6 +8,8 @@ interface ReferenceBrowserState {
   target: ReferenceTarget | null;
   query: string;
   filters: GalleryFilterValues;
+  /** Collapses each version chain into its original, as the gallery's Originals Only does. */
+  originalsOnly: boolean;
 }
 
 // Owned by the editor so closing or remounting the picker keeps its browsing position.
@@ -17,6 +19,7 @@ export function useReferenceBrowser() {
     target: null,
     query: "",
     filters: emptyGalleryFilters,
+    originalsOnly: false,
   });
   const scroll = useRef(0);
   return { state, setState, scroll };

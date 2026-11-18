@@ -1,5 +1,6 @@
 import { Alert, ScrollArea, Text } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
+import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { MediaItem } from "../../types";
@@ -7,13 +8,17 @@ import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import {
   GalleryFilterPanel,
+  type GalleryFilterValues,
+  ShowToggles,
   emptyGalleryFilters,
   useActiveFilters,
 } from "../gallery/GalleryFilters";
 import { useWindowSpan } from "../gallery/MediaGrid";
 import { useMediaPreview } from "../gallery/MediaPreview";
 import { MorePages } from "../gallery/MorePages";
+import { versionGroups } from "../gallery/versions";
 import { PickerGrid, PickerHeader, PickerTile } from "./Picker";
+import { queueQuery } from "./Queue";
 import { galleryReferenceType, useGalleryImages } from "./references";
 import type { ReferenceBrowser } from "./useReferenceBrowser";
 
@@ -59,7 +64,7 @@ export function GalleryChoices({
   onLayer?: (open: boolean) => void;
 }) {
   const tabs = [galleryTabs, ...more];
-  const { query, filters } = browser.state;
+  const { query, filters, originalsOnly } = browser.state;
   const tab = tabs.flat().some((item) => item.value === browser.state.tab)
     ? browser.state.tab
     : "gallery";
@@ -69,14 +74,42 @@ export function GalleryChoices({
     browser.scroll.current = 0;
     browser.setState((previous) => ({ ...previous, ...patch }));
   }
-  const activeFilters = useActiveFilters({
-    kind: "image",
+  // Uploads is the gallery's own filter, set by the tab; uploads have no ratings, comparisons or
+  // versions, so the Show filters stay out of it.
+  const applied = uploads
+    ? { ...filters, rating: "" as const, comparisons: false, uploads }
+    : filters;
+  const grouped = !uploads && originalsOnly;
+  const filterProps = {
+    kind: "image" as const,
     value: filters,
-    onChange: (filters) => browse({ filters }),
-  });
+    onChange: (filters: GalleryFilterValues) => browse({ filters }),
+  };
+  // Filter ▾ counts what the tab applies.
+  const activeFilters = useActiveFilters({ ...filterProps, value: applied }, [
+    ...(applied.rating === "liked"
+      ? [
+          {
+            key: "liked",
+            label: "Liked",
+            remove: () => browse({ filters: { ...filters, rating: "" } }),
+          },
+        ]
+      : []),
+    ...(grouped
+      ? [
+          {
+            key: "versions",
+            label: "Originals Only",
+            remove: () => browse({ originalsOnly: false }),
+          },
+        ]
+      : []),
+  ]);
   const [search] = useDebouncedValue(query, 250);
-  // Uploads is the gallery's own filter, set by the tab.
-  const { listing, items } = useGalleryImages(search, { ...filters, rating: "", uploads }, enabled);
+  const { listing, items: loaded } = useGalleryImages(search, applied, enabled);
+  const queue = useQuery({ ...queueQuery, enabled: grouped }).data?.jobs;
+  const items = grouped ? versionGroups(loaded, queue || []).map((group) => group[0]) : loaded;
   const [viewport, setViewport] = useState<HTMLDivElement | null>(null);
   const grid = useRef<HTMLDivElement>(null);
   // Tiles are square in a CSS grid: its columns and one row's height place every row unmeasured.
@@ -138,13 +171,20 @@ export function GalleryChoices({
         query={query}
         onQueryChange={(query) => browse({ query })}
         filterCount={activeFilters.length}
-        onClearFilters={() => browse({ filters: emptyGalleryFilters })}
+        onClearFilters={() => browse({ filters: emptyGalleryFilters, originalsOnly: false })}
         actions={actions}
         filters={
           <GalleryFilterPanel
-            kind="image"
-            value={filters}
-            onChange={(filters) => browse({ filters })}
+            {...filterProps}
+            toggles={
+              !uploads && (
+                <ShowToggles
+                  {...filterProps}
+                  originalsOnly={originalsOnly}
+                  onOriginalsOnly={(originalsOnly) => browse({ originalsOnly })}
+                />
+              )
+            }
           />
         }
       />

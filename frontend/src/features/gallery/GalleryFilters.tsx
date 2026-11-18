@@ -428,10 +428,53 @@ export function FilterToggle({
 }
 
 /**
+ * The Show filters the gallery and the reference picker share: Comparisons (images), Liked or
+ * Disliked, and Originals Only where `onOriginalsOnly` is given. Liked and Disliked turn Uploads off.
+ */
+export function ShowToggles({
+  kind,
+  value,
+  onChange,
+  originalsOnly = false,
+  onOriginalsOnly,
+}: FilterProps & { originalsOnly?: boolean; onOriginalsOnly?: (on: boolean) => void }) {
+  const rate = (rating: Rating, label: string) => (
+    <FilterToggle
+      label={label}
+      on={value.rating === rating}
+      onToggle={() =>
+        onChange({ ...value, rating: value.rating === rating ? "" : rating, uploads: false })
+      }
+    />
+  );
+  return (
+    <Input.Wrapper label="Show">
+      <Group gap={6} mt={4} role="group" aria-label="Show">
+        {kind === "image" && (
+          <FilterToggle
+            label="Comparisons"
+            on={value.comparisons}
+            onToggle={() => onChange({ ...value, comparisons: !value.comparisons })}
+          />
+        )}
+        {rate("liked", "Liked")}
+        {rate("disliked", "Disliked")}
+        {onOriginalsOnly && (
+          <FilterToggle
+            label="Originals Only"
+            on={originalsOnly}
+            onToggle={() => onOriginalsOnly(!originalsOnly)}
+          />
+        )}
+      </Group>
+    </Input.Wrapper>
+  );
+}
+
+/**
  * The filters, shared by the gallery's Filter popup and the reference picker: the gallery's `view`
- * (Grid or Runs) with the view's own `toggles` (such as Originals Only) under it, then the date and
- * each facet. Liked and Uploads sit outside it, the gallery's toggles, and Uploads the picker's tab.
- * Choices apply at once.
+ * (Grid or Runs) and the `toggles` (`ShowToggles`), then the date and each facet. Uploads sits
+ * outside it, the gallery's toggle and the picker's tab. Choices apply at once.
  */
 export function GalleryFilterPanel({
   kind,
@@ -531,15 +574,15 @@ export function GalleryFilterPanel({
           Couldn't Load Filters
         </Button>
       )}
-      {view && (
-        <Input.Wrapper label="View">
-          <Stack gap="xs" mt={4}>
-            {view}
+      {(view || toggles) && (
+        <>
+          <Stack gap="md">
+            {view && <Input.Wrapper label="View">{view}</Input.Wrapper>}
             {toggles}
           </Stack>
-        </Input.Wrapper>
+          <Divider />
+        </>
       )}
-      {view && <Divider />}
       <Input.Wrapper label="Date">
         <SegmentedControl
           aria-label="Date"

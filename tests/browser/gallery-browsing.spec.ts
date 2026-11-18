@@ -1484,7 +1484,8 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await expect(filter).toHaveAttribute("aria-expanded", "false");
   // Disliked is a filter in the panel, leaving the toolbar Liked and Uploads.
   await expect(page.getByRole("button", { name: "Disliked", exact: true })).toHaveCount(0);
-  const liked = page.getByRole("button", { name: "Liked", exact: true });
+  // The toolbar's Liked, not the Filters popup's while it fades out.
+  const liked = page.getByRole("button", { name: "Liked", exact: true }).first();
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toBeVisible();

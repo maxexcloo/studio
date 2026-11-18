@@ -598,3 +598,29 @@ test("Virtualised uploads retain their asset IDs and numbering after the leading
   await expect.poll(() => state.referenceRequests).toEqual([{ galleryItemId: "owned-upload-99" }]);
   expect(await grid.getByRole("listitem").count()).toBeLessThan(100);
 });
+
+test("Liked narrows the reference choices, and Uploads leaves the Show filters out", async ({
+  page,
+}) => {
+  const state = await setup(page);
+  state.gallery.find((item) => item.id === "alpha")!.rating = "liked";
+  const picker = await openReferenceChoices(page);
+  const choice = (name: string) =>
+    picker.getByRole("button", { name: `Use reference: ${name}`, exact: true });
+  await expect(choice("Beta")).toBeVisible();
+  await picker.getByRole("button", { name: "Filter Gallery", exact: true }).click();
+  const filters = page.getByRole("dialog", { name: "Filters", exact: true });
+  const liked = filters
+    .getByRole("group", { name: "Show", exact: true })
+    .getByRole("button", { name: "Liked", exact: true });
+  await liked.click();
+  await expect(liked).toHaveAttribute("aria-pressed", "true");
+  await liked.press("Escape");
+  await expect(filters).toBeHidden();
+  await expect(choice("Beta")).toHaveCount(0);
+  await expect(choice("Alpha")).toBeVisible();
+  await showUploads(page);
+  await picker.getByRole("button", { name: "Filter Uploads", exact: true }).click();
+  await expect(filters).toBeVisible();
+  await expect(filters.getByRole("group", { name: "Show", exact: true })).toHaveCount(0);
+});
