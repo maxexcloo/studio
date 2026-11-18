@@ -24,6 +24,7 @@ import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { TasteIssues } from "../taste/TasteIssues";
 import { TasteProfile } from "../taste/TasteProfile";
+import { TasteReflection } from "../taste/TasteReflection";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamDeck } from "./DreamDeck";
 import { DreamDigest } from "./DreamDigest";
@@ -208,6 +209,7 @@ export function DreamPage() {
             <Stack gap="lg">
               <TasteIssues />
               <TasteProfile />
+              <TasteReflection />
             </Stack>
           </ScrollArea>
         ) : (
@@ -222,6 +224,7 @@ export function DreamPage() {
             <Stack gap="lg">
               <TasteIssues />
               <TasteProfile />
+              <TasteReflection />
             </Stack>
           </ScrollArea>
         )
