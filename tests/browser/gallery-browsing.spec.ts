@@ -921,9 +921,11 @@ test("Download takes a selection of any size as one archive", async ({ page }, t
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
   await expect(status).toHaveText("700 Selected");
-  const download = page.waitForEvent("download");
-  await (await selectionMenuItem(page, "Share", "Download")).click();
-  expect((await download).url()).toMatch(/\/api\/gallery\/export\?selection=token$/);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    selectionAction(page, "Download").click(),
+  ]);
+  expect(download.url()).toMatch(/\/api\/gallery\/export\?selection=token$/);
   expect(posted).toHaveLength(700);
   await expect(status).toHaveCount(0);
 });
@@ -978,8 +980,14 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   // The view (Grid or Runs) leads the popup.
   await expect(page.getByRole("radiogroup", { name: "Gallery View", exact: true })).toBeVisible();
-  await expect(page.getByRole("switch", { name: "Originals Only", exact: true })).not.toBeChecked();
-  await expect(page.getByRole("switch", { name: "Comparisons", exact: true })).not.toBeChecked();
+  await expect(page.getByRole("button", { name: "Originals Only", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(page.getByRole("button", { name: "Comparisons", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
   await page.keyboard.press("Escape");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Generating");
@@ -1044,14 +1052,17 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   );
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
-  // Phones that share natively share beside Download.
+  // Phones that share natively offer Share beside Download; elsewhere Share is Download itself.
   const sharing = phone && (await page.evaluate(() => typeof navigator.share === "function"));
-  await selectionAction(page, "Share").click();
-  await expect(page.getByRole("menuitem")).toHaveText(
-    sharing ? ["Download", "Share"] : ["Download"],
-  );
-  await selectionAction(page, "Share").click();
-  await expect(page.getByRole("menu")).toHaveCount(0);
+  if (sharing) {
+    await selectionAction(page, "Share").click();
+    await expect(page.getByRole("menuitem")).toHaveText(["Download", "Share"]);
+    await selectionAction(page, "Share").click();
+    await expect(page.getByRole("menu")).toHaveCount(0);
+  } else {
+    await expect(selectionAction(page, "Download")).toBeVisible();
+    await expect(selectionAction(page, "Share")).toHaveCount(0);
+  }
   await selectionAction(page, "Like").click();
   await expect.poll(() => state.gallery.filter((item) => item.rating === "liked").length).toBe(2);
   // Each finished action ends the selection.
@@ -1484,11 +1495,8 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   ).toHaveText("90 Selected");
   await page.evaluate(() => window.scrollBy(0, 800));
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-  await expect(selectionAction(page, "Share")).toBeInViewport({ ratio: 1 });
-  await selectionAction(page, "Share").click();
-  await expect(page.getByRole("menuitem", { name: "Download", exact: true })).toBeVisible();
-  await selectionAction(page, "Share").click();
-  await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
+  await expect(selectionAction(page, "Download")).toBeInViewport({ ratio: 1 });
+  await page.keyboard.press("Escape");
   await expect(liked).toBeInViewport({ ratio: 1 });
   await expect(filter).toBeInViewport({ ratio: 1 });
   await filter.click();
@@ -1498,7 +1506,7 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await search.fill("Browse");
   await liked.click();
   await filter.click();
-  await page.getByRole("switch", { name: "Disliked", exact: true }).click();
+  await page.getByRole("button", { name: "Disliked", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(liked).toHaveAttribute("aria-pressed", "false");
   await expect
@@ -1512,7 +1520,7 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await expect(dislikedChip).toBeVisible();
   await filter.click();
   await page.getByText("Week", { exact: true }).click();
-  await page.getByRole("switch", { name: "Comparisons", exact: true }).click();
+  await page.getByRole("button", { name: "Comparisons", exact: true }).click();
   await page.keyboard.press("Escape");
   // Clear All takes the panel's filters, Disliked included, and leaves Liked to its toggle.
   await page.getByRole("button", { name: "Clear All", exact: true }).click();
@@ -1520,7 +1528,10 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await liked.click();
   await filter.click();
   await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();
-  await expect(page.getByRole("switch", { name: "Comparisons", exact: true })).not.toBeChecked();
+  await expect(page.getByRole("button", { name: "Comparisons", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
   await page.keyboard.press("Escape");
   await expect(search).toHaveValue("Browse");
   // Filters persist across reloads; the transient search does not.

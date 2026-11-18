@@ -1,4 +1,4 @@
-import { ActionIcon, Button, Divider, Menu, Text, Tooltip } from "@mantine/core";
+import { Button, Divider, Menu, Text } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Shuffle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -33,7 +33,7 @@ const compareLimit = 4;
 
 /**
  * The contextual selection bar under the toolbar: the count and quick selects, then at its end the
- * selection's actions and, on desktop, Clear Selection. The same actions show as a context menu at
+ * selection's actions. The same actions show as a context menu at
  * `menu` (right-click or Shift+F10).
  */
 export function GallerySelectionBar({
@@ -265,33 +265,37 @@ export function GallerySelectionBar({
           ],
         ],
       }),
-    itemAction("share", {
-      loading: download.isPending || prepare.isPending,
-      menu: [
-        [
-          {
-            id: "download",
-            label: "Download",
-            icon: icons.download,
-            disabled: !ready.length || download.isPending,
-            onClick: () => download.mutate(),
-          },
-          // Phones that share natively also share the files.
-          ...(phone && typeof navigator.share === "function"
-            ? [
-                {
-                  id: "share-file",
-                  label: "Share",
-                  icon: icons.share,
-                  disabled: !ready.length || ready.length > shareLimit || prepare.isPending,
-                  keepOpen: !prepared,
-                  onClick: () => void share(),
-                },
-              ]
-            : []),
-        ],
-      ],
-    }),
+    // Phones that share natively offer Download and Share; elsewhere Share is Download itself.
+    phone && typeof navigator.share === "function"
+      ? itemAction("share", {
+          loading: download.isPending || prepare.isPending,
+          menu: [
+            [
+              {
+                id: "download",
+                label: "Download",
+                icon: icons.download,
+                disabled: !ready.length || download.isPending,
+                onClick: () => download.mutate(),
+              },
+              {
+                id: "share-file",
+                label: "Share",
+                icon: icons.share,
+                disabled: !ready.length || ready.length > shareLimit || prepare.isPending,
+                keepOpen: !prepared,
+                onClick: () => void share(),
+              },
+            ],
+          ],
+        })
+      : itemAction("share", {
+          label: "Download",
+          icon: icons.download,
+          disabled: !ready.length || download.isPending,
+          loading: download.isPending,
+          onClick: () => download.mutate(),
+        }),
     itemAction("like", {
       pressed: allLiked,
       disabled: !ready.length || pending,
@@ -422,23 +426,6 @@ export function GallerySelectionBar({
             stacked={phone}
             menuPosition="bottom-end"
           />
-          {/* Phones end the selection with the toolbar's Select, which stays pressed. */}
-          {!phone && (
-            <>
-              <Divider orientation="vertical" className={classes.divider} />
-              <Tooltip label="Clear Selection">
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label="Clear Selection"
-                  disabled={pending}
-                  onClick={selection.end}
-                >
-                  <icons.clear size={18} />
-                </ActionIcon>
-              </Tooltip>
-            </>
-          )}
         </div>
       </div>
       <Menu
