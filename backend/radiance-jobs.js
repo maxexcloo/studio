@@ -1,3 +1,5 @@
+import { setTimeout as delay } from "node:timers/promises";
+
 import { accountAccessForId } from "./account-store.js";
 import { writeCivitaiParameters } from "./civitai/civitai.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
@@ -100,24 +102,20 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const transient = (error) => !error.status || error.status >= 500 || error.status === 429;
 
 /**
- * When Radiance first lists `model` as resident while `request` is open, or null when it never
- * does; a model already resident on the first look took no loading.
+ * Times the model load while an image request is open. A model already resident on the first
+ * look took no loading.
  */
-async function residentAt(client, model, request, pollMs) {
-  let settled = false;
-  request.then(
-    () => (settled = true),
-    () => (settled = true),
-  );
-  for (let first = true; !settled; first = false) {
+async function timeModelLoad(client, model, marks, signal) {
+  for (let first = true; !signal.aborted; first = false) {
     const models = await Promise.resolve()
-      .then(() => client.models())
+      .then(() => client.models(AbortSignal.any([signal, AbortSignal.timeout(2000)])))
       .catch(() => []);
-    if (models.find((entry) => entry.id === model)?.state === "resident")
-      return first ? null : Date.now();
-    await Promise.race([pause(pollMs), request.catch(() => null)]);
+    if (models.find((entry) => entry.id === model)?.state === "resident") {
+      if (!first && !signal.aborted) marks.resident = Date.now();
+      return;
+    }
+    await delay(modelPollMs, undefined, { signal }).catch(() => undefined);
   }
-  return null;
 }
 
 /**
@@ -245,14 +243,18 @@ export async function runRadianceJob(
         if (record.video)
           made = await runVideo(id, client, record, save, request.body, pollMs, marks || {});
         else {
-          const images = client.images(
-            request.route,
-            request.body,
-            AbortSignal.timeout(radianceWorkMs),
-          );
-          const loaded = marks && residentAt(client, record.values.model, images, modelPollMs);
-          made = await images;
-          if (marks) marks.resident = await loaded;
+          const timing = new AbortController();
+          try {
+            const images = client.images(
+              request.route,
+              request.body,
+              AbortSignal.timeout(radianceWorkMs),
+            );
+            if (marks) void timeModelLoad(client, record.values.model, marks, timing.signal);
+            made = await images;
+          } finally {
+            timing.abort();
+          }
         }
         if (marks) marks.received = Date.now();
         if (ended(id)) return;

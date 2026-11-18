@@ -159,7 +159,10 @@ export function createGenerationQueue({
       admitting.add(job.id);
       try {
         if (workloads.length && !mediaLeases.has(job.id))
-          mediaLeases.set(job.id, await runtime.controller.acquire(workloads));
+          mediaLeases.set(
+            job.id,
+            await runtime.controller.acquire(workloads, job.priority ?? queuePriority.manual),
+          );
         started = true;
         await loadComfyContext(job.backend);
       } catch (error) {

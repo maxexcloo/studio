@@ -539,10 +539,16 @@ export class RuntimeController {
         this.timeouts.drain,
         async () => {
           this.queue?.releaseStale();
-          if (this.swapHeld())
-            return `Waiting for higher-priority work on ${plan.stop.map(label).join(", ")} first.`;
           // Work can't run on a workload without pods, so its leases hold nothing back.
           const states = await this.states();
+          const swapTier = this.swapTier();
+          if (
+            swapTier !== undefined &&
+            plan.stop.some(
+              (id) => isRadiance(this.workload(id)) && this.queue!.waitingTier(id) < swapTier,
+            )
+          )
+            return `Waiting for higher-priority work on ${plan.stop.map(label).join(", ")} first.`;
           const busy = plan.stop.filter(
             (id) => !this.forced.has(id) && this.active.get(id) && holds(states.get(id)!),
           );
@@ -623,16 +629,21 @@ export class RuntimeController {
    * Admit work on the first ready candidate. Several deployments can serve one worker address (a
    * one- and a two-GPU video deployment behind one Service); the first is the one to start.
    */
-  async acquire(candidates: string | string[]): Promise<RuntimeLease> {
+  async acquire(candidates: string | string[], priority?: number): Promise<RuntimeLease> {
     const choices = this.workloads.filter((item) => [candidates].flat().includes(item.id));
     if (!choices.length) throw new RuntimeUnavailable("The selected workload is not configured.");
     const states = await Promise.all(choices.map((workload) => this.engine.state(workload)));
     // Checked after reading state, so an operation that began meanwhile still blocks admission.
+    const swapTier = this.swapTier();
     const ready = choices.find(
       (workload, index) =>
         states[index].replicas > 0 &&
         states[index].ready > 0 &&
-        (!this.stopping.has(workload.id) || (isRadiance(workload) && this.swapHeld())),
+        (!this.stopping.has(workload.id) ||
+          (isRadiance(workload) &&
+            priority !== undefined &&
+            swapTier !== undefined &&
+            priority < swapTier)),
     );
     if (ready) return this.retain(ready.id);
     const leaving = choices.find((workload) => this.stopping.has(workload.id));
@@ -786,16 +797,15 @@ export class RuntimeController {
   }
 
   /**
-   * Whether the automatic swap still waiting to stop Radiance holds for it: Radiance has work of a
-   * higher tier than the ComfyUI work the swap is for waiting to start, which it admits meanwhile.
+   * The tier of the ComfyUI work an automatic swap is draining Radiance for. Only higher-tier
+   * Radiance jobs may still start.
    */
-  private swapHeld() {
+  private swapTier() {
     const operation = this.current;
     if (!this.queue || !this.draining || !this.record.home || operation?.type !== "apply")
-      return false;
-    const radiance = operation.stop.filter((id) => isRadiance(this.workload(id)));
-    const tier = (ids: string[]) => Math.min(...ids.map((id) => this.queue!.waitingTier(id)));
-    return radiance.length > 0 && tier(radiance) < tier(operation.start);
+      return undefined;
+    if (!operation.stop.some((id) => isRadiance(this.workload(id)))) return undefined;
+    return Math.min(...operation.start.map((id) => this.queue!.waitingTier(id)));
   }
 
   /** Stop the running change at its next check; what it already stopped or started stays so. */

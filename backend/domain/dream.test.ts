@@ -59,6 +59,7 @@ function fixture(t: TestContext, catalogue = profiles) {
   const taste = createTaste({ dataDir, writer: () => null });
   const projects = createProjects({ dataDir, now: () => state.clock });
   const state = {
+    owners: ["alice", "bob"],
     overrides: {} as Partial<DreamSettings>,
     clock: Date.now(),
     items: [] as DreamItem[],
@@ -192,7 +193,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     taste,
     projects: (ownerId) => projects.list(ownerId),
     chats: (ownerId) => projects.chats(ownerId),
-    owners: () => ["alice", "bob"],
+    owners: () => state.owners,
     access: (ownerId) => state.access[ownerId] ?? null,
     catalogue: async () => ({
       profiles: catalogue,
@@ -509,6 +510,19 @@ test("Dream is off until turned on, queues one hidden job per account only while
       .jobs("alice")
       .filter((job) => job.priority !== queuePriority.dream)
       .every((job) => job.status === "cancelled"),
+  );
+});
+
+test("Dream gives each account a turn before filling a second slot for any account", async (t) => {
+  const { dream, state, live } = fixture(t);
+  state.owners.push("cara");
+  state.access.cara = { ...state.access.alice!, account: { userId: "cara", role: "user" } };
+  state.slots = 2;
+  for (const owner of state.owners) await dream.save(owner, { enabled: true });
+  await dream.tick();
+  assert.deepEqual(
+    live().map((job) => job.ownerId),
+    ["alice", "bob", "cara", "alice", "bob", "cara"],
   );
 });
 

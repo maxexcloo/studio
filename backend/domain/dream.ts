@@ -2566,8 +2566,9 @@ export function createDream(options: {
       // starts after the one served last.
       for (let queued = true; queued && !pressed();) {
         queued = false;
+        const start = next;
         for (let step = 0; step < owners.length && !pressed(); step++) {
-          const index = (next + step) % owners.length;
+          const index = (start + step) % owners.length;
           const ownerId = owners[index];
           if (held(ownerId) >= options.slots()) continue;
           let state: { status: DreamStatus; reason?: string };
