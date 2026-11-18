@@ -998,7 +998,7 @@ export async function promptTool(scope: Page | Locator, box: string, label: stri
 export async function promptMenu(scope: Page | Locator, box: string) {
   const page = "page" in scope ? scope.page() : scope;
   const button = scope.getByRole("button", { name: new RegExp(`^(AI|More) ${box} Actions$`) });
-  // The phone Generate sheet shows a box's tools only while it is being typed in.
+  // The phone Generate sheet shows a box's AI menu at rest, and its other tools while it is typed in.
   const text = page
     .getByRole("dialog", { name: "Generate", exact: true })
     .getByRole("textbox", { name: box, exact: true });

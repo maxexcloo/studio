@@ -188,7 +188,9 @@ recur across features.
 - On phones, overlays keep their actions at the bottom and always in sight:
   full-screen dialogs and sheets take the page's solid surface and pin their
   `DialogFooter` above the safe area while the content between scrolls, with
-  one scroll owner per form. On touch screens, popups and option lists open
+  one scroll owner per form. That surface reaches past the screen's edges, so
+  the page behind never shows or scrolls, even as the keyboard moves it or iOS
+  bounces; the shared theme owns this. On touch screens, popups and option lists open
   with the keyboard down; their search waits for a tap.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`.
@@ -199,9 +201,10 @@ recur across features.
   or the AI icon when the box has an AI tool; the AI icon (`icons.assistant`)
   marks everything AI does. The viewer's prompt keeps its AI tools in the
   bar's AI menu and its send beside the text.
-  Composer fields edit in place: at rest the phone Generate sheet shows only
-  the text, filling the room between its heading and the chips (one row
-  that scrolls sideways), with no tools. Typing gives the text the top of the
+  Composer fields edit in place: at rest the phone Generate sheet's prompt,
+  and its Negative Prompt when shown, share the room between its heading and
+  the chips, which wrap onto as many rows as they need; each box shows only
+  its AI menu in its corner, if it has one. Typing gives the text the top of the
   screen, without the sheet's header, above one action bar: the box's menu,
   Copy and Clear/Reset/Undo as icons, then Done, which returns to the sheet,
   in place of the output, Clear and Generate. There Reset returns
