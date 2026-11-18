@@ -10,7 +10,7 @@ import { dataDir } from "../data-dir.js";
 import { createResultNumbers } from "../domain/result-numbers.ts";
 import { generationRecord } from "../generation-record.js";
 import { mediaFile, mediaParams, mediaPath, mediaUrls } from "../media-paths.js";
-import { dreamState, galleryKey } from "../persistence/gallery-rows.ts";
+import { dreamArm, dreamPair, dreamState, galleryKey } from "../persistence/gallery-rows.ts";
 import {
   readRuntimeDocument,
   runtimeDatabase,
@@ -116,7 +116,9 @@ const list = (values) => JSON.stringify([...values].map(String));
  * The SQL for a gallery query: each field narrows the rows. `ownerId` is exact ("" is the
  * single-user owner); `unlisted` keeps (or leaves out) what the gallery doesn't list: disliked items
  * and Dream's pool; `rating` is "liked" or "disliked"; `status`, `notStatus` and `dreamState` take
- * one or several; `liked` keeps the owner's liked items and kept Dream results; `conversationIds` match the chats that asked for
+ * one or several; `dreamArm` keeps Dream results whose arm starts with one of its prefixes,
+ * `notDreamArm` leaves out one arm and `dreamPair` false leaves out comparison sides; `liked` keeps
+ * the owner's liked items and kept Dream results; `conversationIds` match the chats that asked for
  * items and `turnId` one turn of a chat; `ids` match items' ids and `notIds` leave them out, `named` their id, URL or gallery key
  * and `idPrefix` the start of their id; `since` keeps items made from then on (ms) and every
  * pending one, `before` those made by then; `limit` (galleryItems) reads only that many; `prompt` matches the prompt exactly and `titled` keeps
@@ -145,6 +147,15 @@ function where(query = {}) {
     const states = [query.dreamState].flat();
     add(`${dreamState} IN (${states.map(() => "?").join(", ")})`, ...states);
   }
+  if (query.dreamArm !== undefined) {
+    const prefixes = [query.dreamArm].flat();
+    add(
+      `(${prefixes.map(() => `substr(${dreamArm}, 1, length(?)) = ?`).join(" OR ")})`,
+      ...prefixes.flatMap((prefix) => [prefix, prefix]),
+    );
+  }
+  if (query.notDreamArm !== undefined) add(`${dreamArm} IS NOT ?`, query.notDreamArm);
+  if (query.dreamPair === false) add(`${dreamPair} IS NULL`);
   // Liked rows read only the owner's order index, kept ones the Dream index.
   if (query.liked)
     add(
@@ -190,10 +201,19 @@ function where(query = {}) {
 }
 
 /**
+ * The index a query reads: for unfinished states the status index, as its statistics say each
+ * status is common (most items are done), and for Dream states the Dream index.
+ */
+function indexFor(query) {
+  if (query.dreamState !== undefined) return "INDEXED BY studio_gallery_dream";
+  const unfinished = query.status !== undefined && ![query.status].flat().includes("done");
+  return unfinished ? "INDEXED BY studio_gallery_status" : "";
+}
+
+/**
  * Every item the query matches, in gallery order unless `ordered` is false (sorting a whole
- * gallery costs more than reading it). A query for unfinished states reads the status index: its
- * statistics say each status is common, as most items are done. A query for Dream states reads
- * the Dream index. `sample` picks that many matches at random before any record is parsed.
+ * gallery costs more than reading it), read through `indexFor`'s index. `sample` picks that many
+ * matches at random before any record is parsed.
  */
 export function galleryItems(query = {}, { ordered = true } = {}) {
   if (query.sample !== undefined) {
@@ -206,16 +226,9 @@ export function galleryItems(query = {}, { ordered = true } = {}) {
       .map(parse);
   }
   const { sql, params } = where(query);
-  const unfinished = query.status !== undefined && ![query.status].flat().includes("done");
-  const index =
-    query.dreamState !== undefined
-      ? "INDEXED BY studio_gallery_dream"
-      : unfinished
-        ? "INDEXED BY studio_gallery_status"
-        : "";
   const limit = query.limit === undefined ? [] : [query.limit];
   return statement(
-    `SELECT value FROM studio_gallery ${index} ${sql} ${ordered ? `ORDER BY ${order}` : ""} ${limit.length ? "LIMIT ?" : ""}`,
+    `SELECT value FROM studio_gallery ${indexFor(query)} ${sql} ${ordered ? `ORDER BY ${order}` : ""} ${limit.length ? "LIMIT ?" : ""}`,
   )
     .all(...params, ...limit)
     .map(parse);
@@ -280,7 +293,9 @@ export function* eachGalleryItem(query = {}, after) {
 
 export function countGalleryItems(query = {}) {
   const { sql, params } = where(query);
-  return statement(`SELECT count(*) AS count FROM studio_gallery ${sql}`).get(...params).count;
+  return statement(`SELECT count(*) AS count FROM studio_gallery ${indexFor(query)} ${sql}`).get(
+    ...params,
+  ).count;
 }
 
 export function hasGalleryItems(query = {}) {

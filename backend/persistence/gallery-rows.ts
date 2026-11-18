@@ -12,8 +12,13 @@ export function galleryKey(item: GalleryItem | null | undefined): string {
 
 const field = (name: string) => `json_extract(value, '$.${name}')`;
 
-/** A row's Dream state, null outside Dream; the `studio_gallery_dream` index's expression. */
+/**
+ * A row's Dream state (null outside Dream), arm and comparison side: the `studio_gallery_dream`
+ * index's expressions.
+ */
 export const dreamState = field("dream.state");
+export const dreamArm = field("dream.arm");
+export const dreamPair = field("dream.pair");
 
 /**
  * Columns derived from each row's JSON, so queries filter and order the gallery in SQL. `created_ms`
@@ -47,8 +52,9 @@ const galleryOrder =
   "uploaded, unlisted, bucket, created_ms DESC, job_id DESC, item_index, item_id DESC, status, type, rating";
 
 /** The indexes over `galleryColumns`: gallery order with and without an owner, jobs, ids, sets,
- * states, Dream states, an owner's prompts (a repeated prompt's title), times (recent work) and
- * runs (profile health, read from the index alone). */
+ * states, Dream states (with arms and comparison sides, so Dream's counts read the index alone),
+ * an owner's prompts (a repeated prompt's title), times (recent work) and runs (profile health,
+ * read from the index alone). */
 const galleryIndexes: [string, string][] = [
   ["studio_gallery_order", galleryOrder],
   ["studio_gallery_owner_order", `owner_id, ${galleryOrder}`],
@@ -57,7 +63,7 @@ const galleryIndexes: [string, string][] = [
   ["studio_gallery_set", "set_id"],
   ["studio_gallery_status", "status"],
   ["studio_gallery_upscale", "upscale_status"],
-  ["studio_gallery_dream", `${dreamState}, owner_id`],
+  ["studio_gallery_dream", `${dreamState}, owner_id, ${dreamArm}, ${dreamPair}`],
   ["studio_gallery_prompt", "owner_id, json_extract(value, '$.prompt')"],
   ["studio_gallery_created", "created_ms"],
   [
