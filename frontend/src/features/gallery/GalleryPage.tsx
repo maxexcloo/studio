@@ -17,7 +17,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { ArrowUp, LayoutGrid, Rows3, SquareCheck } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type Location, Navigate, useLocation, useNavigate, useParams } from "react-router";
 
 import { terminalStatuses } from "../../../../shared/queue";
@@ -70,7 +70,8 @@ import {
 
 import classes from "./GalleryPage.module.css";
 
-type PageState = GalleryState & OpenComposerState & { compose?: boolean; viewer?: boolean };
+type PageState = GalleryState &
+  OpenComposerState & { compose?: boolean; run?: string; viewer?: boolean };
 
 /**
  * Links already shared (in chats too) carried the viewer's item and the gallery's state as query
@@ -122,9 +123,8 @@ function Gallery() {
   const [originalsOnly, setOriginalsOnly] = useRemembered("gallery-originals-only", false);
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const [focusItem, setFocusItem] = useState<string | null>(null);
-  // The run (a job or result set, `runKey`) whose results the viewer flips through; unset, it
-  // flips through the whole gallery.
-  const [run, setRun] = useState<string>();
+  // History restores the run's neighbours when returning from a linked result.
+  const run = state?.run;
   // A caption tag in Details links here with `q`: it becomes the search and closes the viewer.
   const linkedQuery = state?.q;
   // The viewer's item (`/images/<id>`): opening one adds a history entry, so Back closes it, and
@@ -470,10 +470,9 @@ function Gallery() {
   const openItem = useCallback(
     (item: MediaItem, run?: string) => {
       setFocusItem(null);
-      setRun(run);
       const { chat, set, show, similar, turn } = latest.current.state || {};
       void routerNavigate(viewerPath(item), {
-        state: { chat, set, show, similar, turn, viewer: true } satisfies PageState,
+        state: { chat, run, set, show, similar, turn, viewer: true } satisfies PageState,
       });
     },
     [routerNavigate],
@@ -495,10 +494,12 @@ function Gallery() {
   const showItem = useCallback(
     (item: MediaItem) => {
       // Moving to another set's results flips through that set.
-      if (run && runKey(item) !== run) setRun(runKey(item));
-      void routerNavigate(viewerPath(item), { replace: true, state: location.state });
+      void routerNavigate(viewerPath(item), {
+        replace: true,
+        state: run ? { ...state, run: runKey(item) } : state,
+      });
     },
-    [run, routerNavigate, location.state],
+    [run, routerNavigate, state],
   );
   const closeViewer = useCallback(() => {
     if (state?.viewer) {
@@ -561,8 +562,21 @@ function Gallery() {
       onMenuClose={() => setMenu(null)}
     />
   );
+  const page = useRef<HTMLDivElement>(null);
+  const toolbar = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const host = page.current!;
+    const controls = toolbar.current!;
+    const measure = () =>
+      host.style.setProperty("--gallery-toolbar-height", `${controls.offsetHeight}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(controls, { box: "border-box" });
+    return () => observer.disconnect();
+  }, []);
   return (
     <Stack
+      ref={page}
       gap="sm"
       className={classes.page}
       onKeyDown={(event) => {
@@ -593,6 +607,7 @@ function Gallery() {
       {/* The search and filters stay in place while selecting; the selection bar follows them.
           Phones keep them in sight only while a search, filter or selection applies. */}
       <div
+        ref={toolbar}
         className={classes.toolbar}
         data-pinned={
           selection.selecting || Boolean(query || setId || chat) || hasFilters || undefined
@@ -744,6 +759,19 @@ function Gallery() {
             </>
           }
         />
+        {chat && (
+          <SegmentedControl
+            aria-label="Chat Media"
+            mt="xs"
+            size="xs"
+            value={kind}
+            onChange={(value) => switchKind(value as MediaKind)}
+            data={[
+              { value: "image", label: "Images" },
+              { value: "video", label: "Videos" },
+            ]}
+          />
+        )}
         {selectionBar}
       </div>
       {itemId &&

@@ -12,21 +12,22 @@
   opacity: 0.6;
 }
 
-/* New results waiting while the gallery is scrolled: a pill that stays in view without taking
-   room from the tiles beneath it, below the sticky toolbar on desktop. */
+/* New results stay in view below any sticky controls without moving the tiles. */
 .incoming {
   position: sticky;
-  top: calc(var(--app-shell-header-offset, var(--app-shell-header-height)) + 4.5rem);
+  top: calc(
+    var(--app-shell-header-offset, var(--app-shell-header-height)) + var(--mantine-spacing-sm) +
+      var(--gallery-pinned-height, 0px)
+  );
   z-index: 6;
   display: flex;
   justify-content: center;
   height: 0;
 }
 
-:root[data-phone] .incoming {
-  top: calc(
-    var(--app-shell-header-offset, var(--app-shell-header-height)) + var(--mantine-spacing-sm)
-  );
+:root:not([data-phone]) .incoming,
+.toolbar[data-pinned] ~ .results .incoming {
+  --gallery-pinned-height: var(--gallery-toolbar-height, 0px);
 }
 
 .incoming > * {
