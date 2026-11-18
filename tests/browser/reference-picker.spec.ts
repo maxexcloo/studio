@@ -17,7 +17,7 @@ import {
   stamp,
 } from "./fixtures";
 
-async function setup(page: Page) {
+async function setup(page: Page, { openComposer = true } = {}) {
   const state = await fixtures(page);
   const profile: Profile = {
     ...profiles[0],
@@ -41,8 +41,10 @@ async function setup(page: Page) {
       height: 1024,
       createdAt: stamp,
     });
-  await create(page);
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Combine the references");
+  if (openComposer) {
+    await create(page);
+    await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Combine the references");
+  }
   return state;
 }
 
@@ -318,7 +320,7 @@ test("Pasting a file in References fills the next slot", async ({ page }) => {
 });
 
 test("Gallery and References sort media through separate remembered choices", async ({ page }) => {
-  const state = await setup(page);
+  const state = await setup(page, { openComposer: false });
   state.gallery[1].createdAt = "2025-01-01T00:00:00Z";
   await page.goto("/images");
   await page.getByRole("button", { name: "Sort Gallery", exact: true }).click();
