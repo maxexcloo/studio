@@ -58,9 +58,13 @@ export function GalleryToolbar({
     if (query && phone) setSearching(true);
   }, [query, phone]);
   const chips = useActiveFilters({ kind, value, onChange }, extraChips);
-  // The toolbar's own toggles stay on.
+  // The toolbar's own toggles (Liked, Uploads) stay on.
   const clear = () => {
-    onChange({ ...emptyGalleryFilters, rating: value.rating, uploads: value.uploads });
+    onChange({
+      ...emptyGalleryFilters,
+      rating: value.rating === "liked" ? "liked" : "",
+      uploads: value.uploads,
+    });
     for (const chip of extraChips) chip.remove();
   };
   const toolbar = useRef<HTMLDivElement>(null);
@@ -181,18 +185,6 @@ export function GalleryToolbar({
         on={value.rating === "liked"}
         onToggle={() =>
           onChange({ ...value, rating: value.rating === "liked" ? "" : "liked", uploads: false })
-        }
-      />
-      <FilterToggle
-        label="Disliked"
-        icon={icons.dislike}
-        on={value.rating === "disliked"}
-        onToggle={() =>
-          onChange({
-            ...value,
-            rating: value.rating === "disliked" ? "" : "disliked",
-            uploads: false,
-          })
         }
       />
       <FilterToggle

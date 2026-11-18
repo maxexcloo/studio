@@ -25,11 +25,13 @@
 }
 
 /* A hold on a touch screen selects or opens the tile's menu: no image preview, text selection or
-   drag lift of the system's may take it first. iOS still lifts the subject out of a held image, so
-   touches land on the tile's button rather than its media. */
+   drag lift of the system's may take it first, nor, until the finger lifts, on the menu opening
+   under it (`data-holding`). iOS still lifts the subject out of a held image, so touches land on
+   the tile's button rather than its media. */
 @media (pointer: coarse) {
   .tile,
-  .tile * {
+  .tile *,
+  :global(:root[data-holding]) * {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
@@ -126,6 +128,9 @@
   justify-content: center;
   gap: 0.375rem;
   padding: var(--mantine-spacing-sm) var(--mantine-spacing-sm) 3rem;
+  /* A long failure, even one unbroken word, wraps and clips within its own tile. */
+  overflow: hidden;
+  overflow-wrap: anywhere;
   text-align: center;
   pointer-events: none;
   border-radius: inherit;

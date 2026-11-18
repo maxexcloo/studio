@@ -63,15 +63,11 @@ for (const kind of ["image", "video"] as const) {
       kind === "image"
         ? viewer.getByRole("img", { name: prompt, exact: true })
         : viewer.locator("video");
-    // Share › Download, or a video's Download › Video where it offers other formats.
+    // Share › Download, or a video's Download Video beside Download GIF.
     const expectDownload = async (href: string, extension?: string) => {
       const share = viewer.getByRole("button", { name: "Share", exact: true });
       await share.click();
-      let download = page.getByRole("menuitem", { name: "Download", exact: true });
-      if (!(await download.getAttribute("href"))) {
-        await download.click();
-        download = page.getByRole("menuitem", { name: "Video", exact: true });
-      }
+      const download = page.getByRole("menuitem", { name: /^Download( Video)?$/ });
       await expect(download).toHaveAttribute("href", href);
       if (extension) await expect(download).toHaveAttribute("download", `source.${extension}`);
       await share.click();

@@ -1,15 +1,11 @@
-/* Desktop sticks the toolbar and selection together; phones stick this bar below the header. */
+/* The toolbar holding the bar sticks it and draws its rule. The actions end the count's row, or
+   take one of their own, still at its end, where they don't fit beside it. */
 .header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  column-gap: 8px;
   min-height: 44px;
-  /* It spans the page's gutters, so tiles never show beside it. */
-  margin-inline: calc(-1 * var(--app-shell-padding, 0px));
-  padding-inline: var(--app-shell-padding, 0px);
-  background: var(--studio-glass-chrome);
-  -webkit-backdrop-filter: var(--studio-glass-filter);
-  backdrop-filter: var(--studio-glass-filter);
 }
 
 .count {
@@ -20,50 +16,32 @@
 
 .actions {
   display: flex;
-  min-width: 0;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  align-items: center;
+  max-width: 100%;
 }
 
-/* Desktop: the count, quick selects, actions and Clear Selection divided like the bars' groups. */
+/* Phone controls share their room compactly (ActionBar's stacked bar), so they move to a row of
+   their own only where the count's row leaves under 40 px for each. */
+:root[data-phone] .actions {
+  min-width: min(100%, calc(var(--actions) * 40px));
+}
+
+:root[data-phone] .actions > * {
+  margin-inline: auto 0;
+}
+
 .divider {
   align-self: stretch;
   flex-shrink: 0;
   margin-block: 10px;
 }
 
-/* The quick selects keep their names, scrolling sideways on a narrow screen. */
 .quick {
   display: flex;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 
 .quick > * {
   flex-shrink: 0;
-}
-
-/* On desktop the sticky toolbar holding the bar draws its rule. */
-:root[data-phone] .header {
-  /* Its rule sits inside the row, so the bar is exactly the toolbar's height. */
-  box-shadow: inset 0 -1px 0 var(--studio-glass-border);
-  position: sticky;
-  top: var(--app-shell-header-offset, 0px);
-  z-index: 3;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  padding-inline: max(var(--app-shell-padding, 0px), env(safe-area-inset-left))
-    max(var(--app-shell-padding, 0px), env(safe-area-inset-right));
-  padding-block: var(--mantine-spacing-xs);
-}
-
-:root[data-phone] .quick {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  overflow: visible;
-}
-
-:root[data-phone] .actions {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  width: 100%;
-  margin-left: 0;
 }

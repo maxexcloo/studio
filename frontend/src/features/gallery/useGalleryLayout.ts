@@ -271,10 +271,13 @@ export function useHoldToSelect(
     };
     const timer = window.setTimeout(() => {
       fired = true;
+      // Until the finger lifts, the system's text selection takes nothing (MediaTile.module.css).
+      document.documentElement.dataset.holding = "";
       hold();
     }, holdDelay);
     function stop() {
       window.clearTimeout(timer);
+      delete document.documentElement.dataset.holding;
       for (const [type, listener, options] of listeners)
         window.removeEventListener(type, listener as EventListener, options);
       press.current = null;

@@ -106,9 +106,15 @@ export function useRatings() {
   });
 }
 
-/** A dislike's notification: the item left the gallery, with Undo to restore it. */
+let lastDisliked: string | undefined;
+
+/**
+ * A dislike's notification: the item left the gallery, with Undo to restore it. It replaces the
+ * previous dislike's, so its Undo is always the latest; earlier ones stay under Disliked.
+ */
 export function showDisliked(count: number, undo: () => void) {
   const owner = document.activeElement?.closest<HTMLElement>('[role="dialog"]');
+  if (lastDisliked) notifications.hide(lastDisliked);
   const notification = notifications.show({
     autoClose: 8000,
     message: (
@@ -130,6 +136,7 @@ export function showDisliked(count: number, undo: () => void) {
       </Group>
     ),
   });
+  lastDisliked = notification;
 }
 
 /** One item's Like and Dislike toggles, pending while a change to that item is. */

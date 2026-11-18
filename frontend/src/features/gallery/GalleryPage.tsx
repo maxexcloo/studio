@@ -582,8 +582,14 @@ function Gallery() {
       }}
     >
       <VisuallyHidden component="h1">{kind === "video" ? "Videos" : "Images"}</VisuallyHidden>
-      {/* The search and filters stay in place while selecting; the selection bar follows them. */}
-      <div className={classes.toolbar}>
+      {/* The search and filters stay in place while selecting; the selection bar follows them.
+          Phones keep them in sight only while a search, filter or selection applies. */}
+      <div
+        className={classes.toolbar}
+        data-pinned={
+          selection.selecting || Boolean(query || setId || chat) || hasFilters || undefined
+        }
+      >
         <GalleryToolbar
           query={query}
           onQueryChange={setQuery}
@@ -687,6 +693,19 @@ function Gallery() {
                   }
                 />
               )}
+              {/* Disliked items show only here; it turns Liked and Uploads off. */}
+              <Switch
+                label="Disliked"
+                labelPosition="left"
+                checked={filters.rating === "disliked"}
+                onChange={(event) =>
+                  setFilters({
+                    ...filters,
+                    rating: event.currentTarget.checked ? "disliked" : "",
+                    uploads: false,
+                  })
+                }
+              />
               {view === "grid" && (
                 <Switch
                   label="Originals Only"
@@ -717,9 +736,8 @@ function Gallery() {
             </>
           }
         />
-        {!phone && selectionBar}
+        {selectionBar}
       </div>
-      {phone && selectionBar}
       {itemId &&
         !gallery.isPending &&
         !selected &&
@@ -823,6 +841,7 @@ function Gallery() {
           related={loaded}
           total={run || versions ? undefined : viewerOrder.current?.total}
           navigate={showItem}
+          follow={openItem}
           onReturnFocus={(item) => {
             const visible = new Set(loaded.map((candidate) => candidate.id));
             if (visible.has(item.id)) return setFocusItem(item.id);
@@ -846,7 +865,7 @@ function Gallery() {
 
 function ViewLabel({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <Center inline className={classes.viewLabel}>
+    <Center className={classes.viewLabel}>
       {icon}
       <span>{text}</span>
     </Center>
