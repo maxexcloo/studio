@@ -338,8 +338,8 @@ export function TextBox({
       </Menu.Dropdown>
     </Menu>
   );
-  // At rest the tools stand over the text's end; while it has focus, the bar leads with the menu,
-  // then Copy and Clear/Reset/Undo, all as icons of one size.
+  // At rest the tools stand over the text's end; while it has focus, the bar leads with the menu
+  // and Copy, and Clear/Reset/Undo sits at its far end beside the form's primary, all as icons of one size.
   const toolGroup = (
     <div
       className={inBar ? classes.barTools : classes.corner}
@@ -357,6 +357,7 @@ export function TextBox({
                 variant="subtle"
                 color="gray"
                 aria-label={action.label}
+                data-edit={action.id}
                 disabled={action.disabled}
                 onClick={action.onClick}
               >

@@ -101,7 +101,16 @@
  */
 .textTools {
   display: flex;
+  flex: 1;
   min-width: 0;
+}
+
+:where(:root[data-phone]) .actions {
+  flex: 1;
+}
+
+.footer:has(.textTools:not(:empty)) .actions {
+  flex: none;
 }
 
 .textTools:empty,

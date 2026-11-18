@@ -214,9 +214,15 @@
 /* While the text has focus, its tools lead its form's action bar, centred on the bar's row. */
 .barTools {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 4px;
   min-width: 0;
+}
+
+/* Clear sits immediately before the bar's primary, as everywhere else. */
+.barTools > [data-edit="clear"] {
+  margin-inline-start: auto;
 }
 
 .editor textarea {
