@@ -118,25 +118,29 @@ export function TextBox({
   const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
   useKeyboardDrop(editing, () => close());
-  // Clear turns into Undo, which restores the text, until the text next changes.
-  const start = reset ?? "";
-  const [cleared, setCleared] = useState<string | null>(null);
+  const bar = useContext(TextToolsBar);
+  const [active, setActive] = useState(false);
+  // The text an in-place box had when it took focus: changed since, Reset returns to it.
+  const [original, setOriginal] = useState<string>();
+  const resetTo = reset ?? (original && value !== original ? original : undefined);
+  const start = resetTo ?? "";
+  // Clear and Reset turn into Undo, which restores the text, until the text next changes.
+  const [cleared, setCleared] = useState<{ from: string; to: string } | null>(null);
   useEffect(() => {
-    if (value !== start) setCleared(null);
-  }, [value, start]);
-  const clear: Action =
-    cleared !== null && value === start
-      ? { id: "clear", label: "Undo", icon: icons.undo, onClick: () => onChange(cleared) }
-      : {
-          id: "clear",
-          label: reset === undefined ? "Clear" : "Reset",
-          icon: reset === undefined ? icons.clear : icons.reset,
-          disabled: value === start || props.readOnly,
-          onClick: () => {
-            setCleared(value);
-            onChange(start);
-          },
-        };
+    if (cleared && value !== cleared.to) setCleared(null);
+  }, [value, cleared]);
+  const clear: Action = cleared
+    ? { id: "clear", label: "Undo", icon: icons.undo, onClick: () => onChange(cleared.from) }
+    : {
+        id: "clear",
+        label: resetTo === undefined ? "Clear" : "Reset",
+        icon: resetTo === undefined ? icons.clear : icons.reset,
+        disabled: value === start || props.readOnly,
+        onClick: () => {
+          setCleared({ from: value, to: start });
+          onChange(start);
+        },
+      };
   const copier = useCopy();
   // Phones show Copy and Clear above the keyboard; desktop boxes leave them to the browser, keeping
   // only Reset and its Undo, beside the text while they can act.
@@ -149,7 +153,7 @@ export function TextBox({
           disabled: !value,
           onClick: () => copier.copy(value, title),
         },
-        ...(reset === undefined || value !== start || cleared !== null ? [clear] : []),
+        ...(reset === undefined || value !== reset || cleared ? [clear] : []),
       ]
     : [];
   const edit = !mobile && reset !== undefined && !clear.disabled ? clear : undefined;
@@ -223,8 +227,6 @@ export function TextBox({
       </ActionIcon>
     </Tooltip>
   );
-  const bar = useContext(TextToolsBar);
-  const [active, setActive] = useState(false);
   // Only a box in the bar's own surface, not one in a dialog opened from it, joins the bar.
   const inBar =
     mobile &&
@@ -335,33 +337,39 @@ export function TextBox({
       </Menu.Dropdown>
     </Menu>
   );
+  // At rest the tools stand over the text's end; while it has focus, the bar leads with the menu,
+  // then Copy and Clear/Reset/Undo, all as icons of one size.
   const toolGroup = (
     <div
-      className={classes.corner}
+      className={inBar ? classes.barTools : classes.corner}
       role="group"
       aria-label={`${title} Tools`}
       data-text-tools
       onMouseDown={keepFocus}
     >
-      {editButtons}
-      {inBar &&
-        others.map(
-          (tool) =>
-            tool.icon && (
-              <Tooltip key={tool.id} label={tool.label}>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label={tool.label}
-                  disabled={tool.disabled}
-                  onClick={tool.onClick}
-                >
-                  <tool.icon size={18} />
-                </ActionIcon>
-              </Tooltip>
-            ),
-        )}
-      {menu}
+      {inBar ? (
+        <>
+          {menu}
+          {edits.map((action) => (
+            <Tooltip key={action.id} label={action.label}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                aria-label={action.label}
+                disabled={action.disabled}
+                onClick={action.onClick}
+              >
+                {action.icon && <action.icon size={18} />}
+              </ActionIcon>
+            </Tooltip>
+          ))}
+        </>
+      ) : (
+        <>
+          {editButtons}
+          {menu}
+        </>
+      )}
       {send}
     </div>
   );
@@ -489,12 +497,15 @@ export function TextBox({
       {/* AI tools remain available beside the summary before its phone editor opens. */}
       {mobile && inline ? (
         // In place, the text fills the surface with its tools as icons in its corner, or while it
-        // has focus in its form's action bar, with its menu's plain tools (Recent Prompts) beside.
+        // has focus in its form's action bar.
         <div
           className={classes.editor}
           data-text-editor
           onFocus={(event) => {
-            if (event.target === (field.current as EventTarget | null)) setActive(true);
+            if (event.target !== (field.current as EventTarget | null)) return;
+            // Returning from its own tools keeps the text it started from.
+            if (!active) setOriginal(value);
+            setActive(true);
           }}
           // Its tools and their menu, wherever they stand, keep the text active.
           onBlur={(event) => {
@@ -502,8 +513,10 @@ export function TextBox({
             if (
               !next ||
               !(next === field.current || next.closest(`${popupLayer}, [data-text-tools]`))
-            )
+            ) {
               setActive(false);
+              setOriginal(undefined);
+            }
           }}
         >
           <div className={classes.columned}>

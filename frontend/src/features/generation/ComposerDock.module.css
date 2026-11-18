@@ -63,3 +63,8 @@
   flex: 1;
   min-height: 0;
 }
+
+/* Typing gives the text the top of the screen; the bar's Done (or Escape) returns to the sheet. */
+.sheet:has([data-typing]) .sheetHeader {
+  display: none;
+}
