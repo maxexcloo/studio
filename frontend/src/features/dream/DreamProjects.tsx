@@ -46,7 +46,7 @@ function ProjectEditor({ project, onClose }: { project?: Project; onClose: () =>
   return (
     <ProjectForm
       initial={project ?? blankProject}
-      action="Save"
+      action={project ? "Save" : "Create"}
       pending={save.isPending}
       error={save.error?.message}
       onSubmit={({ name, brief, constraints }) =>

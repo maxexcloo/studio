@@ -17,6 +17,17 @@ async function fillBox(scope: Locator, name: string, value: string, phone: boole
   await sheet.getByRole("button", { name: `Close ${name}`, exact: true }).click();
 }
 
+/** Turns Use LoRAs on or off in a project form's LoRAs chip. */
+async function useLoras(form: Locator, on: boolean) {
+  await form.getByRole("button", { name: "LoRAs", exact: true }).click();
+  const popup = form.page().getByRole("dialog", { name: "LoRAs", exact: true });
+  const toggle = popup.getByRole("switch", { name: "Use LoRAs", exact: true });
+  await toggle.dispatchEvent("click");
+  await expect(toggle).toBeChecked({ checked: on });
+  await popup.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(popup).toBeHidden();
+}
+
 const current = (page: Page) => page.getByRole("group", { name: "Current Dream", exact: true });
 /** Clicks an action in full screen's Dream bar, whose Recreate ▾ holds More Like This and Variations. */
 async function dreamAction(page: Page, name: string) {
@@ -740,8 +751,8 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   const editor = page.getByRole("dialog", { name: "New Project", exact: true });
   await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Harbour");
   await fillBox(editor, "Avoid", "people", isMobile);
-  await editor.getByRole("checkbox", { name: "Use LoRAs", exact: true }).uncheck();
-  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await useLoras(editor, false);
+  await editor.getByRole("button", { name: "Create", exact: true }).click();
   await expect(editor).toBeHidden();
   const harbour = page.getByRole("region", { name: "Harbour", exact: true });
   await expect(harbour).toContainText("No LoRAs");
@@ -754,7 +765,7 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const edit = page.getByRole("dialog", { name: "Edit Project", exact: true });
-  await edit.getByRole("checkbox", { name: "Use LoRAs", exact: true }).check();
+  await useLoras(edit, true);
   await edit.getByRole("button", { name: "Save", exact: true }).click();
   await expect(edit).toBeHidden();
   await expect(harbour).not.toContainText("No LoRAs");

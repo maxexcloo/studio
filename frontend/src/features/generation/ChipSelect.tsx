@@ -43,6 +43,7 @@ export type ChipSelectProps = Pick<
   target?: Record<string, unknown>;
   field?: boolean;
   disabled?: boolean;
+  withinPortal?: boolean;
 };
 
 /**
@@ -69,6 +70,7 @@ export function ChipSelect({
   onDropdownClose,
   nothingFoundMessage,
   renderOption,
+  withinPortal = true,
 }: ChipSelectProps) {
   const touch = useTouch();
   const [search, setSearch] = useState("");
@@ -123,7 +125,7 @@ export function ChipSelect({
       position={field ? "bottom-end" : "top-start"}
       middlewares={{ ...popupMiddlewares, size: { padding: 12 } }}
       classNames={{ dropdown: classes.fittedList }}
-      withinPortal
+      withinPortal={withinPortal}
       onOptionSubmit={(selected) => {
         onChange?.(selected);
         combobox.closeDropdown();
