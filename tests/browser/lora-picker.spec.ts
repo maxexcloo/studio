@@ -5,7 +5,6 @@ import {
   create,
   fixtures,
   openLoraChoices,
-  pickerTab,
   profiles,
   renamePreset,
   saveCurrent,
@@ -13,7 +12,7 @@ import {
   showLoraStack,
 } from "./fixtures";
 
-test("LoRA ratings persist and order the list, tabs and search narrow the choices, and Trigger Words reach the generation", async ({
+test("LoRA ratings persist and order the list, search narrows the choices, and Trigger Words reach the generation", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -84,10 +83,6 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
     )
     .toEqual(["Soft Style", "Detail Slider"]);
-  await pickerTab(page, "LoRAs", "Liked");
-  await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
-  await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toHaveCount(0);
-  await pickerTab(page, "LoRAs", "All");
   await page.getByRole("textbox", { name: "Search LoRAs", exact: true }).fill("inkbird");
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toHaveCount(0);
   const detail = choices.getByRole("button", { name: "Detail Slider", exact: true });

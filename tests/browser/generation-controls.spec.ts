@@ -844,14 +844,13 @@ test("Phone prompt boxes copy and undoably clear in place; desktop leaves both t
   );
   await page.keyboard.type(" at dusk");
   await expect(prompt).toHaveValue("A lantern in fog at dusk");
-  // Typing shows the text, its tools in its corner, the action bar and Close.
-  await expect(generate.getByRole("button", { name: "Close Generate", exact: true })).toBeVisible();
+  // Typing shows the text and the action bar with its tools and Done, which returns to the sheet.
   await expect(generate.getByRole("group", { name: "Prompt Tools", exact: true })).toBeVisible();
   await expect(generate.locator("[data-text-editor]", { has: prompt })).toBeVisible();
-  await expect(
-    generate.getByRole("group", { name: "Generation Actions", exact: true }),
-  ).toBeVisible();
-  await prompt.blur();
+  const actions = generate.getByRole("group", { name: "Generation Actions", exact: true });
+  await actions.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(prompt).not.toBeFocused();
+  await expect(actions.getByRole("button", { name: "Generate Image", exact: true })).toBeVisible();
   // Closing returns the page and its dock where they were.
   await generate.getByRole("button", { name: "Close Generate", exact: true }).click();
   await expect(generate).toBeHidden();
@@ -1034,7 +1033,7 @@ test("The phone Generate sheet fits the screen and keeps Generate above the keyb
   await expect(sheet).toBeHidden();
 });
 
-test("Typing in the phone Generate sheet merges the prompt's tools into one bar and keeps Close", async ({
+test("Typing in the phone Generate sheet gives the prompt the screen above one bar of its tools and Done", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Phones only");
@@ -1057,23 +1056,50 @@ test("Typing in the phone Generate sheet merges the prompt's tools into one bar 
   await expect(bar.getByRole("group", { name: "Prompt Tools", exact: true })).toHaveCount(0);
   await prompt.click();
   await prompt.fill("A copper fox in a misty forest at dawn, cinematic light, ".repeat(20));
-  // Typing puts the tools in the bar as icons, with Generate, in place of the output; the bar
-  // ends where it did and the text, scrolled to its end, ends above it.
+  // Typing puts AI, Copy and Clear in the bar as icons, with Done and Generate, in place of the
+  // output; Recent Prompts stays in the AI menu. The bar ends where it did, the header gives the
+  // text the top of the screen, and the text, scrolled to its end, ends above the bar.
   await expect(bar.getByRole("group", { name: "Prompt Tools", exact: true })).toBeVisible();
-  for (const name of ["Copy", "Clear", "Recent Prompts", "AI Prompt Actions"])
-    await expect(tools.getByRole("button", { name, exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      tools
+        .getByRole("button")
+        .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
+    )
+    .toEqual(["AI Prompt Actions", "Copy", "Clear"]);
   await expect(output).toBeHidden();
   await expect(bar.getByRole("button", { name: "Generate Image", exact: true })).toBeVisible();
+  const done = bar.getByRole("button", { name: "Done", exact: true });
+  await expect(done).toBeVisible();
   await expect.poll(async () => Math.abs((await bottom()) - resting)).toBeLessThanOrEqual(2);
+  await expect(sheet.getByRole("button", { name: "Close Generate", exact: true })).toBeHidden();
   await prompt.evaluate((text) => (text.scrollTop = text.scrollHeight));
   const text = (await prompt.boundingBox())!;
   expect(text.y + text.height).toBeLessThanOrEqual((await tools.boundingBox())!.y + 1);
-  // Close stays in sight while typing, and Escape closes too.
+  // Changed text resets to what it was on focus; unchanged, Clear empties it.
+  await prompt.blur();
+  await prompt.click();
+  await prompt.fill("A copper fox");
+  await prompt.blur();
+  await prompt.click();
+  await page.keyboard.type(" at dusk");
+  await tools.getByRole("button", { name: "Reset", exact: true }).click();
+  await expect(prompt).toHaveValue("A copper fox");
+  await tools.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(prompt).toHaveValue("A copper fox at dusk");
+  await prompt.fill("A copper fox");
+  await tools.getByRole("button", { name: "Clear", exact: true }).click();
+  await expect(prompt).toHaveValue("");
+  await tools.getByRole("button", { name: "Undo", exact: true }).click();
+  // Done returns to the sheet with the draft and its header.
+  await done.click();
+  await expect(prompt).not.toBeFocused();
+  await expect(prompt).toHaveValue("A copper fox");
+  await expect(output).toBeVisible();
+  await expect(done).toBeHidden();
   const close = sheet.getByRole("button", { name: "Close Generate", exact: true });
   await expect(close).toBeInViewport({ ratio: 1 });
-  await close.click();
-  await expect(sheet).toBeHidden();
-  await page.locator("[data-composer-prompt]").click();
+  // Escape closes the sheet while typing too.
   await prompt.click();
   await expect(prompt).toBeFocused();
   await page.keyboard.press("Escape");

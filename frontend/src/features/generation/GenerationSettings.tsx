@@ -154,10 +154,9 @@ export function GenerationSettings({
       control: (
         <Select
           label="Rebalance"
-          description="How Krea 2 weighs the prompt's text layers; Legacy follows it hardest"
           comboboxProps={nested}
           data={profile.options.rebalances.map((value) => ({ value, label: titleCase(value) }))}
-          value={String(input.rebalance || "")}
+          value={String(input.rebalance || profile.defaults.rebalance || "")}
           allowDeselect={false}
           onChange={(rebalance) => {
             if (rebalance !== null) onChange({ rebalance });

@@ -88,12 +88,6 @@ const typeNames: Record<string, string> = {
   character: "Character",
   concept: "Concept",
 };
-/** Which LoRAs the picker lists: every one the profile can load, or the liked among them. */
-const loraTabs = [
-  { value: "all", label: "All" },
-  { value: "liked", label: "Liked" },
-] as const;
-type LoraTab = (typeof loraTabs)[number]["value"];
 /** Whether a LoRA lists the family, however the profile spells it. */
 const fitsFamily = (families: string[], family: string) =>
   families.some((value) => loraFamilyId(value) === loraFamilyId(family));
@@ -127,7 +121,6 @@ export function useLoraPicker() {
   // The family the list shows; null shows the profile's.
   const [family, setFamily] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useRemembered<LoraTab>("lora-tab", "all");
   const [loraSort, setLoraSort] = useRemembered<LoraSort>("lora-sort", "rating");
   // The preset the stack was loaded from or saved as, and its name field's state.
   const [presetId, setPresetId] = useState<string>();
@@ -139,8 +132,6 @@ export function useLoraPicker() {
     setFamily,
     query,
     setQuery,
-    tab,
-    setTab,
     loraSort,
     setLoraSort,
     presetId,
@@ -327,7 +318,7 @@ function useLoraDraft({ value, onChange }: Omit<LoraPickerProps, "picker">) {
   };
 }
 
-/** The LoRAs to choose from: tabs, search, family and sort over the list. */
+/** The LoRAs to choose from: search, family and sort over the list; Rating leads with the liked. */
 function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   const { input, profile, update, info, metadata, title } = useLoraDraft({
     value,
@@ -345,18 +336,14 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   );
   const ratings = library.data?.library.ratings || {};
   const uses = previews.data?.uses || {};
-  // A tab remembered from before shows All.
-  const tab = loraTabs.some((item) => item.value === picker.tab) ? picker.tab : "all";
-  const listed =
-    tab === "liked" ? available.filter((file) => ratings[file] === "liked") : available;
-  const families = [...new Set(listed.flatMap(familiesOf).map(loraFamilyId))].sort((a, b) =>
+  const families = [...new Set(available.flatMap(familiesOf).map(loraFamilyId))].sort((a, b) =>
     compareNames(modelFamilyLabel(a), modelFamilyLabel(b)),
   );
   // The profile's family until another is chosen; All Families when no LoRA lists it.
   const ownFamily = loraFamilyId(profile?.family || "");
   const family = picker.family ?? (families.includes(ownFamily) ? ownFamily : "all");
   const terms = picker.query.trim().toLowerCase();
-  const shown = listed
+  const shown = available
     .filter(
       (file) =>
         (family === "all" || fitsFamily(familiesOf(file), family)) &&
@@ -388,8 +375,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
             },
           ],
     );
-  const empty =
-    terms || family !== "all" ? "No Matches" : tab === "liked" ? "No Liked LoRAs" : "No LoRAs";
+  const empty = terms || family !== "all" ? "No Matches" : "No LoRAs";
   // Loading and empty states take the scroll pane's place, centred in its space.
   const state = info.isPending ? (
     <LoadingState fill label="Loading LoRAs" />
@@ -433,9 +419,6 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   const header = (
     <PickerHeader
       label="LoRAs"
-      tabs={[[...loraTabs]]}
-      tab={tab}
-      onTabChange={picker.setTab}
       query={picker.query}
       onQueryChange={picker.setQuery}
       actions={
@@ -683,7 +666,7 @@ function StackEntry({
         ? triggers.filter((word) => (lora.triggers as string[]).includes(word))
         : triggers;
   return (
-    <Stack gap={6} className={classes.entry} data-disabled={!enabled || undefined}>
+    <Stack gap={4} className={classes.entry} data-disabled={!enabled || undefined}>
       <Group gap="xs" wrap="nowrap">
         <Switch
           classNames={{ root: classes.enable, body: classes.enable, labelWrapper: classes.enable }}
@@ -700,7 +683,7 @@ function StackEntry({
           <icons.clear size={16} />
         </ActionIcon>
       </Group>
-      <Stack gap={6} className={classes.details}>
+      <Stack gap={4} className={classes.details}>
         <StrengthControl
           label={`${title} Strength`}
           value={lora.strength}
@@ -710,27 +693,33 @@ function StackEntry({
           mark={loraDefaultStrength(info)}
           onChange={(strength) => onChange({ strength })}
         />
-        {strengthIssue ? (
-          <Text size="xs" c="red">
-            {strengthIssue}
+        {/* The strength's advice and the source share one line. */}
+        {(strengthIssue || range || info?.sourceUrl) && (
+          <Text size="xs" c="dimmed">
+            {strengthIssue ? (
+              <Text span c="red" inherit>
+                {strengthIssue}
+              </Text>
+            ) : (
+              range && (
+                <span>
+                  Suggested {range.min} to {range.max}
+                  {range.default !== undefined && `, default ${range.default}`}
+                </span>
+              )
+            )}
+            {(strengthIssue || range) && info?.sourceUrl && " · "}
+            {info?.sourceUrl && (
+              <Anchor inherit href={info.sourceUrl} target="_blank" rel="noopener noreferrer">
+                View Source
+              </Anchor>
+            )}
           </Text>
-        ) : (
-          range && (
-            <Text size="xs" c="dimmed">
-              Suggested {range.min} to {range.max}
-              {range.default !== undefined && `, default ${range.default}`}
-            </Text>
-          )
         )}
         {!compatible && (
           <Text size="xs" c="yellow">
             {unavailable || "This profile can't use this LoRA. Disable or remove it."}
           </Text>
-        )}
-        {info?.sourceUrl && (
-          <Anchor size="xs" href={info.sourceUrl} target="_blank" rel="noopener noreferrer">
-            View Source
-          </Anchor>
         )}
         {!!triggers.length && (
           <Chip.Group
@@ -765,7 +754,7 @@ function StackEntry({
           </Chip.Group>
         )}
         {info?.description && (
-          <Text size="xs" c="dimmed" lineClamp={3}>
+          <Text size="xs" c="dimmed" lineClamp={2}>
             {info.description}
           </Text>
         )}

@@ -47,6 +47,11 @@ select {
 [data-popup][data-position^="right"] {
   transform-origin: left;
 }
+/* A popup kept inside another glass surface (not portalled) can blur only that surface, not the
+   media behind it, so it takes the solid raised colour to stay readable. */
+:not([data-portal]) > [data-popup] {
+  background: var(--studio-glass-solid) !important;
+}
 .mantine-Notifications-root[data-position="top-center"] {
   top: calc(var(--mantine-spacing-xs) + env(safe-area-inset-top));
   width: calc(
