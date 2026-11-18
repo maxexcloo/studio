@@ -208,7 +208,7 @@ test("one-GPU Qwen and Noct fit their actual conditioning limits without constra
       () => imageRequest({ ...image, model }, Array(4).fill(new Uint8Array([1]))),
       /3 reference/,
     );
-    // The two-GPU twin holds four references at 2048.
+    // The two-GPU twin takes 2048 and four references.
     const twin = imageRequest(
       { ...image, model: `${model}-refs`, width: 2048 },
       Array(4).fill(new Uint8Array([1])),
