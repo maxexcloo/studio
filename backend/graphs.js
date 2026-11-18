@@ -6,7 +6,7 @@ import { getCustomWorkflow } from "./custom-workflows.js";
 import { outputFolderName } from "./data-names.js";
 import { inpaintGraph } from "./inpaint.js";
 import { radianceLorasForBase, workflowLoraBase } from "./lora/radiance.js";
-import { isRadianceNode, radianceSizeStep } from "./providers/radiance.ts";
+import { isRadianceNode, radianceNodeSizeStep } from "./providers/radiance.ts";
 import { selectImageMode } from "./workflow-modes.js";
 
 export function composeWorkflowPrompt(workflow, userPrompt = "") {
@@ -65,11 +65,11 @@ async function applyMappedInputs(graph, workflow, body) {
       setMappedInput(graph, controls[key], value);
   }
   for (const node of Object.values(graph)) {
-    if (!isRadianceNode(node.class_type)) continue;
+    const step = radianceNodeSizeStep(node.class_type, node.inputs?.model);
+    if (!step) continue;
     for (const key of ["width", "height"]) {
       const side = Number(node.inputs?.[key]);
-      if (Number.isFinite(side) && side > 0)
-        node.inputs[key] = snapDimension(side, { step: radianceSizeStep });
+      if (Number.isFinite(side) && side > 0) node.inputs[key] = snapDimension(side, { step });
     }
   }
   // Flux 2's schedule depends on the dimensions of the latent being sampled.
