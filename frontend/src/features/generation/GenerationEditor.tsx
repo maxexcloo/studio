@@ -158,6 +158,7 @@ export function GenerationEditor({
   autoFocusPrompt = false,
   focusPrompt = false,
   fill = false,
+  onNegativeWritten,
   ideas: offerIdeas = false,
 }: {
   input: GenerationInput;
@@ -204,6 +205,7 @@ export function GenerationEditor({
    * of the chips, one row that scrolls sideways, and actions, and a text box being edited takes it alone.
    */
   fill?: boolean;
+  onNegativeWritten?: () => void;
   /** Offers taste-led prompt ideas in the prompt's AI menu while the prompt is empty. */
   ideas?: boolean;
 }) {
@@ -337,6 +339,7 @@ export function GenerationEditor({
               onChange={onChange}
               assistantScope={assistantScope}
               negative={usesNegative(profile)}
+              onNegativeWritten={onNegativeWritten}
               autoFocus={autoFocusPrompt}
               fill={fill}
               ideas={offerIdeas}
