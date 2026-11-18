@@ -56,7 +56,7 @@ export function SizePicker({
   const nativeResolution = String(
     input.resolution ||
       profile?.defaults?.resolution ||
-      (input.kind === "video" ? "720p" : Math.max(input.width, input.height) > 1024 ? "2k" : "1k"),
+      (input.kind === "video" ? "720p" : Math.max(input.width, input.height) > 1280 ? "2k" : "1k"),
   );
   // One tab per resolution the presets draw at (a single one reads Presets), then Custom's own
   // width and height where the model takes any size.
@@ -193,6 +193,7 @@ export function SizePicker({
                           width: preset.w,
                           height: preset.h,
                           resolutionTier: isResolution(view) ? view : undefined,
+                          ...(native.length ? { resolution: view } : {}),
                         })
                       }
                     >

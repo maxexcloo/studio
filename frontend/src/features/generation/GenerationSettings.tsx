@@ -164,6 +164,23 @@ export function GenerationSettings({
         />
       ),
     });
+  if (profile?.options?.qualities?.length)
+    fields.push({
+      label: "Quality",
+      control: (
+        <Select
+          label="Quality"
+          description="Auto is Low for new images and Medium for edits"
+          comboboxProps={nested}
+          data={profile.options.qualities.map((value) => ({ value, label: titleCase(value) }))}
+          value={String(input.quality || profile.defaults.quality || "auto")}
+          allowDeselect={false}
+          onChange={(quality) => {
+            if (quality !== null) onChange({ quality });
+          }}
+        />
+      ),
+    });
   encoderSlots.forEach((slot, index) => {
     const label = encoderSlots.length > 1 ? slot.label : "Text Encoder";
     fields.push({
