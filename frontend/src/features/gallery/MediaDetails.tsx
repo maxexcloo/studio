@@ -36,7 +36,7 @@ import { backendLabel, isProfile, profileName, shownProfileName } from "../gener
 import { WritingThinking } from "../generation/PromptWriting";
 import { queueQuery } from "../generation/Queue";
 import { referenceAssetQuery } from "../generation/references";
-import { mediaNumber, mediaTitle } from "./mediaLabels";
+import { mediaTitle } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { derivations } from "./versions";
 import { type GalleryState, galleryPath, viewerPath } from "./viewerLink";
@@ -221,7 +221,6 @@ function generationDetails(
       ["File", item.outputName || item.filename],
       ["File Size", size === null ? pendingValue : formatBytes(size)],
       ["Time", time(item.createdAt)],
-      ["Result", mediaNumber(item)],
     ]),
     // The stages in the order they ran, then their totals.
     timing: rows([
