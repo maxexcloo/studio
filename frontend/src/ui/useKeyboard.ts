@@ -127,11 +127,11 @@ export function useDialogKeyboard() {
   const keyboard = useKeyboard(Boolean(owner));
   useEffect(() => {
     if (!owner) return;
-    owner.style.setProperty("--studio-dialog-top", `${keyboard.top}px`);
-    owner.style.setProperty("--studio-dialog-inset", `${keyboard.inset}px`);
+    owner.style.top = `${keyboard.top}px`;
+    owner.style.bottom = `${keyboard.inset}px`;
     return () => {
-      owner.style.removeProperty("--studio-dialog-top");
-      owner.style.removeProperty("--studio-dialog-inset");
+      owner.style.removeProperty("top");
+      owner.style.removeProperty("bottom");
     };
   }, [owner, keyboard.top, keyboard.inset]);
 }

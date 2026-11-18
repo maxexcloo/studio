@@ -1146,6 +1146,12 @@ export async function openReferenceChoices(page: Page) {
  * shows both.
  */
 export async function showReferenceStack(page: Page) {
+  // A successful placement may return to the stack before its Done button can be clicked.
+  await expect(
+    page
+      .getByRole("region", { name: "Reference Choices", exact: true })
+      .and(page.locator('[aria-busy="true"]')),
+  ).toHaveCount(0);
   const add = page.getByRole("button", { name: "Add References", exact: true, expanded: true });
   const adding = page.getByRole("dialog", { name: "Add References", exact: true });
   if (await add.isVisible())

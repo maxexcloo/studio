@@ -327,7 +327,6 @@ export function studioTheme({
           size: "lg",
         },
         classNames: {
-          inner: classes.dialogInner,
           content: classes.dialogContent,
           body: classes.dialogBody,
         },

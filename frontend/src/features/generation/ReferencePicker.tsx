@@ -292,6 +292,7 @@ export function ReferencePicker({
     <Stack
       component="section"
       aria-label="Reference Choices"
+      aria-busy={placement.adding || placement.uploading || undefined}
       gap="sm"
       // Phones fill the sheet between its header and footer; the grid owns scrolling and keeps its
       // position.
