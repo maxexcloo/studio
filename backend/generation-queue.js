@@ -211,6 +211,7 @@ export function createGenerationQueue({
           outputs,
           {
             ...job.input,
+            galleryAt: job.galleryAt,
             kind: request.kind,
             ownerId: job.ownerId,
             model: job.input.model || job.input.profileId,

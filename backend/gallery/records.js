@@ -180,6 +180,7 @@ export function makePendingItems(id, body) {
     prompt: body.prompt || "",
     negative: body.negative || "",
     createdAt,
+    ...(body.galleryAt ? { galleryAt: body.galleryAt } : {}),
     // An inpaint result is the whole original picture, whatever size the crop sampled at.
     width: Number(body.inpaint?.image?.width || body.width || 0),
     height: Number(body.inpaint?.image?.height || body.height || 0),

@@ -115,7 +115,7 @@ const parse = (row) => withLive(JSON.parse(row.value));
 
 /* ----------------------------------------------------------------- Queries */
 
-const order = "bucket, created_ms DESC, job_id DESC, item_index, item_id DESC";
+const order = "bucket, gallery_ms DESC, job_id DESC, item_index, item_id DESC";
 const list = (values) => JSON.stringify([...values].map(String));
 
 /**
@@ -240,10 +240,10 @@ export function galleryItems(query = {}, { ordered = true } = {}) {
     .map(parse);
 }
 
-const keyColumns = "key, value, bucket, created_ms, job_id, item_index, item_id";
+const keyColumns = "key, value, bucket, gallery_ms, job_id, item_index, item_id";
 const rowKey = (row) => ({
   bucket: row.bucket,
-  time: row.created_ms,
+  time: row.gallery_ms,
   jobId: row.job_id,
   index: row.item_index,
   id: row.item_id,
@@ -678,14 +678,14 @@ function afterKey(key) {
   }
   return [
     {
-      sql: ["bucket = ?", time === null ? "created_ms IS NULL" : "created_ms = ?", tie],
+      sql: ["bucket = ?", time === null ? "gallery_ms IS NULL" : "gallery_ms = ?", tie],
       params: [bucket, ...(time === null ? [] : [time]), ...tieParams],
     },
     ...(time === null
       ? []
       : [
-          { sql: ["bucket = ?", "created_ms < ?"], params: [bucket, time] },
-          { sql: ["bucket = ?", "created_ms IS NULL"], params: [bucket] },
+          { sql: ["bucket = ?", "gallery_ms < ?"], params: [bucket, time] },
+          { sql: ["bucket = ?", "gallery_ms IS NULL"], params: [bucket] },
         ]),
     { sql: ["bucket > ?"], params: [bucket] },
   ];
@@ -1259,6 +1259,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         ...(body.refusedPrompt ? { refusedPrompt: body.refusedPrompt } : {}),
         filename: title || item.filename,
         createdAt: existing[index]?.createdAt || new Date().toISOString(),
+        ...(body.galleryAt ? { galleryAt: body.galleryAt } : {}),
         durationMs,
         // How long ComfyUI itself took, without waiting in its queue.
         ...(job.timing ? { timing: job.timing } : {}),
