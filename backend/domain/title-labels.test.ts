@@ -20,6 +20,7 @@ test("titles shorten by whole phrases, never mid-phrase", () => {
     "Sleeping Maltese Shih Tzu Puppy",
   );
   assert.equal(shortTitle("hair blowing in the wind", 4), "Hair Blowing");
+  assert.equal(replyTitle("lighthouse at dusk over the sea"), "Lighthouse at Dusk");
   assert.equal(replyTitle(""), "");
 });
 

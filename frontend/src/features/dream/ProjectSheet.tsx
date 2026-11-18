@@ -242,13 +242,7 @@ export function ProjectSheet({
       {project && (
         <Stack gap="lg">
           <ProjectDetail project={project} projects={projects} profileLabel={profileLabel} />
-          <DialogFooter
-            secondary={
-              <Button variant="default" onClick={() => onEdit(project)}>
-                Edit
-              </Button>
-            }
-          >
+          <DialogFooter secondary={[{ label: "Edit", onClick: () => onEdit(project) }]}>
             <Button onClick={onClose}>Close</Button>
           </DialogFooter>
         </Stack>

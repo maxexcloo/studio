@@ -238,16 +238,14 @@ function CatalogueForm({
         <DialogFooter
           onCancel={close}
           pending={save.isPending}
-          secondary={
-            <Button
-              variant="default"
-              disabled={form.isDirty() || save.isPending}
-              loading={undo.isPending}
-              onClick={() => undo.mutate()}
-            >
-              Undo Last Change
-            </Button>
-          }
+          secondary={[
+            {
+              label: "Undo Last Change",
+              disabled: form.isDirty(),
+              loading: undo.isPending,
+              onClick: () => undo.mutate(),
+            },
+          ]}
         >
           <Button
             type="submit"

@@ -219,6 +219,14 @@ export function usePromptHistory({
             }
           }}
         >
+          <Switch
+            // Remounts once loaded so the saved state appears without the thumb sliding.
+            key={keep.history.data ? "loaded" : "loading"}
+            label="Keep Recent Prompts"
+            checked={keep.history.data?.enabled ?? false}
+            disabled={!keep.history.data}
+            onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
+          />
           <Combobox.EventsTarget>
             <SearchInput
               aria-label="Search Prompt History"
@@ -228,14 +236,6 @@ export function usePromptHistory({
               data-autofocus
             />
           </Combobox.EventsTarget>
-          <Switch
-            // Remounts once loaded so the saved state appears without the thumb sliding.
-            key={keep.history.data ? "loaded" : "loading"}
-            label="Keep Recent Prompts"
-            checked={keep.history.data?.enabled ?? false}
-            disabled={!keep.history.data}
-            onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
-          />
           {history.isPending ? (
             <LoadingState label="Loading Prompt History" fill />
           ) : history.error ? (

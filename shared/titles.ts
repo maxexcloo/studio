@@ -37,7 +37,8 @@ function shorten(words: string[], max: number) {
   for (let end = max; end > 0; end--)
     if (boundary.test(words[end])) {
       const kept = words.slice(0, end);
-      while (kept.length > 1 && minor.test(kept.at(-1)!)) kept.pop();
+      // Never end on a word that starts the phrase cut off ("Lighthouse at Dusk Over").
+      while (kept.length > 1 && boundary.test(kept.at(-1)!)) kept.pop();
       return kept;
     }
   return words.slice(-max);
