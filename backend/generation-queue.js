@@ -311,6 +311,21 @@ export function createGenerationQueue({
         if (next !== model) return wait;
       },
       settled: async (job) => {
+        if (job.admittedAt !== undefined)
+          logEvent("Queue job timing", {
+            job: job.id,
+            worker: job.backend || "cloud",
+            tier: job.priority ?? queuePriority.manual,
+            status: job.status,
+            admittedAt: job.admittedAt,
+            admissionMs: Math.max(0, job.admittedAt - Date.parse(job.createdAt)),
+            ...(job.savingAt === undefined
+              ? {}
+              : {
+                  savingAt: job.savingAt,
+                  saveMs: Math.max(0, Date.parse(job.updatedAt) - job.savingAt),
+                }),
+          });
         if (job.status === "failed")
           logWarning("Job failed", {
             job: job.id,

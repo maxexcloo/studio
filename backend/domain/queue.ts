@@ -410,7 +410,7 @@ export class GenerationQueue {
             const observation = { ...observed, reason: observed.reason || "" };
             job = { ...latest, ...observation };
             if (observed.status === "completed") {
-              job = this.store.save({ ...job, status: "saving" });
+              job = this.store.save(this.saving(job));
               let saved;
               try {
                 saved = await this.adapter.saveOutputs(job);
@@ -561,7 +561,12 @@ export class GenerationQueue {
               wait(job, reason);
               continue;
             }
-            job = this.store.save({ ...job, status: "starting", reason: "" });
+            job = this.store.save({
+              ...job,
+              status: "starting",
+              reason: "",
+              admittedAt: this.now(),
+            });
             // Persist starting before crossing the provider boundary: interrupted responses are never resubmitted.
             this.acceptedIds.add(job.id);
             this.loaded.set(resource, job);
@@ -570,11 +575,10 @@ export class GenerationQueue {
               const observation = await this.adapter.submit(job);
               const latest = this.store.job(job.ownerId, job.id)!;
               if (terminalStatuses.has(latest.status)) continue;
-              let submitted = this.store.save({
-                ...latest,
-                ...observation,
-                ...(observation.status === "completed" ? { status: "saving" as const } : {}),
-              });
+              const observed = { ...latest, ...observation };
+              let submitted = this.store.save(
+                observation.status === "completed" ? this.saving(observed) : observed,
+              );
               if (observation.status === "completed") {
                 const saved = await this.adapter.saveOutputs(submitted);
                 submitted = this.store.save({ ...submitted, ...saved, status: savedStatus(saved) });
@@ -799,6 +803,10 @@ export class GenerationQueue {
         throw error;
       }
     }
+  }
+
+  private saving(job: OwnedJob): OwnedJob {
+    return { ...job, status: "saving", savingAt: job.savingAt ?? this.now() };
   }
 
   /**

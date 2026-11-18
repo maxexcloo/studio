@@ -2,6 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { accountAccessForId } from "./account-store.js";
 import { writeCivitaiParameters } from "./civitai/civitai.js";
+import { logEvent } from "./crash-log.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { describeFailure } from "./failures.js";
 import { replaceGalleryJob, updateGalleryJob } from "./gallery/store.js";
@@ -101,20 +102,35 @@ function cancelledRun(id) {
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const transient = (error) => !error.status || error.status >= 500 || error.status === 429;
 
-/**
- * Times the model load while an image request is open. A model already resident on the first
- * look took no loading.
- */
+/** Radiance exposes residency per model. Sampling start for an individual image is unavailable. */
 async function timeModelLoad(client, model, marks, signal) {
-  for (let first = true; !signal.aborted; first = false) {
+  while (!signal.aborted) {
     const models = await Promise.resolve()
       .then(() => client.models(AbortSignal.any([signal, AbortSignal.timeout(2000)])))
       .catch(() => []);
-    if (models.find((entry) => entry.id === model)?.state === "resident") {
-      if (!first && !signal.aborted) marks.resident = Date.now();
-      return;
+    if (signal.aborted) return;
+    const state = models.find((entry) => entry.id === model)?.state;
+    if (state) {
+      const now = Date.now();
+      marks.initialModelState ??= state;
+      if (state === "loading") marks.loading ??= now;
+      if (state === "resident") {
+        if (marks.initialModelState !== "resident") marks.resident = now;
+        return;
+      }
     }
     await delay(modelPollMs, undefined, { signal }).catch(() => undefined);
+  }
+}
+
+async function withModelTiming(client, model, marks, request) {
+  if (!marks) return request;
+  const timing = new AbortController();
+  void timeModelLoad(client, model, marks, timing.signal);
+  try {
+    return await request;
+  } finally {
+    timing.abort();
   }
 }
 
@@ -122,12 +138,12 @@ async function timeModelLoad(client, model, marks, signal) {
  * A DELETE forgets an active video before its GPU stops; retain it until its terminal status.
  * `marks` takes when Radiance accepted the video (its model loaded) and when it completed.
  */
-async function runVideo(id, client, record, save, body, pollMs, marks = {}) {
+async function runVideo(id, client, record, save, body, pollMs, marks) {
   let video;
   if (record.videoId) video = await client.video(record.videoId);
   else {
-    video = await client.createVideo(body);
-    marks.created = Date.now();
+    video = await withModelTiming(client, record.values.model, marks, client.createVideo(body));
+    if (marks) marks.created = Date.now();
     record.videoId = video.id;
     save();
   }
@@ -150,14 +166,15 @@ async function runVideo(id, client, record, save, body, pollMs, marks = {}) {
       showProgress(id, "Reconnecting");
     }
   }
-  marks.completed = Date.now();
+  if (marks) marks.completed = Date.now();
   showProgress(id, "Saving");
   return [await client.videoContent(record.videoId)];
 }
 
+const span = (from, to) => (from && to && to >= from ? Math.round(to - from) : undefined);
+
 /** The stages Studio saw, for Details › Timing; each only when it was measured. */
 function radianceTiming(body, marks) {
-  const span = (from, to) => (from && to && to >= from ? Math.round(to - from) : undefined);
   const stages = {
     queueMs: span(body.queuedAt, body.startedAt),
     setupMs: span(marks.start, marks.sent),
@@ -241,21 +258,14 @@ export async function runRadianceJob(
         showProgress(id, "Generating");
         if (marks) marks.sent = Date.now();
         if (record.video)
-          made = await runVideo(id, client, record, save, request.body, pollMs, marks || {});
-        else {
-          const timing = new AbortController();
-          try {
-            const images = client.images(
-              request.route,
-              request.body,
-              AbortSignal.timeout(radianceWorkMs),
-            );
-            if (marks) void timeModelLoad(client, record.values.model, marks, timing.signal);
-            made = await images;
-          } finally {
-            timing.abort();
-          }
-        }
+          made = await runVideo(id, client, record, save, request.body, pollMs, marks);
+        else
+          made = await withModelTiming(
+            client,
+            record.values.model,
+            marks,
+            client.images(request.route, request.body, AbortSignal.timeout(radianceWorkMs)),
+          );
         if (marks) marks.received = Date.now();
         if (ended(id)) return;
       }
@@ -305,6 +315,7 @@ export async function runRadianceJob(
       jobs.set(id, { ...jobs.get(id), timing: radianceTiming(record.body, marks) });
     }
     const completed = await replaceGalleryJob(id, delivered, record.body, jobs);
+    if (marks) marks.published = Date.now();
     markWorkflowUsed(record.body.profileId || record.body.model || record.body.workflow || "");
     setTerminalJob(id, { status: "done", outputs: completed });
     noteIngested([id]);
@@ -324,6 +335,24 @@ export async function runRadianceJob(
     const failure = describeFailure({ message: error.message });
     setTerminalJob(id, { status: "failed", error: failure.summary, failure });
     updateGalleryJob(id, { status: "failed", filename: failure.title, failure });
+  } finally {
+    if (marks?.sent)
+      logEvent("Radiance job timing", {
+        job: id,
+        worker: worker.id,
+        model: record.values.model,
+        status: jobs.get(id)?.status ?? "recovering",
+        sentAt: marks.sent,
+        initialModelState: marks.initialModelState,
+        modelLoadingAt: marks.loading,
+        modelResidentAt: marks.resident,
+        providerAcceptedAt: marks.created,
+        // The video POST includes loading. Images have only a model-level residency observation.
+        providerWaitMs: span(marks.sent, marks.created ?? marks.resident),
+        modelLoadMs: span(marks.loading, marks.resident),
+        requestMs: span(marks.sent, marks.received),
+        saveMs: span(marks.received, marks.published),
+      });
   }
 }
 
