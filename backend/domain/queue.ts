@@ -629,7 +629,7 @@ export class GenerationQueue {
       reason: `Stopped: no progress for ${minutes} min.`,
     });
     await this.adapter.settled?.(failed);
-    if (job.stallRetry) return;
+    if (job.retried) return;
     const busy = new Set(
       this.store
         .openJobs()
@@ -641,13 +641,22 @@ export class GenerationQueue {
     );
     const target = others.find((resource) => !busy.has(resource)) ?? others[0];
     if (!target) return;
+    const retry = this.again(job, target);
+    logEvent(`Queued stalled job ${job.id} again as ${retry.id} on ${target}`);
+  }
+
+  /**
+   * Queues a failed job once more on its own or another resource, keeping its tier, set and Dream
+   * origin; a job queued again this way only fails the next time.
+   */
+  again(job: OwnedJob, resource = job.resource): OwnedJob {
     const retry = this.store.enqueue(
       job.ownerId,
       job.sessionId,
       job.input,
       job.operation,
       job.parentJobId,
-      target,
+      resource,
       undefined,
       {
         priority: job.priority,
@@ -657,8 +666,7 @@ export class GenerationQueue {
         ...(job.faceRedo ? { faceRedo: job.faceRedo } : {}),
       },
     );
-    this.store.save({ ...retry, stallRetry: true });
-    logEvent(`Queued stalled job ${job.id} again as ${retry.id} on ${target}`);
+    return this.store.save({ ...retry, retried: true });
   }
 
   /** Whether another local video job has started and not yet finished and saved. */
