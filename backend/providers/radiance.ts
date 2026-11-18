@@ -207,7 +207,9 @@ export function imageRequest(
   // Krea 2's text-tap rebalance; Radiance refuses it for other models.
   if (values.rebalance && values.rebalance !== "off") body.rebalance = values.rebalance;
   // Send the profile's exact schedule and off value; omission uses the model's own CFG default.
-  body.num_inference_steps = Number(values.steps);
+  // A fixed-step profile has no steps, so the model keeps its own schedule.
+  const steps = Number(values.steps);
+  if (steps > 0) body.num_inference_steps = steps;
   body.guidance_scale = radianceGuidance(Number(values.cfg), family);
   body.negative_prompt = String(values.negative_prompt || "");
   if (transparent) body.background = "transparent";
