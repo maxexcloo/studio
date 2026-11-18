@@ -1,7 +1,9 @@
 import type { Express, RequestHandler } from "express";
 
 import type { BenchmarkRun } from "../../shared/runtime.ts";
+import { logEvent } from "../crash-log.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
+import { RadianceClient } from "../providers/radiance.ts";
 import { Benchmarks } from "./benchmarks.ts";
 import { RuntimeController, type RuntimeRecord } from "./controller.ts";
 import {
@@ -56,18 +58,32 @@ export async function loadRuntime(
     fetchImpl,
     ...document<BenchmarkRun[]>("runtime-benchmarks"),
   });
-  // Restores the last placement after an outside stop, then swaps for ComfyUI work or back, then
-  // restarts an idle Radiance short of host memory.
   const shutdown = new AbortController();
-  const reconcile = setInterval(
-    () =>
-      void controller
-        .reconcile()
-        .then(() => (shutdown.signal.aborted ? undefined : controller.swapOnDemand()))
-        .then(() => controller.restartWhenIdle(shutdown.signal))
-        .catch(() => {}),
-    30_000,
-  ).unref();
+  const radiance = workloads
+    .filter((workload) => workload.backend === "radiance")
+    .map(({ id, url }) => ({
+      id,
+      client: new RadianceClient(url, fetchImpl, environment.STUDIO_RADIANCE_KEY),
+      since: Date.now() / 1000,
+    }));
+  const reconcile = setInterval(() => {
+    // Restore placement, handle swaps, then recover an idle Radiance short of host memory.
+    void controller
+      .reconcile()
+      .then(() => (shutdown.signal.aborted ? undefined : controller.swapOnDemand()))
+      .then(() => controller.restartWhenIdle(shutdown.signal))
+      .catch(() => {});
+    // Retain recent GPU samples in the logs. Allow one missed interval before dropping old samples.
+    for (const fleet of radiance)
+      void fleet.client
+        .cardHistory(Math.max(fleet.since, Date.now() / 1000 - 60), shutdown.signal)
+        .then((history) => {
+          if (!history || shutdown.signal.aborted) return;
+          fleet.since = history.at.at(-1)!;
+          logEvent("Radiance card utilisation", { worker: fleet.id, ...history });
+        })
+        .catch(() => {});
+  }, 30_000).unref();
   return {
     controller,
     benchmarks,

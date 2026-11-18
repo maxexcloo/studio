@@ -406,6 +406,29 @@ export class RadianceClient {
     }));
   }
 
+  /** The fleet's recorded per-card busy fractions, aligned to Unix timestamps in seconds. */
+  async cardHistory(since: number, signal?: AbortSignal) {
+    const route = `/history?since=${since}`;
+    const timeout = AbortSignal.timeout(2000);
+    const { t, c } = (await (
+      await this.call(
+        "GET",
+        route,
+        undefined,
+        signal ? AbortSignal.any([signal, timeout]) : timeout,
+      )
+    ).json()) as { t: number[]; c: Record<string, (number | null)[]> };
+    const first = t.findIndex((at) => at > since);
+    if (first < 0) return;
+    const cards = Object.entries(c).flatMap(([name, values]) => {
+      const match = /^busy(\d+)$/.exec(name);
+      return match && values.length === t.length
+        ? [{ card: Number(match[1]), busy: values.slice(first) }]
+        : [];
+    });
+    if (cards.length) return { at: t.slice(first), cards };
+  }
+
   /**
    * Whether Radiance's live view, as Bifrost's local/auto reads it, shows every card under a fifth
    * busy and no model running or waiting on work; false when it can't tell within two seconds.

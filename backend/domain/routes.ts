@@ -6,7 +6,7 @@ import {
   type QueueRetryResponse,
   type UnfinishedJob,
 } from "../../shared/queue.ts";
-import { logWarning } from "../crash-log.js";
+import { logEvent, logWarning } from "../crash-log.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import { type RouteAccount, directRoute } from "./direct-route.ts";
 import { GenerationQueue } from "./queue.ts";
@@ -30,6 +30,17 @@ export const unconfirmedCancel =
   "Cancellation could not be confirmed. The recorded job remains available for recovery.";
 const object = (value: unknown): value is GenerationInput =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
+
+const newPollProfile = () => ({
+  requests: 0,
+  deltaRequests: 0,
+  listedJobs: 0,
+  returnedJobs: 0,
+  totalListMs: 0,
+  totalHydrateMs: 0,
+  totalJsonSendMs: 0,
+  slowest: { totalMs: 0, listMs: 0, hydrateMs: 0, jsonSendMs: 0 },
+});
 
 export function registerQueueRoutes(
   app: object,
@@ -71,6 +82,20 @@ export function registerQueueRoutes(
   // every reader passes over for the records.
   const queued = (ownerId: string, jobs: OwnedJob[]) =>
     shown(ownerId, jobs).map((job) => (job.items.length ? { ...job, outputs: [] } : job));
+  let pollProfile = newPollProfile();
+  let pollReport: ReturnType<typeof setTimeout> | undefined;
+  function reportPollProfile() {
+    const { totalListMs, totalHydrateMs, totalJsonSendMs, slowest, ...counts } = pollProfile;
+    logEvent("Queue poll profile", {
+      ...counts,
+      totalListMs: Math.round(totalListMs),
+      totalHydrateMs: Math.round(totalHydrateMs),
+      totalJsonSendMs: Math.round(totalJsonSendMs),
+      slowest,
+    });
+    pollProfile = newPollProfile();
+    pollReport = undefined;
+  }
   directRoute(app, "GET", "/api/user-presets", (account) => ({
     status: 200,
     payload: { presets: store.presets(ownerOf(account)) },
@@ -161,17 +186,35 @@ export function registerQueueRoutes(
   });
   // With `since` (an `updatedAt`), only the jobs changed since then, and every listed job's ID.
   directRoute(app, "GET", "/api/queue", (account, { query }) => {
+    const started = performance.now();
     const ownerId = ownerOf(account);
     const pauses = store.pauses();
     const jobs = listed(store, ownerId, { results: false });
+    const listedAt = performance.now();
     const since = typeof query.since === "string" ? query.since : undefined;
+    const payload = {
+      jobs: queued(ownerId, since ? jobs.filter((job) => job.updatedAt >= since) : jobs),
+      ...(since ? { ids: jobs.map((job) => job.id) } : {}),
+      paused: { mine: pauses.has(ownerId), all: pauses.has(everyone) },
+    } satisfies QueueResponse;
+    const listMs = listedAt - started;
+    const hydrateMs = performance.now() - listedAt;
     return {
       status: 200,
-      payload: {
-        jobs: queued(ownerId, since ? jobs.filter((job) => job.updatedAt >= since) : jobs),
-        ...(since ? { ids: jobs.map((job) => job.id) } : {}),
-        paused: { mine: pauses.has(ownerId), all: pauses.has(everyone) },
-      } satisfies QueueResponse,
+      payload,
+      onJsonSent(jsonSendMs: number) {
+        pollProfile.requests += 1;
+        if (since) pollProfile.deltaRequests += 1;
+        pollProfile.listedJobs += jobs.length;
+        pollProfile.returnedJobs += payload.jobs.length;
+        pollProfile.totalListMs += listMs;
+        pollProfile.totalHydrateMs += hydrateMs;
+        pollProfile.totalJsonSendMs += jsonSendMs;
+        const totalMs = listMs + hydrateMs + jsonSendMs;
+        if (totalMs > pollProfile.slowest.totalMs)
+          pollProfile.slowest = { totalMs, listMs, hydrateMs, jsonSendMs };
+        pollReport ??= setTimeout(reportPollProfile, 60_000).unref();
+      },
     };
   });
   // One of the person's jobs, however old: the queue lists only the latest finished ones.
