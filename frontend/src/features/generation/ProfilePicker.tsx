@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { isCloudProfile } from "../../../../shared/profiles";
 import type { GenerationInput, Models, Profile } from "../../types";
+import { compareNames } from "../../ui/DataTable";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { ChipOption, ChipSelect } from "./ChipSelect";
@@ -58,14 +59,13 @@ function profileLabel(profile: Profile, profiles: Profile[]) {
 /** Profiles grouped by readable family name, for every profile selector. */
 export function profileOptions(available: Profile[]) {
   const family = (profile: Profile) => modelFamilyLabel(profile.family, profile.familyName);
-  return [...new Set(available.map(family))]
-    .sort((a, b) => a.localeCompare(b))
-    .map((group) => ({
-      group,
-      items: available
-        .filter((profile) => family(profile) === group)
-        .map((profile) => ({ value: profile.id, label: profileLabel(profile, available) })),
-    }));
+  return [...new Set(available.map(family))].sort(compareNames).map((group) => ({
+    group,
+    items: available
+      .filter((profile) => family(profile) === group)
+      .map((profile) => ({ value: profile.id, label: profileLabel(profile, available) }))
+      .sort((a, b) => compareNames(a.label, b.label)),
+  }));
 }
 
 export function ProfilePicker({

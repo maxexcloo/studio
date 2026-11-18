@@ -18,6 +18,7 @@ import {
   maxSuggestions,
 } from "../../../../shared/suggestions";
 import { type Action, type ActionGroups } from "../../ui/ActionBar";
+import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { changeSummary } from "./changeSummary";
 import { assistantQuery } from "./PromptAssistant";
@@ -193,7 +194,7 @@ export function useChangeSuggestions<K extends QueryKey>({
   });
   const list = [...(steps.data?.suggestions ?? [])]
     .slice(0, maxSuggestions)
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => compareNames(a.label, b.label));
   const loading = refresh.isPending || (steps.isFetching && !list.length);
   const { options, again } = suggested(
     loading,
@@ -251,7 +252,7 @@ export const assistMenu = ({
         templates.length || custom.length
           ? [
               { id: "templates-heading", label: "Templates", heading: true },
-              ...[...templates].sort((a, b) => String(a.label).localeCompare(String(b.label))),
+              ...[...templates].sort((a, b) => compareNames(String(a.label), String(b.label))),
               ...custom,
             ]
           : [],

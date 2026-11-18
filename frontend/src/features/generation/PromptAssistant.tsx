@@ -7,6 +7,7 @@ import { maxLoras } from "../../../../shared/profiles";
 import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import type { Action as ToolAction } from "../../ui/ActionBar";
+import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { CustomDialog } from "./CustomDialog";
 
@@ -319,7 +320,7 @@ export function usePromptAssistant({
   const custom = change || info.presets.some((item) => item.id === "custom");
   const styles = info.presets
     .filter((item) => item.id !== "custom")
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => compareNames(a.label, b.label));
   const improve: ToolAction[] = [
     // Each style is a choice that runs at once; the last one used carries a check.
     ...(styles.length > 1

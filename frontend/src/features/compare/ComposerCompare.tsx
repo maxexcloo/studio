@@ -30,6 +30,7 @@ import {
   withResolution,
 } from "../../../../shared/resolution";
 import type { GenerationInput } from "../../types";
+import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import { TextBox } from "../../ui/TextBox";
@@ -99,7 +100,7 @@ export function CompareMenu() {
   const compatible = effective?.capabilities.lora ? compatibleLoras(effective, info) : [];
   const loraOptions = compatible
     .map((file) => ({ value: file, label: loraName(file, info[file]) }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => compareNames(a.label, b.label));
   const selectedLoras = compatible.filter((file) => loras.includes(file));
   // Only strengths the LoRA accepts; picks made for another range give way to its default sweep.
   const strengthChoices = loraStrengthChoices(info[loraFile]);

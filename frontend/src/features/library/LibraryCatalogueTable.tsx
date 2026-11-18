@@ -2,7 +2,7 @@ import { ActionIcon, Alert, Badge, Menu, Select, Stack, Text, Tooltip } from "@m
 import { type ReactNode, useState } from "react";
 
 import { copyText } from "../../ui/clipboard";
-import { DataTable } from "../../ui/DataTable";
+import { DataTable, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { usePhone } from "../../ui/usePhone";
@@ -110,7 +110,7 @@ const statusOf = (item: LibraryItem) =>
       : item.installed
         ? { label: "Installed", color: "green" }
         : { label: "Not Installed", color: "gray" };
-const unique = (values: string[]) => [...new Set(values)].sort((a, b) => a.localeCompare(b));
+const unique = (values: string[]) => [...new Set(values)].sort(compareNames);
 const views = [
   { value: "installed", label: "Installed" },
   { value: "available", label: "Available" },
