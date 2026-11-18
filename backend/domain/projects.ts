@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  type ChangeBy,
   type Project,
   type ProjectContent,
   maxProjectBrief,
+  maxProjectChanges,
   maxProjectLoras,
   maxProjectName,
   maxProjectProfiles,
@@ -19,10 +21,12 @@ interface ProjectsRecord {
   chats: Chats;
 }
 /** What a create or update may carry: any part of a project's content. */
-interface ProjectPatch {
+export interface ProjectPatch {
   name?: string;
   brief?: Partial<ProjectContent["brief"]>;
   constraints?: Partial<ProjectContent["constraints"]>;
+  paused?: boolean;
+  favoured?: boolean;
 }
 
 const maxProjects = 50;
@@ -40,9 +44,17 @@ const text = (value: unknown, field: string, max: number) => {
 
 /** A patch from a request body, checked field by field; unknown fields are refused. */
 export function projectPatch(body: unknown): ProjectPatch {
-  const { name, brief, constraints, ...rest } = (body || {}) as Record<string, any>;
+  const { name, brief, constraints, paused, favoured, ...rest } = (body || {}) as Record<
+    string,
+    any
+  >;
   if (Object.keys(rest).length) throw failure(`Unknown field ${Object.keys(rest)[0]}.`, 400);
   const patch: ProjectPatch = {};
+  for (const [key, value] of Object.entries({ paused, favoured }))
+    if (value !== undefined) {
+      if (typeof value !== "boolean") throw failure(`Set ${key} to true or false.`, 400);
+      Object.assign(patch, { [key]: value });
+    }
   if (name !== undefined) {
     patch.name = text(name, "name", maxProjectName);
     if (!patch.name) throw failure("Name the project.", 400);
@@ -147,13 +159,42 @@ export function createProjects({
     if (!project) throw failure("That project no longer exists.", 404);
     return project;
   };
-  const content = ({ name, brief, constraints }: ProjectContent): ProjectContent =>
-    structuredClone({ name, brief, constraints });
-  const merged = (base: ProjectContent, patch: ProjectPatch): ProjectContent => ({
-    name: patch.name ?? base.name,
-    brief: { ...base.brief, ...patch.brief },
-    constraints: { ...base.constraints, ...patch.constraints },
-  });
+  const content = ({ name, brief, constraints, paused, favoured }: ProjectContent) =>
+    structuredClone({
+      name,
+      brief,
+      constraints,
+      ...(paused ? { paused } : {}),
+      ...(favoured ? { favoured } : {}),
+    }) as ProjectContent;
+  const merged = (base: ProjectContent, patch: ProjectPatch) =>
+    content({
+      name: patch.name ?? base.name,
+      brief: { ...base.brief, ...patch.brief },
+      constraints: { ...base.constraints, ...patch.constraints },
+      paused: patch.paused ?? base.paused,
+      favoured: patch.favoured ?? base.favoured,
+    });
+  /** What differs between two versions of a project: "name", brief fields and so on. */
+  const changed = (before: ProjectContent, after: ProjectContent) => {
+    const same = (a: unknown, b: unknown) => JSON.stringify(a || "") === JSON.stringify(b || "");
+    const briefKeys = [...new Set([...Object.keys(before.brief), ...Object.keys(after.brief)])];
+    return [
+      ...(same(before.name, after.name) ? [] : ["name"]),
+      ...briefKeys.filter(
+        (key) => !same(before.brief[key as "styles"], after.brief[key as "styles"]),
+      ),
+      ...(["constraints", "paused", "favoured"] as const).filter(
+        (key) => !same(before[key], after[key]),
+      ),
+    ];
+  };
+  /** Replaces a project's content, dropping flags the new content leaves unset. */
+  const assign = (project: Project, next: ProjectContent) => {
+    delete project.paused;
+    delete project.favoured;
+    Object.assign(project, next);
+  };
   /** A chat's attached project, or null; a missing project detaches it. */
   const attached = (record: ProjectsRecord, chat: string) => {
     const projectId = record.chats[chat]?.projectId;
@@ -171,12 +212,16 @@ export function createProjects({
     list: (ownerId: string) => read(ownerId).projects,
     /** Each attached chat's project and latest request, by conversation id. */
     chats: (ownerId: string) => read(ownerId).chats,
-    create(ownerId: string, patch: ProjectPatch) {
+    /** Makes a project; one Dream proposed notes why. */
+    create(ownerId: string, patch: ProjectPatch, why = "") {
       if (!patch.name) throw failure("Name the project.", 400);
       const record = read(ownerId);
       if (record.projects.length >= maxProjects)
         throw failure(`Keep to ${maxProjects} projects; delete one first.`, 409);
       const at = stamp();
+      const changes = why
+        ? [{ id: randomUUID(), at, by: "dream" as const, why, fields: ["created"] }]
+        : undefined;
       const project: Project = {
         id: randomUUID(),
         ...merged(
@@ -189,29 +234,42 @@ export function createProjects({
         ),
         createdAt: at,
         updatedAt: at,
+        ...(changes ? { changes } : {}),
       };
       record.projects.push(project);
       write(ownerId, record);
       return project;
     },
-    /** Changes a project, keeping what it replaced for Undo. */
-    update(ownerId: string, id: string, patch: ProjectPatch, by: "chat" | "studio") {
+    /**
+     * Changes a project, keeping what it replaced for one Undo, and notes who changed what and,
+     * for Dream's proposals, why. A patch that changes nothing leaves it as it was.
+     */
+    update(ownerId: string, id: string, patch: ProjectPatch, by: ChangeBy, why = "") {
       const record = read(ownerId);
       const project = find(record, id);
-      const previous = content(project);
-      Object.assign(project, merged(project, patch), {
-        previous: { ...previous, by },
-        updatedAt: stamp(),
-      });
+      const before = content(project);
+      const after = merged(project, patch);
+      const fields = changed(before, after);
+      if (!fields.length) return project;
+      const change = { id: randomUUID(), at: stamp(), by, why, fields };
+      assign(project, after);
+      project.previous = { ...before, change: change.id };
+      project.changes = [change, ...(project.changes || [])].slice(0, maxProjectChanges);
+      project.updatedAt = change.at;
       write(ownerId, record);
       return project;
     },
+    /** Takes back the latest change, once. */
     undo(ownerId: string, id: string) {
       const record = read(ownerId);
       const project = find(record, id);
       if (!project.previous) throw failure("There is nothing to undo.", 409);
-      const { by: _by, ...previous } = project.previous;
-      Object.assign(project, previous, { updatedAt: stamp() });
+      const { change, ...previous } = project.previous;
+      assign(project, previous);
+      project.changes = (project.changes || []).map((entry) =>
+        entry.id === change ? { ...entry, undone: true as const } : entry,
+      );
+      project.updatedAt = stamp();
       delete project.previous;
       write(ownerId, record);
       return project;

@@ -160,7 +160,7 @@ export function createReview(options: {
     wanted: (item) => {
       const state = item.dream?.state;
       if (item.type !== "image" || item.uploaded || item.rating === "disliked") return false;
-      if (state === "discarded") return false;
+      if (state === "discarded" || state === "draft") return false;
       if (state !== "unseen" && !(now() - Date.parse(item.createdAt || "") <= recentMs))
         return false;
       if (!vision[options.text(item.ownerId || "").side]) return false;

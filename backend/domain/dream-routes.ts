@@ -1,19 +1,23 @@
 import { dreamDefaults, dreamSettingError } from "../../shared/dream.ts";
+import { maxDismissReason } from "../../shared/inbox.ts";
 import { type RouteAccount, type RouteRun, directRoute } from "./direct-route.ts";
 import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
+import type { InboxStore } from "./inbox.ts";
 import { type Projects, projectPatch } from "./projects.ts";
 import { digest } from "./review.ts";
 
-/** The caller's own Dream: settings, the unseen pool, verdicts, discards and projects. */
+/** The caller's own Dream: settings, the unseen pool, verdicts, discards, projects and the Inbox. */
 export function registerDreamRoutes(
   app: object,
   {
     dream,
     projects,
+    inbox,
     listed,
   }: {
     dream: Dream;
     projects: Projects;
+    inbox: InboxStore;
     /** The results as lists carry them, numbered (domain/result-numbers.ts) and without what Details reads. */
     listed: <T extends object>(items: T[]) => T[];
   },
@@ -132,9 +136,22 @@ export function registerDreamRoutes(
       throw Object.assign(new Error("Name the chat."), { status: 400 });
     return chat;
   };
+  // Each project's stats and share of turns, with its newest results.
   route("GET", "/api/dream/projects", (account) => ({
     status: 200,
-    payload: { projects: projects.list(owner(account)) },
+    payload: {
+      projects: projects.list(owner(account)),
+      stats: Object.fromEntries(
+        Object.entries(dream.projectStats(owner(account))).map(([id, stats]) => [
+          id,
+          { ...stats, results: listed(stats.results) },
+        ]),
+      ),
+    },
+  }));
+  route("GET", "/api/dream/projects/:projectId/results", (account, { params }) => ({
+    status: 200,
+    payload: { items: listed(dream.projectResults(owner(account), params.projectId, 60)) },
   }));
   route("POST", "/api/dream/projects", (account, { body }) =>
     answer(() => ({ project: projects.create(owner(account), projectPatch(body)) })),
@@ -146,7 +163,7 @@ export function registerDreamRoutes(
         owner(account),
         params.projectId,
         projectPatch(body),
-        query?.by === "chat" ? "chat" : "studio",
+        query?.by === "chat" ? "chat" : "you",
       ),
     })),
   );
@@ -168,18 +185,48 @@ export function registerDreamRoutes(
   route("POST", "/api/dream/projects/activity", (account, { body }) =>
     answer(() => ({ project: projects.activity(owner(account), chatOf(body)) })),
   );
-  // Library › Characters' suggested cards: Accept makes the card, Dismiss turns it down.
-  route("GET", "/api/dream/suggestions", (account) => ({
-    status: 200,
-    payload: { suggestions: dream.suggestions(owner(account)) },
-  }));
-  route("POST", "/api/dream/suggestions/:suggestionId/accept", (account, { params }) =>
-    answer(() => ({
-      card: dream.accept(owner(account), account || undefined, params.suggestionId),
+  // Dream › Projects' Inbox: Accept (with the person's edits) applies a proposal, Undo takes it
+  // back, and Dismiss or Clear snooze proposals with an optional reason.
+  const shown = <T extends { proposals: { evidence: object[]; drafts?: object[] }[] }>(
+    value: T,
+  ) => ({
+    ...value,
+    proposals: value.proposals.map((proposal) => ({
+      ...proposal,
+      evidence: listed(proposal.evidence),
+      ...(proposal.drafts ? { drafts: listed(proposal.drafts) } : {}),
     })),
+  });
+  const reason = (body: Record<string, unknown> | undefined) => {
+    const value = body?.reason ?? "";
+    if (typeof value !== "string" || value.length > maxDismissReason)
+      throw Object.assign(new Error(`Say why in at most ${maxDismissReason} characters.`), {
+        status: 400,
+      });
+    return value;
+  };
+  /** An Inbox route's answer, or its refusal. */
+  const inboxAnswer = async (run: () => Promise<object> | object) => {
+    try {
+      return { status: 200, payload: shown((await run()) as Parameters<typeof shown>[0]) };
+    } catch (error) {
+      return refuse(error);
+    }
+  };
+  route("GET", "/api/dream/inbox", (account) => inboxAnswer(() => inbox.read(owner(account))));
+  route("POST", "/api/dream/inbox/clear", (account, { body }) =>
+    inboxAnswer(() => inbox.clear(owner(account), reason(body))),
   );
-  route("POST", "/api/dream/suggestions/:suggestionId/dismiss", (account, { params }) =>
-    answer(() => (dream.dismiss(owner(account), params.suggestionId), { ok: true })),
+  route("POST", "/api/dream/inbox/:proposalId/accept", (account, { params, body }) =>
+    inboxAnswer(() =>
+      inbox.accept(owner(account), account || undefined, params.proposalId, body?.change),
+    ),
+  );
+  route("POST", "/api/dream/inbox/:proposalId/dismiss", (account, { params, body }) =>
+    inboxAnswer(() => inbox.dismiss(owner(account), params.proposalId, reason(body))),
+  );
+  route("POST", "/api/dream/inbox/:proposalId/undo", (account, { params }) =>
+    inboxAnswer(() => inbox.undo(owner(account), params.proposalId)),
   );
   route("GET", "/api/dream/calibration", (account, { query }) => {
     const limit = Math.max(
