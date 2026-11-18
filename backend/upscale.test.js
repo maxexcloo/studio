@@ -42,7 +42,9 @@ const registryListing = {
 test("SeedVR2 caches only on a recently used worker with enough reported RAM for its weights", () => {
   const worker = "gpu-one";
   const info = infoWith(registryListing);
-  const ram = (gib) => ({ system: { ram_total: gib * 1024 ** 3 } });
+  const ram = (gib, free = gib) => ({
+    system: { ram_total: gib * 1024 ** 3, ram_free: free * 1024 ** 3 },
+  });
   const graphFor = (options, quality = "fast") =>
     upscaleGraph({ width: 1024, height: 1024, quality }, info, { worker, now: 1000, ...options })
       .graph;
@@ -57,11 +59,18 @@ test("SeedVR2 caches only on a recently used worker with enough reported RAM for
   noteWorkerUpscale(worker, 500);
   assert.deepEqual(caches({ stats: ram(32) }), [true, true]);
   assert.deepEqual(caches({ stats: ram(31) }), [false, false]);
+  assert.deepEqual(caches({ stats: ram(64, 16) }), [false, false]);
   assert.deepEqual(caches({}), [false, false]);
   assert.deepEqual(caches({ worker: "gpu-two", stats: ram(32) }), [false, false]);
   assert.deepEqual(caches({ stats: ram(32), now: 600_500 }), [false, false]);
   assert.deepEqual(caches({ stats: ram(64) }, "high"), [false, false]);
   assert.deepEqual(caches({ stats: ram(128) }, "high"), [true, true]);
+  const mac = upscaleGraph(
+    { width: 1024, height: 1024, quality: "fast" },
+    infoWith({ ...registryListing, devices: ["mps"], offloads: ["none", "mps"] }),
+    { worker, now: 1000, stats: ram(64) },
+  ).graph;
+  assert.equal(mac.studio_seedvr2_dit.inputs.cache_model, false, "caching needs an offload device");
 });
 
 test("the worker's listing decides what is installed", () => {

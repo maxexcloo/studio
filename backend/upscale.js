@@ -417,16 +417,15 @@ export function upscaleGraph(body, info = {}, { worker, stats, now = Date.now() 
   const swap = ditDevices.offload !== "none";
   const ditBytes = modelFiles[path.basename(dit.file)]?.bytes;
   const vaeBytes = modelFiles[path.basename(vae.file)]?.bytes;
-  const ramBytes = stats?.system?.ram_total;
-  const lastUpscale = lastUpscaleByWorker.get(worker);
-  const keepModels = Boolean(
-    lastUpscale !== undefined &&
-    now - lastUpscale < upscaleCacheWindowMs &&
-    ditBytes &&
-    vaeBytes &&
-    Number.isFinite(ramBytes) &&
-    ramBytes >= Math.max(32 * 1024 ** 3, 8 * (ditBytes + vaeBytes)),
-  );
+  const ram = stats?.system;
+  // SeedVR2 refuses to cache without an offload device. Free memory, not the total, since other
+  // workers and Radiance share the host; unknown sizes or stats compare false.
+  const keepModels =
+    swap &&
+    vaeDevices.offload !== "none" &&
+    now - lastUpscaleByWorker.get(worker) < upscaleCacheWindowMs &&
+    ram?.ram_total >= 32 * 1024 ** 3 &&
+    ram?.ram_free >= 8 * (ditBytes + vaeBytes);
   const graph = {};
   graph["1"] = { class_type: "LoadImage", inputs: { image: String(body.imageName || "") } };
   const video = body.mediaType === "video";

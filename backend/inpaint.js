@@ -195,11 +195,11 @@ export async function inpaintFiles(sharp, sourceBuffer, maskBuffer, { targetPixe
   if (blend) {
     const core = spreadMask(grown, box, Math.round(blend * 0.8), 0);
     const soft = await rawGray(gray(core, box.width, box.height).blur(Math.max(0.3, blend / 2.5)));
-    for (let i = 0; i < boxMask.length; i += 1) {
-      if (grown[i]) boxMask[i] = Math.max(boxMask[i], soft[i]);
+    for (let i = 0; i < paint.length; i += 1) {
+      if (grown[i]) paint[i] = Math.max(paint[i], soft[i]);
     }
   }
-  const compositeMask = await pngGray(gray(boxMask, box.width, box.height));
+  const compositeMask = await pngGray(gray(paint, box.width, box.height));
   return {
     box,
     work,

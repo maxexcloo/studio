@@ -89,7 +89,10 @@ test("the files: an exact crop, a hard grown sampling mask and a feathered stitc
     .png()
     .toBuffer();
   const maskRaw = Buffer.alloc(width * height);
-  for (let y = 400; y < 600; y += 1) maskRaw.fill(255, y * width + 1000, y * width + 1200);
+  for (let y = 400; y < 600; y += 1) {
+    maskRaw.fill(255, y * width + 1000, y * width + 1200);
+    maskRaw[y * width + 1000] = 128; // A soft brush edge
+  }
   const mask = await sharp(maskRaw, { raw: { width, height, channels: 1 } })
     .png()
     .toBuffer();
@@ -125,6 +128,9 @@ test("the files: an exact crop, a hard grown sampling mask and a feathered stitc
     "the seam fades outside the paint",
   );
   assert.equal(at(paintLeft - 21, 256), 0, "the seam stays inside the sampling mask");
+  const hard = await inpaintFiles(sharp, source, mask, { targetPixels: 1024 * 1024, feather: 0 });
+  const hardStitch = await sharp(hard.compositeMask).extractChannel(0).raw().toBuffer();
+  assert.equal(hardStitch[256 * 512 + paintLeft], 255, "without softness the paint is still whole");
 
   const sampling = await sharp(files.samplingMask)
     .extractChannel(0)
