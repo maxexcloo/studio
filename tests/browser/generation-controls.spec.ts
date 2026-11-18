@@ -1014,7 +1014,7 @@ test("The phone Generate sheet fits the screen and keeps its action bar above th
   await expect.poll(barBottom).toBeGreaterThan(100 + 932 - 300 - 60);
   await scrollTo(0);
   // Typing keeps the whole screen while a browser's toolbar folds away above the keyboard; only
-  // the keyboard dropping (Android's Back keeps focus) ends it.
+  // the keyboard dropping (Android's Back) ends it, letting the text go.
   const typing = sheet.locator("[data-typing]");
   const visible = async (lower: number) =>
     page.evaluate((lower) => {
@@ -1030,6 +1030,8 @@ test("The phone Generate sheet fits the screen and keeps its action bar above th
   await expect(typing).toHaveCount(1);
   await visible(0);
   await expect(typing).toHaveCount(0);
+  await expect(prompt).not.toBeFocused();
+  await prompt.click();
   await visible(300);
   // Done returns to the sheet, whose bar ends with Generate.
   await done.click();

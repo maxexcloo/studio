@@ -248,6 +248,15 @@ test("trusted optional adapter policy validates conditioning and full publisher 
   );
   loraCatalogue().edit("loras/style.safetensors", { compatibility: { conditionings: ["FL2VA"] } });
   assert.equal(sanitizeGenerateBody(request, info).loras[0].strength, 10);
+  loraCatalogue().edit("loras/style.safetensors", {
+    strength: { min: 0.123, max: 0.127, step: 0.001 },
+  });
+  for (const strength of [0.123, 0.125, 0.127])
+    assert.equal(
+      sanitizeGenerateBody({ ...request, loras: [{ name: "style.safetensors", strength }] }, info)
+        .loras[0].strength,
+      strength,
+    );
 });
 
 test("runtime profiles expose owned prompting and select explicit image-mode guidance", () => {

@@ -111,6 +111,8 @@ test("a ready profile runs a generate request to the gallery", async () => {
   const profile = models.body.profiles.find((item) => item.id === "custom:test-image");
   assert.ok(profile, "the profile is offered");
   assert.equal(profile.family, "sdxl");
+  const chat = "chat-a".padEnd(256, "a");
+  const turn = "turn-1".padEnd(256, "a");
 
   const queued = fake.nextPrompt();
   const generate = await api("/api/generate", {
@@ -125,7 +127,7 @@ test("a ready profile runs a generate request to the gallery", async () => {
       negative: "",
       count: 1,
       seed: "42",
-      chat: { conversationId: "chat-a", turnId: "turn-1" },
+      chat: { conversationId: chat, turnId: turn },
     },
   });
   assert.equal(generate.status, 200, JSON.stringify(generate.body));
@@ -159,10 +161,10 @@ test("a ready profile runs a generate request to the gallery", async () => {
   );
   // `chat` keeps one chat's results and `turn` one turn of it.
   for (const [query, listed] of [
-    ["chat=chat-a", true],
-    ["chat=chat-a&turn=turn-1", true],
-    ["chat=chat-a&turn=turn-2", false],
-    ["chat=chat-b", false],
+    [`chat=${chat}`, true],
+    [`chat=${chat}&turn=${turn}`, true],
+    [`chat=${chat}&turn=${turn.slice(0, 200)}`, false],
+    [`chat=${chat.slice(0, 200)}`, false],
   ])
     assert.equal(
       (await api(`/api/gallery?limit=20&${query}`)).body.items.some(

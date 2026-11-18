@@ -2084,6 +2084,11 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
     (await request(`/inbox/${edit.id}/accept`, { change: { brief: { styles: "x" } } })).status,
     400,
   );
+  assert.equal(
+    (await request(`/inbox/${edit.id}/accept`, { change: { brief: { avoid: "people" } } })).status,
+    409,
+  );
+  assert.equal((await request(`/inbox/${edit.id}/undo`, {})).status, 409);
   await request(`/inbox/${edit.id}/accept`, {
     change: { brief: { avoid: "people, crowds, boats" } },
   });
@@ -2112,6 +2117,15 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
   assert.deepEqual(
     picks.map(({ change, why }) => [change.brief?.styles, why]),
     [["lighting: cold dawn", "A chat picked cold dawn for Lighting in a comparison"]],
+  );
+  state.clock += 6 * 3_600_000;
+  const proposing = inbox.propose("alice");
+  inbox.picked("alice", beach.id, "Lighting", "bright noon", "you");
+  await proposing;
+  assert.ok(
+    inbox
+      .read("alice")
+      .proposals.some(({ change }) => change.brief?.styles === "lighting: bright noon"),
   );
 });
 

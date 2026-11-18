@@ -404,6 +404,7 @@ export class GenerationQueue {
               return;
             }
             const latest = this.store.job(job.ownerId, job.id)!;
+            if (terminalStatuses.has(latest.status)) return;
             const observation = { ...observed, reason: observed.reason || "" };
             job = { ...latest, ...observation };
             if (observed.status === "completed") {
@@ -429,6 +430,7 @@ export class GenerationQueue {
             }
           } catch (error) {
             const latest = this.store.job(job.ownerId, job.id)!;
+            if (terminalStatuses.has(latest.status)) return;
             saveObservation(latest, {
               reason: `Waiting for the recorded generation: ${(error as Error).message}`,
             });
@@ -548,6 +550,7 @@ export class GenerationQueue {
             try {
               const observation = await this.adapter.submit(job);
               const latest = this.store.job(job.ownerId, job.id)!;
+              if (terminalStatuses.has(latest.status)) continue;
               let submitted = this.store.save({
                 ...latest,
                 ...observation,
@@ -565,6 +568,7 @@ export class GenerationQueue {
               }
             } catch (error) {
               const latest = this.store.job(job.ownerId, job.id)!;
+              if (terminalStatuses.has(latest.status)) continue;
               this.store.save({
                 ...latest,
                 reason: `Submission outcome is unknown; checking before any retry: ${(error as Error).message}`,

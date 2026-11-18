@@ -52,12 +52,14 @@ export function useModelDownloads() {
     data?.active,
     ...(data?.queued || []),
     ...(data?.paused || []),
-    ...(data?.recent || []).filter((item) => ["failed", "paused"].includes(item.status)),
+    ...(data?.recent || []),
   ]) {
     const key = item && `${item.folder}/${item.file}`;
     if (key && !shown.has(key)) shown.set(key, item);
   }
-  return [...shown.values()];
+  return [...shown.values()].filter(
+    (item) => running(item) || ["failed", "paused"].includes(item.status),
+  );
 }
 
 /**

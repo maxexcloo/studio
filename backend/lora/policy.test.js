@@ -104,6 +104,7 @@ test("every strength a LoRA is offered or given lies within the range the server
     { strengthRange: { min: -5, max: 5, step: 0.05 } },
     { strengthRange: { min: 0, max: 1, step: 0.05 }, recommendedStrength: 1.4 },
     { recommendedStrength: 3 },
+    { strengthRange: { min: 0.123, max: 0.127, default: 0.125, step: 0.001 } },
   ];
   for (const info of cases) {
     const { min, max } = loraStrengthRange(info);
@@ -115,7 +116,7 @@ test("every strength a LoRA is offered or given lies within the range the server
     assert.ok(loraStrengthChoices(info).length <= 11, label);
     const sweep = loraStrengthSweep(info);
     assert.equal(sweep[0], 0, label);
-    assert.ok(sweep.slice(1).includes(Math.round(loraDefaultStrength(info) * 100) / 100), label);
+    assert.ok(sweep.slice(1).includes(loraDefaultStrength(info)), label);
   }
   // An unpublished range widens to take in the recommendation; a published one clamps it.
   assert.deepEqual(loraStrengthRange({ recommendedStrength: 3 }), { min: 0, max: 3, step: 0.05 });

@@ -241,6 +241,10 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
   await page.keyboard.press("Escape");
   await expect(tile(1)).toBeVisible();
   await expect(tile(2)).toHaveCount(0);
+  await tile(0).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByText(/^[12] \/ 2$/)).toBeVisible();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await page.getByRole("button", { name: "Remove This Chat Filter", exact: true }).click();
   await expect(page).toHaveURL(/\/images$/);
   await expect(tile(2)).toBeVisible();
