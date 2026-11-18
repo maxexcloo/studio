@@ -6,7 +6,6 @@ import {
   Menu,
   Modal,
   SegmentedControl,
-  Select,
   Stack,
   Switch,
   Text,
@@ -19,16 +18,16 @@ import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
-import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import {
+  FilterChoices,
+  SectionHeader,
+  SectionToolbar,
+  ToolbarAction,
+} from "../../ui/SectionToolbar";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { assistantQuery } from "../generation/PromptAssistant";
-import {
-  type PromptStyle,
-  type PromptStyleList,
-  type PromptStyleVersion,
-  promptStylesQuery,
-} from "./queries";
+import { type PromptStyle, type PromptStyleList, promptStylesQuery } from "./queries";
 
 const path = "/api/profiles/prompt-styles";
 
@@ -184,66 +183,6 @@ function StyleEditor({
   );
 }
 
-/** The list's saved versions; restoring one saves it as a new version. */
-function StyleVersions({ hash, close }: { hash: string; close: () => void }) {
-  const phone = usePhone();
-  const { refresh } = useSaveStyles();
-  const versions = useQuery({
-    queryKey: [...promptStylesQuery.queryKey, "versions"],
-    queryFn: () => api<{ versions: PromptStyleVersion[] }>(`${path}/versions`),
-  });
-  const restore = useMutation({
-    meta: { inlineError: true },
-    mutationFn: (version: number) => post(`${path}/revert`, { version, baseHash: hash }),
-    onSuccess: () => {
-      refresh();
-      close();
-    },
-  });
-  return (
-    <Modal opened onClose={close} title="Prompt Style Versions" fullScreen={phone}>
-      <Stack>
-        {(versions.error || restore.error) && (
-          <Alert color="red">{(versions.error || restore.error)!.message}</Alert>
-        )}
-        <DataTable
-          label="Prompt Style Versions"
-          rows={versions.data?.versions || []}
-          rowKey={(entry) => `${entry.version}`}
-          rowName={(entry) => `Version ${entry.version}`}
-          loading={versions.isPending && "Loading Versions"}
-          empty="No Versions"
-          columns={[
-            {
-              key: "version",
-              header: "Version",
-              cell: (entry) => <Text size="sm">{entry.version}</Text>,
-            },
-            {
-              key: "by",
-              header: "Saved By",
-              main: true,
-              cell: (entry) => (
-                <Text size="sm" truncate>
-                  {entry.by || entry.origin}
-                </Text>
-              ),
-            },
-          ]}
-          rowActions={(entry) => (
-            <Menu.Item disabled={restore.isPending} onClick={() => restore.mutate(entry.version)}>
-              Restore Version
-            </Menu.Item>
-          )}
-        />
-        <DialogFooter>
-          <Button onClick={close}>Close</Button>
-        </DialogFooter>
-      </Stack>
-    </Modal>
-  );
-}
-
 /**
  * Library › Prompt Styles: the assistant's fixed options, alphabetically with a type filter.
  */
@@ -251,10 +190,9 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
   const client = useQueryClient();
   const list = useQuery(promptStylesQuery);
   const [query, setQuery] = useState("");
-  const [kind, setKind] = useState<Kind | "all">("all");
+  const [kind, setKind] = useState<Kind | null>(null);
   const [editing, setEditing] = useState<{ style: PromptStyle | null; kind: Kind } | null>(null);
   const [deleting, setDeleting] = useState<PromptStyle | null>(null);
-  const [versions, setVersions] = useState(false);
   const { save, refresh } = useSaveStyles();
   const styles = list.data?.styles || [];
   // Switches apply at once, showing the change before the save answers.
@@ -284,23 +222,20 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
           query={query}
           onQueryChange={setQuery}
           filters={
-            <Select
+            <FilterChoices
               label="Type"
-              data={[{ value: "all", label: "All" }, ...kinds]}
+              data={kinds}
               value={kind}
-              onChange={(value) => setKind(value as Kind | "all")}
-              allowDeselect={false}
-              comboboxProps={{ withinPortal: false }}
+              onChange={(value) => setKind(value as Kind | null)}
             />
           }
-          filterCount={Number(kind !== "all")}
-          onClearFilters={() => setKind("all")}
-          more={[{ label: "Versions", icon: icons.versions, onClick: () => setVersions(true) }]}
+          filterCount={Number(!!kind)}
+          onClearFilters={() => setKind(null)}
           actions={
             <ToolbarAction
               label="New Style"
               icon={icons.add}
-              onClick={() => setEditing({ style: null, kind: kind === "all" ? "improve" : kind })}
+              onClick={() => setEditing({ style: null, kind: kind ?? "improve" })}
             />
           }
         />
@@ -320,7 +255,7 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
       ) : (
         <DataTable
           label="Prompt Styles"
-          rows={styles.filter((style) => kind === "all" || style.kind === kind)}
+          rows={styles.filter((style) => !kind || style.kind === kind)}
           rowKey={(style) => `${style.kind}:${style.id}`}
           rowName={(style) => style.label}
           loading={list.isPending && "Loading Prompt Styles"}
@@ -387,14 +322,15 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
                 leftSection={<icons.edit size={16} />}
                 onClick={() => setEditing({ style, kind: style.kind })}
               >
-                Edit Style
+                Edit
               </Menu.Item>
+              <Menu.Divider />
               <Menu.Item
                 color="red"
                 leftSection={<icons.delete size={16} />}
                 onClick={() => setDeleting(style)}
               >
-                Delete Style
+                Delete
               </Menu.Item>
             </>
           )}
@@ -408,9 +344,6 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
           close={() => setEditing(null)}
         />
       )}
-      {versions && list.data && (
-        <StyleVersions hash={list.data.hash} close={() => setVersions(false)} />
-      )}
       <ConfirmDialog
         opened={!!deleting}
         title="Delete Style"
@@ -420,7 +353,7 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
         onConfirm={() => deleting && remove.mutate(deleting)}
         onClose={() => setDeleting(null)}
       >
-        {`Delete ${deleting?.label}? Its version history keeps it restorable.`}
+        {`Delete ${deleting?.label}?`}
       </ConfirmDialog>
     </Stack>
   );

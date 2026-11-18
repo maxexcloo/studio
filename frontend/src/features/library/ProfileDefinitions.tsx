@@ -1,15 +1,21 @@
-import { Alert, Badge, Button, Group, Menu, Popover, Select, Stack, Text } from "@mantine/core";
+import { Alert, Badge, Button, Group, Menu, Popover, Stack, Text } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Combine, Merge, Zap } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
-import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import {
+  FilterChoices,
+  SectionHeader,
+  SectionToolbar,
+  ToolbarAction,
+} from "../../ui/SectionToolbar";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { modelFamilyLabel } from "../generation/modelFamily";
@@ -127,24 +133,43 @@ function useDefinitions() {
   return { profileList, guideList, profiles, guides, guideOf, users };
 }
 
-/** A profile's or guide's row menu: edit it, then copy its ID, download it as JSON or duplicate it. */
-function rowMenu(
-  edit: (editing: Editing) => void,
-  kind: DefinitionKind,
-  noun: string,
-  id: string,
-  duplicate?: () => void,
-) {
+/** The definition a row menu's Delete is confirming. */
+interface Deleting {
+  kind: DefinitionKind;
+  id: string;
+  name: string;
+}
+
+/**
+ * A profile's or guide's row menu: Edit, then the rest A–Z (Copy ID, Download, Duplicate… and any
+ * `more`), then Delete.
+ */
+function rowMenu({
+  kind,
+  id,
+  name,
+  edit,
+  remove,
+  duplicate,
+  more,
+}: Deleting & {
+  edit: (editing: Editing) => void;
+  remove: (deleting: Deleting) => void;
+  duplicate?: () => void;
+  more?: ReactNode;
+}) {
   return (
     <>
       <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => edit({ kind, id })}>
-        Edit {noun}
+        Edit
       </Menu.Item>
+      <Menu.Divider />
+      {more}
       <Menu.Item
         leftSection={<icons.copy size={16} />}
-        onClick={() => void copyText(id, `${noun} ID`)}
+        onClick={() => void copyText(id, kind === "guide" ? "Guide ID" : "Profile ID")}
       >
-        Copy {noun} ID
+        Copy ID
       </Menu.Item>
       <Menu.Item
         leftSection={<icons.download size={16} />}
@@ -152,14 +177,59 @@ function rowMenu(
         href={`${definitionPath(kind, id)}/download`}
         download={`${id}.json`}
       >
-        Download {noun}
+        Download
       </Menu.Item>
       {duplicate && (
         <Menu.Item leftSection={<icons.duplicate size={16} />} onClick={duplicate}>
-          Duplicate {noun}…
+          Duplicate…
         </Menu.Item>
       )}
+      <Menu.Divider />
+      <Menu.Item
+        color="red"
+        leftSection={<icons.delete size={16} />}
+        onClick={() => remove({ kind, id, name })}
+      >
+        Delete
+      </Menu.Item>
     </>
+  );
+}
+
+/**
+ * Delete from a row menu: removes the definition over the hash it reads first, as the editor's
+ * Delete does. A guide still in use stays, and the server says so.
+ */
+function DeleteDefinition({ deleting, close }: { deleting: Deleting | null; close: () => void }) {
+  const client = useQueryClient();
+  const remove = useMutation({
+    mutationFn: async ({ kind, id }: Deleting) => {
+      const { hash } = await api<LoadedDefinition>(definitionPath(kind, id));
+      return post(`${definitionPath(kind, id)}/remove`, { baseHash: hash });
+    },
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: definitionsKey });
+      void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
+      close();
+    },
+  });
+  return (
+    <ConfirmDialog
+      opened={Boolean(deleting)}
+      title={`Delete ${deleting?.kind === "guide" ? "Guide" : "Profile"}`}
+      action="Delete"
+      pending={remove.isPending}
+      error={remove.error?.message}
+      onConfirm={() => deleting && remove.mutate(deleting)}
+      onClose={() => {
+        close();
+        remove.reset();
+      }}
+    >
+      {deleting?.kind === "guide"
+        ? `Delete ${deleting.name}? Its version history keeps it restorable. A guide that profiles still use stays until they use another.`
+        : `Delete ${deleting?.name}? Its version history keeps it restorable; gallery items made with it stay.`}
+    </ConfirmDialog>
   );
 }
 
@@ -172,6 +242,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const [merging, setMerging] = useState(false);
   const [combining, setCombining] = useState(false);
   const [converting, setConverting] = useState<ProfileRow | null>(null);
+  const [deleting, setDeleting] = useState<Deleting | null>(null);
   const { profileList, profiles, guideOf } = useDefinitions();
   const stats = useQuery(profileStatsQuery).data?.profiles;
   const families = [
@@ -238,17 +309,11 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           query={profileQuery}
           onQueryChange={setProfileQuery}
           filters={
-            <Select
+            <FilterChoices
               label="Family"
-              placeholder="All Families"
               data={families.map((value) => ({ value, label: modelFamilyLabel(value) }))}
               value={family}
               onChange={setFamily}
-              clearable
-              searchable
-              openOnFocus={false}
-              comboboxProps={{ withinPortal: false }}
-              data-mantine-stop-propagation
             />
           }
           filterCount={Number(!!family)}
@@ -345,15 +410,20 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
             ]}
             rowActions={(entry) => (
               <>
-                {rowMenu(setEditing, "profile", "Profile", entry.id, () =>
-                  duplicating.mutate(entry.id),
-                )}
-                {/* A Krea 2 profile on ComfyUI can take a converted Radiance backend, or a newer one. */}
-                {entry.family === "krea2" && entry.kind === "image" && (
-                  <Menu.Item leftSection={<Zap size={16} />} onClick={() => setConverting(entry)}>
-                    Convert to Radiance…
-                  </Menu.Item>
-                )}
+                {rowMenu({
+                  kind: "profile",
+                  id: entry.id,
+                  name: entry.name || entry.id,
+                  edit: setEditing,
+                  remove: setDeleting,
+                  duplicate: () => duplicating.mutate(entry.id),
+                  // A Krea 2 profile on ComfyUI can take a converted Radiance backend, or a newer one.
+                  more: entry.family === "krea2" && entry.kind === "image" && (
+                    <Menu.Item leftSection={<Zap size={16} />} onClick={() => setConverting(entry)}>
+                      Convert to Radiance…
+                    </Menu.Item>
+                  ),
+                })}
               </>
             )}
           />
@@ -362,6 +432,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
       <MergeDuplicateProfiles opened={merging} onClose={() => setMerging(false)} />
       <CombineBackends opened={combining} onClose={() => setCombining(false)} />
       <ConvertToRadiance profile={converting} onClose={() => setConverting(null)} />
+      <DeleteDefinition deleting={deleting} close={() => setDeleting(null)} />
       {editing && (
         <DefinitionEditor
           kind={editing.kind}
@@ -427,6 +498,7 @@ function UsedBy({ guide, profiles = [] }: { guide: string; profiles?: string[] }
 export function GuideDefinitions({ heading }: { heading: ReactNode }) {
   const [guideQuery, setGuideQuery] = useState("");
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [deleting, setDeleting] = useState<Deleting | null>(null);
   const { guideList, guides, users } = useDefinitions();
   return (
     <Stack gap="md">
@@ -489,7 +561,15 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
               cell: (entry) => <Version {...entry} />,
             },
           ]}
-          rowActions={(entry) => rowMenu(setEditing, "guide", "Guide", entry.packId)}
+          rowActions={(entry) =>
+            rowMenu({
+              kind: "guide",
+              id: entry.packId,
+              name: entry.name,
+              edit: setEditing,
+              remove: setDeleting,
+            })
+          }
         />
       )}
       {editing && (
@@ -501,6 +581,7 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
           existingIds={guides.map((entry) => entry.packId)}
         />
       )}
+      <DeleteDefinition deleting={deleting} close={() => setDeleting(null)} />
     </Stack>
   );
 }

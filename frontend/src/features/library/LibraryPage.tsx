@@ -16,6 +16,7 @@ import {
   freeUpdate,
   libraryItemCategory,
 } from "./LibraryCatalogueTable";
+import { LibraryDownloads } from "./LibraryDownloads";
 import { LibraryImports } from "./LibraryImports";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 import { LibraryPresets } from "./LibraryPresets";
@@ -142,6 +143,9 @@ export function LibraryPage() {
           presets: (heading) => <LibraryPresets heading={heading} />,
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
           promptStyles: (heading) => <PromptStyles heading={heading} />,
+          downloads: (heading) => (
+            <LibraryDownloads heading={heading} active={activeSection === "downloads"} />
+          ),
           files: catalogueSection("files"),
         }}
       />

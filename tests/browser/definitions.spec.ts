@@ -133,6 +133,7 @@ test("Guide editing and restoring an earlier version create distinct saved revis
     }),
   );
   const saved: (typeof original)[] = [structuredClone(original)];
+  const removals: unknown[] = [];
   await page.route("**/api/profiles/guides**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/profiles/guides")
@@ -149,11 +150,13 @@ test("Guide editing and restoring an earlier version create distinct saved revis
       return route.fulfill({
         json: { version: { pack: saved[Number(path.split("/").at(-1)) - 1] } },
       });
-    if (path.endsWith("/remove"))
+    if (path.endsWith("/remove")) {
+      removals.push(route.request().postDataJSON());
       return route.fulfill({
         status: 409,
         json: { ok: false, error: "This guide is still used by custom:fixture." },
       });
+    }
     if (path.endsWith("/revert")) {
       const body = route.request().postDataJSON();
       expect(body.baseHash).toBe(`hash-${version}`);
@@ -215,6 +218,15 @@ test("Guide editing and restoring an earlier version create distinct saved revis
   const confirm = page.getByRole("dialog", { name: "Delete Guide", exact: true });
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(confirm).toContainText("This guide is still used by custom:fixture.");
+  // The row menu deletes too, over the hash it reads first.
+  await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
+  await editor.getByRole("button", { name: "Close Definition Editor", exact: true }).click();
+  await expect(editor).toBeHidden();
+  await page.getByRole("button", { name: "Actions for Owned Guide", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await confirm.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(confirm).toContainText("This guide is still used by custom:fixture.");
+  expect(removals).toEqual([{ baseHash: "hash-3" }, { baseHash: "hash-3" }]);
 });
 
 test("Model classification saves and reads back while definition administration stays restricted", async ({
@@ -252,7 +264,7 @@ test("Model classification saves and reads back while definition administration 
   await section(page, "Library", "Files");
   const edit = async () => {
     await page.getByRole("button", { name: "Actions for Base Model", exact: true }).click();
-    await page.getByRole("menuitem", { name: "Edit Catalogue Entry", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   };
   await edit();
   const editor = page.getByRole("dialog", { name: "Edit Base Model", exact: true });
@@ -516,7 +528,7 @@ test("Import Workflow opens a workflow, and a row's Duplicate copies its profile
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(editor).toBeHidden();
   await page.getByRole("button", { name: "Actions for Owned Profile", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Duplicate Profile…", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Duplicate…", exact: true }).click();
   await expect(editor.getByRole("textbox", { name: "Definition ID", exact: true })).toHaveValue(
     "owned-copy",
   );
@@ -551,8 +563,8 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
   await openNav(page, "Library");
   await section(page, "Library", "Profiles");
   for (const [part, row, item, file] of [
-    ["Profiles", "Owned Profile", "Download Profile", "owned.json"],
-    ["Guides", "Krea 2", "Download Guide", "krea2.json"],
+    ["Profiles", "Owned Profile", "Download", "owned.json"],
+    ["Guides", "Krea 2", "Download", "krea2.json"],
   ]) {
     await section(page, "Library", part);
     await page.getByRole("button", { name: `Actions for ${row}`, exact: true }).click();
@@ -603,9 +615,8 @@ test("Prompt Styles filter, switch and edit the assistant's alphabetical options
     "Spicy Uncensored",
   ]);
   await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
-  const type = page.getByRole("combobox", { name: "Type", exact: true });
-  await type.click();
-  await page.getByRole("option", { name: "Improve Prompt", exact: true }).click();
+  const type = page.getByRole("radiogroup", { name: "Type", exact: true });
+  await type.getByText("Improve Prompt", { exact: true }).click();
   await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
   await expect(table.getByText("Spicy line.")).toBeVisible();
   await expect(table.getByText("Cinematic Camera", { exact: true })).toBeHidden();
@@ -618,8 +629,7 @@ test("Prompt Styles filter, switch and edit the assistant's alphabetical options
   await expect(table.getByRole("switch", { name: "Enable Candid", exact: true })).not.toBeChecked();
 
   await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
-  await type.click();
-  await page.getByRole("option", { name: "Animate", exact: true }).click();
+  await type.getByText("Animate", { exact: true }).click();
   await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
   await page.getByRole("button", { name: "New Style", exact: true }).click();
   const creating = page.getByRole("dialog", { name: "New Prompt Style", exact: true });
@@ -629,7 +639,7 @@ test("Prompt Styles filter, switch and edit the assistant's alphabetical options
   await table.getByRole("button", { name: "Actions for Cinematic Camera", exact: true }).click();
   await page
     .getByRole("menu", { name: "Actions for Cinematic Camera", exact: true })
-    .getByRole("menuitem", { name: "Edit Style", exact: true })
+    .getByRole("menuitem", { name: "Edit", exact: true })
     .click();
   const dialog = page.getByRole("dialog", { name: "Edit Prompt Style", exact: true });
   await dialog.getByRole("textbox", { name: "Description", exact: true }).fill("A moving camera.");

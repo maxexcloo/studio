@@ -342,7 +342,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
         rowActions={(group) => (
           <>
             <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => setEditing(group)}>
-              Edit Group
+              Edit
             </Menu.Item>
             <Menu.Divider />
             {/* The server refuses too: a group in use or the default stays. */}
@@ -352,7 +352,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
               disabled={users(group) > 0 || group.id === data.defaultAccessProfileId}
               onClick={() => setDeleting(group)}
             >
-              Delete Group
+              Delete
             </Menu.Item>
           </>
         )}
@@ -731,7 +731,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                   leftSection={<UserCheck size={16} />}
                   onClick={() => change.mutate({ id: account.id, patch: { disabled: false } })}
                 >
-                  Enable User
+                  Enable
                 </Menu.Item>
               )}
               {!own && (
@@ -743,7 +743,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                       leftSection={<UserX size={16} />}
                       onClick={act("disable")}
                     >
-                      Disable User
+                      Disable
                     </Menu.Item>
                   )}
                   {galleryOf(account) > 0 && (

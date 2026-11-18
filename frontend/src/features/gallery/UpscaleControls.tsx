@@ -81,7 +81,7 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
     mutationFn: (id: string) => post("/api/models/downloads", { id }),
     onSuccess: () => {
       notifications.show({
-        message: "Downloading the face detector in Library › Imports.",
+        message: "Downloading the face detector in Library › Downloads.",
       });
       void cache.invalidateQueries({ queryKey: downloadsQuery.queryKey });
     },
