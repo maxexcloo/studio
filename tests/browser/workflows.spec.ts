@@ -1,16 +1,18 @@
 import { expect, test } from "@playwright/test";
 
-import { expandComposer, fixtures, profiles, stamp } from "./fixtures";
+import { expandComposer, finishTyping, fixtures, pressGenerate, profiles, stamp } from "./fixtures";
 
 test("Images and Videos tabs keep an expanding bottom composer", async ({ page }, testInfo) => {
   const state = await fixtures(page);
   await page.goto("/");
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An amber bird");
+  await finishTyping(page);
   const primary = page.getByRole("button", { name: "Generate Image", exact: true });
   await expect(primary).toBeEnabled();
   const visual = await primary.evaluate((element) => {
     const style = getComputedStyle(element);
-    const label = element.querySelector("svg")!;
+    // Desktop's arrow, or a phone's whole label.
+    const label = element.querySelector("svg") ?? element;
     return {
       color: style.color,
       background: style.backgroundColor,
@@ -32,7 +34,7 @@ test("Images and Videos tabs keep an expanding bottom composer", async ({ page }
   expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)).toBeGreaterThanOrEqual(4.5);
   expect(visual.clipped).toBe(false);
   expect(visual.overflow).toBe(false);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect(page).toHaveURL("/images");
   await expect.poll(() => state.jobs.length).toBe(1);
   await expect(
@@ -45,7 +47,7 @@ test("Images and Videos tabs keep an expanding bottom composer", async ({ page }
     "Studio Image · Image · Local GPU",
   );
   await page.getByRole("option", { name: /^Image Fast\b/ }).click();
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.profileId).toBe("image:fast");
   if (testInfo.project.use.isMobile)

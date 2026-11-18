@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
 
-import { fixtures, image, stamp, viewerAction } from "./fixtures";
+import { finishTyping, fixtures, image, pressGenerate, stamp, viewerAction } from "./fixtures";
 
 const png = await sharp({ create: { width: 24, height: 16, channels: 3, background: "#46a3ff" } })
   .png()
@@ -52,10 +52,11 @@ test("Prompt paste attaches an owned reference before submission", async ({ page
         files,
       );
     await expect.poll(() => uploads).toBe(1);
+    await finishTyping(page);
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeDisabled();
     release();
     await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+    await pressGenerate(page);
     await expect.poll(() => state.jobs.length).toBe(1);
     expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "upload-1", slot: "image" }]);
   } finally {

@@ -1,7 +1,7 @@
 import { Alert, Badge, Button, Group, Menu, Popover, Stack, Text } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Combine, Merge, Zap } from "lucide-react";
+import { ChevronDown, Zap } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
@@ -19,7 +19,6 @@ import {
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { modelFamilyLabel } from "../generation/modelFamily";
-import { CombineBackends } from "./CombineBackends";
 import { ConvertToRadiance } from "./ConvertToRadiance";
 import {
   DefinitionEditor,
@@ -27,7 +26,6 @@ import {
   type LoadedDefinition,
   definitionPath,
 } from "./DefinitionEditor";
-import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
 import {
   type ProfileRow,
   type ProfileStats,
@@ -239,8 +237,6 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const [profileQuery, setProfileQuery] = useState("");
   const [family, setFamily] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
-  const [merging, setMerging] = useState(false);
-  const [combining, setCombining] = useState(false);
   const [converting, setConverting] = useState<ProfileRow | null>(null);
   const [deleting, setDeleting] = useState<Deleting | null>(null);
   const { profileList, profiles, guideOf } = useDefinitions();
@@ -321,8 +317,6 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           more={[
             // Every profile and guide, in one archive.
             { label: "Download All", icon: icons.download, href: "/api/profiles/export" },
-            { label: "Combine Backends…", icon: Combine, onClick: () => setCombining(true) },
-            { label: "Merge Duplicate Profiles…", icon: Merge, onClick: () => setMerging(true) },
           ]}
           actions={
             <ToolbarAction
@@ -429,8 +423,6 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           />
         )}
       </Stack>
-      <MergeDuplicateProfiles opened={merging} onClose={() => setMerging(false)} />
-      <CombineBackends opened={combining} onClose={() => setCombining(false)} />
       <ConvertToRadiance profile={converting} onClose={() => setConverting(null)} />
       <DeleteDefinition deleting={deleting} close={() => setDeleting(null)} />
       {editing && (

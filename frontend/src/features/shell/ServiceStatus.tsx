@@ -23,6 +23,7 @@ import { usePhone } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import { useIsAdmin } from "../auth/AccountGate";
 import { Queue, QueueActions, queueEntries, useQueue } from "../generation/Queue";
+import { useModelDownloads } from "../library/useModelDownloads";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
 
 import classes from "./ServiceStatus.module.css";
@@ -49,7 +50,8 @@ export function StatusAction() {
     void client.invalidateQueries({ queryKey: servicesStatusQuery.queryKey });
   }, [client, runningKey]);
   const title = "Generations";
-  const count = queue.data ? queueEntries(queue.data.jobs).length : 0;
+  const downloads = useModelDownloads();
+  const count = (queue.data ? queueEntries(queue.data.jobs).length : 0) + downloads.length;
   const heading = count ? `${title} (${count})` : title;
   // A sideways touch drag pulls the drawer with the finger; far enough, and it closes.
   const swipe = useSwipeClose("left", close);
@@ -141,7 +143,7 @@ export function StatusAction() {
               <QueueActions />
             </Group>
             <div className={classes.list}>
-              <Queue />
+              <Queue downloads={downloads} />
             </div>
             <Divider />
             {status}
@@ -173,7 +175,7 @@ export function StatusAction() {
           <Drawer.Body className={classes.body}>
             <FocusTrap.InitialFocus />
             <div className={classes.list}>
-              <Queue />
+              <Queue downloads={downloads} />
             </div>
             <Divider />
             {status}

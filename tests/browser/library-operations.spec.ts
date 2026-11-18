@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
 
 import {
   chooseView,
@@ -14,25 +14,31 @@ import {
   toolbarSearch,
 } from "./fixtures";
 
-test("The Library groups AI, Cards and Generation, sets Downloads, Files and Imports apart and opens on the Chat Brief", async ({
+/** A catalogue toolbar's Updates ▾ action. */
+async function updates(page: Page, action: "Check" | "Update All") {
+  await page.getByRole("button", { name: "Updates", exact: true }).click();
+  await page.getByRole("menuitem", { name: action, exact: true }).click();
+}
+
+test("The Library groups AI, Cards and Generation, sets Files and Imports apart and opens on Presets", async ({
   page,
 }) => {
   await fixtures(page);
   await page.goto("/library");
   const groups = {
-    AI: ["Chat Brief", "Presets"],
+    AI: ["Presets"],
     Cards: ["Characters", "Outfits", "Scenes"],
     Generation: ["Guides", "LoRAs", "Profiles", "Prompt Styles"],
   };
-  const order = [...Object.values(groups).flat(), "Downloads", "Files", "Imports"];
+  const order = [...Object.values(groups).flat(), "Files", "Imports"];
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
-    await expect(select).toHaveValue("Chat Brief");
+    await expect(select).toHaveValue("Presets");
     await select.click();
     await expect(page.getByRole("option")).toHaveText(order);
   } else {
     const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
-    await expect(nav.getByRole("link", { name: "Chat Brief", exact: true })).toHaveAttribute(
+    await expect(nav.getByRole("link", { name: "Presets", exact: true })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -44,11 +50,10 @@ test("The Library groups AI, Cards and Generation, sets Downloads, Files and Imp
   }
 });
 
-test("Model downloads cancel only the chosen file and explicitly resume or retry", async ({
+test("The queue lists model downloads to stop, resume, retry or discard one at a time", async ({
   page,
 }) => {
   const studio = await fixtures(page);
-  let modelReads = 0;
   let freshModelReads = 0;
   const downloadedProfile = {
     ...profiles[0],
@@ -57,7 +62,6 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
     recipe: undefined,
   };
   await page.route(/\/api\/models(?:\?.*)?$/, (route) => {
-    modelReads++;
     const fresh = !new URL(route.request().url()).searchParams.has("cached");
     if (fresh) freshModelReads++;
     // Like the server, a fresh read refreshes the cached catalogue that later cached reads return.
@@ -112,14 +116,24 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
       },
     ] as any[],
   };
-  const requests: { path: string; id: string }[] = [];
+  const requests: { path: string; id: string; discard?: boolean }[] = [];
   let failCancel = true;
+  let parked = true;
+  const parkedError =
+    "ComfyUI isn't running, so it can't receive downloads. Start it in Settings › Workers.";
   await page.route("**/api/models/downloads**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() === "POST") {
-      const { id } = route.request().postDataJSON();
-      requests.push({ path, id });
-      if (path.endsWith("/cancel")) {
+      const { id, discard } = route.request().postDataJSON();
+      requests.push({ path, id, ...(discard ? { discard } : {}) });
+      if (discard) {
+        // Like the server while ComfyUI is parked: discarding writes to its model library.
+        if (parked) {
+          parked = false;
+          return route.fulfill({ status: 409, json: { ok: false, error: parkedError } });
+        }
+        state.paused = state.paused.filter((item) => item.id !== id);
+      } else if (path.endsWith("/cancel")) {
         if (failCancel) {
           failCancel = false;
           return route.fulfill({
@@ -141,47 +155,54 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
     return route.fulfill({ json: state });
   });
   await page.goto("/images");
-  await openNav(page, "Library");
-  const readsBeforeDownloads = modelReads;
-  await section(page, "Library", "Downloads");
-  const table = page.getByRole("table", { name: "Model Downloads" });
-  await expect(table.getByRole("row").filter({ hasText: active.file })).toContainText(
-    "Downloading",
-  );
+  // A finished download refreshes the models without the queue being open.
+  await expect.poll(() => freshModelReads).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const download = (file: string) =>
+    queue.getByRole("group", { name: `Download ${file}`, exact: true });
+  await expect(queue.getByText("Keep generating", { exact: true })).toBeVisible();
+  await expect(download(active.file)).toContainText("Downloading · 25%");
+  await expect(download("completed.safetensors")).toHaveCount(0);
   expect(requests).toEqual([]);
-  await expect(table.getByRole("row").filter({ hasText: "completed.safetensors" })).toContainText(
-    "Completed",
-  );
-  await expect.poll(() => modelReads).toBeGreaterThan(readsBeforeDownloads);
-  const actions = async (file: string, action: string) => {
-    await table.getByRole("button", { name: `Actions for ${file}`, exact: true }).click();
-    await page.getByRole("menuitem", { name: action, exact: true }).click();
-    await expect(page.getByRole("menu")).toBeHidden();
-  };
-  await actions(active.file, "Stop");
+  const press = (file: string, action: string) =>
+    download(file).getByRole("button", { name: action, exact: true }).click();
+  await press(active.file, "Stop");
   await expect(page.getByText("Worker is reconnecting. Try again.", { exact: true })).toBeVisible();
-  await expect(table.getByRole("row").filter({ hasText: active.file })).toContainText(
-    "Downloading",
-  );
-  await actions(active.file, "Stop");
-  await expect(table.getByRole("row").filter({ hasText: active.file })).toContainText("Paused");
-  await expect(table.getByRole("row").filter({ hasText: queued.file })).toContainText("Queued");
-  await actions(paused.file, "Resume");
-  await expect(table.getByRole("row").filter({ hasText: paused.file })).toContainText("Queued");
-  await actions(failed.file, "Retry");
-  await expect(table.getByRole("row").filter({ hasText: failed.file })).toContainText("Queued");
+  await expect(download(active.file)).toContainText("Downloading");
+  await press(active.file, "Stop");
+  await expect(download(active.file)).toContainText("Stopped");
+  await expect(download(queued.file)).toContainText("Queued");
+  await press(paused.file, "Resume");
+  await expect(download(paused.file)).toContainText("Queued");
+  await press(failed.file, "Retry");
+  await expect(download(failed.file)).toContainText("Queued");
+  // Discarding a partial file confirms, and says so while ComfyUI is parked.
+  await press(active.file, "Discard");
+  const confirm = page.getByRole("dialog", { name: "Discard Download", exact: true });
+  await confirm.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(page.getByText(parkedError, { exact: true })).toBeVisible();
+  await expect(download(active.file)).toBeVisible();
+  await confirm.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(confirm).toBeHidden();
+  await expect(download(active.file)).toHaveCount(0);
   expect(requests).toEqual([
     { path: "/api/models/downloads/cancel", id: active.id },
     { path: "/api/models/downloads/cancel", id: active.id },
     { path: "/api/models/downloads", id: paused.id },
     { path: "/api/models/downloads", id: failed.id },
+    { path: "/api/models/downloads/cancel", id: active.id, discard: true },
+    { path: "/api/models/downloads/cancel", id: active.id, discard: true },
   ]);
   expect(studio.jobs[0].status).toBe("running");
-  expect(freshModelReads).toBeGreaterThan(0);
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Library", exact: true })).toBeHidden();
-  // The lasting failure notification would sit over the phone composer's chips.
-  await page.locator(".mantine-Notification-root").getByRole("button").click();
+  await expect(queue).toBeHidden();
+  // The lasting failure notifications would sit over the phone composer's chips.
+  const notifications = page.locator(".mantine-Notification-root");
+  for (let count = await notifications.count(); count > 0; count--) {
+    await notifications.first().getByRole("button").click();
+    await expect(notifications).toHaveCount(count - 1);
+  }
   await expandComposer(page);
   const profile = page.getByRole("combobox", { name: "Profile", exact: true });
   await profile.click();
@@ -265,7 +286,7 @@ test("Catalogue checks updates and queues only the explicitly chosen available o
   await section(page, "Library", "Files");
   const table = page.getByRole("table", { name: "Library Files", exact: true });
   await expect(table.getByText("Base Model", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Check Updates", exact: true }).click();
+  await updates(page, "Check");
   await expect(table.getByRole("row").filter({ hasText: "Base Model" })).toContainText(
     "Update Available",
   );
@@ -280,7 +301,7 @@ test("Catalogue checks updates and queues only the explicitly chosen available o
   );
   expect(applied).toEqual([{ key: items[0].key }, { key: items[1].key, alternative: true }]);
   replacementVerified = true;
-  await page.getByRole("button", { name: "Check Updates", exact: true }).click();
+  await updates(page, "Check");
   const original = table.getByRole("row").filter({ hasText: "Base Model" });
   await expect(original).toContainText(
     "Replacement verified; existing file retained because a profile still uses it.",
@@ -345,9 +366,12 @@ test("Update All applies every free update in one request", async ({ page }) => 
   await filters.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(table.getByRole("row")).toHaveCount(3);
   await loras.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
-  await loras.getByRole("button", { name: "Update All", exact: true }).click();
+  await updates(page, "Update All");
   await expect(loras.getByText("2 updates queued.", { exact: true })).toBeVisible();
-  await expect(loras.getByRole("button", { name: "Update All", exact: true })).toBeHidden();
+  // With nothing left to apply, Update All waits for the next check.
+  await loras.getByRole("button", { name: "Updates", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Update All", exact: true })).toBeDisabled();
+  await page.keyboard.press("Escape");
   expect(requests).toEqual([{ all: true }]);
 });
 

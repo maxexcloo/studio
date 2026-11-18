@@ -4,10 +4,12 @@ import {
   closeLoras,
   closePresets,
   create,
+  finishTyping,
   fixtures,
   loadSaved,
   openLoraChoices,
   openPresets,
+  pressGenerate,
   promptMenu,
   promptTool,
   saveCurrent,
@@ -88,6 +90,7 @@ test("Stopping held assistance retains the draft and unblocks generation", async
     await prompt.fill("Keep my original bird");
     await assist(page, "Improve Prompt");
     await expect.poll(() => started).toBe(true);
+    await finishTyping(page);
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeDisabled();
     // The ⋯ spins and says what it is doing until it finishes or its Stop is chosen.
     const more = page.getByRole("button", { name: "AI Prompt Actions", exact: true });
@@ -99,7 +102,7 @@ test("Stopping held assistance retains the draft and unblocks generation", async
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeEnabled();
     await expect(prompt).toHaveValue("Keep my original bird");
     release();
-    await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+    await pressGenerate(page);
     await expect.poll(() => state.jobs.length).toBe(1);
     expect(state.jobs[0].input.prompt).toBe("Keep my original bird");
   } finally {
@@ -178,7 +181,7 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await expect(page.getByRole("switch", { name: "Enable Soft Style", exact: true })).toBeChecked();
   await closeLoras(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input).toMatchObject({
     prompt: "My later direction in warm light",
@@ -214,7 +217,7 @@ test("Loading a new preset dismisses earlier draft Undo and keeps the preset inp
   await loadSaved(page, "Another Working Draft");
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeHidden();
   await expect(prompt).toHaveValue("A cinematic amber bird");
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input).toMatchObject({
     prompt: "A cinematic amber bird",
@@ -354,7 +357,7 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
       actions: ["recreate"],
     },
   ]);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.prompt).toBe("A castle at night");
 });

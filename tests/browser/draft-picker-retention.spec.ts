@@ -1,6 +1,14 @@
 import { type Page, expect, test } from "@playwright/test";
 
-import { closeReferences, create, fixtures, image, openReferenceChoices, stamp } from "./fixtures";
+import {
+  closeReferences,
+  create,
+  fixtures,
+  image,
+  openReferenceChoices,
+  pressGenerate,
+  stamp,
+} from "./fixtures";
 
 function referenceItem() {
   return {
@@ -67,6 +75,6 @@ test("Reference browsing keeps its scroll, query and filters in the gallery edit
     .getByRole("button", { name: "Use reference: Copper bird reference", exact: true })
     .click();
   await finishReferences(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
 });

@@ -1,4 +1,4 @@
-import { type Page, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import {
   editDefinition,
@@ -9,12 +9,6 @@ import {
   serveProfiles,
   signIn,
 } from "./fixtures";
-
-/** The Profiles toolbar's secondary actions, under More. */
-async function profileAction(page: Page, name: string) {
-  await page.getByRole("button", { name: "More Profiles Actions", exact: true }).click();
-  await page.getByRole("menuitem", { name, exact: true }).click();
-}
 
 test("Profile edits preserve workflow metadata and retain unsaved text after a conflict", async ({
   page,
@@ -291,41 +285,6 @@ test("Model classification saves and reads back while definition administration 
   expect(writes).toHaveLength(1);
 });
 
-test("Merge Duplicate Profiles previews the merge and applies exactly that preview", async ({
-  page,
-}) => {
-  await fixtures(page);
-  let merged = false;
-  const posted: unknown[] = [];
-  const merge = { from: "h3-fl-pdd8", to: "video-h3-fast-comfyui", name: "H3 Fast" };
-  await page.route("**/api/profiles/duplicates**", async (route) => {
-    if (route.request().method() === "POST") {
-      posted.push(route.request().postDataJSON());
-      merged = true;
-      return route.fulfill({ json: { merged: [merge] } });
-    }
-    return route.fulfill({
-      json: {
-        hash: "plan-1",
-        merges: merged ? [] : [merge],
-        differing: [{ name: "Krea 2 Turbo", ids: ["a", "b"], differences: ["graph"] }],
-        unresolved: [],
-      },
-    });
-  });
-  await page.goto("/images");
-  await openNav(page, "Library");
-  await section(page, "Library", "Profiles");
-  await profileAction(page, "Merge Duplicate Profiles…");
-  const dialog = page.getByRole("dialog", { name: "Merge Duplicate Profiles", exact: true });
-  await expect(dialog).toContainText("Keeps video-h3-fast-comfyui, removes h3-fl-pdd8");
-  await expect(dialog).toContainText("a, b differ in graph");
-  await dialog.getByRole("button", { name: "Merge 1 Profile", exact: true }).click();
-  await expect(dialog).toContainText("Merged 1.");
-  await expect(dialog.getByRole("button", { name: "Merge Profiles", exact: true })).toBeDisabled();
-  expect(posted).toEqual([{ hash: "plan-1" }]);
-});
-
 test("A combined profile's Backend select is a saved edit that switches what the editor shows", async ({
   page,
 }) => {
@@ -396,63 +355,6 @@ test("A combined profile's Backend select is a saved edit that switches what the
   expect(studio.description).toBeUndefined();
 });
 
-test("Combine Backends previews pairs with their differences and combines the picked ones", async ({
-  page,
-}) => {
-  await fixtures(page);
-  const posted: unknown[] = [];
-  const pair = {
-    key: "image-krea2-turbo-radiance+image-krea2-turbo-comfyui",
-    id: "image-krea2-turbo",
-    name: "Krea 2 Turbo · Fast · 8 Steps",
-    radiance: { id: "image-krea2-turbo-radiance", name: "Krea 2 Turbo · Radiance · Fast" },
-    comfyui: { id: "image-krea2-turbo-comfyui", name: "Krea 2 Turbo · ComfyUI · Fast" },
-    differences: [{ label: "References", radiance: "0", comfyui: "1" }],
-  };
-  let combined = false;
-  await page.route("**/api/profiles/backends**", async (route) => {
-    if (route.request().method() === "POST") {
-      posted.push(route.request().postDataJSON());
-      combined = true;
-      return route.fulfill({
-        json: {
-          combined: [{ id: pair.id, name: "Krea 2 Turbo", backend: "radiance", from: [] }],
-        },
-      });
-    }
-    return route.fulfill({ json: { hash: "plan-1", pairs: combined ? [] : [pair] } });
-  });
-  await page.goto("/images");
-  await openNav(page, "Library");
-  await section(page, "Library", "Profiles");
-  await profileAction(page, "Combine Backends…");
-  const dialog = page.getByRole("dialog", { name: "Combine Backends", exact: true });
-  await expect(
-    dialog.getByRole("table", { name: `Differences for ${pair.name}`, exact: true }),
-  ).toContainText("References01");
-  await expect(dialog.getByRole("button", { name: "Combine Pairs", exact: true })).toBeDisabled();
-  await dialog.getByRole("checkbox", { name: pair.name, exact: true }).check();
-  await dialog.getByRole("textbox", { name: "Combined Name", exact: true }).fill("Krea 2 Turbo");
-  await dialog.getByRole("combobox", { name: "Default Backend", exact: true }).click();
-  await dialog.getByRole("option", { name: "Radiance", exact: true }).click();
-  await dialog.getByRole("button", { name: "Combine 1 Pair", exact: true }).click();
-  await expect(dialog).toContainText("Combined Krea 2 Turbo.");
-  expect(posted).toEqual([
-    {
-      hash: "plan-1",
-      selections: [
-        {
-          radiance: pair.radiance.id,
-          comfyui: pair.comfyui.id,
-          name: "Krea 2 Turbo",
-          backend: "radiance",
-        },
-      ],
-    },
-  ]);
-  await expect(dialog).not.toContainText(pair.radiance.id);
-});
-
 test("The Profiles toolbar groups search and filter, then More and importing", async ({ page }) => {
   await fixtures(page);
   await page.goto("/images");
@@ -478,11 +380,7 @@ test("The Profiles toolbar groups search and filter, then More and importing", a
     "Import Workflow",
   ]);
   await page.getByRole("button", { name: "More Profiles Actions", exact: true }).click();
-  await expect(page.getByRole("menuitem")).toHaveText([
-    "Download All",
-    "Combine Backends…",
-    "Merge Duplicate Profiles…",
-  ]);
+  await expect(page.getByRole("menuitem")).toHaveText(["Download All"]);
 });
 
 test("Import Workflow opens a workflow, and a row's Duplicate copies its profile under a new ID", async ({

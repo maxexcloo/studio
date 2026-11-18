@@ -1,4 +1,5 @@
-import { ActionIcon, Alert, Badge, Menu, Stack, Text, Tooltip } from "@mantine/core";
+import { Alert, Badge, Menu, Stack, Text } from "@mantine/core";
+import { ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { copyText } from "../../ui/clipboard";
@@ -132,7 +133,6 @@ export function LibraryCatalogueTable({
   onCheckUpdates,
   onTest,
   onUpdateAll,
-  checkingUpdates = false,
   updateNote,
   inventoryError,
   onEdit,
@@ -151,7 +151,6 @@ export function LibraryCatalogueTable({
   onTest?: (item: LibraryItem) => void;
   /** Applies every free update, models and LoRAs alike; absent when there are none. */
   onUpdateAll?: () => void;
-  checkingUpdates?: boolean;
   /** What the last update check or update did. */
   updateNote?: string;
   onEdit?: (item: LibraryItem) => void;
@@ -224,30 +223,32 @@ export function LibraryCatalogueTable({
             setModelType(null);
           }}
           actions={
-            <>
-              {onCheckUpdates && (
-                <Tooltip label="Check Updates">
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    aria-label="Check Updates"
-                    loading={checkingUpdates}
-                    disabled={updatePending}
-                    onClick={onCheckUpdates}
+            onCheckUpdates && (
+              <Menu position="bottom-end">
+                <Menu.Target>
+                  {/* Filled while free updates wait to be applied. */}
+                  <ToolbarAction
+                    label="Updates"
+                    icon={icons.download}
+                    variant={onUpdateAll ? undefined : "default"}
+                    rightSection={<ChevronDown size={14} />}
+                    loading={updatePending}
+                  />
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item leftSection={<icons.refresh size={16} />} onClick={onCheckUpdates}>
+                    Check
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<icons.download size={16} />}
+                    disabled={!onUpdateAll}
+                    onClick={onUpdateAll}
                   >
-                    <icons.refresh size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
-              {onUpdateAll && (
-                <ToolbarAction
-                  label="Update All"
-                  icon={icons.download}
-                  disabled={updatePending}
-                  onClick={onUpdateAll}
-                />
-              )}
-            </>
+                    Update All
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            )
           }
         />
       </SectionHeader>

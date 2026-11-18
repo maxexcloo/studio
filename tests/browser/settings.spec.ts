@@ -10,31 +10,6 @@ import {
   stamp,
 } from "./fixtures";
 
-test("Chat Brief edits in place and restores the account's standing rules", async ({ page }) => {
-  const state = await fixtures(page);
-  await signIn(page, { id: "member", role: "user" });
-  await page.goto("/library#chatBrief");
-  const brief = page.getByRole("form", { name: "Brief", exact: true });
-  const save = brief.getByRole("button", { name: "Save", exact: true });
-  await expect(save).toBeDisabled();
-  await brief.getByRole("textbox", { name: "Subjects", exact: true }).fill("Portraits");
-  await brief.getByRole("textbox", { name: "Ethnicity", exact: true }).fill("Asian");
-  await brief
-    .getByRole("textbox", { name: "Banned Changes & Rules", exact: true })
-    .fill("Keep the outfit");
-  await save.click();
-  await expect(save).toBeDisabled();
-  expect(state.preferences.preferences.chatBrief).toMatchObject({
-    subjects: "Portraits",
-    ethnicity: "Asian",
-    rules: "Keep the outfit",
-  });
-  await page.reload();
-  await expect(
-    brief.getByRole("textbox", { name: "Banned Changes & Rules", exact: true }),
-  ).toHaveValue("Keep the outfit");
-});
-
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({
   page,
 }) => {

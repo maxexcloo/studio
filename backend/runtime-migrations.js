@@ -1,7 +1,7 @@
 import { reloadAccountPreferences } from "./account-preferences.js";
 import { reloadAccountStore } from "./account-store.js";
 import { characterGenerated } from "./character-generated.js";
-import { chatBriefFavourites } from "./chat-brief-favourites.js";
+import { chatBriefRemoval } from "./chat-brief-removal.js";
 import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
@@ -94,8 +94,8 @@ const steps = [
     online: true,
   },
   {
-    name: "chatBriefFavourites",
-    run: chatBriefFavourites,
+    name: "chatBriefRemoval",
+    run: chatBriefRemoval,
     changes: (plan) => plan.accounts,
     online: true,
     reload: reloadAccountPreferences,

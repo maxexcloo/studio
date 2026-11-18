@@ -1,5 +1,5 @@
 /**
- * Library › Profiles › Merge Duplicate Profiles: an administrator's explicit, repeatable action,
+ * Merge Duplicate Profiles (MCP maintenance tool): an administrator's explicit, repeatable action,
  * never run at startup.
  *
  * Two profile files are duplicates when they share a name and kind and run the same definition:
