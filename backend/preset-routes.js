@@ -193,7 +193,7 @@ export function registerPresetRoutes(
         return;
       }
       if (item.type === "video") {
-        res.type("mp4").sendFile(file);
+        res.type("mp4").sendFile(file, { dotfiles: "allow" });
         return;
       }
       res.type("png");
