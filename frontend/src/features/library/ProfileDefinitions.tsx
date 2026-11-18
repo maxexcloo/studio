@@ -370,9 +370,12 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                         .join(" · ") || entry.id}
                     </Text>
                     {phone && (
-                      <Text size="xs" c="dimmed">
-                        {guideOf(entry) ? `Guide: ${guideOf(entry)}` : "No Guide"}
-                      </Text>
+                      <Group gap="xs" wrap="nowrap">
+                        <Text size="xs" c="dimmed">
+                          {`${guideOf(entry) ? `Guide: ${guideOf(entry)}` : "No Guide"} · v${entry.version}`}
+                        </Text>
+                        {entry.aiDrafted && <Badge color="orange">AI</Badge>}
+                      </Group>
                     )}
                   </>
                 ),
@@ -391,6 +394,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
               {
                 key: "version",
                 header: "Version",
+                hideOnPhone: true,
                 sortValue: (entry) => entry.version,
                 cell: (entry) => <Version {...entry} />,
               },
