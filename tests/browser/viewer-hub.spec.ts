@@ -338,6 +338,72 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
   await expect(field).toHaveValue("An amber bird");
 });
 
+test("A delayed automatic change runs on its source without closing the next image", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const { state, viewer } = await seed(page, {}, async (page, state) => {
+    state.gallery.push({
+      ...state.gallery[0],
+      id: "neighbour",
+      jobId: "job-neighbour",
+      prompt: "An ivory fox",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    await page.route("**/api/suggestions", async (route) => {
+      const body = route.request().postDataJSON();
+      if (body.surface === "viewer")
+        return route.fulfill({
+          json: { suggestions: [{ label: "Add Rain", request: "add rain" }] },
+        });
+      if (body.surface !== "change") return route.fallback();
+      expect(body.itemId).toBe("hub");
+      await held;
+      await route.fulfill({
+        json: {
+          suggestions: [
+            {
+              action: "recreate",
+              label: "Rain",
+              request: body.request,
+              prompt: "An amber bird in rain",
+            },
+          ],
+        },
+      });
+    });
+  });
+  try {
+    await viewerPromptMenu(page);
+    const requested = page.waitForRequest(
+      (request) =>
+        request.url().endsWith("/api/suggestions") && request.postDataJSON()?.surface === "change",
+    );
+    await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
+    await requested;
+    await page.keyboard.press("ArrowRight");
+    const picture = viewer.getByRole("img", { name: "An ivory fox", exact: true });
+    const prompt = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+    await expect(picture).toBeVisible();
+    await expect(prompt).toHaveValue("An ivory fox");
+    await expect(viewer.getByRole("button", { name: "Edit", exact: true })).not.toHaveAttribute(
+      "data-loading",
+    );
+    release();
+    await expect.poll(() => state.jobs.length).toBe(2);
+    expect(state.jobs[1]).toMatchObject({
+      parentItemId: "hub",
+      input: { prompt: "An amber bird in rain" },
+    });
+    await expect(picture).toBeVisible();
+    await expect(prompt).toHaveValue("An ivory fox");
+    await expect(viewer.getByRole("list", { name: "Versions", exact: true })).toHaveCount(0);
+  } finally {
+    release();
+  }
+});
+
 test("The viewer's prompt rests on one line and shows the whole prompt while focused", async ({
   page,
 }, testInfo) => {

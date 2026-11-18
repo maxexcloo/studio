@@ -2,6 +2,7 @@ import {
   keepPreviousData,
   queryOptions,
   useInfiniteQuery,
+  useIsMutating,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
@@ -186,6 +187,7 @@ type ReferenceList = {
 };
 
 type GalleryReference = Pick<MediaItem, "id" | "type"> & { frame?: number };
+const galleryPlacementKey = ["gallery-reference-placement"];
 
 /** Taps, drops and pastes fill the chosen target, else the next empty slot. */
 export function useReferencePlacement(list: ReferenceList) {
@@ -209,6 +211,7 @@ export function useReferencePlacement(list: ReferenceList) {
   });
   // A video gives one frame: `frame` milliseconds in, or its last.
   const gallery = useMutation({
+    mutationKey: galleryPlacementKey,
     mutationFn: ({ id, type, frame }: GalleryReference) =>
       post<{ asset: ReferenceAsset }>("/api/reference-assets/from-gallery", {
         galleryItemId: id,
@@ -242,12 +245,13 @@ export function useReferencePlacement(list: ReferenceList) {
     chosen?: ReferenceTarget | null,
     onAdded?: (count: number) => void,
   ) {
-    gallery.mutate(item, {
-      onSuccess: ({ asset }) => {
+    void gallery.mutateAsync(item).then(
+      ({ asset }) => {
         const count = place(asset, chosen);
         if (count !== undefined) onAdded?.(count);
       },
-    });
+      () => {},
+    );
   }
   return {
     place,
@@ -263,12 +267,17 @@ export function useReferenceFiles() {
   return useReferencePlacement(useReferenceList());
 }
 
-export function useGalleryReference() {
+export function useGalleryReference(itemId?: string) {
   const placement = useReferencePlacement(useReferenceList());
+  const pending = useIsMutating({
+    mutationKey: galleryPlacementKey,
+    predicate: (mutation) =>
+      Boolean(itemId && (mutation.state.variables as GalleryReference | undefined)?.id === itemId),
+  });
   return {
     mutate: (item: GalleryReference, options?: { onSuccess?: () => void }) =>
       placement.addGalleryItem(item, null, options?.onSuccess),
-    isPending: placement.adding,
+    isPending: itemId ? pending > 0 : placement.adding,
   };
 }
 

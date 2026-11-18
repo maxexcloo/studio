@@ -1,5 +1,5 @@
 import { type MutationOptions, hashKey, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
 /**
  * A media action's mutation, kept with the item it started on rather than with the component that
@@ -39,7 +39,7 @@ export function useItemMutation<TData = unknown, TVariables = void>(
   // This component's last failure, while it still shows the item.
   const [failure, setFailure] = useState<{ key: string; error: Error }>();
   const shown = useRef<string | null>(key);
-  useEffect(() => {
+  useLayoutEffect(() => {
     shown.current = key;
     return () => {
       shown.current = null;
@@ -51,7 +51,7 @@ export function useItemMutation<TData = unknown, TVariables = void>(
       .build(client, { ...options, mutationKey })
       .execute(variables)
       .catch((error: Error) => {
-        setFailure({ key, error });
+        if (shown.current === key) setFailure({ key, error });
         throw error;
       });
   };
