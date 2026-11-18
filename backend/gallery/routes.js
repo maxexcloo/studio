@@ -23,7 +23,6 @@ import { compareGalleryItems } from "./order.js";
 import { listedRecord, makePendingItems } from "./records.js";
 import {
   cleanupGalleryState,
-  eachGalleryItem,
   filterVisibleGallery,
   forgetGalleryItems,
   galleryChangeCount,
@@ -32,6 +31,7 @@ import {
   galleryItems,
   galleryJobItems,
   galleryRevisionValue,
+  gallerySummaryRows,
   hideGalleryItems,
   outputFileCandidates,
   pageGallery,
@@ -54,7 +54,7 @@ const summaries = new Map();
 const keptSummaries = 20;
 const summaryMs = 60_000;
 
-/** `build(items)` over the request's own visible items the query narrows, kept as above. */
+/** `build(rows)` over gallerySummaryRows of the request's own items the query narrows, kept as above. */
 function ownedSummary(req, name, query, build) {
   const owned = ownedQuery(req.studioAccount);
   const key = JSON.stringify([name, owned, query]);
@@ -63,12 +63,7 @@ function ownedSummary(req, name, query, build) {
   if (kept && (kept.changes === changes || Date.now() - kept.at < summaryMs)) return kept.value;
   summaries.delete(key);
   if (summaries.size >= keptSummaries) summaries.delete(summaries.keys().next().value);
-  const items = owned ? eachGalleryItem({ ...owned, ...query, unlisted: false }) : [];
-  const value = build(
-    (function* () {
-      for (const item of items) if (filterVisibleGallery([item]).length) yield item;
-    })(),
-  );
+  const value = build(owned ? gallerySummaryRows({ ...owned, ...query }) : []);
   summaries.set(key, { changes, at: Date.now(), value });
   return value;
 }
@@ -140,17 +135,16 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
 
   app.get("/api/gallery/filters", (req, res) => {
     const type = String(req.query.type || "");
-    const found = ownedSummary(req, "filters", type ? { type } : {}, (items) => {
+    const found = ownedSummary(req, "filters", type ? { type } : {}, (rows) => {
       const models = new Set();
       const names = [];
       const loras = [];
       const tagged = [];
-      for (const item of items) {
-        models.add(item.model);
-        names.push(item.settings?.modelName);
-        for (const lora of Array.isArray(item.settings?.loras) ? item.settings.loras : [])
-          loras.push(lora?.name);
-        if (item.caption?.tags) tagged.push({ caption: { tags: item.caption.tags } });
+      for (const row of rows) {
+        models.add(row.model);
+        names.push(row.modelName);
+        for (const lora of Array.isArray(row.loras) ? row.loras : []) loras.push(lora?.name);
+        if (row.tags) tagged.push({ caption: { tags: row.tags } });
       }
       // Each recorded model resolves once: resolving reads the alias file's state.
       return {
@@ -175,16 +169,16 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
   // Per LoRA, the newest finished image the account made with it (its picker preview) and how
   // many of its finished images enabled it (the picker's Most Used order).
   app.get("/api/loras/previews", (req, res) => {
-    const found = ownedSummary(req, "lora-previews", { status: "done" }, (items) => {
+    const found = ownedSummary(req, "lora-previews", { status: "done" }, (rows) => {
       const newest = {};
       const uses = {};
-      for (const item of items) {
-        const time = Date.parse(item.createdAt || "") || 0;
-        for (const lora of Array.isArray(item.settings?.loras) ? item.settings.loras : []) {
+      for (const row of rows) {
+        const time = Date.parse(row.createdAt || "") || 0;
+        for (const lora of Array.isArray(row.loras) ? row.loras : []) {
           if (!lora?.name || lora.enabled === false) continue;
           uses[lora.name] = (uses[lora.name] || 0) + 1;
-          if (item.thumbnailUrl && !(newest[lora.name]?.time >= time))
-            newest[lora.name] = { time, url: item.thumbnailUrl };
+          if (row.thumbnailUrl && !(newest[lora.name]?.time >= time))
+            newest[lora.name] = { time, url: row.thumbnailUrl };
         }
       }
       const previews = Object.entries(newest).map(([name, { url }]) => [name, url]);
