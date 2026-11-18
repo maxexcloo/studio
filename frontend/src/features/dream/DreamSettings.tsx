@@ -1,28 +1,13 @@
-import {
-  ActionIcon,
-  Alert,
-  Button,
-  Drawer,
-  Popover,
-  SegmentedControl,
-  Stack,
-  Switch,
-  Text,
-  Tooltip,
-} from "@mantine/core";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { Alert, SegmentedControl, Switch, Text } from "@mantine/core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../api";
-import { DialogFooter } from "../../ui/ConfirmDialog";
-import { icons } from "../../ui/icons";
+import { LoadingState } from "../../ui/LoadingState";
 import { NumberSetting } from "../../ui/NumberSetting";
-import { SettingRow } from "../../ui/SettingRows";
-import { usePhone } from "../../ui/usePhone";
-import { fittedPopup } from "../generation/chip";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { type Dream, type DreamSettings, dreamCountQuery, dreamQuery, dreamWhen } from "./queries";
 
-/** Notes a setting an administrator forces on every account (Settings › Dream). */
+/** Notes a setting an administrator forces on every account (Settings › Generation). */
 export const lockedByAdministrator = "Set by an administrator.";
 
 /** Saves part of the Dream settings and shows the result at once. */
@@ -47,10 +32,14 @@ export function useDreamSettings() {
   });
 }
 
-function SettingsForm({ dream }: { dream: Dream }) {
+/** Settings › Dream: the account's own Dream settings, each media kind in its own group. */
+export function DreamPreferences() {
+  const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
-  const { settings } = dream;
-  const locked = (key: keyof DreamSettings) => dream.locked.includes(key);
+  if (dream.isPending) return <LoadingState label="Loading Dream" fill />;
+  if (dream.error) return <Alert color="red">{dream.error.message}</Alert>;
+  const { settings, locked: lockedKeys } = dream.data;
+  const locked = (key: keyof DreamSettings) => lockedKeys.includes(key);
   const note = (key: keyof DreamSettings) => (locked(key) ? ` ${lockedByAdministrator}` : "");
   const toggle = (
     key: "enabled" | "images" | "spicy" | "videos",
@@ -104,87 +93,34 @@ function SettingsForm({ dream }: { dream: Dream }) {
     </SettingRow>
   );
   return (
-    <Stack gap="xs">
-      <Text size="xs" c="dimmed">
-        {dreamWhen(dream)}
-      </Text>
-      {dream.reason && (
-        <Text size="xs" c="dimmed" role="status" aria-label="Dream Status">
-          {dream.reason}
+    <>
+      <SettingGroup title="Dream">
+        <Text size="xs" c="dimmed">
+          {dreamWhen(dream.data)}
         </Text>
-      )}
-      <div>
+        {dream.data.reason && (
+          <Text size="xs" c="dimmed" role="status" aria-label="Dream Status">
+            {dream.data.reason}
+          </Text>
+        )}
         {toggle("enabled", "Dream", "Make new images from your taste in idle time.")}
-        {/* Spicy sits under the main switch; the rest run A–Z, each switch above its cap. */}
-        {dream.spicyAvailable && toggle("spicy", "Spicy", "Allow explicit themes.")}
+        {dream.data.spicyAvailable && toggle("spicy", "Spicy", "Allow explicit themes.")}
+      </SettingGroup>
+      <SettingGroup title="Images">
         {toggle("images", "Images", "Make new images.")}
         {number("dailyImages", "Images per Day", 500, "The most images Dream makes a day.")}
         {backend("imageBackend", "Images")}
+      </SettingGroup>
+      <SettingGroup title="Videos">
         {toggle("videos", "Videos", "Animate kept or liked images too.")}
         {number("dailyVideos", "Videos per Day", 100, "The most videos Dream makes a day.")}
         {backend("videoBackend", "Videos")}
-      </div>
+      </SettingGroup>
       {save.error && (
         <Alert color="red" title="Couldn't Save Dream Settings">
           {save.error.message}
         </Alert>
       )}
-    </Stack>
-  );
-}
-
-/** Dream Settings on the deck: a popover on desktop, a bottom drawer on phones. */
-export function DreamSettingsButton({ dream }: { dream: Dream }) {
-  const phone = usePhone();
-  const [opened, setOpened] = useState(false);
-  const button = (
-    <Tooltip label="Dream Settings" disabled={opened}>
-      <ActionIcon
-        variant={opened ? "light" : "subtle"}
-        color={opened ? undefined : "gray"}
-        aria-label="Dream Settings"
-        aria-expanded={opened}
-        onClick={() => setOpened((open) => !open)}
-      >
-        <icons.settings size={18} />
-      </ActionIcon>
-    </Tooltip>
-  );
-  if (phone)
-    return (
-      <>
-        {button}
-        <Drawer
-          opened={opened}
-          onClose={() => setOpened(false)}
-          position="bottom"
-          radius="lg"
-          styles={{ content: { height: "auto", maxHeight: "90dvh" } }}
-          title="Dream Settings"
-          closeButtonProps={{ "aria-label": "Close Dream Settings" }}
-        >
-          <Stack gap="md">
-            <SettingsForm dream={dream} />
-            <DialogFooter>
-              <Button onClick={() => setOpened(false)}>Done</Button>
-            </DialogFooter>
-          </Stack>
-        </Drawer>
-      </>
-    );
-  return (
-    <Popover
-      opened={opened}
-      onChange={setOpened}
-      position="bottom-end"
-      width={400}
-      trapFocus
-      {...fittedPopup}
-    >
-      <Popover.Target>{button}</Popover.Target>
-      <Popover.Dropdown aria-label="Dream Settings" role="dialog">
-        <SettingsForm dream={dream} />
-      </Popover.Dropdown>
-    </Popover>
+    </>
   );
 }

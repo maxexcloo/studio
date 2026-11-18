@@ -93,7 +93,7 @@ export function BenchmarkResults() {
         rowActions={(run) => (
           <>
             <Menu.Item leftSection={<icons.log size={16} />} onClick={() => setLogId(run.id)}>
-              View Log
+              View Logs
             </Menu.Item>
             {run.status === "running" && (
               <Menu.Item

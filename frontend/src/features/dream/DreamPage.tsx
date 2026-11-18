@@ -29,7 +29,7 @@ import { DreamDeck } from "./DreamDeck";
 import { DreamDigest } from "./DreamDigest";
 import { DreamHistory } from "./DreamHistory";
 import { DreamProjects } from "./DreamProjects";
-import { DreamSettingsButton, lockedByAdministrator, useDreamSettings } from "./DreamSettings";
+import { lockedByAdministrator, useDreamSettings } from "./DreamSettings";
 import { type Dream, type DreamMedia, dreamCountQuery, dreamQuery, dreamWhen } from "./queries";
 
 import classes from "./DreamPage.module.css";
@@ -92,7 +92,7 @@ function Empty({ dream }: { dream: Dream }) {
 const views = ["deck", "overview", "projects", "taste", "discarded", "history"] as const;
 
 /**
- * Dream: the deck of unseen results, comparisons and calibration, with its pause and settings;
+ * Dream: the deck of unseen results, comparisons and calibration, with its pause;
  * While You Were Away as the overview per project, the projects, the discards or the taste profile.
  * Opening it counts as a visit.
  */
@@ -205,7 +205,6 @@ export function DreamPage() {
               </ActionIcon>
             </Tooltip>
           )}
-          {data && <DreamSettingsButton dream={data} />}
         </Group>
       </Group>
       {phone && selector}

@@ -2,43 +2,39 @@
 .enter {
   animation: enter var(--studio-motion-duration) var(--studio-ease-enter);
 }
-/* Never narrower than its choices: where the tools leave too little room, it takes a row of its
-   own above them. */
-.views {
-  flex: 1 0 auto;
-}
-/* An upright phone's narrow row leaves it a row of its own, which its choices then fill. */
-:where(:root[data-phone]:not([data-phone="sideways"])) .views > * {
-  flex-grow: 1;
-}
 .divider {
   align-self: stretch;
   margin: 4px 2px;
 }
 /*
- * A section's heading with its toolbar at the end of the same row (the heading grows to push it
- * there), wrapping below it when narrow, still ending at the content's edge. The toolbar stays
- * level with the title however many lines the description takes.
+ * A section's heading with its toolbar at the top right of the description's line: the title (on
+ * desktop) runs above, and the description wraps beside the toolbar. A phone's open search takes
+ * a full row under the description.
  */
 .header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--mantine-spacing-xs) var(--mantine-spacing-md);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--mantine-spacing-md);
 }
 .header > :first-child {
-  flex: 1 1 16rem;
-  min-width: 0;
+  display: contents;
+}
+.header > :first-child > * {
+  grid-column: 1;
+}
+.header > :first-child > :last-child {
+  grid-row: 2;
+  align-self: center;
 }
 .header > :last-child {
-  flex: 0 1 auto;
+  grid-column: 2;
+  grid-row: 2;
   min-width: 0;
-  margin-inline-start: auto;
 }
-/* Phones give the toolbar its own full row, so every section's actions end at the same edge as its
-   rows' ⋯ buttons. */
-:where([data-phone]) .header > :last-child {
-  flex-basis: 100%;
+.header > :last-child:has(.searching) {
+  grid-column: 1 / -1;
+  grid-row: 3;
 }
 @keyframes enter {
   from {

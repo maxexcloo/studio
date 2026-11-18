@@ -1,6 +1,6 @@
 import { type Locator, type Page, expect, test } from "@playwright/test";
 
-import { dreamItem, fixtures, serveDream, stamp } from "./fixtures";
+import { dreamItem, fixtures, section, serveDream, stamp } from "./fixtures";
 
 /** Opens a route-backed Dream view from its menu. */
 async function showView(page: Page, name: string | RegExp) {
@@ -268,7 +268,7 @@ test("On a phone held sideways, a deck card's caption stands beside its media", 
   expect(like.y + like.height).toBeLessThanOrEqual(390);
 });
 
-test("Dream explains itself while off and saves its settings on the deck", async ({ page }) => {
+test("Dream explains itself while off and saves its settings in Settings", async ({ page }) => {
   await fixtures(page);
   const dream = await serveDream(page, { enabled: false, spicyAvailable: true });
   await page.goto("/dream");
@@ -280,29 +280,28 @@ test("Dream explains itself while off and saves its settings on the deck", async
       exact: true,
     }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
+  await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
+  expect(dream.settings.paused).toBe(true);
 
-  await page.getByRole("button", { name: "Dream Settings", exact: true }).click();
-  const settings = page.getByRole("dialog", { name: "Dream Settings" });
-  const videos = settings.getByRole("switch", { name: /^Videos/ });
-  // The row's accessible name is on the visually hidden input, which the phone drawer scrolls.
-  await videos.dispatchEvent("click");
+  await page.goto("/settings");
+  await section(page, "Settings", "Dream");
+  const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
+  await expect(settings).toContainText("Dream is paused · 12 of 40 today");
+  const videos = settings.getByRole("switch", { name: "Videos", exact: true });
+  await videos.click({ force: true });
   await expect(videos).toBeChecked();
   await expect(settings).toContainText("12 of 40 today · 1 of 4 videos");
   const images = settings.getByRole("textbox", { name: "Images per Day" });
   await images.fill("200");
   await images.press("Enter");
-  await expect(settings.getByRole("switch", { name: /^Spicy/ })).toBeVisible();
+  await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeVisible();
   await expect
     .poll(() => dream.requests.map((request) => request.body))
-    .toEqual([{ enabled: true }, { videos: true }, { dailyImages: 200 }]);
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
-  await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
-  expect(dream.settings.paused).toBe(true);
-  await page.getByRole("button", { name: "Dream Settings", exact: true }).click();
+    .toEqual([{ enabled: true }, { paused: true }, { videos: true }, { dailyImages: 200 }]);
   await expect(settings).toContainText("Dream is paused · 12 of 200 today");
   // Images per Day follows Images, as Videos per Day follows Videos.
-  await settings.getByRole("switch", { name: /^Images/ }).dispatchEvent("click");
+  await settings.getByRole("switch", { name: "Images", exact: true }).click({ force: true });
   await expect(images).toBeDisabled();
   await expect(settings).toContainText("Dream is paused · 1 of 4 videos");
   await expect.poll(() => dream.settings.images).toBe(false);
@@ -319,8 +318,8 @@ test("Dream settings an administrator forces stay locked for the account", async
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
   await expect(page.getByText("Set by an administrator.", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Turn On", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Dream Settings", exact: true }).click();
-  const settings = page.getByRole("dialog", { name: "Dream Settings" });
+  await page.goto("/settings#dream");
+  const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
   await expect(settings.getByRole("switch", { name: "Dream", exact: true })).toBeDisabled();
   await expect(
     settings
@@ -479,16 +478,16 @@ test("Dream navigation orders its views and History shows retained activity and 
   await expect(page).toHaveURL(/\/dream$/);
 });
 
-test("Dream says why it can't run in its settings, not over the deck", async ({ page }) => {
+test("Dream says why it can't run in Settings › Dream, not over the deck", async ({ page }) => {
   await fixtures(page);
   await serveDream(page, { reason: "The text model is offline.", unseen: [dreamItem("fox")] });
   await page.goto("/dream");
   await expect(current(page)).toBeVisible();
   await expect(page.getByText("The text model is offline.")).toHaveCount(0);
-  await page.getByRole("button", { name: "Dream Settings", exact: true }).click();
+  await page.goto("/settings#dream");
   await expect(
     page
-      .getByRole("dialog", { name: "Dream Settings" })
+      .getByRole("region", { name: "Settings: Dream", exact: true })
       .getByRole("status", { name: "Dream Status" }),
   ).toContainText("The text model is offline.");
 });

@@ -1,6 +1,6 @@
 import { Badge } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { isCloudProfile } from "../../../../shared/profiles";
@@ -8,7 +8,7 @@ import type { GenerationInput, Models, Profile } from "../../types";
 import { compareNames } from "../../ui/DataTable";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
-import { ChipOption, ChipSelect } from "./ChipSelect";
+import { ChipOption, ChipSelect, type ChipSelectProps } from "./ChipSelect";
 import { inputForProfile, modelsQuery, useGeneration } from "./GenerationProvider";
 import { modelFamilyLabel } from "./modelFamily";
 import { backendLabel, isProfile, profileName } from "./payload";
@@ -68,6 +68,77 @@ export function profileOptions(available: Profile[]) {
   }));
 }
 
+/**
+ * Every profile choice: a chip in the composer, or a `field` in a Settings row, listing `profiles`
+ * by family with their readable names, facts and readiness. `unset` names the choice of none (a
+ * setting's default), listed first; a saved profile no longer offered still reads by its ID.
+ */
+export function ProfileSelect({
+  name,
+  profiles,
+  value,
+  onChange,
+  unset,
+  ...trigger
+}: {
+  name: string;
+  profiles: Profile[];
+  value: string | null;
+  onChange: (profile: Profile | null) => void;
+  unset?: string;
+} & Partial<
+  Pick<ChipSelectProps, "field" | "disabled" | "swatch" | "title" | "target" | "label">
+>) {
+  const workers = useQuery(modelsQuery).data?.workers;
+  const selected = profiles.find((profile) => isProfile(profile, value ?? undefined));
+  const selectedLabel = selected && profileLabel(selected, profiles);
+  const readiness = selected && profileReadiness(selected, workers);
+  return (
+    <ChipSelect
+      name={name}
+      searchable
+      nothingFoundMessage="No Matches"
+      data={[...(unset ? [{ value: "", label: unset }] : []), ...profileOptions(profiles)]}
+      value={selected?.id ?? (value || (unset ? "" : null))}
+      renderOption={({ option, checked }) => {
+        const profile = profiles.find((profile) => profile.id === option.value);
+        const status = profile && profileReadiness(profile, workers);
+        return (
+          <ChipOption
+            label={option.label}
+            description={profile && profileFacts(profile)}
+            checked={checked}
+            badges={
+              <>
+                {profile?.aiDrafted && (
+                  <Badge size="xs" color="orange">
+                    AI
+                  </Badge>
+                )}
+                {profile?.failing && (
+                  <Badge size="xs" color="red" title="Most of its runs in the last week failed">
+                    Failing
+                  </Badge>
+                )}
+                {status && status.label !== "Ready" && (
+                  <Badge size="xs" color={status.color}>
+                    {status.label}
+                  </Badge>
+                )}
+              </>
+            }
+          />
+        );
+      }}
+      onChange={(id) => onChange(profiles.find((profile) => profile.id === id) ?? null)}
+      swatch={readiness?.color}
+      title={selectedLabel && [selectedLabel, readiness?.label].filter(Boolean).join(" · ")}
+      label={selectedLabel || value || unset || "Choose a Profile"}
+      {...trigger}
+    />
+  );
+}
+
 export function ProfilePicker({
   value,
   onChange,
@@ -99,45 +170,12 @@ export function ProfilePicker({
   const selectedBackend = selected?.backend && (input.profileBackend || selected.backend);
   return (
     <>
-      <ChipSelect
+      <ProfileSelect
         name="Profile"
         target={{ "data-profile-picker": true }}
-        searchable
-        nothingFoundMessage="No Matches"
-        data={profileOptions(available)}
+        profiles={available}
         value={selected?.id ?? null}
-        renderOption={({ option, checked }) => {
-          const profile = available.find((profile) => profile.id === option.value);
-          const status = profile && profileReadiness(profile, workers);
-          return (
-            <ChipOption
-              label={option.label}
-              description={profile && profileFacts(profile)}
-              checked={checked}
-              badges={
-                <>
-                  {profile?.aiDrafted && (
-                    <Badge size="xs" color="orange">
-                      AI
-                    </Badge>
-                  )}
-                  {profile?.failing && (
-                    <Badge size="xs" color="red" title="Most of its runs in the last week failed">
-                      Failing
-                    </Badge>
-                  )}
-                  {status && status.label !== "Ready" && (
-                    <Badge size="xs" color={status.color}>
-                      {status.label}
-                    </Badge>
-                  )}
-                </>
-              }
-            />
-          );
-        }}
-        onChange={(id) => {
-          const profile = available.find((profile) => profile.id === id);
+        onChange={(profile) => {
           if (!profile) return;
           if (onChange) onChange(inputForProfile(input, profile));
           else context.selectProfile(profile);

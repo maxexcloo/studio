@@ -194,12 +194,14 @@ for (const name of ["mousedown", "touchstart"]) {
     },
     true,
   );
-  // Let React and native controls handle presses inside the popup first. Mantine's independent
-  // document listeners must not then dismiss its parents, including parents in other portals.
-  document.addEventListener(name, (event) => {
-    if (managedPress) event.stopImmediatePropagation();
-  });
 }
+// Let React and native controls handle presses inside the popup first. Mantine's independent
+// document listeners (the theme limits them to mousedown) must not then dismiss its parents,
+// including parents in other portals. Touchstart passes: a dialog's scroll lock measures each
+// touch drag from it, and without it cancels the drag, so lists in dialogs wouldn't scroll.
+document.addEventListener("mousedown", (event) => {
+  if (managedPress) event.stopImmediatePropagation();
+});
 for (const name of ["pointerup", "mouseup", "touchend"]) {
   window.addEventListener(
     name,

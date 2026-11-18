@@ -6,6 +6,7 @@ import {
   ComboboxPopover,
   type ComboboxPopoverProps,
   Group,
+  InputBase,
   ScrollArea,
   Stack,
   Text,
@@ -17,32 +18,13 @@ import {
 import { ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
+import { popupMiddlewares } from "../../theme";
 import { useTouch } from "../../ui/usePhone";
 import { chipProps } from "./chip";
 
 import classes from "./GenerationInputControls.module.css";
 
-/**
- * A rail chip that opens its option list: the composer's Profile. `swatch`
- * is a readiness colour beside the name; `target` adds attributes to the chip itself. On touch
- * screens the search waits for a tap; desktop opening focuses it for keyboard navigation.
- */
-export function ChipSelect({
-  name,
-  label,
-  swatch,
-  title,
-  target,
-  searchable,
-  data,
-  value,
-  onChange,
-  dropdownOpened,
-  onDropdownOpen,
-  onDropdownClose,
-  nothingFoundMessage,
-  renderOption,
-}: Pick<
+export type ChipSelectProps = Pick<
   ComboboxPopoverProps,
   | "data"
   | "value"
@@ -59,7 +41,35 @@ export function ChipSelect({
   swatch?: string;
   title?: string;
   target?: Record<string, unknown>;
-}) {
+  field?: boolean;
+  disabled?: boolean;
+};
+
+/**
+ * A rail chip that opens its option list: the composer's Profile. `swatch`
+ * is a readiness colour beside the name; `target` adds attributes to the chip itself. On touch
+ * screens the search waits for a tap; desktop opening focuses it for keyboard navigation. A
+ * `field` trigger is a select field instead, filling a Settings row. The list fits the screen,
+ * scrolling inside when it is taller.
+ */
+export function ChipSelect({
+  name,
+  label,
+  swatch,
+  title,
+  target,
+  field = false,
+  disabled,
+  searchable,
+  data,
+  value,
+  onChange,
+  dropdownOpened,
+  onDropdownOpen,
+  onDropdownClose,
+  nothingFoundMessage,
+  renderOption,
+}: ChipSelectProps) {
   const touch = useTouch();
   const [search, setSearch] = useState("");
   const combobox = useCombobox({
@@ -96,12 +106,23 @@ export function ChipSelect({
         {renderOption ? renderOption({ option, checked: option.value === value }) : option.label}
       </Combobox.Option>
     );
+  const swatchDot = swatch && (
+    <ColorSwatch
+      component="span"
+      size={8}
+      withShadow={false}
+      color={`var(--mantine-color-${swatch}-6)`}
+      aria-hidden
+    />
+  );
   return (
     <Combobox
       store={combobox}
       returnFocus
       width="min(440px, 100vw - 32px)"
-      position="top-start"
+      position={field ? "bottom-end" : "top-start"}
+      middlewares={{ ...popupMiddlewares, size: { padding: 12 } }}
+      classNames={{ dropdown: classes.fittedList }}
       withinPortal
       onOptionSubmit={(selected) => {
         onChange?.(selected);
@@ -110,26 +131,34 @@ export function ChipSelect({
       }}
     >
       <ComboboxPopover.Target>
-        <Button
-          aria-label={name}
-          {...chipProps}
-          {...target}
-          leftSection={
-            swatch && (
-              <ColorSwatch
-                component="span"
-                size={8}
-                withShadow={false}
-                color={`var(--mantine-color-${swatch}-6)`}
-                aria-hidden
-              />
-            )
-          }
-          rightSection={<ChevronDown size={14} />}
-          title={title}
-        >
-          <span className={classes.label}>{label}</span>
-        </Button>
+        {field ? (
+          <InputBase
+            component="button"
+            type="button"
+            pointer
+            aria-label={name}
+            disabled={disabled}
+            {...target}
+            leftSection={swatchDot}
+            rightSection={<ChevronDown size={16} />}
+            rightSectionPointerEvents="none"
+            title={title}
+          >
+            <span className={classes.fieldLabel}>{label}</span>
+          </InputBase>
+        ) : (
+          <Button
+            aria-label={name}
+            disabled={disabled}
+            {...chipProps}
+            {...target}
+            leftSection={swatchDot}
+            rightSection={<ChevronDown size={14} />}
+            title={title}
+          >
+            <span className={classes.label}>{label}</span>
+          </Button>
+        )}
       </ComboboxPopover.Target>
       <Combobox.Dropdown>
         {searchable && (
@@ -143,7 +172,7 @@ export function ChipSelect({
             }}
           />
         )}
-        <ScrollArea.Autosize mah={320} type="scroll">
+        <ScrollArea.Autosize mah={320} mih={0} type="scroll">
           <Combobox.Options>
             {options.map(render)}
             {empty && nothingFoundMessage && <Combobox.Empty>{nothingFoundMessage}</Combobox.Empty>}
