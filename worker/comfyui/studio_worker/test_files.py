@@ -7,7 +7,7 @@ from files import delete_files, resolve_target, token_matches
 
 class WorkerFileTests(unittest.TestCase):
     def setUp(self):
-        self.root = tempfile.mkdtemp()
+        self.root = self.enterContext(tempfile.TemporaryDirectory())
         self.bases = {
             name: os.path.join(self.root, name) for name in ("output", "input", "temp")
         }

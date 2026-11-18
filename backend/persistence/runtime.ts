@@ -209,8 +209,11 @@ export function deleteRuntimeDocument(dataDir: string, name: string): void {
   runtimeDatabase(dataDir).prepare("DELETE FROM studio_documents WHERE name = ?").run(name);
 }
 
-export function closeRuntimeDatabase(dataDir: string): void {
-  const filename = databaseFile(dataDir);
-  databases.get(filename)?.close();
-  databases.delete(filename);
+/** Closes the runtime databases of `folder` and of any data folder beneath it. */
+export function closeRuntimeDatabase(folder: string): void {
+  for (const [filename, db] of databases) {
+    if (path.relative(folder, filename).startsWith("..")) continue;
+    db.close();
+    databases.delete(filename);
+  }
 }

@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-// Each test file runs in its own process, so these folders stay here.
-const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
+import { temporaryFolder } from "../fixtures/temporary.js";
+
+const outputDir = temporaryFolder("studio-output-");
 process.env.STUDIO_MEDIA_DIR = outputDir;
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
+process.env.STUDIO_DATA_DIR = temporaryFolder("studio-data-");
 const { galleryRevisionValue, hideGalleryItems, pageGallery, replaceGalleryJob } =
   await import("./store.js");
 const { setGallery } = await import("../fixtures/gallery.js");

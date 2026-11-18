@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import sharp from "sharp";
 
-// Each test file runs in its own process, so these folders stay here.
-const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-media-"));
+import { temporaryFolder } from "../fixtures/temporary.js";
+
+const outputDir = temporaryFolder("studio-media-");
 process.env.STUDIO_MEDIA_DIR = outputDir;
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
+process.env.STUDIO_DATA_DIR = temporaryFolder("studio-data-");
 const { parametersText, writeCivitaiParameters } = await import("./civitai.js");
 const { a1111Recipe, readImageMetadata } = await import("../image-metadata.js");
 
