@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
   type CardKind,
@@ -24,7 +24,11 @@ import {
   maxProjectName,
 } from "../../shared/projects.ts";
 import { maxTasteRule, tasteLimits } from "../../shared/taste.ts";
-import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
+import {
+  readRuntimeDocument,
+  runtimeTransaction,
+  writeRuntimeDocument,
+} from "../persistence/runtime.ts";
 import type { GenerationAccount } from "./admission.ts";
 import type { DreamItem } from "./dream.ts";
 import type { Issue } from "./issues.ts";
@@ -44,6 +48,7 @@ interface AcceptedRecord {
     /** A project it made, or changed (`change`, the change's id). */
     projectId?: string;
     change?: string;
+    revision?: string;
     rule?: string;
     card?: { kind: CardKind; id: string };
   };
@@ -105,6 +110,8 @@ const clean = (value: unknown, limit: number) =>
     .slice(0, limit);
 const lower = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
+const revisionOf = (record: object) =>
+  createHash("sha256").update(JSON.stringify(record)).digest("hex");
 const titled = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const parsed = (text: string): Record<string, unknown> | null => {
   try {
@@ -289,7 +296,7 @@ export function createInbox(options: {
     account: GenerationAccount | undefined,
     kind: CardKind,
     fields: { name: string; description: string; referenceIds: string[] },
-  ): { id: string };
+  ): Character;
   deleteCard(ownerId: string, kind: CardKind, id: string): void;
   /** A gallery image as a reference asset, or a throw where it can't be one. */
   reference(account: GenerationAccount | undefined, itemId: string): { id: string };
@@ -308,6 +315,7 @@ export function createInbox(options: {
     ): DreamItem[];
     drafts(ownerId: string, proposalId: string): DreamItem[];
     promote(ownerId: string, proposalId: string, projectId: string): void;
+    detachProject(ownerId: string, projectId: string): void;
     dropDrafts(ownerId: string, keep: Set<string>): Promise<void>;
   };
   /** The owner's results with these ids, as lists show them. */
@@ -654,7 +662,7 @@ export function createInbox(options: {
     if (proposal.kind === "project") {
       const project = projects.create(ownerId, projectPatch(change.project), proposal.why);
       options.dream.promote(ownerId, proposal.id, project.id);
-      return { projectId: project.id };
+      return { projectId: project.id, revision: revisionOf(project) };
     }
     if (proposal.kind === "brief" || proposal.kind === "pacing") {
       const previous = projectOf(ownerId, proposal.projectId)?.previous?.change;
@@ -689,7 +697,7 @@ export function createInbox(options: {
       })
       .slice(0, cardKinds[kind].images.max);
     const card = options.createCard(account, kind, { name, description, referenceIds });
-    return { card: { kind, id: card.id } };
+    return { card: { kind, id: card.id }, revision: revisionOf(card) };
   }
   /** Takes proposals out of the Inbox, snoozed, noting the reason; drops their samples. */
   async function dismiss(ownerId: string, ids: string[] | "all", reason = "") {
@@ -808,23 +816,36 @@ export function createInbox(options: {
     clear: (ownerId: string, reason?: string) => dismiss(ownerId, "all", reason),
     /** Takes back an accepted proposal, while nothing has changed what it did since. */
     undo(ownerId: string, id: string) {
-      const record = load(ownerId);
-      const accepted = record.accepted.find((entry) => entry.id === id);
-      if (!accepted) throw failure("There is nothing to undo.", 409);
-      const { projectId, change, rule, card } = accepted.undo;
-      if (projectId && change) {
-        if (projectOf(ownerId, projectId)?.previous?.change !== change)
-          throw failure("A later change replaced it; undo that in the project first.", 409);
-        projects.undo(ownerId, projectId);
-      } else if (projectId) {
-        if (projectOf(ownerId, projectId)) projects.remove(ownerId, projectId);
-      } else if (rule)
-        options.taste.edit(ownerId, {
-          rules: options.taste.read(ownerId).rules.filter((entry) => entry !== rule),
-        });
-      else if (card) options.deleteCard(ownerId, card.kind, card.id);
-      record.accepted = record.accepted.filter((entry) => entry !== accepted);
-      save(ownerId, record);
+      runtimeTransaction(options.dataDir, () => {
+        const record = load(ownerId);
+        const accepted = record.accepted.find((entry) => entry.id === id);
+        if (!accepted) throw failure("There is nothing to undo.", 409);
+        const { projectId, change, revision, rule, card } = accepted.undo;
+        if (projectId && change) {
+          if (projectOf(ownerId, projectId)?.previous?.change !== change)
+            throw failure("A later change replaced it; undo that in the project first.", 409);
+          projects.undo(ownerId, projectId);
+        } else if (projectId) {
+          const project = projectOf(ownerId, projectId);
+          if (!project || revisionOf(project) !== revision)
+            throw failure("Undo can only remove a project unchanged since it was accepted.", 409);
+          if (Object.values(projects.chats(ownerId)).some((chat) => chat.projectId === projectId))
+            throw failure("Detach the project's chats before undoing it.", 409);
+          options.dream.detachProject(ownerId, projectId);
+          projects.remove(ownerId, projectId);
+        } else if (rule)
+          options.taste.edit(ownerId, {
+            rules: options.taste.read(ownerId).rules.filter((entry) => entry !== rule),
+          });
+        else if (card) {
+          const current = options.cards(ownerId)?.[card.kind].find((entry) => entry.id === card.id);
+          if (!current || revisionOf(current) !== revision)
+            throw failure("Undo can only remove a card unchanged since it was accepted.", 409);
+          options.deleteCard(ownerId, card.kind, card.id);
+        }
+        record.accepted = record.accepted.filter((entry) => entry !== accepted);
+        save(ownerId, record);
+      });
       return read(ownerId);
     },
   };

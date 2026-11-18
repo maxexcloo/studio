@@ -416,7 +416,7 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   // Off the menu, so no submenu opens under the pointer and takes the next click as outside it.
   await page.mouse.move(0, 0);
   await expect(page.getByRole("menu")).toHaveCount(1);
-  // The tile menu lists comparing in a section of its own, not under Recreate.
+  await page.getByRole("menuitem", { name: "AI", exact: true }).click();
   await page.getByRole("menuitem", { name: "Compare in Composer", exact: true }).click();
   await expect(variants(page).getByRole("radio", { name: "B", exact: true })).toBeChecked();
   await expect(page.getByRole("button", { name: "Clear Seed 1234567", exact: true })).toBeVisible();
@@ -582,6 +582,17 @@ test("Variants of a result show their numbers, the axis they vary and propose a 
   );
   await page.goto("/compare/fox-options");
   await expect(page.getByRole("heading", { name: "Which Lighting?", exact: true })).toBeVisible();
+  if (testInfo.project.use.isMobile) {
+    const viewport = page.viewportSize()!;
+    await page.setViewportSize({ width: 740, height: 320 });
+    const first = page.getByRole("button", { name: "Open A · Blue Hour", exact: true });
+    const tileHeight = async () => (await first.boundingBox())?.height ?? 0;
+    await expect.poll(tileHeight).toBeGreaterThan(100);
+    await page.getByText("Side by Side", { exact: true }).click();
+    await expect.poll(tileHeight).toBeGreaterThan(100);
+    await page.getByText("Scroll", { exact: true }).click();
+    await page.setViewportSize(viewport);
+  }
 
   // Picking one proposes it for the chat's project brief in Dream's Inbox.
   await page.getByRole("button", { name: "Pick B · Golden Dusk as Winner", exact: true }).click();

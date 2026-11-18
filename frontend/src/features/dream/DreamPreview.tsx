@@ -1,10 +1,11 @@
 import { Badge, CloseButton, Group, Modal, Text, VisuallyHidden } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { loraName } from "../../../../shared/profiles";
 import type { MediaItem } from "../../types";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
+import { videoLifecycle } from "../gallery/videoPlayback";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import type { Choice } from "./choices";
 import type { DeckCard } from "./deck";
@@ -15,7 +16,15 @@ import type { DreamItem } from "./queries";
 import classes from "./DreamPage.module.css";
 
 /** Why Dream made a result, its prompt and the LoRAs it tried, each rated here; `full` unclamped. */
-export function Caption({ item, full = false }: { item: DreamItem; full?: boolean }) {
+export function Caption({
+  item,
+  full = false,
+  readOnly = false,
+}: {
+  item: DreamItem;
+  full?: boolean;
+  readOnly?: boolean;
+}) {
   const info = useQuery(loraInfoQuery);
   // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's Liked LoRAs.
   const loras = (Array.isArray(item.settings?.loras) ? item.settings.loras : [])
@@ -38,7 +47,7 @@ export function Caption({ item, full = false }: { item: DreamItem; full?: boolea
             <Text size="xs" truncate>
               LoRA: {title}
             </Text>
-            <LoraRatings file={file} title={title} />
+            {!readOnly && <LoraRatings file={file} title={title} />}
           </Group>
         );
       })}
@@ -46,21 +55,33 @@ export function Caption({ item, full = false }: { item: DreamItem; full?: boolea
   );
 }
 
-function Media({ item }: { item: MediaItem }) {
+function Media({ item, active }: { item: MediaItem; active: boolean }) {
   const source = mediaSource(item);
-  return item.type === "video" ? (
+  const video = useRef<HTMLVideoElement>(null);
+  const url = item.type === "video" && active ? playbackUrl(source.url) : undefined;
+  useEffect(() => {
+    const element = video.current;
+    if (!element) return;
+    if (!document.hidden) void element.play().catch(() => undefined);
+    return videoLifecycle(element);
+  }, [url]);
+  return url ? (
     <video
-      src={playbackUrl(source.url)}
+      key={url}
+      ref={video}
+      src={url}
       poster={source.thumbnailUrl}
       aria-label={item.prompt || "Dream video"}
       controls
-      autoPlay
       muted
       loop
       playsInline
     />
   ) : (
-    <img src={source.displayUrl} alt={item.prompt || "Dream image"} />
+    <img
+      src={item.type === "video" ? source.thumbnailUrl : source.displayUrl}
+      alt={item.prompt || (item.type === "video" ? "Dream video" : "Dream image")}
+    />
   );
 }
 
@@ -76,7 +97,7 @@ export function DreamPreview({
 }: {
   card: DeckCard;
   side: number;
-  close: () => void;
+  close: (itemId: string) => void;
   act: (choice: Choice["choice"]) => void;
 }) {
   const items = card.kind === "pair" ? card.items : [card.item];
@@ -84,6 +105,7 @@ export function DreamPreview({
   const dreamt = card.kind === "dream" || (card.kind === "pair" && !!card.pairId);
   const track = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(side);
+  const closePreview = () => close(items[shown].id);
   useLayoutEffect(() => {
     const element = track.current;
     if (element) element.scrollLeft = side * element.clientWidth;
@@ -95,7 +117,7 @@ export function DreamPreview({
   return (
     <Modal
       opened
-      onClose={close}
+      onClose={closePreview}
       fullScreen
       withCloseButton={false}
       padding={0}
@@ -107,7 +129,19 @@ export function DreamPreview({
         body: classes.preview,
       }}
       onKeyDown={(event) => {
-        if (card.kind !== "pair" || (event.key !== "ArrowLeft" && event.key !== "ArrowRight"))
+        if (
+          card.kind !== "pair" ||
+          (event.key !== "ArrowLeft" && event.key !== "ArrowRight") ||
+          event.defaultPrevented ||
+          event.nativeEvent.isComposing ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.shiftKey ||
+          (event.target as Element).closest(
+            'video,input,textarea,select,[contenteditable="true"],[role="slider"]',
+          )
+        )
           return;
         event.preventDefault();
         move(event.key === "ArrowLeft" ? -1 : 1);
@@ -121,14 +155,20 @@ export function DreamPreview({
         ) : (
           <span />
         )}
-        <CloseButton aria-label="Close Preview" data-autofocus onClick={close} />
+        <CloseButton aria-label="Close Preview" data-autofocus onClick={closePreview} />
       </Group>
       <div
         ref={track}
         className={classes.previewTrack}
         onScroll={(event) =>
           setShown(
-            Math.round(event.currentTarget.scrollLeft / (event.currentTarget.clientWidth || 1)),
+            Math.max(
+              0,
+              Math.min(
+                items.length - 1,
+                Math.round(event.currentTarget.scrollLeft / (event.currentTarget.clientWidth || 1)),
+              ),
+            ),
           )
         }
       >
@@ -139,10 +179,10 @@ export function DreamPreview({
             aria-label={card.kind === "pair" ? sideLabel(card, index) : undefined}
           >
             <div className={classes.previewMedia}>
-              <Media item={item} />
+              <Media item={item} active={index === shown} />
             </div>
             {dreamt ? (
-              <Caption item={item as DreamItem} full />
+              <Caption item={item as DreamItem} full readOnly />
             ) : (
               <div className={classes.caption}>
                 <Text size="xs" c="dimmed">

@@ -16,7 +16,11 @@ import type { DreamActivity } from "../../shared/taste.ts";
 import { replyTitle, titleRule } from "../../shared/titles.ts";
 import { logger } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
-import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
+import {
+  readRuntimeDocument,
+  runtimeTransaction,
+  writeRuntimeDocument,
+} from "../persistence/runtime.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import { logFailure } from "./log-failure.ts";
 import type { Chats } from "./projects.ts";
@@ -102,6 +106,7 @@ type DreamVideoSource = { item: DreamItem; extend: boolean };
 type DreamQuery = {
   dreamState?: DreamState | DreamState[];
   dreamArm?: string | string[];
+  dreamProject?: string;
   notDreamArm?: string;
   dreamPair?: false;
   liked?: boolean;
@@ -120,6 +125,7 @@ type DreamQuery = {
   /** This many matches at random. */
   sample?: number;
 };
+type Rating = "liked" | "disliked" | null;
 /** A gallery item's Dream record; only a kept item shows in the gallery. */
 interface DreamMark extends Omit<DreamOrigin, "state"> {
   state: DreamState;
@@ -697,6 +703,8 @@ export function createDream(options: {
   likeness(a: DreamItem, b: DreamItem): number | undefined;
   /** Saves an item's Dream record and its rating (none where undefined). */
   mark(ownerId: string, itemId: string, dream: DreamMark, rating: string | undefined): void;
+  /** Applies a deck rating through the gallery's usual rating and taste updates. */
+  rate(ownerId: string, itemId: string, rating: Rating): void;
   /** Deletes the owner's items and their files, as the gallery's own delete does. */
   remove(ownerId: string, itemIds: string[]): void;
   /** The account's LoRA library, or null where it may not use LoRAs. */
@@ -1111,11 +1119,14 @@ export function createDream(options: {
     const kept = statsRead.get(ownerId);
     if (kept && !fresh && now() - kept.at < turns.keptMs) return kept.stats;
     const stats = new Map<string, ProjectStats<DreamItem>>();
-    const scores = new Map<string, number[]>();
-    for (const item of options.gallery(ownerId, { dreamState: poolStates, limit: turns.read })) {
-      const projectId = item.dream?.projectId;
-      if (!projectId) continue;
-      const entry = stats.get(projectId) || {
+    for (const { id } of options.projects(ownerId)) {
+      const items = options.gallery(ownerId, {
+        dreamProject: id,
+        dreamState: poolStates,
+        status: "done",
+        limit: turns.read,
+      });
+      const entry: ProjectStats<DreamItem> = {
         kept: 0,
         liked: 0,
         missed: 0,
@@ -1124,18 +1135,22 @@ export function createDream(options: {
         share: 0,
         results: [],
       };
-      stats.set(projectId, entry);
-      if (item.dream!.state === "kept") entry.kept++;
-      if (item.dream!.state === "discarded") entry.discarded++;
-      else if (item.status === "done" && entry.results.length < turns.results)
-        entry.results.push(item);
-      if (item.rating === "liked") entry.liked++;
-      if (item.review?.miss) entry.missed++;
-      if (item.review) scores.set(projectId, [...(scores.get(projectId) || []), item.review.score]);
+      let reviewed = 0;
+      let scores = 0;
+      for (const item of items) {
+        if (item.dream!.state === "kept") entry.kept++;
+        if (item.dream!.state === "discarded") entry.discarded++;
+        else if (entry.results.length < turns.results) entry.results.push(item);
+        if (item.rating === "liked") entry.liked++;
+        if (item.review?.miss) entry.missed++;
+        if (item.review) {
+          reviewed++;
+          scores += item.review.score;
+        }
+      }
+      if (reviewed) entry.review = Math.round((scores / reviewed) * 10) / 10;
+      stats.set(id, entry);
     }
-    for (const [projectId, list] of scores)
-      stats.get(projectId)!.review =
-        Math.round((list.reduce((sum, score) => sum + score, 0) / list.length) * 10) / 10;
     statsRead.set(ownerId, { at: now(), stats });
     return stats;
   }
@@ -2823,13 +2838,21 @@ export function createDream(options: {
     },
     /** A project's newest finished results, with its discards where asked. */
     projectResults: (ownerId: string, projectId: string, limit: number, discarded = false) =>
-      options
-        .gallery(ownerId, {
-          dreamState: discarded ? poolStates : ["unseen", "kept"],
-          limit: turns.read,
-        })
-        .filter((item) => item.dream?.projectId === projectId && item.status === "done")
-        .slice(0, limit),
+      options.gallery(ownerId, {
+        dreamProject: projectId,
+        dreamState: discarded ? poolStates : ["unseen", "kept"],
+        status: "done",
+        limit,
+      }),
+    /** Leaves a removed project's results in the deck or gallery without its project id. */
+    detachProject(ownerId: string, projectId: string) {
+      if (live().some((job) => job.ownerId === ownerId && job.dream?.projectId === projectId))
+        throw failure("Wait for the project's active generations before undoing it.", 409);
+      for (const item of options.gallery(ownerId, { dreamProject: projectId })) {
+        const { projectId: _projectId, ...mark } = item.dream!;
+        options.mark(ownerId, String(item.id), mark, item.rating);
+      }
+    },
     /** The newest images the account liked or kept, with their prompts. */
     liked: (ownerId: string, limit: number) =>
       generations(ownerId, { liked: true, type: "image", status: "done" })
@@ -2895,10 +2918,13 @@ export function createDream(options: {
     },
     /**
      * Teaches the taste profile which older images the person likes or passes over (a this-or-that
-     * pair is one of each, or both alike, and rates them against each other). The gallery itself
-     * stays as it was.
+     * pair is one of each, or both alike, and rates them against each other). A single-card
+     * rating applies alongside its judgement.
      */
-    calibrate(ownerId: string, { liked, passed }: { liked: string[]; passed: string[] }) {
+    calibrate(
+      ownerId: string,
+      { liked, passed, rating }: { liked: string[]; passed: string[]; rating?: Rating },
+    ) {
       const pool = new Map(
         calibrationPool(ownerId, { type: undefined, ids: [...liked, ...passed] }).map((item) => [
           String(item.id),
@@ -2913,48 +2939,60 @@ export function createDream(options: {
         if (!item) throw failure("That gallery image is unavailable.", 404);
         return tasteSignal(kind, item.jobId, itemValues(item));
       };
-      options.taste.record(ownerId, [
+      const signals = [
         ...liked.map(signal("calibrate-like")),
         ...passed.map(signal("calibrate-pass")),
-      ]);
+      ];
       const ids = [...liked, ...passed];
-      const record = read(ownerId);
-      // A pair: one liked over the other, or both alike.
-      if (ids.length === 2) rate(record, ids[0], ids[1], liked.length === 1 ? 1 : 0.5);
-      record.judged = [...ids, ...(record.judged || []).filter((id) => !ids.includes(id))].slice(
-        0,
-        judgedLimit,
-      );
-      write(ownerId, record);
+      runtimeTransaction(options.dataDir, () => {
+        options.taste.record(ownerId, signals, true);
+        const record = read(ownerId);
+        // A pair: one liked over the other, or both alike.
+        if (ids.length === 2) rate(record, ids[0], ids[1], liked.length === 1 ? 1 : 0.5);
+        record.judged = [...ids, ...(record.judged || []).filter((id) => !ids.includes(id))].slice(
+          0,
+          judgedLimit,
+        );
+        write(ownerId, record);
+        if (rating !== undefined) options.rate(ownerId, ids[0], rating);
+      });
     },
     /**
      * The Deck's Undo: Dream results go back to unseen and unrated, gallery images back to
-     * unjudged, and the taste profile forgets what the judgement taught. A rating given on a
-     * gallery image is taken back through the gallery first.
+     * unjudged, and the taste profile forgets what the judgement taught. Any gallery rating
+     * given with the judgement is restored in the same write.
      */
-    undo(ownerId: string, ids: string[]) {
+    undo(
+      ownerId: string,
+      ids: string[],
+      { calibration = false, rating }: { calibration?: boolean; rating?: Rating } = {},
+    ) {
       const items = options.items(ownerId, ids);
       if (items.length !== ids.length) throw failure("That result is unavailable.", 404);
-      const signals = options.taste.read(ownerId).signals;
-      const jobIds = items.flatMap((item) => (item.jobId ? [String(item.jobId)] : []));
-      // A Dream result's judgement starts when it was decided; a gallery image's when calibration
-      // heard of it.
-      const starts = items.flatMap((item) =>
-        item.dream
-          ? item.dream.decidedAt || []
-          : signals.find(
-              (signal) => signal.jobId === item.jobId && signal.kind.startsWith("calibrate-"),
-            )?.at || [],
-      );
-      for (const item of items)
-        if (item.dream && item.dream.state !== "unseen") {
-          const { decidedAt: _, ...mark } = item.dream;
-          options.mark(ownerId, String(item.id), { ...mark, state: "unseen" }, undefined);
-        }
-      if (starts.length) options.taste.takeBack(ownerId, jobIds, starts.sort()[0]);
-      const record = read(ownerId);
-      record.judged = (record.judged || []).filter((id) => !ids.includes(id));
-      write(ownerId, record);
+      if (rating !== undefined && items[0].status !== "done")
+        throw failure("That result is no longer finished.", 409);
+      runtimeTransaction(options.dataDir, () => {
+        const signals = options.taste.read(ownerId).signals;
+        const jobIds = items.flatMap((item) => (item.jobId ? [String(item.jobId)] : []));
+        const starts = items.flatMap((item) =>
+          !calibration && item.dream
+            ? item.dream.decidedAt || []
+            : signals.find(
+                (signal) => signal.jobId === item.jobId && signal.kind.startsWith("calibrate-"),
+              )?.at || [],
+        );
+        if (rating !== undefined) options.rate(ownerId, ids[0], rating);
+        if (!calibration)
+          for (const item of items)
+            if (item.dream && item.dream.state !== "unseen") {
+              const { decidedAt: _, ...mark } = item.dream;
+              options.mark(ownerId, String(item.id), { ...mark, state: "unseen" }, undefined);
+            }
+        if (starts.length) options.taste.takeBack(ownerId, jobIds, starts.sort()[0]);
+        const record = read(ownerId);
+        record.judged = (record.judged || []).filter((id) => !ids.includes(id));
+        write(ownerId, record);
+      });
     },
     keep: (ownerId: string, itemId: string) => decide(ownerId, itemId, "kept"),
     discard: (ownerId: string, itemId: string) => decide(ownerId, itemId, "discarded"),

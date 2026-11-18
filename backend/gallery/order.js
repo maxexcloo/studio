@@ -11,9 +11,9 @@ function galleryBucket(item) {
   return String(item.prompt || "").trim() ? 0 : 1;
 }
 
-/** Date.parse's time of `createdAt`, null when unreadable. */
+/** Date.parse's time of the gallery position, null when unreadable. */
 function galleryTime(item) {
-  const time = Date.parse(item?.createdAt || "");
+  const time = Date.parse(item?.galleryAt || item?.createdAt || "");
   return Number.isFinite(time) ? time : null;
 }
 

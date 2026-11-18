@@ -41,13 +41,6 @@
   height: 20px;
 }
 
-/* A centred dialog fits the area above a phone's keyboard while one of its fields is typed in
-   (ui/useKeyboard.ts), scrolling its content there; Mantine's own limit is the full height. */
-.dialogInner {
-  top: var(--studio-dialog-top, 0px);
-  bottom: var(--studio-dialog-inset, 0px);
-}
-
 /* A centred dialog sits on a solid raised surface: glass over the dimmed backdrop reads as flat
    grey. Paper's glass is inline. */
 .dialogContent:not([data-full-screen]) {
@@ -82,11 +75,18 @@
   bottom: 0;
   z-index: 1;
   margin-top: auto;
-  margin-inline: calc(-1 * var(--mb-padding, var(--mantine-spacing-md)));
   padding: var(--mantine-spacing-sm) var(--mb-padding, var(--mantine-spacing-md))
     calc(var(--mantine-spacing-md) + env(safe-area-inset-bottom));
   border-top: 1px solid var(--studio-glass-border);
   background: var(--mantine-color-body);
+}
+
+:where([data-phone]) .dialogContent[data-full-screen] .dialogBody [data-dialog-footer] {
+  margin-inline: calc(-1 * var(--mb-padding, var(--mantine-spacing-md)));
+}
+
+:where([data-phone]) .dialogContent[data-full-screen] > [data-dialog-footer] {
+  flex: none;
 }
 
 /* Touch targets (44 px, the theme's touch bar size) for small controls on touch screens. A sort

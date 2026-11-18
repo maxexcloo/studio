@@ -1,4 +1,5 @@
 .page {
+  --compare-min-height: 12rem;
   padding-bottom: var(--mantine-spacing-xl);
 }
 
@@ -39,13 +40,9 @@
 .grid {
   width: 100%;
   margin-inline: auto;
-}
-
-/* Every row of variants fits the viewport height together. */
-.grid {
   max-width: calc(
-    (100dvh - 17rem) / var(--compare-rows) * var(--compare-aspect) * var(--compare-columns) +
-      (var(--compare-columns) - 1) * var(--mantine-spacing-sm)
+    max(var(--compare-min-height), (100dvh - 17rem) / var(--compare-rows)) * var(--compare-aspect) *
+      var(--compare-columns) + (var(--compare-columns) - 1) * var(--mantine-spacing-sm)
   );
 }
 
@@ -63,5 +60,8 @@
   flex: 0 0 100%;
   min-width: 0;
   scroll-snap-align: start;
-  padding-inline: max(0px, (100% - (100dvh - 17rem) * var(--compare-aspect)) / 2);
+  padding-inline: max(
+    0px,
+    (100% - max(var(--compare-min-height), 100dvh - 17rem) * var(--compare-aspect)) / 2
+  );
 }

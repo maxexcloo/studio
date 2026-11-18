@@ -144,6 +144,10 @@ export function registerProfileRoutes(
     return { meta };
   });
   route("POST", "/api/profiles/editable/:id/remove", async (account, { params, body }) => {
+    if (body && Object.hasOwn(body, "replacement"))
+      throw Object.assign(new Error("Profile removal no longer accepts replacement."), {
+        status: 400,
+      });
     const result = removeProfile(params.id, {
       baseHash: String(body?.baseHash || ""),
       by: accountName(account),

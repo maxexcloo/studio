@@ -105,6 +105,12 @@ test("versions list, show, revert as a new version and approve an AI draft", asy
   fs.writeFileSync(path.join(userWorkflowsDir, "krea-test.json"), profile("Seed"));
   profileStore().record("krea-test", profile("Seed"), { origin: "seed" });
   const first = editor.readEditableProfile("krea-test");
+  const staleRemoval = await call("POST", "/api/profiles/editable/krea-test/remove", {
+    baseHash: first.hash,
+    replacement: "custom:other-profile",
+  });
+  assert.equal(staleRemoval.status, 400);
+  assert.equal(editor.readEditableProfile("krea-test").hash, first.hash);
   const drafted = editor.saveEditableProfile("krea-test", profile("Drafted"), {
     baseHash: first.hash,
     by: "assistant",

@@ -30,6 +30,7 @@ const holdTime = 500;
 export function SwipeCard({
   children,
   depth,
+  paused = false,
   fly,
   onSwipe,
   onTap,
@@ -41,6 +42,7 @@ export function SwipeCard({
   children: ReactNode;
   /** 0 for the top card, 1 for the one waiting beneath it. */
   depth: number;
+  paused?: boolean;
   fly?: RefObject<Fly | null>;
   onSwipe?: (direction: Direction) => void;
   onTap?: (target: HTMLElement) => void;
@@ -66,7 +68,7 @@ export function SwipeCard({
   const leaving = useRef(false);
   const holding = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(holding.current), []);
-  useInSync(card, !depth);
+  useInSync(card, !depth && !paused);
   /** Ends the press as a hold: the card settles and the release opens nothing. */
   function hold() {
     clearTimeout(holding.current);
