@@ -118,6 +118,10 @@ function fixture(t: TestContext, catalogue = profiles) {
           item.ownerId === ownerId &&
           (query.dreamState === undefined ||
             [query.dreamState].flat().includes(item.dream?.state)) &&
+          (query.dreamArm === undefined ||
+            [query.dreamArm].flat().some((arm) => item.dream?.arm?.startsWith(arm))) &&
+          (query.notDreamArm === undefined || item.dream?.arm !== query.notDreamArm) &&
+          (query.dreamPair !== false || !item.dream?.pair) &&
           (!query.liked || item.rating === "liked" || item.dream?.state === "kept") &&
           (!query.rating || item.rating === query.rating) &&
           (query.unlisted === undefined ||

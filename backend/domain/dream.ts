@@ -105,14 +105,19 @@ interface DreamPair {
 type PairAxis = "profile" | "lora" | "strength" | "steps" | "cfg" | "wording";
 export type PairAnswer = "a" | "b" | "both" | "neither";
 type DreamState = "unseen" | "kept" | "discarded";
+/** Every Dream result's state: the whole pool. */
+const poolStates: DreamState[] = ["unseen", "kept", "discarded"];
 type DreamVideoSource = { item: DreamItem; extend: boolean };
 /**
- * A gallery read narrowed in SQL (gallery/store.js): Dream states, liked or disliked items
- * (`rating`), liked items with kept results (`liked`), kind, status, the chats that asked for them,
- * ids or the first `limit` in gallery order.
+ * A gallery read narrowed in SQL (gallery/store.js): Dream states, arms (by prefix) and comparison
+ * sides, liked or disliked items (`rating`), liked items with kept results (`liked`), kind, status,
+ * the chats that asked for them, ids or the first `limit` in gallery order.
  */
 type DreamQuery = {
   dreamState?: DreamState | DreamState[];
+  dreamArm?: string | string[];
+  notDreamArm?: string;
+  dreamPair?: false;
   liked?: boolean;
   rating?: "liked" | "disliked";
   type?: string;
@@ -871,7 +876,7 @@ export function createDream(options: {
   let considering:
     | {
         ownerId: string;
-        results?: DreamItem[];
+        latest?: DreamItem[];
         jobIds?: Set<string>;
         promptJobIds?: Map<string, string[]>;
       }
@@ -889,23 +894,20 @@ export function createDream(options: {
     if (!cache.has(key)) cache.set(key, store.promptJobIds(ownerId, profileIds));
     return cache.get(key)!;
   }
-  /** All of Dream's results in gallery order, unseen, kept and discarded. */
-  function allResults(ownerId: string) {
-    const read = () => options.gallery(ownerId, { dreamState: ["unseen", "kept", "discarded"] });
-    if (considering?.ownerId !== ownerId) return read();
-    return (considering.results ??= read());
-  }
   /** Dream's latest image results, leaving out comparisons and series, which are alike by design. */
-  const dreamResults = (ownerId: string) =>
-    allResults(ownerId)
-      .filter(
-        (item) =>
-          item.type === "image" &&
-          item.status === "done" &&
-          !item.dream?.pair &&
-          item.dream?.arm !== "series",
-      )
-      .slice(0, diversity.results);
+  function dreamResults(ownerId: string) {
+    const read = () =>
+      options.gallery(ownerId, {
+        dreamState: poolStates,
+        type: "image",
+        status: "done",
+        dreamPair: false,
+        notDreamArm: "series",
+        limit: diversity.results,
+      });
+    if (considering?.ownerId !== ownerId) return read();
+    return (considering.latest ??= read());
+  }
   /**
    * What a profile (`profile:<id>`) or LoRA (`lora:<name>`) weighs after its share of Dream's
    * latest images within a day (`diversity`).
@@ -1299,14 +1301,12 @@ export function createDream(options: {
    */
   function exploring(ownerId: string) {
     const { start, low, high, window } = exploreShare;
-    const decided = allResults(ownerId)
-      .filter(
-        (item) =>
-          item.dream?.state !== "unseen" &&
-          !item.dream?.pair &&
-          /^(exploit|explore:|continue:)/.test(item.dream?.arm || ""),
-      )
-      .slice(0, window);
+    const decided = options.gallery(ownerId, {
+      dreamState: ["kept", "discarded"],
+      dreamArm: ["exploit", "explore:", "continue:"],
+      dreamPair: false,
+      limit: window,
+    });
     const rate = (explored: boolean) => {
       const side = decided.filter((item) => item.dream!.arm!.startsWith("explore:") === explored);
       return (side.filter((item) => item.dream!.state === "kept").length + 1) / (side.length + 2);
@@ -1886,8 +1886,7 @@ export function createDream(options: {
       const otherProfile = exploreProfile(ownerId, kind, catalogue.profiles, profile);
       const open = [...(otherProfile ? ["profile"] : []), ...(fresh ? ["lora"] : []), "prompt"];
       const made = (arm: string) =>
-        allResults(ownerId).filter((item) => item.dream?.arm?.startsWith(arm) && !item.dream.pair)
-          .length;
+        options.count(ownerId, { dreamState: poolStates, dreamArm: arm, dreamPair: false });
       const share = Math.round(exploring(ownerId) * 100);
       const axis = !steer && !chance(100 - share) ? open[made("explore:") % open.length] : "";
       const { projects, handedOff } = turnProjects(ownerId);
