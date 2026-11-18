@@ -7,16 +7,23 @@ import { defaultWorkerId } from "../workers.js";
 import { cancelDownload, discardDownload, downloadState, startDownload } from "./downloads.js";
 
 export function registerModelDownloadRoutes(app, { loadComfyContext }) {
-  // Every downloads answer starts from the worker's current files.
+  // Every downloads answer starts from the worker's current files, or its last known ones while
+  // ComfyUI is parked; writing into its model library still needs it running.
   const route = (method, path, run) =>
     directRoute(app, method, path, async (account, input) => {
-      try {
-        await refreshWorkerModels();
-      } catch (error) {
-        return { status: 503, payload: { ok: false, error: error.message } };
-      }
-      return run(account, input);
+      const reachable = await refreshWorkerModels()
+        .then(() => true)
+        .catch(() => false);
+      return run(account, input, reachable);
     });
+  const unreachable = {
+    status: 409,
+    payload: {
+      ok: false,
+      error:
+        "ComfyUI isn't running, so it can't receive downloads. Start it in Settings › Workers.",
+    },
+  };
 
   route("GET", "/api/models/downloads", () => ({
     status: 200,
@@ -25,9 +32,10 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
 
   // Catalogue files and provider previews resolved on the server are accepted
   // by ID; this route never accepts a browser-supplied download address.
-  route("POST", "/api/models/downloads", async (account, { body }) => {
+  route("POST", "/api/models/downloads", async (account, { body }, reachable) => {
     const refused = adminRefusal(account);
     if (refused) return refused;
+    if (!reachable) return unreachable;
     const spec = catalogueDownload(body?.id) || libraryDownload(String(body?.id || ""));
     if (!spec) return { status: 400, payload: { ok: false, error: "Unknown file." } };
     try {
@@ -41,11 +49,12 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
     }
   });
 
-  route("POST", "/api/models/downloads/cancel", async (account, { body }) => {
+  route("POST", "/api/models/downloads/cancel", async (account, { body }, reachable) => {
     const refused = adminRefusal(account);
     if (refused) return refused;
     const id = String(body?.id || "");
     const spec = body?.discard ? catalogueDownload(id) || libraryDownload(id) : null;
+    if (spec && !reachable) return unreachable;
     try {
       if (spec) await discardDownload(spec);
       else cancelDownload(id);
