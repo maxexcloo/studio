@@ -1053,11 +1053,11 @@ test("Typing in the phone Generate sheet gives the prompt the screen above one b
     const box = (await bar.boundingBox())!;
     return Math.round(box.y + box.height);
   };
-  // At rest the tools stand over the text, and the bar holds the output and Generate.
+  // At rest the text stands alone, without its tools, and the bar holds the output and Generate.
   await expect.poll(bottom).toBeLessThanOrEqual(page.viewportSize()!.height);
   const resting = await bottom();
   await expect(output).toBeVisible();
-  await expect(bar.getByRole("group", { name: "Prompt Tools", exact: true })).toHaveCount(0);
+  await expect(tools).toHaveCount(0);
   await prompt.click();
   await prompt.fill("A copper fox in a misty forest at dawn, cinematic light, ".repeat(20));
   // Typing puts AI, Copy and Clear in the bar as icons, then Done, in place of the output, Clear
@@ -1101,6 +1101,7 @@ test("Typing in the phone Generate sheet gives the prompt the screen above one b
   await expect(prompt).toHaveValue("A copper fox");
   await expect(output).toBeVisible();
   await expect(done).toBeHidden();
+  await expect(tools).toHaveCount(0);
   const close = sheet.getByRole("button", { name: "Close Generate", exact: true });
   await expect(close).toBeInViewport({ ratio: 1 });
   // Escape closes the sheet while typing too.
