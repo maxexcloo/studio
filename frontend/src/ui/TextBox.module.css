@@ -204,6 +204,14 @@
   gap: 4px;
 }
 
+/* While the text has focus, its tools lead its form's action bar, centred on the bar's row. */
+.barTools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
 .editor textarea {
   flex: 1;
   min-height: 0;

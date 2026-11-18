@@ -66,7 +66,7 @@ function radianceProfile(studio, model) {
     steps: defaults.steps || 8,
     width: defaults.width || 1024,
     loras: "[]",
-    rebalance: "off",
+    rebalance: "balanced",
   };
   const controls = Object.fromEntries(
     ["count", "height", "model", "prompt", "rebalance", "seed", "steps", "width"].map((input) => [
