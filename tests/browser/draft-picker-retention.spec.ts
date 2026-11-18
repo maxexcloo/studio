@@ -62,6 +62,7 @@ test("Reference browsing keeps its scroll, query and filters in the gallery edit
   await square.click();
   await square.press("Escape");
   await expect(filters).toBeHidden();
+  await expect(references).toBeVisible();
   await finishReferences(page);
   await openReferenceChoices(page);
   await expect(
@@ -71,10 +72,13 @@ test("Reference browsing keeps its scroll, query and filters in the gallery edit
   await expect(square).toHaveAttribute("aria-pressed", "true");
   await square.press("Escape");
   await expect(filters).toBeHidden();
-  await page
+  await expect(references).toBeVisible();
+  await references
     .getByRole("button", { name: "Use reference: Copper bird reference", exact: true })
     .click();
-  await finishReferences(page);
+  // Picking the only reference closes the picker.
+  await expect(page.getByRole("dialog", { name: "References", exact: true })).toBeHidden();
+  await expect(references).toBeHidden();
   await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
 });

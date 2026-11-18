@@ -645,6 +645,11 @@ test("Radiance short of host memory restarts once idle and quiet, then queues th
   await controller.restartWhenIdle();
   assert.deepEqual(kube.log, []);
   radianceBusy.value = false;
+  const shutdown = new AbortController();
+  const checking = controller.restartWhenIdle(shutdown.signal);
+  shutdown.abort();
+  await checking;
+  assert.deepEqual([kube.log, retried], [[], []]);
   await controller.restartWhenIdle();
   await controller.settled;
   assert.deepEqual(kube.log, [

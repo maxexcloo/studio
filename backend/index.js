@@ -227,10 +227,13 @@ installShutdown({ drain: () => drainServer() });
 
 watchEventLoop();
 const app = express();
+const stopping = new AbortController();
 // Routes match exactly as written. Express otherwise matches /API/… to /api/… while every gate
 // checks the lowercase prefix, so a capitalised path would reach handlers ungated.
 app.set("case sensitive routing", true);
 app.use((req, res, next) => {
+  if (stopping.signal.aborted)
+    return res.status(503).set("Connection", "close").json({ error: "Studio is stopping." });
   res.once(
     "close",
     track(() => routeLabel(req.method, req.originalUrl)),
@@ -388,7 +391,6 @@ async function ingestRecoveredRecords(backend, records, promptIds = []) {
   }
   return moved.records;
 }
-setInterval(() => void tracked("Job recovery", recoverRunningJobs), 5000).unref();
 
 async function recoverGalleryFromHistory() {
   // Recovery follows only jobs already recorded in this runtime's gallery.
@@ -584,6 +586,7 @@ const workloadModels = () =>
     .map((item) => item.model);
 const assistantEngine = registerAssistantRoutes(app, {
   localText,
+  shutdown: stopping.signal,
   workloadModels,
   frame: (req, id) => assistant.image(req.studioAccount, id),
   caption: (req, id) => assistant.caption(req.studioAccount, id),
@@ -1264,16 +1267,18 @@ const nextSteps = createNextStepWork({
   image: smallImage,
 });
 
-generationQueue.start();
-dream.start();
-finishing.start();
-captioner.start();
-selfReview.start();
-imageSearch.start();
-faceCheck.start();
-titler.start();
-suggester.start();
-nextSteps.start();
+const backgroundWork = [
+  generationQueue,
+  dream,
+  finishing,
+  captioner,
+  selfReview,
+  imageSearch,
+  faceCheck,
+  titler,
+  suggester,
+  nextSteps,
+];
 
 const upscale = registerUpscaleRoutes(app, {
   finishing,
@@ -1318,18 +1323,6 @@ app.all("/api/*splat", (_req, res) =>
 if (fs.existsSync(dist)) serveApp(app, dist);
 app.use(routeErrors);
 
-setTimeout(
-  () =>
-    recoverGalleryFromHistory()
-      .catch(() => null)
-      // Videos imported before their size was read get it now.
-      .then(() => fillVideoSizes())
-      .catch(() => null),
-  1200,
-);
-// Studio media's thumbnails and posters are built ahead of their first view.
-startMediaWarmup();
-
 // dev.mjs sets the port of Vite, which serves the page.
 const devPort = process.env.STUDIO_DEV_PORT;
 // A reverse proxy pools idle upstream connections (Traefik for 90 seconds) and sends the next
@@ -1346,7 +1339,11 @@ server.once("error", (error) => {
   );
   process.exit(1);
 });
-if (multiUserEnabled) listenForAgentSignIn();
+const agentSignIn = multiUserEnabled ? listenForAgentSignIn() : undefined;
+let warmup;
+let galleryRecovery;
+let jobRecovery;
+let stopMediaWarmup;
 server.listen(Number(port), host, () => {
   const listening = server.address().port;
   // Phone links in Settings use the bound address.
@@ -1368,9 +1365,6 @@ server.listen(Number(port), host, () => {
         if (entry.family === "IPv4" && !entry.internal)
           console.log(`    ➜  Network   http://${entry.address}:${pagePort}`);
   }
-  // Each worker's node list takes a large ComfyUI a second to send: read it now, not on the first request.
-  if (listWorkers().length)
-    void tracked("Catalogue warm-up", () => catalogue.mediaModels()).catch(() => {});
   void (async () => {
     // No workers is a setup of its own: say so.
     if (!listWorkers().length) {
@@ -1390,16 +1384,45 @@ server.listen(Number(port), host, () => {
   })().catch(() => {});
   // Tells a parent process (the server tests) where this one listens.
   process.send?.({ type: "ready", version: appVersion, url: `http://${shownHost}:${pagePort}` });
+  for (const work of backgroundWork) work.start();
+  jobRecovery = setInterval(() => void tracked("Job recovery", recoverRunningJobs), 5000).unref();
+  galleryRecovery = setTimeout(
+    () =>
+      recoverGalleryFromHistory()
+        .catch(() => null)
+        // Videos imported before their size was read get it now.
+        .then(() => fillVideoSizes())
+        .catch(() => null),
+    1200,
+  ).unref();
+  stopMediaWarmup = startMediaWarmup();
+  // Allow initial requests through before building the worker catalogues.
+  if (listWorkers().length)
+    warmup = setTimeout(
+      () => void tracked("Catalogue warm-up", () => catalogue.mediaModels()).catch(() => {}),
+      1000,
+    ).unref();
 });
 
 drainServer = async () => {
-  // MCP calls waiting inline for images reply with their links instead of outliving the grace.
-  mcp?.endWaits();
-  generationQueue.stop();
-  await new Promise((resolve, reject) => {
+  const closed = new Promise((resolve, reject) => {
     if (!server.listening) return resolve();
     server.close((error) => (error ? reject(error) : resolve()));
   });
+  agentSignIn?.close();
+  stopping.abort();
+  // MCP calls waiting inline for images reply with their links instead of outliving the grace.
+  mcp?.endWaits();
+  for (const work of backgroundWork) work.stop();
+  runtime?.stop();
+  stopMediaWarmup?.();
+  clearTimeout(warmup);
+  clearTimeout(galleryRecovery);
+  clearInterval(jobRecovery);
+  server.closeIdleConnections();
+  // Bound the wait for slow responses and clients still uploading a request body.
+  const disconnect = setTimeout(() => server.closeAllConnections(), 2000);
+  await closed.finally(() => clearTimeout(disconnect));
   flushWorkflowPreferences();
   // The runtime database's one connection; nothing may write after this.
   store.close();
