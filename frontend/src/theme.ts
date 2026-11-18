@@ -242,7 +242,7 @@ export function studioTheme({
       }),
       Button: Button.extend({
         classNames: (_theme, props) => ({
-          root: `${classes.button} ${touch && height(props.size) ? classes.phoneIcons : ""}`,
+          root: `${classes.button} ${touch && height(props.size) ? classes.phoneIcons : ""} ${String(props.size).startsWith("compact") ? classes.compact : ""}`,
         }),
         defaultProps: { size: "md", fw: 500, autoContrast: true },
         // A touch button is at least as wide as it is tall (All, Clear).

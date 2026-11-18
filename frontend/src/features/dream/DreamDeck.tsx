@@ -1,9 +1,8 @@
-import { ActionIcon, Badge, Button, Group, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Button, Text, Tooltip } from "@mantine/core";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 
-import { loraName } from "../../../../shared/profiles";
 import { failure, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
@@ -11,17 +10,17 @@ import { LoadingState } from "../../ui/LoadingState";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { mediaSource } from "../gallery/mediaSource";
-import { MediaViewer } from "../gallery/MediaViewer";
 import { galleryKey } from "../gallery/queries";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
-import { type Verdict, viewerChoices } from "./choices";
+import type { Verdict } from "./choices";
 import { type DeckCard, type PairDeckCard, cardIds, deckCards } from "./deck";
 import { DeckButtons } from "./DeckButtons";
-import { PairContent, sideLabel } from "./PairCard";
+import { DeckMedia } from "./DeckMedia";
+import { Caption, DreamPreview } from "./DreamPreview";
+import { PairContent } from "./PairCard";
 import {
   type DreamItem,
   type DreamMedia,
@@ -36,15 +35,8 @@ import { type Direction, type Fly, SwipeCard } from "./SwipeCard";
 import classes from "./DreamPage.module.css";
 
 type SingleCard = Exclude<DeckCard, PairDeckCard>;
-const directions: Record<Verdict, Direction> = {
-  discard: "left",
-  keep: "right",
-  variations: "up",
-  like: "up",
-  animate: "right",
-  refine: "right",
-  more: "right",
-};
+/** The deck's verdicts, the ways their cards fly. */
+const directions: Record<string, Direction> = { discard: "left", keep: "right", like: "up" };
 /** A pair is answered by its direction: A left, B right, Both up and Neither down. */
 const answers: Record<Direction, PairAnswer> = {
   left: "a",
@@ -61,27 +53,6 @@ const keyDirections: Record<string, Direction> = {
   ArrowUp: "up",
   ArrowDown: "down",
 };
-/** Full screen's verdicts and answers return to the deck; Edit and others don't. */
-const closing = new Set<string>(["discard", "like", "keep", "a", "b", "both", "neither"]);
-/** Verdicts that start new work, which Undo cannot take back. */
-const immediate = new Set<string>(["variations", "animate", "refine", "more"]);
-
-/** Deck media stays still; opening the shared viewer owns playback and its lifecycle. */
-function Media({ item }: { item: MediaItem }) {
-  const source = mediaSource(item);
-  const [failed, setFailed] = useState(false);
-  if (failed) return null;
-  return (
-    <img
-      src={item.type === "video" ? source.thumbnailUrl || source.url : source.displayUrl}
-      alt={item.prompt || "Dream image"}
-      draggable={false}
-      decoding="async"
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
 /** Warms the browser cache for a card that is not on screen yet. */
 function usePrefetch(card?: DeckCard) {
   useEffect(() => {
@@ -227,65 +198,6 @@ function useUndo(onFailed: (judgement: Judgement) => void, onGone: (card: DeckCa
   });
 }
 
-/** How many Dream results a card holds; calibration cards hold none. */
-const dreamed = (card: DeckCard) =>
-  card.kind === "dream" ? 1 : card.kind === "pair" && card.pairId ? 2 : 0;
-
-function Caption({ item }: { item: DreamItem }) {
-  const info = useQuery(loraInfoQuery);
-  // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's Liked LoRAs.
-  const loras = (Array.isArray(item.settings?.loras) ? item.settings.loras : [])
-    .filter((lora) => lora?.name && lora.enabled !== false)
-    .map((lora) => String(lora.name));
-  return (
-    <div className={classes.caption}>
-      {item.dream?.why && (
-        <Text size="sm" fw={500} lineClamp={1}>
-          {item.dream.why}
-        </Text>
-      )}
-      <Text size="xs" c="dimmed" lineClamp={2}>
-        {item.prompt || item.dream?.prompt}
-      </Text>
-      {loras.map((file) => {
-        const title = loraName(file, info.data?.loras[file]);
-        return (
-          <Group key={file} gap="xs" wrap="nowrap" justify="space-between">
-            <Text size="xs" truncate>
-              LoRA: {title}
-            </Text>
-            <LoraRatings file={file} title={title} />
-          </Group>
-        );
-      })}
-    </div>
-  );
-}
-
-/** The current batch as a strip: judged results filled, the current one marked, the rest to come. */
-function BatchStrip({ done, total }: { done: number; total: number }) {
-  if (total < 2) return null;
-  return (
-    <div
-      className={classes.strip}
-      role="progressbar"
-      aria-label="Dream Batch"
-      aria-valuemin={0}
-      aria-valuemax={total}
-      aria-valuenow={done}
-      aria-valuetext={`${done + 1} of ${total}`}
-    >
-      {Array.from({ length: total }, (_, index) => (
-        <span
-          key={index}
-          data-done={index < done || undefined}
-          data-current={index === done || undefined}
-        />
-      ))}
-    </div>
-  );
-}
-
 const cardLabel = (card: DeckCard, top: boolean) =>
   card.kind === "pair"
     ? top
@@ -293,7 +205,7 @@ const cardLabel = (card: DeckCard, top: boolean) =>
       : "Next Comparison"
     : `${top ? "Current" : "Next"} ${card.kind === "dream" ? "Dream" : "Gallery Image"}`;
 
-/** The unseen deck and its shared preview; tapping media opens it, actions and swipes judge it. */
+/** The unseen deck and its preview; tapping media opens it, buttons, keys and swipes judge it. */
 export function DreamDeck({
   items,
   media,
@@ -311,8 +223,8 @@ export function DreamDeck({
   const touch = useTouch();
   const [current, setCurrent] = useState<DeckCard>();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
-  const [counts, setCounts] = useState({ judged: 0, dreamed: 0 });
-  // The id of the top card's item open in the viewer; after a verdict it follows the next card.
+  const [judged, setJudged] = useState(0);
+  // The id of the top card's item open in the preview.
   const [viewing, setViewing] = useState<string | null>(null);
   // The side a tap chose, outlined while its card leaves.
   const [picked, setPicked] = useState<{ key: string; side: 0 | 1 } | null>(null);
@@ -345,16 +257,12 @@ export function DreamDeck({
     ...returned.filter((item) => !items.some((listed) => listed.id === item.id)),
   ].filter((item) => !decided.has(item.id));
   const gallery = useCalibration(pairsOnly ? 2 : 1, decided, media);
-  const cards = deckCards(unseen, gallery.items, counts.judged, { pairsOnly, media, current });
+  const cards = deckCards(unseen, gallery.items, judged, { pairsOnly, media, current });
   const [top, next] = cards;
   if (top !== current) setCurrent(top);
   usePrefetch(cards[2]);
   const fly = useRef<Fly | null>(null);
-  const stage = useRef<HTMLDivElement>(null);
   const busy = useRef(false);
-  const single = top?.kind === "pair" ? undefined : top;
-  const image = single?.item.type === "image";
-  const dream = single?.kind === "dream";
 
   /** Takes the card off the deck. */
   function decide(card: DeckCard) {
@@ -364,16 +272,13 @@ export function DreamDeck({
       for (const id of cardIds(card)) next.add(id);
       return next;
     });
-    setCounts((previous) => ({
-      judged: previous.judged + 1,
-      dreamed: previous.dreamed + dreamed(card),
-    }));
+    setJudged((previous) => previous + 1);
   }
-  /** Takes the card off the deck and sends its judgement; Undo can take back all but new work. */
+  /** Takes the card off the deck and sends its judgement, which Undo can take back. */
   function commit(judgement: Judgement) {
     decide(judgement.card);
     judge.mutate(judgement);
-    if (!immediate.has(judgement.verdict)) setHistory((previous) => [...previous, judgement]);
+    setHistory((previous) => [...previous, judgement]);
   }
   /** Puts the last judged card back on top and takes its judgement back. */
   function undo() {
@@ -386,10 +291,7 @@ export function DreamDeck({
     else if (card.kind === "pair" && card.pairId)
       setReturned((previous) => [...previous, ...(card.items as DreamItem[])]);
     restore(card);
-    setCounts((previous) => ({
-      judged: previous.judged - 1,
-      dreamed: previous.dreamed - dreamed(card),
-    }));
+    setJudged((previous) => previous - 1);
     takeBack.mutate(last);
   }
   /** Flies the top card out its way, then commits the verdict or answer. */
@@ -405,8 +307,7 @@ export function DreamDeck({
         return commit({ card: top, verdict: choice as PairAnswer });
       }
       if (!(choice in directions)) return;
-      if (immediate.has(choice) && !(image && dream)) return;
-      await fly.current?.(directions[choice as Verdict]);
+      await fly.current?.(directions[choice]);
       commit({ card: top, verdict: choice as Verdict });
     } finally {
       busy.current = false;
@@ -448,37 +349,25 @@ export function DreamDeck({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // The viewer shows the top card, so a verdict there moves on to the next card in place.
+  // The preview shows the top card; an answer there closes it and plays out on the deck.
   const shown = !top ? [] : top.kind === "pair" ? top.items : [top.item];
-  if (viewing && !shown.length) setViewing(null);
-  const pairLabel = (item: MediaItem) =>
-    top?.kind === "pair"
-      ? sideLabel(
-          top,
-          top.items.findIndex((side) => side.id === item.id),
-        )
-      : "";
-  const viewer = viewing && top && (
-    <MediaViewer
-      item={shown.find((item) => item.id === viewing) || shown[0]}
-      items={shown}
-      navigate={(item) => setViewing(item.id)}
-      close={() => setViewing(null)}
-      onReturnFocus={(item) => {
-        const targets = [
-          ...(stage.current?.querySelectorAll<HTMLElement>('[data-depth="0"] [data-preview-id]') ??
-            []),
-        ];
-        (targets.find((target) => target.dataset.previewId === item.id) ?? targets[0])?.focus({
-          preventScroll: true,
-        });
+  const side = shown.findIndex((item) => item.id === viewing);
+  if (viewing && side < 0) setViewing(null);
+  const preview = top && side >= 0 && (
+    <DreamPreview
+      card={top}
+      side={side}
+      close={() => {
+        // The preview mounts open, so Mantine has no opening to return focus from.
+        flushSync(() => setViewing(null));
+        document
+          .querySelector<HTMLElement>(`[data-depth="0"] [data-preview-id="${viewing}"]`)
+          ?.focus({ preventScroll: true });
       }}
-      actions={viewerChoices(top, (choice) => {
-        if (closing.has(choice)) setViewing(null);
+      act={(choice) => {
+        setViewing(null);
         void act(choice);
-      })}
-      itemLabel={top.kind === "pair" ? pairLabel : undefined}
-      sideBySide={top.kind === "pair"}
+      }}
     />
   );
   // Undo stands beside the view menu, so it stays in reach with the deck empty too.
@@ -487,8 +376,8 @@ export function DreamDeck({
     createPortal(
       <Button
         size="compact-sm"
-        variant="default"
-        radius="xl"
+        variant="subtle"
+        color="gray"
         leftSection={<icons.undo size={14} />}
         disabled={!history.length}
         onClick={undo}
@@ -519,11 +408,9 @@ export function DreamDeck({
       </ActionIcon>
     </Tooltip>
   );
-  const batch = counts.dreamed + unseen.length;
   return (
     <>
-      <BatchStrip done={counts.dreamed} total={batch} />
-      <div ref={stage} className={classes.stage} aria-hidden={!!viewing} inert={!!viewing}>
+      <div className={classes.stage} aria-hidden={!!viewing} inert={!!viewing}>
         {[next, top].map(
           (card) =>
             card && (
@@ -568,7 +455,7 @@ export function DreamDeck({
                 ) : (
                   <>
                     <div className={classes.media}>
-                      <Media item={card.item} />
+                      <DeckMedia item={card.item} playing={card === top} />
                       {card.kind === "calibration" && (
                         <Badge className={classes.label} variant="default">
                           From Your Gallery
@@ -600,7 +487,7 @@ export function DreamDeck({
         </Text>
       )}
       {undoButton}
-      {viewer}
+      {preview}
     </>
   );
 }

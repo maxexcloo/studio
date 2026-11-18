@@ -233,21 +233,16 @@ export function CompareMenu() {
           onChange={(value) => setAxis(value!)}
         />
         {axis === "Model" && (
-          <>
-            <MultiSelect
-              {...selection}
-              label="Models"
-              placeholder="Choose models"
-              data={modelOptions}
-              value={chosen.map((each) => each.id)}
-              onChange={setModels}
-              maxValues={compareVariants.max - 1}
-              nothingFoundMessage="No models found"
-            />
-            <Text size="xs" c="dimmed">
-              Includes the current model, {profile && modelName(profileName(profile))}.
-            </Text>
-          </>
+          <MultiSelect
+            {...selection}
+            label="Models"
+            placeholder="Choose models"
+            data={modelOptions}
+            value={chosen.map((each) => each.id)}
+            onChange={setModels}
+            maxValues={compareVariants.max - 1}
+            nothingFoundMessage="No models found"
+          />
         )}
         {axis === "LoRA" && (
           <>
@@ -335,6 +330,9 @@ export function CompareMenu() {
           />
         )}
         <Text size="xs" c="dimmed">
+          {axis === "Model" &&
+            profile &&
+            `Includes the current model, ${modelName(profileName(profile))}. `}
           {plural(count, "variant")} · choose {compareVariants.min}–{compareVariants.max} to
           compare.
         </Text>

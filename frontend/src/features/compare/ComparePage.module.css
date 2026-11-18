@@ -44,12 +44,12 @@
 /* Every row of variants fits the viewport height together. */
 .grid {
   max-width: calc(
-    (100dvh - 15rem) / var(--compare-rows) * var(--compare-aspect) * var(--compare-columns) +
+    (100dvh - 17rem) / var(--compare-rows) * var(--compare-aspect) * var(--compare-columns) +
       (var(--compare-columns) - 1) * var(--mantine-spacing-sm)
   );
 }
 
-/* Phones: one variant per swipe, snapping to each. */
+/* Scroll: one variant per swipe, snapping to each, as large as the viewport's height allows. */
 .track {
   display: flex;
   overflow-x: auto;
@@ -63,4 +63,5 @@
   flex: 0 0 100%;
   min-width: 0;
   scroll-snap-align: start;
+  padding-inline: max(0px, (100% - (100dvh - 17rem) * var(--compare-aspect)) / 2);
 }
