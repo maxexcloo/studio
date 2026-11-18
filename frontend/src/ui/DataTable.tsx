@@ -27,11 +27,16 @@ interface DataColumn<T> {
 }
 type Sort = { key: string; descending: boolean };
 
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+/** Natural name order for every name sort: case, accents and punctuation aside, numbers by value. */
+export const compareNames = new Intl.Collator(undefined, {
+  ignorePunctuation: true,
+  numeric: true,
+  sensitivity: "base",
+}).compare;
 function compare(a: string | number | undefined, b: string | number | undefined) {
   if (a === undefined || a === "") return b === undefined || b === "" ? 0 : 1;
   if (b === undefined || b === "") return -1;
-  return typeof a === "number" && typeof b === "number" ? a - b : collator.compare(`${a}`, `${b}`);
+  return typeof a === "number" && typeof b === "number" ? a - b : compareNames(`${a}`, `${b}`);
 }
 
 /**

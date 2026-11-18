@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
@@ -26,7 +27,7 @@ export function DeleteFailedItems({ others = false }: { others?: boolean }) {
     ...(accounts.data?.accounts || [])
       .filter((entry) => entry.id !== own)
       .map((entry) => ({ value: entry.id, label: entry.username }))
-      .sort((a, b) => a.label.localeCompare(b.label)),
+      .sort((a, b) => compareNames(a.label, b.label)),
   ];
   const whose = !others
     ? "your"
