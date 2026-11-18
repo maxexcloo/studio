@@ -1,4 +1,4 @@
-import { Badge, Image, Menu, Stack, Text, UnstyledButton } from "@mantine/core";
+import { Badge, Group, Image, Menu, Stack, Text, UnstyledButton } from "@mantine/core";
 import { ArrowLeft, ArrowRight, Replace } from "lucide-react";
 import { type DragEvent, useState } from "react";
 
@@ -285,21 +285,32 @@ export function ReferenceRoles({
       )}
       {strengths.map(({ asset, index, range, value, mark, set }) => {
         const label = `${referenceLabel(asset, index, profile)} Strength`;
+        // Each strength stands beside its reference's thumbnail, as a LoRA's beside its name.
         return (
-          <Stack key={referenceKey(asset)} gap={4}>
-            <Text size="xs" c="dimmed">
-              {label}
-            </Text>
-            <StrengthControl
-              label={label}
-              value={value}
-              min={range.min}
-              max={range.max}
-              step={range.step}
-              mark={mark}
-              onChange={set}
+          <Group key={referenceKey(asset)} gap="sm" wrap="nowrap">
+            <Image
+              src={asset.thumbnailUrl || asset.url}
+              alt=""
+              h={40}
+              w={40}
+              radius="sm"
+              fallbackSrc=""
             />
-          </Stack>
+            <Stack gap={0} flex={1} miw={0}>
+              <Text size="xs" c="dimmed" truncate>
+                {label}
+              </Text>
+              <StrengthControl
+                label={label}
+                value={value}
+                min={range.min}
+                max={range.max}
+                step={range.step}
+                mark={mark}
+                onChange={set}
+              />
+            </Stack>
+          </Group>
         );
       })}
     </Stack>

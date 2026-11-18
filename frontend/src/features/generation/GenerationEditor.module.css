@@ -88,8 +88,8 @@
 }
 
 /*
- * While a text box has focus, its tools join the action bar in place of the output and Clear, and
- * Generate gives way to its icon.
+ * While a text box has focus, its tools join the action bar in place of the output and Clear,
+ * Done returns to the sheet, and Generate gives way to its icon.
  */
 .textTools {
   display: flex;
@@ -97,14 +97,7 @@
 }
 
 .textTools:empty,
-.send {
+.footer:has(.textTools:not(:empty)) .resting,
+.footer:not(:has(.textTools:not(:empty))) .typing {
   display: none;
-}
-
-.footer:has(.textTools:not(:empty)) .resting {
-  display: none;
-}
-
-.footer:has(.textTools:not(:empty)) .send {
-  display: flex;
 }
