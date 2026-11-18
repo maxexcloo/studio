@@ -156,6 +156,7 @@ test("The viewer directly offers Suggested and Templates without styles or item 
     ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
     "Refresh",
     "Custom…",
+    "Compare in Composer",
     "More Like This",
     "Similar",
   ]);
@@ -258,6 +259,7 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
     "Refresh",
     "Softer Shadows",
     "Custom…",
+    "Compare in Composer",
     "More Like This",
     "Similar",
   ]);

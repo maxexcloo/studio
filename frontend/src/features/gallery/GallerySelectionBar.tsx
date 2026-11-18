@@ -32,9 +32,9 @@ const shareLimit = 20;
 const compareLimit = 4;
 
 /**
- * The contextual selection bar under the toolbar: the count and quick selects, then
- * the selection's actions and Clear Selection. The same actions show as a context menu at `menu`
- * (right-click or Shift+F10).
+ * The contextual selection bar under the toolbar: the count and quick selects, then at its end the
+ * selection's actions and, on desktop, Clear Selection. The same actions show as a context menu at
+ * `menu` (right-click or Shift+F10).
  */
 export function GallerySelectionBar({
   selection,
@@ -356,66 +356,49 @@ export function GallerySelectionBar({
     document.addEventListener("keydown", keys);
     return () => document.removeEventListener("keydown", keys);
   }, [confirm, pending, selection.end, deletable.length]);
-  // Phones name them by what they select (All, None, Failed, In Progress). Each select takes every
-  // match of the search and filters, loading the pages not shown yet first. Select None takes Select
-  // All's place once everything is selected.
+  // Select All, Select Failed and Select None always show, disabled where they would change
+  // nothing; phones name them by what they select. Each select takes every match of the search
+  // and filters, loading the pages not shown yet first.
   const [quickPicked, setQuickPicked] = useState("");
-  const matching = [
-    { id: "select-all", label: "Select All", short: "All", match: () => true },
-    {
-      id: "select-failed",
-      label: "Select Failed",
-      short: "Failed",
-      match: (item: MediaItem) => item.status === "failed",
-    },
-    {
-      id: "select-running",
-      label: "Select In Progress",
-      short: "In Progress",
-      match: (item: MediaItem) => !finished(item),
-    },
-  ]
-    .map((action) => ({ ...action, shown: selection.items.some(action.match) }))
-    .filter(({ id, shown }) => (id === "select-all" ? !selection.all : shown))
-    .map(({ match, shown, ...action }) => ({
+  const quick = [
+    ...[
+      { id: "select-all", label: "Select All", short: "All", match: () => true },
+      {
+        id: "select-failed",
+        label: "Select Failed",
+        short: "Failed",
+        match: (item: MediaItem) => item.status === "failed",
+      },
+    ].map(({ match, ...action }) => ({
       ...action,
-      disabled: !shown || pending || selection.loading,
+      disabled:
+        pending ||
+        selection.loading ||
+        (action.id === "select-all"
+          ? selection.all
+          : selection.complete && !selection.items.some(match)),
       loading: selection.loading && quickPicked === action.id,
       onClick: () => {
         setQuickPicked(action.id);
         selection.selectMatching(match);
       },
-    }));
-  const none = {
-    id: "select-none",
-    label: "Select None",
-    short: "None",
-    disabled: pending,
-    loading: false,
-    onClick: selection.clear,
-  };
-  const all = matching.filter((action) => action.id === "select-all");
-  const quick = [
-    ...all,
-    ...(selected.length ? [none] : []),
-    ...matching.filter((action) => action.id !== "select-all"),
+    })),
+    {
+      id: "select-none",
+      label: "Select None",
+      short: "None",
+      disabled: pending || !selected.length,
+      loading: false,
+      onClick: selection.clear,
+    },
   ];
-  const bar = (
-    <ActionBarGroups
-      groups={actions}
-      labelled={namedItemActions}
-      fit={phone}
-      stacked={phone}
-      menuPosition="bottom-end"
-    />
-  );
   return (
     <>
       <div className={classes.header} role="group" aria-label="Gallery Selection">
         <Text size="sm" fw={500} role="status" className={classes.count}>
           {selected.length} Selected
         </Text>
-        {!phone && <Divider orientation="vertical" className={classes.divider} />}
+        <Divider orientation="vertical" className={classes.divider} />
         <div role="group" aria-label="Quick Select" className={classes.quick}>
           {quick.map((action) => (
             <Button
@@ -432,23 +415,37 @@ export function GallerySelectionBar({
             </Button>
           ))}
         </div>
-        {!phone && <Divider orientation="vertical" className={classes.divider} />}
-        <div role="group" aria-label="Selected Item Actions" className={classes.actions}>
-          {bar}
+        <div
+          role="group"
+          aria-label="Selected Item Actions"
+          className={classes.actions}
+          style={{ "--actions": actions.flat().length } as React.CSSProperties}
+        >
+          <ActionBarGroups
+            groups={actions}
+            labelled={namedItemActions}
+            fit={phone}
+            stacked={phone}
+            menuPosition="bottom-end"
+          />
+          {/* Phones end the selection with the toolbar's Select, which stays pressed. */}
+          {!phone && (
+            <>
+              <Divider orientation="vertical" className={classes.divider} />
+              <Tooltip label="Clear Selection">
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label="Clear Selection"
+                  disabled={pending}
+                  onClick={selection.end}
+                >
+                  <icons.clear size={18} />
+                </ActionIcon>
+              </Tooltip>
+            </>
+          )}
         </div>
-        {!phone && <Divider orientation="vertical" className={classes.divider} />}
-        {/* The count leads; closing the selection is always the last icon. */}
-        <Tooltip label="Clear Selection">
-          <ActionIcon
-            variant="subtle"
-            color="gray"
-            aria-label="Clear Selection"
-            disabled={pending}
-            onClick={selection.end}
-          >
-            <icons.clear size={18} />
-          </ActionIcon>
-        </Tooltip>
       </div>
       <Menu
         opened={menu !== null}

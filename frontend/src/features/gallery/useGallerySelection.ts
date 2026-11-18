@@ -73,6 +73,8 @@ export function useGallerySelection(
       selectedItems: selected ? items.filter((item) => selected.has(item.id)) : [],
       /** Whether every match of the search and filters is selected. */
       all: more.complete && items.length > 0 && items.every((item) => selected?.has(item.id)),
+      /** Whether every match of the search and filters has loaded. */
+      complete: more.complete,
       items,
       /** Whether a quick select is waiting for the rest of the matches to load. */
       loading: pending !== null,

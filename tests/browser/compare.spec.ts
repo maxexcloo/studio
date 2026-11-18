@@ -412,7 +412,7 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   await page
     .getByRole("button", { name: "Open image: Amber Bird", exact: true })
     .click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  // The tile menu lists comparing in a section of its own, not under Recreate.
   await page.getByRole("menuitem", { name: "Compare in Composer", exact: true }).click();
   await expect(variants(page).getByRole("radio", { name: "B", exact: true })).toBeChecked();
   await expect(page.getByRole("button", { name: "Clear Seed 1234567", exact: true })).toBeVisible();
@@ -456,8 +456,8 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
     "href",
     "/compare/compare-2",
   );
-  // Recreate ▾ also opens the comparison the image belongs to.
-  await viewerAction(page, "Recreate");
+  // AI ▾ also opens the comparison the image belongs to.
+  await viewerAction(page, "AI");
   await expect(
     page.getByRole("menuitem", { name: "Compare in Composer", exact: true }),
   ).toBeVisible();

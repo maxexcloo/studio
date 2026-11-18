@@ -210,8 +210,8 @@ interface FilterProps {
 }
 
 /**
- * The active filters as removable chips, one per value, plus any `extra` view choices. Liked,
- * Disliked and Uploads have none: their own toggle or tab shows them.
+ * The active filters as removable chips, one per value, plus any `extra` view choices. Liked and
+ * Uploads have none: their own toggle or tab shows them.
  */
 export function useActiveFilters(
   { kind, value, onChange }: FilterProps,
@@ -229,6 +229,9 @@ export function useActiveFilters(
             remove: () => onChange({ ...value, comparisons: false }),
           },
         ]
+      : []),
+    ...(value.rating === "disliked"
+      ? [{ key: "disliked", label: "Disliked", remove: () => onChange({ ...value, rating: "" }) }]
       : []),
     ...extra,
     ...facets.flatMap((facet) => {

@@ -10,7 +10,6 @@ import { stripMetadata } from "../metadata-strip.js";
 import { getThumbnail } from "../thumbnails.js";
 import {
   getComfyVideoGif,
-  getComfyVideoLoop,
   getComfyVideoPlayback,
   getComfyVideoPoster,
   getComfyVideoPreview,
@@ -170,13 +169,6 @@ export function registerComfyMediaRoutes(app) {
           .type("image/gif")
           .attachment(`${path.parse(filename).name}.gif`)
           .send(await getComfyVideoGif(filename, subfolder, type));
-        return;
-      }
-      if (req.query.format === "loop") {
-        res
-          .type("video/mp4")
-          .attachment(`${path.parse(filename).name} loop.mp4`)
-          .send(await getComfyVideoLoop(filename, subfolder, type));
         return;
       }
       // The viewer's copy (getComfyVideoPlayback); a video not kept here plays as ComfyUI has it.

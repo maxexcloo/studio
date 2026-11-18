@@ -31,6 +31,7 @@ import {
   galleryJobItems,
   galleryRevisionValue,
   gallerySummaryRows,
+  hasGalleryMedia,
   hideGalleryItems,
   outputFileCandidates,
   pageGallery,
@@ -311,11 +312,11 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
   });
 
   // One item in full, as Details shows it: the gallery's pages leave out its prompt's thinking.
+  // Like a result number, it opens any of the account's items with media, listed or not (a Dream
+  // result another was made from).
   directRoute(app, "GET", "/api/gallery/items/:id", (account, { params }) => {
-    const [item] = filterVisibleGallery([galleryItem(params.id)].filter(Boolean), {
-      disliked: true,
-    });
-    return item && recordBelongsToAccount(item, account)
+    const item = galleryItem(params.id);
+    return item && hasGalleryMedia(item) && recordBelongsToAccount(item, account)
       ? { status: 200, payload: { item: resultNumbers.numbered([item])[0] } }
       : { status: 404, payload: { error: "That item is no longer in the gallery." } };
   });
@@ -330,7 +331,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const found = resultNumber(ownerId, params.number);
     const saved = found && galleryJobItems(found.jobId, ownerId);
     let item = saved && saved.find((item) => (item.index ?? 0) === found.index);
-    if (item) [item] = filterVisibleGallery([item], { disliked: true });
+    if (item && !hasGalleryMedia(item)) item = undefined;
     else if (found && !saved.length) {
       const job = store.job(ownerId, found.jobId);
       if (job && !job.cleared && job.operation !== "upscale" && !terminalStatuses.has(job.status))

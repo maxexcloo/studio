@@ -106,16 +106,16 @@ test("Dislike hides a tile, Disliked shows it and Restore brings it back", async
   await expect.poll(() => state.gallery[0].rating).toBe("disliked");
   // Undo is offered while the dislike's notification shows.
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
-  // Disliked sits beside Liked in the filter bar.
-  await page.getByRole("button", { name: "Disliked", exact: true }).click();
+  // Disliked is one of the filters, shown as a removable chip while on.
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByRole("switch", { name: "Disliked", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(tile).toBeVisible();
   await select();
   await selectionAction(page, "Restore").click();
   await expect(tile).toBeHidden();
   await expect.poll(() => state.gallery[0].rating).toBeUndefined();
-  await page.getByRole("button", { name: "Disliked", exact: true }).click();
-  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Remove Disliked Filter", exact: true }).click();
   await expect(tile).toBeVisible();
 });
 
@@ -127,15 +127,18 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // Select, then the bar's order with Share's options in its place: Animate, Edit, Recreate,
-  // Upscale | AI, Copy Details, Copy Prompt, Download | Like, Dislike | Report, Delete.
+  // Select, then the bar's order with AI's and Share's options in their place: Animate, Edit,
+  // Recreate, Upscale | comparing and discovery A–Z | Copy Details, Copy Prompt, Download | Like,
+  // Dislike | Report, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Select",
     "Animate",
     "Edit",
     "Recreate",
     "Upscale",
-    "AI",
+    "Compare in Composer",
+    "More Like This",
+    "Similar",
     "Copy Details",
     "Copy Prompt",
     "Download",
@@ -444,7 +447,6 @@ test("Similar ranks the gallery by an image from its tile menu or the viewer, as
   state.gallery.push({ ...state.gallery[0], id: "tile-moth", jobId: "", prompt: "A paper moth" });
   await page.reload();
   await tileMenu(page);
-  await page.getByRole("menuitem", { name: "AI", exact: true }).click();
   await page.getByRole("menuitem", { name: "Similar", exact: true }).click();
   const chip = (label: string) =>
     page.getByRole("button", { name: `Remove ${label} Filter`, exact: true });
