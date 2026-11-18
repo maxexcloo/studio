@@ -1037,13 +1037,6 @@ export function SavedName<T extends SavedItem>({
             >
               Rename {noun}
             </Menu.Item>
-            <Menu.Item
-              leftSection={<icons.add size={16} />}
-              disabled={!canSave}
-              onClick={() => naming.name("save")}
-            >
-              Save as New {noun}
-            </Menu.Item>
             <Menu.Divider />
             <Menu.Item
               color="red"
