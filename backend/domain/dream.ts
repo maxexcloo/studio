@@ -434,6 +434,11 @@ const elo = { start: 1500, k: 32, winners: 3, weight: 1000 };
 /** An idea sharing more than this share of its content words with a recent one is a repeat. */
 const repeatOverlap = 0.6;
 const tickMs = 45_000;
+/**
+ * A Dream video that found no model to run on waits until the account's video profiles change, or
+ * this long, before trying again.
+ */
+const videoRecheckMs = 3_600_000;
 /** Failed writes back off from one tick, doubling up to this. */
 const maxBackoffMs = 600_000;
 /** Dream explores the profile an account ran fewest jobs on over this many days. */
@@ -928,10 +933,10 @@ export function createDream(options: {
       Math.max(diversity.floor, 1 - (used.get(key) || 0) / Math.max(jobs.length, 1));
   }
   /**
-   * Profiles whose last `failStreak` Dream jobs within `failWindowMs` all failed on their worker, so
+   * Profiles whose last `streak` Dream jobs within `failWindowMs` all failed on their worker, so
    * Dream stops spending ideas on them until those failures age out.
    */
-  function failingProfiles(ownerId: string) {
+  function failingProfiles(ownerId: string, streak = failStreak) {
     const outcomes = new Map<string, string[]>();
     for (const job of store.jobsSince(ownerId, new Date(now() - failWindowMs).toISOString())) {
       if (!dreamJob(job) || !["completed", "failed"].includes(job.status)) continue;
@@ -943,8 +948,8 @@ export function createDream(options: {
     return new Set(
       [...outcomes]
         .filter(([, statuses]) => {
-          const last = statuses.slice(-failStreak);
-          return last.length === failStreak && last.every((status) => status === "failed");
+          const last = statuses.slice(-streak);
+          return last.length === streak && last.every((status) => status === "failed");
         })
         .map(([id]) => id),
     );
@@ -1845,7 +1850,19 @@ export function createDream(options: {
           idle = "Dream videos wait until Studio is idle.";
           continue;
         }
-        const refused = await video(ownerId, record, access);
+        const key = [
+          backend,
+          ...(await options.catalogue(ownerId, access.account)).profiles
+            .filter((profile) => kindOf(profile) === "video")
+            .map((profile) => `${profile.id}:${profile.mediaInputs?.length}`),
+        ].join();
+        const missed = videoMisses.get(ownerId);
+        if (missed?.key === key && now() < missed.until) {
+          reason = missed.reason;
+          continue;
+        }
+        videoMisses.delete(ownerId);
+        const refused = await video(ownerId, record, access, key);
         if (!refused) return { status: "generating" };
         reason = refused;
         continue;
@@ -2077,7 +2094,7 @@ export function createDream(options: {
    * Queues a video that animates the account's best still or extends one of its videos
    * (videoSources), on its selected backend; answers why it couldn't, or "".
    */
-  async function video(ownerId: string, record: DreamRecord, access: DreamAccess) {
+  async function video(ownerId: string, record: DreamRecord, access: DreamAccess, key: string) {
     const referenceOf = ({ item, extend }: DreamVideoSource) => {
       try {
         return options.reference(access.account, String(item.id), extend ? "last" : undefined);
@@ -2092,13 +2109,15 @@ export function createDream(options: {
         markUsed(ownerId, source);
         continue;
       }
-      const refused = await animate(ownerId, record, access, source, reference);
+      const refused = await animate(ownerId, record, access, source, reference, key);
       if (refused && referenceOf(source)) return refused;
       markUsed(ownerId, source);
       if (!refused) return "";
     }
     return "Dream videos animate a kept or liked image. Keep or like one first.";
   }
+  /** Each account's last Dream video that found no model, and the video profiles it saw then. */
+  const videoMisses = new Map<string, { reason: string; key: string; until: number }>();
   /** Marks a video source used, so Dream animates or extends it only once. */
   function markUsed(ownerId: string, { item, extend }: DreamVideoSource) {
     const latest = read(ownerId);
@@ -2112,7 +2131,12 @@ export function createDream(options: {
     access: DreamAccess,
     { item, extend }: DreamVideoSource,
     reference: { id: string; source?: string },
+    key: string,
   ) {
+    const miss = (reason: string) => {
+      videoMisses.set(ownerId, { reason, key, until: now() + videoRecheckMs });
+      return reason;
+    };
     let choice: Awaited<ReturnType<typeof options.videoProfile>>;
     try {
       choice = await options.videoProfile(ownerId, access.account, {
@@ -2122,13 +2146,18 @@ export function createDream(options: {
         ...(extend ? { extend: String(item.settings?.profileId || "") } : {}),
       });
     } catch (error) {
-      return (error as Error).message;
+      return miss((error as Error).message);
     }
     const { profile } = choice;
     if (extend && profile.id !== item.settings?.profileId)
-      return "The source video's model isn't ready.";
+      return miss("The source video's model isn't ready.");
     if (isCloudProfile(profile) !== (record.settings.videoBackend === "cloud"))
-      return "No video model is ready.";
+      return miss("No video model is ready.");
+    // A failed video can take its worker down with it, so one failure sets its profile aside.
+    if (failingProfiles(ownerId, 1).has(profile.id))
+      return miss(
+        `Dream's last video on ${profile.label || profile.id} failed; it waits to try again.`,
+      );
     const slot =
       profile.mediaInputs?.find((input) => input.role === "start") || profile.mediaInputs?.[0];
     const spicy = spicyShare(record, access);
@@ -2545,12 +2574,13 @@ export function createDream(options: {
 
   const states = new Map<string, { status: DreamStatus; reason?: string }>();
   const noted = new Map<string, string>();
-  /** Each account's reason Dream doesn't run (paused, capped, unavailable or failing) is logged once, until it changes. */
+  /**
+   * Each account's reason Dream doesn't run (paused, capped, unavailable or failing) is logged once,
+   * until another reason replaces it; work generated in between keeps it.
+   */
   function note(ownerId: string, state: { status: DreamStatus; reason?: string }) {
-    const text =
-      state.status === "generating"
-        ? ""
-        : state.reason || (state.status === "paused" ? "Paused." : "");
+    if (state.status === "generating") return;
+    const text = state.reason || (state.status === "paused" ? "Paused." : "");
     if (text && noted.get(ownerId) !== text)
       log.info(`Dream skips ${ownerId ? `account ${ownerId}` : "Studio"}: ${text}`);
     noted.set(ownerId, text);
