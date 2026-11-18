@@ -1,9 +1,10 @@
 import { ActionIcon, Stack, Tooltip } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 import { icons } from "../../ui/icons";
-import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
 import { DreamPreferences } from "../dream/DreamSettings";
@@ -17,9 +18,16 @@ import { MaintenanceSettings } from "./MaintenanceSettings";
 import { OwnAccount } from "./OwnAccount";
 import { Preferences } from "./Preferences";
 import { useSettingsNavigation } from "./SettingsNavigation";
+import { UnfinishedItems } from "./UnfinishedItems";
 
 const workerQueries = [servicesStatusQuery.queryKey, runtimeStatusQuery.queryKey];
-function WorkerSettings({ heading }: { heading: ReactNode }) {
+function WorkerSettings({
+  heading,
+  onOpenUnfinished,
+}: {
+  heading: ReactNode;
+  onOpenUnfinished: () => void;
+}) {
   const client = useQueryClient();
   const refreshing =
     useIsFetching({
@@ -31,19 +39,27 @@ function WorkerSettings({ heading }: { heading: ReactNode }) {
         <SectionToolbar
           label="Workers"
           actions={
-            <Tooltip label="Refresh">
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                aria-label="Refresh"
-                loading={refreshing}
-                onClick={() =>
-                  workerQueries.forEach((queryKey) => void client.refetchQueries({ queryKey }))
-                }
-              >
-                <icons.refresh size={18} />
-              </ActionIcon>
-            </Tooltip>
+            <>
+              <ToolbarAction
+                label="Unfinished Items"
+                icon={icons.unfinished}
+                variant="default"
+                onClick={onOpenUnfinished}
+              />
+              <Tooltip label="Refresh">
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label="Refresh"
+                  loading={refreshing}
+                  onClick={() =>
+                    workerQueries.forEach((queryKey) => void client.refetchQueries({ queryKey }))
+                  }
+                >
+                  <icons.refresh size={18} />
+                </ActionIcon>
+              </Tooltip>
+            </>
           }
         />
       </SectionHeader>
@@ -52,36 +68,42 @@ function WorkerSettings({ heading }: { heading: ReactNode }) {
   );
 }
 export function SettingsPage() {
-  const { multi, options } = useSettingsNavigation();
+  const { admin, multi, options } = useSettingsNavigation();
+  const [unfinishedOpen, unfinished] = useDisclosure();
   return (
-    <WorkspaceSections
-      label="Settings"
-      sections={options}
-      content={{
-        account: (
-          <Stack component="section" aria-label="Your Account" id="account">
-            {multi ? (
-              <OwnAccount />
-            ) : (
-              <SettingGroup title="Sign-In">
-                <SettingRow
-                  label="Single-User Mode"
-                  description="No sign-in and every feature on. Accounts, groups and personal MCP access need multi-user mode."
-                />
-              </SettingGroup>
-            )}
-          </Stack>
-        ),
-        preferences: <Preferences />,
-        dream: <DreamPreferences />,
-        generation: <GenerationSettings />,
-        groups: (heading) => <GroupsAdmin heading={heading} />,
-        integrations: <IntegrationSettings />,
-        maintenance: <MaintenanceSettings />,
-        users: (heading) => <UsersAdmin heading={heading} />,
-        workers: (heading) => <WorkerSettings heading={heading} />,
-        about: <AboutStudio />,
-      }}
-    />
+    <>
+      <WorkspaceSections
+        label="Settings"
+        sections={options}
+        content={{
+          account: (
+            <Stack component="section" aria-label="Your Account" id="account">
+              {multi ? (
+                <OwnAccount />
+              ) : (
+                <SettingGroup title="Sign-In">
+                  <SettingRow
+                    label="Single-User Mode"
+                    description="No sign-in and every feature on. Accounts, groups and personal MCP access need multi-user mode."
+                  />
+                </SettingGroup>
+              )}
+            </Stack>
+          ),
+          preferences: <Preferences />,
+          dream: <DreamPreferences />,
+          generation: <GenerationSettings />,
+          groups: (heading) => <GroupsAdmin heading={heading} />,
+          integrations: <IntegrationSettings />,
+          maintenance: <MaintenanceSettings onOpenUnfinished={unfinished.open} />,
+          users: (heading) => <UsersAdmin heading={heading} />,
+          workers: (heading) => (
+            <WorkerSettings heading={heading} onOpenUnfinished={unfinished.open} />
+          ),
+          about: <AboutStudio />,
+        }}
+      />
+      {admin && <UnfinishedItems opened={unfinishedOpen} onClose={unfinished.close} />}
+    </>
   );
 }
