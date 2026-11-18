@@ -29,10 +29,11 @@ import { loraInfos } from "./lora/info.js";
 import { withLoraTriggers } from "./lora/prompts.js";
 import { loraAllowed } from "./model/catalogue.js";
 import { recordPrompt } from "./prompt-history.js";
+import { RadianceClient } from "./providers/radiance.ts";
 import { referenceExistsForAccount, stageReferenceAssetsForAccount } from "./references.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { upscaleTargets } from "./upscale.js";
-import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
+import { fastTwin, sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {
   capabilityForProfile,
   defaultWorkerId,
@@ -196,14 +197,14 @@ export function createGenerationSubmission({
   }
 
   /** Starts a queued job on its worker (domain/generation-adapter.ts); answers `{ status, payload }`. */
-  async function submitGeneration(job, account) {
+  async function submitGeneration(job, account, options) {
     const input = { ...job.input, clientJobId: job.id };
     const routed = await routeGeneration(input, account, job.backend);
     if (routed.payload) return routed;
-    return generateOnBackend(routed.backend, job, input, account);
+    return generateOnBackend(routed.backend, job, input, account, options);
   }
 
-  async function prepareGenerationBody(backend, input) {
+  async function prepareGenerationBody(backend, input, options) {
     let context;
     try {
       context = await loadComfyContext(backend);
@@ -223,6 +224,9 @@ export function createGenerationSubmission({
         .map((item) => item.name);
       if (requested.length) await loraInfos(backend, requested.slice(0, 32)).catch(() => null);
       const body = sanitizeGenerateBody(input, context.info, context.stats, prompting);
+      // A burst alone in Studio's queue takes the two-card copy only while Radiance shows itself idle too.
+      const twin = options?.alone && fastTwin(body, context.info);
+      if (twin && (await new RadianceClient(workerById(backend).url).idle())) body.modelName = twin;
       const enabledLoras = (body.loras || []).filter((item) => item.enabled !== false);
       if (enabledLoras.length) {
         const issue = optionalLoraIssue(
@@ -240,7 +244,7 @@ export function createGenerationSubmission({
     }
   }
 
-  async function generateOnBackend(backend, job, input, account) {
+  async function generateOnBackend(backend, job, input, account, options) {
     const id = job.id;
     const existing = jobs.get(id);
     // In account mode a job ID belongs to one owner for good: a reused ID must never touch
@@ -264,7 +268,7 @@ export function createGenerationSubmission({
           revision: galleryRevisionValue(),
         },
       };
-    const prepared = await prepareGenerationBody(backend, input);
+    const prepared = await prepareGenerationBody(backend, input, options);
     if (prepared.payload) return prepared;
     const { body } = prepared;
     body.comfyBackend = backend;

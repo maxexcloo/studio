@@ -151,6 +151,30 @@ export function validateReferenceSlots(references, profile) {
       );
   }
 }
+
+/** The models a workflow's model input takes on the worker. */
+const listedModels = (info, workflow) => {
+  const control = workflow.controls?.model;
+  return optionsFor(info, workflow.graph?.[control?.node]?.class_type, control?.input);
+};
+
+/**
+ * The two-GPU copy a run of three or more pictures may take on Radiance where the worker lists
+ * one: the model's `-fast` twin, or the `-refs` one for Qwen and Noct. A run with LoRAs keeps its
+ * stack's model, and one already on `-refs` has no further twin.
+ */
+export function fastTwin(body, info) {
+  if (body.kind !== "image" || body.count < 3 || body.loras?.length) return "";
+  const workflow = resolveImageMode(
+    getCustomWorkflow(body.workflow, body.profileBackend) || {},
+    body,
+  );
+  const models = listedModels(info, workflow);
+  return (
+    [`${body.modelName}-fast`, `${body.modelName}-refs`].find((name) => models.includes(name)) || ""
+  );
+}
+
 export function sanitizeGenerateBody(
   input = {},
   info = {},
@@ -291,12 +315,7 @@ export function sanitizeGenerateBody(
   // A run with LoRAs moves to the stack's own model, which graphs.js sends and the item records;
   // otherwise a size and references one card can't hold move to its `-refs` twin where the worker has one.
   const model = String(input.modelName || customWorkflow?.defaults?.model || "");
-  const control = customWorkflow.controls?.model;
-  const models = optionsFor(
-    info,
-    customWorkflow.graph?.[control?.node]?.class_type,
-    control?.input,
-  );
+  const models = listedModels(info, customWorkflow);
   const twin = `${model}-refs`;
   const width = snapInteger(input.width, fallback("width", widthRange), widthRange);
   const height = snapInteger(input.height, fallback("height", heightRange), heightRange);
