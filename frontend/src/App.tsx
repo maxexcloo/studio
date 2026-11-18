@@ -1,4 +1,4 @@
-import { AppShell, FocusTrap, Modal } from "@mantine/core";
+import { AppShell, FocusTrap, Modal, rem } from "@mantine/core";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 
@@ -65,7 +65,11 @@ function Workspace() {
   const mode = (overlay ? background : location).pathname;
   if (mode.startsWith("/dream") && !dream) return <Navigate to="/images" replace />;
   return (
-    <AppShell header={{ height: 68 }} padding={{ base: "sm", md: "lg" }}>
+    <AppShell
+      // The installed app draws under the status bar, so the header grows by its inset.
+      header={{ height: `calc(${rem(68)} + env(safe-area-inset-top))` }}
+      padding={{ base: "sm", md: "lg" }}
+    >
       <AppShell.Header>
         <AppHeader mode={mode} />
       </AppShell.Header>
