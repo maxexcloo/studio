@@ -45,6 +45,8 @@ test("an image request sends its exact schedule, guidance and LoRAs", () => {
   assert.ok(masked.get("mask"));
   assert.equal(masked.get("background"), "transparent");
   assert.equal(masked.get("output_format"), "png");
+  const fixed = imageRequest({ ...image, steps: undefined }, [new Uint8Array([1])]);
+  assert.equal((fixed.body as FormData).has("num_inference_steps"), false);
 });
 
 test("an edit reaches Radiance as multipart fields through the default client", async () => {
