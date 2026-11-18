@@ -163,6 +163,7 @@ export function DreamPage() {
           <PopupTooltip label="Dream View">
             <Menu.Target>
               <Button
+                size="compact-md"
                 variant="subtle"
                 color="gray"
                 aria-label="Dream View"

@@ -195,6 +195,7 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
   const [deleting, setDeleting] = useState<PromptStyle | null>(null);
   const { save, refresh } = useSaveStyles();
   const styles = list.data?.styles || [];
+  const phone = usePhone();
   // Switches apply at once, showing the change before the save answers.
   const apply = useMutation({
     mutationFn: (next: PromptStyle[]) => {
@@ -302,6 +303,8 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
               cell: (style) => (
                 <Switch
                   aria-label={`Enable ${style.label}`}
+                  // Phones fold the switch under the name, away from its column's heading.
+                  label={phone ? "Enabled" : undefined}
                   checked={style.enabled}
                   onChange={(event) =>
                     apply.mutate(

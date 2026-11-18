@@ -3,7 +3,7 @@ import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 import { icons } from "../../ui/icons";
-import { SectionHeader } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
 import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
@@ -28,19 +28,24 @@ function WorkerSettings({ heading }: { heading: ReactNode }) {
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
-        <Tooltip label="Refresh">
-          <ActionIcon
-            variant="subtle"
-            color="gray"
-            aria-label="Refresh"
-            loading={refreshing}
-            onClick={() =>
-              workerQueries.forEach((queryKey) => void client.refetchQueries({ queryKey }))
-            }
-          >
-            <icons.refresh size={18} />
-          </ActionIcon>
-        </Tooltip>
+        <SectionToolbar
+          label="Workers"
+          actions={
+            <Tooltip label="Refresh">
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                aria-label="Refresh"
+                loading={refreshing}
+                onClick={() =>
+                  workerQueries.forEach((queryKey) => void client.refetchQueries({ queryKey }))
+                }
+              >
+                <icons.refresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+          }
+        />
       </SectionHeader>
       <RuntimePanel />
     </Stack>
