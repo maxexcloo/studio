@@ -451,6 +451,14 @@ function Gallery() {
   );
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped || Boolean(similar);
+  // Liked or Uploads alone: its pressed toggle in the toolbar already undoes it.
+  const toggledOnly =
+    !search &&
+    !grouped &&
+    !similar &&
+    (filters.uploads || filters.rating === "liked") &&
+    JSON.stringify({ ...filters, uploads: false, rating: "" }) ===
+      JSON.stringify(emptyGalleryFilters);
   const clearFilters = () => {
     setFilters(emptyGalleryFilters);
     setOriginalsOnly(false);
@@ -797,7 +805,8 @@ function Gallery() {
         <EmptyState
           fill
           action={
-            hasFilters && (
+            hasFilters &&
+            !toggledOnly && (
               <Button variant="default" onClick={clearFilters}>
                 Clear Filters
               </Button>
@@ -806,11 +815,15 @@ function Gallery() {
         >
           {similar
             ? "No Similar Images Yet"
-            : search || hasFilters
-              ? "No Matches"
-              : kind === "video"
-                ? "No Videos"
-                : "No Images"}
+            : toggledOnly
+              ? filters.uploads
+                ? "No Uploads"
+                : `No Liked ${kind === "video" ? "Videos" : "Images"}`
+              : search || hasFilters
+                ? "No Matches"
+                : kind === "video"
+                  ? "No Videos"
+                  : "No Images"}
         </EmptyState>
       )}
       {refresh.isError && (
