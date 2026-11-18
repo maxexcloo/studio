@@ -5,7 +5,7 @@ import { moveTargets, onWorkerOffline, routeJob } from "./comfy/backends.js";
 import { comfyOn } from "./comfy/comfy.js";
 import { cancelPrompt, isTransientComfyError } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
-import { logWarning } from "./crash-log.js";
+import { logEvent, logWarning } from "./crash-log.js";
 import { getCustomWorkflow, workflowOnBackend } from "./custom-workflows.js";
 import { createCloudQueueAdapter } from "./domain/cloud-adapter.ts";
 import { createGenerationQueueAdapter } from "./domain/generation-adapter.ts";
@@ -25,6 +25,7 @@ import { withPngText } from "./png-text.js";
 import { writingIssue, writingRequest } from "./prompt-stage.js";
 import { providerMediaWriter } from "./providers/media.ts";
 import { recoverRadianceJob } from "./radiance-jobs.js";
+import { hostMemoryShort } from "./runtime/controller.ts";
 import { runUpscaleJob } from "./upscale-jobs.js";
 import { resultSource } from "./version-sources.js";
 import {
@@ -313,6 +314,22 @@ export function createGenerationQueue({
             worker: job.backend,
             reason: String(job.reason || "").slice(0, 200),
           });
+        // Radiance short of host memory restarts once idle, then runs the job once more.
+        if (job.status === "failed" && hostMemoryShort(String(job.reason || "")))
+          for (const workload of managedWorkloads(job))
+            runtime?.controller.restartForMemory(workload, job.reason, () => {
+              if (job.retried) return;
+              try {
+                const retry = generationQueue.again(job);
+                logEvent(`Queued job ${job.id} again as ${retry.id} after freeing host memory`);
+                void generationQueue.tick();
+              } catch (error) {
+                logWarning("Could not queue a job again after freeing host memory", {
+                  job: job.id,
+                  reason: error.message,
+                });
+              }
+            });
         await generationAdapter.settled(job);
         if (job.status !== "completed") return;
         // Its results keep the result it was made from, once the run has left the queue too, and

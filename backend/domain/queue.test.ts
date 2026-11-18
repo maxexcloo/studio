@@ -389,7 +389,7 @@ test("a run without progress for 10 minutes is stopped, failed and queued once o
     assert.ok(events.includes(`released:${hung}`));
     const retry = store.jobs("alice").find((job) => job.id !== hung)!;
     assert.deepEqual(
-      [retry.resource, retry.priority, retry.stallRetry],
+      [retry.resource, retry.priority, retry.retried],
       ["worker:secondary", queuePriority.dream, true],
     );
     await queue.tick();

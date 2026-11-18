@@ -56,12 +56,14 @@ export async function loadRuntime(
     fetchImpl,
     ...document<BenchmarkRun[]>("runtime-benchmarks"),
   });
-  // Restores the last placement after an outside stop, then swaps for ComfyUI work or back.
+  // Restores the last placement after an outside stop, then swaps for ComfyUI work or back, then
+  // restarts an idle Radiance short of host memory.
   setInterval(
     () =>
       void controller
         .reconcile()
         .then(() => controller.swapOnDemand())
+        .then(() => controller.restartWhenIdle())
         .catch(() => {}),
     30_000,
   ).unref();
