@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { type Locator, type Page, expect } from "@playwright/test";
 
 import { dreamDefaults, dreamOverrideKeys } from "../../shared/dream";
+import type { QueueRetryResponse } from "../../shared/queue";
 
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
 const familyLabels = { flux1: "FLUX.1", sdxl: "SDXL" };
@@ -885,6 +886,28 @@ export async function fixtures(page: Page) {
     queuePause,
   };
 }
+export async function serveRetries(
+  page: Page,
+  { jobs, gallery }: Pick<Awaited<ReturnType<typeof fixtures>>, "jobs" | "gallery">,
+  admit: (
+    ids: string[],
+  ) => QueueRetryResponse["outcomes"] | Promise<QueueRetryResponse["outcomes"]>,
+) {
+  await page.route("**/api/queue/retry", async (route) => {
+    const { ids } = route.request().postDataJSON() as { ids: string[] };
+    const outcomes = await admit(ids);
+    const accepted = new Set(
+      outcomes.flatMap((outcome) => ("replacement" in outcome ? [outcome.id] : [])),
+    );
+    for (const job of jobs) if (accepted.has(job.id)) job.cleared = true;
+    for (let index = gallery.length - 1; index >= 0; index--) {
+      const item = gallery[index];
+      if (item.status === "failed" && accepted.has(item.jobId)) gallery.splice(index, 1);
+    }
+    await route.fulfill({ status: 202, json: { outcomes } });
+  });
+}
+
 /** Serves `/api/models` with these profiles in place of the fixture catalogue. */
 export async function serveProfiles(page: Page, profiles: Profile[]) {
   await page.route(/\/api\/models(?:\?.*)?$/, (route) =>

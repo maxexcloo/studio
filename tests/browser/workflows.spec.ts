@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-import { expandComposer, finishTyping, fixtures, pressGenerate, profiles, stamp } from "./fixtures";
+import {
+  expandComposer,
+  finishTyping,
+  fixtures,
+  pressGenerate,
+  profiles,
+  serveRetries,
+  stamp,
+} from "./fixtures";
 
 test("Images and Videos tabs keep an expanding bottom composer", async ({ page }, testInfo) => {
   const state = await fixtures(page);
@@ -92,10 +100,10 @@ test("Retry pending state holds while unrelated jobs remain cancellable", async 
   const accepted = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route("**/api/queue/retry-0/retry", async (route) => {
+  await serveRetries(page, state, async ([id]) => {
     calls++;
     await accepted;
-    await route.fulfill({ json: { job: state.jobs[0] } });
+    return [{ id, replacement: "replacement-job" }];
   });
   try {
     await page.goto("/images");

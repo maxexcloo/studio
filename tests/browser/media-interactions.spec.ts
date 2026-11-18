@@ -1,7 +1,15 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
 
-import { finishTyping, fixtures, image, pressGenerate, stamp, viewerAction } from "./fixtures";
+import {
+  finishTyping,
+  fixtures,
+  image,
+  pressGenerate,
+  serveRetries,
+  stamp,
+  viewerAction,
+} from "./fixtures";
 
 const png = await sharp({ create: { width: 24, height: 16, channels: 3, background: "#46a3ff" } })
   .png()
@@ -129,7 +137,7 @@ test("Retrying a failed entry in the viewer replaces it with the new run", async
   });
   let retries = 0;
   // Like the durable queue, a retry admits a new job whose pending item joins the gallery.
-  await page.route("**/api/queue/failed-job/retry", async (route) => {
+  await serveRetries(page, state, ([id]) => {
     retries++;
     const retried = { ...job, id: "retried-job", status: "running", reason: "Generation resumed" };
     state.jobs.push(retried);
@@ -139,7 +147,7 @@ test("Retrying a failed entry in the viewer replaces it with the new run", async
       jobId: retried.id,
       status: "running",
     });
-    await route.fulfill({ json: { job: retried } });
+    return [{ id, replacement: retried.id }];
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Failed Study", exact: true }).click();
