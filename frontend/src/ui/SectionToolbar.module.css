@@ -2,18 +2,28 @@
 .enter {
   animation: enter var(--studio-motion-duration) var(--studio-ease-enter);
 }
+/* Never narrower than its choices: where the tools leave too little room, it takes a row of its
+   own above them. */
+.views {
+  flex: 1 0 auto;
+}
+/* An upright phone's narrow row leaves it a row of its own, which its choices then fill. */
+:where(:root[data-phone]:not([data-phone="sideways"])) .views > * {
+  flex-grow: 1;
+}
 .divider {
   align-self: stretch;
   margin: 4px 2px;
 }
 /*
  * A section's heading with its toolbar at the end of the same row (the heading grows to push it
- * there), wrapping below it, from the start, when narrow.
+ * there), wrapping below it when narrow, still ending at the content's edge. The toolbar stays
+ * level with the title however many lines the description takes.
  */
 .header {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--mantine-spacing-xs) var(--mantine-spacing-md);
 }
 .header > :first-child {
@@ -23,6 +33,7 @@
 .header > :last-child {
   flex: 0 1 auto;
   min-width: 0;
+  margin-inline-start: auto;
 }
 /* Phones give the toolbar its own full row, so every section's actions end at the same edge as its
    rows' ⋯ buttons. */

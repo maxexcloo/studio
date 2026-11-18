@@ -80,7 +80,7 @@
   padding-top: var(--mantine-spacing-xs);
 }
 
-/* Beside the text stand its send and ⋯, centred on its height; the text fills the row's height. */
+/* Beside the text stand its send and ⋯, level with its first line; the text fills the row's height. */
 .columned {
   position: relative;
   display: flex;
@@ -106,17 +106,24 @@
   align-items: center;
 }
 
+/* As tall as a one-line field, so its buttons centre on the first line however tall the text grows. */
+.columned > .tools {
+  align-self: flex-start;
+  min-height: 36px;
+}
+
+@media (pointer: coarse) {
+  .columned > .tools {
+    min-height: 44px;
+  }
+}
+
 /* A tool's popup opens from the box's end, where the ⋯ stands. */
 .anchor {
   position: absolute;
   top: 0;
   right: 0;
   pointer-events: none;
-}
-
-.columned > .anchor {
-  top: 50%;
-  translate: 0 -50%;
 }
 
 .anchor > * {

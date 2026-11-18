@@ -48,12 +48,16 @@
   bottom: var(--studio-dialog-inset, 0px);
 }
 
+/* A centred dialog sits on a solid raised surface: glass over the dimmed backdrop reads as flat
+   grey. Paper's glass is inline. */
 .dialogContent:not([data-full-screen]) {
   max-height: 100% !important;
+  background: var(--studio-glass-solid) !important;
+  backdrop-filter: none !important;
 }
 
-/* A full-screen dialog or sheet covers the page, so it takes the page's solid surface rather than
-   glass tinted by the overlay beneath it, matching its pinned footer. Paper's glass is inline. */
+/* A full-screen dialog or sheet covers the page, so it takes the page's solid surface, matching its
+   pinned footer. */
 .dialogContent[data-full-screen] {
   background: var(--mantine-color-body) !important;
   backdrop-filter: none !important;
@@ -110,6 +114,17 @@
   inset: -8px -4px;
 }
 
+/* As tall as the bar's icons and compact buttons beside it: a touch target on touch screens. */
+.segmented {
+  height: 2rem;
+}
+
+@media (pointer: coarse) {
+  .segmented {
+    height: 2.75rem;
+  }
+}
+
 /* Studio's darker zinc palette leaves Mantine's segmented track (dark-8) black and its indicator
    (dark-5) darker than a raised glass surface, so the choice read as a hole beside its label.
    Tints of white sit a step above whatever surface holds them. */
@@ -150,4 +165,9 @@
   height: 8px;
   translate: 0 -50%;
   border-radius: 50%;
+}
+
+/* Touch screens show no tooltips (the theme's Tooltip). */
+.touchTooltip {
+  display: none !important;
 }

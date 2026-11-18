@@ -3,6 +3,8 @@
 }
 .toolbar {
   flex: 1 1 auto;
+  display: flex;
+  justify-content: flex-end;
   min-width: 0;
 }
 .fill {
@@ -15,4 +17,10 @@
 .wide > :not(button) {
   flex: 1;
   min-width: 0;
+}
+/* A segmented choice is as tall as the Selects in the rows around it. */
+@media not (pointer: coarse) {
+  .wide > :global(.mantine-SegmentedControl-root) {
+    height: 2.25rem;
+  }
 }

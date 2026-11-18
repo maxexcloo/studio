@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Group, Text } from "@mantine/core";
+import { Alert, Badge, Button, Text } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
@@ -80,11 +80,9 @@ export function PersonalMcpToken() {
       <SettingGroup
         title="MCP"
         toolbar={
-          <Group justify="flex-end">
-            <Badge color={enabled ? "green" : "gray"} miw="max-content">
-              {enabled ? "Active" : "No Token"}
-            </Badge>
-          </Group>
+          <Badge color={enabled ? "green" : "gray"} miw="max-content">
+            {enabled ? "Active" : "No Token"}
+          </Badge>
         }
       >
         {status.error && <Alert color="red">{status.error.message}</Alert>}
