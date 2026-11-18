@@ -416,7 +416,7 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   // Off the menu, so no submenu opens under the pointer and takes the next click as outside it.
   await page.mouse.move(0, 0);
   await expect(page.getByRole("menu")).toHaveCount(1);
-  await page.getByRole("menuitem", { name: "AI", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Compare in Composer", exact: true }).click();
   await expect(variants(page).getByRole("radio", { name: "B", exact: true })).toBeChecked();
   await expect(page.getByRole("button", { name: "Clear Seed 1234567", exact: true })).toBeVisible();
@@ -462,9 +462,6 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   );
   // AI ▾ also opens the comparison the image belongs to.
   await viewerAction(page, "AI");
-  await expect(
-    page.getByRole("menuitem", { name: "Compare in Composer", exact: true }),
-  ).toBeVisible();
   await page.getByRole("menuitem", { name: "Open Comparison", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\/compare-2$/);
 });
