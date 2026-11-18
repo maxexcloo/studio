@@ -759,19 +759,6 @@ function Gallery() {
             </>
           }
         />
-        {chat && (
-          <SegmentedControl
-            aria-label="Chat Media"
-            mt="xs"
-            size="xs"
-            value={kind}
-            onChange={(value) => switchKind(value as MediaKind)}
-            data={[
-              { value: "image", label: "Images" },
-              { value: "video", label: "Videos" },
-            ]}
-          />
-        )}
         {selectionBar}
       </div>
       {itemId &&

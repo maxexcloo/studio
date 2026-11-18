@@ -58,31 +58,31 @@ export function Caption({
 function Media({ item, active }: { item: MediaItem; active: boolean }) {
   const source = mediaSource(item);
   const video = useRef<HTMLVideoElement>(null);
-  const url = item.type === "video" && active ? playbackUrl(source.url) : undefined;
+  const isVideo = item.type === "video";
+  const url = isVideo && active ? playbackUrl(source.url) : undefined;
   useEffect(() => {
     const element = video.current;
     if (!element) return;
     if (!document.hidden) void element.play().catch(() => undefined);
     return videoLifecycle(element);
   }, [url]);
-  return url ? (
-    <video
-      key={url}
-      ref={video}
-      src={url}
-      poster={source.thumbnailUrl}
-      aria-label={item.prompt || "Dream video"}
-      controls
-      muted
-      loop
-      playsInline
-    />
-  ) : (
-    <img
-      src={item.type === "video" ? source.thumbnailUrl : source.displayUrl}
-      alt={item.prompt || (item.type === "video" ? "Dream video" : "Dream image")}
-    />
-  );
+  if (url)
+    return (
+      <video
+        key={url}
+        ref={video}
+        src={url}
+        poster={source.thumbnailUrl}
+        aria-label={item.prompt || "Dream video"}
+        controls
+        muted
+        loop
+        playsInline
+      />
+    );
+  const image = isVideo ? source.thumbnailUrl : source.displayUrl;
+  if (!image) return null;
+  return <img src={image} alt={item.prompt || (isVideo ? "Dream video" : "Dream image")} />;
 }
 
 /**
@@ -129,22 +129,22 @@ export function DreamPreview({
         body: classes.preview,
       }}
       onKeyDown={(event) => {
+        const { key, altKey, ctrlKey, metaKey, shiftKey } = event;
+        if (card.kind !== "pair" || (key !== "ArrowLeft" && key !== "ArrowRight")) return;
         if (
-          card.kind !== "pair" ||
-          (event.key !== "ArrowLeft" && event.key !== "ArrowRight") ||
           event.defaultPrevented ||
           event.nativeEvent.isComposing ||
-          event.altKey ||
-          event.ctrlKey ||
-          event.metaKey ||
-          event.shiftKey ||
+          altKey ||
+          ctrlKey ||
+          metaKey ||
+          shiftKey ||
           (event.target as Element).closest(
             'video,input,textarea,select,[contenteditable="true"],[role="slider"]',
           )
         )
           return;
         event.preventDefault();
-        move(event.key === "ArrowLeft" ? -1 : 1);
+        move(key === "ArrowLeft" ? -1 : 1);
       }}
     >
       <Group justify="space-between" wrap="nowrap" p="sm">
