@@ -479,6 +479,7 @@ export class GenerationQueue {
         groups.set(job.resource, group);
       }
     }
+    if (!groups.size) return;
     // Lower tiers wait while higher ones are queued (no aging); the stable sort keeps FIFO within a tier.
     // Within a tier, jobs reusing what the resource holds go first: the model and LoRAs of a job
     // running there or the last one it ran, then its model alone. A resource with several slots
@@ -486,13 +487,16 @@ export class GenerationQueue {
     // Once an older job of a tier has been overtaken reuseBypassLimit times, the tier runs strictly
     // FIFO. Overtakes are counted from the stored jobs (later jobs of the same resource and tier that
     // started), so the bound survives restarts. Started work is never pre-empted.
-    const position = new Map(all.map((job, index) => [job.id, index]));
-    const tier = (job: OwnedJob) => job.priority ?? queuePriority.manual;
-    const overtaken = (job: OwnedJob) =>
-      all
-        .slice(position.get(job.id)! + 1)
-        .filter((later) => later.resource === job.resource && tier(later) === tier(job))
-        .filter(isStarted).length;
+    const laterStarts = new Map<string, number>();
+    const overtaken = new Set<string>();
+    for (let index = all.length - 1; index >= 0; index--) {
+      const job = all[index];
+      if (!groups.has(job.resource)) continue;
+      const key = JSON.stringify([job.resource, job.priority ?? queuePriority.manual]);
+      const count = laterStarts.get(key) ?? 0;
+      if (isStarted(job)) laterStarts.set(key, count + 1);
+      else if (count >= reuseBypassLimit) overtaken.add(job.id);
+    }
     const order = (resource: string, jobs: OwnedJob[], fifo: Set<number>) => {
       const loaded = this.loaded.get(resource);
       const warm = [...(running.get(resource) ?? []), ...(loaded ? [loaded] : [])];
@@ -504,9 +508,7 @@ export class GenerationQueue {
         // Resource groups run independently. A slow cloud request or offline worker cannot hold the scheduler.
         this.scheduling.add(resource);
         let room = free(resource);
-        const fifo = new Set(
-          candidates.filter((job) => overtaken(job) >= reuseBypassLimit).map(rank),
-        );
+        const fifo = new Set(candidates.filter((job) => overtaken.has(job.id)).map(rank));
         const next = order(resource, [...candidates], fifo);
         try {
           while (next.length) {

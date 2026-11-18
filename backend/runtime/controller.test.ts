@@ -586,12 +586,23 @@ test("a swap for ComfyUI work holds while Radiance has work of a higher tier wai
     (await controller.observe()).operation!.progress,
     "Waiting for higher-priority work on Radiance first.",
   );
-  const manual = await controller.acquire("radiance");
+  await assert.rejects(
+    controller.acquire("radiance", 1),
+    /Waiting for the runtime change to finish/,
+  );
+  await assert.rejects(
+    controller.acquire("radiance", 3),
+    /Waiting for the runtime change to finish/,
+  );
+  const manual = await controller.acquire("radiance", 0);
   tiers.set("radiance", 1);
   await settle();
   assert.match((await controller.observe()).operation!.progress, /accepted operation on Radiance/);
   // Work of the swap's own tier waits for it.
-  await assert.rejects(controller.acquire("radiance"), /Waiting for the runtime change to finish/);
+  await assert.rejects(
+    controller.acquire("radiance", 1),
+    /Waiting for the runtime change to finish/,
+  );
   assert.deepEqual(kube.log, []);
   manual.release();
   await controller.settled;

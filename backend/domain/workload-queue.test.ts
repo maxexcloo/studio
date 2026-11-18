@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { pausedReason } from "../../shared/queue.ts";
 import { openDatabase } from "../persistence/runtime.ts";
 import { GenerationQueue, type QueueAdapter } from "./queue.ts";
-import { Store } from "./store.ts";
+import { Store, everyone, queuePriority } from "./store.ts";
 import { workloadQueue } from "./workload-queue.ts";
 
 function fixture() {
@@ -97,4 +98,23 @@ test("Cancel Queue cancels queued work at once and asks running work to stop", a
   assert.deepEqual([running.status, running.cancelRequested], ["running", true]);
   assert.equal(store.job("artist", "elsewhere")!.status, "queued");
   assert.deepEqual(settled, ["queued cancelled"]);
+});
+
+test("swap priority follows pause and resume before the next queue tick updates display reasons", (t) => {
+  const { store, job, work } = fixture();
+  t.after(() => store.close());
+  job("manual", "radiance", { reason: pausedReason });
+  const other = store.createSession("other");
+  store.enqueue("other", other.id, {}, "image", undefined, "worker:radiance", undefined, {
+    priority: queuePriority.mcp,
+  });
+  const queue = work();
+  assert.equal(queue.waitingTier("radiance"), queuePriority.manual);
+  store.setPaused("artist", true);
+  assert.equal(queue.waitingTier("radiance"), queuePriority.mcp);
+  store.setPaused(everyone, true);
+  assert.equal(queue.waitingTier("radiance"), Infinity);
+  store.setPaused(everyone, false);
+  store.setPaused("artist", false);
+  assert.equal(queue.waitingTier("radiance"), queuePriority.manual);
 });
