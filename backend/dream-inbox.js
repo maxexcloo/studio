@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { cardKinds } from "../shared/characters.ts";
-import { ownerDocuments, savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
+import { ownerDocuments, savedDocument, writeRuntimeDocuments } from "./persistence/runtime.ts";
 
 // As the Inbox snoozes a dismissal (domain/inbox.ts).
 const snoozeMs = 14 * 86_400_000;
@@ -108,6 +108,6 @@ export function dreamInbox(dataDir, { apply = false, now = Date.now() } = {}) {
     }
     writes.set(name, value);
   }
-  if (apply) for (const [name, value] of writes) writeRuntimeDocument(dataDir, name, value);
+  if (apply && writes.size) writeRuntimeDocuments(dataDir, writes);
   return { applied: apply, suggestions, snoozed, projects, accounts: writes.size };
 }

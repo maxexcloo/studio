@@ -69,7 +69,7 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
   const profileLabel = (id: string) =>
     models.data?.profiles.find((profile) => profile.id === id)?.label || id;
   const list = projects.data?.projects || [];
-  const empty = !list.length && !inbox.data?.proposals.length;
+  const empty = !list.length && inbox.isSuccess && !inbox.data.proposals.length;
   return (
     <>
       {actionTarget &&
@@ -92,6 +92,8 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
         <Alert color="red" title="Couldn't Load Projects">
           {projects.error.message}
         </Alert>
+      ) : !list.length && inbox.isPending ? (
+        <LoadingState fill label="Loading Inbox" />
       ) : empty ? (
         <EmptyState
           fill

@@ -116,6 +116,30 @@ test("conflicting work waits until outputs save; independent cloud work proceeds
   }
 });
 
+test("A worker restart keeps work ended when an in-flight provider response arrives", async (t) => {
+  for (const stage of ["submit", "observe"] as const) {
+    const { store, queue, adapter, events } = fixture();
+    t.after(() => store.close());
+    const session = store.createSession("alice");
+    const job = store.enqueue("alice", session.id, {}, "image");
+    if (stage === "observe") await queue.tick();
+    const requested = deferred();
+    const respond = deferred();
+    adapter[stage] = async () => {
+      requested.resolve();
+      await respond.promise;
+      return { status: "completed", outputs: [{ url: "/media/old-run.png" }] };
+    };
+    const tick = queue.tick();
+    await requested.promise;
+    await queue.end("alice", job.id, "Worker restarted.");
+    respond.resolve();
+    await tick;
+    assert.equal(store.job("alice", job.id)?.status, "failed", stage);
+    assert.deepEqual(events, [`released:${job.id}`], stage);
+  }
+});
+
 test("one local video runs at a time across workers; images and cloud videos go alongside", async () => {
   const { store, queue, submitted, observations } = fixture();
   try {

@@ -95,14 +95,18 @@ export const ComposerDock = memo(function ComposerDock({
   const keyboard = useKeyboard(phone && opened, sheet);
   // Tapping a text box flips the sheet's typing layout at once, rather than once iOS reports the
   // keyboard after its animation, and holds it while the keyboard animates and iOS scrolls to the
-  // text; it ends as the text loses focus or the keyboard drops (Android's Back keeps focus). The
-  // bar's lift still follows the viewport. It names the box being typed in (`data-text-box`), which
-  // keeps the screen while the box's tools or their menu have focus.
+  // text; it ends as the text loses focus or the keyboard drops (Android's Back keeps focus, so the
+  // drop lets the text go). The bar's lift still follows the viewport. It names the box being typed
+  // in (`data-text-box`), which keeps the screen while the box's tools or their menu have focus.
   const [typing, setTyping] = useState<string>();
   const tapping = useRef(false);
-  useKeyboardDrop(typing !== undefined, () => setTyping(undefined));
-  const sheetField = (panel: HTMLElement, target: unknown) =>
+  const sheetField = (panel: HTMLElement, target: unknown): target is HTMLTextAreaElement =>
     target instanceof HTMLTextAreaElement && panel.contains(target);
+  useKeyboardDrop(typing !== undefined, () => {
+    const field = document.activeElement;
+    if (sheet.current && sheetField(sheet.current, field)) field.blur();
+    setTyping(undefined);
+  });
   const textBox = (target: EventTarget) =>
     (target as Element).closest<HTMLElement>("[data-text-box]")?.dataset.textBox;
   // Phones type in the Generate sheet instead, so the dock stays put there. On other touch screens

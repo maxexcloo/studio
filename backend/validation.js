@@ -94,7 +94,10 @@ function sanitizeLoras(
     if (!name) continue;
     if (!installed.includes(name)) throw new Error(`LoRA “${name}” isn't available in ComfyUI.`);
     const loraInfo = catalogueLoraInfo(name);
-    const strength = snapNumber(item.strength, loraDefaultStrength(loraInfo), strengthRange);
+    const fallback = loraDefaultStrength(loraInfo);
+    const strength = loraInfo?.strengthRange
+      ? clampNumber(item.strength, fallback, strengthRange.min, strengthRange.max)
+      : snapNumber(item.strength, fallback, strengthRange);
     const issue = optionalLoraPolicyIssue({ name, strength }, loraInfo, {
       ...profile,
       loraAdapter: adapter,

@@ -463,8 +463,8 @@ export function useMediaActions(
   // viewer to ask there (GalleryPage's item path, ViewerPrompt's `ask`).
   const openViewer = (ask: ViewerAsk) => {
     onApplied();
-    const { set, similar } = (location.state as GalleryState | null) || {};
-    navigate(viewerPath(item), { state: { set, similar, viewer: true, ask } });
+    const { chat, set, show, similar, turn } = (location.state as GalleryState | null) || {};
+    navigate(viewerPath(item), { state: { chat, set, show, similar, turn, viewer: true, ask } });
   };
   const editAsk: EditAsk = edit ?? {
     pending: false,

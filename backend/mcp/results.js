@@ -15,7 +15,13 @@ import {
 // The status and result tools wait briefly at most: a chat waiting on a tool blocks its turn.
 const wait = z.number().int().min(0).max(20).default(0);
 // A YYYY-MM-DD date, without z.iso.date's long pattern in the schema every chat step resends.
-const date = z.string().regex(/^\d{4}-\d\d-\d\d$/);
+const date = z
+  .string()
+  .regex(/^\d{4}-\d\d-\d\d$/)
+  .refine((value) => {
+    const day = new Date(`${value}T00:00:00.000Z`);
+    return Number.isFinite(day.getTime()) && day.toISOString().startsWith(`${value}T`);
+  }, "Use a valid calendar date");
 export const job = {
   job_id: z.string().min(1).max(200).describe('A ref such as "result 3", or a job_id.'),
 };
