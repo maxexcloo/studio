@@ -31,11 +31,19 @@ test("imageSizeDefaults sets the Krea 2 family's default size to 1K, versioned, 
   write(profile("kroma", "krea2", 1536, 2048));
   write(profile("wide", "krea2", 2048, 1536));
   write(profile("flux", "flux3", 1536, 2048));
-  assert.deepEqual(imageSizeDefaults(dataDir), { applied: false, profiles: ["kroma"] });
+  const broken = path.join(dir, "broken.json");
+  fs.writeFileSync(broken, "{");
+  assert.deepEqual(imageSizeDefaults(dataDir), {
+    applied: false,
+    profiles: ["kroma"],
+    unreadable: ["broken.json"],
+  });
   assert.deepEqual(imageSizeDefaults(dataDir, { apply: true }), {
     applied: true,
     profiles: ["kroma"],
+    unreadable: ["broken.json"],
   });
+  assert.equal(fs.readFileSync(broken, "utf8"), "{");
   const saved = JSON.parse(fs.readFileSync(path.join(dir, "kroma.json"), "utf8")).studio.backends
     .radiance;
   assert.deepEqual(saved.defaults, { width: 768, height: 1024, steps: 8 });

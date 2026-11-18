@@ -80,14 +80,21 @@ function combinedRenames(ids) {
 /** Each profile in `workflows` by id, with its backends when it is combined. */
 function profileBackends(dir) {
   const ids = new Map();
-  if (!fs.existsSync(dir)) return ids;
+  const unreadable = [];
+  if (!fs.existsSync(dir)) return { ids, unreadable };
   for (const name of fs
     .readdirSync(dir)
     .filter((file) => file.endsWith(".json") && !file.startsWith("."))) {
-    const raw = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
-    ids.set(raw?.studio?.id || name.slice(0, -5), Object.keys(raw?.studio?.backends || {}));
+    const id = name.slice(0, -5);
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
+      ids.set(raw?.studio?.id || id, Object.keys(raw?.studio?.backends || {}));
+    } catch {
+      unreadable.push(name);
+      ids.set(id, []);
+    }
   }
-  return ids;
+  return { ids, unreadable };
 }
 
 // Rows read and rewritten per event loop turn, so a run never holds the server up for long.
@@ -108,8 +115,10 @@ export async function profileAliases(dataDir, { apply = false } = {}) {
   const dir = path.join(dataDir, "workflows");
   const file = path.join(dir, ".studio-aliases.json");
   const aliases = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
-  const profiles = profileBackends(dir);
-  const renames = new Map([...combinedRenames(profiles), ...renamesOf(aliases)]);
+  const { ids: profiles, unreadable } = profileBackends(dir);
+  // An unreadable profile can still declare an ID different from its filename.
+  const inferred = unreadable.length ? new Map() : combinedRenames(profiles);
+  const renames = new Map([...inferred, ...renamesOf(aliases)]);
   let rewritten = 0;
   const unmatched = {};
   if (fs.existsSync(databaseFile(dataDir))) {
@@ -159,5 +168,6 @@ export async function profileAliases(dataDir, { apply = false } = {}) {
     records: rewritten,
     renames: Object.fromEntries([...renames].map(([from, { to }]) => [from, to])),
     unmatched,
+    ...(unreadable.length ? { unreadable } : {}),
   };
 }
