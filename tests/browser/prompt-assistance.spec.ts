@@ -181,6 +181,7 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
     page.getByRole("button", { name: "Apply Detail Slider", exact: true }),
   ).toBeDisabled();
   await expect(prompt).toHaveValue("My later direction in warm light");
+  await finishTyping(page);
   await openLoraChoices(page);
   await page.getByRole("button", { name: "Soft Style", exact: true }).click();
   await closeLoras(page);

@@ -420,6 +420,8 @@ export function usePromptAssistant({
               variant="default"
               disabled={added || assistance.isPending}
               aria-label={`Apply ${item.title || item.name}`}
+              // The text keeps focus, so the phone sheet's typing layout stays put under the press.
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => apply(item)}
             >
               {added ? "Added" : "Apply"}
