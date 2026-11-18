@@ -871,7 +871,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "combine_backends",
     "combine backends",
-    "Combine a model's Radiance and ComfyUI profiles into one, as Library › Profiles › Combine Backends does, only when asked. preview lists the pairs it could combine with what differs, and a hash; apply combines selections (radiance and comfyui ids from one preview pair, optionally name and backend, the default backend, comfyui unless given) with that hash; both profiles' versions stay. A stale hash is refused: preview again.",
+    "Combine a model's Radiance and ComfyUI profiles into one, only when asked. preview lists the pairs it could combine with what differs, and a hash; apply combines selections (radiance and comfyui ids from one preview pair, optionally name and backend, the default backend, comfyui unless given) with that hash; both profiles' versions stay. A stale hash is refused: preview again.",
     {
       action: z.enum(["preview", "apply"]).default("preview"),
       hash: z.string().trim().min(1).max(200).optional(),

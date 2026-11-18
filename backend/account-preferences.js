@@ -1,7 +1,5 @@
 import { appearanceChoices } from "../shared/appearance.ts";
-import { cleanBrief } from "../shared/chat-brief.ts";
 import { dataDir } from "./data-dir.js";
-import { minorAgeRefusal } from "./minor-age.js";
 import {
   deleteRuntimeDocument,
   readRuntimeDocument,
@@ -19,8 +17,7 @@ import {
  * animate-profile.js, assistant.js). A side that can't run gives way to the other, saying so; a
  * model the person picks always wins. `galleryWork` is which unfinished work the gallery shows:
  * none (unsaved), work in progress, or queued work too (gallery/routes.js). `appearance` holds the header's Appearance
- * settings (shared/appearance.ts), and `chatBrief` the standing brief chats write to
- * (shared/chat-brief.ts). Keys Studio no longer knows are dropped as the document is read.
+ * settings (shared/appearance.ts). Keys Studio no longer knows are dropped as the document is read.
  */
 const preferenceDefaults = Object.freeze({
   cloudModels: true,
@@ -46,8 +43,7 @@ const known = (key) =>
   Object.hasOwn(preferenceDefaults, key) ||
   Object.hasOwn(preferenceChoices, key) ||
   modelKeys.has(key) ||
-  key === "appearance" ||
-  key === "chatBrief";
+  key === "appearance";
 const cache = new Map();
 const documentName = (ownerId) => `preferences:${ownerId}`;
 
@@ -106,13 +102,6 @@ export function saveAccountPreferences(ownerId, patch) {
           !appearanceChoices[setting].includes(choice)
         )
           throw new Error(`Set appearance ${setting} to one of its choices.`);
-      continue;
-    }
-    if (key === "chatBrief") {
-      const brief = cleanBrief(value);
-      const refusal = minorAgeRefusal(Object.values(brief).flat().join("\n"));
-      if (refusal) throw new Error(refusal);
-      patch = { ...patch, chatBrief: brief };
       continue;
     }
     if (modelKeys.has(key)) {

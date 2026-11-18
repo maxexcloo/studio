@@ -8,6 +8,7 @@ import {
   closeTextEditor,
   fixtures,
   image,
+  pressGenerate,
   profiles,
   serveProfiles,
   stamp,
@@ -1906,7 +1907,7 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   await expect(enabled).not.toBeChecked();
   await enabled.check();
   await closeLoras(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "owned-asset", slot: "image" }]);
   expect(state.jobs[0].input.referenceRole).toBe("reference");

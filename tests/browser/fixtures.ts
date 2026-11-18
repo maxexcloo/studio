@@ -913,6 +913,21 @@ export async function expandComposer(page: Page) {
   // The compact bar leaves once the composer has opened and focused its prompt.
   await expect(page.locator("[data-composer-prompt]")).toHaveCount(0);
 }
+/**
+ * While a phone sheet's text box has focus its bar holds Done in place of Generate; Done returns
+ * to the sheet. Elsewhere there is nothing to finish.
+ */
+export async function finishTyping(page: Page) {
+  const done = page
+    .getByRole("group", { name: "Generation Actions", exact: true })
+    .getByRole("button", { name: "Done", exact: true });
+  if (await done.count()) await done.click();
+}
+/** Presses the composer's Generate, finishing any typing first. */
+export async function pressGenerate(page: Page, name = "Generate Image") {
+  await finishTyping(page);
+  await page.getByRole("button", { name, exact: true }).click();
+}
 export async function openNav(page: Page, label: string) {
   if (["Library", "Settings"].includes(label)) {
     await page.getByRole("button", { name: "More Options", exact: true }).click();

@@ -6,6 +6,7 @@ import {
   fixtures,
   image,
   loadSaved,
+  pressGenerate,
   profiles,
   selectionAction,
   serveProfiles,
@@ -249,7 +250,7 @@ test("Edit submits the image with the profile's reference-mode settings", async 
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
-  await page.getByRole("button", { name: "Edit Image", exact: true }).click();
+  await pressGenerate(page, "Edit Image");
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
     operation: "refine",
@@ -313,7 +314,7 @@ test("A reference placed by hand applies the profile's reference-mode settings",
   await page.getByRole("menuitem", { name: "Use as Reference", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
     denoise: 0.65,
@@ -401,7 +402,7 @@ for (const surface of ["tile", "viewer"]) {
     await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveText(
       "Image Fast",
     );
-    await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+    await pressGenerate(page);
     await expect.poll(() => state.jobs.length).toBe(2);
     expect(state.referenceRequests).toEqual([{ galleryItemId: "tile-bird" }]);
     expect(state.jobs[1].input).toMatchObject({

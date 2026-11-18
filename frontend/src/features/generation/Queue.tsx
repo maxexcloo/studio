@@ -41,6 +41,7 @@ import {
 import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
+import { formatBytes } from "../../ui/bytes";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
@@ -50,6 +51,8 @@ import { usePhone } from "../../ui/usePhone";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
 import { useTryAgain } from "../gallery/useTryAgain";
+import type { ModelDownload } from "../library/queries";
+import { downloadActions, useDownloadAction } from "../library/useModelDownloads";
 import { useGenerationActions } from "./GenerationProvider";
 import { loraInfoQuery } from "./LoraPicker";
 import { isProfile, profileName, shownProfileName } from "./payload";
@@ -695,6 +698,89 @@ function QueueSetRow({
     </div>
   );
 }
+const downloadStatus: Record<string, string> = {
+  downloading: "Downloading",
+  failed: "Failed",
+  paused: "Stopped",
+  queued: "Queued",
+};
+/**
+ * A model download's row: its file, how far it got, Stop, Resume or Retry, and Discard for a
+ * partial file, which confirms.
+ */
+function DownloadRow({ item }: { item: ModelDownload }) {
+  const action = useDownloadAction();
+  const [discarding, setDiscarding] = useState(false);
+  const can = downloadActions(item);
+  const name = item.label || item.file;
+  const percent =
+    item.status === "downloading" && item.totalBytes
+      ? `${Math.floor((100 * (item.receivedBytes || 0)) / item.totalBytes)}%`
+      : "";
+  const size = item.receivedBytes
+    ? `${formatBytes(item.receivedBytes)}${item.totalBytes ? ` of ${formatBytes(item.totalBytes)}` : ""}`
+    : "";
+  const pending = (kind: "stop" | "start" | "discard") =>
+    action.isPending && action.variables?.action === kind;
+  return (
+    <div className={classes.row} role="group" aria-label={`Download ${name}`}>
+      <Group wrap="nowrap" gap="sm" py="xs">
+        <RowLead sortable={false} icon={icons.download} alert={item.status === "failed"} />
+        <Stack gap={2} flex={1} miw={0}>
+          <Text size="sm" truncate>
+            {name}
+          </Text>
+          <Text size="xs" c={item.status === "failed" ? "red" : "dimmed"} lineClamp={2}>
+            {[downloadStatus[item.status] || item.status, percent, size, item.error]
+              .filter(Boolean)
+              .join(" · ")}
+          </Text>
+        </Stack>
+        {can.discard && (
+          <RowButton
+            label="Discard"
+            icon={icons.delete}
+            pending={pending("discard")}
+            onClick={() => setDiscarding(true)}
+          />
+        )}
+        {can.start && (
+          <RowButton
+            label={item.status === "paused" ? "Resume" : "Retry"}
+            icon={item.status === "paused" ? icons.resume : icons.retry}
+            pending={pending("start")}
+            onClick={() => action.mutate({ item, action: "start" })}
+          />
+        )}
+        {can.stop && (
+          <RowButton
+            label="Stop"
+            icon={icons.stop}
+            pending={pending("stop")}
+            onClick={() => action.mutate({ item, action: "stop" })}
+          />
+        )}
+      </Group>
+      <ConfirmDialog
+        opened={discarding}
+        title="Discard Download"
+        action="Discard"
+        pending={pending("discard")}
+        onClose={() => setDiscarding(false)}
+        onConfirm={() =>
+          action
+            .mutateAsync({ item, action: "discard" })
+            .then(() => setDiscarding(false))
+            // The MutationCache notification reports a failure; the dialog stays open to retry.
+            .catch(() => undefined)
+        }
+      >
+        Studio deletes the part of {name} downloaded so far; downloading it again starts from the
+        beginning.
+      </ConfirmDialog>
+    </div>
+  );
+}
 function ClearJob({ job }: { job: QueueJob }) {
   const action = useQueueAction(job.id);
   return (
@@ -831,7 +917,8 @@ function pauseControl(paused: QueuePause, everyone: boolean) {
     : [everyone ? "pause-all" : "pause"];
   return { held, label: held ? "Resume Queue" : "Pause Queue", actions };
 }
-export function Queue() {
+/** The account's work, then an administrator's model downloads (`useModelDownloads`). */
+export function Queue({ downloads }: { downloads: ModelDownload[] }) {
   const queue = useQueue();
   const action = useQueueAction();
   const everyone = usePausesEveryone();
@@ -842,7 +929,7 @@ export function Queue() {
   if (queue.isPending) return <LoadingState label="Loading Generations" fill />;
   const { paused } = queue.data;
   const jobs = shownJobs(queue.data.jobs);
-  if (!jobs.length) {
+  if (!jobs.length && !downloads.length) {
     // An empty queue still offers the one action that lets work start again.
     const pause = pauseControl(paused, everyone);
     return (
@@ -923,6 +1010,9 @@ export function Queue() {
       ) : (
         entries.map((entry) => row(entry))
       )}
+      {downloads.map((item) => (
+        <DownloadRow key={`${item.folder}/${item.file}`} item={item} />
+      ))}
     </Stack>
   );
 }

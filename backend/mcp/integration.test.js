@@ -407,15 +407,6 @@ async function fixture(
   app.get("/api/characters", (_req, res) => res.json({ characters }));
   app.get("/api/outfits", (_req, res) => res.json({ outfits }));
   app.get("/api/scenes", (_req, res) => res.json({ scenes }));
-  // The account's chat brief (preference-routes.js): a change sets only the fields it names.
-  let chatBrief = {};
-  app.get("/api/chat-brief", (_req, res) => res.json({ brief: chatBrief }));
-  app.patch("/api/chat-brief", (req, res) => {
-    chatBrief = Object.fromEntries(
-      Object.entries({ ...chatBrief, ...req.body }).filter(([, value]) => String(value) !== ""),
-    );
-    res.json({ brief: chatBrief });
-  });
   app.post("/api/characters/:id/sheet", (req, res) => {
     characters.find((card) => card.id === req.params.id).sheet = { status: "making" };
     res.json({ ok: true, jobId: "sheet-job", profile: "Qwen-Image 2.1" });
@@ -7430,8 +7421,6 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
     record("lora-ops", { library: { ratings: { "fixture-effect.safetensors": "liked" } } }),
   );
   assert.equal(data(await call(mine, "taste")).summary, "Moody light");
-  await call(mine, "project", { action: "brief", avoid: "clowns" });
-  assert.deepEqual(seen.at(-1).body, { preferences: { avoid: ["clowns"] } });
   assert.deepEqual(
     data(
       await call(mine, "taste", {
@@ -7914,34 +7903,12 @@ test("axis varies one thing at one seed, one image each, as a lettered side-by-s
   assert.equal(f.submitted.length, 0);
 });
 
-test("MCP generation follows supplied prompts independently of saved account brief and taste", async (t) => {
+test("MCP generation follows supplied prompts independently of saved taste", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
-  // Explicit preference edits remain available without constraining generation.
-  const learnt = { avoid: ["coat"], models: [], loras: ["film"] };
-  const taste = { ...learnt, preferences: {} };
+  // Saved taste never constrains generation.
+  const taste = { avoid: ["buttons"], models: [imageProfile.id], loras: ["film"], preferences: {} };
   f.app.get("/api/taste", (_req, res) => res.json(taste));
-  f.app.put("/api/taste", (req, res) => {
-    for (const [key, value] of Object.entries(req.body.preferences)) {
-      if (value === null) delete taste.preferences[key];
-      else taste.preferences[key] = value;
-      taste[key] = value ?? learnt[key];
-    }
-    res.json(taste);
-  });
-  await generate(client, { prompts: ["A red coat"] });
-  const saved = data(
-    await call(client, "project", {
-      action: "brief",
-      subjects: "a woman in her 30s",
-      profiles: [imageProfile.id],
-      avoid: "buttons",
-    }),
-  );
-  assert.deepEqual(taste.preferences, { avoid: ["buttons"], models: [imageProfile.id] });
-  assert.equal(saved.user_brief.subjects, "a woman in her 30s");
-  assert.deepEqual(saved.avoid, ["buttons"]);
-  assert.deepEqual(saved.lora_names, ["film"]);
   await generate(client, { prompts: ["A coat with buttons"] });
   const reply = await call(client, "generate", { prompts: ["A woollen coat"] });
   assert.doesNotMatch(texts(reply), /The user's brief|the user's favourite/);
@@ -7950,11 +7917,6 @@ test("MCP generation follows supplied prompts independently of saved account bri
   assert.doesNotMatch(
     texts(await call(await f.client(), "generate", { prompts: ["A cotton coat"] })),
     /The user's brief/,
-  );
-  // "" clears a field.
-  assert.equal(
-    data(await call(client, "project", { action: "brief", subjects: "" })).user_brief.subjects,
-    undefined,
   );
   // Rules are the exception: limits a chat hears with its first generate and again when they
   // change, while the prompts still run as written.

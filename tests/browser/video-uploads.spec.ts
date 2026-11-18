@@ -6,6 +6,7 @@ import {
   fixtures,
   image,
   openReferenceChoices,
+  pressGenerate,
   showOnly,
   showUploads,
   stamp,
@@ -85,7 +86,7 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
     .setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: clip! });
   await expect.poll(() => uploads.length).toBe(2);
   await closeReferences(page);
-  await page.getByRole("button", { name: "Generate Video", exact: true }).click();
+  await pressGenerate(page, "Generate Video");
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0]).toMatchObject({
     sessionId: "session-recreate",

@@ -5,6 +5,7 @@ import {
   create,
   fixtures,
   openLoraChoices,
+  pressGenerate,
   profiles,
   renamePreset,
   saveCurrent,
@@ -115,7 +116,7 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
   );
   await closeLoras(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A quiet bird");
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.loras).toEqual([
     { name: "detail.safetensors", strength: 0.8, enabled: true, triggers: ["fine detail"] },
@@ -244,7 +245,7 @@ test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, te
     await drag.press("Space");
   }
   await closeLoras(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.loras.map((lora: { name: string }) => lora.name)).toEqual(
     testInfo.project.use.isMobile
