@@ -147,7 +147,6 @@ export function registerProfileRoutes(
     const result = removeProfile(params.id, {
       baseHash: String(body?.baseHash || ""),
       by: accountName(account),
-      replacement: String(body?.replacement || ""),
     });
     await onSaved(params.id);
     return result;

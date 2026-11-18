@@ -4,7 +4,6 @@
  * that is on must match. `workflow` is a single value.
  */
 import { galleryOrigin } from "../../shared/gallery-origin.ts";
-import { canonicalProfileId } from "../profile/store.js";
 
 /** Long-edge size bands, without overlap: each upper bound is inclusive, the next band starts one pixel above. */
 export const gallerySizeBands = [
@@ -52,11 +51,7 @@ export function filterValues(value) {
     .filter(Boolean);
 }
 
-/**
- * A test for the structured filters, or null when none is on. Build it once per search: it resolves
- * each recorded profile id once, since resolving reads the alias file's state (profile/store.js),
- * which for every item of a large gallery made a search take about 100 ms per page.
- */
+/** A test for the structured filters, or null when none is on. */
 export function galleryFiltersTest(filters = {}) {
   const terms = Object.fromEntries(
     ["lora", "model", "workflow"].map((key) => [
@@ -71,17 +66,11 @@ export function galleryFiltersTest(filters = {}) {
   const text = Object.keys(terms).filter((key) => terms[key].length);
   if (!text.length && !sizes.length && !aspects.length && !tags.length && !origins.length)
     return null;
-  const kept = new Map();
-  const canonical = (id) => {
-    if (!kept.has(id)) kept.set(id, canonicalProfileId(id));
-    return kept.get(id);
-  };
   const fields = {
     lora: (settings) =>
       (Array.isArray(settings.loras) ? settings.loras : []).map((lora) => lora?.name),
-    // A merged profile's records match its kept id too (profile/merge.js).
-    model: (settings, item) => [item.model, settings.modelName, canonical(item.model)],
-    workflow: (settings) => [settings.workflow, settings.profileId, canonical(settings.profileId)],
+    model: (settings, item) => [item.model, settings.modelName],
+    workflow: (settings) => [settings.workflow, settings.profileId],
   };
   return (item) => {
     if (origins.length && !origins.includes(galleryOrigin(item))) return false;

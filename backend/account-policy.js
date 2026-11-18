@@ -18,7 +18,6 @@
  */
 import { isCloudProfile } from "../shared/profiles.ts";
 import { kindDefaults } from "./account-preferences.js";
-import { canonicalProfileId } from "./profile/store.js";
 
 export const accountRoles = Object.freeze({ administrator: "administrator", user: "user" });
 
@@ -110,14 +109,7 @@ export function effectiveAccountAccess(
   const profile = profiles?.[account.accessProfileId];
   if (!profile) return { authenticated: false, reason: "profile-unassigned" };
   const safe = normaliseAccessProfile(
-    {
-      ...profile,
-      id: account.accessProfileId,
-      // A grant of a merged profile grants the profile it became (profile/merge.js).
-      ...(Array.isArray(profile.generationProfiles)
-        ? { generationProfiles: profile.generationProfiles.map(canonicalProfileId) }
-        : {}),
-    },
+    { ...profile, id: account.accessProfileId },
     availableProfiles,
   );
   return {

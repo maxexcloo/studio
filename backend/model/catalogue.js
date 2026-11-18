@@ -15,7 +15,6 @@ import { customWorkflowsRevision } from "../custom-workflows.js";
 import { step } from "../event-loop.js";
 import { families } from "../family-catalogue.js";
 import { uncensoredLoraNames } from "../lora/info.js";
-import { canonicalProfileId, profileAliasBackend, profileStore } from "../profile/store.js";
 import { RadianceClient, radianceInfo } from "../providers/radiance.ts";
 import { parkedWorkers } from "../runtime/services.ts";
 import { sharedRequests } from "../shared-requests.js";
@@ -466,34 +465,6 @@ export function modelsForAccount(models, req) {
     ...models,
     loras: lorasOn ? (models.loras || []).filter(allowed) : [],
     profiles,
-  };
-}
-
-/**
- * Each profile lists the merged ids that now resolve to it, so the browser can match records that
- * name them, and the backend each per-backend id ran on (`aliasBackends`), so reruns keep it.
- */
-export function withProfileAliases(models) {
-  const aliases = {};
-  const backends = {};
-  for (const id of Object.keys(profileStore().aliases())) {
-    const kept = canonicalProfileId(`custom:${id}`);
-    (aliases[kept] ||= []).push(`custom:${id}`);
-    const backend = profileAliasBackend(id);
-    if (backend) (backends[kept] ||= {})[`custom:${id}`] = backend;
-  }
-  if (!Object.keys(aliases).length || !models?.profiles) return models;
-  return {
-    ...models,
-    profiles: models.profiles.map((profile) =>
-      aliases[profile.id]
-        ? {
-            ...profile,
-            aliases: aliases[profile.id],
-            ...(backends[profile.id] ? { aliasBackends: backends[profile.id] } : {}),
-          }
-        : profile,
-    ),
   };
 }
 

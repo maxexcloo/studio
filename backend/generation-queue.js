@@ -21,7 +21,6 @@ import { mediaRoot, mediaSubfolder } from "./media-paths.js";
 import { ingestRunResults, removeComfyFiles } from "./media-store.js";
 import { minorAgeRefusal } from "./minor-age.js";
 import { withPngText } from "./png-text.js";
-import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { writingIssue, writingRequest } from "./prompt-stage.js";
 import { providerMediaWriter } from "./providers/media.ts";
 import { recoverRadianceJob } from "./radiance-jobs.js";
@@ -65,9 +64,7 @@ export function createGenerationQueue({
     const models = await mediaModels(false)
       .then((result) => result.models)
       .catch(() => ({ profiles: [] }));
-    const profile = models.profiles?.find(
-      (item) => item.id === canonicalProfileId(input.profileId),
-    );
+    const profile = models.profiles?.find((item) => item.id === input.profileId);
     const capability = profile
       ? capabilityForProfile(profile)
       : input.kind === "video"
@@ -365,11 +362,6 @@ export function createGenerationQueue({
     }
   }
   async function validateGeneration(input, account) {
-    // A per-backend id merged into a combined profile runs on the backend it named.
-    const named = profileAliasBackend(input.profileId);
-    // A merged profile's old id (a reused result, preset or MCP call) runs and is stored as the kept one.
-    for (const key of ["profileId", "model", "workflow"])
-      if (typeof input[key] === "string") input[key] = canonicalProfileId(input[key]);
     // The backend a combined profile's run uses (runBackend) is stored with it. Any other profile
     // runs without one.
     const combined =
@@ -387,7 +379,7 @@ export function createGenerationQueue({
           };
         }),
         combined.backend,
-        input.profileBackend || named,
+        input.profileBackend,
         Boolean(input.referenceAssets?.length),
         input.loras?.some((lora) => lora?.enabled !== false) ?? false,
       );

@@ -13,8 +13,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   { id: "second", url: "http://127.0.0.1:10", capabilities: ["image"] },
 ]);
 const { backendCandidates, combineBackends } = await import("./backends.js");
-const { canonicalProfileId, guideStore, profileAliasBackend, profileStore } =
-  await import("./store.js");
+const { guideStore, profileStore } = await import("./store.js");
 const { getCustomWorkflow, metadataFromJson, userWorkflowsDir } =
   await import("../custom-workflows.js");
 const { inferModels } = await import("../model/models.js");
@@ -25,11 +24,6 @@ const { readEditableProfile, saveEditableProfile, validateProfileText } =
 const { generationSettings } = await import("../gallery/records.js");
 const { timingKey } = await import("../generation-timing.js");
 const { generationEstimate, recordGeneration } = await import("../timings.js");
-const { profileStats } = await import("../stats.js");
-const { matchesGalleryFilters } = await import("../gallery/filters.js");
-const { effectiveAccountAccess, mayUseGenerationProfile } = await import("../account-policy.js");
-const { findProfile } = await import("../mcp/tiers.js");
-const { buildExport } = await import("./export.js");
 const { loadWorkflowPreferences, saveWorkflowPreferences } =
   await import("../workflow-catalogue.js");
 const { McpMedia } = await import("../mcp/media.js");
@@ -316,7 +310,7 @@ test("the preview pairs one model's Radiance and ComfyUI profiles and says what 
   });
 });
 
-test("combining needs the preview's hash, backs up, aliases each id to its backend and is safe to repeat", () => {
+test("combining needs the preview's hash, backs up and is safe to repeat", () => {
   const preview = backendCandidates();
   const selections = [
     { radiance: radianceId, comfyui: comfyId, name: "Krea 2 Turbo · Fast", backend: "radiance" },
@@ -349,11 +343,6 @@ test("combining needs the preview's hash, backs up, aliases each id to its backe
   assert.equal(raw.studio.backends.comfyui.graph[1].class_type, "UNETLoader");
   assert.equal(raw.studio.backends.radiance.description, "Radiance runtime.");
   assert.equal(profileStore().meta(combinedId).version, 1);
-  assert.equal(profileStore().aliases()[radianceId].backend, "radiance");
-  assert.deepEqual(
-    [profileStore().aliases()[comfyId].to, profileStore().aliases()[comfyId].backend],
-    [combinedId, "comfyui"],
-  );
   // The guide binding and negatives of the default backend go to the combined id... here Radiance
   // has none; the old ids' entries go.
   const { bindings } = guideStore().bindings();
@@ -381,51 +370,6 @@ test("combining needs the preview's hash, backs up, aliases each id to its backe
   assert.throws(() => combineBackends({ hash: preview.hash, selections }), { status: 409 });
 });
 
-test("an old per-backend id resolves to the combined profile on its own backend in every reader", () => {
-  const combined = `custom:${combinedId}`;
-  const old = `custom:${comfyId}`;
-  assert.equal(canonicalProfileId(old), combined);
-  assert.equal(profileAliasBackend(old), "comfyui");
-  assert.equal(profileAliasBackend(`custom:${radianceId}`), "radiance");
-  assert.equal(profileAliasBackend(combined), "");
-  // The workflow an old id names is its own backend's; the combined id runs its selected one.
-  assert.equal(getCustomWorkflow(old)?.backend, "comfyui");
-  assert.equal(getCustomWorkflow(old)?.id, combinedId);
-  assert.equal(getCustomWorkflow(combined)?.backend, "radiance");
-  assert.equal(getCustomWorkflow(combined, "comfyui")?.backend, "comfyui");
-
-  const profiles = [
-    {
-      id: combined,
-      label: "Krea 2 Turbo · Fast",
-      family: "krea2",
-      backend: "radiance",
-      backendOptions: [{ id: "comfyui" }, { id: "radiance" }],
-    },
-  ];
-  assert.equal(findProfile(profiles, old)?.namedBackend, "comfyui");
-  assert.equal(findProfile(profiles, combined)?.namedBackend, undefined);
-  assert.equal(findProfile(profiles, "krea 2 turbo")?.id, combined);
-
-  const now = Date.parse("2026-10-27T00:00:00Z");
-  const item = (profileId) => ({
-    status: "done",
-    createdAt: "2026-10-26T00:00:00Z",
-    settings: { profileId },
-  });
-  assert.equal(
-    profileStats([item(old), item(`custom:${radianceId}`), item(combined)], now)[combined]?.runs,
-    3,
-  );
-  assert.ok(matchesGalleryFilters({ ...item(old), model: old }, { workflow: combined }));
-  const access = effectiveAccountAccess(
-    { id: "user-1", role: "user", accessProfileId: "group" },
-    { group: { generationProfiles: [old], features: {} } },
-    [combined],
-  );
-  assert.ok(mayUseGenerationProfile(access, { id: combined }));
-});
-
 test("switching the backend is an ordinary versioned edit, and records and timings follow it", () => {
   const current = readEditableProfile(combinedId);
   const raw = JSON.parse(current.text);
@@ -451,17 +395,7 @@ test("switching the backend is an ordinary versioned edit, and records and timin
   );
 });
 
-test("an export keeps a combined id's aliases with their backends", () => {
-  const { files } = buildExport({
-    workflowsDir: userWorkflowsDir,
-    profiles: profileStore(),
-    guides: guideStore(),
-  });
-  const aliases = JSON.parse(files.find((file) => file.name === "profile-aliases.json").body);
-  assert.deepEqual([aliases[radianceId].to, aliases[radianceId].backend], [combinedId, "radiance"]);
-});
-
-test("MCP reruns an old result on the backend it ran on and sends the backend with each job", async (t) => {
+test("MCP reruns a result on the backend it ran on and sends the backend with each job", async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backends-mcp-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const sent = [];
@@ -513,7 +447,11 @@ test("MCP reruns an old result on the backend it ran on and sends the backend wi
       return { status: 200, payload: { jobId: body.clientJobId } };
     },
   });
-  const old = { type: "image", prompt: "a fox", settings: { profileId: `custom:${radianceId}` } };
+  const old = {
+    type: "image",
+    prompt: "a fox",
+    settings: { profileId: `custom:${combinedId}`, profileBackend: "radiance" },
+  };
   const current = (await media.profiles("image", "owner"))[0];
   const alternate = media.profileForBackend(
     {
@@ -523,15 +461,11 @@ test("MCP reruns an old result on the backend it ran on and sends the backend wi
       keepsCharacters: true,
       loraNote: "Previous backend only",
       imageModes: { reference: { defaults: { cfg: 4 } } },
-      namedBackend: "radiance",
-      aliases: ["legacy"],
     },
     "radiance",
   );
   for (const field of ["recipe", "editReferences", "keepsCharacters", "loraNote", "imageModes"])
     assert.equal(Object.hasOwn(alternate, field), false, field);
-  assert.deepEqual(alternate.aliases, ["legacy"]);
-  assert.equal(alternate.namedBackend, "radiance");
   const plan = await media.rerun("owner", old);
   assert.equal(plan.args.profile_id, `custom:${combinedId}`);
   assert.equal(plan.args.profile_backend, "radiance");

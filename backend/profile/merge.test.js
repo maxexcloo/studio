@@ -16,13 +16,8 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 const { duplicateProfiles, mergeDuplicateProfiles } = await import("./merge.js");
 const { readGalleryRows, writeGalleryRows } = await import("../persistence/gallery-rows.ts");
 const { runtimeDatabase } = await import("../persistence/runtime.ts");
-const { canonicalProfileId, guideStore, profileStore } = await import("./store.js");
-const { getCustomWorkflow, userWorkflowsDir } = await import("../custom-workflows.js");
-const { buildExport } = await import("./export.js");
-const { profileStats } = await import("../stats.js");
-const { matchesGalleryFilters } = await import("../gallery/filters.js");
-const { effectiveAccountAccess, mayUseGenerationProfile } = await import("../account-policy.js");
-const { findProfile } = await import("../mcp/tiers.js");
+const { guideStore, profileStore } = await import("./store.js");
+const { userWorkflowsDir } = await import("../custom-workflows.js");
 const { loadWorkflowPreferences, saveWorkflowPreferences } =
   await import("../workflow-catalogue.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
@@ -118,7 +113,7 @@ test("the preview merges identical same-named profiles into the newer id and lis
   fs.writeFileSync(guideStore().file, JSON.stringify(store));
 });
 
-test("merging needs the preview's hash, backs up, aliases, and is safe to repeat", () => {
+test("merging needs the preview's hash, backs up and is safe to repeat", () => {
   const preview = duplicateProfiles();
   assert.throws(() => mergeDuplicateProfiles({ hash: "stale" }), { status: 409 });
   assert.ok(fs.existsSync(path.join(userWorkflowsDir, `${oldId}.json`)));
@@ -129,7 +124,6 @@ test("merging needs the preview's hash, backs up, aliases, and is safe to repeat
     [[oldId, keptId]],
   );
   assert.ok(!fs.existsSync(path.join(userWorkflowsDir, `${oldId}.json`)));
-  assert.equal(profileStore().aliases()[oldId].to, keptId);
   assert.ok(profileStore().versions(oldId).length >= 1);
   assert.deepEqual(Object.keys(loadWorkflowPreferences().lastUsed), [`custom:${keptId}`]);
   for (const [name, body] of Object.entries(ownerFiles))
@@ -140,43 +134,4 @@ test("merging needs the preview's hash, backs up, aliases, and is safe to repeat
   assert.deepEqual(mergeDuplicateProfiles({ hash: preview.hash }), { merged: [] });
   assert.ok(fs.existsSync(path.join(userWorkflowsDir, "image-radiance-krea2-turbo.json")));
   assert.ok(fs.existsSync(path.join(userWorkflowsDir, "old-a.json")));
-});
-
-test("every reader resolves a merged id to the kept profile", () => {
-  const old = `custom:${oldId}`;
-  const kept = `custom:${keptId}`;
-  assert.equal(canonicalProfileId(old), kept);
-  assert.equal(canonicalProfileId(oldId), keptId);
-  assert.equal(canonicalProfileId("custom:old-a"), "custom:old-a");
-  assert.equal(getCustomWorkflow(old)?.id, keptId);
-
-  const profiles = [{ id: kept, label: "H3 · ComfyUI · Fast", family: "flux" }];
-  assert.equal(findProfile(profiles, old)?.id, kept);
-
-  const now = Date.parse("2026-10-27T00:00:00Z");
-  const item = (profileId) => ({
-    status: "done",
-    createdAt: "2026-10-26T00:00:00Z",
-    settings: { profileId },
-  });
-  assert.equal(profileStats([item(old), item(kept)], now)[kept]?.runs, 2);
-  assert.ok(matchesGalleryFilters({ ...item(old), model: old }, { workflow: kept }));
-  assert.ok(matchesGalleryFilters({ ...item(old), model: old }, { model: [kept] }));
-
-  const access = effectiveAccountAccess(
-    { id: "user-1", role: "user", accessProfileId: "group" },
-    { group: { generationProfiles: [old], features: {} } },
-    [kept],
-  );
-  assert.ok(mayUseGenerationProfile(access, { id: kept }));
-});
-
-test("an export carries the merged ids as aliases", () => {
-  const { files } = buildExport({
-    workflowsDir: userWorkflowsDir,
-    profiles: profileStore(),
-    guides: guideStore(),
-  });
-  const aliases = files.find((file) => file.name === "profile-aliases.json");
-  assert.equal(JSON.parse(aliases.body)[oldId].to, keptId);
 });
