@@ -2084,6 +2084,11 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
     (await request(`/inbox/${edit.id}/accept`, { change: { brief: { styles: "x" } } })).status,
     400,
   );
+  assert.equal(
+    (await request(`/inbox/${edit.id}/accept`, { change: { brief: { avoid: "people" } } })).status,
+    409,
+  );
+  assert.equal((await request(`/inbox/${edit.id}/undo`, {})).status, 409);
   await request(`/inbox/${edit.id}/accept`, {
     change: { brief: { avoid: "people, crowds, boats" } },
   });

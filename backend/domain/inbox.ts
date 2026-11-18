@@ -657,13 +657,17 @@ export function createInbox(options: {
       return { projectId: project.id };
     }
     if (proposal.kind === "brief" || proposal.kind === "pacing") {
+      const previous = projectOf(ownerId, proposal.projectId)?.previous?.change;
       const patch = projectPatch({
         ...(change.brief ? { brief: change.brief } : {}),
         ...(change.paused !== undefined ? { paused: change.paused } : {}),
         ...(change.favoured !== undefined ? { favoured: change.favoured } : {}),
       });
       const project = projects.update(ownerId, proposal.projectId!, patch, "dream", proposal.why);
-      return { projectId: project.id, change: project.previous?.change };
+      const changeId = project.previous?.change;
+      if (!changeId || changeId === previous)
+        throw failure("The project already has that change.", 409);
+      return { projectId: project.id, change: changeId };
     }
     if (proposal.kind === "rule") {
       const rule = change.rule!;
