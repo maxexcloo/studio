@@ -221,12 +221,19 @@ test("New Character saves a name, description and gallery images from the Refere
   await references.getByRole("button", { name: "New Character", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "New Character", exact: true });
   await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Mara");
-  await editor.getByRole("textbox", { name: "Description", exact: true }).click();
+  const description = editor.getByRole("textbox", { name: "Description", exact: true });
+  await description.click();
   // Phones edit the description full screen; desktops type in place.
-  const description = page.getByRole("textbox", { name: "Description", exact: true }).last();
-  await description.fill("red-haired ranger");
-  const done = page.getByRole("button", { name: "Close Description", exact: true });
-  if (await done.isVisible()) await done.click();
+  const phone = await page.evaluate(() => "phone" in document.documentElement.dataset);
+  await (
+    phone
+      ? page
+          .getByRole("dialog", { name: "Description", exact: true })
+          .getByRole("textbox", { name: "Description", exact: true })
+      : description
+  ).fill("red-haired ranger");
+  await closeTextEditor(page, "Description");
+  await expect(description).toHaveValue("red-haired ranger");
   const likes = editor.getByRole("combobox", { name: "Likes", exact: true });
   await likes.fill("Tea, Earl Grey");
   await likes.press("Enter");
