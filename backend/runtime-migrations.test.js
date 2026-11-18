@@ -46,7 +46,14 @@ test("the migrations route answers administrators with every step's plan, and lo
     whereWorkRuns: { applied, accounts: 0 },
     localTextAuto: { applied, accounts: 0 },
     profileAliases: { applied, aliases: 0, records: 0, renames: {} },
-    flux2Records: { applied, records: 0, unresolved: 0 },
+    flux2Records: {
+      applied,
+      records: 0,
+      modelFile: 0,
+      profileName: 0,
+      textEncoder: 0,
+      unresolved: 0,
+    },
     // Needs Studio stopped, so the running server only plans it.
     runtimeSettings: { applied: false, settings: 0 },
   });
