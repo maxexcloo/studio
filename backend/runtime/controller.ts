@@ -11,6 +11,7 @@ import {
   type WorkloadPhase,
 } from "../../shared/runtime.ts";
 import type { ServiceKind } from "../../shared/services.ts";
+import { logEvent } from "../crash-log.js";
 import type { DeploymentState } from "./kubernetes.ts";
 
 /** One Kubernetes deployment Studio may scale between 0 and 1 replicas (runtime/workloads.ts). */
@@ -484,6 +485,13 @@ export class RuntimeController {
       progress: "Starting the change.",
       steps: [],
     };
+    // Who or what changed the GPUs, and why: an administrator's account, a restore or a swap.
+    logEvent(`GPU ${type === "restart" ? "restart" : "placement"}`, {
+      by: requestedBy,
+      before: plan.holders,
+      stop: plan.stop,
+      start: plan.start,
+    });
     this.record.operations.unshift(operation);
     this.record.operations.length = Math.min(this.record.operations.length, historyLimit);
     if (type === "apply") this.record.desired = plan.target;
