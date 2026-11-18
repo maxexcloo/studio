@@ -1,11 +1,20 @@
-import { type Page, expect, test } from "@playwright/test";
+import { type Locator, type Page, expect, test } from "@playwright/test";
 
-import { dreamItem, fixtures, section, serveDream, stamp } from "./fixtures";
+import { dreamItem, fixtures, serveDream, stamp } from "./fixtures";
 
 /** Opens a route-backed Dream view from its menu. */
 async function showView(page: Page, name: string | RegExp) {
   await page.getByRole("button", { name: "Dream View", exact: true }).click();
   await page.getByRole("menuitem", { name, exact: true }).click();
+}
+/** Fills a text box in a dialog, through its full-screen editor on phones. */
+async function fillBox(scope: Locator, name: string, value: string, phone: boolean) {
+  const box = scope.getByRole("textbox", { name, exact: true });
+  if (!phone) return box.fill(value);
+  await box.click();
+  const sheet = scope.page().getByRole("dialog", { name, exact: true });
+  await sheet.getByRole("textbox", { name, exact: true }).fill(value);
+  await sheet.getByRole("button", { name: `Close ${name}`, exact: true }).click();
 }
 
 const current = (page: Page) => page.getByRole("group", { name: "Current Dream", exact: true });
@@ -242,54 +251,6 @@ test("While You Were Away shows a series as one set, in its order", async ({ pag
   await expect(views).toHaveCount(1);
 });
 
-test("Library offers Dream's suggested cards in their sections: Accept makes the card, Dismiss turns one down", async ({
-  page,
-}) => {
-  const state = await fixtures(page);
-  const liked = (id: string) => ({ ...dreamItem(id), dream: undefined, rating: "liked" });
-  const dream = await serveDream(page, {
-    characters: state.characters,
-    suggestions: [
-      {
-        id: "mara",
-        kind: "characters",
-        name: "Mara",
-        description: "red hair, freckles",
-        items: [liked("one"), liked("two")],
-      },
-      {
-        id: "rooftop",
-        kind: "scenes",
-        name: "Rooftop",
-        description: "a city rooftop at night",
-        items: [liked("three"), liked("four")],
-      },
-    ],
-  });
-  await page.goto("/library#characters");
-  const suggestions = page.getByRole("list", { name: "Suggestions" });
-  const mara = suggestions.getByRole("listitem", { name: "Mara" });
-  await expect(suggestions.getByRole("listitem")).toHaveCount(1);
-  await expect(mara.getByText("In 2 liked results", { exact: true })).toBeVisible();
-  await expect(mara.getByRole("group", { name: "Mara's Results" }).getByRole("button")).toHaveCount(
-    2,
-  );
-  await section(page, "Library", "Scenes");
-  const rooftop = suggestions.getByRole("listitem", { name: "Rooftop" });
-  await rooftop.getByRole("button", { name: "Dismiss", exact: true }).click();
-  await expect(rooftop).toHaveCount(0);
-  await section(page, "Library", "Characters");
-  await mara.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(suggestions).toHaveCount(0);
-  await expect(
-    page.getByRole("list", { name: "Characters" }).getByRole("listitem", { name: "Mara" }),
-  ).toBeVisible();
-  expect(verdicts(dream)).toEqual([
-    "POST /api/dream/suggestions/rooftop/dismiss",
-    "POST /api/dream/suggestions/mara/accept",
-  ]);
-});
-
 test("On a phone held sideways, a deck card's caption stands beside its media", async ({
   page,
 }, testInfo) => {
@@ -468,53 +429,6 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   await expect(
     page.getByRole("dialog", { name: "Clear Taste Profile", exact: true }),
   ).toBeVisible();
-});
-
-test("Issues suggest a rule that Add Rule keeps in Taste, and Dismiss drops one", async ({
-  page,
-}) => {
-  await fixtures(page);
-  const dream = await serveDream(page, {
-    issues: [
-      {
-        issue: "Waist too wide",
-        rule: "always a clearly narrow waist",
-        count: 4,
-        sources: { report: 1, review: 1, chat: 2 },
-        examples: [],
-      },
-      {
-        issue: "Extra fingers",
-        rule: "",
-        count: 2,
-        sources: { report: 2, review: 0, chat: 0 },
-        examples: [],
-      },
-    ],
-  });
-  await page.goto("/dream");
-  await showView(page, "Taste");
-  const issues = page.getByRole("region", { name: "Issues" });
-  await expect(issues.getByText("4 times · Chats 2 · Reports 1 · Review 1")).toBeVisible();
-  await issues.getByRole("button", { name: "Add Rule", exact: true }).click();
-  const editor = page.getByRole("dialog", { name: "Add Rule", exact: true });
-  await expect(editor.getByRole("textbox", { name: "Rule", exact: true })).toHaveValue(
-    "always a clearly narrow waist",
-  );
-  await editor.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(editor).toBeHidden();
-  await expect
-    .poll(() => dream.requests.at(-1))
-    .toEqual({
-      method: "POST",
-      path: "/api/taste/issues/accept",
-      body: { rule: "always a clearly narrow waist" },
-    });
-  await expect(issues.getByText("Waist too wide")).toBeHidden();
-  const profile = page.getByRole("region", { name: "Taste Profile" });
-  await expect(profile.getByText("always a clearly narrow waist", { exact: true })).toBeVisible();
-  await issues.getByRole("button", { name: "Dismiss", exact: true }).click();
-  await expect(issues.getByText("No recurring issues in the last two weeks.")).toBeVisible();
 });
 
 test("Dream navigation orders its views and History shows retained activity and available result links", async ({
@@ -804,50 +718,69 @@ test("The Dream tab counts the results waiting for a verdict, a comparison as on
   await expect(tab).toHaveAccessibleDescription("3 Unseen");
 });
 
-test("Dream's projects are created, edited, undone and deleted in dialogs", async ({
+test("Dream's projects show how they fare, open in detail with Undo, and are created, edited, paused and deleted", async ({
   page,
   isMobile,
 }) => {
   await fixtures(page);
+  const constraints = { profiles: [], loras: true, aspect: "", resolution: "" };
   const dream = await serveDream(page, {
     projects: [
       {
         id: "project-coast",
         name: "Coast",
         brief: { subjects: "Seabirds", styles: "", avoid: "" },
-        constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
+        constraints,
         previous: {
           name: "Coast",
           brief: { subjects: "Gulls", styles: "", avoid: "" },
-          constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
-          by: "chat",
+          constraints,
+          change: "change-1",
         },
+        changes: [{ id: "change-1", at: stamp, by: "chat", why: "", fields: ["subjects"] }],
       },
     ],
+    stats: {
+      "project-coast": {
+        kept: 3,
+        liked: 1,
+        missed: 2,
+        discarded: 4,
+        review: 6.5,
+        share: 0.6,
+        results: [dreamItem("gull")],
+      },
+    },
   });
   await page.goto("/dream");
   await showView(page, "Projects");
   const coast = page.getByRole("region", { name: "Coast", exact: true });
-  // A chat's change shows with Undo, which restores what it replaced.
-  await expect(coast).toContainText("Changed by a chat");
-  await coast.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(coast).toContainText("Gulls");
-  await expect(coast.getByRole("button", { name: "Undo", exact: true })).toBeHidden();
+  await expect(coast).toContainText("Kept 3");
+  await expect(coast).toContainText("Review 6.5");
+  await expect(coast.getByRole("progressbar", { name: "60% of turns" })).toBeVisible();
+
+  // The detail view lists a chat's change with Undo, which restores what it replaced.
+  await coast.getByRole("button", { name: "Open Coast", exact: true }).click();
+  await expect(page).toHaveURL(/\/dream\/projects\/project-coast$/);
+  const detail = page.getByRole("dialog", { name: "Coast", exact: true });
+  const changes = detail.getByRole("list", { name: "Changes", exact: true });
+  await expect(changes).toContainText("Chat · Subjects");
+  await changes.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(detail).toContainText("Gulls");
+  await expect(changes).toContainText("Undone");
+  await expect(changes.getByRole("button", { name: "Undo", exact: true })).toBeHidden();
+  await detail.getByRole("button", { name: "Close", exact: true }).last().click();
+  await expect(detail).toBeHidden();
+  await expect(page).toHaveURL(/\/dream\/projects$/);
 
   await page.getByRole("button", { name: "New Project", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "New Project", exact: true });
   await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Harbour");
-  if (isMobile) {
-    await editor.getByRole("textbox", { name: "Avoid", exact: true }).click();
-    const sheet = page.getByRole("dialog", { name: "Avoid", exact: true });
-    await sheet.getByRole("textbox", { name: "Avoid", exact: true }).fill("people");
-    await sheet.getByRole("button", { name: "Close Avoid", exact: true }).click();
-  } else await editor.getByRole("textbox", { name: "Avoid", exact: true }).fill("people");
+  await fillBox(editor, "Avoid", "people", isMobile);
   await editor.getByRole("checkbox", { name: "Use LoRAs", exact: true }).uncheck();
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   const harbour = page.getByRole("region", { name: "Harbour", exact: true });
-  await expect(harbour).toContainText("people");
   await expect(harbour).toContainText("No LoRAs");
   expect(dream.requests.at(-1)).toMatchObject({
     method: "POST",
@@ -856,24 +789,134 @@ test("Dream's projects are created, edited, undone and deleted in dialogs", asyn
   });
 
   await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Edit Project", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const edit = page.getByRole("dialog", { name: "Edit Project", exact: true });
   await edit.getByRole("checkbox", { name: "Use LoRAs", exact: true }).check();
   await edit.getByRole("button", { name: "Save", exact: true }).click();
   await expect(edit).toBeHidden();
   await expect(harbour).not.toContainText("No LoRAs");
-  await expect(harbour).toContainText("Changed");
 
   await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Delete Project", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Pause", exact: true }).click();
+  await expect(harbour).toContainText("Paused");
+  expect(dream.requests.at(-1)).toMatchObject({
+    method: "PUT",
+    path: "/api/dream/projects/project-2",
+    body: { paused: true },
+  });
+
+  await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Delete Project", exact: true })
-    .getByRole("button", { name: "Delete Project", exact: true })
+    .getByRole("button", { name: "Delete", exact: true })
     .click();
   await expect(harbour).toBeHidden();
   expect(dream.requests.at(-1)).toMatchObject({
     method: "DELETE",
     path: "/api/dream/projects/project-2",
+  });
+});
+
+test("The Inbox accepts, edits then accepts, dismisses with a reason and clears Dream's proposals", async ({
+  page,
+  isMobile,
+}) => {
+  await fixtures(page);
+  const constraints = { profiles: [], loras: true, aspect: "", resolution: "" };
+  const proposal = (id: string, kind: string, title: string, change: object, extra = {}) => ({
+    id,
+    kind,
+    title,
+    why: `Why ${title}.`,
+    at: stamp,
+    change,
+    evidence: [],
+    ...extra,
+  });
+  const dream = await serveDream(page, {
+    projects: [
+      {
+        id: "coast",
+        name: "Coast",
+        brief: { subjects: "gulls", styles: "film grain, cold light", avoid: "" },
+        constraints,
+      },
+    ],
+    proposals: [
+      proposal("waist", "rule", "Add a Rule", { rule: "always a clearly narrow waist" }),
+      proposal(
+        "light",
+        "brief",
+        "Warmer Light for Coast",
+        { brief: { styles: "film grain, warm dusk light" } },
+        { projectId: "coast", evidence: [dreamItem("dusk")] },
+      ),
+      proposal("pause", "pacing", "Pause Coast", { paused: true }, { projectId: "coast" }),
+      proposal("mara", "card", "Mara", {
+        card: { kind: "characters", name: "Mara", description: "red hair" },
+      }),
+    ],
+  });
+  await page.goto("/dream/projects");
+  await expect(page.getByRole("region", { name: "Inbox (4)", exact: true })).toBeVisible();
+
+  // A rule goes to Taste › Rules, with Undo.
+  const rule = page.getByRole("article", { name: "Add a Rule", exact: true });
+  await rule.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect(rule).toBeHidden();
+  await expect(page.getByText("Accepted Add a Rule", { exact: true })).toBeVisible();
+
+  // A brief edit shows its words changed, and Edit changes them before accepting.
+  const light = page.getByRole("article", { name: "Warmer Light for Coast", exact: true });
+  await expect(light.getByText("cold", { exact: true })).toBeVisible();
+  await expect(light.getByText("warm dusk", { exact: true })).toBeVisible();
+  await expect(light.getByRole("button", { name: /^Preview / })).toHaveCount(1);
+  await expect(
+    page.getByRole("article", { name: "Pause Coast" }).getByRole("button", { name: "Edit" }),
+  ).toBeHidden();
+  await light.getByRole("button", { name: "Edit", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Warmer Light for Coast", exact: true });
+  await fillBox(editor, "Styles", "film grain, dusk", isMobile);
+  await editor.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect(editor).toBeHidden();
+  expect(dream.requests.at(-1)).toEqual({
+    method: "POST",
+    path: "/api/dream/inbox/light/accept",
+    body: { change: { brief: { styles: "film grain, dusk" } } },
+  });
+  await expect(page.getByRole("region", { name: "Coast", exact: true })).toContainText(
+    "film grain, dusk",
+  );
+
+  // Dismiss takes an optional reason that teaches Dream.
+  await page
+    .getByRole("article", { name: "Pause Coast", exact: true })
+    .getByRole("button", { name: "Dismiss", exact: true })
+    .click();
+  const dismiss = page.getByRole("dialog", { name: "Dismiss", exact: true });
+  await fillBox(dismiss, "Reason", "Coast is new", isMobile);
+  await dismiss.getByRole("button", { name: "Dismiss", exact: true }).click();
+  await expect(dismiss).toBeHidden();
+  expect(dream.requests.at(-1)).toEqual({
+    method: "POST",
+    path: "/api/dream/inbox/pause/dismiss",
+    body: { reason: "Coast is new" },
+  });
+
+  await page
+    .getByRole("region", { name: "Inbox (1)", exact: true })
+    .getByRole("button", { name: "Clear Inbox", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Clear Inbox", exact: true })
+    .getByRole("button", { name: "Clear", exact: true })
+    .click();
+  await expect(page.getByRole("region", { name: /^Inbox/ })).toBeHidden();
+  expect(dream.requests.at(-1)).toEqual({
+    method: "POST",
+    path: "/api/dream/inbox/clear",
+    body: {},
   });
 });
 

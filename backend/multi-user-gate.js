@@ -62,16 +62,16 @@ const ordinaryRoutes = [
   // Comparisons, the taste profile, suggestions and Dream use only the requester's own records.
   [
     "GET",
-    /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/calibration|\/count|\/discarded|\/suggestions)?)$/,
+    /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/calibration|\/count|\/discarded|\/inbox)?)$/,
   ],
   [
     "POST",
-    /^\/api\/(comparisons(\/run|\/variants)?|taste\/refresh|suggestions|dream\/(calibration|visit)|dream\/suggestions\/[\w-]+\/(accept|dismiss)|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
+    /^\/api\/(comparisons(\/run|\/variants)?|taste\/refresh|suggestions|dream\/(calibration|visit)|dream\/inbox\/(clear|[\w-]+\/(accept|dismiss|undo))|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/(taste|dream\/discarded)$/],
   // Dream projects are the requester's own (domain/projects.ts).
-  ["GET", /^\/api\/dream\/projects$/],
+  ["GET", /^\/api\/dream\/projects(\/[\w-]+\/results)?$/],
   ["POST", /^\/api\/dream\/projects(\/(attach|activity)|\/[\w-]+\/undo)?$/],
   ["PUT", /^\/api\/dream\/projects\/[\w-]+$/],
   ["DELETE", /^\/api\/dream\/projects\/[\w-]+$/],

@@ -21,8 +21,10 @@ import {
   type DreamProfile,
   createDream,
   dreamRequest,
-  suggestionsFrom,
+  turnShares,
 } from "./dream.ts";
+import { createInbox, ideasFrom } from "./inbox.ts";
+import type { Issue } from "./issues.ts";
 import { createProjects } from "./projects.ts";
 import { type GenerationQueue, writtenJob } from "./queue.ts";
 import { registerQueueRoutes } from "./routes.ts";
@@ -94,8 +96,36 @@ function fixture(t: TestContext, catalogue = profiles) {
     gone: new Set<string>(),
     /** How alike two images are, as Image Search's vectors would say. */
     likeness: (_a: DreamItem, _b: DreamItem): number | undefined => undefined,
-    /** The text model's reply when asked for suggestions. */
-    suggestions: { suggestions: [] } as unknown,
+    /** The text model's reply when asked for new projects and cards, and for brief edits. */
+    ideas: { projects: [], cards: [] } as unknown,
+    edits: { edits: [] } as unknown,
+    /** Recurring issues and their rules (domain/issues.ts). */
+    issues: [] as Issue[],
+  };
+  const writer = {
+    model: async () => "writer",
+    chat: async ({
+      model,
+      messages,
+    }: {
+      model: string;
+      messages: { role: "system" | "user"; content: string }[];
+    }) => {
+      state.calls.push({ model, system: messages[0].content, user: messages[1].content });
+      if (messages[0].content.startsWith("You find what recurs"))
+        return { text: JSON.stringify(state.ideas) };
+      if (messages[0].content.startsWith("You improve the briefs"))
+        return { text: JSON.stringify(state.edits) };
+      state.prompts++;
+      return {
+        text: JSON.stringify({
+          prompt: `dream ${state.prompts}`,
+          why: "You like foxes.",
+          title: `Fox Dream ${state.prompts}`,
+          ...state.replies.shift(),
+        }),
+      };
+    },
   };
   const admission = createGenerationAdmission({
     store,
@@ -161,23 +191,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     },
     slots: () => state.slots,
     text: () => ({ side: "cloud", uncensored: false }),
-    writer: {
-      model: async () => "writer",
-      chat: async ({ model, messages }) => {
-        state.calls.push({ model, system: messages[0].content, user: messages[1].content });
-        if (messages[0].content.startsWith("You find what recurs"))
-          return { text: JSON.stringify(state.suggestions) };
-        state.prompts++;
-        return {
-          text: JSON.stringify({
-            prompt: `dream ${state.prompts}`,
-            why: "You like foxes.",
-            title: `Fox Dream ${state.prompts}`,
-            ...state.replies.shift(),
-          }),
-        };
-      },
-    },
+    writer,
     guide: () => ({ summary: "natural language" }),
     negative: (profile) => state.negatives[profile.id] ?? "",
     count: (ownerId, query) => matching(ownerId, query).length,
@@ -225,10 +239,9 @@ function fixture(t: TestContext, catalogue = profiles) {
       return { profile: own || catalogue.find((profile) => profile.id === state.video)! };
     },
     cards: () => state.cards,
-    createCard: (_account, kind, fields) => {
-      const card = { id: `${kind}-${state.cards![kind].length + 1}`, ...fields } as Character;
-      state.cards![kind].push(card);
-      return card;
+    inbox: {
+      propose: (ownerId) => inbox.propose(ownerId),
+      drafts: (ownerId) => inbox.drafts(ownerId),
     },
     minorAge: (text) => /\b16\b/.exec(text)?.[0] || "",
     // Like the queue's writing stage, then the generation route: a Dream job's pending tile
@@ -265,6 +278,31 @@ function fixture(t: TestContext, catalogue = profiles) {
     now: () => state.clock,
     random: (size) => (size === 100 ? state.rolls : (state.draws[size] ??= [])).shift() ?? 0,
     log: { info: (message) => state.logs.push(message) },
+  });
+  const inbox = createInbox({
+    dataDir,
+    projects,
+    taste,
+    issues: () => state.issues,
+    writer,
+    text: () => ({ side: "cloud", uncensored: false }),
+    online: async () => state.online.text === true,
+    cards: () => state.cards,
+    createCard: (_account, kind, fields) => {
+      const card = { id: `${kind}-${state.cards![kind].length + 1}`, ...fields } as Character;
+      state.cards![kind].push(card);
+      return card;
+    },
+    deleteCard: (_ownerId, kind, id) => {
+      state.cards![kind] = state.cards![kind].filter((card) => card.id !== id);
+    },
+    reference: (_account, itemId) => ({ id: `asset-${itemId}` }),
+    minorAge: (text) => /\b16\b/.exec(text)?.[0] || "",
+    likeness: (a, b) => state.likeness(a, b),
+    dream,
+    items: (ownerId, ids) =>
+      state.items.filter((item) => item.ownerId === ownerId && ids.includes(String(item.id))),
+    now: () => state.clock,
   });
   /** Finishes a job and its tile, as saving its outputs would. */
   const finish = (ownerId: string, jobId: string) => {
@@ -321,6 +359,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     dataDir,
     generated,
     projects,
+    inbox,
   };
 }
 
@@ -798,7 +837,7 @@ test("Dream skips unavailable accounts and offline services, logging each reason
 /** Serves the Dream routes; `request` answers as the user named in its last argument. */
 async function serve(
   t: TestContext,
-  { dream, projects }: Pick<ReturnType<typeof fixture>, "dream" | "projects">,
+  { dream, projects, inbox }: Pick<ReturnType<typeof fixture>, "dream" | "projects" | "inbox">,
 ) {
   const app = express();
   app.use(express.json());
@@ -806,7 +845,7 @@ async function serve(
     Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]), role: "user" } });
     next();
   });
-  registerDreamRoutes(app as never, { dream, projects, listed: (items) => items });
+  registerDreamRoutes(app as never, { dream, projects, inbox, listed: (items) => items });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => {
@@ -930,7 +969,27 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.equal((await request("")).status, 403);
 });
 
-test("Dream's ideas take the account's projects in turn and While You Were Away groups them", async (t) => {
+test("Projects share turns by how their results fare, with a floor for new ones; paused ones take none", () => {
+  const stats = new Map([
+    ["strong", { kept: 18, liked: 6, discarded: 2, review: 8.5 }],
+    ["weak", { kept: 1, liked: 0, discarded: 19, review: 3 }],
+  ]);
+  const shares = turnShares(
+    [{ id: "strong" }, { id: "weak" }, { id: "new" }, { id: "rested", paused: true }],
+    stats,
+  );
+  assert.equal(shares.get("rested"), 0);
+  assert.ok(Math.abs([...shares.values()].reduce((sum, share) => sum + share, 0) - 1) < 1e-9);
+  assert.ok(shares.get("strong")! > shares.get("new")!);
+  assert.ok(shares.get("new")! > shares.get("weak")!);
+  // However poorly a project fares, it keeps half an equal share.
+  assert.ok(shares.get("weak")! >= 0.5 / 3);
+  // Favouring a project doubles its weight.
+  const favoured = turnShares([{ id: "strong" }, { id: "new", favoured: true }], new Map());
+  assert.ok(favoured.get("new")! > favoured.get("strong")!);
+});
+
+test("Dream's ideas take the account's active projects and While You Were Away groups them", async (t) => {
   const fx = fixture(t);
   const { dream, state, projects, dreamOnce } = fx;
   await dream.save("alice", { enabled: true });
@@ -939,10 +998,14 @@ test("Dream's ideas take the account's projects in turn and While You Were Away 
     brief: { subjects: "the sea", avoid: "people" },
   });
   const city = projects.create("alice", { name: "City" });
-  for (let index = 0; index < 3; index++) await dreamOnce();
+  projects.update("alice", city.id, { paused: true }, "you");
+  for (let index = 0; index < 2; index++) await dreamOnce();
+  projects.update("alice", city.id, { paused: false }, "you");
+  projects.update("alice", beach.id, { paused: true }, "you");
+  await dreamOnce();
   assert.deepEqual(
     state.items.map((item) => item.dream?.projectId),
-    [beach.id, city.id, beach.id],
+    [city.id, beach.id, beach.id],
   );
   // The brief steers the writer; a project without one adds nothing.
   assert.match(
@@ -950,9 +1013,9 @@ test("Dream's ideas take the account's projects in turn and While You Were Away 
     /Project brief \(Beach\):\n- Subjects: the sea\n- Avoid: people/,
   );
   assert.match(state.calls[0].system, /keep to its brief/);
-  assert.doesNotMatch(state.calls[1].user, /Project brief/);
+  assert.doesNotMatch(state.calls[2].user, /Project brief/);
 
-  const [last, , first] = state.items;
+  const [, last, first] = state.items;
   last.review = { score: 9, miss: "", model: "m", at: "" };
   first.review = { score: 2, miss: "people", model: "m", at: "" };
   const request = await serve(t, fx);
@@ -964,8 +1027,8 @@ test("Dream's ideas take the account's projects in turn and While You Were Away 
       group.misses.map((item) => item.prompt),
     ]),
     [
-      ["Beach", ["dream 3"], ["dream 1"]],
-      ["City", ["dream 2"], []],
+      ["Beach", ["dream 2"], ["dream 1"]],
+      ["City", ["dream 3"], []],
     ],
   );
 
@@ -1816,117 +1879,240 @@ test("A Dream job's writing request keeps its own fields through admission", () 
   });
 });
 
-test("Suggestions recur in two liked results, keep within a card's limits and the 18+ floor, and never repeat a card", () => {
+test("Ideas recur in liked results, cards in two and projects in three, within limits and the 18+ floor, never repeating what the account has", () => {
   const liked = [{ id: "a" }, { id: "b" }, { id: "c" }];
-  const found = suggestionsFrom(
+  const found = ideasFrom(
     {
-      suggestions: [
+      projects: [
+        { name: "Neon Rooftops", subjects: "Mara on rooftops", styles: "neon", results: [1, 2, 3] },
+        { name: "Diners", subjects: "all-night diners", styles: "", results: [1, 2] },
+        { name: "Teens", subjects: "a 16 year old", styles: "", results: [1, 2, 3] },
+        { name: "Beach", subjects: "the sea", styles: "", results: [1, 2, 3] },
+      ],
+      cards: [
         { kind: "Character", name: "Mara", description: "red hair, freckles", results: [1, 3, 3] },
         { kind: "outfit", name: "Green Cloak", description: "a long green cloak", results: [2] },
-        { kind: "scene", name: "Diner", description: "an all-night diner", results: [1, 9] },
         { kind: "character", name: "Kid", description: "a 16 year old", results: [1, 2] },
         { kind: "scene", name: "Harbour", description: "a harbour at dusk", results: [2, 3] },
         { kind: "scene", name: "harbour", description: "the same harbour", results: [1, 2] },
-        { kind: "outfit", name: "Mara", description: "", results: [1, 2] },
+        { kind: "character", name: "Ava", description: "dark hair", results: [1, 2] },
         { kind: "prop", name: "Lamp", description: "a brass lamp", results: [1, 2] },
       ],
     },
     {
       liked,
-      taken: new Set(["characters:ava"]),
+      taken: new Set(["card:characters:ava", "project:beach"]),
       minorAge: (text) => /\b16\b/.exec(text)?.[0] || "",
       at: "now",
     },
   );
   assert.deepEqual(
-    found.map(({ kind, name, itemIds }) => [kind, name, itemIds]),
+    found.map(({ kind, title, evidence }) => [kind, title, evidence]),
     [
-      ["characters", "Mara", ["a", "c"]],
-      ["scenes", "Harbour", ["b", "c"]],
+      ["project", "Neon Rooftops", ["a", "b", "c"]],
+      ["card", "Mara", ["a", "c"]],
+      ["card", "Harbour", ["b", "c"]],
     ],
   );
-  assert.deepEqual(
-    suggestionsFrom(
-      {
-        suggestions: [
-          { kind: "character", name: "Ava", description: "dark hair", results: [1, 2] },
-        ],
-      },
-      { liked, taken: new Set(["characters:ava"]), minorAge: () => "", at: "now" },
-    ),
-    [],
-  );
-  assert.deepEqual(
-    suggestionsFrom("nonsense", { liked, taken: new Set(), minorAge: () => "", at: "" }),
-    [],
-  );
+  assert.deepEqual(ideasFrom(null, { liked, taken: new Set(), minorAge: () => "", at: "" }), []);
 });
 
-test("Dream suggests recurring cards from liked results once a day; Accept makes the card and Dismiss turns it down", async (t) => {
+test("The Inbox proposes from likes while idle; a proposed project runs draft samples that Accept keeps and Dismiss deletes", async (t) => {
   const fx = fixture(t);
-  const { dream, state, generated } = fx;
-  const liked = (id: string, prompt: string) => ({
+  const { dream, state, generated, inbox, projects, dreamOnce } = fx;
+  const liked = (id: string) => ({
     id,
     ownerId: "alice",
     type: "image",
     status: "done",
-    prompt,
+    prompt: `Mara on a rooftop ${id}`,
     rating: "liked",
     jobId: `job-${id}`,
   });
-  generated(...["1", "2", "3", "4", "5"].map((id) => liked(id, `Mara on a rooftop ${id}`)));
-  await dream.save("alice", { enabled: true, dailyImages: 0 });
-  state.suggestions = {
-    suggestions: [
-      { kind: "character", name: "Mara", description: "red hair, freckles", results: [1, 2, 3] },
-      { kind: "scene", name: "Rooftop", description: "a city rooftop at night", results: [2, 4] },
+  generated(...["1", "2", "3", "4", "5", "6"].map(liked));
+  await dream.save("alice", { enabled: true, dailyImages: 10 });
+  state.ideas = {
+    projects: [
+      { name: "Rooftops", subjects: "Mara on rooftops", styles: "neon", results: [1, 2, 3] },
+      { name: "Harbours", subjects: "harbours at dusk", styles: "film", results: [4, 5, 6] },
     ],
+    cards: [{ kind: "character", name: "Mara", description: "red hair", results: [1, 2] }],
   };
-  // Five liked results are too few to look for what recurs.
-  await dream.tick();
-  assert.equal(dream.suggestions("alice").length, 0);
-  generated(liked("6", "Mara on a rooftop 6"));
-  await dream.tick();
+  await dreamOnce();
   const asked = state.calls.filter((call) => call.system.startsWith("You find what recurs"));
   assert.equal(asked.length, 1);
   assert.match(asked[0].system, /18 or older/);
-  assert.match(
-    asked[0].user,
-    /Liked images:\n\[1\] Mara on a rooftop 1\n\[2\] Mara on a rooftop 2/,
-  );
-  const [mara, rooftop] = dream.suggestions("alice");
+  assert.match(asked[0].user, /Liked images:\n\[1\] Mara on a rooftop 1/);
+  const proposals = () => inbox.read("alice").proposals;
   assert.deepEqual(
-    [mara.kind, mara.name, mara.items.map((item) => item.id)],
-    ["characters", "Mara", ["1", "2", "3"]],
+    proposals().map(({ kind, title }) => [kind, title]),
+    [
+      ["project", "Rooftops"],
+      ["project", "Harbours"],
+      ["card", "Mara"],
+    ],
   );
-  // Once a day.
-  await dream.tick();
-  assert.equal(state.calls.filter((call) => call.system.startsWith("You find")).length, 1);
+  const [rooftops, harbours, mara] = proposals();
+  assert.deepEqual(
+    mara.evidence.map((item) => item.id),
+    ["1", "2"],
+  );
+  // Each proposed project gets its samples, written to its brief, before Dream returns to its own work.
+  for (let index = 0; index < 6; index++) await dreamOnce();
+  const drafts = state.items.filter((item) => item.dream?.state === "draft");
+  assert.deepEqual(
+    drafts.map((item) => item.dream?.draft),
+    [harbours.id, harbours.id, harbours.id, rooftops.id, rooftops.id, rooftops.id],
+  );
+  assert.match(state.calls.at(-1)!.user, /Project brief \(Harbours\):\n- Subjects: harbours/);
+  await dreamOnce();
+  assert.equal(state.items[0].dream?.state, "unseen");
+  // Samples stay out of the deck until their project is accepted.
+  assert.equal(dream.unseen("alice").length, 2);
+  assert.equal(proposals()[0].drafts!.length, 3);
 
   const request = await serve(t, fx);
-  const accepted = await request(`/suggestions/${mara.id}/accept`, {});
-  assert.equal(accepted.status, 200);
+  const accepted = await request(`/inbox/${rooftops.id}/accept`, {});
+  assert.deepEqual(accepted.body.accepted, { id: rooftops.id, title: "Rooftops" });
+  const [made] = projects.list("alice");
+  assert.deepEqual(
+    [made.name, made.brief.subjects, made.changes?.[0].by],
+    ["Rooftops", "Mara on rooftops", "dream"],
+  );
+  assert.equal(dream.unseen("alice").filter((item) => item.dream?.projectId === made.id).length, 3);
+  // Dismissing deletes a project's samples, and its reason teaches the next batch.
+  const dismissed = await request(`/inbox/${harbours.id}/dismiss`, { reason: "too quiet" });
+  assert.deepEqual(
+    dismissed.body.proposals.map((proposal: { title: string }) => proposal.title),
+    ["Mara"],
+  );
+  assert.equal(state.items.filter((item) => item.dream?.state === "draft").length, 0);
+  // Undo takes the accepted project back.
+  assert.equal((await request(`/inbox/${rooftops.id}/undo`, {})).status, 200);
+  assert.deepEqual(projects.list("alice"), []);
+  assert.equal((await request(`/inbox/${rooftops.id}/undo`, {})).status, 409);
+  // A card proposal makes the card from the results it recurs in.
+  await request(`/inbox/${mara.id}/accept`, {
+    change: { card: { name: "Mara", description: "red hair, freckles" } },
+  });
   assert.deepEqual(state.cards!.characters, [
     {
       id: "characters-1",
       name: "Mara",
       description: "red hair, freckles",
-      referenceIds: ["asset-1", "asset-2", "asset-3"],
+      referenceIds: ["asset-1", "asset-2"],
     },
   ]);
-  assert.equal((await request(`/suggestions/${rooftop.id}/dismiss`, {})).status, 200);
-  assert.equal((await request(`/suggestions/${rooftop.id}/dismiss`, {})).status, 404);
-  assert.deepEqual((await request("/suggestions")).body.suggestions, []);
-  // A day later neither is proposed again, and the writer hears they were taken or turned down.
-  state.clock += 86_400_000;
+  // A batch waits six hours; then a dismissed idea stays snoozed and the writer hears why.
+  await dream.tick();
+  assert.equal(state.calls.filter((call) => call.system.startsWith("You find")).length, 1);
+  state.clock += 6 * 3_600_000;
   await dream.tick();
   const again = state.calls.filter((call) => call.system.startsWith("You find")).at(-1)!;
-  assert.match(again.user, /- character: Mara/);
-  assert.match(again.user, /- scenes:rooftop/);
-  assert.equal(dream.suggestions("alice").length, 0);
-  // Without Characters there is nothing to suggest or accept.
-  state.cards = null;
-  assert.deepEqual(dream.suggestions("alice"), []);
+  assert.match(again.user, /- Harbours: too quiet/);
+  assert.deepEqual(
+    proposals().map((proposal) => proposal.title),
+    ["Rooftops"],
+  );
+  // Clear Inbox dismisses everything.
+  assert.deepEqual((await request("/inbox/clear", {})).body.proposals, []);
+});
+
+test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project as Dream, with one Undo", async (t) => {
+  const fx = fixture(t);
+  const { dream, state, inbox, projects, taste } = fx;
+  const beach = projects.create("alice", {
+    name: "Beach",
+    brief: { subjects: "the sea", avoid: "people" },
+  });
+  // Twelve discards and a keep, three of them missing the brief for crowds.
+  for (let index = 0; index < 13; index++)
+    state.items.push({
+      id: `b${index}`,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      prompt: `a beach ${index}`,
+      dream: {
+        state: index ? "discarded" : "kept",
+        prompt: "",
+        why: "",
+        at: "",
+        projectId: beach.id,
+      },
+      ...(index < 4 ? { review: { score: 3, miss: "crowds", model: "m", at: "" } } : {}),
+    });
+  state.issues = [
+    {
+      issue: "Waist too wide",
+      rule: "always a narrow waist",
+      count: 3,
+      sources: { report: 1, review: 1, chat: 1 },
+      examples: [{ id: "b1" }],
+    },
+  ];
+  state.edits = {
+    edits: [
+      {
+        project: 1,
+        field: "avoid",
+        text: "people, crowds",
+        why: "Crowds keep showing",
+        results: [1],
+      },
+    ],
+  };
+  await dream.save("alice", { enabled: true, dailyImages: 0 });
+  await dream.tick();
+  const edits = state.calls.filter((call) => call.system.startsWith("You improve the briefs"));
+  assert.match(edits[0].user, /Project 1: Beach\n {2}subjects: the sea/);
+  assert.match(edits[0].user, /Misses the brief:\n {2}\[1\] crowds/);
+  const byKind = (kind: string) =>
+    inbox.read("alice").proposals.find((proposal) => proposal.kind === kind)!;
+  assert.deepEqual(
+    inbox.read("alice").proposals.map(({ kind, title }) => [kind, title]),
+    [
+      ["pacing", "Pause Beach"],
+      ["rule", "always a narrow waist"],
+      ["brief", "Edit Beach's Avoid"],
+    ],
+  );
+  const request = await serve(t, fx);
+  // Edit then Accept may change only the fields the proposal changes.
+  const edit = byKind("brief");
+  assert.equal(
+    (await request(`/inbox/${edit.id}/accept`, { change: { brief: { styles: "x" } } })).status,
+    400,
+  );
+  await request(`/inbox/${edit.id}/accept`, {
+    change: { brief: { avoid: "people, crowds, boats" } },
+  });
+  let [project] = projects.list("alice");
+  assert.equal(project.brief.avoid, "people, crowds, boats");
+  assert.deepEqual(
+    project.changes?.map(({ by, why, fields }) => [by, why, fields]),
+    [["dream", "Crowds keep showing", ["avoid"]]],
+  );
+  await request(`/inbox/${byKind("pacing").id}/accept`, {});
+  // Only the latest change can be undone.
+  assert.equal((await request(`/inbox/${edit.id}/undo`, {})).status, 409);
+  assert.equal((await request(`/projects/${beach.id}/undo`, {})).status, 200);
+  [project] = projects.list("alice");
+  assert.equal(project.paused, undefined);
+  assert.equal(project.brief.avoid, "people, crowds, boats");
+  const rule = byKind("rule");
+  await request(`/inbox/${rule.id}/accept`, {});
+  assert.deepEqual(taste.read("alice").rules, ["always a narrow waist"]);
+  await request(`/inbox/${rule.id}/undo`, {});
+  assert.deepEqual(taste.read("alice").rules, []);
+  // A comparison's pick proposes the project's styles, a later pick on that axis replacing it.
+  inbox.picked("alice", beach.id, "Lighting", "warm dusk", "you");
+  inbox.picked("alice", beach.id, "Lighting", "cold dawn", "chat");
+  const picks = inbox.read("alice").proposals.filter((proposal) => proposal.kind === "brief");
+  assert.deepEqual(
+    picks.map(({ change, why }) => [change.brief?.styles, why]),
+    [["lighting: cold dawn", "A chat picked cold dawn for Lighting in a comparison"]],
+  );
 });
 
 test("A series follows a liked image's character through one night on its profile and LoRAs, then ends", async (t) => {
@@ -2143,7 +2329,7 @@ test("A failed Dream video sets its profile aside rather than sending the next o
 });
 
 test("administrator overrides win over account choices, which they leave saved, and lock them", async (t) => {
-  const { dream, projects, state, dataDir, dreamOnce } = fixture(t);
+  const { dream, projects, inbox, state, dataDir, dreamOnce } = fixture(t);
   await dream.save("alice", { spicy: true, dailyImages: 12 });
   state.overrides = { enabled: true, spicy: false };
   assert.deepEqual(dream.locked(), ["enabled", "spicy"]);
@@ -2167,7 +2353,7 @@ test("administrator overrides win over account choices, which they leave saved, 
   assert.equal(dream.read("bob").settings.enabled, false);
 
   state.overrides = { imageBackend: "cloud" };
-  const request = await serve(t, { dream, projects });
+  const request = await serve(t, { dream, projects, inbox });
   assert.equal((await request("/settings", { imageBackend: "auto" }, "PUT")).status, 400);
   assert.equal((await request("/settings", { imageBackend: "local" }, "PUT")).status, 409);
   assert.deepEqual((await request("")).body.locked, ["imageBackend"]);

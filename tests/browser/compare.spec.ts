@@ -534,7 +534,7 @@ test("Compare Selected sets chosen images side by side, number keys pick the win
   ).toBeVisible();
 });
 
-test("Variants of a result show their numbers, the axis they vary and Undo for the brief a pick changes", async ({
+test("Variants of a result show their numbers, the axis they vary and propose a pick for the brief", async ({
   page,
 }, testInfo) => {
   const state = await fixtures(page);
@@ -555,7 +555,7 @@ test("Variants of a result show their numbers, the axis they vary and Undo for t
     settings: { profileId: "image:test", seed: "7" },
   }));
   state.gallery.unshift(...items);
-  const comparison = (winner?: (typeof items)[number], brief?: object) => ({
+  const comparison = (winner?: (typeof items)[number], proposal?: object) => ({
     id: "fox-options",
     createdAt: stamp,
     seed: "7",
@@ -567,9 +567,8 @@ test("Variants of a result show their numbers, the axis they vary and Undo for t
       label: `${"AB"[index]} · ${names[index]}`,
       item,
     })),
-    ...(brief ? { brief } : {}),
+    ...(proposal ? { proposal } : {}),
   });
-  const undone: string[] = [];
   await page.route("**/api/comparisons/fox-options", (route) =>
     route.fulfill({ json: comparison() }),
   );
@@ -578,22 +577,17 @@ test("Variants of a result show their numbers, the axis they vary and Undo for t
       json: comparison(items[1], {
         projectId: "foxes",
         name: "Foxes",
-        styles: "lighting: Golden Dusk",
       }),
     }),
   );
-  await page.route("**/api/dream/projects/foxes/undo", (route) => {
-    undone.push(route.request().method());
-    return route.fulfill({ json: { project: { id: "foxes" } } });
-  });
   await page.goto("/compare/fox-options");
   await expect(page.getByRole("heading", { name: "Which Lighting?", exact: true })).toBeVisible();
 
-  // Picking one adds it to the chat's project brief, which Undo restores.
+  // Picking one proposes it for the chat's project brief in Dream's Inbox.
   await page.getByRole("button", { name: "Pick B · Golden Dusk as Winner", exact: true }).click();
-  await expect(page.getByText("Added to Foxes's brief", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect.poll(() => undone).toEqual(["POST"]);
+  await expect(
+    page.getByText("Proposed for Foxes's brief in Dream's Inbox", { exact: true }),
+  ).toBeVisible();
 
   // Details carry no result number.
   await page.getByRole("button", { name: "Open B · Golden Dusk", exact: true }).click();

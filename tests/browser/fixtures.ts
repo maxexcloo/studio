@@ -1295,17 +1295,14 @@ export async function serveDream(
     reason?: string;
     /** The taste profile `/api/taste` serves; edits keep learnt words separate. */
     taste?: Record<string, unknown>;
-    /** Recurring issues `/api/taste/issues` serves; Add Rule and Dismiss remove one. */
-    issues?: any[];
-    /** Dream's projects, which create, edit, Undo and Delete change. */
+    /** Dream's projects, which create, edit, Pause, Undo and Delete change. */
     projects?: any[];
+    /** Each project's stats, by id. */
+    stats?: Record<string, any>;
+    /** What the Inbox proposes; Accept applies a rule or brief edit, Dismiss and Clear drop them. */
+    proposals?: any[];
     /** When the visit before this one ended. */
     since?: string;
-    /** Suggested cards; accepting one adds it to its matching collection. */
-    suggestions?: any[];
-    characters?: any[];
-    outfits?: any[];
-    scenes?: any[];
   } = {},
 ) {
   const state = {
@@ -1321,7 +1318,7 @@ export async function serveDream(
     /** Every Dream result served, so Undo can bring one back. */
     known: new Map<string, any>(),
     projects: options.projects ?? [],
-    suggestions: options.suggestions ?? [],
+    proposals: options.proposals ?? [],
     requests: [] as { method: string; path: string; body: any }[],
   };
   // As the backend, without ranking: single results by project in the order given, misses apart.
@@ -1388,21 +1385,6 @@ export async function serveDream(
   await page.route(/\/api\/taste\/reflection(?:\?.*)?$/, (route) =>
     route.fulfill({ json: { sameness: { made: none, liked: none }, days: [] } }),
   );
-  let issues = options.issues ?? [];
-  await page.route(/\/api\/taste\/issues(?:\/\w+)?$/, (route) => {
-    const request = route.request();
-    const path = new URL(request.url()).pathname;
-    if (request.method() === "POST") {
-      const body = request.postDataJSON() || {};
-      state.requests.push({ method: "POST", path, body });
-      if (path.endsWith("/accept")) {
-        Object.assign(taste, { rules: [...(taste.rules as string[]), body.rule] });
-        issues = issues.filter((issue) => issue.rule !== body.rule);
-      }
-      if (path.endsWith("/dismiss")) issues = issues.filter((issue) => issue.issue !== body.issue);
-    }
-    return route.fulfill({ json: { updatedAt: "", issues, writer: false } });
-  });
   await page.route(/\/api\/taste$/, (route) => {
     const request = route.request();
     if (request.method() === "PUT") {
@@ -1498,37 +1480,37 @@ export async function serveDream(
         },
       });
     }
-    if (path === "/api/dream/suggestions")
-      return route.fulfill({ json: { suggestions: state.suggestions } });
-    const suggested = /^\/api\/dream\/suggestions\/([^/]+)\/(accept|dismiss)$/.exec(path);
-    if (suggested) {
-      const suggestion = state.suggestions.find((entry) => entry.id === suggested[1]);
-      state.suggestions = state.suggestions.filter((entry) => entry !== suggestion);
-      if (suggested[2] === "dismiss") return route.fulfill({ json: { ok: true } });
-      const card = {
-        id: `chr-${suggestion.id}`,
-        name: suggestion.name,
-        description: suggestion.description,
-        referenceIds: suggestion.items.map((item: any) => item.id),
-        references: suggestion.items.map((item: any) => ({
-          id: item.id,
-          name: "Character Image",
-          thumbnailUrl: item.thumbnailUrl,
-          url: item.url,
-          width: 1024,
-          height: 1024,
-        })),
-        missing: 0,
-      };
-      options[suggestion.kind as "characters" | "outfits" | "scenes"]?.push(card);
-      return route.fulfill({ json: { card } });
+    // As the backend: Accept applies a rule or a brief edit (as edited), Dismiss and Clear drop.
+    const inbox = () => ({ proposals: state.proposals });
+    if (path === "/api/dream/inbox") return route.fulfill({ json: inbox() });
+    if (path === "/api/dream/inbox/clear") {
+      state.proposals = [];
+      return route.fulfill({ json: inbox() });
+    }
+    const proposalRoute = /^\/api\/dream\/inbox\/([^/]+)\/(accept|dismiss|undo)$/.exec(path);
+    if (proposalRoute) {
+      const proposal = state.proposals.find((entry) => entry.id === proposalRoute[1]);
+      if (proposalRoute[2] === "undo") return route.fulfill({ json: inbox() });
+      state.proposals = state.proposals.filter((entry) => entry !== proposal);
+      if (proposalRoute[2] === "dismiss") return route.fulfill({ json: inbox() });
+      const change = body.change ?? proposal.change;
+      if (change.rule) Object.assign(taste, { rules: [...(taste.rules as string[]), change.rule] });
+      const project = state.projects.find((entry) => entry.id === proposal.projectId);
+      if (project && change.brief) project.brief = { ...project.brief, ...change.brief };
+      return route.fulfill({
+        json: { ...inbox(), accepted: { id: proposal.id, title: proposal.title } },
+      });
     }
     if (path === "/api/dream/projects") {
-      if (method === "GET") return route.fulfill({ json: { projects: state.projects } });
-      const project = { ...body, id: `project-${state.projects.length + 1}` };
+      if (method === "GET")
+        return route.fulfill({ json: { projects: state.projects, stats: options.stats ?? {} } });
+      const project = { ...body, id: `project-${state.projects.length + 1}`, changes: [] };
       state.projects.push(project);
       return route.fulfill({ json: { project } });
     }
+    if (/^\/api\/dream\/projects\/[^/]+\/results$/.test(path))
+      return route.fulfill({ json: { items: [] } });
+    // As the backend: each change is listed, and Undo takes back only the latest.
     const projectRoute = /^\/api\/dream\/projects\/([^/]+)(\/undo)?$/.exec(path);
     if (projectRoute) {
       const project = state.projects.find((entry) => entry.id === projectRoute[1]);
@@ -1536,12 +1518,28 @@ export async function serveDream(
         state.projects = state.projects.filter((entry) => entry !== project);
         return route.fulfill({ json: { ok: true } });
       }
-      const { id, previous, ...content } = project;
+      const { id, previous, changes = [], ...content } = project;
       if (projectRoute[2]) {
-        const { by: _by, ...restored } = previous;
-        Object.assign(project, restored);
+        const { change: _change, ...restored } = previous;
+        Object.assign(project, restored, {
+          changes: changes.map((entry: any, index: number) =>
+            index ? entry : { ...entry, undone: true },
+          ),
+        });
         delete project.previous;
-      } else Object.assign(project, body, { previous: { ...content, by: "studio" } });
+      } else {
+        const change = {
+          id: `change-${changes.length + 1}`,
+          at: stamp,
+          by: "you",
+          why: "",
+          fields: Object.keys(body),
+        };
+        Object.assign(project, body, {
+          previous: { ...content, change: change.id },
+          changes: [change, ...changes],
+        });
+      }
       return route.fulfill({ json: { project } });
     }
     const answered = /^\/api\/dream\/pairs\/([^/]+)\/answer$/.exec(path);

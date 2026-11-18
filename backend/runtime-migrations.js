@@ -6,6 +6,7 @@ import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
 import { dreamDefaultChoices } from "./dream-default-choices.js";
+import { dreamInbox } from "./dream-inbox.js";
 import { dreamOwnership } from "./dream-ownership.js";
 import { flux2Records } from "./flux2-records.js";
 import { galleryRatings } from "./gallery-ratings.js";
@@ -133,6 +134,12 @@ const steps = [
     changes: (plan) => plan.records,
     online: true,
     reload: reloadProfileRecords,
+  },
+  {
+    name: "dreamInbox",
+    run: dreamInbox,
+    changes: (plan) => plan.accounts,
+    online: true,
   },
   {
     name: "runtimeSettings",
