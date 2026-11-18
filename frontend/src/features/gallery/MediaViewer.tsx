@@ -407,26 +407,8 @@ export function MediaViewer({
   const stage = useRef<HTMLDivElement>(null);
   const containStage = useCallback((view: HTMLDivElement | null) => {
     stage.current = view;
-    if (!view) return;
     // Keys reach the viewer from the start, before the dialog's own focus lands on its control.
-    view.focus({ preventScroll: true });
-    // Safari can take an edge swipe for history navigation despite touch-action on the media.
-    const containEdge = (event: TouchEvent) => {
-      if (event.touches.length !== 1 || layerAbove(view)) return;
-      const target = event.target as Element;
-      if (
-        target.closest("a, button, input, textarea, select") &&
-        (!target.closest("[data-zoom-mode]") || target.closest("[data-zoom-controls]"))
-      )
-        return;
-      const x = event.touches[0].clientX;
-      if (x <= 20 || x >= window.innerWidth - 20) event.preventDefault();
-    };
-    view.addEventListener("touchstart", containEdge, { passive: false });
-    return () => {
-      view.removeEventListener("touchstart", containEdge);
-      stage.current = null;
-    };
+    view?.focus({ preventScroll: true });
   }, []);
   // Hidden chrome leaves the whole screen to the media: the stage moves its centre to the screen's,
   // measured again as the stage resizes, the screen turning included.

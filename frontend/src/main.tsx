@@ -85,6 +85,30 @@ function AppNotifications() {
     />
   );
 }
+// Keep iOS history gestures from taking over Studio's swipes.
+document.addEventListener(
+  "touchstart",
+  (event) => {
+    if (!event.cancelable || event.touches.length !== 1) return;
+    const edge = 20;
+    const { clientX } = event.touches[0];
+    if (clientX > edge && clientX < window.innerWidth - edge) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (
+      target.closest("input, textarea, select, label") ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    )
+      return;
+    if (
+      target.closest("a, button") &&
+      (!target.closest("[data-zoom-mode]") || target.closest("[data-zoom-controls]"))
+    )
+      return;
+    event.preventDefault();
+  },
+  { capture: true, passive: false },
+);
 // The gallery places its own scroll when the viewer closes through Back; iOS Safari's restoration
 // of the opening position would land afterwards and override it.
 history.scrollRestoration = "manual";
