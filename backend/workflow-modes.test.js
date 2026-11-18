@@ -149,6 +149,28 @@ test("an omitted denoise on a reference run keeps the reference mode's own", () 
   assert.equal(body.denoise, 0.65);
 });
 
+test("a size set only in the generate mode keeps presets on the family step", () => {
+  const prepared = structuredClone(raw);
+  Object.assign(prepared.studio, { id: "mode-sizes", family: "zimage" });
+  prepared.studio.imageModes.generate.graph[8] = {
+    class_type: "EmptyLatentImage",
+    inputs: { width: 1024, height: 1024 },
+  };
+  prepared.studio.imageModes.generate.controls = {
+    ...controls,
+    width: { node: "8", input: "width" },
+    height: { node: "8", input: "height" },
+  };
+  saveImportedWorkflow(prepared);
+  const size = ["INT", { default: 1024, min: 16, max: 16384, step: 8 }];
+  const sized = { ...info, EmptyLatentImage: list({ width: size, height: size }) };
+  const profile = inferModels(sized).profiles.find((item) => item.id === "custom:mode-sizes");
+  assert.equal(profile.constraints.width.step, 16);
+  assert.equal(profile.constraints.height.step, 16);
+  assert.ok(profile.aspectPresets.length > 1);
+  for (const { w, h } of profile.aspectPresets) assert.ok(w % 16 === 0 && h % 16 === 0);
+});
+
 test("recipe-owned graph adapters are not inspected as optional stack entries", async () => {
   const { optionalLoraIssue } = await import("./lora/catalogue.js");
   const prepared = structuredClone(raw);
