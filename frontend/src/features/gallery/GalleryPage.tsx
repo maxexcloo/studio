@@ -2,7 +2,6 @@ import {
   Alert,
   Button,
   Center,
-  Group,
   SegmentedControl,
   Stack,
   Tooltip,
@@ -32,7 +31,7 @@ import { useGenerationActions } from "../generation/GenerationProvider";
 import type { OpenComposerState } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import { useTileCaptions } from "../settings/accountPreferences";
-import { FilterToggle, emptyGalleryFilters } from "./GalleryFilters";
+import { ShowToggles, emptyGalleryFilters } from "./GalleryFilters";
 import { GalleryImport, droppedFiles, useGalleryUpload } from "./GalleryImport";
 import { GallerySelectionBar } from "./GallerySelectionBar";
 import { GalleryToolbar } from "./GalleryToolbar";
@@ -694,6 +693,7 @@ function Gallery() {
               aria-label="Gallery View"
               fullWidth
               size="xs"
+              mt={4}
               value={view}
               onChange={(value) => setView(value as "grid" | "runs")}
               data={[
@@ -706,34 +706,13 @@ function Gallery() {
             />
           }
           toggles={
-            <Group gap={6} role="group" aria-label="Show">
-              {kind === "image" && (
-                <FilterToggle
-                  label="Comparisons"
-                  on={filters.comparisons}
-                  onToggle={() => setFilters({ ...filters, comparisons: !filters.comparisons })}
-                />
-              )}
-              {/* Disliked items show only here; it turns Liked and Uploads off. */}
-              <FilterToggle
-                label="Disliked"
-                on={filters.rating === "disliked"}
-                onToggle={() =>
-                  setFilters({
-                    ...filters,
-                    rating: filters.rating === "disliked" ? "" : "disliked",
-                    uploads: false,
-                  })
-                }
-              />
-              {view === "grid" && (
-                <FilterToggle
-                  label="Originals Only"
-                  on={originalsOnly}
-                  onToggle={() => setOriginalsOnly(!originalsOnly)}
-                />
-              )}
-            </Group>
+            <ShowToggles
+              kind={kind}
+              value={filters}
+              onChange={setFilters}
+              originalsOnly={originalsOnly}
+              onOriginalsOnly={view === "grid" ? setOriginalsOnly : undefined}
+            />
           }
           actions={
             <>
