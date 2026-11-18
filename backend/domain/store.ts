@@ -108,6 +108,23 @@ export class Store {
       CREATE TABLE IF NOT EXISTS studio_user_presets (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, record TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS studio_user_presets_owner ON studio_user_presets(owner_id);
       CREATE TABLE IF NOT EXISTS studio_provider_jobs (id TEXT PRIMARY KEY REFERENCES studio_queue(id), owner_id TEXT NOT NULL, record TEXT NOT NULL);`);
+    // Each job's profile and whether it ran a prompt, indexed with its ID, so promptJobIds reads
+    // the index alone instead of parsing every record.
+    const columns = this.db
+      .prepare("SELECT name FROM pragma_table_xinfo('studio_queue')")
+      .all()
+      .map((row) => row.name);
+    if (!columns.includes("profile_id"))
+      this.db.exec(
+        "ALTER TABLE studio_queue ADD COLUMN profile_id GENERATED ALWAYS AS (json_extract(record, '$.input.profileId')) VIRTUAL",
+      );
+    if (!columns.includes("prompted"))
+      this.db.exec(
+        "ALTER TABLE studio_queue ADD COLUMN prompted GENERATED ALWAYS AS (trim(coalesce(json_extract(record, '$.input.prompt'), '')) != '') VIRTUAL",
+      );
+    this.db.exec(
+      "CREATE INDEX IF NOT EXISTS studio_queue_prompted ON studio_queue(owner_id, profile_id, prompted, id)",
+    );
   }
 
   /** A session holds the jobs of one request or run of requests, such as an MCP conversation's. */
@@ -400,7 +417,7 @@ export class Store {
   promptJobIds(ownerId: string, profileIds: string[]): string[] {
     return this.db
       .prepare(
-        `SELECT id FROM studio_queue WHERE owner_id = ? AND json_extract(record, '$.input.profileId') IN (SELECT value FROM json_each(?)) AND trim(coalesce(json_extract(record, '$.input.prompt'), '')) != ''`,
+        "SELECT id FROM studio_queue WHERE owner_id = ? AND profile_id IN (SELECT value FROM json_each(?)) AND prompted",
       )
       .all(ownerId, JSON.stringify(profileIds))
       .map((row) => row.id as string);
