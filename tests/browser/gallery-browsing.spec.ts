@@ -150,13 +150,17 @@ test("Select All takes every match across pages, and the search and Liked stay w
   if (test.info().project.use.isMobile) {
     const selection = page.getByRole("group", { name: "Gallery Selection", exact: true });
     const actions = selection.getByRole("group", { name: "Selected Item Actions", exact: true });
-    await expect(actions.getByRole("button", { name: "Unlike", exact: true })).toBeInViewport({
+    // One row that scrolls sideways, starting at the count and quick selects.
+    await expect(status).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("button", { name: "Select None", exact: true })).toBeInViewport({
       ratio: 1,
     });
     await page.evaluate(() => window.scrollBy(0, 800));
-    await expect(actions.getByRole("button", { name: "Unlike", exact: true })).toBeInViewport({
-      ratio: 1,
-    });
+    await expect(status).toBeInViewport({ ratio: 1 });
+    const unlike = actions.getByRole("button", { name: "Unlike", exact: true });
+    await unlike.scrollIntoViewIfNeeded();
+    await expect(unlike).toBeInViewport({ ratio: 1 });
+    expect((await unlike.boundingBox())!.y).toBeLessThan((await status.boundingBox())!.y + 20);
     // Phones end the selection with Select, which stays in sight while it applies.
     await expect(select).toBeInViewport({ ratio: 1 });
     await expect(

@@ -140,7 +140,9 @@ recur across features.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
   phone media item bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and
-  only then do they wrap, never scrolling.
+  only then do they wrap, never scrolling. On phones the gallery selection bar
+  instead keeps its count, quick selects and actions on one row that scrolls
+  sideways.
 - Like and Dislike rate an item and teach taste. A Dislike never deletes: it
   hides the item with Undo, and the gallery's Disliked filter shows it again.
   Dream's Accept keeps a result unrated; its Like accepts and rates it.
