@@ -24,6 +24,11 @@
   flex: 0 1 auto;
   min-width: 0;
 }
+/* Phones give the toolbar its own full row, so every section's actions end at the same edge as its
+   rows' ⋯ buttons. */
+:where([data-phone]) .header > :last-child {
+  flex-basis: 100%;
+}
 @keyframes enter {
   from {
     opacity: 0;
