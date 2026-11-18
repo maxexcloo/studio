@@ -649,6 +649,7 @@ export async function fixtures(page: Page) {
       galleryRequests.push(url.search);
       const items = gallery.filter(
         (i) =>
+          (url.searchParams.get("select") !== "failed" || i.status === "failed") &&
           (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
           (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
           Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&

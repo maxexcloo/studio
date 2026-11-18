@@ -787,7 +787,12 @@ function keptList(query, filter, filterKey, rank, sort) {
   for (const unit of galleryUnits(query, filter)) {
     if (sort === "liked") unit.key.liked = unit.items.some((item) => item.rating === "liked");
     for (const item of unit.items)
-      entries.push({ key: galleryKey(item), unit: unit.key, ...(rank && { score: rank(item) }) });
+      entries.push({
+        key: galleryKey(item),
+        unit: unit.key,
+        failed: item.status === "failed",
+        ...(rank && { score: rank(item) }),
+      });
   }
   if (rank)
     entries = entries
@@ -806,6 +811,16 @@ function keptList(query, filter, filterKey, rank, sort) {
     lists.set(name, list);
   }
   return list;
+}
+
+function listedItems(entries) {
+  if (!entries.length) return [];
+  const byKey = new Map(
+    statement("SELECT key, value FROM studio_gallery WHERE key IN (SELECT value FROM json_each(?))")
+      .all(list(entries.map((entry) => entry.key)))
+      .map((row) => [row.key, parse(row)]),
+  );
+  return entries.flatMap((entry) => (byKey.has(entry.key) ? [byKey.get(entry.key)] : []));
 }
 
 /** A page cut from a kept list; its cursor names its last item and where it stood. */
@@ -832,13 +847,6 @@ function listPage(list, cursor, limit, ranked, sort) {
     }
   }
   const slice = list.entries.slice(start, start + limit);
-  const byKey = new Map(
-    galleryItems({ named: slice.map((entry) => entry.key) }).map((item) => [
-      galleryKey(item),
-      item,
-    ]),
-  );
-  const items = slice.flatMap((entry) => (byKey.has(entry.key) ? [byKey.get(entry.key)] : []));
   const end = start + slice.length;
   const last = slice.at(-1);
   const nextCursor =
@@ -847,7 +855,24 @@ function listPage(list, cursor, limit, ranked, sort) {
       : ranked
         ? `r|${end}`
         : `k|${encodeURIComponent(last.key)}|${encodeURIComponent(JSON.stringify(last.unit))}`;
-  return { items, nextCursor };
+  return { items: listedItems(slice), nextCursor };
+}
+
+/** Failed rows are sparse. A failed set member still sorts at the whole set's anchor. */
+function failedGalleryItems(query) {
+  const items = galleryItems({ ...query, status: "failed" }, { ordered: false }).filter(
+    hasGalleryMedia,
+  );
+  const anchors = new Map();
+  for (const item of items) {
+    const set = item.resultSet?.id;
+    if (set && !anchors.has(set)) anchors.set(set, setItems(query, set)[0]);
+  }
+  return items.sort(
+    (a, b) =>
+      compareGalleryItems(anchors.get(a.resultSet?.id) || a, anchors.get(b.resultSet?.id) || b) ||
+      compareGalleryItems(a, b),
+  );
 }
 
 /**
@@ -855,6 +880,7 @@ function listPage(list, cursor, limit, ranked, sort) {
  * `query` narrows it in SQL (galleryItems' fields) and `filter` tests each item in JS, with
  * `filterKey` naming everything `filter` depends on so its list is kept between pages. `rank`
  * (Find Similar) orders by its score instead, highest first, leaving out items it can't score.
+ * `selection` reads all or only failed members of the same list in one request.
  */
 export function pageGallery({
   type = "",
@@ -867,6 +893,7 @@ export function pageGallery({
   filterKey = "",
   rank = null,
   sort = "newest",
+  selection,
 } = {}) {
   const safeLimit = Math.max(1, Math.min(500, Number(limit || 200)));
   const sql = {
@@ -877,8 +904,24 @@ export function pageGallery({
     ...(type && { type }),
     notStatus: [query.notStatus ?? [], "cancelled", ...(includeFailed ? [] : ["failed"])].flat(),
   };
-  if (filter || rank || sort !== "newest") {
-    const list = keptList(sql, filter, filterKey, rank, sort);
+  const list =
+    filter || rank || sort !== "newest" ? keptList(sql, filter, filterKey, rank, sort) : null;
+  if (selection) {
+    const failed = selection === "failed";
+    const items = list
+      ? listedItems(failed ? list.entries.filter((entry) => entry.failed) : list.entries)
+      : failed
+        ? failedGalleryItems(sql)
+        : Array.from(galleryUnits(sql, null)).flatMap(({ items }) => items);
+    return {
+      items,
+      nextCursor: "",
+      hasMore: false,
+      revision: galleryRevision,
+      totalApprox: items.length,
+    };
+  }
+  if (list) {
     const page = listPage(list, cursor, safeLimit, Boolean(rank), sort);
     return {
       ...page,
