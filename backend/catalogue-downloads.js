@@ -5,6 +5,7 @@
 import { families } from "./family-catalogue.js";
 import { encoderKinds, vaeKinds } from "./model/components.js";
 import { existingCopy } from "./model/downloads.js";
+import { modelFiles } from "./upscale.js";
 
 // The commit each repository's files are fetched at, so a download is always the file its
 // `sha256` names. When a file changes upstream, the Library's update check offers it as an Update
@@ -773,14 +774,16 @@ const downloadSources = {
 };
 
 /**
- * Catalogue entries (library/catalogue.js) with each installed catalogue download's Hugging Face
- * source filled in, so the update check covers them. An entry with its own provider source, or
- * with another file's hash under the same name, keeps what it has; the first build of a name wins.
+ * Catalogue entries (library/catalogue.js) with each installed catalogue download's and SeedVR2
+ * weight's Hugging Face source filled in, so the update check covers them. An entry with its own
+ * provider source, or with another file's hash under the same name, keeps what it has; the first
+ * build of a name wins.
  */
 export function withCatalogueSources(entries) {
   const merged = { ...entries };
   const seen = new Set();
-  for (const [source, folder] of Object.values(downloadSources))
+  const upscalers = Object.entries(modelFiles).map(([file, item]) => ({ file, ...item }));
+  for (const [source, folder] of [...Object.values(downloadSources), [upscalers, "SEEDVR2"]])
     for (const item of Object.values(source).flat()) {
       const key = `${folder}/${item.file}`;
       const entry = merged[key];
@@ -797,7 +800,9 @@ export function withCatalogueSources(entries) {
         file: item.file,
         sha256: item.sha256,
         bytes: item.bytes,
-        source: { provider: "hf", repo: hub[1], revision: hub[2], path: hub[3] },
+        source: hub
+          ? { provider: "hf", repo: hub[1], revision: hub[2], path: hub[3] }
+          : { provider: "hf", repo: item.repo, path: item.file },
       };
     }
   return merged;
