@@ -27,7 +27,7 @@
 - Keep runtime data out of Git and test output.
 - Tests never generate media or call cloud providers. Verify real behaviour on the live deployment, never on a local copy of production data.
 - Report measured conditions for performance claims.
-- To use live Studio or LibreChat in agent-browser as the user, never another account, run `mise run browser-sign-in` then `agent-browser --session <name> state load <file>` with the file it names (`--state` is ignored on the shared browser).
+- To use live Studio or LibreChat in agent-browser, sign in as the user: run `mise run browser-sign-in` then `agent-browser --session <name> state load <file>` with the file it names (`--state` is ignored on the shared browser). Audits may read other Studio accounts' data, but nothing an agent does may write to, generate in or carry data between accounts.
 
 ## UI Patterns
 
