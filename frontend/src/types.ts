@@ -1,4 +1,5 @@
 import type { CardKind } from "../../shared/characters";
+import type { Review } from "../../shared/projects";
 import type { QueueJob as SharedQueueJob } from "../../shared/queue";
 import type { Resolution } from "../../shared/resolution";
 import type { UpscaleQuality } from "../../shared/upscale";
@@ -186,6 +187,8 @@ export interface MediaItem {
   faceRedo?: boolean;
   /** A prompt that would recreate an item made without one (an upload); Recreate uses it. */
   suggestedPrompt?: string;
+  /** Self-review against its owner's rules and any project's brief (backend/domain/review.ts). */
+  review?: Review;
   createdAt?: string;
   /** Liked, or disliked and so hidden from the gallery but its Disliked view. */
   rating?: Rating;

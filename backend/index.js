@@ -668,7 +668,7 @@ const jobAdmitted = (job) => {
   if (photo) itemsRated(job.ownerId, setGalleryRatings([photo.id], "liked"));
   finishing.admitted(job);
   captioner.interrupt();
-  dreamReview.interrupt();
+  selfReview.interrupt();
   imageSearch.interrupt();
   titler.interrupt();
   suggester.interrupt();
@@ -1109,17 +1109,18 @@ const captioner = createCaptioner({
   persist: (document) => writeRuntimeDocument(dataDir, "captions", document),
 });
 registerIdlePassRoutes(app, "/api/gallery/captions", { work: captioner, requireAdmin });
-// Dream review (domain/review.ts): each project's unseen results scored against its brief.
-const dreamReview = createReview({
+// Self-review (domain/review.ts): recent results scored against their owner's rules and any project's brief.
+const selfReview = createReview({
   writer: assistantEngine,
   text: textWriter,
   idle: galleryIdle,
-  allowed: (ownerId) => Boolean(dream.access(ownerId)),
+  allowed: promptAssistantOwner,
   items: idleItems,
   changes: galleryChangeCount,
   visible: hasGalleryMedia,
   projects: (ownerId) => projects.list(ownerId),
-  explicit: (ownerId) => Boolean(dream.access(ownerId)?.uncensored),
+  rules: (ownerId) => taste.read(ownerId).rules,
+  explicit: explicitFor,
   image: smallImage,
   save: (item, review) => updateGalleryJob(galleryKey(item), { review }),
 });
@@ -1225,7 +1226,7 @@ generationQueue.start();
 dream.start();
 finishing.start();
 captioner.start();
-dreamReview.start();
+selfReview.start();
 imageSearch.start();
 faceCheck.start();
 titler.start();
