@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import test, { after } from "node:test";
 
 import express from "express";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-account-export-"));
+import { temporaryFolder } from "../fixtures/temporary.js";
+
+const temporary = temporaryFolder("studio-account-export-");
 const output = path.join(temporary, "output");
 process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
 process.env.STUDIO_MEDIA_DIR = output;

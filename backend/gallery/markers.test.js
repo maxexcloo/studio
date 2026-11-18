@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-markers-"));
+import { temporaryFolder } from "../fixtures/temporary.js";
+
+const temporary = temporaryFolder("studio-markers-");
 const dataDir = path.join(temporary, "data");
 fs.mkdirSync(path.join(dataDir, ".thumbnails"), { recursive: true });
 process.env.STUDIO_DATA_DIR = dataDir;

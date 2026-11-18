@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-thumbs-"));
+import { temporaryFolder } from "./fixtures/temporary.js";
+
+process.env.STUDIO_DATA_DIR = temporaryFolder("studio-thumbs-");
 const { sweepThumbnails } = await import("./thumbnails.js");
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-thumb-cache-"));
-test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+const dir = temporaryFolder("studio-thumb-cache-");
 
 const hour = 60 * 60 * 1000;
 function thumbnail(name, bytes, usedHoursAgo, now) {
