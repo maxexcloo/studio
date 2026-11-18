@@ -1,6 +1,10 @@
 :root {
   --studio-composer-gap: 1rem;
 }
+html,
+body {
+  overscroll-behavior-x: none;
+}
 a {
   color: inherit;
 }
