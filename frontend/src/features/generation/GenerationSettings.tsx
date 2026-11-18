@@ -14,6 +14,7 @@ import { Fragment, type ReactNode } from "react";
 
 import { titleCase } from "../../../../shared/titles";
 import type { GenerationInput, Profile } from "../../types";
+import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { iconChipProps } from "./chip";
 import { controlRange, stepsRange } from "./payload";
@@ -266,7 +267,7 @@ export function GenerationSettings({
         ),
       },
     );
-  fields.sort((a, b) => a.label.localeCompare(b.label));
+  fields.sort((a, b) => compareNames(a.label, b.label));
   const content = (
     <Stack gap="sm">
       {fields.map(({ label, control }) => (

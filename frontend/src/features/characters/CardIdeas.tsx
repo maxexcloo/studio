@@ -7,6 +7,7 @@ import type { CardKind } from "../../../../shared/characters";
 import { post } from "../../api";
 import type { ReferenceAsset } from "../../types";
 import { type Action, ActionMenuItems } from "../../ui/ActionBar";
+import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { UndoButton, assistMenu, suggested } from "../generation/AskChange";
@@ -60,7 +61,7 @@ export function useCardIdeas({
       if (request) pick(answer.options[0]);
     },
   });
-  const options = [...(ideas.data?.options ?? [])].sort((a, b) => a.localeCompare(b));
+  const options = [...(ideas.data?.options ?? [])].sort(compareNames);
   const loading = again.isPending || (ideas.isFetching && !options.length);
   const noun = nouns[field];
   const suggestions = suggested(

@@ -6,7 +6,7 @@ import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
-import { DataTable } from "../../ui/DataTable";
+import { DataTable, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
@@ -176,7 +176,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const stats = useQuery(profileStatsQuery).data?.profiles;
   const families = [
     ...new Set(profiles.flatMap((entry) => (entry.family ? [entry.family] : []))),
-  ].sort((a, b) => modelFamilyLabel(a).localeCompare(modelFamilyLabel(b)));
+  ].sort((a, b) => compareNames(modelFamilyLabel(a), modelFamilyLabel(b)));
   const profileRows = family ? profiles.filter((entry) => entry.family === family) : profiles;
   // Runs record the runtime id, `custom:` plus the definition's id.
   const statsOf = (id: string) => stats?.[`custom:${id}`] || stats?.[id];

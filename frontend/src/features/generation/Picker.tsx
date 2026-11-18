@@ -36,6 +36,7 @@ import {
 import { menuWidth } from "../../theme";
 import { ClearButton } from "../../ui/ClearButton";
 import { DialogFooter } from "../../ui/ConfirmDialog";
+import { compareNames } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
@@ -624,9 +625,9 @@ export function savedItems<T extends SavedItem>(items: T[], query: string, sort:
     .filter(({ item }) => !terms || item.name.toLocaleLowerCase().includes(terms))
     .sort((a, b) =>
       sort === "name-asc"
-        ? a.item.name.localeCompare(b.item.name)
+        ? compareNames(a.item.name, b.item.name)
         : sort === "name-desc"
-          ? b.item.name.localeCompare(a.item.name)
+          ? compareNames(b.item.name, a.item.name)
           : sort === "newest"
             ? b.at - a.at
             : a.at - b.at,
@@ -865,7 +866,7 @@ export function SavedName<T extends SavedItem>({
     ? []
     : records
         .filter((record) => text === null || key(record.name).includes(key(typed)))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => compareNames(a.name, b.name));
   const actions: { value: string; label: string }[] = [];
   if (typed && !taken) {
     if (mode !== "rename" && canSave)

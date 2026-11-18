@@ -28,6 +28,7 @@ import {
 } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, Profile, Rating } from "../../types";
+import { compareNames } from "../../ui/DataTable";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -119,7 +120,7 @@ const loraSortLabels: Record<LoraSort, string> = {
 /** Every LoRA list's order: liked, then unrated, then disliked, each by title. */
 const byRating =
   (ratings: Record<string, Rating>, title: (file: string) => string) => (a: string, b: string) =>
-    ratingOrder(ratings[a]) - ratingOrder(ratings[b]) || title(a).localeCompare(title(b));
+    ratingOrder(ratings[a]) - ratingOrder(ratings[b]) || compareNames(title(a), title(b));
 
 export function useLoraPicker() {
   const [opened, setOpened] = useState(false);
@@ -349,7 +350,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   const listed =
     tab === "liked" ? available.filter((file) => ratings[file] === "liked") : available;
   const families = [...new Set(listed.flatMap(familiesOf).map(loraFamilyId))].sort((a, b) =>
-    modelFamilyLabel(a).localeCompare(modelFamilyLabel(b)),
+    compareNames(modelFamilyLabel(a), modelFamilyLabel(b)),
   );
   // The profile's family until another is chosen; All Families when no LoRA lists it.
   const ownFamily = loraFamilyId(profile?.family || "");
@@ -369,8 +370,8 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
       picker.loraSort === "rating"
         ? byRating(ratings, title)
         : picker.loraSort === "used"
-          ? (a, b) => (uses[b] || 0) - (uses[a] || 0) || title(a).localeCompare(title(b))
-          : (a, b) => (picker.loraSort === "name-desc" ? -1 : 1) * title(a).localeCompare(title(b)),
+          ? (a, b) => (uses[b] || 0) - (uses[a] || 0) || compareNames(title(a), title(b))
+          : (a, b) => (picker.loraSort === "name-desc" ? -1 : 1) * compareNames(title(a), title(b)),
     );
   const selected = new Set(input.loras.map((lora) => lora.name));
   const toggle = (file: string) =>

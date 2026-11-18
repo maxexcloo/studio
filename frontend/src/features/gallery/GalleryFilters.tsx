@@ -20,6 +20,7 @@ import { loraName, profileNameParts } from "../../../../shared/profiles";
 import { titleCase } from "../../../../shared/titles";
 import { api } from "../../api";
 import type { MediaKind, Profile, Rating } from "../../types";
+import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
@@ -148,7 +149,7 @@ function byName(keys: string[], name: (key: string) => string): GalleryFilterOpt
   const named = new Map<string, string[]>();
   for (const key of keys) named.set(name(key), [...(named.get(name(key)) || []), key]);
   return [...named]
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => compareNames(a, b))
     .map(([label, keys]) => ({ value: label, label, keys }));
 }
 

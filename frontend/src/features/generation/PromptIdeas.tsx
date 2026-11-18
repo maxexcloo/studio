@@ -4,6 +4,7 @@ import { useState } from "react";
 import { maxSuggestions } from "../../../../shared/suggestions";
 import type { MediaKind } from "../../types";
 import type { Action } from "../../ui/ActionBar";
+import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { useGroupFeature } from "../auth/AccountGate";
 import { askPromptIdeas, promptIdeasQuery } from "../taste/suggestions";
@@ -34,9 +35,7 @@ export function usePromptIdeas({
     mutationFn: () => askPromptIdeas(kind, true),
     onSuccess: (answer) => client.setQueryData(query.queryKey, answer),
   });
-  const list = [...(ideas.data?.suggestions ?? [])]
-    .slice(0, maxSuggestions)
-    .sort((a, b) => a.localeCompare(b));
+  const list = [...(ideas.data?.suggestions ?? [])].slice(0, maxSuggestions).sort(compareNames);
   const loading = refresh.isPending || ((ideas.isPending || ideas.isFetching) && !list.length);
   const { options, again } = suggested(
     loading,
