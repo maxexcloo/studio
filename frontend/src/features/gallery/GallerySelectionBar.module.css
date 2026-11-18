@@ -1,5 +1,6 @@
 /* The toolbar holding the bar sticks it and draws its rule. The actions end the count's row, or
-   take one of their own, still at its end, where they don't fit beside it. */
+   take one of their own, still at its end, where they don't fit beside it; phones keep one row
+   that scrolls sideways from the count. */
 .header {
   display: flex;
   flex-wrap: wrap;
@@ -22,14 +23,22 @@
   max-width: 100%;
 }
 
-/* Phone controls share their room compactly (ActionBar's stacked bar), so they move to a row of
-   their own only where the count's row leaves under 40 px for each. */
+:root[data-phone] .header {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
 :root[data-phone] .actions {
-  min-width: min(100%, calc(var(--actions) * 40px));
+  flex-shrink: 0;
+  max-width: none;
 }
 
 :root[data-phone] .actions > * {
+  width: auto;
+  max-width: none;
   margin-inline: auto 0;
+  overflow-x: visible;
 }
 
 .divider {

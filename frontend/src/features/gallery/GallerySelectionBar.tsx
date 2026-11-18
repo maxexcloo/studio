@@ -415,16 +415,10 @@ export function GallerySelectionBar({
             </Button>
           ))}
         </div>
-        <div
-          role="group"
-          aria-label="Selected Item Actions"
-          className={classes.actions}
-          style={{ "--actions": actions.flat().length } as React.CSSProperties}
-        >
+        <div role="group" aria-label="Selected Item Actions" className={classes.actions}>
           <ActionBarGroups
             groups={actions}
             labelled={namedItemActions}
-            fit={phone}
             stacked={phone}
             menuPosition="bottom-end"
           />
