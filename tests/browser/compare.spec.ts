@@ -595,10 +595,11 @@ test("Variants of a result show their numbers, the axis they vary and Undo for t
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect.poll(() => undone).toEqual(["POST"]);
 
-  // The viewer names a result by the number chats use for it.
+  // Details carry no result number.
   await page.getByRole("button", { name: "Open B · Golden Dusk", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   if (testInfo.project.use.isMobile)
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-  await expect(page.getByRole("cell", { name: "#13", exact: true })).toBeVisible();
+  await expect(viewer.getByText("Dimensions", { exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "#13", exact: true })).toHaveCount(0);
 });
