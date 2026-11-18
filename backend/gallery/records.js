@@ -211,6 +211,7 @@ export function generationSettings(body) {
     ...(body.duration ? { duration: Number(body.duration) } : {}),
     ...(body.resolution ? { resolution: String(body.resolution) } : {}),
     ...(body.resolutionTier ? { resolutionTier: String(body.resolutionTier) } : {}),
+    ...(body.quality ? { quality: String(body.quality) } : {}),
     ...(body.rebalance ? { rebalance: String(body.rebalance) } : {}),
     ...(body.transparent ? { transparent: true } : {}),
     // The prompt as typed, before its LoRAs' trigger words, for reuse in the prompt field.

@@ -200,6 +200,7 @@ function generationDetails(
       ["Seed", settings.seed],
       ["Count", !video && Number(settings.count) > 1 ? settings.count : ""],
       ["Resolution", settings.resolution || settings.resolutionTier],
+      ["Quality", titleCase(String(settings.quality || ""))],
       ["Text Encoder", comfyui(fileStem(settings.textEncoder))],
       ["VAE", comfyui(fileStem(settings.vae))],
       ["CLIP Type", comfyui(settings.clipType)],

@@ -6,6 +6,8 @@ export interface CloudRequest {
   height: number;
   duration: number;
   resolution: string;
+  /** Grok Imagine Image 2.0's low, medium or auto quality. */
+  quality?: string;
   count: number;
   reference?: Uint8Array;
   /** A video's last frame, which Grok Imagine Video 1.5 pins. */
@@ -140,6 +142,7 @@ export class CliProxyMedia {
       response_format: "b64_json",
       size: `${input.width}x${input.height}`,
       ...(input.resolution ? { resolution: input.resolution } : {}),
+      ...(input.quality ? { quality: input.quality } : {}),
     };
     let body: object | FormData = fields;
     if (input.model === "grok-imagine-image-2.0") {

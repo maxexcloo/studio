@@ -15,6 +15,8 @@ const resolutions: Record<string, string[]> = {
   "grok-imagine-video-1.5": ["480p", "720p", "1080p"],
   "grok-imagine-video-1.5-lite": ["480p", "720p", "1080p"],
 };
+// Grok Imagine Image 2.0's quality; Auto is low for generation and medium for edits.
+const qualities: Record<string, string[]> = { "grok-imagine-image-2.0": ["auto", "low", "medium"] };
 // Video 1.5 and its Lite tier make sound unless asked not to; only 1.5 pins a last frame.
 const takesSound = (model: string) => model.startsWith("grok-imagine-video-1.5");
 const takesLastFrame = (model: string) => model === "grok-imagine-video-1.5";
@@ -119,6 +121,7 @@ export function studioCloudProfiles(options: ProfileOptions) {
               options: {
                 ...workflow.options,
                 ...(resolutions[model]?.length ? { resolutions: resolutions[model] } : {}),
+                ...(qualities[model] ? { qualities: qualities[model] } : {}),
               },
               imageModes: workflow.imageModes,
             }),
@@ -197,10 +200,14 @@ export function studioCloudProfiles(options: ProfileOptions) {
     const allowed = resolutions[model];
     if (allowed?.length) {
       resolution ||=
-        profile.kind === "video" ? "720p" : Math.max(width, height) > 1024 ? "2k" : "1k";
+        profile.kind === "video" ? "720p" : Math.max(width, height) > 1280 ? "2k" : "1k";
       if (!allowed.includes(resolution))
         throw new Error(`${model} supports ${allowed.join(", ")} resolution, not ${resolution}.`);
     } else if (allowed && resolution) throw new Error(`${model} has no resolution setting.`);
+    // A model without a quality setting ignores one kept from another profile or mode.
+    const quality = qualities[model] ? String(input.quality ?? defaults.quality ?? "") : "";
+    if (quality && !qualities[model].includes(quality))
+      throw new Error(`${model} supports ${qualities[model].join(", ")} quality, not ${quality}.`);
     return {
       kind: profile.kind,
       model,
@@ -209,6 +216,7 @@ export function studioCloudProfiles(options: ProfileOptions) {
       height,
       duration,
       resolution,
+      ...(quality ? { quality } : {}),
       count,
       ...(reference ? { reference } : {}),
       ...(lastFrame ? { lastFrame } : {}),
