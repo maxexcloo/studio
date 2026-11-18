@@ -3,7 +3,6 @@ import { type Ref, memo } from "react";
 import type { ChangeAction } from "../../../../shared/suggestions";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { TextBox } from "../../ui/TextBox";
-import { usePhone } from "../../ui/usePhone";
 import { askDraftChange, askDraftSteps, draftStepsQuery } from "../taste/suggestions";
 import {
   ChangeSuggestions,
@@ -81,6 +80,7 @@ export function PromptFields({
   onChange,
   assistantScope,
   negative,
+  onNegativeWritten,
   textareaRef,
   autoFocus = false,
   fill = false,
@@ -94,6 +94,7 @@ export function PromptFields({
   assistantScope: string;
   /** Shows the negative prompt, for profiles that use one. */
   negative: boolean;
+  onNegativeWritten?: () => void;
   textareaRef?: Ref<HTMLTextAreaElement>;
   /** Lets the surrounding focus trap start in the prompt. */
   autoFocus?: boolean;
@@ -113,6 +114,7 @@ export function PromptFields({
     profile,
     references,
     onChange,
+    onNegativeWritten,
     change: ask?.available
       ? {
           send: ask.sendRequest,
@@ -143,7 +145,12 @@ export function PromptFields({
   const idea = offerIdeas ? ideas.tool : undefined;
   return (
     <>
-      <div className={classes.area} data-fill={fill || undefined} data-text-box="prompt">
+      <div
+        className={classes.area}
+        data-split={negative || undefined}
+        data-fill={fill || undefined}
+        data-text-box="prompt"
+      >
         <TextBox
           ref={textareaRef}
           tools={[idea, assistant.action, history.action].filter((tool) => !!tool)}
@@ -151,7 +158,7 @@ export function PromptFields({
           busy={assistant.working}
           popups={history.popup}
           data-expanded-prompt
-          classNames={{ root: classes.root, wrapper: classes.wrapper, input: classes.input }}
+          classNames={{ input: classes.input }}
           className={proposal ? proposedClass : undefined}
           // The proposal's action names it over the prompt; Generate runs it.
           description={
@@ -163,10 +170,9 @@ export function PromptFields({
           placeholder={
             input.kind === "image" ? "Describe the image" : "Describe the motion and camera"
           }
-          // In the phone sheet the prompt fills the room above the settings instead of growing.
           autosize={!fill}
-          minRows={3}
-          maxRows={10}
+          minRows={negative ? 4 : 3}
+          maxRows={negative ? 4 : 10}
           inline={fill}
           value={input.prompt}
           onChange={(prompt) => onChange({ prompt })}
@@ -186,7 +192,6 @@ export function PromptFields({
   );
 }
 
-/** Memoised, so typing the prompt doesn't render it: the autosized text measures itself each render. */
 const NegativePrompt = memo(function NegativePrompt({
   value,
   onChange,
@@ -196,7 +201,6 @@ const NegativePrompt = memo(function NegativePrompt({
   onChange: (patch: Partial<GenerationInput>) => void;
   fill: boolean;
 }) {
-  const phone = usePhone();
   const history = usePromptHistory({
     kind: "negative",
     value,
@@ -211,10 +215,7 @@ const NegativePrompt = memo(function NegativePrompt({
         variant="unstyled"
         aria-label="Negative Prompt"
         placeholder="Negative prompt: what to leave out"
-        // In the phone sheet it shares the room left with the prompt instead of growing.
-        autosize={!fill}
-        minRows={1}
-        maxRows={phone ? 2 : 4}
+        rows={2}
         inline={fill}
         value={value}
         onChange={(negative) => onChange({ negative })}

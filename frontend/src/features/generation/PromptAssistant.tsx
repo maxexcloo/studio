@@ -89,6 +89,7 @@ export function usePromptAssistant({
   input,
   profile,
   onChange,
+  onNegativeWritten,
   references = [],
   scopeKey = "",
   change,
@@ -96,6 +97,7 @@ export function usePromptAssistant({
   input: GenerationInput;
   profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
+  onNegativeWritten?: () => void;
   references?: ReferenceAsset[];
   scopeKey?: string;
   /**
@@ -124,8 +126,8 @@ export function usePromptAssistant({
   const mounted = useRef(false);
   const scope = useRef(0);
   const undoNotifications = useRef(new Set<string>());
-  const latest = useRef({ input, profile, onChange });
-  latest.current = { input, profile, onChange };
+  const latest = useRef({ input, profile, onChange, onNegativeWritten });
+  latest.current = { input, profile, onChange, onNegativeWritten };
   useEffect(() => {
     mounted.current = true;
     scope.current++;
@@ -278,6 +280,7 @@ export function usePromptAssistant({
           return;
         }
         applyChange("Negative prompt written", { negative: result.negative });
+        current.onNegativeWritten?.();
       } else {
         const offered = new Set(current.profile?.options?.loras || []);
         const usable = (result.loras || []).filter((item) => offered.has(item.name));
