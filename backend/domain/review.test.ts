@@ -87,6 +87,7 @@ test("review scores each unseen project image against its brief and saves it", a
     items: () => items,
     visible: () => true,
     projects: () => [project("beach", { subjects: "the sea", avoid: "people" }), project("empty")],
+    rules: () => [],
     explicit: () => true,
     image: async () => ({ mime: "image/jpeg", data: "" }),
     save: (item, result) => saved.push([String(item.id), result]),
@@ -95,7 +96,66 @@ test("review scores each unseen project image against its brief and saves it", a
   });
   assert.equal(await review.tick(), "done");
   assert.deepEqual(asked, [{ brief: "Subjects: the sea\nAvoid: people", explicit: true }]);
-  assert.deepEqual(saved, [
-    ["beach", { score: 3, miss: "no sea", model: "vision", at: "1970-01-01T00:00:00.000Z" }],
-  ]);
+  assert.deepEqual(
+    saved.map(([id, { brief, ...result }]) => [id, result, typeof brief]),
+    [
+      [
+        "beach",
+        { score: 3, miss: "no sea", model: "vision", at: "1970-01-01T00:00:00.000Z" },
+        "string",
+      ],
+    ],
+  );
+});
+
+test("review checks recent images against their owner's rules, again once the rules change", async () => {
+  const day = 24 * 60 * 60_000;
+  let now = 30 * day;
+  const made = (age: number) => new Date(now - age * day).toISOString();
+  let rules = ["always photographic, never CGI"];
+  const asked: string[] = [];
+  const items: ReviewItem[] = [
+    { id: "old", type: "image", status: "done", createdAt: made(8), prompt: "a fox" },
+    { id: "clip", type: "video", status: "done", createdAt: made(0), prompt: "a fox" },
+    { id: "no", type: "image", status: "done", createdAt: made(0), rating: "disliked" },
+    { id: "new", type: "image", status: "done", createdAt: made(1), prompt: "a fox" },
+  ];
+  const review = createReview({
+    writer: {
+      supportsVision: async () => true,
+      review: async ({ brief }) => (
+        asked.push(brief),
+        { score: 4, miss: "breaks 'never CGI': looks rendered", model: "vision" }
+      ),
+    },
+    idle: () => true,
+    allowed: () => true,
+    text: () => ({ side: "cloud", uncensored: false }),
+    items: () => items,
+    visible: () => true,
+    projects: () => [],
+    rules: () => rules,
+    explicit: () => false,
+    image: async () => ({ mime: "image/jpeg", data: "" }),
+    save: (item, result) => Object.assign(item, { review: result }),
+    now: () => now,
+    log: { info() {} },
+  });
+  assert.equal(await review.tick(), "done");
+  assert.deepEqual(asked, ["Rules:\n- always photographic, never CGI\nPrompt: a fox"]);
+  assert.deepEqual(
+    items.map((item) => [item.id, item.review?.miss]),
+    [
+      ["old", undefined],
+      ["clip", undefined],
+      ["no", undefined],
+      ["new", "breaks 'never CGI': looks rendered"],
+    ],
+  );
+  now += 60_000;
+  assert.equal(await review.tick(), "none");
+  rules = ["never CGI"];
+  now += 60_000;
+  assert.equal(await review.tick(), "done");
+  assert.equal(asked.at(-1), "Rules:\n- never CGI\nPrompt: a fox");
 });
