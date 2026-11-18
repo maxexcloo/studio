@@ -148,19 +148,20 @@ export function SendButton({
 
 /**
  * Suggested options then Refresh, which reads Loading… in their place while they load, and with
- * none one No Suggestions line.
+ * none one line: why they failed (`failure`), or else No Suggestions.
  */
 export function suggested(
   loading: boolean,
   list: Action[],
   refresh: Pick<Action, "disabled" | "onClick">,
+  failure?: string,
 ): { options: Action[]; again: Action } {
   return {
     options: loading
       ? []
       : list.length
         ? list
-        : [{ id: "none", label: "No Suggestions", disabled: true }],
+        : [{ id: "none", label: failure || "No Suggestions", disabled: true }],
     // Never disabled while it works, only inert: a disabled item drops focus out of the open menu.
     again: loading
       ? { id: "refresh", label: "Loading…", icon: icons.refresh, loading: true, keepOpen: true }
@@ -204,6 +205,7 @@ export function useChangeSuggestions<K extends QueryKey>({
       onClick: () => onPick(step.request),
     })),
     { disabled, onClick: () => refresh.mutate() },
+    steps.error?.message || steps.data?.reason,
   );
   const action: Action = {
     id: "suggestions",

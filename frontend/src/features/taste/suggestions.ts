@@ -4,8 +4,13 @@ import type { Change, ChangeAction, NextStep, Suggestions } from "../../../../sh
 import { post } from "../../api";
 import type { MediaKind } from "../../types";
 
-// Studio caches each answer for ten minutes too; a failed ask stays quiet and isn't retried.
-const cached = { staleTime: 10 * 60_000, retry: false } as const;
+// Studio caches each answer for ten minutes too; a failed ask isn't retried, but a reply with
+// none (its reason) is asked again when next wanted.
+const cached = {
+  staleTime: (query: { state: { data?: { reason?: string } } }) =>
+    query.state.data?.reason ? 0 : 10 * 60_000,
+  retry: false,
+} as const;
 
 /** Prompt ideas for an empty composer, from the account's taste profile; `fresh` asks for others. */
 export const askPromptIdeas = (kind: MediaKind, fresh = false) =>

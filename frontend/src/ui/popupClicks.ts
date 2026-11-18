@@ -151,7 +151,39 @@ window.addEventListener(
   },
   true,
 );
-window.addEventListener("pointercancel", () => (closing = false), true);
+// A touch that travels within a popup is a scroll, never a choice. Safari still clicks after a
+// swipe that could not scroll (a list at its end, or one under a dialog's scroll lock).
+const swipeSlop = 10;
+let swiped: { id: number; x: number; y: number; moved: boolean } | null = null;
+window.addEventListener(
+  "pointerdown",
+  (event) => {
+    swiped =
+      event.pointerType === "touch" && (event.target as Element).closest(popupLayer)
+        ? { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false }
+        : null;
+  },
+  true,
+);
+window.addEventListener(
+  "pointermove",
+  (event) => {
+    if (
+      swiped?.id === event.pointerId &&
+      Math.hypot(event.clientX - swiped.x, event.clientY - swiped.y) > swipeSlop
+    )
+      swiped.moved = true;
+  },
+  true,
+);
+window.addEventListener(
+  "pointercancel",
+  () => {
+    closing = false;
+    if (swiped) swiped.moved = true;
+  },
+  true,
+);
 for (const name of ["mousedown", "touchstart"]) {
   window.addEventListener(
     name,
@@ -181,7 +213,14 @@ window.addEventListener(
   "click",
   (event) => {
     // Keyboard activation (detail 0) never follows a press.
-    if (!closing || event.detail === 0) return;
+    if (event.detail === 0) return;
+    if (swiped?.moved) {
+      swiped = null;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (!closing) return;
     closing = false;
     event.preventDefault();
     event.stopPropagation();
