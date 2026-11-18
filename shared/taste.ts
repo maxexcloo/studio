@@ -2,18 +2,22 @@
 export const maxTasteSummary = 1000;
 /** The longest word or tag a taste field holds, in characters. */
 export const maxTastePhrase = 80;
+/** The longest rule, in characters. */
+export const maxTasteRule = 160;
 
 /**
  * A taste profile's fields: words the summariser writes (likes, dislikes as `avoid`, styles and
  * the note) and favourites read from scores (model profile ids, LoRA names, shapes as
  * width-over-height ratios such as "0.67", caption tags). A field the person edits is theirs, and
- * Studio's learning leaves it alone until they hand it back.
+ * Studio's learning leaves it alone until they hand it back. Rules are the person's alone: limits
+ * every prompt written for them keeps ("never fat: always a clear waist"), never a look to aim for.
  */
 export interface TasteFields {
   likes: string[];
   avoid: string[];
   styles: string[];
   note: string;
+  rules: string[];
   models: string[];
   loras: string[];
   shapes: string[];
@@ -25,6 +29,7 @@ export const tasteLimits = {
   avoid: 40,
   styles: 8,
   note: 400,
+  rules: 12,
   models: 8,
   loras: 8,
   shapes: 6,

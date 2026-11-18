@@ -271,7 +271,7 @@ test("Custom needs an instruction and keeps it non-explicit without Uncensored M
   assert.equal((await custom("spicy", "make it explicit")).status, 200);
   assert.match(
     calls.at(-1).messages[0].content,
-    /\nEvery person in it is an adult, 18 or older,[^\n]*Explicit/,
+    /\nEvery person in it must be 18 or older,[^\n]*Explicit/,
   );
 });
 

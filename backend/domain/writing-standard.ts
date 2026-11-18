@@ -42,9 +42,12 @@ export const applyChange =
 export const matchEffort =
   "Match the effort to the input: expand a short prompt the way the guide recommends, and only tidy a detailed one (order, grammar, repeated ideas), keeping its wording where it already works.";
 
-/** Overrides any guide, style or instruction asking for younger people (minor-age.js refuses them). */
+/**
+ * Overrides any guide, style or instruction asking for younger people (minor-age.js refuses them),
+ * without handing the writer words to repeat: "adult" in a prompt pulls faces older and stiffer.
+ */
 const adults = (who: string) =>
-  `${who} is an adult, 18 or older, whatever the guide, style or instruction says: never give them a younger age or call them a teen or a schoolchild.`;
+  `${who} must be 18 or older, whatever the guide, style or instruction says: never give them a younger age or call them a teen or a schoolchild. Describe them naturally (a woman, a man, an age the input gives); never add the word "adult" or an age just to say so.`;
 
 /**
  * The one content rule: `explicit` where the account may have explicit wording (Uncensored

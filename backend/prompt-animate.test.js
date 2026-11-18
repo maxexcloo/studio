@@ -62,7 +62,7 @@ test("each theme asks for its own motion and camera", () => {
   assert.match(theme("living"), /keeps rolling as if the photo were a candid video/);
   assert.match(theme("action"), /energetic action that this frame sets up/);
   assert.match(theme("dialogue"), /the people in the frame talk/);
-  assert.match(theme("spicy"), /already in the frame[\s\S]*Every person in it is an adult/);
+  assert.match(theme("spicy"), /already in the frame[\s\S]*Every person in it must be 18 or older/);
   assert.match(theme("custom"), /instruction decides what happens.*with what is in the frame/);
 });
 
