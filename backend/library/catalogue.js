@@ -30,6 +30,8 @@ export const catalogueKinds = Object.freeze({
   text_encoders: "text_encoder",
   vae: "vae",
   clip_vision: "clip_vision",
+  SEEDVR2: "upscaler",
+  ultralytics_bbox: "detector",
 });
 const editOrigins = new Set(["admin", "import", "ai", "chat"]);
 const layerNames = ["definitions", "provider", "manifest"];

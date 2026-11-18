@@ -38,16 +38,20 @@ interface UpdateChoice {
 const modelKinds: Record<string, string> = {
   checkpoint: "Checkpoint",
   clip_vision: "CLIP Vision",
+  detector: "Detector",
   diffusion_model: "Diffusion Model",
   model: "Model",
   text_encoder: "Text Encoder",
+  upscaler: "Upscaler",
   vae: "VAE",
 };
 const modelFolders: Record<string, string> = {
   checkpoints: "checkpoint",
   clip_vision: "clip_vision",
   diffusion_models: "diffusion_model",
+  SEEDVR2: "upscaler",
   text_encoders: "text_encoder",
+  ultralytics_bbox: "detector",
   vae: "vae",
 };
 const loraTypes: Record<string, string> = {

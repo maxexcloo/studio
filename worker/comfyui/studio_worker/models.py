@@ -21,6 +21,7 @@ FOLDERS = {
     "clip_vision": WEIGHTS,
     "diffusion_models": WEIGHTS,
     "loras": WEIGHTS,
+    "SEEDVR2": WEIGHTS,
     "text_encoders": WEIGHTS,
     "ultralytics_bbox": {".pt"},
     "vae": WEIGHTS,
