@@ -67,23 +67,15 @@ const action =
   });
 
 /**
- * The choices as the viewer's action groups, on one row in the item bar's order: Animate and Edit,
- * then Recreate ▾ holding More Like This and Variations, then the ratings, Accept the filled one. A
- * comparison names all its answers, each with an equal target.
+ * A result's choices as the viewer's action groups, on one row in the item bar's order: Animate and
+ * Edit, then Recreate ▾ holding More Like This and Variations, then the ratings, Accept the filled
+ * one.
  */
 export function viewerChoices(
   card: DeckCard,
   act: (choice: Choice["choice"]) => void,
 ): ViewerActions {
-  const choices = dreamChoices(card).map((group) => group.map(action(act, true)));
-  if (card.kind === "pair")
-    return {
-      label: "Comparison Answers",
-      equal: true,
-      groups: choices,
-      labelled: choices.flat().map((choice) => choice.id),
-    };
-  const all = choices.flat();
+  const all = dreamChoices(card).flatMap((group) => group.map(action(act, true)));
   const pick = (...ids: string[]) => ids.flatMap((id) => all.filter((choice) => choice.id === id));
   const dream = pick("more-like-this", "variations");
   const groups: ActionGroups = [

@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Group,
+  SegmentedControl,
   SimpleGrid,
   Stack,
   Text,
@@ -12,7 +13,7 @@ import {
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { titleCase } from "../../../../shared/titles";
@@ -23,11 +24,12 @@ import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
+import { useRemembered } from "../auth/useRemembered";
 import { projectPath, projectsQuery } from "../dream/queries";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { galleryKey } from "../gallery/queries";
-import { useHoldToSelect } from "../gallery/useGalleryLayout";
+import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
 import type { GalleryState } from "../gallery/viewerLink";
 import { type Comparison, comparisonQuery } from "./queries";
@@ -262,7 +264,12 @@ export function ComparePage() {
   );
 }
 
-/** The variants as a grid that fits the viewport on desktop, or a swiped row of one on phones. */
+type Layout = "side" | "scroll";
+
+/**
+ * The variants side by side in the gallery's columns, every row fitting the viewport, or one at a
+ * time in a swiped row; phones start with the row.
+ */
 function Variants({
   count,
   aspect,
@@ -273,25 +280,12 @@ function Variants({
   children: ReactNode;
 }) {
   const phone = usePhone();
+  const { columns: gallery } = useGalleryColumns();
+  const [saved, setLayout] = useRemembered<Layout | null>("compare-layout", null);
+  const layout = saved ?? (phone ? "scroll" : "side");
   const track = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(0);
-  if (!phone) {
-    const columns = count <= 4 ? count : Math.ceil(count / 2);
-    return (
-      <SimpleGrid
-        cols={columns}
-        spacing="sm"
-        className={classes.grid}
-        style={{
-          "--compare-columns": columns,
-          "--compare-rows": Math.ceil(count / columns),
-          "--compare-aspect": aspect,
-        }}
-      >
-        {children}
-      </SimpleGrid>
-    );
-  }
+  const columns = Math.min(count, gallery);
   const move = (step: number) => {
     const element = track.current!;
     element.scrollTo({ left: (shown + step) * element.clientWidth });
@@ -299,37 +293,70 @@ function Variants({
   return (
     <Stack gap="xs">
       <Group justify="space-between" wrap="nowrap">
-        <ActionIcon
-          variant="default"
-          aria-label="Previous Variant"
-          disabled={shown === 0}
-          onClick={() => move(-1)}
-        >
-          <icons.previous size={20} />
-        </ActionIcon>
-        <Text size="sm" c="dimmed" aria-live="polite">
-          {shown + 1} of {count}
-        </Text>
-        <ActionIcon
-          variant="default"
-          aria-label="Next Variant"
-          disabled={shown === count - 1}
-          onClick={() => move(1)}
-        >
-          <icons.next size={20} />
-        </ActionIcon>
+        <SegmentedControl
+          aria-label="Compare Layout"
+          size="xs"
+          value={layout}
+          onChange={(value) => {
+            setShown(0);
+            setLayout(value as Layout);
+          }}
+          data={[
+            { value: "side", label: "Side by Side" },
+            { value: "scroll", label: "Scroll" },
+          ]}
+        />
+        {layout === "scroll" && (
+          <Group gap="xs" wrap="nowrap">
+            <ActionIcon
+              variant="default"
+              aria-label="Previous Variant"
+              disabled={shown === 0}
+              onClick={() => move(-1)}
+            >
+              <icons.previous size={20} />
+            </ActionIcon>
+            <Text size="sm" c="dimmed" aria-live="polite">
+              {shown + 1} of {count}
+            </Text>
+            <ActionIcon
+              variant="default"
+              aria-label="Next Variant"
+              disabled={shown === count - 1}
+              onClick={() => move(1)}
+            >
+              <icons.next size={20} />
+            </ActionIcon>
+          </Group>
+        )}
       </Group>
-      <div
-        ref={track}
-        className={classes.track}
-        onScroll={(event) =>
-          setShown(
-            Math.round(event.currentTarget.scrollLeft / (event.currentTarget.clientWidth || 1)),
-          )
-        }
-      >
-        {children}
-      </div>
+      {layout === "side" ? (
+        <SimpleGrid
+          cols={columns}
+          spacing="sm"
+          className={classes.grid}
+          style={{
+            "--compare-columns": columns,
+            "--compare-rows": Math.ceil(count / columns),
+            "--compare-aspect": aspect,
+          }}
+        >
+          {children}
+        </SimpleGrid>
+      ) : (
+        <div
+          ref={track}
+          className={classes.track}
+          style={{ "--compare-aspect": aspect } as CSSProperties}
+          onScroll={(event) =>
+            setShown(
+              Math.round(event.currentTarget.scrollLeft / (event.currentTarget.clientWidth || 1)),
+            )
+          }
+        >
+          {children}
+        </div>
+      )}
     </Stack>
   );
 }

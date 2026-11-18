@@ -1,15 +1,33 @@
 import { Text, UnstyledButton } from "@mantine/core";
-import type { CSSProperties } from "react";
+import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 
-import { icons } from "../../ui/icons";
-import { mediaSource } from "../gallery/mediaSource";
 import type { PairDeckCard } from "./deck";
+import { DeckMedia } from "./DeckMedia";
 
 import classes from "./DreamPage.module.css";
 
 export const sideNames = ["A", "B"] as const;
 export const sideLabel = (card: PairDeckCard, index: number) =>
   `${sideNames[index]}${card.labels ? ` · ${card.labels[index]}` : ""}`;
+
+/**
+ * Whether the sides show larger next to each other than one above the other: when the space is
+ * wider, for its height, than one side's shape.
+ */
+function useSideBySide(ratio: number) {
+  const pair = useRef<HTMLDivElement>(null);
+  const [beside, setBeside] = useState(true);
+  useLayoutEffect(() => {
+    const element = pair.current!;
+    const measure = () =>
+      setBeside(element.clientWidth / Math.max(1, element.clientHeight) >= ratio);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ratio]);
+  return { pair, beside };
+}
 
 /** Comparison media opens the shared preview; the bottom bar owns the choices. */
 export function PairContent({
@@ -23,6 +41,8 @@ export function PairContent({
   picked?: 0 | 1;
   view: (index: 0 | 1) => void;
 }) {
+  const [first] = card.items;
+  const { pair, beside } = useSideBySide((first.width || 1) / (first.height || 1));
   return (
     <>
       <div className={classes.caption}>
@@ -33,11 +53,10 @@ export function PairContent({
           {card.pairId ? "Alike but for one thing" : "From your gallery"} · Tap to Look Closer
         </Text>
       </div>
-      <div className={classes.pair}>
+      <div ref={pair} className={classes.pair} data-stacked={!beside || undefined}>
         {card.items.map((item, index) => {
           const side = index as 0 | 1;
           const label = sideLabel(card, side);
-          const source = mediaSource(item);
           return (
             <div
               key={item.id}
@@ -62,11 +81,7 @@ export function PairContent({
                     view(side);
                   }}
                 >
-                  <img
-                    src={item.type === "video" ? source.thumbnailUrl : source.displayUrl}
-                    alt={item.prompt || (item.type === "video" ? "Dream video" : "Dream image")}
-                    draggable={false}
-                  />
+                  <DeckMedia item={item} playing={top} />
                 </div>
                 <UnstyledButton
                   className={classes.side}
@@ -77,7 +92,6 @@ export function PairContent({
                   <Text span size="sm" fw={600} truncate>
                     {label}
                   </Text>
-                  <icons.preview size={14} />
                 </UnstyledButton>
               </div>
             </div>

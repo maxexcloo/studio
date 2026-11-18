@@ -15,10 +15,12 @@ import {
   Stack,
   Text,
   TextInput,
+  Tooltip,
   getDefaultZIndex,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 import { loraName } from "../../../../shared/profiles";
 import {
@@ -260,8 +262,11 @@ function ProjectCard({
   );
 }
 
-/** Dream's projects: each a brief and the constraints a chat attached to it keeps to. */
-export function DreamProjects() {
+/**
+ * Dream's projects: each a brief and the constraints a chat attached to it keeps to. New Project
+ * stands in Dream's toolbar (`actionTarget`).
+ */
+export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement | null }) {
   const client = useQueryClient();
   const projects = useQuery(projectsQuery);
   const models = useQuery(modelsQuery);
@@ -285,6 +290,20 @@ export function DreamProjects() {
   const list = projects.data?.projects || [];
   return (
     <>
+      {actionTarget &&
+        createPortal(
+          <Tooltip label="New Project">
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              aria-label="New Project"
+              onClick={() => setEditing({})}
+            >
+              <icons.add size={18} />
+            </ActionIcon>
+          </Tooltip>,
+          actionTarget,
+        )}
       {projects.isPending ? (
         <LoadingState fill label="Loading Projects" />
       ) : projects.isError ? (
@@ -298,7 +317,6 @@ export function DreamProjects() {
       ) : (
         <ScrollArea flex={1} mih={0}>
           <Stack w="100%" maw={760} mx="auto" gap="sm" pb="md">
-            <Group justify="flex-end">{create}</Group>
             {list.map((project) => (
               <ProjectCard
                 key={project.id}

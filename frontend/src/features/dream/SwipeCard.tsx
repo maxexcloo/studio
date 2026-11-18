@@ -3,6 +3,7 @@ import { type ReactNode, type RefObject, useEffect, useRef } from "react";
 
 import { easing } from "../../theme";
 import { useMotionDuration } from "../../ui/Appearance";
+import { useInSync } from "./DeckMedia";
 
 import classes from "./DreamPage.module.css";
 
@@ -65,6 +66,7 @@ export function SwipeCard({
   const leaving = useRef(false);
   const holding = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(holding.current), []);
+  useInSync(card, !depth);
   /** Ends the press as a hold: the card settles and the release opens nothing. */
   function hold() {
     clearTimeout(holding.current);
