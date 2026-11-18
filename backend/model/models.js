@@ -485,7 +485,12 @@ export function inferModels(
         inpaint:
           workflow.kind === "image" &&
           workflow.capabilities.inpaint !== false &&
-          Boolean(workflow.mediaInputs?.length || workflow.controls?.startImage) &&
+          Boolean(
+            workflow.mediaInputs?.length ||
+            workflow.controls?.startImage ||
+            // Radiance's Qwen may take its image only in Reference mode.
+            (radianceQwen && workflow.imageModes?.reference?.mediaInputs?.length),
+          ) &&
           (radianceImage
             ? radianceQwen
             : imageSaves(workflow.graph).length > 0 &&
