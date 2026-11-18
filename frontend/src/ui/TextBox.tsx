@@ -118,8 +118,6 @@ export function TextBox({
   const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
   useKeyboardDrop(editing, () => close());
-  const bar = useContext(TextToolsBar);
-  const [active, setActive] = useState(false);
   // The text an in-place box had when it took focus: changed since, Reset returns to it.
   const [original, setOriginal] = useState<string>();
   const resetTo = reset ?? (original && value !== original ? original : undefined);
@@ -173,7 +171,19 @@ export function TextBox({
       <span className={classes.editText}>{action.label}</span>
     </Button>
   ));
-  const spins = tools !== undefined && (!phone || editing || ai) && !hideTools;
+  const bar = useContext(TextToolsBar);
+  const [active, setActive] = useState(false);
+  const field = useRef<HTMLTextAreaElement>(null);
+  // Only a box in the bar's own surface, not one in a dialog opened from it, joins the bar. Such a
+  // box shows its tools only there, while typing; at rest the text alone fills its room.
+  const barred =
+    mobile &&
+    inline &&
+    bar !== null &&
+    bar.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]');
+  const inBar = barred && active ? bar : null;
+  const spins =
+    tools !== undefined && (!phone || editing || ai) && !hideTools && (!barred || active);
   const description =
     busy && !spins ? (
       <span className={classes.busy} role="status">
@@ -187,7 +197,6 @@ export function TextBox({
   const resting = oneLine && !focused;
   // The resting line is drawn over the text, since WebKit ends no textarea in an ellipsis; it
   // takes the textarea's font, padding and border so the two line up.
-  const field = useRef<HTMLTextAreaElement>(null);
   const ref = useMergedRef(field, props.ref);
   const line = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
@@ -227,14 +236,6 @@ export function TextBox({
       </ActionIcon>
     </Tooltip>
   );
-  // Only a box in the bar's own surface, not one in a dialog opened from it, joins the bar.
-  const inBar =
-    mobile &&
-    inline &&
-    active &&
-    bar?.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]')
-      ? bar
-      : null;
   const visible = useVisibleRect(menuOpened);
   const bounds = { padding: 12, rootBoundary: visible ?? ("viewport" as const) };
   const menu = !menuless && tools !== undefined && (
@@ -496,8 +497,8 @@ export function TextBox({
       {busy && spins && <VisuallyHidden role="status">{busy}</VisuallyHidden>}
       {/* AI tools remain available beside the summary before its phone editor opens. */}
       {mobile && inline ? (
-        // In place, the text fills the surface with its tools as icons in its corner, or while it
-        // has focus in its form's action bar.
+        // In place, the text fills the surface with its tools as icons in its corner, or only while
+        // it has focus in its form's action bar.
         <div
           className={classes.editor}
           data-text-editor
@@ -521,7 +522,10 @@ export function TextBox({
         >
           <div className={classes.columned}>
             {textarea}
-            {(tools || send) && (inBar ? createPortal(toolGroup, inBar) : toolGroup)}
+            {inBar
+              ? createPortal(toolGroup, inBar)
+              : (tools || send) &&
+                (barred ? send && <div className={classes.corner}>{send}</div> : toolGroup)}
           </div>
           {below && <div className={classes.below}>{below}</div>}
           {popups && <div className={classes.anchor}>{popups}</div>}
