@@ -16,6 +16,19 @@ export const galleryKind = (pathname: string): MediaKind | undefined =>
       ? "video"
       : undefined;
 
+/**
+ * The item a gallery path names, or "". Read from the path itself: React Router's params turn a
+ * literal "%2F" into "/", and a generated item's ID is its media URL, whose subfolder has one.
+ */
+export const viewerPathId = (pathname: string) => {
+  const segment = /^\/(?:images|videos)\/([^/]+)/.exec(pathname)?.[1] || "";
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+};
+
 /** An item's permanent address: `/images/<id>` or `/videos/<id>`. */
 export const viewerPath = (item: { id: string; number?: number; type: MediaKind }) =>
   `${galleryPath(item.type)}/${encodeURIComponent(viewerItemId(item))}`;
