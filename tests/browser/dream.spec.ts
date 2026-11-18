@@ -519,15 +519,17 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   await page.getByRole("button", { name: "View B", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "B", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  // Calibration hears of a disliked image before the rating hides it.
-  await expect.poll(() => dream.requests.length).toBe(5);
-  expect(dream.requests.map((request) => request.body)).toEqual([
-    { liked: ["g1"] },
-    { passed: ["g2"] },
-    { ids: ["g2"], rating: "disliked" },
-    { liked: ["g3"] },
-    { liked: ["g5"], passed: ["g4"] },
-  ]);
+  // Dislike applies its rating in the same calibration request.
+  await expect
+    .poll(() => dream.requests)
+    .toEqual(
+      [
+        { liked: ["g1"] },
+        { passed: ["g2"], rating: "disliked" },
+        { liked: ["g3"] },
+        { liked: ["g5"], passed: ["g4"] },
+      ].map((body) => ({ method: "POST", path: "/api/dream/calibration", body })),
+    );
 });
 
 test("A Dream comparison asks its question and answers with swipes, keys and buttons", async ({
