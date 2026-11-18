@@ -1,6 +1,6 @@
 /**
- * Library › Profiles › Combine Backends: an administrator's explicit, repeatable action, never run
- * at startup. It makes one profile of a model's Radiance and ComfyUI profiles.
+ * Combine Backends (MCP combine_backends tool): an administrator's explicit, repeatable action,
+ * never run at startup. It makes one profile of a model's Radiance and ComfyUI profiles.
  *
  * Candidates are pairs of profiles of the same kind, family and model name (the name's first
  * segment, "Krea 2 Turbo" in "Krea 2 Turbo · Radiance · Fast · 8 Steps"): one whose graph runs on

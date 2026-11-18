@@ -6,12 +6,6 @@ import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSecti
 import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
 export const librarySections = {
-  chatBrief: {
-    label: "Chat Brief",
-    description: "Standing rules every chat keeps to, so you needn't repeat them.",
-    icon: icons.chat,
-    group: "AI",
-  },
   presets: {
     label: "Presets",
     description:
@@ -65,14 +59,6 @@ export const librarySections = {
     admin: true,
     group: "Generation",
   },
-  downloads: {
-    label: "Downloads",
-    description:
-      "Model files downloading for the Library. A stopped download resumes from its part.",
-    icon: icons.download,
-    admin: true,
-    apart: true,
-  },
   files: {
     label: "Files",
     description:
@@ -90,7 +76,7 @@ export const librarySections = {
     apart: true,
   },
 };
-/** Administrators see the whole Library; other accounts only their Chat Brief, Presets and cards. */
+/** Administrators see the whole Library; other accounts only their Presets and cards. */
 export function useLibraryNavigation() {
   const admin = useIsAdmin();
   const characters = useGroupFeature("characters");

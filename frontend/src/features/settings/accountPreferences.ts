@@ -1,7 +1,6 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { Appearance } from "../../../../shared/appearance";
-import type { ChatBrief } from "../../../../shared/chat-brief";
 import { api } from "../../api";
 import { accountQuery, useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
@@ -26,8 +25,6 @@ interface PreferenceValues {
   loras: boolean;
   tileCaptions: boolean;
   uncensoredModels: boolean;
-  /** The standing brief every chat writes its prompts to; unsaved, none. */
-  chatBrief?: ChatBrief;
   /** Which unfinished work the gallery shows; unsaved, none. */
   galleryWork?: GalleryWorkPreference;
   /** Where images run by default; unsaved (and Cloud while Cloud Models is off), Local. */

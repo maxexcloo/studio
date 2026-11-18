@@ -10,6 +10,7 @@ import {
   image,
   openReferenceChoices,
   pickerTab,
+  pressGenerate,
   profiles,
   serveProfiles,
   showReferenceStack,
@@ -137,7 +138,7 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
       .click();
   }
   await closeReferences(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   const expected = slots.map((slot, index) => ({ assetId: `upload-${index + 1}`, slot: slot.id }));
   [expected[8], expected[9]] = [expected[9], expected[8]];

@@ -7,6 +7,7 @@ import {
   fixtures,
   image,
   openReferenceChoices,
+  pressGenerate,
   profiles,
   serveProfiles,
   showReferenceStack,
@@ -95,7 +96,7 @@ test("Multiple owned references preserve order, role identity and capacity throu
   await expect(page.getByRole("dialog", { name: "References", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1 · Inputs", exact: true })).toBeVisible();
   await expect(page.getByRole("img", { name: "Reference 3 · End", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   const expected = [
     { assetId: "asset-second", slot: "images" },
@@ -184,7 +185,7 @@ test("Removing a picked reference keeps its upload, one upload fills several slo
   await expect(slots.getByRole("button", { name: "Slot 2 · Inputs", exact: true })).toBeVisible();
   expect(state.gallery.filter((item) => item.uploaded)).toHaveLength(2);
   await closeReferences(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toEqual([
     { assetId: "asset-kept", slot: "images" },
@@ -261,7 +262,7 @@ test("Each reference takes one Strength: a guiding one its own, an img2img start
   await expect(strength).toHaveValue("0.6");
   await strength.fill("1.2");
   await closeReferences(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toEqual([
     { assetId: "asset-first", slot: "image" },

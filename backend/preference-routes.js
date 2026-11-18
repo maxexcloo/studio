@@ -6,7 +6,6 @@ import {
   savedPreferenceKeys,
 } from "./account-preferences.js";
 import { groupGrants } from "./account-store.js";
-import { directRoute } from "./domain/direct-route.ts";
 
 /**
  * Settings › Preferences: the caller's own preferences, and which personal features (Cloud Models,
@@ -38,21 +37,5 @@ export function registerPreferenceRoutes(app) {
         });
     saveAccountPreferences(ownerIdForRequest(req), patch);
     res.json(show(req));
-  });
-  // The chat brief alone, for MCP's brief tool: a change sets only the fields it names.
-  const brief = (account) => accountPreferences(account?.userId || "").chatBrief || {};
-  directRoute(app, "GET", "/api/chat-brief", (account) => ({
-    status: 200,
-    payload: { brief: brief(account) },
-  }));
-  directRoute(app, "PATCH", "/api/chat-brief", (account, { body }) => {
-    try {
-      saveAccountPreferences(account?.userId || "", {
-        chatBrief: { ...brief(account), ...body },
-      });
-      return { status: 200, payload: { brief: brief(account) } };
-    } catch (error) {
-      return { status: 400, payload: { ok: false, error: error.message } };
-    }
   });
 }

@@ -6,9 +6,11 @@ import {
   closeReferences,
   combinedImageProfile,
   create,
+  finishTyping,
   fixtures,
   image,
   openReferenceChoices,
+  pressGenerate,
   serveProfiles,
   showUploads,
 } from "./fixtures";
@@ -73,6 +75,7 @@ test("Switching image backends changes reference capacity and preserves an overs
   await closeReferences(page);
   await backend.click();
   await page.getByRole("option", { name: "Radiance", exact: true }).click();
+  await finishTyping(page);
   const generate = page.getByRole("button", { name: "Generate Image", exact: true });
   await expect(generate).toHaveAttribute("aria-disabled", "true");
   await expect(generate).toHaveAttribute("aria-description", /at most 4 reference images/);
@@ -126,7 +129,7 @@ test("A text-only Radiance default sends a run with references to ComfyUI", asyn
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText("0/8");
   await closeLoras(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toHaveLength(1);
 });

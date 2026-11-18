@@ -7,6 +7,7 @@ import {
   image,
   openLoraChoices,
   openNav,
+  pressGenerate,
   profiles,
   section,
   selectionMenuItem,
@@ -198,7 +199,7 @@ test("Compare ▾ builds variants across a LoRA's strengths and across models", 
   await search.press("Escape");
   await expect(models).toBeVisible();
   await start(page);
-  await page.getByRole("button", { name: "Compare 2", exact: true }).click();
+  await pressGenerate(page, "Compare 2");
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   const requests = state.comparisons[0].requests;
   expect(
@@ -249,7 +250,7 @@ test("Compare searches a long model list, reaches its last choice and retains th
   } else await search.press("Escape");
   await expect(setup).toBeVisible();
   await start(page);
-  await page.getByRole("button", { name: "Compare 2", exact: true }).click();
+  await pressGenerate(page, "Compare 2");
   await expect.poll(() => state.comparisons.length).toBe(1);
   expect(state.comparisons[0].requests.map((variant: any) => variant.input.profileId)).toEqual([
     "image:test",
@@ -291,7 +292,7 @@ test("Compare stages compatible LoRAs from an empty stack and only the model's n
   await page.getByRole("option", { name: "2K", exact: true }).click();
   await sizes.press("Escape");
   await start(page);
-  await page.getByRole("button", { name: "Compare 2", exact: true }).click();
+  await pressGenerate(page, "Compare 2");
   await expect.poll(() => state.comparisons.length).toBe(1);
   const requests = state.comparisons[0].requests;
   expect(requests.map((variant: any) => [variant.input.width, variant.input.height])).toEqual([
@@ -321,7 +322,7 @@ test("Compare preserves provider resolution enum values without converting them 
   await page.getByRole("option", { name: "2K", exact: true }).click();
   await choices.press("Escape");
   await start(page);
-  await page.getByRole("button", { name: "Compare 2", exact: true }).click();
+  await pressGenerate(page, "Compare 2");
   await expect.poll(() => state.comparisons.length).toBe(1);
   expect(state.comparisons[0].requests.map((variant: any) => variant.input.resolution)).toEqual([
     "1k",
@@ -420,7 +421,7 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   await expect(variants(page).getByRole("radio", { name: "B", exact: true })).toBeChecked();
   await expect(page.getByRole("button", { name: "Clear Seed 1234567", exact: true })).toBeVisible();
   await prompt(page).fill("A jade bird");
-  await page.getByRole("button", { name: "Compare 2", exact: true }).click();
+  await pressGenerate(page, "Compare 2");
 
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   const [run] = state.comparisons;
@@ -440,7 +441,7 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   await expect(prompt(page)).toHaveValue("A jade bird");
   await variants(page).getByText("B", { exact: true }).click();
   await prompt(page).fill("A jade bird in flight");
-  await page.getByRole("button", { name: "Compare 2", exact: true }).click();
+  await pressGenerate(page, "Compare 2");
   await expect(page).toHaveURL(/\/compare\/compare-2$/);
   expect(state.comparisons[1].requests.map((variant: any) => variant.input.prompt)).toEqual([
     "A jade bird",
