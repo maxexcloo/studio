@@ -39,7 +39,13 @@ function session(model: string) {
   return loading;
 }
 
-parentPort!.on("message", async ({ id, model, input, type, data, dims, outputs }: InferRequest) => {
+parentPort!.on("message", async (request: InferRequest | "end") => {
+  // Released explicitly: ending the thread leaves the models' native memory allocated.
+  if (request === "end") {
+    for (const loading of sessions.values()) await (await loading.catch(() => null))?.release();
+    process.exit();
+  }
+  const { id, model, input, type, data, dims, outputs } = request;
   try {
     const result = await (await session(model)).run({ [input]: new ort.Tensor(type, data, dims) });
     const sent = Object.fromEntries(

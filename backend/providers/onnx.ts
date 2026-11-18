@@ -95,41 +95,52 @@ export function createModelFiles({
   };
 }
 
-/** Runs ONNX models in one worker thread (providers/onnx-worker.ts), off the event loop. */
+/**
+ * Runs ONNX models in one worker thread (providers/onnx-worker.ts), off the event loop. A worker
+ * left idle for ten minutes ends, returning its loaded models' memory; the next run starts another.
+ */
 export function createOnnxRunner(name: string) {
-  let worker: Worker | null = null;
-  const calls = new Map<
-    number,
-    { resolve(outputs: Record<string, Float32Array>): void; reject(error: Error): void }
-  >();
+  type Call = { resolve(outputs: Record<string, Float32Array>): void; reject(error: Error): void };
+  let current: { worker: Worker; calls: Map<number, Call> } | null = null;
+  let idle: NodeJS.Timeout | undefined;
   let callCount = 0;
   function startWorker() {
-    const started = new Worker(new URL("./onnx-worker.ts", import.meta.url));
-    started.on("message", ({ id, outputs, error }) => {
+    const worker = new Worker(new URL("./onnx-worker.ts", import.meta.url));
+    const calls = new Map<number, Call>();
+    const started = { worker, calls };
+    worker.on("message", ({ id, outputs, error }) => {
       const call = calls.get(id);
       calls.delete(id);
-      // Held open only while it has work, so an idle worker never keeps Studio from exiting.
-      if (!calls.size) started.unref();
+      if (!calls.size) {
+        // Held open only while it has work, so an idle worker never keeps Studio from exiting.
+        worker.unref();
+        idle = setTimeout(() => {
+          if (current === started) current = null;
+          worker.postMessage("end");
+        }, 10 * 60_000).unref();
+      }
       if (error) call?.reject(new Error(error));
       else call?.resolve(outputs);
     });
     const fail = (error: Error) => {
-      if (worker === started) worker = null;
+      if (current === started) current = null;
       for (const call of calls.values()) call.reject(error);
       calls.clear();
     };
-    started.on("error", fail);
-    started.on("exit", (code) => fail(new Error(`The ${name} worker exited (${code}).`)));
+    worker.on("error", fail);
+    worker.on("exit", (code) => fail(new Error(`The ${name} worker exited (${code}).`)));
     return started;
   }
   return {
     /** The named `outputs` of `model` for one input tensor. */
     run(request: Omit<InferRequest, "id">) {
+      clearTimeout(idle);
       const id = (callCount += 1);
+      current ||= startWorker();
+      const { worker, calls } = current;
       const result = new Promise<Record<string, Float32Array>>((resolve, reject) =>
         calls.set(id, { resolve, reject }),
       );
-      worker ||= startWorker();
       worker.ref();
       worker.postMessage({ id, ...request }, [request.data.buffer as ArrayBuffer]);
       return result;

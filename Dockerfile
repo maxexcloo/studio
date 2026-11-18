@@ -14,9 +14,13 @@ RUN if [ "$STUDIO_PREBUILT" = 1 ]; then test -f dist/index.html; else npm run bu
 
 FROM node:26.13.1-trixie-slim AS runtime
 
+# glibc otherwise keeps freed native memory (libvips, ONNX models) fragmented in its heaps and
+# per-thread arenas; allocations over 128 KiB are mapped instead, so freeing returns them.
 ENV STUDIO_DATA_DIR=/data \
     STUDIO_ENV_FILE=/data/.env \
     HOST=0.0.0.0 \
+    MALLOC_ARENA_MAX=2 \
+    MALLOC_MMAP_THRESHOLD_=131072 \
     NODE_ENV=production \
     PORT=8787
 
