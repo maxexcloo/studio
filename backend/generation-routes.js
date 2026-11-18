@@ -400,7 +400,12 @@ export function createGenerationSubmission({
     // A mask was sent but nothing in it was painted, so this runs as a plain edit. Kept with the
     // result, so Details says the mask went unused.
     body.maskSkipped = Boolean(input.inpaint?.mask && !body.inpaint);
-    if (input.inpaint && !body.inpaint && body.referenceAssets?.length) {
+    if (
+      input.inpaint &&
+      !body.inpaint &&
+      body.referenceAssets?.length &&
+      !isRadianceWorker(workerById(backend))
+    ) {
       try {
         const [first, ...others] = body.referenceAssets;
         const [replacement] = await stageReferenceAssetsForAccount(backend, account, [first], {

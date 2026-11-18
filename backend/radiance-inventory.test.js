@@ -256,3 +256,81 @@ test("a Radiance profile that loads reference images is offered", async () => {
   assert.equal(offered.capabilities.inpaintStitch, false);
   assert.equal(offered.capabilities.transparent, true);
 });
+
+test("a masked Qwen edit on Radiance keeps its mask and stages nothing in ComfyUI", async () => {
+  const { inferModels } = await import("./model/models.js");
+  const { createGenerationSubmission } = await import("./generation-routes.js");
+  const model = "qwen-image-2.1-turbo-iq8r";
+  const controls = Object.fromEntries(
+    ["model", "prompt", "width", "height"].map((input) => [input, { node: "1", input }]),
+  );
+  saveImportedWorkflow({
+    studio: {
+      id: "qwen-reference-mode",
+      kind: "image",
+      family: "qwen_image_21",
+      defaults: { model, width: 1344, height: 1344 },
+      controls,
+      imageModes: {
+        reference: {
+          controls,
+          mediaInputs: [
+            {
+              id: "reference",
+              kind: "image",
+              label: "Reference Image",
+              control: { input: "image", node: "3" },
+              max: 1,
+            },
+          ],
+          graph: {
+            1: {
+              class_type: "RadianceImageGenerate",
+              inputs: { model, "images.image_1": ["3", 0] },
+            },
+            2: { class_type: "SaveImage", inputs: { images: ["1", 0] } },
+            3: { class_type: "LoadImage", inputs: { image: "reference.png" } },
+          },
+        },
+      },
+    },
+    graph: {
+      1: { class_type: "RadianceImageGenerate", inputs: { model } },
+      2: { class_type: "SaveImage", inputs: { images: ["1", 0] } },
+    },
+  });
+  const stats = { radiance: [{ id: model, state: "cold" }] };
+  const info = radianceInfo(stats.radiance);
+  const models = inferModels(info, stats);
+  const profile = models.profiles.find((item) => item.id === "custom:qwen-reference-mode");
+  assert.equal(profile.capabilities.inpaint, true);
+  const routes = createGenerationSubmission({
+    loadComfyContext: async () => ({ info, stats }),
+    mediaModels: async () => ({ models }),
+    comfyDownMessage: (_backend, message) => message,
+  });
+  const submit = (id, inpaint) =>
+    routes.submitGeneration({
+      id,
+      backend: "radiance",
+      ownerId: "",
+      createdAt: new Date().toISOString(),
+      input: {
+        kind: "image",
+        profileId: profile.id,
+        workflow: profile.workflow,
+        model: profile.model,
+        prompt: "A red door",
+        referenceAssets: [{ slot: "reference", assetId: "door" }],
+        inpaint,
+      },
+    });
+  requests.length = 0;
+  const masked = await submit("masked-qwen", { mask: "data:image/png;base64,iVBORw0KGgo=" });
+  assert.equal(masked.status, 200, JSON.stringify(masked.payload));
+  assert.equal(masked.payload.items[0].settings.maskSkipped, undefined);
+  // An unpainted mask runs as a plain edit, whose reference Radiance uploads itself.
+  const unpainted = await submit("unpainted-qwen", { mask: "" });
+  assert.equal(unpainted.status, 200, JSON.stringify(unpainted.payload));
+  assert.ok(!requests.some((route) => route.includes("/upload/image")), requests.join(", "));
+});
