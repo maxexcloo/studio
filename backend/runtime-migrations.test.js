@@ -45,7 +45,7 @@ test("the migrations route answers administrators with every step's plan, and lo
     imageSizeDefaults: { applied, profiles: [] },
     whereWorkRuns: { applied, accounts: 0 },
     localTextAuto: { applied, accounts: 0 },
-    profileAliases: { applied, aliases: 0, records: 0, renames: {} },
+    profileAliases: { applied, aliases: 0, records: 0, renames: {}, unmatched: {} },
     flux2Records: {
       applied,
       records: 0,

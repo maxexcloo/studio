@@ -26,9 +26,9 @@ import { whereWorkRuns } from "./where-work-runs.js";
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
  * and POST /api/maintenance/migrations. `changes(plan)` counts what a step's plan lists to do.
  * An `online` step may apply while Studio runs: no request writes between its read and its write
- * (the steps are synchronous, or write through the server's own store), and `reload` then makes
- * the running server read what it wrote. Any other step writes state the server holds and cannot
- * reload, so it needs Studio stopped.
+ * (each read and its write happen in one turn, or go through the server's own store), and `reload`
+ * then makes the running server read what it wrote. Any other step writes state the server holds
+ * and cannot reload, so it needs Studio stopped.
  */
 // Gallery, queue, Dream and MCP copies go with the restart that follows (profile-aliases.js).
 function reloadProfileRecords(dataDir) {
