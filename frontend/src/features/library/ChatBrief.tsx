@@ -1,19 +1,12 @@
-import { Alert, Button, Stack, TextInput } from "@mantine/core";
+import { Alert, Button, Group, Stack, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 
-import {
-  type ChatBrief as Brief,
-  briefSummary,
-  briefTexts,
-  maxBriefText,
-} from "../../../../shared/chat-brief";
+import { type ChatBrief as Brief, briefTexts, maxBriefText } from "../../../../shared/chat-brief";
 import { api } from "../../api";
-import { DialogFooter } from "../../ui/ConfirmDialog";
+import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader } from "../../ui/SectionToolbar";
-import { SettingRow } from "../../ui/SettingRows";
-import { CardDialog, CardForm } from "../characters/CardImages";
 import { type PreferencesStatus, preferencesQuery } from "../settings/accountPreferences";
 
 const labels: Record<(typeof briefTexts)[number], string> = {
@@ -25,8 +18,8 @@ const labels: Record<(typeof briefTexts)[number], string> = {
   rules: "Banned Changes & Rules",
 };
 
-/** The brief's fields, each saved as given; an empty one clears. */
-function BriefForm({ brief, close }: { brief: Brief; close: () => void }) {
+/** The brief's fields, edited in place and saved as given; an empty one clears. */
+function BriefForm({ brief }: { brief: Brief }) {
   const client = useQueryClient();
   const form = useForm({
     initialValues: Object.fromEntries(briefTexts.map((key) => [key, brief[key] ?? ""])) as Record<
@@ -43,11 +36,18 @@ function BriefForm({ brief, close }: { brief: Brief; close: () => void }) {
       }),
     onSuccess: (status) => {
       client.setQueryData(preferencesQuery.queryKey, status);
-      close();
+      form.resetDirty();
     },
   });
   return (
-    <CardForm onSubmit={() => save.mutate()}>
+    <Stack
+      component="form"
+      aria-label="Brief"
+      onSubmit={(event) => {
+        event.preventDefault();
+        save.mutate();
+      }}
+    >
       {briefTexts.map((key) => (
         <TextInput
           key={key}
@@ -57,32 +57,26 @@ function BriefForm({ brief, close }: { brief: Brief; close: () => void }) {
         />
       ))}
       {save.error && <Alert color="red">{save.error.message}</Alert>}
-      <DialogFooter pending={save.isPending} onCancel={close}>
+      <Group justify="flex-end">
         <Button type="submit" disabled={!form.isDirty()} loading={save.isPending}>
           Save
         </Button>
-      </DialogFooter>
-    </CardForm>
+      </Group>
+    </Stack>
   );
 }
 
 /** Library › Chat Brief: the standing brief every chat writes its prompts to. */
 export function LibraryChatBrief({ heading }: { heading: ReactNode }) {
   const status = useQuery(preferencesQuery).data;
-  const [editing, setEditing] = useState(false);
-  if (!status) return <SectionHeader heading={heading}>{null}</SectionHeader>;
-  const brief = status.preferences.chatBrief ?? {};
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>{null}</SectionHeader>
-      <SettingRow label="Brief" description={briefSummary(brief) || "No rules yet."}>
-        <Button size="compact-sm" variant="default" onClick={() => setEditing(true)}>
-          Edit
-        </Button>
-        <CardDialog opened={editing} onClose={() => setEditing(false)} title="Chat Brief">
-          {editing && <BriefForm brief={brief} close={() => setEditing(false)} />}
-        </CardDialog>
-      </SettingRow>
+      {status ? (
+        <BriefForm brief={status.preferences.chatBrief ?? {}} />
+      ) : (
+        <LoadingState label="Loading Chat Brief" />
+      )}
     </Stack>
   );
 }

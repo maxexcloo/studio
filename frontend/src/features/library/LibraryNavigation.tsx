@@ -60,11 +60,18 @@ export const librarySections = {
   },
   promptStyles: {
     label: "Prompt Styles",
-    description:
-      "Shared assistant styles and templates for Improve Prompt, Animate and Edit. Every saved version is kept.",
+    description: "Shared assistant styles and templates for Improve Prompt, Animate and Edit.",
     icon: icons.assistant,
     admin: true,
     group: "Generation",
+  },
+  downloads: {
+    label: "Downloads",
+    description:
+      "Model files downloading for the Library. A stopped download resumes from its part.",
+    icon: icons.download,
+    admin: true,
+    apart: true,
   },
   files: {
     label: "Files",
@@ -77,7 +84,7 @@ export const librarySections = {
   imports: {
     label: "Imports",
     description:
-      "Shared models and recipes from Civitai, Hugging Face or recipe images, and their downloads.",
+      "Shared models and recipes from Civitai, Hugging Face or recipe images, and the files they need.",
     icon: icons.import,
     admin: true,
     apart: true,

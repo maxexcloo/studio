@@ -10,28 +10,28 @@ import {
   stamp,
 } from "./fixtures";
 
-test("Chat Brief edits and restores the account's standing rules", async ({ page }) => {
+test("Chat Brief edits in place and restores the account's standing rules", async ({ page }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "member", role: "user" });
   await page.goto("/library#chatBrief");
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
-  const editor = page.getByRole("dialog", { name: "Chat Brief", exact: true });
-  await editor.getByRole("textbox", { name: "Subjects", exact: true }).fill("Portraits");
-  await editor.getByRole("textbox", { name: "Ethnicity", exact: true }).fill("Asian");
-  await editor
+  const brief = page.getByRole("form", { name: "Brief", exact: true });
+  const save = brief.getByRole("button", { name: "Save", exact: true });
+  await expect(save).toBeDisabled();
+  await brief.getByRole("textbox", { name: "Subjects", exact: true }).fill("Portraits");
+  await brief.getByRole("textbox", { name: "Ethnicity", exact: true }).fill("Asian");
+  await brief
     .getByRole("textbox", { name: "Banned Changes & Rules", exact: true })
     .fill("Keep the outfit");
-  await editor.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(editor).toBeHidden();
+  await save.click();
+  await expect(save).toBeDisabled();
   expect(state.preferences.preferences.chatBrief).toMatchObject({
     subjects: "Portraits",
     ethnicity: "Asian",
     rules: "Keep the outfit",
   });
   await page.reload();
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(
-    editor.getByRole("textbox", { name: "Banned Changes & Rules", exact: true }),
+    brief.getByRole("textbox", { name: "Banned Changes & Rules", exact: true }),
   ).toHaveValue("Keep the outfit");
 });
 
@@ -329,19 +329,26 @@ test("Settings › Preferences saves where each kind runs and its default models
 
   const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
   // Text's defaults offer the gateway's models on their own side, Studio's until one is chosen.
-  const textCloud = where.getByRole("combobox", { name: "Text Cloud Default", exact: true });
+  const textCloud = where.getByRole("combobox", { name: "Text Default Cloud Model", exact: true });
   await expect(textCloud).toHaveValue("");
   await textCloud.click();
   await expect(page.getByRole("option")).toHaveText(["Auto · Cloud", "Uncensored · Cloud"]);
   await page.getByRole("option", { name: "Uncensored · Cloud", exact: true }).click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBe("cloud/uncensored");
   await expect(textCloud).toHaveValue("Uncensored · Cloud");
-  const area = (name: string) => where.getByRole("radiogroup", { name, exact: true });
+  const area = (kind: string) =>
+    where.getByRole("radiogroup", { name: `${kind} Default`, exact: true });
   const choose = (name: string, choice: string) =>
     area(name).locator("label").filter({ hasText: choice }).click();
   // Without a grant there is no Cloud Models switch, and Cloud stays a choice.
   await expect(where.getByRole("switch")).toHaveCount(0);
+  // Each kind leads its rows, Images, Videos then Text.
   await expect(where.getByRole("radiogroup")).toHaveCount(3);
+  expect(
+    await where
+      .getByRole("radiogroup")
+      .evaluateAll((groups) => groups.map((group) => group.getAttribute("aria-label"))),
+  ).toEqual(["Images Default", "Videos Default", "Text Default"]);
   await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();
   // Text runs on Cloud until the account picks Local.
   await expect(area("Text").getByRole("radio", { name: "Cloud" })).toBeChecked();
@@ -613,6 +620,18 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   await page.getByRole("menuitem", { name: "Start", exact: true }).click();
   await expect(dialog).toContainText("Start: Video");
   expect(previews.at(-1)).toEqual({ start: ["video"] });
+  // A running workload's Stop previews the placement without it; Start waits until it stops.
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await table
+    .getByRole("row", { name: "Image", exact: true })
+    .getByRole("button", { name: "Actions for Image", exact: true })
+    .click();
+  await expect(page.getByRole("menuitem", { name: "Start", exact: true })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "Cancel Queue", exact: true })).toBeDisabled();
+  await page.getByRole("menuitem", { name: "Stop", exact: true }).click();
+  await expect(dialog).toBeVisible();
+  expect(previews.at(-1)).toEqual({ workloads: ["text"] });
 });
 
 test("Workers keep a stopped workload quiet and stop a running change on request", async ({

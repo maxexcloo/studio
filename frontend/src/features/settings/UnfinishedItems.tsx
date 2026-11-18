@@ -103,6 +103,7 @@ export function UnfinishedItems() {
         opened={opened}
         onClose={closeWhenTop("unfinished", () => setOpened(false))}
         size="xl"
+        centered
       >
         <Modal.Overlay />
         <Modal.Content>

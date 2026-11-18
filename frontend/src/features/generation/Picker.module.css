@@ -411,3 +411,15 @@
     transition: none;
   }
 }
+
+/* The Uploads tab's first tile: a dashed square choosing files. */
+.uploadTile {
+  min-width: 0;
+}
+
+.upload:global(.mantine-Button-root) {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-style: dashed;
+}
