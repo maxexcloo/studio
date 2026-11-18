@@ -135,8 +135,6 @@ const chatContext = z
     "Who and what it shows; series names a story or project; notes: backstory for Studio's writers.",
   );
 const promptList = z.array(z.string().trim().min(1)).min(1).max(maxSplitJobs);
-// Images the account's chats may have unfinished before generate queues more: a round to review.
-const maxPendingImages = 16;
 /** A JSON array sent as one string, or a single prompt. */
 const promptListText = z.string().transform((text) => {
   try {
@@ -1153,10 +1151,12 @@ export function registerGenerateTools({
       ...args
     } = constrained.args;
     const unfinished = preview ? 0 : await media.pendingOutputs(owner, signal);
-    if (unfinished > maxPendingImages)
-      throw new Error(
-        `${unfinished} chat images are still unfinished in Studio, so nothing was queued. Do not call generate again in this turn, not even after waiting: tell the user the images are still running and stop. The next round starts only when the user asks.`,
-      );
+    const waitingNote =
+      unfinished === 1
+        ? "1 chat image was already waiting in Studio; these queue after it. "
+        : unfinished
+          ? `${unfinished} chat images were already waiting in Studio; these queue after them. `
+          : "";
     if (args.reference_asset_ids)
       args.reference_asset_ids = await Promise.all(
         args.reference_asset_ids.map((id) => referenceAsset(id, signal)),
@@ -1182,7 +1182,7 @@ export function registerGenerateTools({
         content: [
           {
             type: "text",
-            text: `Queued ${card.name}'s character sheet on ${made.profile}: Studio writes its prompt, then keeps its face, front, side and back views on the card, and generate sends the view a prompt names. Share the link and end your turn.\n\n[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`,
+            text: `Queued ${card.name}'s character sheet on ${made.profile}: Studio writes its prompt, then keeps its face, front, side and back views on the card, and generate sends the view a prompt names. ${waitingNote}Share the link and end your turn.\n\n[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`,
           },
         ],
         structuredContent: { status: "queued", jobs: [{ job_id: made.jobId, ref, link }] },
@@ -1381,13 +1381,13 @@ export function registerGenerateTools({
         }
       }
     }
-    let projectNote = "";
+    let projectNote = waitingNote;
     if (project) {
       const kept = projectTargets(project, targets, await media.profiles("all", owner), {
         references,
       });
       targets = kept.targets;
-      projectNote = `${constrained.note}${kept.note}${briefLine(project)}`;
+      projectNote = `${waitingNote}${constrained.note}${kept.note}${briefLine(project)}`;
     }
     if (remembered.kept.length)
       projectNote = `Kept from earlier: ${remembered.kept.join(", ")}. ${projectNote}`;
