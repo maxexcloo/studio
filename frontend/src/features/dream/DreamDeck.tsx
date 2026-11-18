@@ -1,7 +1,7 @@
 import { ActionIcon, Badge, Button, Text, Tooltip } from "@mantine/core";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 
 import { failure, post } from "../../api";
 import type { MediaItem } from "../../types";
@@ -357,7 +357,13 @@ export function DreamDeck({
     <DreamPreview
       card={top}
       side={side}
-      close={() => setViewing(null)}
+      close={() => {
+        // The preview mounts open, so Mantine has no opening to return focus from.
+        flushSync(() => setViewing(null));
+        document
+          .querySelector<HTMLElement>(`[data-depth="0"] [data-preview-id="${viewing}"]`)
+          ?.focus({ preventScroll: true });
+      }}
       act={(choice) => {
         setViewing(null);
         void act(choice);
