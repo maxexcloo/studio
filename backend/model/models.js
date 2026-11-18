@@ -12,10 +12,9 @@ import { families } from "../family-catalogue.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
 import { workflowLoraBase } from "../lora/radiance.js";
 import {
-  isRadianceNode,
   radianceImageLimits,
   radianceImageNode,
-  radianceSizeStep,
+  radianceNodeSizeStep,
   radianceVideoLimits,
 } from "../providers/radiance.ts";
 import { classifyModel } from "./families.js";
@@ -223,14 +222,16 @@ export function buildProfile({
 /**
  * The size step an imported workflow's model needs. A latent node may accept any
  * multiple of 8 while the model itself needs 16 or 32 (Qwen Image 2.1): an
- * off-step size is silently cut by ComfyUI and can come out mangled. Radiance's nodes refuse
- * anything but multiples of 32, also while their worker's node list hasn't arrived.
+ * off-step size is silently cut by ComfyUI and can come out mangled. Radiance's own
+ * model grids apply even before its worker's node list arrives.
  */
 export function workflowFamilyStep(workflow) {
-  const radiance = [workflow, ...Object.values(workflow.imageModes || {})].some((mode) =>
-    Object.values(mode.graph || {}).some((node) => isRadianceNode(node?.class_type)),
+  const radianceSteps = [workflow, ...Object.values(workflow.imageModes || {})].flatMap((mode) =>
+    Object.values(mode.graph || {}).map((node) =>
+      radianceNodeSizeStep(node?.class_type, node?.inputs?.model),
+    ),
   );
-  return Math.max(workflowFamilyValue(workflow, "sizeStep") || 0, radiance ? radianceSizeStep : 0);
+  return Math.max(workflowFamilyValue(workflow, "sizeStep") || 0, ...radianceSteps);
 }
 
 /** A family catalogue value for an imported workflow: its declared family's, else its model file's family's. */
