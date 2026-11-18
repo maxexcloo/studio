@@ -465,6 +465,53 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   ).toBeVisible();
 });
 
+test("Issues suggest a rule that Add Rule keeps in Taste, and Dismiss drops one", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const dream = await serveDream(page, {
+    issues: [
+      {
+        issue: "Waist too wide",
+        rule: "always a clearly narrow waist",
+        count: 4,
+        sources: { report: 1, review: 1, chat: 2 },
+        examples: [],
+      },
+      {
+        issue: "Extra fingers",
+        rule: "",
+        count: 2,
+        sources: { report: 2, review: 0, chat: 0 },
+        examples: [],
+      },
+    ],
+  });
+  await page.goto("/dream");
+  await showView(page, "Taste");
+  const issues = page.getByRole("region", { name: "Issues" });
+  await expect(issues.getByText("4 times · Chats 2 · Reports 1 · Review 1")).toBeVisible();
+  await issues.getByRole("button", { name: "Add Rule", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Add Rule", exact: true });
+  await expect(editor.getByRole("textbox", { name: "Rule", exact: true })).toHaveValue(
+    "always a clearly narrow waist",
+  );
+  await editor.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(editor).toBeHidden();
+  await expect
+    .poll(() => dream.requests.at(-1))
+    .toEqual({
+      method: "POST",
+      path: "/api/taste/issues/accept",
+      body: { rule: "always a clearly narrow waist" },
+    });
+  await expect(issues.getByText("Waist too wide")).toBeHidden();
+  const profile = page.getByRole("region", { name: "Taste Profile" });
+  await expect(profile.getByText("always a clearly narrow waist", { exact: true })).toBeVisible();
+  await issues.getByRole("button", { name: "Dismiss", exact: true }).click();
+  await expect(issues.getByText("No recurring issues in the last two weeks.")).toBeVisible();
+});
+
 test("Dream navigation orders its views and History shows retained activity and available result links", async ({
   page,
 }) => {
