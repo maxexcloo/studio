@@ -140,7 +140,7 @@ export function AppHeader({ mode }: { mode: string }) {
         <StatusAction />
       </Group>
       <ModeSwitcher mode={mode} />
-      <Group gap={phone ? 0 : "xs"} wrap="nowrap">
+      <Group gap={phone ? 0 : "xs"} wrap="nowrap" className={classes.end}>
         <AppearanceMenu />
         <HeaderOptions />
       </Group>

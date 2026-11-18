@@ -1,30 +1,83 @@
-import { Alert, Box, Button, FocusTrap, Group, Modal, Stack, Text } from "@mantine/core";
+import { Alert, Box, Button, FocusTrap, Group, Menu, Modal, Stack, Text } from "@mantine/core";
 import { type ReactNode, useRef } from "react";
 
+import { menuWidth } from "../theme";
+import { icons } from "./icons";
+import { PopupTooltip } from "./PopupTooltip";
+import { usePhone } from "./usePhone";
+
+/** A footer's secondary action: a default button before Cancel. */
+interface FooterAction {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
 /**
- * Every dialog's and sheet's footer, at the right: any `secondary` actions (default buttons, such
- * as Check), Cancel, then its one filled primary action (`children`). Without `onCancel`, where
- * there is nothing to cancel, the action (Done, Close) follows the secondary ones. A `leading`
- * action that adds content (Add, Upload) sits apart at the left edge, keeping the row on one line.
+ * Every dialog's and sheet's footer, on one line at the right: any `secondary` actions (default
+ * buttons, such as Check), Cancel, then its one filled primary action (`children`). Without
+ * `onCancel`, where there is nothing to cancel, the action (Done, Close) follows the secondary
+ * ones. A `leading` action that adds content (Add, Upload) sits apart at the left edge. Phones fold
+ * two or more secondary actions into one ⋯ menu, so the row never wraps.
  */
 export function DialogFooter({
   pending,
   onCancel,
   leading,
-  secondary,
+  secondary = [],
   children,
 }: {
   pending?: boolean;
   onCancel?: () => void;
   leading?: ReactNode;
-  secondary?: ReactNode;
+  secondary?: FooterAction[];
   children: ReactNode;
 }) {
+  const phone = usePhone();
   // A phone's full-screen dialog pins it to the bottom, in sight while the body scrolls (theme).
   return (
-    <Group justify="flex-end" gap="xs" wrap={leading ? "nowrap" : undefined} data-dialog-footer>
+    <Group justify="flex-end" gap="xs" wrap="nowrap" data-dialog-footer>
       {leading && <Box me="auto">{leading}</Box>}
-      {secondary}
+      {phone && secondary.length > 1 ? (
+        <Menu position="top-end" width={menuWidth}>
+          <PopupTooltip label="More Actions">
+            <Menu.Target>
+              <Button
+                variant="default"
+                px="xs"
+                aria-label="More Actions"
+                loading={secondary.some((action) => action.loading)}
+              >
+                <icons.more size={18} />
+              </Button>
+            </Menu.Target>
+          </PopupTooltip>
+          <Menu.Dropdown>
+            {secondary.map((action) => (
+              <Menu.Item
+                key={action.label}
+                disabled={action.disabled || action.loading || pending}
+                onClick={action.onClick}
+              >
+                {action.label}
+              </Menu.Item>
+            ))}
+          </Menu.Dropdown>
+        </Menu>
+      ) : (
+        secondary.map((action) => (
+          <Button
+            key={action.label}
+            variant="default"
+            disabled={action.disabled || pending}
+            loading={action.loading}
+            onClick={action.onClick}
+          >
+            {action.label}
+          </Button>
+        ))
+      )}
       {onCancel && (
         <Button variant="default" disabled={pending} onClick={onCancel}>
           Cancel

@@ -28,6 +28,7 @@ import {
   Select,
   Switch,
   Table,
+  Tabs,
   Tooltip,
   alpha,
   createTheme,
@@ -420,24 +421,23 @@ export function studioTheme({
       SegmentedControl: SegmentedControl.extend({
         classNames: { root: classes.segmented },
         defaultProps: {
-          // Compact text everywhere; touch screens raise its height below, not its text.
+          // Compact text everywhere; its height follows the bar density below.
           size: "sm",
           withItemsBorders: false,
           transitionDuration: motionDuration,
           transitionTimingFunction: easing.enter,
         },
-        // Each choice is a touch target too, the whole control as tall as a touch screen's other
-        // controls: its choices sit inside its 4 px padding.
-        styles: touch
-          ? {
-              label: {
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                minHeight: rem(bar - 8),
-              },
-            }
-          : {},
+        // Its choices fill its height (theme.module.css) inside whatever padding it has.
+        styles: {
+          control: { height: "100%" },
+          label: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "100%",
+            paddingBlock: 0,
+          },
+        },
       }),
       // Every control that opens a picker shows ▾, as the chips do (AGENTS.md › UI Patterns).
       MultiSelect: MultiSelect.extend({
@@ -471,8 +471,16 @@ export function studioTheme({
       }),
       // A sort header is a touch target on touch screens (ui/DataTable.tsx).
       Table: Table.extend({ classNames: touch ? { th: classes.touchHeader } : {} }),
-      // A tapped tooltip lingers on touch, so touch screens show none unless a call enables its own.
+      // Tabs stay on one row, scrolling sideways where they outgrow it.
+      Tabs: Tabs.extend({
+        styles: {
+          list: { flexWrap: "nowrap", overflowX: "auto", overscrollBehaviorX: "contain" },
+          tab: { flexShrink: 0 },
+        },
+      }),
+      // A tapped tooltip lingers on touch, so touch screens show none, whatever a call's `disabled`.
       Tooltip: Tooltip.extend({
+        classNames: touch ? { tooltip: classes.touchTooltip } : {},
         // Above every layer, the bare viewer over dialogs included.
         defaultProps: { transitionProps, disabled: touch, zIndex: getDefaultZIndex("max") },
         styles: {

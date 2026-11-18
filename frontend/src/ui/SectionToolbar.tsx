@@ -16,6 +16,7 @@ import {
 import { type LucideIcon, Search } from "lucide-react";
 import { type ComponentPropsWithRef, type ReactNode, useEffect, useRef, useState } from "react";
 
+import { menuWidth } from "../theme";
 import { ClearButton } from "./ClearButton";
 import { DialogFooter } from "./ConfirmDialog";
 import { icons } from "./icons";
@@ -170,24 +171,29 @@ export function SectionToolbar({
         w={expanded ? "100%" : "13rem"}
       />
     );
+  // Phones never cut a view's choice off: short of room, the views take their own row.
+  const segments = views && (
+    <ScrollingSegments
+      className={phone ? classes.views : undefined}
+      aria-label={`${label} View`}
+      size={phone ? "xs" : "sm"}
+      radius="xl"
+      fullWidth={phone}
+      data={views}
+      value={view}
+      onChange={onViewChange}
+    />
+  );
   if (searching && phone && onQueryChange)
     return (
-      <Group className={classes.enter} mih={44} wrap="nowrap">
+      <Group className={classes.enter} gap="xs" mih={44}>
+        {segments}
         {search(true)}
       </Group>
     );
   return (
-    <Group className={classes.enter} gap="xs" mih={44} wrap="nowrap">
-      {views && (
-        <ScrollingSegments
-          aria-label={`${label} View`}
-          size={phone ? "xs" : "sm"}
-          radius="xl"
-          data={views}
-          value={view}
-          onChange={onViewChange}
-        />
-      )}
+    <Group className={classes.enter} gap="xs" mih={44} wrap={phone ? "wrap" : "nowrap"}>
+      {segments}
       <Group gap={4} ml="auto" wrap="nowrap">
         {onQueryChange &&
           (phone ? (
@@ -268,7 +274,7 @@ export function SectionToolbar({
         )}
         {(onQueryChange || filters) && more.length > 0 && <ToolbarDivider />}
         {more.length > 0 && (
-          <Menu position="bottom-end">
+          <Menu position="bottom-end" width={menuWidth}>
             <PopupTooltip label={`More ${label} Actions`}>
               <Menu.Target>
                 <ActionIcon variant="subtle" color="gray" aria-label={`More ${label} Actions`}>
