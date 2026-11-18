@@ -272,11 +272,16 @@ test("Clear Failed Set clears only the owner's failed members of an all-failed s
     member("alice", alice.id, "set", "cancelled"),
   ];
   const foreign = member("bob", bob.id, "set", "failed");
+  const foreignOnly = member("bob", bob.id, "foreign-only", "failed");
+  const account = { userId: "alice", role: "user" };
   const app = express();
   app.use((req, _res, next) => {
-    Object.assign(req, { studioAccount: { userId: "alice" } });
+    Object.assign(req, { studioAccount: account });
     next();
   });
+  app.use((req, res, next) =>
+    enforceMultiUserRequest(req, res, next, { accountForRequest: () => account }),
+  );
   registerQueueRoutes(app, { store, queue: new GenerationQueue(store, {} as never), ...unused });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -290,7 +295,11 @@ test("Clear Failed Set clears only the owner's failed members of an all-failed s
     assert.deepEqual((await listed("?since=2099-01-01")).clearableFailedSets, ["set"]);
     assert.equal((await clearSet("mixed")).status, 409);
     assert.equal((await clearSet("active")).status, 409);
-    assert.deepEqual(await (await clearSet("set")).json(), { cleared: 2 });
+    assert.equal((await clearSet("foreign-only")).status, 409);
+    assert.equal((await fetch(`${base}/sets/set/delete`, { method: "POST" })).status, 403);
+    const success = await clearSet("set");
+    assert.equal(success.status, 200);
+    assert.deepEqual(await success.json(), { cleared: 2 });
     assert.deepEqual((await listed()).clearableFailedSets, []);
     assert.deepEqual(
       (await listed()).jobs.filter((job) => job.status === "failed").map(({ id }) => id),
@@ -302,7 +311,7 @@ test("Clear Failed Set clears only the owner's failed members of an all-failed s
       assert.equal(saved.cleared, true);
       assert.deepEqual(saved.items, [result]);
     }
-    for (const { ownerId, id } of [cancelled, foreign, mixed])
+    for (const { ownerId, id } of [cancelled, foreign, foreignOnly, mixed])
       assert.equal(store.job(ownerId, id)?.cleared, undefined);
   } finally {
     server.closeAllConnections();

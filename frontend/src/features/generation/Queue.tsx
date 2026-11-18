@@ -63,7 +63,7 @@ import { referenceLabel } from "./references";
 import type { QueueRowDrag } from "./SortableQueue";
 
 import classes from "./Queue.module.css";
-type QueueListing = Pick<QueueResponse, "clearableFailedSets" | "paused"> & { jobs: QueueJob[] };
+type QueueListing = Omit<QueueResponse, "jobs"> & { jobs: QueueJob[] };
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
   // A poll fetches only the jobs changed since the newest it holds and keeps the rest; an
@@ -81,8 +81,7 @@ export const queueQuery = queryOptions({
       );
       const known = new Map([...held, ...changes.jobs].map((job) => [job.id, job]));
       const jobs = changes.ids.map((id) => known.get(id));
-      if (jobs.every((job) => job !== undefined))
-        return { jobs, paused: changes.paused, clearableFailedSets: changes.clearableFailedSets };
+      if (jobs.every((job) => job !== undefined)) return { ...changes, jobs };
     }
     return api<QueueListing>("/api/queue");
   },
