@@ -728,8 +728,8 @@ export function createInbox(options: {
      * brief edits while there is room. Answers whether it asked the text model.
      */
     async propose(ownerId: string) {
+      await options.dream.dropDrafts(ownerId, keep(load(ownerId)));
       const record = load(ownerId);
-      await options.dream.dropDrafts(ownerId, keep(record));
       if (now() - (Date.parse(record.batchAt || "") || 0) < limits.batchMs) return false;
       // Stamped first, so a failed batch waits too.
       record.batchAt = stamp();

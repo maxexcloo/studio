@@ -2118,6 +2118,15 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
     picks.map(({ change, why }) => [change.brief?.styles, why]),
     [["lighting: cold dawn", "A chat picked cold dawn for Lighting in a comparison"]],
   );
+  state.clock += 6 * 3_600_000;
+  const proposing = inbox.propose("alice");
+  inbox.picked("alice", beach.id, "Lighting", "bright noon", "you");
+  await proposing;
+  assert.ok(
+    inbox
+      .read("alice")
+      .proposals.some(({ change }) => change.brief?.styles === "lighting: bright noon"),
+  );
 });
 
 test("A series follows a liked image's character through one night on its profile and LoRAs, then ends", async (t) => {
