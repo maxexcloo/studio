@@ -9,6 +9,7 @@ import {
   openReferenceChoices,
   selectionAction,
   selectionMenuItem,
+  serveRetries,
   showOnly,
   stamp,
   toolbarSearch,
@@ -465,23 +466,21 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const attempts: string[] = [];
+  const attempts: string[][] = [];
   let failSecond = true;
-  await page.route("**/api/queue/*/retry", async (route) => {
-    const id = new URL(route.request().url()).pathname.split("/")[3];
-    attempts.push(id);
-    if (id === "batch-a") await held;
-    if (id === "batch-b" && failSecond) {
-      await route.fulfill({ status: 503, json: { error: "Second worker remains offline" } });
-      return;
-    }
-    const job = {
-      ...state.jobs.find((job) => job.id === id),
-      id: `retried-${id}`,
-      status: "queued",
-    };
-    state.jobs.push(job);
-    await route.fulfill({ json: { job } });
+  await serveRetries(page, state, async (ids) => {
+    attempts.push(ids);
+    await held;
+    return ids.map((id) => {
+      if (id === "batch-b" && failSecond) return { id, error: "Second worker remains offline" };
+      const job = {
+        ...state.jobs.find((job) => job.id === id),
+        id: `retried-${id}`,
+        status: "queued",
+      };
+      state.jobs.push(job);
+      return { id, replacement: job.id };
+    });
   });
   try {
     await page.goto("/images");
@@ -493,11 +492,11 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
     await retry.click();
     await expect(retry).toBeDisabled();
     await retry.dispatchEvent("click");
-    expect(attempts).toEqual(["batch-a"]);
+    await expect.poll(() => attempts).toEqual([["batch-a", "batch-b"]]);
     release();
     // Only the item whose retry failed stays selected.
     await expect(selection.getByRole("status")).toHaveText("1 Selected");
-    expect(attempts).toEqual(["batch-a", "batch-b"]);
+    expect(attempts).toEqual([["batch-a", "batch-b"]]);
     await expect(
       page.getByRole("checkbox", { name: "Select Failed Third", exact: true }),
     ).toBeChecked();
@@ -509,7 +508,7 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
     await retry.click();
     // Once every retry is accepted the selection ends.
     await expect(selection).toHaveCount(0);
-    expect(attempts).toEqual(["batch-a", "batch-b", "batch-b"]);
+    expect(attempts).toEqual([["batch-a", "batch-b"], ["batch-b"]]);
   } finally {
     release();
   }
@@ -705,7 +704,7 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
   );
   // The newest result, so the retry has a place below it to keep.
   state.gallery.unshift({ ...results(1)[0], id: "newest", prompt: "Newest study" });
-  await page.route("**/api/queue/failed-job/retry", async (route) => {
+  await serveRetries(page, state, ([id]) => {
     const retried = job("retried-job", "queued", { galleryAt: stamp });
     state.jobs.push(retried);
     // The retry's tile lists where the failed one did, not first.
@@ -720,7 +719,7 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
         status: "pending",
       },
     );
-    await route.fulfill({ json: { job: retried } });
+    return [{ id, replacement: retried.id }];
   });
   await page.goto("/images");
   await expect(page.getByText("Sampling · 50%", { exact: true })).toHaveCount(2);

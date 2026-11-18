@@ -1,41 +1,44 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-import { post } from "../../api";
+import type { QueueRetryResponse } from "../../../../shared/queue";
+import { failure, post } from "../../api";
 import type { MediaItem } from "../../types";
-import { useQueueAction } from "../generation/Queue";
+import { queueActionKey, queueQuery } from "../generation/Queue";
+import { mediaTitle } from "./mediaLabels";
 import { galleryKey } from "./queries";
 
-/**
- * Retries failed jobs once each through the shared queue command. An accepted retry's new job
- * replaces the failed one in the queue and its pending tiles replace the failed tiles; failures are
- * reported by the queue command and their tiles remain. Resolves to each accepted job's
- * replacement job ID.
- */
 export function useTryAgain(items: MediaItem[]) {
-  const retry = useQueueAction().mutateAsync;
   const client = useQueryClient();
+  const { mutateAsync } = useMutation({
+    mutationKey: queueActionKey,
+    mutationFn: (body: { ids: string[] }) => post<QueueRetryResponse>("/api/queue/retry", body),
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: queueQuery.queryKey }),
+        client.invalidateQueries({ queryKey: galleryKey }),
+      ]),
+  });
+
   return useCallback(
     async (jobIds: string[]) => {
+      const ids = [...new Set(jobIds)];
       const accepted = new Map<string, string>();
-      for (const id of new Set(jobIds)) {
-        try {
-          const result = await retry({ id, action: "retry" });
-          if (result) accepted.set(id, result.job?.id || "");
-        } catch {
-          // Reported by the queue command's default notification.
+      if (!ids.length) return accepted;
+      try {
+        const { outcomes } = await mutateAsync({ ids });
+        for (const outcome of outcomes)
+          if ("replacement" in outcome) accepted.set(outcome.id, outcome.replacement);
+        const refused = outcomes.find((outcome) => "error" in outcome);
+        if (refused) {
+          const item = items.find((item) => item.jobId === refused.id);
+          failure(item ? `${mediaTitle(item)}. ${refused.error}` : refused.error);
         }
+      } catch {
+        // The MutationCache reports a failed request.
       }
-      const replaced = items
-        .filter((item) => item.status === "failed" && accepted.has(item.jobId || ""))
-        .map((item) => item.id);
-      await Promise.allSettled([
-        ...[...accepted.keys()].map((id) => retry({ id, action: "clear" })),
-        replaced.length && post("/api/gallery/delete", { ids: replaced }),
-      ]);
-      if (accepted.size) await client.invalidateQueries({ queryKey: galleryKey });
       return accepted;
     },
-    [retry, client, items],
+    [items, mutateAsync],
   );
 }

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { fixtures, image, signIn, stamp } from "./fixtures";
+import { fixtures, image, serveRetries, signIn, stamp } from "./fixtures";
 
 test("the queue pauses, resumes and reorders the account's waiting work", async ({ page }) => {
   const state = await fixtures(page);
@@ -276,15 +276,13 @@ test("Retry and a set's Retry Failed go through the shared retry, replacing the 
     job("lone-failed", "failed", [], ""),
   );
   state.gallery.push(tile);
-  for (const [failed, retried, queueSet] of [
-    ["set-failed", "set-retried", "set"],
-    ["lone-failed", "lone-retried", ""],
-  ])
-    await page.route(`**/api/queue/${failed}/retry`, async (route) => {
-      const next = job(retried, "queued", [], queueSet);
+  await serveRetries(page, state, (ids) =>
+    ids.map((id) => {
+      const next = job(`retried-${id}`, "queued", [], id === "set-failed" ? "set" : "");
       state.jobs.push(next);
-      await route.fulfill({ json: { job: next } });
-    });
+      return { id, replacement: next.id };
+    }),
+  );
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
   const queue = page.getByRole("dialog", { name: "Generations", exact: true });

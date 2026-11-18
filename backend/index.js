@@ -128,6 +128,7 @@ import {
   outputFileSize,
   putGalleryItems,
   recordsFromComfyHistory,
+  removeGalleryItems,
   resultNumbers,
   setGalleryRatings,
   updateGalleryJob,
@@ -788,6 +789,8 @@ registerQueueRoutes(app, {
     const item = galleryItem(id);
     return Boolean(item && (item.ownerId || "") === ownerId && !isGalleryHidden(item));
   },
+  removeRetryTiles: (ownerId, jobIds) =>
+    removeGalleryItems(galleryItems({ ownerId, jobIds, status: "failed" }, { ordered: false })),
 });
 registerMaintenanceRoutes(app, { store, queue: generationQueue, adminRefusal });
 registerResultSetRoutes(app, {
