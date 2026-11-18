@@ -540,29 +540,27 @@ function DefinitionForm({
         )}
         <DialogFooter
           onCancel={close}
-          secondary={
-            <>
-              {kind === "profile" && !creating && (
-                <Button
-                  variant="default"
-                  loading={validate.isPending}
-                  disabled={!!error}
-                  onClick={() => validate.mutate()}
-                >
-                  Check
-                </Button>
-              )}
-              {meta?.aiDrafted && (
-                <Button
-                  variant="default"
-                  disabled={busy || form.isDirty()}
-                  onClick={() => action.mutate({ action: "approve" })}
-                >
-                  Approve
-                </Button>
-              )}
-            </>
-          }
+          secondary={[
+            ...(kind === "profile" && !creating
+              ? [
+                  {
+                    label: "Check",
+                    loading: validate.isPending,
+                    disabled: !!error,
+                    onClick: () => validate.mutate(),
+                  },
+                ]
+              : []),
+            ...(meta?.aiDrafted
+              ? [
+                  {
+                    label: "Approve",
+                    disabled: busy || form.isDirty(),
+                    onClick: () => action.mutate({ action: "approve" }),
+                  },
+                ]
+              : []),
+          ]}
         >
           <Button
             type="submit"

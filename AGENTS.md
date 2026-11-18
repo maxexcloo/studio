@@ -95,8 +95,9 @@ recur across features.
   `DialogFooter` of real buttons: any default secondary actions, Cancel, then
   one filled primary, which follows the secondaries alone (Done, Close) where
   there is nothing to cancel. An action that adds content (Add, Upload) is the
-  footer's `leading` action instead, alone at its left edge on one row, phones
-  included. An anchored chip popup (desktop, or `floating`)
+  footer's `leading` action instead, alone at its left edge. A footer stays on
+  one row, phones included: there two or more secondaries fold into one ⋯
+  menu. An anchored chip popup (desktop, or `floating`)
   whose only button would be Done has no footer and closes on outside click
   or Escape; phone sheets keep Done. A primary is its bare verb (Save,
   Compare, Create), adding a noun only where the verb alone is ambiguous. Clearing a

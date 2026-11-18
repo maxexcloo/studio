@@ -30,12 +30,6 @@
   border: 1px solid var(--mantine-color-default-border);
 }
 
-@media (pointer: coarse) {
-  .roles :global(.mantine-SegmentedControl-label) {
-    min-height: calc(2.75rem - 4px);
-  }
-}
-
 /* Two classes outrank Mantine's own Button padding, which would leave a phone icon a 6 px sliver. */
 .chip.iconChip {
   aspect-ratio: 1;

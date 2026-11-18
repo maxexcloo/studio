@@ -16,7 +16,7 @@ import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../
 import { ClearButton } from "../../ui/ClearButton";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextToolsBar } from "../../ui/TextBox";
-import { usePhone, useTouch } from "../../ui/usePhone";
+import { usePhone } from "../../ui/usePhone";
 import { GenerationInputControls } from "./GenerationInputControls";
 import { type Draft, defaultProfile, useGeneration } from "./GenerationProvider";
 import { useLoraPicker } from "./LoraPicker";
@@ -222,7 +222,6 @@ export function GenerationEditor({
   const loraPicker = useLoraPicker();
   const prompt = useRef<HTMLTextAreaElement>(null);
   const phone = usePhone();
-  const touch = useTouch();
   const submitState = useSubmitState({
     input,
     profile,
@@ -390,8 +389,7 @@ export function GenerationEditor({
               <ClearButton className={classes.resting} onClear={onClear} onUndo={onUndoClear} />
               <Tooltip
                 label={blockedReason}
-                // Touch screens keep tooltips off; the reason stays in Generate's description.
-                disabled={!blockedReason || touch}
+                disabled={!blockedReason}
                 events={{ hover: true, focus: true, touch: false }}
               >
                 <Button

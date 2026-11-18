@@ -54,9 +54,10 @@
   font-size: var(--mantine-font-size-lg);
 }
 
-/* Every header control keeps a 44 px touch height; the modes are wider targets than the side
-   controls, sized so four modes fit between them on a 375 px phone. */
-:where(:root[data-phone]) .header :is(button, a):not(.home) {
+/* Every header control keeps a 44 px touch height; the modes are wider targets than the status,
+   sized so four modes fit between the side controls on a 375 px phone. The end's icons keep their
+   theme size, in line with the page toolbars' icons below them. */
+:where(:root[data-phone]) .header :is(button, a):not(.home, .end *) {
   width: 32px;
   height: 44px;
   min-width: 0 !important;
