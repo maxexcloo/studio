@@ -454,8 +454,14 @@ export async function fixtures(page: Page) {
     if (path === "/api/queue") {
       // Jobs change in place here, so a poll since a change gets every job back as changed.
       const listed = jobs.filter((job) => !job.cleared);
+      const failedSets = new Set(
+        listed.filter((job) => job.queueSet && job.status === "failed").map((job) => job.queueSet),
+      );
       return respond({
         jobs: listed,
+        clearableFailedSets: [...failedSets].filter((set) =>
+          jobs.every((job) => job.queueSet !== set || ["failed", "cancelled"].includes(job.status)),
+        ),
         ...(url.searchParams.has("since") ? { ids: listed.map((job) => job.id) } : {}),
         paused: queuePause,
       });
@@ -493,6 +499,14 @@ export async function fixtures(page: Page) {
     }
     if (path === "/api/queue/clear-failed") {
       const failed = jobs.filter((job) => job.status === "failed" && !job.cleared);
+      failed.forEach((job) => (job.cleared = true));
+      return respond({ cleared: failed.length });
+    }
+    const clearSet = /^\/api\/queue\/sets\/([^/]+)\/clear-failed$/.exec(path);
+    if (clearSet) {
+      const failed = jobs.filter(
+        (job) => job.queueSet === clearSet[1] && job.status === "failed" && !job.cleared,
+      );
       failed.forEach((job) => (job.cleared = true));
       return respond({ cleared: failed.length });
     }

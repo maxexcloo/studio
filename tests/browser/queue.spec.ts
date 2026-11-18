@@ -286,6 +286,7 @@ test("Retry and a set's Retry Failed go through the shared retry, replacing the 
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
   const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  await expect(queue.getByRole("button", { name: "Clear Failed Set", exact: true })).toHaveCount(0);
   await queue.getByRole("button", { name: "Retry Failed", exact: true }).click();
   // The failed tile goes, as a retry anywhere else, and the original leaves the set.
   await expect.poll(() => state.gallery.map((item) => item.id)).not.toContain("failed-tile");
@@ -295,6 +296,51 @@ test("Retry and a set's Retry Failed go through the shared retry, replacing the 
   // A lone job's Retry clears its failed original from the queue too.
   await queue.getByRole("button", { name: "Retry", exact: true }).click();
   await expect.poll(() => state.jobs.find((item) => item.id === "lone-failed")?.cleared).toBe(true);
+});
+
+test("Clear Failed Set removes the collapsed set from the queue and keeps failed gallery records", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const tile = { id: "failed-tile", jobId: "failed-first", status: "failed", url: image };
+  for (const [id, status, queueSet] of [
+    ["failed-first", "failed", "set"],
+    ["failed-second", "failed", "set"],
+    ["cancelled", "cancelled", "set"],
+    ["other-failed", "failed", "other"],
+  ])
+    state.jobs.push({
+      id,
+      jobId: id,
+      sessionId: "s",
+      operation: "image",
+      status,
+      reason: "",
+      input: {
+        prompt: id,
+        resultSet: { id: queueSet, title: "Fox Studies", index: 0 },
+      },
+      queueSet,
+      items: id === tile.jobId ? [tile] : [],
+      outputs: [],
+      createdAt: stamp,
+      updatedAt: stamp,
+    });
+  state.gallery.push(tile);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const set = queue.getByRole("button", { name: /^Fox Studies/ });
+  await expect(set).toHaveAttribute("aria-expanded", "false");
+  await expect(queue.getByRole("button", { name: "Retry Failed", exact: true })).toBeVisible();
+  await queue.getByRole("button", { name: "Clear Failed Set", exact: true }).click();
+  await expect(set).toBeHidden();
+  await expect(queue.getByText("other-failed", { exact: true })).toBeVisible();
+  expect(state.jobs.filter((job) => job.cleared).map((job) => job.id)).toEqual([
+    "failed-first",
+    "failed-second",
+  ]);
+  expect(state.gallery).toContainEqual(tile);
 });
 
 test("an administrator opens Settings › Workers from the summary under the queue", async ({

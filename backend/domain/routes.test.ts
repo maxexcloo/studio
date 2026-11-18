@@ -9,13 +9,14 @@ import type {
   QueueCancelAllResponse,
   QueueResponse,
   QueueRetryResponse,
+  QueueStatus,
   UnfinishedJob,
 } from "../../shared/queue.ts";
 import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import { GenerationQueue, type JobObservation } from "./queue.ts";
 import { registerMaintenanceRoutes, registerQueueRoutes } from "./routes.ts";
-import { Store, everyone } from "./store.ts";
+import { Store, everyone, listedFinishedJobs } from "./store.ts";
 const { enforceMultiUserRequest } = await import(
   new URL("../multi-user-gate.js", import.meta.url).href
 );
@@ -244,6 +245,68 @@ test("Retry admits distinct owned failures in order and leaves refused jobs avai
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     queue.stop();
+    store.close();
+  }
+});
+
+test("Clear Failed Set clears only the owner's failed members of an all-failed set", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  const alice = store.createSession("alice");
+  const bob = store.createSession("bob");
+  const result = { id: "failed-tile", status: "failed" };
+  const member = (ownerId: string, sessionId: string, queueSet: string, status: QueueStatus) => {
+    const job = store.enqueue(ownerId, sessionId, {}, "image", undefined, undefined, undefined, {
+      queueSet,
+    });
+    return store.save({ ...job, status, items: [result] });
+  };
+  const oldCompleted = member("alice", alice.id, "mixed", "completed");
+  for (let index = 0; index < listedFinishedJobs; index++)
+    member("alice", alice.id, "older-history", "completed");
+  const mixed = member("alice", alice.id, "mixed", "failed");
+  const activeFailed = member("alice", alice.id, "active", "failed");
+  member("alice", alice.id, "active", "running");
+  const [first, second, cancelled] = [
+    member("alice", alice.id, "set", "failed"),
+    member("alice", alice.id, "set", "failed"),
+    member("alice", alice.id, "set", "cancelled"),
+  ];
+  const foreign = member("bob", bob.id, "set", "failed");
+  const app = express();
+  app.use((req, _res, next) => {
+    Object.assign(req, { studioAccount: { userId: "alice" } });
+    next();
+  });
+  registerQueueRoutes(app, { store, queue: new GenerationQueue(store, {} as never), ...unused });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/queue`;
+  const listed = async (query = "") => (await (await fetch(base + query)).json()) as QueueResponse;
+  const clearSet = (set: string) => fetch(`${base}/sets/${set}/clear-failed`, { method: "POST" });
+  try {
+    const { jobs, clearableFailedSets } = await listed();
+    assert.ok(!jobs.some((job) => job.id === oldCompleted.id));
+    assert.deepEqual(clearableFailedSets, ["set"]);
+    assert.deepEqual((await listed("?since=2099-01-01")).clearableFailedSets, ["set"]);
+    assert.equal((await clearSet("mixed")).status, 409);
+    assert.equal((await clearSet("active")).status, 409);
+    assert.deepEqual(await (await clearSet("set")).json(), { cleared: 2 });
+    assert.deepEqual((await listed()).clearableFailedSets, []);
+    assert.deepEqual(
+      (await listed()).jobs.filter((job) => job.status === "failed").map(({ id }) => id),
+      [mixed.id, activeFailed.id],
+    );
+    for (const { ownerId, id } of [first, second]) {
+      const saved = store.job(ownerId, id);
+      assert.equal(saved?.status, "failed");
+      assert.equal(saved.cleared, true);
+      assert.deepEqual(saved.items, [result]);
+    }
+    for (const { ownerId, id } of [cancelled, foreign, mixed])
+      assert.equal(store.job(ownerId, id)?.cleared, undefined);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     store.close();
   }
 });
