@@ -8,7 +8,7 @@ import { chipProps, iconChipProps } from "./chip";
 import { GenerationSettings } from "./GenerationSettings";
 import { lengthChoices } from "./length";
 import { LoraPicker, type LoraPickerState } from "./LoraPicker";
-import { backendInputPatch, backendLabel } from "./payload";
+import { backendInputPatch, backendLabel, profileForLoras } from "./payload";
 import { ProfilePicker } from "./ProfilePicker";
 import { SizePicker } from "./SizePicker";
 
@@ -165,7 +165,8 @@ export function GenerationInputControls({
       {references && hasReferences && (
         <ReferenceRole input={input} onChange={onChange} mask={mask} />
       )}
-      {profile?.capabilities.lora && (
+      {(input.loras.length > 0 ||
+        profileForLoras(profile, input.profileBackend, hasReferences)?.capabilities.lora) && (
         <LoraPicker value={input} onChange={onChange} picker={loraPicker} />
       )}
       <SizePicker input={input} profile={profile} onChange={onChange} />

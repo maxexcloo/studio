@@ -1,4 +1,5 @@
 import type { CardKind } from "../../shared/characters";
+import type { LoraBase } from "../../shared/profiles";
 import type { Review } from "../../shared/projects";
 import type { QueueJob as SharedQueueJob } from "../../shared/queue";
 import type { Resolution } from "../../shared/resolution";
@@ -19,7 +20,8 @@ export interface Profile {
   workerIds?: string[];
   maxLoras?: number;
   /** How the profile applies optional LoRAs, such as "radiance-tags-v1". */
-  loraAdapter?: string;
+  loraAdapter?: string | null;
+  loraBase?: LoraBase | null;
   loraNote?: string;
   provider?: string;
   ready?: boolean;
@@ -49,7 +51,12 @@ export interface Profile {
   imageModes?: Partial<
     Record<
       "generate" | "reference",
-      { defaults?: Record<string, string | number>; capabilities?: Record<string, boolean> }
+      {
+        defaults?: Record<string, string | number>;
+        capabilities?: Record<string, boolean>;
+        loraAdapter?: string | null;
+        loraBase?: LoraBase | null;
+      }
     >
   >;
   mediaInputs?: {

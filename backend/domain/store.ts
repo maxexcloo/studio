@@ -71,6 +71,8 @@ const now = () => new Date().toISOString();
 export const everyone = "*";
 /** Not yet done: pending, or handed to a provider. */
 const openStatuses = [...pendingStatuses, ...activeStatuses];
+const jobPriority = "json_extract(record, '$.priority')";
+const dreamPriority = `${jobPriority} = ${queuePriority.dream}`;
 /** How many of an account's finished jobs its queue lists, newest first; older ones are read one at a time (`job`). */
 export const listedFinishedJobs = 200;
 const placeholders = (values: Iterable<unknown>) => [...values].map(() => "?").join(", ");
@@ -103,13 +105,13 @@ export class Store {
       CREATE INDEX IF NOT EXISTS studio_queue_status ON studio_queue(status, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_session ON studio_queue(session_id, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_set ON studio_queue(json_extract(record, '$.queueSet'));
-      CREATE INDEX IF NOT EXISTS studio_queue_priority ON studio_queue(status, json_extract(record, '$.priority'));
+      CREATE INDEX IF NOT EXISTS studio_queue_priority ON studio_queue(status, ${jobPriority});
+      CREATE INDEX IF NOT EXISTS studio_queue_dream_recent ON studio_queue(owner_id, created_at) WHERE ${dreamPriority};
       CREATE TABLE IF NOT EXISTS studio_queue_pauses (owner_id TEXT PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS studio_user_presets (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, record TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS studio_user_presets_owner ON studio_user_presets(owner_id);
       CREATE TABLE IF NOT EXISTS studio_provider_jobs (id TEXT PRIMARY KEY REFERENCES studio_queue(id), owner_id TEXT NOT NULL, record TEXT NOT NULL);`);
-    // Each job's profile and whether it ran a prompt, indexed with its ID, so promptJobIds reads
-    // the index alone instead of parsing every record.
+    // Gallery seed selection and recent profile counts query jobs without loading their records.
     const columns = this.db
       .prepare("SELECT name FROM pragma_table_xinfo('studio_queue')")
       .all()
@@ -123,7 +125,7 @@ export class Store {
         "ALTER TABLE studio_queue ADD COLUMN prompted GENERATED ALWAYS AS (trim(coalesce(json_extract(record, '$.input.prompt'), '')) != '') VIRTUAL",
       );
     this.db.exec(
-      "CREATE INDEX IF NOT EXISTS studio_queue_prompted ON studio_queue(owner_id, profile_id, prompted, id)",
+      "DROP INDEX IF EXISTS studio_queue_prompted; CREATE INDEX IF NOT EXISTS studio_queue_profile ON studio_queue(owner_id, profile_id, created_at, status)",
     );
   }
 
@@ -327,14 +329,84 @@ export class Store {
   }
 
   /** Whether any unfinished job is someone's own work, not Dream's, read from the priority index alone. */
-  hasOpenOwnWork(): boolean {
+  hasOpenOwnWork(waiting = false): boolean {
+    const statuses = waiting ? pendingStatuses : openStatuses;
     return Boolean(
       this.db
         .prepare(
-          `SELECT 1 FROM studio_queue INDEXED BY studio_queue_priority WHERE status IN (${placeholders(openStatuses)}) AND json_extract(record, '$.priority') IS NOT ${queuePriority.dream} LIMIT 1`,
+          `SELECT 1 FROM studio_queue INDEXED BY studio_queue_priority WHERE status IN (${placeholders(statuses)}) AND ${jobPriority} IS NOT ${queuePriority.dream} LIMIT 1`,
         )
-        .get(...openStatuses),
+        .get(...statuses),
     );
+  }
+
+  /** Open Dream work, without loading prompts, outputs or other accounts' own work. */
+  openDreamJobs(ownerId?: string, waiting = false) {
+    const statuses = waiting ? pendingStatuses : openStatuses;
+    return this.db
+      .prepare(
+        `SELECT id, owner_id AS ownerId,
+          json_extract(record, '$.resource') AS resource,
+          json_extract(record, '$.input.kind') AS kind,
+          json_extract(record, '$.input.type') AS type,
+          json_extract(record, '$.dream.projectId') AS projectId,
+          json_extract(record, '$.dream.draft') AS draft
+        FROM studio_queue INDEXED BY studio_queue_priority
+        WHERE status IN (${placeholders(statuses)}) AND ${dreamPriority}${ownerId === undefined ? "" : " AND owner_id = ?"}
+        ORDER BY created_at, rowid`,
+      )
+      .all(...statuses, ...(ownerId === undefined ? [] : [ownerId])) as {
+      id: string;
+      ownerId: string;
+      resource: string;
+      kind: string | null;
+      type: string | null;
+      projectId: string | null;
+      draft: string | null;
+    }[];
+  }
+
+  hasWritingJobs(): boolean {
+    return Boolean(
+      this.db.prepare("SELECT 1 FROM studio_queue WHERE status = 'writing' LIMIT 1").get(),
+    );
+  }
+
+  /** Reads a seed's input without transferring the job's saved media records. */
+  jobInput(ownerId: string, id: string): GenerationInput | undefined {
+    const row = this.db
+      .prepare(
+        "SELECT json_extract(record, '$.input') AS input FROM studio_queue WHERE id = ? AND owner_id = ?",
+      )
+      .get(id, ownerId);
+    return row ? JSON.parse(row.input as string) : undefined;
+  }
+
+  /** Recent Dream jobs, in queue order, with only the fields its scheduler uses. */
+  dreamJobsSince(ownerId: string, since: string) {
+    return this.db
+      .prepare(
+        `SELECT created_at AS createdAt, status, profile_id AS profileId,
+          json_extract(record, '$.dream.at') AS dreamAt,
+          json_extract(record, '$.input.kind') AS kind,
+          json_extract(record, '$.input.type') AS type,
+          CASE WHEN json_type(record, '$.input.loras') = 'array'
+            THEN json_extract(record, '$.input.loras') END AS loras,
+          json_type(record, '$.input.writing') IN ('object', 'array')
+            AND json_type(record, '$.input.writing.prompt') IS NOT 'text' AS awaitsWriting
+        FROM studio_queue WHERE owner_id = ? AND created_at >= ? AND ${dreamPriority}
+        ORDER BY created_at, rowid`,
+      )
+      .all(ownerId, since) as {
+      createdAt: string;
+      status: string;
+      profileId: string | null;
+      dreamAt: string | null;
+      kind: string | null;
+      type: string | null;
+      loras: string | null;
+      awaitsWriting: number | null;
+    }[];
   }
 
   /**
@@ -378,20 +450,20 @@ export class Store {
     return row ? JSON.parse(row.record as string) : undefined;
   }
 
-  /**
-   * How many of the owner's jobs ran each profile (by `input.profileId`) since an ISO time, with
-   * every profile they ever ran at 0 or more. Cancelled jobs tried nothing and are left out.
-   */
-  profileRuns(ownerId: string, since: string): Map<string, number> {
-    return new Map(
-      this.db
-        .prepare(
-          `SELECT COALESCE(json_extract(record, '$.input.profileId'), '') AS profile, SUM(created_at >= ?) AS recent
-          FROM studio_queue WHERE owner_id = ? AND status != 'cancelled' GROUP BY profile`,
-        )
-        .all(since, ownerId)
-        .map((row) => [String(row.profile), Number(row.recent)]),
+  /** Counts recent uses of each candidate and distinguishes it from one never used. */
+  profileRuns(ownerId: string, since: string, profiles: string[]): Map<string, number> {
+    const recent = this.db.prepare(
+      "SELECT count(*) AS count FROM studio_queue WHERE owner_id = ? AND profile_id = ? AND created_at >= ? AND status != 'cancelled'",
     );
+    const earlier = this.db.prepare(
+      "SELECT 1 FROM studio_queue WHERE owner_id = ? AND profile_id = ? AND status != 'cancelled' LIMIT 1",
+    );
+    const runs = new Map<string, number>();
+    for (const profile of profiles) {
+      const count = Number(recent.get(ownerId, profile, since)?.count);
+      if (count || earlier.get(ownerId, profile)) runs.set(profile, count);
+    }
+    return runs;
   }
 
   /** The owner's jobs created at or after an ISO time, in queue order: read through the owner index. */
@@ -402,26 +474,6 @@ export class Store {
       )
       .all(ownerId, since)
       .map((row) => JSON.parse(row.record as string));
-  }
-
-  /** The IDs of all the owner's jobs, without reading their records. */
-  jobIds(ownerId: string): Set<string> {
-    return new Set(
-      this.db
-        .prepare("SELECT id FROM studio_queue WHERE owner_id = ?")
-        .all(ownerId)
-        .map((row) => row.id as string),
-    );
-  }
-
-  /** The owner's jobs that ran a prompt on one of `profileIds`. */
-  promptJobIds(ownerId: string, profileIds: string[]): string[] {
-    return this.db
-      .prepare(
-        "SELECT id FROM studio_queue WHERE owner_id = ? AND profile_id IN (SELECT value FROM json_each(?)) AND prompted",
-      )
-      .all(ownerId, JSON.stringify(profileIds))
-      .map((row) => row.id as string);
   }
 
   /**

@@ -1556,10 +1556,23 @@ test("Only someone's own unfinished work, not Dream's or finished work, counts a
   const session = store.createSession("alice");
   const queue = (priority: number) =>
     store.enqueue("alice", session.id, {}, "image", undefined, undefined, undefined, { priority });
-  queue(queuePriority.dream);
+  const dream = queue(queuePriority.dream);
   assert.equal(store.hasOpenOwnWork(), false);
   const own = queue(queuePriority.mcp);
+  assert.equal(store.hasOpenOwnWork(true), true);
+  assert.deepEqual(
+    store.openDreamJobs(undefined, true).map((job) => job.id),
+    [dream.id],
+  );
+  store.save({ ...dream, status: "running" });
+  store.save({ ...own, status: "running" });
   assert.equal(store.hasOpenOwnWork(), true);
+  assert.equal(store.hasOpenOwnWork(true), false);
+  assert.deepEqual(store.openDreamJobs(undefined, true), []);
+  assert.deepEqual(
+    store.openDreamJobs("alice").map((job) => job.id),
+    [dream.id],
+  );
   store.save({ ...own, status: "completed" });
   assert.equal(store.hasOpenOwnWork(), false);
 });

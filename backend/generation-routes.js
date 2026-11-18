@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 
+import { snapDimension } from "../shared/resolution.ts";
 import { upscaleQualities } from "../shared/upscale.ts";
 import { hasFullAccess, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
 import { startFrameSize } from "./animate-profile.js";
@@ -24,12 +25,13 @@ import {
 } from "./gallery/store.js";
 import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
 import { jobs, runJob } from "./jobs.js";
-import { optionalLoraIssue } from "./lora/catalogue.js";
+import { optionalLoraIssue, optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { loraInfos } from "./lora/info.js";
 import { withLoraTriggers } from "./lora/prompts.js";
+import { workflowLoraBase } from "./lora/radiance.js";
 import { loraAllowed } from "./model/catalogue.js";
 import { recordPrompt } from "./prompt-history.js";
-import { RadianceClient } from "./providers/radiance.ts";
+import { RadianceClient, radianceSizeStep } from "./providers/radiance.ts";
 import { referenceExistsForAccount, stageReferenceAssetsForAccount } from "./references.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { upscaleTargets } from "./upscale.js";
@@ -44,6 +46,7 @@ import {
   workerHas,
 } from "./workers.js";
 import { markWorkflowUsed } from "./workflow-catalogue.js";
+import { resolveImageMode } from "./workflow-modes.js";
 
 /** A listed profile as it runs on `backend`, with that backend's own reference slots. */
 const runProfile = (profile, backend) =>
@@ -509,7 +512,9 @@ export function createGenerationSubmission({
     async validateInput(input, account) {
       const routed = await routeGeneration(input, account, undefined, true);
       if (routed.payload) return routed;
+      const radiance = isRadianceWorker(workerById(routed.backend));
       if (routed.offline) {
+        const profile = runProfile(routed.profile, input.profileBackend);
         if (!String(input?.prompt || "").trim())
           return { status: 400, payload: { ok: false, error: "Enter a prompt." } };
         if (input.kind && input.kind !== routed.profile.kind)
@@ -526,11 +531,8 @@ export function createGenerationSubmission({
           fps: 120,
           variationCount: 8,
         })) {
-          const maximum = Math.min(
-            Number(routed.profile.constraints?.[field]?.max) || ceiling,
-            ceiling,
-          );
-          const minimum = Math.max(Number(routed.profile.constraints?.[field]?.min) || 1, 1);
+          const maximum = Math.min(Number(profile.constraints?.[field]?.max) || ceiling, ceiling);
+          const minimum = Math.max(Number(profile.constraints?.[field]?.min) || 1, 1);
           if (
             input[field] !== undefined &&
             (!Number.isFinite(Number(input[field])) ||
@@ -563,12 +565,51 @@ export function createGenerationSubmission({
           };
         try {
           validateReferenceSlots(references, routed.profile);
+          const requested = (Array.isArray(input.loras) ? input.loras : []).filter(
+            (lora) => lora?.enabled !== false && lora?.name,
+          );
+          const installed =
+            requested.length && getCustomWorkflow(input.workflow, input.profileBackend);
+          const workflow = installed && resolveImageMode(installed, input);
+          const loraBase = workflow && workflowLoraBase(workflow, input.modelName);
+          if (loraBase) {
+            const adapterProfile = {
+              ...profile,
+              loraAdapter: workflow.loraStack?.adapter,
+              loraBase,
+            };
+            const infos = await loraInfos(
+              routed.backend,
+              requested.map(({ name }) => name),
+              {
+                remote: false,
+              },
+            );
+            for (const lora of requested) {
+              const issue = optionalLoraPolicyIssue(lora, infos[lora.name], adapterProfile);
+              if (issue) throw new Error(issue);
+            }
+          }
         } catch (error) {
           return { status: 400, payload: { ok: false, error: error.message } };
+        }
+        if (radiance) {
+          const mode = resolveImageMode(profile, input);
+          for (const key of ["width", "height"]) {
+            const value = Number(input[key] ?? mode.defaults?.[key] ?? profile.defaults?.[key]);
+            if (Number.isFinite(value) && value > 0)
+              input[key] = snapDimension(value, {
+                ...profile.constraints?.[key],
+                step: radianceSizeStep,
+              });
+          }
         }
         return { status: 200, payload: { ok: true, backend: routed.backend, waiting: true } };
       }
       const prepared = await prepareGenerationBody(routed.backend, input);
+      // Dream's inherited sizes and direct requests are stored on the worker's grid.
+      if (!prepared.payload && radiance)
+        Object.assign(input, { width: prepared.body.width, height: prepared.body.height });
       return prepared.payload
         ? prepared
         : { status: 200, payload: { ok: true, backend: routed.backend } };

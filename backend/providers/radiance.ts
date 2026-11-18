@@ -26,6 +26,9 @@ export interface RadianceFile {
 
 export const radianceImageNode = "RadianceImageGenerate";
 export const radianceVideoNode = "RadianceVideoGenerate";
+export const radianceSizeStep = 32;
+export const isRadianceNode = (classType: unknown) =>
+  classType === radianceImageNode || classType === radianceVideoNode;
 
 const fps = 24;
 /**
@@ -102,8 +105,8 @@ export function radianceInfo(models: RadianceModel[], loras: string[] = []) {
         model: [names],
         prompt: ["STRING", { multiline: true }],
         negative_prompt: ["STRING", { default: "", multiline: true }],
-        width: ["INT", { default: 1024, min: 64, max: 2048, step: 32 }],
-        height: ["INT", { default: 1024, min: 64, max: 2048, step: 32 }],
+        width: ["INT", { default: 1024, min: 64, max: 2048, step: radianceSizeStep }],
+        height: ["INT", { default: 1024, min: 64, max: 2048, step: radianceSizeStep }],
         steps: ["INT", { default: 8, min: 1, max: 80 }],
         cfg: ["FLOAT", { default: 1, min: 1, max: 10, step: 0.1 }],
         seed,
@@ -120,8 +123,8 @@ export function radianceInfo(models: RadianceModel[], loras: string[] = []) {
       {
         model: [names],
         prompt: ["STRING", { multiline: true }],
-        width: ["INT", { default: 1344, min: 256, max: 2048, step: 32 }],
-        height: ["INT", { default: 768, min: 256, max: 2048, step: 32 }],
+        width: ["INT", { default: 1344, min: 256, max: 2048, step: radianceSizeStep }],
+        height: ["INT", { default: 768, min: 256, max: 2048, step: radianceSizeStep }],
         // Each model's own grid narrows this (radianceVideoLimits).
         frames: ["INT", { default: 192, min: 17, max: 345, step: 1 }],
         steps: ["INT", { default: 50, min: 1, max: 65 }],
@@ -186,12 +189,12 @@ export function imageRequest(
   const model = String(values.model || "");
   const limits = radianceImageLimits(model);
   if (!String(values.prompt || "").trim()) throw new Error("Enter an image prompt.");
-  if (Number(values.width) % 32 || Number(values.height) % 32)
+  if (Number(values.width) % radianceSizeStep || Number(values.height) % radianceSizeStep)
     throw new Error("Image dimensions must be multiples of 32.");
   // A size past the model's longest side shrinks to fit on the 32-pixel grid, keeping its shape.
   const scale = Math.min(1, limits.maxSide / Math.max(Number(values.width), Number(values.height)));
   const [width, height] = [values.width, values.height].map(
-    (side) => Math.floor((Number(side) * scale) / 32) * 32,
+    (side) => Math.floor((Number(side) * scale) / radianceSizeStep) * radianceSizeStep,
   );
   const body: Values = {
     model,
@@ -239,7 +242,9 @@ function seconds(frames: number) {
 function videoSize(width: number, height: number, maxPixels: number) {
   if (width * height <= maxPixels) return [width, height];
   const scale = Math.sqrt(maxPixels / (width * height));
-  return [width, height].map((side) => Math.floor((side * scale) / 32) * 32);
+  return [width, height].map(
+    (side) => Math.floor((side * scale) / radianceSizeStep) * radianceSizeStep,
+  );
 }
 
 /** A reference picture and the role its slot gives it: start, end or (otherwise) reference. */
@@ -267,7 +272,8 @@ export function videoRequest(values: Values, images: RadianceReference[] = []) {
   const refineSteps = Number(values.upscale_refine_steps) || 0;
   const { min, max, step, offset } = limits.frames;
   if (!String(values.prompt || "").trim()) throw new Error("Enter a video prompt.");
-  if (width % 32 || height % 32) throw new Error("Video dimensions must be multiples of 32.");
+  if (width % radianceSizeStep || height % radianceSizeStep)
+    throw new Error("Video dimensions must be multiples of 32.");
   if ((frames - offset) % step || frames < min || frames > max)
     throw new Error(
       `Video frames must follow the ${step}n + ${offset} grid, from ${min} to ${max}.`,

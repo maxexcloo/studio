@@ -88,10 +88,24 @@ const constraintKeys = ["baseModels", "conditionings", "profileIds"] as const;
 export type LoraConstraints = Partial<Record<(typeof constraintKeys)[number], string[]>> & {
   unlisted?: string;
 };
+/** The model that actually runs optional LoRAs when it differs from the profile's base. */
+export type LoraBase = { model: string; family: string; accepts: boolean };
 const basename = (value: unknown) =>
   String(value || "")
     .split(/[\\/]/)
     .pop();
+
+type LoraCompatibilityInfo = { families?: string[]; compatibility?: LoraConstraints };
+type LoraCompatibilityProfile = {
+  id?: string;
+  family?: unknown;
+  loraAdapter?: string | null;
+  loraBase?: LoraBase | null;
+  baseModel?: string;
+  model?: string;
+  defaults?: { model?: unknown };
+  recipe?: { conditioning?: string };
+};
 
 /**
  * Whether a LoRA suits a profile: "other" (trained for another family, or a variant its publisher
@@ -99,37 +113,25 @@ const basename = (value: unknown) =>
  * compatibility.
  */
 export function loraCompatibility(
-  info:
-    | {
-        families?: string[];
-        compatibility?: LoraConstraints;
-      }
-    | null
-    | undefined,
-  profile:
-    | {
-        id?: string;
-        family?: unknown;
-        baseModel?: string;
-        model?: string;
-        defaults?: { model?: unknown };
-        recipe?: { conditioning?: string };
-      }
-    | null
-    | undefined,
+  info: LoraCompatibilityInfo | null | undefined,
+  profile: LoraCompatibilityProfile | null | undefined,
 ): "fits" | "other" | "unknown" {
-  const family = loraFamilyId(profile?.family);
-  if (!info?.families?.length || !family || family === "custom") return "unknown";
-  if (!info.families.some((value) => loraFamilyId(value) === family)) return "other";
-  const constraints = info.compatibility;
-  if (!constraints) return "fits";
-  const model = profile?.baseModel || profile?.defaults?.model || profile?.model;
+  const base = profile?.loraBase;
+  if (base?.accepts === false) return "other";
+  const family = loraFamilyId(base?.family || profile?.family);
+  const knownFamily = Boolean(info?.families?.length && family && family !== "custom");
+  if (knownFamily && !info?.families?.some((value) => loraFamilyId(value) === family))
+    return "other";
+  const constraints = info?.compatibility;
+  if (!constraints) return knownFamily ? "fits" : "unknown";
+  const model = base?.model || profile?.baseModel || profile?.defaults?.model || profile?.model;
   const context = {
     baseModels: String(model || "").startsWith("custom:") ? "" : basename(model),
     conditionings: profile?.recipe?.conditioning,
     profileIds: profile?.id,
   };
   let unknown = false;
+  let matchedTarget = knownFamily;
   for (const key of constraintKeys) {
     if (!Object.hasOwn(constraints, key)) continue;
     if (!context[key]) {
@@ -142,9 +144,20 @@ export function loraCompatibility(
     ) {
       if (constraints.unlisted === "other") return "other";
       unknown = true;
-    }
+    } else if (key !== "conditionings") matchedTarget = true;
   }
-  return unknown ? "unknown" : "fits";
+  return unknown || !matchedTarget ? "unknown" : "fits";
+}
+
+/** Radiance needs a verified target for user-selected adapters. */
+export function loraRejection(
+  info: LoraCompatibilityInfo | null | undefined,
+  profile: LoraCompatibilityProfile | null | undefined,
+) {
+  const fit = loraCompatibility(info, profile);
+  return fit === "other" || (fit === "unknown" && profile?.loraAdapter === "radiance-tags-v1")
+    ? fit
+    : "";
 }
 
 /**

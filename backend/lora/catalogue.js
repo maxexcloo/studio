@@ -1,5 +1,6 @@
 import {
   loraCompatibility,
+  loraRejection,
   loraRoles,
   loraStrengthIssue,
   loraTypes,
@@ -186,12 +187,16 @@ function loraPolicyMetadata(entry) {
 
 /** Applies only to user-added effects, with the server's resolved profile context. */
 export function optionalLoraPolicyIssue(item, info, profile) {
+  if (profile?.loraBase?.accepts === false)
+    return `${profile.displayName || profile.label || "This model"} takes no LoRAs on ${profile.loraBase.model || "this base"}. Remove them from the stack to generate.`;
   // Deferrals cover Radiance's composed adapter; ComfyUI loads the same file exactly.
-  const unavailable =
-    (profile?.loraStack?.adapter ?? profile?.loraAdapter) === "radiance-tags-v1" &&
-    info?.unavailableReason;
+  const loraAdapter = profile?.loraStack?.adapter ?? profile?.loraAdapter;
+  const unavailable = loraAdapter === "radiance-tags-v1" && info?.unavailableReason;
   if (unavailable) return `${info?.title || item.name}: ${unavailable}`;
-  if (loraCompatibility(info, profile) === "other") {
+  const rejection = loraRejection(info, { ...profile, loraAdapter });
+  if (rejection === "unknown")
+    return `${info?.title || item.name} has no verified compatibility with this Radiance model. Remove it from the optional LoRA stack to generate.`;
+  if (rejection === "other") {
     // Another family entirely, or a variant the publisher excludes within this family.
     const family =
       loraCompatibility({ families: info?.families }, profile) === "other"

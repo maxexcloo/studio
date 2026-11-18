@@ -1,11 +1,12 @@
 import { loraDefaultStrength, maxLoras } from "../shared/profiles.ts";
-import { isResolution } from "../shared/resolution.ts";
+import { isResolution, snapDimension } from "../shared/resolution.ts";
 import { missingNodes, nodeRange, optionsFor } from "./comfy/comfy.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { catalogueLoraInfo } from "./lora/info.js";
 import { keptTriggers, recommendedNegative } from "./lora/prompts.js";
-import { inferModels } from "./model/models.js";
+import { workflowLoraBase } from "./lora/radiance.js";
+import { inferModels, workflowFamilyStep } from "./model/models.js";
 import { radianceImageFits } from "./providers/radiance.ts";
 import { hasReferenceImage, resolveImageMode } from "./workflow-modes.js";
 
@@ -71,11 +72,14 @@ function sanitizeLoras(
   kind = "image",
   { limit = maxLoras, adapter } = {},
 ) {
-  if (!profile?.capabilities?.lora) return [];
   const raw = Array.isArray(input.loras) ? input.loras : [];
+  const requested = raw.filter((item) => item?.enabled !== false && item?.name);
+  if (requested.length && profile?.loraBase?.accepts === false)
+    throw new Error(optionalLoraPolicyIssue(requested[0], null, profile));
+  if (!profile?.capabilities?.lora) return [];
   const installed = optionsFor(info, "LoraLoader", "lora_name");
   if (!installed.length) {
-    if (raw.some((item) => item?.enabled !== false && item?.name))
+    if (requested.length)
       throw new Error(
         "The worker has no LoRA inventory. Rescan models before submitting this stack.",
       );
@@ -313,17 +317,28 @@ export function sanitizeGenerateBody(
     : "";
   if (rebalance && !profile.options.rebalances?.includes(rebalance))
     throw new Error("Choose a supported rebalance for this model.");
-  const loras = sanitizeLoras(input, info, profile, kind, {
+  const model = String(input.modelName || customWorkflow?.defaults?.model || "");
+  const loraBase = workflowLoraBase(customWorkflow, model);
+  const loras = sanitizeLoras(input, info, { ...profile, loraBase }, kind, {
     limit: customWorkflow?.loraStack?.max,
     adapter: customWorkflow?.loraStack?.adapter,
   });
   // A run with LoRAs moves to the stack's own model, which graphs.js sends and the item records;
   // otherwise a size and references one card can't hold move to its `-refs` twin where the worker has one.
-  const model = String(input.modelName || customWorkflow?.defaults?.model || "");
   const models = listedModels(info, customWorkflow);
   const twin = `${model}-refs`;
-  const width = snapInteger(input.width, fallback("width", widthRange), widthRange);
-  const height = snapInteger(input.height, fallback("height", heightRange), heightRange);
+  const familyStep = workflowFamilyStep(customWorkflow);
+  const dimension = (key, range) => {
+    const value = fallback(key, range);
+    return familyStep
+      ? snapDimension(clampNumber(input[key], value, range.min, range.max), {
+          ...range,
+          step: Math.max(familyStep, Number(range.step) || 1),
+        })
+      : snapInteger(input[key], value, range);
+  };
+  const width = dimension("width", widthRange);
+  const height = dimension("height", heightRange);
   const crowded = !radianceImageFits(model, width, height, referenceAssets.length);
   const modelName =
     (loras.length && customWorkflow.loraStack?.model) ||
