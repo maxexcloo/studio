@@ -27,8 +27,16 @@ export interface RadianceFile {
 export const radianceImageNode = "RadianceImageGenerate";
 export const radianceVideoNode = "RadianceVideoGenerate";
 export const radianceSizeStep = 32;
+const flux3SizeStep = 16;
 export const isRadianceNode = (classType: unknown) =>
   classType === radianceImageNode || classType === radianceVideoNode;
+
+export function radianceNodeSizeStep(classType: unknown, model: unknown) {
+  if (!isRadianceNode(classType)) return 0;
+  return classType === radianceImageNode && /^flux-3-(?:image-)?klein(?:-|$)/.test(String(model))
+    ? flux3SizeStep
+    : radianceSizeStep;
+}
 
 const fps = 24;
 /**
@@ -105,8 +113,8 @@ export function radianceInfo(models: RadianceModel[], loras: string[] = []) {
         model: [names],
         prompt: ["STRING", { multiline: true }],
         negative_prompt: ["STRING", { default: "", multiline: true }],
-        width: ["INT", { default: 1024, min: 64, max: 2048, step: radianceSizeStep }],
-        height: ["INT", { default: 1024, min: 64, max: 2048, step: radianceSizeStep }],
+        width: ["INT", { default: 1024, min: 64, max: 2048, step: flux3SizeStep }],
+        height: ["INT", { default: 1024, min: 64, max: 2048, step: flux3SizeStep }],
         steps: ["INT", { default: 8, min: 1, max: 80 }],
         cfg: ["FLOAT", { default: 1, min: 1, max: 10, step: 0.1 }],
         seed,
@@ -188,13 +196,14 @@ export function imageRequest(
 ) {
   const model = String(values.model || "");
   const limits = radianceImageLimits(model);
+  const step = radianceNodeSizeStep(radianceImageNode, model);
   if (!String(values.prompt || "").trim()) throw new Error("Enter an image prompt.");
-  if (Number(values.width) % radianceSizeStep || Number(values.height) % radianceSizeStep)
-    throw new Error("Image dimensions must be multiples of 32.");
-  // A size past the model's longest side shrinks to fit on the 32-pixel grid, keeping its shape.
+  if (Number(values.width) % step || Number(values.height) % step)
+    throw new Error(`Image dimensions must be multiples of ${step}.`);
+  // A size past the model's longest side shrinks to fit its grid, keeping its shape.
   const scale = Math.min(1, limits.maxSide / Math.max(Number(values.width), Number(values.height)));
   const [width, height] = [values.width, values.height].map(
-    (side) => Math.floor((Number(side) * scale) / radianceSizeStep) * radianceSizeStep,
+    (side) => Math.floor((Number(side) * scale) / step) * step,
   );
   const body: Values = {
     model,

@@ -610,7 +610,7 @@ export function createGenerationSubmission({
             if (Number.isFinite(value) && value > 0)
               input[key] = snapDimension(value, {
                 ...profile.constraints?.[key],
-                step: radianceSizeStep,
+                step: profile.constraints?.[key]?.step ?? radianceSizeStep,
               });
           }
         }

@@ -12,6 +12,7 @@ const { runRadianceJob, orderedRadianceReferences } = await import("./radiance-j
 const { saveImportedWorkflow } = await import("./custom-workflows.js");
 const { makePendingItems } = await import("./gallery/records.js");
 const { putGalleryItems, galleryItems } = await import("./gallery/store.js");
+const { readImageMetadata } = await import("./image-metadata.js");
 const { mediaFile } = await import("./media-paths.js");
 const sharp = (await import("sharp")).default;
 const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: "blue" } })
@@ -62,9 +63,9 @@ saveImportedWorkflow({
   },
 });
 
-test("Stop during an accepted synchronous image retains the connection and saves the own result", async () => {
+test("Stop keeps accepted Radiance images and saves each with its own seed", async () => {
   const id = "stop-accepted";
-  const body = bodyFor(id);
+  const body = { ...bodyFor(id), count: 2 };
   pending(id, body);
   await runRadianceJob(id, body, worker, {
     store,
@@ -72,16 +73,27 @@ test("Stop during an accepted synchronous image retains the connection and saves
       images: async (_, __, signal) => {
         jobs.set(id, { ...jobs.get(id), status: "cancelling" });
         assert.equal(signal.aborted, false);
-        return [png];
+        return [png, png];
       },
     },
   });
   assert.equal(jobs.get(id).status, "done");
-  const [output] = galleryItems({ jobId: id });
-  assert.equal(output.status, "done");
-  assert.equal(output.settings.profileId, body.profileId);
-  const params = new URLSearchParams(output.url.split("?")[1]);
-  assert.ok(mediaFile(params.get("filename"), params.get("subfolder")));
+  const outputs = galleryItems({ jobId: id }).sort((left, right) => left.index - right.index);
+  assert.deepEqual(
+    outputs.map((output) => output.settings.seed),
+    ["7", "8"],
+  );
+  for (const output of outputs) {
+    assert.equal(output.status, "done");
+    assert.equal(output.settings.profileId, body.profileId);
+    const params = new URLSearchParams(output.url.split("?")[1]);
+    const file = mediaFile(params.get("filename"), params.get("subfolder"));
+    assert.ok(file);
+    assert.match(
+      readImageMetadata(fs.readFileSync(file)).text.parameters,
+      new RegExp(`Seed: ${output.settings.seed}(,|$)`),
+    );
+  }
 });
 
 test("an image run records its queue wait, model load, sampling and save for Details", async () => {

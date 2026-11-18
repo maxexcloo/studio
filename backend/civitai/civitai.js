@@ -126,15 +126,19 @@ function outputFile(output) {
 export async function writeCivitaiParameters(outputs, body) {
   const files = (outputs || [])
     .filter((output) => output?.type !== "video")
-    .map(outputFile)
-    .filter((file) => file && /\.png$/i.test(file));
+    .map((output) => ({ file: outputFile(output), seed: output?.seed ?? body.seed }))
+    .filter(({ file }) => file && /\.png$/i.test(file));
   const results = await Promise.all(
-    files.map(async (file) => {
+    files.map(async ({ file, seed }) => {
       try {
         const buffer = await fs.promises.readFile(file);
         const width = buffer.length > 24 ? buffer.readUInt32BE(16) : 0;
         const height = buffer.length > 24 ? buffer.readUInt32BE(20) : 0;
-        const next = withPngText(buffer, "parameters", parametersText(body, { width, height }));
+        const next = withPngText(
+          buffer,
+          "parameters",
+          parametersText({ ...body, seed }, { width, height }),
+        );
         if (!next) return false;
         await writeBytesFileAsync(file, next);
         return true;
