@@ -385,7 +385,7 @@ export function GenerationEditor({
                 ),
               }))}
             />
-            <Group gap="xs" wrap="nowrap" flex={phone ? 1 : undefined} miw={0} justify="flex-end">
+            <Group className={classes.actions} gap="xs" wrap="nowrap" miw={0} justify="flex-end">
               <ClearButton className={classes.resting} onClear={onClear} onUndo={onUndoClear} />
               <Tooltip
                 label={blockedReason}
