@@ -108,8 +108,9 @@ test("A text-only Radiance default sends a run with references to ComfyUI", asyn
   );
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Follow the reference");
+  // Its Radiance block takes no LoRA runs, so the picker already offers ComfyUI's stack.
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText("0/4");
+  await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText("0/8");
   await closeLoras(page);
   const picker = await openReferenceChoices(page);
   await showUploads(page);
