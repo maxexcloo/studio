@@ -11,6 +11,8 @@ import {
   Combobox,
   ComboboxPopover,
   Drawer,
+  DrawerRoot,
+  type DrawerRootProps,
   FloatingIndicator,
   Input,
   Menu,
@@ -97,6 +99,13 @@ const dropdown = {
 // Title rows sit on their surface; dialogs scroll only their body beneath them.
 const overlayHeader = { background: "transparent" } satisfies CSSProperties;
 const overlayTitle = { fontWeight: 600 } satisfies CSSProperties;
+// A drawer that reaches the top of the screen keeps clear of the status bar in the installed app,
+// and one at a side clear of the notch when the phone is held sideways.
+const drawerInsets = ({ position = "left", size }: DrawerRootProps): CSSProperties => ({
+  ...((position !== "bottom" || size === "100%") && { paddingTop: "env(safe-area-inset-top)" }),
+  ...(position === "left" && { paddingLeft: "env(safe-area-inset-left)" }),
+  ...(position === "right" && { paddingRight: "env(safe-area-inset-right)" }),
+});
 // A closing dialog or drawer lets presses through to what it reveals while it fades out.
 const fading = (opened: boolean): CSSProperties => (opened ? {} : { pointerEvents: "none" });
 
@@ -229,7 +238,7 @@ export function studioTheme({
           root: { "--app-shell-border-color": "var(--studio-glass-border)" } as CSSProperties,
           aside: chrome,
           footer: chrome,
-          header: chrome,
+          header: { ...chrome, paddingTop: "env(safe-area-inset-top)" },
           navbar: chrome,
         },
       }),
@@ -266,7 +275,7 @@ export function studioTheme({
       ComboboxPopover: ComboboxPopover.extend({ styles: { option: target } }),
       Drawer: Drawer.extend({
         styles: (_theme, props) => ({
-          content: fading(props.opened),
+          content: { ...fading(props.opened), ...drawerInsets(props) },
           header: overlayHeader,
           overlay: fading(props.opened),
           title: overlayTitle,
@@ -274,7 +283,10 @@ export function studioTheme({
       }),
       // On the parts, so a compound Drawer (a header with its own actions) shares them.
       DrawerOverlay: { defaultProps: { blur: 6, backgroundOpacity: 0.4 } },
-      DrawerRoot: { defaultProps: { transitionProps } },
+      DrawerRoot: DrawerRoot.extend({
+        defaultProps: { transitionProps },
+        styles: (_theme, props) => ({ content: drawerInsets(props) }),
+      }),
       // Selection indicators slide between items with the shared motion.
       FloatingIndicator: FloatingIndicator.extend({
         defaultProps: { transitionDuration: motionDuration },

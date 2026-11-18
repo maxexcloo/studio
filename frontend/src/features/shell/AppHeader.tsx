@@ -125,7 +125,6 @@ export function AppHeader({ mode }: { mode: string }) {
   return (
     <Group
       h="100%"
-      px={phone ? "sm" : "lg"}
       gap="xs"
       justify="space-between"
       wrap="nowrap"

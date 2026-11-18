@@ -52,6 +52,11 @@ select {
 :not([data-portal]) > [data-popup] {
   background: var(--studio-glass-solid) !important;
 }
+/* The installed app draws under the status bar and, held sideways, beside the notch; full-screen
+   dialogs and sheets keep their content clear of both (their footers clear the home indicator). */
+:where(.mantine-Modal-content[data-full-screen]) {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
 .mantine-Notifications-root[data-position="top-center"] {
   top: calc(var(--mantine-spacing-xs) + env(safe-area-inset-top));
   width: calc(
