@@ -45,7 +45,7 @@ jobs:
         uses: maxexcloo/dotfiles/.github/actions/mise@main
         with:
           # Renovate requires Node 24 in addition to the application runtime.
-          tools: actionlint node node@24 npm:renovate oxfmt
+          tools: actionlint ffmpeg node node@24 npm:renovate oxfmt
       - name: Install Dependencies
         run: mise run setup
       - name: Resolve Browser Image
@@ -86,7 +86,7 @@ jobs:
       - name: Set Up Shared Tools & Tasks
         uses: maxexcloo/dotfiles/.github/actions/mise@main
         with:
-          tools: node
+          tools: ffmpeg node
       - name: Install Dependencies
         run: mise run setup
       - name: Restore Frontend

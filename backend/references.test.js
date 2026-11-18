@@ -2,7 +2,6 @@ import "./fixtures/local-worker.js";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -270,9 +269,8 @@ test("a video's last frame is referenced only by its owner and only for finished
 });
 
 test("a video upload is an uploaded gallery video, used by its first frame and read by its poster", async (t) => {
-  let encoder;
+  const encoder = "ffmpeg";
   try {
-    encoder = createRequire(import.meta.url)("ffmpeg-static");
     execFileSync(encoder, ["-version"], { stdio: "ignore" });
   } catch {
     return t.skip("ffmpeg is not installed");
