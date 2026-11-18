@@ -68,6 +68,7 @@ import { createFaceRedo } from "./domain/face-redo.ts";
 import { createFinishing, registerFinishingRoutes } from "./domain/finishing.ts";
 import { registerIdlePassRoutes } from "./domain/idle-work.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
+import { createIssues, registerIssueRoutes } from "./domain/issues.ts";
 import { createProjects, stylesWithChoice } from "./domain/projects.ts";
 import { createReview } from "./domain/review.ts";
 import { registerMaintenanceRoutes, registerQueueRoutes } from "./domain/routes.ts";
@@ -161,6 +162,7 @@ import {
 } from "./multi-user-auth.js";
 import { enforceMultiUserRequest } from "./multi-user-gate.js";
 import { galleryKey } from "./persistence/gallery-rows.ts";
+import { mcpOwnership } from "./persistence/mcp-ownership.ts";
 import {
   readRuntimeDocument,
   runtimeDatabase,
@@ -820,6 +822,19 @@ registerCompareRoutes(app, {
   },
 });
 registerTasteRoutes(app, { taste });
+const mcpRecords = mcpOwnership(runtimeDatabase(dataDir));
+registerIssueRoutes(app, {
+  issues: createIssues({
+    dataDir,
+    taste,
+    recent: (ownerId, since) =>
+      galleryItems({ ownerId, type: "image", status: "done", since, limit: 400 }),
+    request: (jobId) => mcpRecords.prompt(jobId)?.request || "",
+    writer: tasteWriter,
+    promptWriter: textWriter,
+    updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
+  }),
+});
 /** Whether what the owner is offered may be worded explicitly: Uncensored Models, always in single-user mode. */
 const explicitFor = (ownerId) =>
   !ownerId || mayUseFeature(accountAccessForId(ownerId), "uncensoredModels");

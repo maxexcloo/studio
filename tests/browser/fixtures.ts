@@ -1275,6 +1275,8 @@ export async function serveDream(
     reason?: string;
     /** The taste profile `/api/taste` serves; edits keep learnt words separate. */
     taste?: Record<string, unknown>;
+    /** Recurring issues `/api/taste/issues` serves; Add Rule and Dismiss remove one. */
+    issues?: any[];
     /** Dream's projects, which create, edit, Undo and Delete change. */
     projects?: any[];
     /** When the visit before this one ended. */
@@ -1362,6 +1364,21 @@ export async function serveDream(
       Object.entries(fields).map(([key, none]) => [key, options.taste?.[key] ?? none]),
     ),
   };
+  let issues = options.issues ?? [];
+  await page.route(/\/api\/taste\/issues(?:\/\w+)?$/, (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() === "POST") {
+      const body = request.postDataJSON() || {};
+      state.requests.push({ method: "POST", path, body });
+      if (path.endsWith("/accept")) {
+        Object.assign(taste, { rules: [...(taste.rules as string[]), body.rule] });
+        issues = issues.filter((issue) => issue.rule !== body.rule);
+      }
+      if (path.endsWith("/dismiss")) issues = issues.filter((issue) => issue.issue !== body.issue);
+    }
+    return route.fulfill({ json: { updatedAt: "", issues, writer: false } });
+  });
   await page.route(/\/api\/taste$/, (route) => {
     const request = route.request();
     if (request.method() === "PUT") {
