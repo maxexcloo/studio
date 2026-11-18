@@ -12,7 +12,7 @@ export const dreamDefaults = {
 };
 export type DreamSettings = typeof dreamDefaults;
 /**
- * The settings an administrator may force on every account (Settings › Dream), overriding each
+ * The settings an administrator may force on every account (Settings › Generation), overriding each
  * account's own choice; unset leaves the account's choice.
  */
 export const dreamOverrideKeys = {

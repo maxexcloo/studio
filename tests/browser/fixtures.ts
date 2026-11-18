@@ -1086,6 +1086,12 @@ export async function editDefinition(page: Page, kind: "Profile" | "Guide") {
 
 /** Chooses one of a Library or Settings list's segmented views, such as Models › Available. */
 export async function chooseView(page: Page, list: string, view: string) {
+  // Phones list the views in a menu named by the current one.
+  if (page.viewportSize()!.width < 768) {
+    await page.getByRole("button", { name: `${list} View`, exact: true }).click();
+    await page.getByRole("menuitem", { name: view, exact: true }).click();
+    return;
+  }
   await page
     .getByRole("radiogroup", { name: `${list} View`, exact: true })
     .getByText(view, { exact: true })
@@ -1609,7 +1615,7 @@ export function videoClip() {
   }
 }
 
-/** Settings › Dream with no overrides: every account chooses for itself. */
+/** Settings › Generation with no Dream overrides: every account chooses for itself. */
 export const dreamOverridesFixture = () =>
   Object.fromEntries(
     Object.entries(dreamOverrideKeys).map(([name, key]) => [

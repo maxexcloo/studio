@@ -1,4 +1,4 @@
-import { Button, SegmentedControl, Select, Stack, Switch } from "@mantine/core";
+import { Button, SegmentedControl, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { Fragment } from "react";
 
@@ -6,8 +6,9 @@ import { isCloudProfile } from "../../../../shared/profiles";
 import { titleCase } from "../../../../shared/titles";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { ChipOption, ChipSelect } from "../generation/ChipSelect";
 import { modelsQuery } from "../generation/GenerationProvider";
-import { profileName } from "../generation/payload";
+import { ProfileSelect } from "../generation/ProfilePicker";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import {
@@ -67,6 +68,8 @@ function ModelChoices() {
   );
 }
 
+/** The model a side uses until the account picks one. */
+const studioDefault = "Studio's Default";
 const sides: { value: SidePreference; label: string }[] = [
   { value: "cloud", label: "Cloud" },
   { value: "local", label: "Local" },
@@ -100,24 +103,15 @@ function WhereWorkRuns() {
   if (!status) return null;
   const { preferences } = status;
   const cloud = preferences.cloudModels;
-  const choices = (kind: WorkKind, side: SidePreference) =>
-    kind === "text"
-      ? (textModels || [])
-          .filter((model) => model.startsWith("local/") === (side === "local"))
-          .map((value) => ({ value, label: textModelName(value) }))
-      : (profiles || [])
-          .filter(
-            (profile) =>
-              profile.kind === (kind === "images" ? "image" : "video") &&
-              isCloudProfile(profile) === (side === "cloud"),
-          )
-          .map((profile) => ({ value: profile.id, label: profileName(profile) }));
   const defaultRow = (kind: WorkKind, label: string, side: SidePreference) => {
     const key = defaultModelKeys[kind][side];
     const sideLabel = side === "cloud" ? "Cloud" : "Local";
     const name = `${label} Default ${sideLabel} Model`;
-    const data = choices(kind, side);
-    const value = preferences[key];
+    const value = preferences[key] ?? null;
+    const choose = (choice: string | null) => save.mutate({ [key]: choice || null });
+    const text = (textModels || []).filter(
+      (model) => model.startsWith("local/") === (side === "local"),
+    );
     return (
       <SettingRow
         key={key}
@@ -125,17 +119,37 @@ function WhereWorkRuns() {
         label={name}
         description={`The ${label.toLowerCase()} model ${sideLabel} uses until you pick one.`}
       >
-        <Select
-          aria-label={name}
-          placeholder="Studio's Default"
-          // A saved model no longer offered stays a choice, so it reads as what it is.
-          data={value && !data.some((item) => item.value === value) ? [...data, value] : data}
-          value={value ?? null}
-          onChange={(choice) => save.mutate({ [key]: choice })}
-          clearable
-          searchable
-          nothingFoundMessage="No Matches"
-        />
+        {kind === "text" ? (
+          <ChipSelect
+            field
+            name={name}
+            searchable
+            nothingFoundMessage="No Matches"
+            data={[
+              { value: "", label: studioDefault },
+              ...text.map((model) => ({ value: model, label: textModelName(model) })),
+            ]}
+            value={value ?? ""}
+            renderOption={({ option, checked }) => (
+              <ChipOption label={option.label} checked={checked} />
+            )}
+            onChange={choose}
+            label={value ? textModelName(value) : studioDefault}
+          />
+        ) : (
+          <ProfileSelect
+            field
+            name={name}
+            unset={studioDefault}
+            profiles={(profiles || []).filter(
+              (profile) =>
+                profile.kind === (kind === "images" ? "image" : "video") &&
+                isCloudProfile(profile) === (side === "cloud"),
+            )}
+            value={value}
+            onChange={(profile) => choose(profile?.id ?? null)}
+          />
+        )}
       </SettingRow>
     );
   };

@@ -425,16 +425,6 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
         rowActions={(item) => (
           <>
             <Menu.Item
-              leftSection={<icons.retry size={16} />}
-              disabled={
-                item.phase !== "running" ||
-                (Boolean(operation) && !(item.radiance && operation?.stop.includes(item.id)))
-              }
-              onClick={() => setRestarting(item.id)}
-            >
-              {stopsNow(item) ? "Stop Now" : "Restart"}
-            </Menu.Item>
-            <Menu.Item
               leftSection={<icons.resume size={16} />}
               disabled={Boolean(operation) || (item.phase !== "parked" && item.phase !== "down")}
               onClick={() => starting.mutate(item.id)}
@@ -447,6 +437,16 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
               onClick={() => previewing.mutate(running.filter((id) => id !== item.id))}
             >
               Stop
+            </Menu.Item>
+            <Menu.Item
+              leftSection={<icons.retry size={16} />}
+              disabled={
+                item.phase !== "running" ||
+                (Boolean(operation) && !(item.radiance && operation?.stop.includes(item.id)))
+              }
+              onClick={() => setRestarting(item.id)}
+            >
+              {stopsNow(item) ? "Stop Now" : "Restart"}
             </Menu.Item>
             <Menu.Divider />
             {item.text && benchmarks?.configured && (
@@ -462,7 +462,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
               leftSection={<icons.log size={16} />}
               onClick={() => setWorkloadLogId(item.id)}
             >
-              View Log
+              View Logs
             </Menu.Item>
             <Menu.Divider />
             <Menu.Item
@@ -491,7 +491,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
               flex="none"
               onClick={() => setLogId(shown.id)}
             >
-              View Log
+              View Logs
             </Button>
             {operation && (
               <Button
@@ -631,7 +631,7 @@ export function RuntimeHistory() {
           empty="No Changes"
           rowActions={(entry) => (
             <Menu.Item leftSection={<icons.log size={16} />} onClick={() => setLogId(entry.id)}>
-              View Log
+              View Logs
             </Menu.Item>
           )}
           columns={[

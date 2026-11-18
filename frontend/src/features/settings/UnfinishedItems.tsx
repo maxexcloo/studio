@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Button, Group, Menu, Modal, Stack, Text, Tooltip } from "@mantine/core";
+import { Badge, Button, Group, Menu, Modal, Stack, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ListRestart } from "lucide-react";
 import { useState } from "react";
@@ -12,7 +12,6 @@ import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingRow } from "../../ui/SettingRows";
-import { usePhone } from "../../ui/usePhone";
 import { useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
 import { queueQuery, statusLabels } from "../generation/Queue";
@@ -47,7 +46,6 @@ type Bulk = keyof typeof bulk;
  */
 export function UnfinishedItems() {
   const client = useQueryClient();
-  const phone = usePhone();
   const [opened, setOpened] = useState(false);
   const [deleting, setDeleting] = useState<UnfinishedJob | null>(null);
   const [confirming, setConfirming] = useState<Exclude<Bulk, "retry-all">>();
@@ -120,15 +118,7 @@ export function UnfinishedItems() {
                     disabled: actAll.isPending,
                     onClick: () => (key === "retry-all" ? actAll.mutate(key) : setConfirming(key)),
                   } as const;
-                  const Icon = bulk[key].icon;
-                  // Phones keep the heading to one row with icons alone.
-                  return phone ? (
-                    <Tooltip key={key} label={bulk[key].label}>
-                      <ActionIcon aria-label={bulk[key].label} {...shared}>
-                        <Icon size={18} />
-                      </ActionIcon>
-                    </Tooltip>
-                  ) : (
+                  return (
                     <ToolbarAction
                       key={key}
                       label={bulk[key].label}

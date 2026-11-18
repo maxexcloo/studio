@@ -17,7 +17,7 @@ export interface Deployment {
     profiles: { id: string; label: string; kind: string; ready: boolean }[];
   };
   catalogue: Flag[];
-  /** Settings › Dream: each override, `null` where each account chooses. */
+  /** Settings › Generation › Dream: each override, `null` where each account chooses. */
   dream: { [K in DreamOverride]: Source & { key: string; value: DreamSettings[K] | null } };
   integrations: {
     civitai: { token: { set: boolean } };
@@ -25,7 +25,7 @@ export interface Deployment {
     assistant: { available: boolean; note?: string; model?: string };
   };
 }
-/** Settings › Dream, Gallery, Generation and Integrations: values an administrator saves for everyone. */
+/** Settings › Gallery, Generation and Integrations: values an administrator saves for everyone. */
 export const deploymentQuery = queryOptions({
   queryKey: ["settings-deployment"],
   queryFn: () => api<Deployment>("/api/settings/deployment"),

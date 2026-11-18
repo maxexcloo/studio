@@ -363,23 +363,19 @@ test("The Profiles toolbar groups search and filter, then More and importing", a
   const toolbar = page
     .getByRole("button", { name: "Filter Profiles", exact: true })
     .locator("xpath=..");
-  const items = await toolbar.evaluate((group) =>
-    [...group.children].map((item) =>
-      item.getAttribute("role") === "separator"
-        ? "|"
-        : item.getAttribute("aria-label") ||
-          item.querySelector("input")?.getAttribute("aria-label") ||
-          item.textContent?.trim(),
-    ),
-  );
-  expect(items).toEqual([
-    "Search Profiles",
-    "Filter Profiles",
-    "|",
-    "More Profiles Actions",
-    "Import Workflow",
-  ]);
-  await page.getByRole("button", { name: "More Profiles Actions", exact: true }).click();
+  const search = toolbar.getByLabel("Search Profiles", { exact: true });
+  const filter = toolbar.getByRole("button", { name: "Filter Profiles", exact: true });
+  const divider = toolbar.getByRole("separator");
+  const more = toolbar.getByRole("button", { name: "More Profiles Actions", exact: true });
+  const importing = toolbar.getByRole("button", { name: "Import Workflow", exact: true });
+  const controls = search.or(filter).or(divider).or(more).or(importing);
+  await expect(controls).toHaveCount(5);
+  await expect(controls.nth(0)).toHaveAccessibleName("Search Profiles");
+  await expect(controls.nth(1)).toHaveAccessibleName("Filter Profiles");
+  await expect(controls.nth(2)).toHaveRole("separator");
+  await expect(controls.nth(3)).toHaveAccessibleName("More Profiles Actions");
+  await expect(controls.nth(4)).toHaveAccessibleName("Import Workflow");
+  await more.click();
   await expect(page.getByRole("menuitem")).toHaveText(["Download All"]);
 });
 
