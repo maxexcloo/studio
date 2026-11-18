@@ -166,6 +166,8 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await undoAssistance(page, "Prompt improved");
   await expect(prompt).toHaveValue("My later direction");
   await assist(page, "Write Negative");
+  // The phone sheet keeps typing the prompt through its menu, with the negative prompt hidden.
+  await finishTyping(page);
   await expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
     "poor quality",
   );
@@ -179,6 +181,7 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
     page.getByRole("button", { name: "Apply Detail Slider", exact: true }),
   ).toBeDisabled();
   await expect(prompt).toHaveValue("My later direction in warm light");
+  await finishTyping(page);
   await openLoraChoices(page);
   await page.getByRole("button", { name: "Soft Style", exact: true }).click();
   await closeLoras(page);

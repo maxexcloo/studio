@@ -32,8 +32,7 @@
 
 /*
  * The phone Generate sheet never scrolls: the fields take the room above a bottom bar of chips
- * (wrapping onto as many rows as they need) and actions, which sits at the safe bottom or just
- * above the keyboard (`--keyboard-inset`).
+ * and actions, which sits at the safe bottom or just above the keyboard (`--keyboard-inset`).
  */
 .editor[data-fill] {
   flex: 1;
@@ -60,19 +59,28 @@
   border-top: 1px solid var(--studio-glass-border);
 }
 
-/*
- * While the keyboard is up for a text box (or its tools have focus), it alone fills the room above
- * the bar, which keeps only its actions; the chips and the other box return when the text loses
- * focus or the keyboard drops.
- */
-:global([data-typing]) .editor[data-fill] .fields:focus-within > :not(:focus-within) {
-  display: none;
+/* Its chips keep one row that scrolls sideways from edge to edge; the block padding keeps their
+   focus rings inside the scroller. */
+.editor[data-fill] .footer > [aria-label="Generation Inputs"] {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  margin: -4px calc(-1 * var(--mantine-spacing-md));
+  padding: 4px var(--mantine-spacing-md);
 }
 
-:global([data-typing])
-  .editor[data-fill]:has(.fields:focus-within)
-  .footer
-  > [aria-label="Generation Inputs"] {
+.editor[data-fill] .footer > [aria-label="Generation Inputs"] > * {
+  flex-shrink: 0;
+}
+
+/*
+ * While a text box is being typed in (`data-typing` names it), its text, tools or their menu
+ * having focus, it alone fills the room above the bar, which keeps only its actions; the chips and
+ * the other box return when typing ends.
+ */
+:global([data-typing="prompt"]) .editor[data-fill] .fields > :not([data-text-box="prompt"]),
+:global([data-typing="negative"]) .editor[data-fill] .fields > :not([data-text-box="negative"]),
+:global([data-typing]) .editor[data-fill] .footer > [aria-label="Generation Inputs"] {
   display: none;
 }
 

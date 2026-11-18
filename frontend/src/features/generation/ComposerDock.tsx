@@ -96,12 +96,15 @@ export const ComposerDock = memo(function ComposerDock({
   // Tapping a text box flips the sheet's typing layout at once, rather than once iOS reports the
   // keyboard after its animation, and holds it while the keyboard animates and iOS scrolls to the
   // text; it ends as the text loses focus or the keyboard drops (Android's Back keeps focus). The
-  // bar's lift still follows the viewport.
-  const [typing, setTappedField] = useState(false);
+  // bar's lift still follows the viewport. It names the box being typed in (`data-text-box`), which
+  // keeps the screen while the box's tools or their menu have focus.
+  const [typing, setTyping] = useState<string>();
   const tapping = useRef(false);
-  useKeyboardDrop(typing, () => setTappedField(false));
+  useKeyboardDrop(typing !== undefined, () => setTyping(undefined));
   const sheetField = (panel: HTMLElement, target: unknown) =>
     target instanceof HTMLTextAreaElement && panel.contains(target);
+  const textBox = (target: EventTarget) =>
+    (target as Element).closest<HTMLElement>("[data-text-box]")?.dataset.textBox;
   // Phones type in the Generate sheet instead, so the dock stays put there. On other touch screens
   // (a phone held sideways, a tablet) only typing in the dock lifts it above the keyboard, and the
   // open panel fits the room left above it (`--dock-room`); a desktop keeps its own scroll.
@@ -139,7 +142,7 @@ export const ComposerDock = memo(function ComposerDock({
   function collapse(restoreFocus = true) {
     returningFocus.current = restoreFocus;
     // The sheet unmounts without a blur.
-    setTappedField(false);
+    setTyping(undefined);
     close();
     setExpanded(false);
     if (compose) onDropState("compose");
@@ -353,19 +356,28 @@ export const ComposerDock = memo(function ComposerDock({
               sheet.current = panel?.closest<HTMLElement>(".mantine-Drawer-content") ?? null;
             }}
             className={classes.panel}
-            data-typing={typing || undefined}
+            data-typing={typing}
             onPointerDown={(event) => {
               tapping.current = sheetField(event.currentTarget, event.target);
               // A tap on text that already has focus (returned from a menu) raises the keyboard too.
-              if (tapping.current && event.target === document.activeElement) setTappedField(true);
+              if (tapping.current && event.target === document.activeElement)
+                setTyping(textBox(event.target));
             }}
             onFocus={(event) => {
-              if (tapping.current && sheetField(event.currentTarget, event.target))
-                setTappedField(true);
+              if (
+                (tapping.current || typing !== undefined) &&
+                sheetField(event.currentTarget, event.target)
+              )
+                setTyping(textBox(event.target));
               tapping.current = false;
             }}
             onBlur={(event) => {
-              if (!sheetField(event.currentTarget, event.relatedTarget)) setTappedField(false);
+              const next = event.relatedTarget;
+              if (
+                !sheetField(event.currentTarget, next) &&
+                !(next instanceof Element && next.closest(`${popupLayer}, [data-text-tools]`))
+              )
+                setTyping(undefined);
             }}
             aria-hidden={handingOver || !opened || undefined}
             inert={!opened}
