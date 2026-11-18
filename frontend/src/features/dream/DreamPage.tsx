@@ -101,6 +101,7 @@ export function DreamPage() {
   const phone = usePhone();
   const [media, setMedia] = useRemembered<DreamMedia>("dream-media", "image");
   const [undoTarget, setUndoTarget] = useState<HTMLDivElement | null>(null);
+  const [actionTarget, setActionTarget] = useState<HTMLDivElement | null>(null);
   const client = useQueryClient();
   const dream = useQuery(dreamQuery);
   const count = useQuery(dreamCountQuery);
@@ -117,8 +118,9 @@ export function DreamPage() {
   const navigate = useNavigate();
   const setView = (next: (typeof views)[number]) =>
     navigate(next === "deck" ? "/dream" : `/dream/${next}`);
+  const mediaLabels = { image: "Images", video: "Videos" };
   const viewLabels = {
-    deck: "Deck",
+    deck: mediaLabels[media],
     overview: "Overview",
     projects: "Projects",
     taste: "Taste",
@@ -134,17 +136,25 @@ export function DreamPage() {
     }))
     .filter((group) => group.items.length || group.misses.length);
   // Unseen cards of each kind, so new work on the other kind is never hidden.
-  const counted = (label: string, unseen = 0) => (unseen ? `${label} (${unseen})` : label);
-  const selector = ["deck", "overview", "discarded", "history"].includes(view) && (
+  const unseen = { image: count.data?.images, video: count.data?.videos };
+  const counted = (kind: DreamMedia) =>
+    unseen[kind] ? `${mediaLabels[kind]} (${unseen[kind]})` : mediaLabels[kind];
+  // The deck takes its media from the view menu; the other views that list media switch here.
+  const selector = ["overview", "discarded", "history"].includes(view) && (
     <SegmentedControl
       aria-label="Dream Media"
       value={media}
       onChange={(value) => setMedia(value as DreamMedia)}
       data={[
-        { value: "image", label: counted("Images", count.data?.images) },
-        { value: "video", label: counted("Videos", count.data?.videos) },
+        { value: "image", label: counted("image") },
+        { value: "video", label: counted("video") },
       ]}
     />
+  );
+  const item = (label: string, checked: boolean, open: () => void) => (
+    <Menu.Item key={label} rightSection={checked ? <Check size={14} /> : undefined} onClick={open}>
+      {label}
+    </Menu.Item>
   );
   return (
     <div className={classes.page}>
@@ -156,7 +166,6 @@ export function DreamPage() {
                 variant="subtle"
                 color="gray"
                 aria-label="Dream View"
-                leftSection={<icons.dream size={16} />}
                 rightSection={<ChevronDown size={14} />}
               >
                 {viewLabels[view]}
@@ -164,15 +173,16 @@ export function DreamPage() {
             </Menu.Target>
           </PopupTooltip>
           <Menu.Dropdown>
-            {views.map((value) => (
+            {(["image", "video"] as const).map((kind) =>
+              item(counted(kind), view === "deck" && media === kind, () => {
+                setMedia(kind);
+                setView("deck");
+              }),
+            )}
+            {views.slice(1).map((value) => (
               <Fragment key={value}>
                 {value === "discarded" && <Menu.Divider />}
-                <Menu.Item
-                  rightSection={view === value ? <Check size={14} /> : undefined}
-                  onClick={() => setView(value)}
-                >
-                  {viewLabels[value]}
-                </Menu.Item>
+                {item(viewLabels[value], view === value, () => setView(value))}
               </Fragment>
             ))}
           </Menu.Dropdown>
@@ -180,6 +190,7 @@ export function DreamPage() {
         {!phone && selector}
         <div ref={setUndoTarget} style={{ display: "contents" }} />
         <Group gap={4} wrap="nowrap" ml="auto">
+          <div ref={setActionTarget} style={{ display: "contents" }} />
           {data?.settings.enabled && (
             <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
               <ActionIcon
@@ -202,7 +213,7 @@ export function DreamPage() {
       ) : view === "history" ? (
         <DreamHistory media={media} />
       ) : view === "projects" ? (
-        <DreamProjects />
+        <DreamProjects actionTarget={actionTarget} />
       ) : view === "taste" ? (
         phone ? (
           <ScrollArea flex={1} mih={0} w="100%">

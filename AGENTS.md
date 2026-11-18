@@ -147,7 +147,9 @@ recur across features.
   Dream's Accept keeps a result unrated; its Like accepts and rates it.
 - The Dream Deck alone has its own look: large round Dislike (✕), Like (♥) and
   Accept (✓) buttons and swipes, as dating apps have them, with Undo beside the
-  view menu stepping back through the session's judgements.
+  view menu stepping back through the session's judgements. Its preview offers
+  only those buttons, under the card's media and full text, and swipes between
+  a comparison's sides.
 - A finished selection action ends the selection, keeping selected only the
   items it failed for; opening a menu does not. Quick selects take every
   match, not only loaded pages, and deletion confirms.
@@ -244,7 +246,8 @@ recur across features.
   comparison share `MediaZoom`. Display, thumbnails, sharing and downloads
   respect the saved original/upscale choice through `mediaSource`.
 - Reserve media dimensions, virtualise large galleries, lazy-load images and
-  avoid autoplaying tile videos. Release a closed viewer's player and pause
+  avoid autoplaying tile videos; only the Dream Deck's top card plays its
+  videos, muted and in step. Release a closed viewer's player and pause
   playback when the tab hides. Heavy tools load only when opened. Paging keeps
   loaded results and offers retry on failure.
 
