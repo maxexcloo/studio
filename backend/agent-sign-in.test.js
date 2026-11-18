@@ -1,18 +1,20 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import net from "node:net";
-import os from "node:os";
 import path from "node:path";
 import { text } from "node:stream/consumers";
 import test from "node:test";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-agent-sign-in-"));
+import { temporaryFolder } from "./fixtures/temporary.js";
+
+const temporary = temporaryFolder(
+  "studio-agent-sign-in-",
+  () => new Promise((resolve) => server.close(resolve)),
+);
 process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
 const store = await import("./account-store.js");
 const { listenForAgentSignIn } = await import("./agent-sign-in.js");
 const socketPath = path.join(temporary, "sign-in.sock");
 const server = listenForAgentSignIn(socketPath);
-test.after(() => server.close());
 
 async function ask(email) {
   const socket = net.connect(socketPath);

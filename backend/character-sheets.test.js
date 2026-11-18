@@ -1,14 +1,12 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 
 import sharp from "sharp";
 
 import { characterLead, sheetView } from "../shared/characters.ts";
+import { temporaryFolder } from "./fixtures/temporary.js";
 
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-character-sheets-"));
+process.env.STUDIO_DATA_DIR = temporaryFolder("studio-character-sheets-");
 const { characterPrompt, createCharacterSheets, sheetPanels, sheetProfile, sheetReferences } =
   await import("./character-sheets.js");
 const { createCard, listCards } = await import("./cards.js");
