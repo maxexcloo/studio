@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { execFileSync, fork, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -18,12 +17,7 @@ fs.mkdirSync(media, { recursive: true });
 await sharp({ create: { width: 900, height: 900, channels: 3, background: "#a37" } })
   .png()
   .toFile(path.join(media, "still.png"));
-let encoder;
-try {
-  encoder = createRequire(import.meta.url)("ffmpeg-static");
-} catch {
-  encoder = "ffmpeg";
-}
+const encoder = "ffmpeg";
 let canEncode = true;
 try {
   execFileSync(encoder, [

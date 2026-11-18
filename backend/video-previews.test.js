@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test, { after } from "node:test";
@@ -11,12 +10,7 @@ import express from "express";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-video-previews-test-"));
 process.env.STUDIO_DATA_DIR = path.join(dir, "data");
 const previews = await import("./video-previews.js");
-let encoder;
-try {
-  encoder = createRequire(import.meta.url)("ffmpeg-static");
-} catch {
-  encoder = "ffmpeg";
-}
+const encoder = "ffmpeg";
 let available = true;
 try {
   execFileSync(encoder, ["-version"], { stdio: "ignore" });

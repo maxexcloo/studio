@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { Transform } from "node:stream";
@@ -16,17 +15,7 @@ import { mediaType } from "./media-paths.js";
 import { sendMediaBuffer } from "./media-response.js";
 import { digest } from "./values.js";
 
-const require = createRequire(import.meta.url);
-let encoder = process.env.STUDIO_FFMPEG_PATH;
-if (!encoder) {
-  try {
-    const bundled = require("ffmpeg-static");
-    if (bundled && fs.existsSync(bundled)) encoder = bundled;
-  } catch {
-    /* System ffmpeg remains usable. */
-  }
-}
-encoder ||= "ffmpeg";
+const encoder = process.env.STUDIO_FFMPEG_PATH || "ffmpeg";
 const dir = path.join(dataDir, ".video-previews");
 // Grid tiles run up to ~700 CSS px on a 2x screen: 720 keeps them sharp at a few MB per clip.
 const version = "v2-720-24-8";
