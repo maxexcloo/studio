@@ -978,8 +978,14 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   // The view (Grid or Runs) leads the popup.
   await expect(page.getByRole("radiogroup", { name: "Gallery View", exact: true })).toBeVisible();
-  await expect(page.getByRole("switch", { name: "Originals Only", exact: true })).not.toBeChecked();
-  await expect(page.getByRole("switch", { name: "Comparisons", exact: true })).not.toBeChecked();
+  await expect(page.getByRole("button", { name: "Originals Only", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(page.getByRole("button", { name: "Comparisons", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
   await page.keyboard.press("Escape");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Generating");
@@ -1498,7 +1504,7 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await search.fill("Browse");
   await liked.click();
   await filter.click();
-  await page.getByRole("switch", { name: "Disliked", exact: true }).click();
+  await page.getByRole("button", { name: "Disliked", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(liked).toHaveAttribute("aria-pressed", "false");
   await expect
@@ -1512,7 +1518,7 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await expect(dislikedChip).toBeVisible();
   await filter.click();
   await page.getByText("Week", { exact: true }).click();
-  await page.getByRole("switch", { name: "Comparisons", exact: true }).click();
+  await page.getByRole("button", { name: "Comparisons", exact: true }).click();
   await page.keyboard.press("Escape");
   // Clear All takes the panel's filters, Disliked included, and leaves Liked to its toggle.
   await page.getByRole("button", { name: "Clear All", exact: true }).click();
@@ -1520,7 +1526,10 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await liked.click();
   await filter.click();
   await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();
-  await expect(page.getByRole("switch", { name: "Comparisons", exact: true })).not.toBeChecked();
+  await expect(page.getByRole("button", { name: "Comparisons", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
   await page.keyboard.press("Escape");
   await expect(search).toHaveValue("Browse");
   // Filters persist across reloads; the transient search does not.

@@ -533,7 +533,7 @@ export function GalleryFilterPanel({
       )}
       {view && (
         <Input.Wrapper label="View">
-          <Stack gap="xs" mt={4} className={classes.toggles}>
+          <Stack gap="xs" mt={4}>
             {view}
             {toggles}
           </Stack>

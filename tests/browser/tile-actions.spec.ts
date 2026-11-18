@@ -112,7 +112,7 @@ test("Dislike hides a tile, Disliked shows it and Restore brings it back", async
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
   // Disliked is one of the filters, shown as a removable chip while on.
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("switch", { name: "Disliked", exact: true }).click();
+  await page.getByRole("button", { name: "Disliked", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(tile).toBeVisible();
   await select();
