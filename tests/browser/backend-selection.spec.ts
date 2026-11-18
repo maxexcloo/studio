@@ -9,6 +9,7 @@ import {
   finishTyping,
   fixtures,
   image,
+  openLoraChoices,
   openReferenceChoices,
   pressGenerate,
   serveProfiles,
@@ -91,7 +92,10 @@ test("Switching image backends changes reference capacity and preserves an overs
 
 test("A text-only Radiance default sends a run with references to ComfyUI", async ({ page }) => {
   const state = await fixtures(page);
-  await serveProfiles(page, [combinedImageProfile(0)]);
+  const profile = combinedImageProfile(0);
+  const radiance = profile.backendOptions!.find((option) => option.id === "radiance")!.profile!;
+  radiance.options = { ...radiance.options, loras: [] };
+  await serveProfiles(page, [profile]);
   await page.route("**/api/reference-assets/upload", (route) =>
     route.fulfill({
       json: {
@@ -109,8 +113,8 @@ test("A text-only Radiance default sends a run with references to ComfyUI", asyn
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Follow the reference");
   // Its Radiance block takes no LoRA runs, so the picker already offers ComfyUI's stack.
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText("0/8");
+  await openLoraChoices(page);
+  await expect(page.getByRole("button", { name: "Detail Slider", exact: true })).toBeVisible();
   await closeLoras(page);
   const picker = await openReferenceChoices(page);
   await showUploads(page);
@@ -127,8 +131,8 @@ test("A text-only Radiance default sends a run with references to ComfyUI", asyn
   ).toBeVisible();
   await closeReferences(page);
   // The reference moves the run to ComfyUI, with its controls and limits.
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText("0/8");
+  await openLoraChoices(page);
+  await expect(page.getByRole("button", { name: "Detail Slider", exact: true })).toBeVisible();
   await closeLoras(page);
   await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);

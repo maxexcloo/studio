@@ -948,7 +948,7 @@ export function SavedName<T extends SavedItem>({
               onClick={() => combobox.openDropdown()}
               onFocus={(event) => {
                 event.currentTarget.select();
-                combobox.openDropdown();
+                if (mode) combobox.openDropdown();
               }}
               onBlur={() => combobox.closeDropdown()}
               onChange={(event) => {
