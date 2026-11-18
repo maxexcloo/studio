@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { PickerGrid, PickerTile } from "../generation/Picker";
+import { type CardSort, listedCards } from "./cardListing";
 import {
   type CardParts,
   promptCardApplied,
@@ -22,6 +23,8 @@ import { type PromptCard, type PromptCardKind, promptCardsQuery } from "./querie
 export function PromptCardChoices({
   kind,
   query,
+  sort,
+  disliked,
   prompt,
   parts,
   onChange,
@@ -29,6 +32,8 @@ export function PromptCardChoices({
 }: {
   kind: PromptCardKind;
   query: string;
+  sort: CardSort;
+  disliked: boolean;
   prompt: string;
   parts?: CardParts;
   onChange: (prompt: string, parts: CardParts) => void;
@@ -37,10 +42,7 @@ export function PromptCardChoices({
   const { noun } = promptCardText[kind];
   const listing = useQuery(promptCardsQuery(kind));
   const dialogs = usePromptCardDialogs(kind, onLayer);
-  const words = query.trim().toLowerCase();
-  const cards = (listing.data || []).filter(
-    (card) => !words || `${card.name} ${card.description}`.toLowerCase().includes(words),
-  );
+  const cards = listedCards(listing.data, query, { sort, disliked });
   if (listing.isPending) return <LoadingState fill label={`Loading ${noun}s`} />;
   if (listing.error) return <Alert color="red">{listing.error.message}</Alert>;
   const applied = (card: PromptCard) => promptCardApplied(kind, card, prompt, parts);

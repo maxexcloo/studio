@@ -89,6 +89,7 @@ export function shownCard(account, character) {
   });
   return {
     ...character,
+    rating: character.rating ?? null,
     references,
     missing: character.referenceIds.length - references.length,
     ...(character.portrait
@@ -240,6 +241,25 @@ export function registerCardRoutes(app) {
       const card = {
         ...kept,
         ...cleanCard(kind, account, body, Boolean(kept.portrait)),
+        updatedAt: new Date().toISOString(),
+      };
+      save(kind, ownerId, cards.with(index, card));
+      return reply(200, account, card);
+    });
+
+    route("PATCH", `/api/${kind}/:id`, (account, ownerId, { params, body }) => {
+      const rating = body?.rating;
+      if (rating !== null && rating !== "liked" && rating !== "disliked")
+        throw new CardError("Choose liked, disliked or null.");
+      const cards = listCards(kind, ownerId);
+      const index = cards.findIndex((card) => card.id === params.id);
+      if (index < 0) return missing;
+      const previous = cards[index];
+      if ((previous.rating ?? null) === rating) return reply(200, account, previous);
+      const { rating: _rating, ...fields } = previous;
+      const card = {
+        ...fields,
+        ...(rating && { rating }),
         updatedAt: new Date().toISOString(),
       };
       save(kind, ownerId, cards.with(index, card));

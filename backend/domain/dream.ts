@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 
-import type { CardKind, Character } from "../../shared/characters.ts";
+import { type CardKind, type Character, suggestedCards } from "../../shared/characters.ts";
 import { type DreamSettings, dreamDefaults } from "../../shared/dream.ts";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import type { Project, ProjectContent, ProjectStats, Review } from "../../shared/projects.ts";
@@ -1060,13 +1060,22 @@ export function createDream(options: {
     }
     const seed = await seedPick(ownerId, record, profiles);
     if (!seed || !chance(seriesShare)) return null;
-    const scenes = (options.cards(ownerId)?.scenes || [])
-      .filter((scene) => scene.description)
-      .map((scene): [string, string] => [scene.name, `${scene.name}: ${scene.description}`]);
-    const places = [...scenes, ...seriesPlaces];
+    const scenes = suggestedCards(options.cards(ownerId)?.scenes || []).filter(
+      (scene) => scene.description,
+    );
+    const placeOf = (scene: Character): [string, string] => [
+      scene.name,
+      `${scene.name}: ${scene.description}`,
+    ];
+    const favourites = scenes.filter((scene) => scene.rating === "liked").map(placeOf);
+    const places = [
+      ...scenes.filter((scene) => scene.rating !== "liked").map(placeOf),
+      ...seriesPlaces,
+    ];
     const first = random(seriesNights.length - seriesLength + 1);
     const stops = seriesNights.slice(first, first + seriesLength).map(([nightTitle, night]) => {
-      const [placeTitle, place] = places.splice(random(places.length), 1)[0];
+      const pool = favourites.length ? favourites : places;
+      const [placeTitle, place] = pool.splice(random(pool.length), 1)[0];
       return { title: `${placeTitle}, ${nightTitle}`, place, night };
     });
     const series: DreamSeries = {

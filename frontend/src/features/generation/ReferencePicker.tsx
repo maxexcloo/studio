@@ -1,19 +1,19 @@
-import { ActionIcon, Button, Image, ScrollArea, Stack, Text, Tooltip } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
+import { ActionIcon, Button, Image, ScrollArea, Stack, Text } from "@mantine/core";
 import { ChevronDown, ImagePlus } from "lucide-react";
 import { type ClipboardEvent, type DragEvent, useState } from "react";
 
 import { startImageSlot } from "../../../../shared/characters";
+import type { GallerySort } from "../../../../shared/gallery-sort";
 import { slotCapacity } from "../../../../shared/profiles";
-import { failure } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
-import { canReadClipboard, readClipboard } from "../../ui/clipboard";
-import { icons } from "../../ui/icons";
-import { usePhone, useTouch } from "../../ui/usePhone";
+import { SortMenu } from "../../ui/SortMenu";
+import { usePhone } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
+import { useRemembered } from "../auth/useRemembered";
+import { CardRatingFilter, cardSortLabels, useCardListing } from "../characters/cardListing";
 import { CharacterChoices } from "../characters/CharacterChoices";
 import { PromptCardChoices } from "../characters/PromptCardChoices";
-import { chipProps, iconChipProps } from "./chip";
+import { chipProps } from "./chip";
 import { GalleryChoices, galleryTabs } from "./GalleryChoices";
 import { draftForProfile, useGeneration } from "./GenerationProvider";
 import { controlRange, referenceDetails, referenceGroup, referenceGroups } from "./payload";
@@ -134,6 +134,9 @@ export function ReferencePicker({
   const tab = referenceTabs.flat().some((item) => item.value === browser.state.tab)
     ? browser.state.tab
     : "gallery";
+  const cardTab = tab !== "gallery" && tab !== "uploads" ? tab : undefined;
+  const cardOrder = useCardListing("references", cardTab ?? "characters");
+  const [mediaSort, setMediaSort] = useRemembered<GallerySort>("reference-media-sort", "newest");
   const target = nextReferenceTarget(references, profile, chosen);
   function browse(patch: Partial<ReferenceBrowser["state"]>) {
     if (!("target" in patch)) browser.scroll.current = 0;
@@ -202,27 +205,6 @@ export function ReferencePicker({
       loading={placement.uploading}
       onFiles={uploadFiles}
     />
-  );
-  // Touch screens have no paste key, and iOS no paste event outside a text field: Paste reads the
-  // clipboard on a tap instead.
-  const touch = useTouch();
-  const pasteButton = touch && canReadClipboard() && (
-    <Tooltip label="Paste" disabled={!phone}>
-      <Button
-        {...(phone ? iconChipProps : chipProps)}
-        aria-label="Paste Reference"
-        disabled={!target || placement.uploading}
-        leftSection={phone ? undefined : <icons.paste size={15} />}
-        onClick={() =>
-          void readClipboard().then(({ files }) => {
-            if (files.length) uploadFiles(files);
-            else notifications.show({ message: "There is no image to paste." });
-          }, failure)
-        }
-      >
-        {phone ? <icons.paste size={16} /> : "Paste"}
-      </Button>
-    </Tooltip>
   );
   // Pasting or dropping files anywhere in the picker uploads them.
   const fileProps = {
@@ -298,78 +280,81 @@ export function ReferencePicker({
       h={phone ? undefined : "min(70dvh, 620px)"}
       {...fileProps}
     >
+      {cardTab && (
+        <PickerHeader
+          label="References"
+          searched={cardTabs.find((item) => item.value === cardTab)?.label}
+          tabs={referenceTabs}
+          tab={tab}
+          onTabChange={(tab) => browse({ tab })}
+          query={cardQuery}
+          onQueryChange={setCardQuery}
+          filters={<CardRatingFilter {...cardOrder} />}
+          filterCount={Number(cardOrder.disliked)}
+          onClearFilters={() => cardOrder.setDisliked(false)}
+          actions={
+            <SortMenu
+              label="Sort References"
+              labels={cardSortLabels}
+              value={cardOrder.sort}
+              onChange={cardOrder.setSort}
+            />
+          }
+        />
+      )}
       {tab === "outfits" || tab === "scenes" ? (
-        <>
-          <PickerHeader
-            label="References"
-            searched={tab === "outfits" ? "Outfits" : "Scenes"}
-            tabs={referenceTabs}
-            tab={tab}
-            onTabChange={(tab) => browse({ tab })}
-            query={cardQuery}
-            onQueryChange={setCardQuery}
-          />
-          <PromptCardChoices
-            kind={tab}
-            query={cardQuery}
-            prompt={prompt.value}
-            parts={input.cardParts}
-            onChange={(prompt, cardParts) => {
-              if (onInputChange) onInputChange({ prompt, cardParts });
+        <PromptCardChoices
+          kind={tab}
+          query={cardQuery}
+          sort={cardOrder.sort}
+          disliked={cardOrder.disliked}
+          prompt={prompt.value}
+          parts={input.cardParts}
+          onChange={(prompt, cardParts) => {
+            if (onInputChange) onInputChange({ prompt, cardParts });
+            else
+              setDraft((previous) => ({
+                ...previous,
+                input: { ...previous.input, prompt, cardParts },
+              }));
+          }}
+          onLayer={setLayer}
+        />
+      ) : tab === "characters" ? (
+        <CharacterChoices
+          query={cardQuery}
+          sort={cardOrder.sort}
+          disliked={cardOrder.disliked}
+          references={references}
+          prompt={prompt.value}
+          parts={input.cardParts}
+          profile={profile}
+          switchable={Boolean(onCharacterProfile) || (!value && !selectedProfile && !ownPrompt)}
+          onChange={(next) => {
+            const editor = next.profile;
+            // The composer's draft moves to the character's model, its images and prompt with it.
+            if (editor && onCharacterProfile) onCharacterProfile(editor, next);
+            else if (editor) setDraft((previous) => draftForProfile(previous, editor, next));
+            else {
+              list.set(next.references);
+              if (onInputChange) onInputChange({ prompt: next.prompt, cardParts: next.cardParts });
               else
                 setDraft((previous) => ({
                   ...previous,
-                  input: { ...previous.input, prompt, cardParts },
+                  input: { ...previous.input, prompt: next.prompt, cardParts: next.cardParts },
                 }));
-            }}
-            onLayer={setLayer}
-          />
-        </>
-      ) : tab === "characters" ? (
-        <>
-          <PickerHeader
-            label="References"
-            searched="Characters"
-            tabs={referenceTabs}
-            tab={tab}
-            onTabChange={(tab) => browse({ tab })}
-            query={cardQuery}
-            onQueryChange={setCardQuery}
-          />
-          <CharacterChoices
-            query={cardQuery}
-            references={references}
-            prompt={prompt.value}
-            parts={input.cardParts}
-            profile={profile}
-            switchable={Boolean(onCharacterProfile) || (!value && !selectedProfile && !ownPrompt)}
-            onChange={(next) => {
-              const editor = next.profile;
-              // The composer's draft moves to the character's model, its images and prompt with it.
-              if (editor && onCharacterProfile) onCharacterProfile(editor, next);
-              else if (editor) setDraft((previous) => draftForProfile(previous, editor, next));
-              else {
-                list.set(next.references);
-                if (onInputChange)
-                  onInputChange({ prompt: next.prompt, cardParts: next.cardParts });
-                else
-                  setDraft((previous) => ({
-                    ...previous,
-                    input: { ...previous.input, prompt: next.prompt, cardParts: next.cardParts },
-                  }));
-              }
-              settle();
-            }}
-            onLayer={setLayer}
-          />
-        </>
+            }
+            settle();
+          }}
+          onLayer={setLayer}
+        />
       ) : (
         <GalleryChoices
           label="References"
           more={charactersOn ? [cardTabs] : []}
           browser={browser}
           enabled={opened}
-          actions={pasteButton}
+          sorting={{ value: mediaSort, onChange: setMediaSort }}
           notice={
             !target && (
               <Text size="xs" c="dimmed">

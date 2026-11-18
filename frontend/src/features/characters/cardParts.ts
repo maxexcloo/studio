@@ -100,7 +100,7 @@ function replaceCardText(prompt: string, parts: CardParts, kind: CardKind) {
 /** Selection follows the applied card's ID and version, never a coincidental text match. */
 export function promptCardApplied(
   kind: PromptCardKind,
-  card: PromptCard,
+  card: Pick<PromptCard, "id" | "description">,
   prompt: string,
   parts?: CardParts,
 ) {
@@ -118,7 +118,7 @@ export function promptCardApplied(
  */
 export function withPromptCard(
   kind: PromptCardKind,
-  card: PromptCard,
+  card: Pick<PromptCard, "description">,
   prompt: string,
   parts?: CardParts,
 ) {

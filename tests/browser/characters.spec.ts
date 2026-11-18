@@ -39,6 +39,61 @@ async function openCharacters(page: Page) {
   return references;
 }
 
+test("Library card ratings hide with Undo and feed the References sort", async ({ page }) => {
+  const state = await fixtures(page);
+  state.characters.push(
+    { ...mara, createdAt: "2026-01-01T00:00:00Z" },
+    { ...mara, id: "chr-ada", name: "Ada", createdAt: "2026-01-02T00:00:00Z" },
+  );
+  await page.goto("/library#characters");
+  const list = page.getByRole("list", { name: "Characters", exact: true });
+  const names = () =>
+    list
+      .getByRole("listitem")
+      .evaluateAll((items) => items.map((item) => item.getAttribute("aria-label")));
+  const actions = page.getByRole("button", { name: "Actions for Mara", exact: true });
+  const rate = async (label: string) => {
+    await actions.click();
+    await page.getByRole("menuitem", { name: label, exact: true }).click();
+  };
+  await expect.poll(names).toEqual(["Ada", "Mara"]);
+  const sort = page.getByRole("button", { name: "Sort Characters", exact: true });
+  await sort.click();
+  await page.getByRole("menuitemradio", { name: "Liked First", exact: true }).click();
+  await rate("Like");
+  await expect.poll(names).toEqual(["Mara", "Ada"]);
+  await rate("Dislike");
+  await expect.poll(names).toEqual(["Ada"]);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(names).toEqual(["Mara", "Ada"]);
+  await rate("Dislike");
+  await expect.poll(names).toEqual(["Ada"]);
+  await page.getByRole("button", { name: "Filter Characters", exact: true }).click();
+  const filters = page.getByRole("dialog", { name: "Characters Filters", exact: true });
+  await filters.getByText("Disliked", { exact: true }).click();
+  await filters.getByRole("button", { name: "Done", exact: true }).click();
+  await expect.poll(names).toEqual(["Mara"]);
+  await rate("Restore");
+  await expect(actions).toHaveCount(0);
+
+  // The picker and Library remember their own order.
+  await page.goto("/images");
+  await create(page);
+  const references = await openCharacters(page);
+  const options = references.getByRole("button", { name: /^Use character: / });
+  await expect(options.first()).toHaveAccessibleName("Use character: Ada");
+  const pickerSort = references.getByRole("button", { name: "Sort References", exact: true });
+  await pickerSort.click();
+  await expect(
+    page.getByRole("menuitemradio", { name: "Liked First", exact: true }),
+  ).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menuitemradio", { name: "Name Z–A", exact: true }).click();
+  await expect(options.first()).toHaveAccessibleName("Use character: Mara");
+  await closeReferences(page);
+  await openCharacters(page);
+  await expect(options.first()).toHaveAccessibleName("Use character: Mara");
+});
+
 test("Picking a character places its first image and leads the prompt with it, and picking it again takes both out", async ({
   page,
 }) => {

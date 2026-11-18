@@ -1,6 +1,7 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
+  type Card,
   type Character,
   type CharacterTrait,
   type SheetRole,
@@ -144,10 +145,7 @@ export function applyCharacter(
 }
 
 /** An outfit or scene card as `/api/<kind>` lists it (backend/cards.js). */
-export interface PromptCard {
-  id: string;
-  name: string;
-  description: string;
+export interface PromptCard extends Omit<Card, "referenceIds"> {
   references: ReferenceAsset[];
 }
 export type PromptCardKind = "outfits" | "scenes";

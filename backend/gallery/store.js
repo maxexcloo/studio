@@ -27,7 +27,7 @@ import {
 } from "../persistence/runtime.ts";
 import { loadSharp } from "../sharp-loader.js";
 import { galleryFiltersTest } from "./filters.js";
-import { compareGalleryItems, compareGalleryKeys } from "./order.js";
+import { compareGalleryItems, compareGalleryUnits } from "./order.js";
 import {
   generationSettings,
   outputsFrom,
@@ -779,18 +779,21 @@ const keptLists = 5;
 const listLifeMs = 60_000;
 
 /** The list `filter` (and `rank`) make of the query: `{ entries: [{ key, unit }], positions }`. */
-function keptList(query, filter, filterKey, rank) {
-  const name = filterKey && JSON.stringify([query, filterKey, Boolean(rank)]);
+function keptList(query, filter, filterKey, rank, sort) {
+  const name = filterKey && JSON.stringify([query, filterKey, Boolean(rank), sort]);
   const kept = name && lists.get(name);
   if (kept && kept.version === listVersion && Date.now() - kept.at <= listLifeMs) return kept;
   let entries = [];
-  for (const unit of galleryUnits(query, filter))
+  for (const unit of galleryUnits(query, filter)) {
+    if (sort === "liked") unit.key.liked = unit.items.some((item) => item.rating === "liked");
     for (const item of unit.items)
       entries.push({ key: galleryKey(item), unit: unit.key, ...(rank && { score: rank(item) }) });
+  }
   if (rank)
     entries = entries
       .filter((entry) => entry.score !== undefined)
       .sort((a, b) => b.score - a.score);
+  else if (sort !== "newest") entries.sort((a, b) => compareGalleryUnits(a.unit, b.unit, sort));
   const list = {
     version: listVersion,
     at: Date.now(),
@@ -806,7 +809,7 @@ function keptList(query, filter, filterKey, rank) {
 }
 
 /** A page cut from a kept list; its cursor names its last item and where it stood. */
-function listPage(list, cursor, limit, ranked) {
+function listPage(list, cursor, limit, ranked, sort) {
   let start = 0;
   if (ranked) start = Number(/^r\|(\d+)$/.exec(cursor)?.[1] || 0);
   else if (cursor) {
@@ -823,7 +826,7 @@ function listPage(list, cursor, limit, ranked) {
         }
       })();
       const found = after
-        ? list.entries.findIndex((entry) => compareGalleryKeys(entry.unit, after) > 0)
+        ? list.entries.findIndex((entry) => compareGalleryUnits(entry.unit, after, sort) > 0)
         : -1;
       start = found < 0 ? list.entries.length : found;
     }
@@ -863,6 +866,7 @@ export function pageGallery({
   filter = null,
   filterKey = "",
   rank = null,
+  sort = "newest",
 } = {}) {
   const safeLimit = Math.max(1, Math.min(500, Number(limit || 200)));
   const sql = {
@@ -873,9 +877,9 @@ export function pageGallery({
     ...(type && { type }),
     notStatus: [query.notStatus ?? [], "cancelled", ...(includeFailed ? [] : ["failed"])].flat(),
   };
-  if (filter || rank) {
-    const list = keptList(sql, filter, filterKey, rank);
-    const page = listPage(list, cursor, safeLimit, Boolean(rank));
+  if (filter || rank || sort !== "newest") {
+    const list = keptList(sql, filter, filterKey, rank, sort);
+    const page = listPage(list, cursor, safeLimit, Boolean(rank), sort);
     return {
       ...page,
       hasMore: Boolean(page.nextCursor),

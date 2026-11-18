@@ -2263,8 +2263,23 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
   );
 });
 
-test("A series follows a liked image's character through one night on its profile and LoRAs, then ends", async (t) => {
+test("A series follows a liked image's character, visiting liked scene cards first", async (t) => {
   const { dream, state, store, dreamOnce } = fixture(t);
+  const scene = {
+    createdAt: new Date(state.clock).toISOString(),
+    updatedAt: new Date(state.clock).toISOString(),
+    referenceIds: [],
+  };
+  state.cards!.scenes.push(
+    {
+      ...scene,
+      id: "shed",
+      name: "Shed",
+      description: "a corrugated iron shed",
+      rating: "disliked",
+    },
+    { ...scene, id: "pier", name: "Pier", description: "a pier over dark water", rating: "liked" },
+  );
   const input = {
     kind: "image",
     profileId: "flux",
@@ -2312,16 +2327,17 @@ test("A series follows a liked image's character through one night on its profil
   assert.match(written[0].system, /result 1 of 4 in a series/);
   assert.match(
     written[0].user,
-    /Seed prompt: Mara, red hair and freckles, in a leather jacket\nIt loads these LoRAs: fox.safetensors\nPlace: a rooftop bar above the city\nTime of night: dusk/,
+    /Seed prompt: Mara, red hair and freckles, in a leather jacket\nIt loads these LoRAs: fox.safetensors\nPlace: Pier: a pier over dark water\nTime of night: dusk/,
   );
   assert.match(
     written[1].user,
-    /Place: a neon-lit back street in the rain\nTime of night: early evening/,
+    /Place: a rooftop bar above the city\nTime of night: early evening/,
   );
+  assert.ok(written.every(({ user }) => !user.includes("a corrugated iron shed")));
   assert.match(written[3].user, /Results so far:\n- dream 1\n- dream 2\n- dream 3/);
   assert.match(
     store.job("alice", jobs[0].id)!.dream!.why,
-    /^Mara · Night Out \(1 of 4\): Rooftop Bar, Dusk/,
+    /^Mara · Night Out \(1 of 4\): Pier, Dusk/,
   );
   // The series is done; with a share's roll against it the next idea is an ordinary one.
   state.rolls = [99];

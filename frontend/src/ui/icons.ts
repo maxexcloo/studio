@@ -1,5 +1,6 @@
 import {
   Activity,
+  ArrowDownUp,
   Blend,
   Bookmark,
   ChevronLeft,
@@ -167,6 +168,7 @@ export const icons = {
   show: Eye,
   /** Similar: the gallery ranked by likeness to an image. */
   similar: ScanSearch,
+  sort: ArrowDownUp,
   /** Stopping work: a stop sign rather than a bare square, which reads as a checkbox. */
   stop: CircleStop,
   undo: Undo2,

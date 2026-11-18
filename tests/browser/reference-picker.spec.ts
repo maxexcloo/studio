@@ -299,28 +299,43 @@ test("An image shared to the installed app opens the composer with it as a refer
   await expect(page).toHaveURL(/\/images$/);
 });
 
-test("On touch screens, Paste reads a copied photo from the clipboard into the next slot", async ({
-  page,
-  isMobile,
-}) => {
-  test.skip(!isMobile, "Desktop pastes with its keys");
-  await page.addInitScript(() => {
-    const photo = new Blob(["fixture"], { type: "image/png" });
-    Object.defineProperty(navigator, "clipboard", {
-      value: {
-        read: async () => [new ClipboardItem({ "text/plain": "caption", "image/png": photo })],
-      },
-    });
-  });
+test("Pasting a file in References fills the next slot", async ({ page }) => {
   const state = await setup(page);
   const picker = await openReferenceChoices(page);
-  await picker.getByRole("button", { name: "Paste Reference", exact: true }).click();
+  await picker.getByRole("textbox", { name: "Search Gallery", exact: true }).evaluate((search) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.items.add(new File(["fixture"], "pasted.png", { type: "image/png" }));
+    search.dispatchEvent(
+      new ClipboardEvent("paste", { clipboardData, bubbles: true, cancelable: true }),
+    );
+  });
   await expect(
     page
       .getByRole("group", { name: "Reference Slots", exact: true })
       .getByRole("button", { name: "Reference 1 · Start", exact: true }),
   ).toBeVisible();
   expect(state.gallery.find((item) => item.id === "upload")?.uploaded).toBe(true);
+});
+
+test("Gallery and References sort media through separate remembered choices", async ({ page }) => {
+  const state = await setup(page);
+  state.gallery[1].createdAt = "2025-01-01T00:00:00Z";
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Sort Gallery", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "Oldest First", exact: true }).click();
+  const gallery = page.getByRole("button", { name: /^Open image: (Alpha|Beta)$/ });
+  await expect(gallery.first()).toHaveAccessibleName("Open image: Beta");
+  await create(page);
+  const picker = await openReferenceChoices(page);
+  const options = picker.getByRole("button", { name: /^Use reference: (Alpha|Beta)$/ });
+  await expect(options.first()).toHaveAccessibleName("Use reference: Alpha");
+  const sort = picker.getByRole("button", { name: "Sort References", exact: true });
+  await sort.click();
+  await page.getByRole("menuitemradio", { name: "Oldest First", exact: true }).click();
+  await expect(options.first()).toHaveAccessibleName("Use reference: Beta");
+  await closeReferences(page);
+  await openReferenceChoices(page);
+  await expect(options.first()).toHaveAccessibleName("Use reference: Beta");
 });
 
 test("The reference grid pages and virtualises as it scrolls, and a tile previews above it", async ({

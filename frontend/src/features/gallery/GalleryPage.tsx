@@ -19,6 +19,7 @@ import { ArrowUp, LayoutGrid, Rows3, SquareCheck } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type Location, Navigate, useLocation, useNavigate } from "react-router";
 
+import type { GallerySort } from "../../../../shared/gallery-sort";
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem, MediaKind } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
@@ -122,6 +123,7 @@ function Gallery() {
   const [view, setView] = useRemembered<"grid" | "runs">("gallery-view", "grid");
   const [originalsOnly, setOriginalsOnly] = useRemembered("gallery-originals-only", false);
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
+  const [sort, setSort] = useRemembered<GallerySort>("gallery-sort", "newest");
   const [focusItem, setFocusItem] = useState<string | null>(null);
   // History restores the run's neighbours when returning from a linked result.
   const run = state?.run;
@@ -190,8 +192,8 @@ function Gallery() {
     }),
   }).data;
   const listing = useMemo(
-    () => ({ search, kind, filters, similar, strictness, setId, chat, turn }) as const,
-    [search, kind, filters, similar, strictness, setId, chat, turn],
+    () => ({ search, kind, filters, similar, strictness, setId, chat, turn, sort }) as const,
+    [search, kind, filters, similar, strictness, setId, chat, turn, sort],
   );
   // The listing key (as JSON) whose every match a quick select is loading: its later pages,
   // refetches included, then come 500 at a time.
@@ -284,8 +286,11 @@ function Gallery() {
       return;
     }
     pendingFirst.current = null;
-    if (client.getQueryData(listingKey)) void readFirst({ cancelRefetch: false });
-  }, [client, listingKey, readFirst, refreshKey]);
+    if (client.getQueryData(listingKey)) {
+      if (sort === "newest") void readFirst({ cancelRefetch: false });
+      else void client.invalidateQueries({ queryKey: listingKey, exact: true });
+    }
+  }, [client, listingKey, readFirst, refreshKey, sort]);
   useEffect(
     () => () => {
       pendingFirst.current = null;
@@ -441,14 +446,10 @@ function Gallery() {
       result = await result.fetchNextPage({ cancelRefetch: false });
     return !result.hasNextPage;
   }, [listingKey, gallery]);
-  const selection = useGallerySelection(
-    items,
-    JSON.stringify([kind, search, filters, similar, strictness, setId, chat, turn]),
-    {
-      complete: !gallery.hasNextPage,
-      load: loadEveryMatch,
-    },
-  );
+  const selection = useGallerySelection(items, JSON.stringify(listingKey), {
+    complete: !gallery.hasNextPage,
+    load: loadEveryMatch,
+  });
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped || Boolean(similar);
   // Liked or Uploads alone: its pressed toggle in the toolbar already undoes it.
@@ -619,6 +620,12 @@ function Gallery() {
           kind={kind}
           value={filters}
           onChange={setFilters}
+          sort={sort}
+          onSortChange={(next) => {
+            setSort(next);
+            if (similar) removeSimilar();
+            window.scrollTo({ top: 0 });
+          }}
           count={gallery.data?.pages.at(-1)?.totalApprox}
           extraChips={[
             ...(similar
@@ -779,8 +786,7 @@ function Gallery() {
             items={items}
             results={resultsKey}
             versions={versions}
-            // A similarity ranking isn't in time order.
-            byDay={!similar}
+            byDay={!similar && sort !== "liked"}
             focusItem={focusItem}
             open={openItem}
             selection={selection}

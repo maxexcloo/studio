@@ -18,6 +18,7 @@ import {
   maxNewCharacters,
   minCharacterAge,
   startImageSlot,
+  suggestedCards,
   withCharacter,
 } from "../../shared/characters.ts";
 import { compareVariants } from "../../shared/compare.ts";
@@ -685,17 +686,20 @@ export function registerGenerateTools({
         // Cards are an extra here: a failed listing leaves them out rather than the models.
         const cards = async (cardKind) =>
           !access || access.features.characters
-            ? ((await media.request("GET", `/api/${cardKind}`, undefined, owner).catch(() => ({})))[
-                cardKind
-              ] ?? [])
+            ? suggestedCards(
+                (
+                  await media.request("GET", `/api/${cardKind}`, undefined, owner).catch(() => ({}))
+                )[cardKind] ?? [],
+              )
             : [];
         const [characters, outfits, scenes] = await Promise.all(Object.keys(cardKinds).map(cards));
         // Each card's gist: generate reads the whole description by name.
         const cardList = (items) =>
-          items.map(({ id, name, description }) => ({
+          items.map(({ id, name, description, rating }) => ({
             id,
             name,
             description: clip(description, 120),
+            ...(rating && { rating }),
           }));
         const shown = (value) => kind === "all" || kind === value;
         const services = catalogue.backends
@@ -748,6 +752,7 @@ export function registerGenerateTools({
                   id: card.id,
                   name: card.name,
                   description: clip(card.description, 120),
+                  ...(card.rating && { rating: card.rating }),
                   images: card.references.length,
                   ...(card.sheet ? { sheet: card.sheet.status } : {}),
                 })),
