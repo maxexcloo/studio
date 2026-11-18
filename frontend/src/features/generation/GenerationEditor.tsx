@@ -16,7 +16,7 @@ import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../
 import { ClearButton } from "../../ui/ClearButton";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextToolsBar } from "../../ui/TextBox";
-import { usePhone } from "../../ui/usePhone";
+import { usePhone, useTouch } from "../../ui/usePhone";
 import { GenerationInputControls } from "./GenerationInputControls";
 import { type Draft, defaultProfile, useGeneration } from "./GenerationProvider";
 import { useLoraPicker } from "./LoraPicker";
@@ -201,7 +201,7 @@ export function GenerationEditor({
   focusPrompt?: boolean;
   /**
    * Fills the phone Generate sheet without scrolling: the prompt takes the room above a bottom bar
-   * of the wrapping chips and actions, and a text box being edited takes it alone.
+   * of the chips, one row that scrolls sideways, and actions, and a text box being edited takes it alone.
    */
   fill?: boolean;
   /** Offers taste-led prompt ideas in the prompt's AI menu while the prompt is empty. */
@@ -222,6 +222,7 @@ export function GenerationEditor({
   const loraPicker = useLoraPicker();
   const prompt = useRef<HTMLTextAreaElement>(null);
   const phone = usePhone();
+  const touch = useTouch();
   const submitState = useSubmitState({
     input,
     profile,
@@ -389,15 +390,15 @@ export function GenerationEditor({
               <ClearButton className={classes.resting} onClear={onClear} onUndo={onUndoClear} />
               <Tooltip
                 label={blockedReason}
-                disabled={!blockedReason}
-                events={{ hover: true, focus: true, touch: true }}
+                // Touch screens keep tooltips off; the reason stays in Generate's description.
+                disabled={!blockedReason || touch}
+                events={{ hover: true, focus: true, touch: false }}
               >
                 <Button
                   className={fill ? classes.resting : undefined}
                   type="submit"
                   radius="xl"
                   rightSection={phone ? undefined : <ArrowUp size={18} />}
-                  size={phone ? "md" : "sm"}
                   flex={phone ? 1 : undefined}
                   loading={pending}
                   {...blockedProps(blockedReason)}

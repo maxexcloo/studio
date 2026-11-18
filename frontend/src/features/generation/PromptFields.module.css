@@ -28,14 +28,14 @@
 }
 
 /* Typed in on the phone sheet, the negative prompt takes the room left too. */
-:global([data-typing]) .negative:focus-within {
+:global([data-typing="negative"]) .negative {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-:global([data-typing]) .negative:focus-within > :first-child {
+:global([data-typing="negative"]) .negative > :first-child {
   flex: 1;
   min-height: 0;
 }
