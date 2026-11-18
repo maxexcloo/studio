@@ -44,7 +44,15 @@ import {
 } from "./controls.js";
 import { findCard } from "./manage.js";
 import { aboutTime, assertJobCount, mcpJson, readyIn, setItems } from "./media.js";
-import { assertAvoided, briefLine, keptChoices, projectArgs, projectTargets } from "./project.js";
+import {
+  accountRules,
+  assertAvoided,
+  briefLine,
+  keptChoices,
+  projectArgs,
+  projectTargets,
+  rulesLine,
+} from "./project.js";
 import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
 import { output, shortPrompt } from "./results.js";
 import {
@@ -898,7 +906,7 @@ export function registerGenerateTools({
     server,
     "generate",
     "generate",
-    `Queue images or videos, at most ${maxSplitJobs} images per call. Models: profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Leave the model, count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Anyone sexual or nude must be 18+ (no teens).`,
+    `Queue images or videos, at most ${maxSplitJobs} images per call. Models: profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Leave the model, count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Never make anyone sexual or nude under 18 or a teen, without adding "adult" or an age to say so.`,
     z.strictObject({
       request: z
         .string()
@@ -1118,7 +1126,10 @@ export function registerGenerateTools({
     );
   };
   const generateOnce = async (input, signal, accepted) => {
-    const project = await attachedProject(signal);
+    const [project, rules] = await Promise.all([
+      attachedProject(signal),
+      accountRules(media, owner, signal),
+    ]);
     const choices = chatChoices.read(owner, conversation);
     const remembered = keptChoices(choices, structuredClone(input));
     const constrained = project
@@ -1378,6 +1389,9 @@ export function registerGenerateTools({
     }
     if (remembered.kept.length)
       projectNote = `Kept from earlier: ${remembered.kept.join(", ")}. ${projectNote}`;
+    // The rules come back with a chat's first generate, when they change, and again as a guide would.
+    if (rules.length && review(refs, `rules:${JSON.stringify(rules)}`))
+      projectNote = `${rulesLine(rules)}${projectNote}`;
     if (axis && targets.some(({ profile }) => !mcpControls(profile).seed))
       throw new Error("These models cannot hold a seed for a controlled comparison.");
     if (axis && several && targets.length < compareVariants.min)

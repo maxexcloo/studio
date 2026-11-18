@@ -1343,6 +1343,7 @@ export async function serveDream(
     avoid: [],
     styles: [],
     note: "",
+    rules: [],
     models: [],
     loras: [],
     shapes: [],
