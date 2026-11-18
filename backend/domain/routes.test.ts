@@ -148,6 +148,48 @@ test("Clearing takes only the owner's failed jobs out of the queue and keeps the
   }
 });
 
+test("The queue shows a job's gallery records, else its own results", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  const session = store.createSession("alice");
+  const own = { id: "own", url: "/media/own.png" };
+  const [saved, bare] = [0, 1].map(() =>
+    store.save({
+      ...store.enqueue("alice", session.id, {}, "image"),
+      status: "completed",
+      items: [own],
+      outputs: [own],
+    }),
+  );
+  const app = express();
+  app.use((req, _res, next) => {
+    Object.assign(req, { studioAccount: { userId: "alice" } });
+    next();
+  });
+  const record = { id: "record", url: "/media/record.png", prompt: "a fox" };
+  registerQueueRoutes(app, {
+    store,
+    queue: new GenerationQueue(store, {} as never),
+    ...unused,
+    media: (_ownerId, jobId) => (jobId === saved.id ? [record] : []),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/queue`;
+  try {
+    const { jobs } = (await (await fetch(base)).json()) as {
+      jobs: { id: string; items: unknown[]; outputs: unknown[] }[];
+    };
+    const shown = new Map(jobs.map((job) => [job.id, job]));
+    assert.deepEqual(shown.get(saved.id)?.items, [record]);
+    assert.deepEqual(shown.get(saved.id)?.outputs, []);
+    assert.deepEqual(shown.get(bare.id)?.items, [own]);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    store.close();
+  }
+});
+
 test("A run from an item records it as its source, only when the item is the owner's", async () => {
   const store = new Store(openDatabase(":memory:"));
   const session = store.createSession("alice");

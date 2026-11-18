@@ -15,8 +15,8 @@ const ownerOf = (account: RouteAccount) => account?.userId || "";
  * The person's queue, Dream's background jobs included, without failed jobs the person cleared:
  * its unfinished and failed work and its latest finished jobs (`Store.queueJobs`).
  */
-const listed = (store: Store, ownerId: string) =>
-  store.queueJobs(ownerId).filter((job) => !job.cleared);
+const listed = (store: Store, ownerId: string, options?: { results: boolean }) =>
+  store.queueJobs(ownerId, options).filter((job) => !job.cleared);
 /** What Stop All acts on: the person's own unfinished work, as Dream's pause stops Dream's. */
 const ownWork = (store: Store, ownerId: string) =>
   store.openJobs(ownerId).filter((job) => !job.cleared && job.priority !== queuePriority.dream);
@@ -59,7 +59,9 @@ export function registerQueueRoutes(
   const shown = (ownerId: string, jobs: OwnedJob[]) =>
     jobs.map((job) => {
       const items = media(ownerId, job.id);
-      return publicJob(items?.length ? { ...job, items } : job);
+      if (items?.length) return publicJob({ ...job, items });
+      // A record listed without its results (Store.queueJobs) is read whole only when needed.
+      return publicJob(job.items ? job : store.job(ownerId, job.id)!);
     });
   // Polled while work runs: a job with gallery records drops the adapter's copies of them, which
   // every reader passes over for the records.
@@ -157,7 +159,7 @@ export function registerQueueRoutes(
   directRoute(app, "GET", "/api/queue", (account, { query }) => {
     const ownerId = ownerOf(account);
     const pauses = store.pauses();
-    const jobs = listed(store, ownerId);
+    const jobs = listed(store, ownerId, { results: false });
     const since = typeof query.since === "string" ? query.since : undefined;
     return {
       status: 200,
