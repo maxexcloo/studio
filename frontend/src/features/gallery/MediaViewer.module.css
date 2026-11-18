@@ -9,11 +9,18 @@
 }
 
 /* The viewer sits over the blurred page, edge to edge under the notch, unlike other full-screen
-   dialogs, which take the page's solid surface and safe-area padding (theme.module.css); the
-   repeated class outranks that rule. Its controls offset themselves. */
+   dialogs, which take the page's solid surface, backdrop included, and safe-area padding
+   (theme.module.css); the repeated classes outrank those rules. Its controls offset themselves. */
 .content.content[data-full-screen] {
   padding: 0;
   background: transparent !important;
+}
+
+.overlay.overlay {
+  inset: 0 !important;
+  background: var(--overlay-bg) !important;
+  backdrop-filter: var(--overlay-filter) !important;
+  -webkit-backdrop-filter: var(--overlay-filter) !important;
 }
 
 /* The header only names the dialog; the viewer draws its own close action. */

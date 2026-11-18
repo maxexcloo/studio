@@ -7,15 +7,22 @@
   padding-inline-end: max(var(--mantine-spacing-xs), var(--input-padding-inline-end, 0px));
 }
 
-/* The phone sheet's prompt (its text box, tools and suggestions) takes the room left. */
-.area[data-fill] {
-  flex: 1;
+/* The phone sheet's prompt (its text box, tools and suggestions) and negative prompt share the room
+   left, the prompt taking the larger part; typing in either gives it all the room. */
+.area[data-fill],
+.negative[data-fill] {
+  flex: 2;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.area[data-fill] > :first-child {
+.negative[data-fill] {
+  flex: 1;
+}
+
+.area[data-fill] > :first-child,
+.negative[data-fill] > :first-child {
   flex: 1;
   min-height: 0;
 }
@@ -25,17 +32,4 @@
   min-height: 0;
   font-size: 1.0625rem;
   resize: none;
-}
-
-/* Typed in on the phone sheet, the negative prompt takes the room left too. */
-:global([data-typing="negative"]) .negative {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-:global([data-typing="negative"]) .negative > :first-child {
-  flex: 1;
-  min-height: 0;
 }

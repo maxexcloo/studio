@@ -32,7 +32,8 @@
 
 /*
  * The phone Generate sheet never scrolls: the fields take the room above a bottom bar of chips
- * and actions, which sits at the safe bottom or just above the keyboard (`--keyboard-inset`).
+ * (wrapping onto as many rows as they need) and actions, which sits at the safe bottom or just
+ * above the keyboard (`--keyboard-inset`).
  */
 .editor[data-fill] {
   flex: 1;
@@ -57,20 +58,6 @@
       calc(var(--keyboard-inset, 0px) + var(--mantine-spacing-xs))
     );
   border-top: 1px solid var(--studio-glass-border);
-}
-
-/* Its chips keep one row that scrolls sideways from edge to edge; the block padding keeps their
-   focus rings inside the scroller. */
-.editor[data-fill] .footer > [aria-label="Generation Inputs"] {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  margin: -4px calc(-1 * var(--mantine-spacing-md));
-  padding: 4px var(--mantine-spacing-md);
-}
-
-.editor[data-fill] .footer > [aria-label="Generation Inputs"] > * {
-  flex-shrink: 0;
 }
 
 /*

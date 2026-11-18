@@ -274,9 +274,20 @@ export function studioTheme({
       // (ComboboxPopover) next, and Select and MultiSelect below.
       Combobox: Combobox.extend({ styles: { option: target } }),
       ComboboxPopover: ComboboxPopover.extend({ styles: { option: target } }),
+      // A drawer's content is its scroller; a full-height one is a full-screen surface.
       Drawer: Drawer.extend({
+        classNames: (_theme, props) => ({
+          ...(props.size === "100%" && {
+            content: classes.fullScreen,
+            overlay: classes.fullScreenOverlay,
+          }),
+        }),
         styles: (_theme, props) => ({
-          content: { ...fading(props.opened), ...drawerInsets(props) },
+          content: {
+            ...fading(props.opened),
+            ...drawerInsets(props),
+            overscrollBehavior: "contain",
+          },
           header: overlayHeader,
           overlay: fading(props.opened),
           title: overlayTitle,
@@ -286,7 +297,9 @@ export function studioTheme({
       DrawerOverlay: { defaultProps: { blur: 6, backgroundOpacity: 0.4 } },
       DrawerRoot: DrawerRoot.extend({
         defaultProps: { transitionProps },
-        styles: (_theme, props) => ({ content: drawerInsets(props) }),
+        styles: (_theme, props) => ({
+          content: { ...drawerInsets(props), overscrollBehavior: "contain" },
+        }),
       }),
       // Selection indicators slide between items with the shared motion.
       FloatingIndicator: FloatingIndicator.extend({
@@ -326,10 +339,11 @@ export function studioTheme({
           radius: "lg",
           size: "lg",
         },
-        classNames: {
+        classNames: (_theme, props) => ({
           content: classes.dialogContent,
           body: classes.dialogBody,
-        },
+          ...(props.fullScreen && { overlay: classes.fullScreenOverlay }),
+        }),
         // The body scrolls under a fixed title row, so a table's rows and sort header never pass
         // under the title, as they would with Mantine's sticky header over a scrolling content.
         styles: (_theme, props) => ({
