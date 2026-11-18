@@ -65,6 +65,18 @@ export function profileForBackend(
     : profile;
 }
 
+export function profileForLoras(
+  profile: Profile | undefined,
+  backend?: string,
+  references = false,
+) {
+  const selected = profileForBackend(profile, backend, references, true);
+  const mode = references && selected?.imageModes?.reference;
+  return selected && mode
+    ? { ...selected, ...mode, defaults: { ...selected.defaults, ...mode.defaults } }
+    : selected;
+}
+
 /** Backend defaults follow the switch; settings the person changed remain their own. */
 export function backendInputPatch(input: GenerationInput, profile: Profile, backend: string) {
   const next = profileForBackend(profile, backend)!;

@@ -4,7 +4,12 @@ import {
   maxCardName,
   maxContextNotes,
 } from "../shared/characters.ts";
-import { loraCompatibility, loraName, loraStrengthRange } from "../shared/profiles.ts";
+import {
+  loraCompatibility,
+  loraName,
+  loraRejection,
+  loraStrengthRange,
+} from "../shared/profiles.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { maxSuggestions } from "../shared/suggestions.ts";
 import { replyTitle, titleRule } from "../shared/titles.ts";
@@ -390,7 +395,7 @@ function suggestedStrength(info) {
 }
 
 /**
- * The deterministic half of LoRA matching: LoRAs that may run on the profile (never 'other', never
+ * The deterministic half of LoRA matching: LoRAs that may run on the profile (none it refuses, never
  * an acceleration or supporting file), scored by the request's words found in each one's title,
  * triggers and tags (description words count half), plus a small boost for LoRAs in liked results.
  * Returns at most `limit` candidates with a score above zero, best first.
@@ -400,7 +405,7 @@ export function preFilterLoras({ profile, prompt, loras = [], liked = [], limit 
   const boosted = new Set(liked);
   const scored = [];
   for (const { name, info = {} } of loras) {
-    if (!name || isRole(info) || loraCompatibility(info, profile) === "other") continue;
+    if (!name || isRole(info) || loraRejection(info, profile)) continue;
     const strong = new Set([
       ...meaningful(loraName(name, info)),
       ...cleanTriggers(info.triggers).flatMap(meaningful),

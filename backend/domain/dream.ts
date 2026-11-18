@@ -7,10 +7,8 @@ import type { Project, ProjectContent, ProjectStats, Review } from "../../shared
 import {
   type GenerationInput,
   type QueueMedia,
-  awaitsWriting,
   finishedItemStatuses,
   maxPromptCharacters,
-  pendingStatuses,
 } from "../../shared/queue.ts";
 import type { DreamActivity } from "../../shared/taste.ts";
 import { replyTitle, titleRule } from "../../shared/titles.ts";
@@ -116,7 +114,9 @@ type DreamQuery = {
   conversationIds?: string[];
   ids?: string[];
   notIds?: string[];
-  jobIds?: string[];
+  ownGeneration?: boolean;
+  promptedProfiles?: string[];
+  dreamDraft?: string;
   uploaded?: boolean;
   unlisted?: boolean;
   limit?: number;
@@ -606,8 +606,6 @@ const motionInstruction = (spicy: boolean) =>
     .filter(Boolean)
     .join(" ");
 
-const dreamJob = (job: OwnedJob) => job.priority === queuePriority.dream;
-const waiting = (job: OwnedJob) => pendingStatuses.has(job.status);
 const kindOf = (value: { kind?: unknown; type?: unknown }): Kind =>
   value.kind === "video" || value.type === "video" ? "video" : "image";
 const normalised = (prompt: string) => prompt.toLowerCase().replace(/\s+/g, " ").trim();
@@ -699,6 +697,7 @@ export function createDream(options: {
   items(ownerId: string, ids: string[]): DreamItem[];
   /** The records the normal gallery shows. */
   visible(items: DreamItem[]): DreamItem[];
+  visibleGenerations(ownerId: string, query: DreamQuery): Promise<DreamItem[]>;
   /** How alike two items' images are (Image Search), undefined where either is not read. */
   likeness(a: DreamItem, b: DreamItem): number | undefined;
   /** Saves an item's Dream record and its rating (none where undefined). */
@@ -796,16 +795,14 @@ export function createDream(options: {
   // The server's local day.
   const day = (time: number) => new Date(time).toDateString();
 
-  const live = () => store.openJobs();
-  const busy = (jobs = live()) => jobs.some((job) => !dreamJob(job));
+  const busy = () => store.hasOpenOwnWork();
   /**
    * Someone's own work waits to start: Dream queues nothing. Images may take a
    * free worker while other work runs; a video holds its GPU for minutes, so it waits for idle.
    */
-  const pressed = () => live().some((job) => !dreamJob(job) && waiting(job));
+  const pressed = () => store.hasOpenOwnWork(true);
   /** The account's Dream jobs not yet finished. */
-  const held = (ownerId: string) =>
-    live().filter((job) => dreamJob(job) && job.ownerId === ownerId).length;
+  const held = (ownerId: string) => store.openDreamJobs(ownerId).length;
   function today(ownerId: string) {
     const counts = { images: 0, videos: 0 };
     const current = day(now());
@@ -814,15 +811,14 @@ export function createDream(options: {
     const start = new Date(now());
     start.setHours(0, 0, 0, 0);
     start.setDate(start.getDate() - 1);
-    for (const job of store.jobsSince(ownerId, start.toISOString()))
+    for (const job of store.dreamJobsSince(ownerId, start.toISOString()))
       // An idea the text model never finished writing made nothing.
       if (
-        dreamJob(job) &&
         job.status !== "cancelled" &&
-        !(job.status === "failed" && awaitsWriting(job.input)) &&
-        day(Date.parse(job.dream?.at || job.createdAt)) === current
+        !(job.status === "failed" && job.awaitsWriting) &&
+        day(Date.parse(job.dreamAt || job.createdAt)) === current
       )
-        counts[kindOf(job.input) === "video" ? "videos" : "images"]++;
+        counts[kindOf(job) === "video" ? "videos" : "images"]++;
     return counts;
   }
   /**
@@ -830,36 +826,18 @@ export function createDream(options: {
    * account (composer, MCP or Dream). Uploads, imports and records rebuilt without a job
    * never reach Dream, so it shows and learns only from what the account made here.
    */
-  function generations(ownerId: string, query: DreamQuery) {
-    const jobs = jobIds(ownerId);
-    return options
-      .visible(options.gallery(ownerId, query))
-      .filter((item) => (item.ownerId || "") === ownerId && item.jobId && jobs.has(item.jobId));
-  }
+  const generationQuery = (query: DreamQuery): DreamQuery => ({
+    ...query,
+    ownGeneration: true,
+    unlisted: false,
+  });
+  const generations = (ownerId: string, query: DreamQuery) =>
+    options.visible(options.gallery(ownerId, generationQuery(query)));
+  const readyGenerations = (ownerId: string, query: DreamQuery) =>
+    options.visibleGenerations(ownerId, generationQuery(query));
   const pool = (ownerId: string, state: DreamState) =>
     options.gallery(ownerId, { dreamState: state });
-  // A large pool or job table takes long to read, so `consider` reads each at most once.
-  let considering:
-    | {
-        ownerId: string;
-        latest?: DreamItem[];
-        jobIds?: Set<string>;
-        promptJobIds?: Map<string, string[]>;
-      }
-    | undefined;
-  /** The IDs of all the owner's jobs. */
-  function jobIds(ownerId: string) {
-    if (considering?.ownerId !== ownerId) return store.jobIds(ownerId);
-    return (considering.jobIds ??= store.jobIds(ownerId));
-  }
-  /** The owner's jobs with a prompt on one of `profileIds`. */
-  function promptJobIds(ownerId: string, profileIds: string[]) {
-    if (considering?.ownerId !== ownerId) return store.promptJobIds(ownerId, profileIds);
-    const key = JSON.stringify(profileIds);
-    const cache = (considering.promptJobIds ??= new Map());
-    if (!cache.has(key)) cache.set(key, store.promptJobIds(ownerId, profileIds));
-    return cache.get(key)!;
-  }
+  let considering: { ownerId: string; latest?: DreamItem[] } | undefined;
   /** Dream's latest image results, leaving out comparisons and series, which are alike by design. */
   function dreamResults(ownerId: string) {
     const read = () =>
@@ -880,16 +858,18 @@ export function createDream(options: {
    */
   function spread(ownerId: string) {
     const jobs = store
-      .jobsSince(ownerId, new Date(now() - 86_400_000).toISOString())
-      .filter((job) => dreamJob(job) && kindOf(job.input) === "image")
+      .dreamJobsSince(ownerId, new Date(now() - 86_400_000).toISOString())
+      .filter((job) => kindOf(job) === "image")
       .slice(-diversity.results);
     const used = new Map<string, number>();
-    for (const { input } of jobs)
+    for (const job of jobs) {
+      const loras = job.loras ? JSON.parse(job.loras) : [];
       for (const key of [
-        `profile:${input.profileId}`,
-        ...(Array.isArray(input.loras) ? input.loras : []).map((lora) => `lora:${lora?.name}`),
+        `profile:${job.profileId ?? undefined}`,
+        ...(Array.isArray(loras) ? loras : []).map((lora) => `lora:${lora?.name}`),
       ])
         used.set(key, (used.get(key) || 0) + 1);
+    }
     return (key: string) =>
       Math.max(diversity.floor, 1 - (used.get(key) || 0) / Math.max(jobs.length, 1));
   }
@@ -899,19 +879,22 @@ export function createDream(options: {
    */
   function failingProfiles(ownerId: string, streak = failStreak) {
     const outcomes = new Map<string, string[]>();
-    for (const job of store.jobsSince(ownerId, new Date(now() - failWindowMs).toISOString())) {
-      if (!dreamJob(job) || !["completed", "failed"].includes(job.status)) continue;
+    for (const job of store.dreamJobsSince(ownerId, new Date(now() - failWindowMs).toISOString())) {
+      if (!["completed", "failed"].includes(job.status)) continue;
       // An idea the text model never finished says nothing about the profile.
-      if (job.status === "failed" && awaitsWriting(job.input)) continue;
-      const id = String(job.input.profileId || "");
-      outcomes.set(id, [...(outcomes.get(id) || []), job.status]);
+      if (job.status === "failed" && job.awaitsWriting) continue;
+      const id = job.profileId || "";
+      if (!outcomes.has(id)) outcomes.set(id, []);
+      const recent = outcomes.get(id)!;
+      recent.push(job.status);
+      if (recent.length > streak) recent.shift();
     }
     return new Set(
       [...outcomes]
-        .filter(([, statuses]) => {
-          const last = statuses.slice(-streak);
-          return last.length === streak && last.every((status) => status === "failed");
-        })
+        .filter(
+          ([, statuses]) =>
+            statuses.length === streak && statuses.every((status) => status === "failed"),
+        )
         .map(([id]) => id),
     );
   }
@@ -930,17 +913,15 @@ export function createDream(options: {
       ...(video && !videoDue ? (["video"] as Kind[]) : []),
     ];
   }
-  /** What stands in the way without asking any service: off, paused, busy workers or the caps. */
-  function quick(ownerId: string, record: DreamRecord) {
-    const { settings } = record;
+  /** What stands in the way before counting today's work. */
+  function blockedBySettings(ownerId: string, { settings }: DreamRecord) {
     if (!settings.enabled) return { status: "off" as const };
     if (settings.paused) return { status: "paused" as const };
     const running = held(ownerId);
     if (running >= options.slots()) return { status: "generating" as const };
-    if (!kinds(settings, today(ownerId)).length)
-      return { status: "capped" as const, reason: "Dream has made today's share." };
     return null;
   }
+  const capped = { status: "capped" as const, reason: "Dream has made today's share." };
 
   /** One of the entries drawn by its weight, among those weighing more than nothing. */
   function drawn<T>(entries: [T, number][]) {
@@ -1016,6 +997,7 @@ export function createDream(options: {
     const runs = store.profileRuns(
       ownerId,
       new Date(now() - recentDays * 86_400_000).toISOString(),
+      others.map((profile) => profile.id),
     );
     const fewest = Math.min(...others.map((profile) => runs.get(profile.id) || 0));
     const profile = pick(others.filter((entry) => (runs.get(entry.id) || 0) === fewest));
@@ -1032,13 +1014,13 @@ export function createDream(options: {
    * `likedStillShare` of videos and from Dream's kept images (best reviewed first) for the rest,
    * each falling back to the other.
    */
-  function videoSources(ownerId: string, record: DreamRecord) {
+  async function videoSources(ownerId: string, record: DreamRecord) {
     const animated = new Set(record.animated);
     const extended = new Set(record.extended);
     const done = (item: DreamItem, type: string) => item.type === type && item.status === "done";
     const score = (item: DreamItem) => item.review?.score ?? 0;
     const best = (a: DreamItem, b: DreamItem) => score(b) - score(a);
-    const liked = generations(ownerId, { liked: true });
+    const liked = await readyGenerations(ownerId, { liked: true, status: "done" });
     const [video] = liked
       .filter(
         (item) =>
@@ -1058,7 +1040,7 @@ export function createDream(options: {
    * scene cards and drawn ones. Null otherwise; a series whose image is no longer liked or kept,
    * or whose profile is gone, ends.
    */
-  function seriesNext(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
+  async function seriesNext(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const current = record.series;
     if (current) {
       const [item] = options
@@ -1070,7 +1052,7 @@ export function createDream(options: {
       delete latest.series;
       write(ownerId, latest);
     }
-    const seed = seedPick(ownerId, record, profiles);
+    const seed = await seedPick(ownerId, record, profiles);
     if (!seed || !chance(seriesShare)) return null;
     const scenes = (options.cards(ownerId)?.scenes || [])
       .filter((scene) => scene.description)
@@ -1165,11 +1147,10 @@ export function createDream(options: {
   function draftWanted(ownerId: string) {
     const proposals = options.inbox?.drafts(ownerId) || [];
     if (!proposals.length) return null;
-    const made = draftItems(ownerId);
     return (
       proposals.find(
         (proposal) =>
-          made.filter((item) => item.dream?.draft === proposal.id).length < draftSamples,
+          options.count(ownerId, { dreamState: "draft", dreamDraft: proposal.id }) < draftSamples,
       ) || null
     );
   }
@@ -1178,21 +1159,25 @@ export function createDream(options: {
    * images its chats made or of its picks (liked ones and the project's kept Dream results), so
    * a liked image among the newest counts twice. Null without one.
    */
-  function seedFor(ownerId: string, project: Project) {
+  async function seedFor(ownerId: string, project: Project) {
     const chats = options.chats(ownerId);
     const conversationIds = Object.keys(chats).filter((id) => chats[id].projectId === project.id);
     const images = { type: "image", status: "done" };
     const made = [
-      ...(conversationIds.length ? generations(ownerId, { ...images, conversationIds }) : []),
-      ...generations(ownerId, { ...images, dreamState: "kept" }).filter(
-        (item) => item.dream?.projectId === project.id,
-      ),
+      ...(conversationIds.length
+        ? await readyGenerations(ownerId, { ...images, conversationIds })
+        : []),
+      ...(await readyGenerations(ownerId, {
+        ...images,
+        dreamState: "kept",
+        dreamProject: project.id,
+      })),
     ].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
     const seeds = [
       ...made.filter((item) => !item.dream).slice(0, seedLatest),
       ...made.filter((item) => item.rating === "liked" || item.dream).slice(0, seedPicks),
     ].flatMap((item) => {
-      const input = store.job(ownerId, String(item.jobId))?.input;
+      const input = store.jobInput(ownerId, String(item.jobId));
       const prompt = clean(input?.prompt, maxPromptCharacters);
       return input && prompt ? [{ input, prompt }] : [];
     });
@@ -1204,53 +1189,64 @@ export function createDream(options: {
    * made are left out too, unless they are all it liked. Only images the account made with a prompt on a ready image profile
    * are sampled, so a draw finds a seed whenever one exists.
    */
-  function picks(ownerId: string, record: DreamRecord, profiles: DreamProfile[], fresh: string[]) {
+  async function picks(
+    ownerId: string,
+    record: DreamRecord,
+    profiles: DreamProfile[],
+    fresh: string[],
+  ) {
     const ready = profiles.filter((entry) => kindOf(entry) === "image").map((entry) => entry.id);
     const query = {
       type: "image",
       status: "done",
       uploaded: false,
-      jobIds: promptJobIds(ownerId, ready),
+      promptedProfiles: ready,
     };
     const ratings = Object.entries(record.ratings || {});
     const won = shuffled(ratings.filter(([, rating]) => rating > elo.start).map(([id]) => id));
-    const sampled = generations(ownerId, { ...query, rating: "liked", sample: seedSample });
+    const sampled = await readyGenerations(ownerId, {
+      ...query,
+      rating: "liked",
+      sample: seedSample,
+    });
     const liked = [
       ...sampled,
-      ...generations(ownerId, { ...query, rating: "liked", ids: fresh }).filter(
+      ...(await readyGenerations(ownerId, { ...query, rating: "liked", ids: fresh })).filter(
         (item) => !sampled.some((other) => other.id === item.id),
       ),
       ...(won.length
-        ? generations(ownerId, { ...query, ids: won.slice(0, elo.winners) }).filter(
+        ? (await readyGenerations(ownerId, { ...query, ids: won.slice(0, elo.winners) })).filter(
             (item) => item.rating !== "liked",
           )
         : []),
     ];
     const others = liked.filter((item) => !item.dream);
     if (others.length && random(ownSeedEvery)) return others;
-    const keeps = generations(ownerId, {
-      ...query,
-      dreamState: "kept",
-      sample: Math.ceil(seedSample / 3),
-    }).filter((item) => item.rating !== "liked");
+    const keeps = (
+      await readyGenerations(ownerId, {
+        ...query,
+        dreamState: "kept",
+        sample: Math.ceil(seedSample / 3),
+      })
+    ).filter((item) => item.rating !== "liked");
     return [...liked, ...keeps];
   }
   /** A liked or kept image with the input it ran with and its profile where that is still ready. */
   function seedOf(ownerId: string, item: DreamItem, profiles: DreamProfile[]) {
-    const input = store.job(ownerId, String(item.jobId))?.input;
+    const input = store.jobInput(ownerId, String(item.jobId));
     const profile = profiles.find(
       (entry) => kindOf(entry) === "image" && entry.id === input?.profileId,
     );
     const prompt = clean(input?.prompt, maxPromptCharacters);
     return input && profile && prompt ? { item, input, profile, prompt } : null;
   }
-  const drawSeeds = (
+  const drawSeeds = async (
     ownerId: string,
     record: DreamRecord,
     profiles: DreamProfile[],
     fresh: string[] = [],
   ) =>
-    picks(ownerId, record, profiles, fresh).flatMap(
+    (await picks(ownerId, record, profiles, fresh)).flatMap(
       (item) => seedOf(ownerId, item, profiles) ?? [],
     );
   /** The images of the account's latest likes (`freshLikes`), newest first. */
@@ -1270,10 +1266,10 @@ export function createDream(options: {
    * results by image, so its seeds spread across the account's subjects, less its rating's lead
    * (`elo`). Null without one.
    */
-  function seedPick(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
+  async function seedPick(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const used = record.seeds || [];
     const fresh = likedLately(ownerId);
-    const drawn = drawSeeds(ownerId, record, profiles, fresh);
+    const drawn = await drawSeeds(ownerId, record, profiles, fresh);
     const unused = drawn.filter(({ item }) => !used.includes(String(item.id)));
     const lately = unused.filter(({ item }) => fresh.includes(String(item.id)));
     const latest = [
@@ -1446,8 +1442,8 @@ export function createDream(options: {
       .slice(0, 6);
   }
   /** A few liked prompts from the account's whole history, sampled so each idea sees different ones. */
-  function tastePrompts(ownerId: string) {
-    return generations(ownerId, { rating: "liked", sample: seedSample })
+  async function tastePrompts(ownerId: string) {
+    return (await readyGenerations(ownerId, { rating: "liked", sample: seedSample }))
       .filter((item) => item.prompt)
       .slice(0, 3 + random(3))
       .map((item) => clean(item.prompt, 300));
@@ -1668,7 +1664,7 @@ export function createDream(options: {
         ? undefined
         : direction(job.input.writing as DreamWriting, recent, anchors);
       drawnAnchors = concept?.anchors || [];
-      const liked = tastePrompts(ownerId);
+      const liked = await tastePrompts(ownerId);
       noveltyPrompts.push(...liked);
       // More Like This follows its source; other ideas move away from what repeats.
       const repeats = like ? [] : lookalikes(ownerId);
@@ -1840,8 +1836,11 @@ export function createDream(options: {
   /** Tries to queue one Dream job for the owner; says what happened. */
   async function consider(ownerId: string): Promise<{ status: DreamStatus; reason?: string }> {
     const record = read(ownerId);
-    const blocked = quick(ownerId, record);
+    const blocked = blockedBySettings(ownerId, record);
     if (blocked) return blocked;
+    const counts = today(ownerId);
+    const due = kinds(record.settings, counts);
+    if (!due.length) return capped;
     if (now() < (failures.get(ownerId)?.until ?? 0))
       return {
         status: "waiting",
@@ -1852,13 +1851,12 @@ export function createDream(options: {
     const writer = options.writer;
     if (!writer)
       return { status: "unavailable", reason: "The prompt assistant is not configured." };
-    const counts = today(ownerId);
     const judged =
       (record.judged?.length || 0) + options.count(ownerId, { dreamState: ["kept", "discarded"] });
     const every = judged >= pairJudgedAt ? pairEveryJudged : pairEvery;
     let reason = "";
     let idle = "";
-    for (const kind of kinds(record.settings, counts)) {
+    for (const kind of due) {
       const backend = record.settings[kind === "image" ? "imageBackend" : "videoBackend"];
       const online = await options.online(kind, backend);
       if (online.text !== "online")
@@ -1872,7 +1870,7 @@ export function createDream(options: {
       }
       if (kind === "video") {
         // One Dream video runs at a time.
-        if (live().some((job) => dreamJob(job) && kindOf(job.input) === "video")) {
+        if (store.openDreamJobs().some((job) => kindOf(job) === "video")) {
           idle = "Dream makes one video at a time.";
           continue;
         }
@@ -1923,7 +1921,7 @@ export function createDream(options: {
         const pair = await comparison(ownerId, record, access, catalogue.profiles);
         if (pair) return pair;
       }
-      const next = steer ? null : seriesNext(ownerId, record, catalogue.profiles);
+      const next = steer ? null : await seriesNext(ownerId, record, catalogue.profiles);
       if (next) {
         const refused = await seriesJob(ownerId, record, access, next);
         if (!refused) return { status: "generating" };
@@ -1961,9 +1959,10 @@ export function createDream(options: {
       // Familiar images continue a handed-off project's chat work, else a drawn liked or kept
       // image, changing one thing in turn.
       const familiar = !axis && !steer && !draft && kind === "image";
-      const chatSeed = familiar && project && handedOff(project) ? seedFor(ownerId, project) : null;
+      const chatSeed =
+        familiar && project && handedOff(project) ? await seedFor(ownerId, project) : null;
       const likedSeed =
-        familiar && !chatSeed ? seedPick(ownerId, record, catalogue.profiles) : null;
+        familiar && !chatSeed ? await seedPick(ownerId, record, catalogue.profiles) : null;
       const seed = chatSeed ?? likedSeed;
       const varied = Object.keys(continueAxes);
       const vary = seed ? varied[made("continue:") % varied.length] : "";
@@ -2137,7 +2136,7 @@ export function createDream(options: {
       }
     };
     // A source deleted or hidden since it was chosen counts as used, so the next one is tried.
-    for (const source of videoSources(ownerId, record)) {
+    for (const source of await videoSources(ownerId, record)) {
       const reference = referenceOf(source);
       if (!reference) {
         markUsed(ownerId, source);
@@ -2250,7 +2249,7 @@ export function createDream(options: {
     ownerId: string,
     record: DreamRecord,
     access: DreamAccess,
-    { series, seed }: NonNullable<ReturnType<typeof seriesNext>>,
+    { series, seed }: NonNullable<Awaited<ReturnType<typeof seriesNext>>>,
   ) {
     const spicy = spicyShare(record, access);
     const { id, title, index, length } = series;
@@ -2306,9 +2305,9 @@ export function createDream(options: {
    * A comparison's starting point: a drawn liked or kept image (`drawSeeds`) the account generated
    * with a ready selected profile, without references, not compared before.
    */
-  function pairBase(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
+  async function pairBase(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const used = new Set(record.compared);
-    const [base] = drawSeeds(ownerId, record, profiles).filter(
+    const [base] = (await drawSeeds(ownerId, record, profiles)).filter(
       ({ item, input }) =>
         !used.has(String(item.id)) &&
         !(Array.isArray(input.referenceAssets) && input.referenceAssets.length),
@@ -2327,7 +2326,7 @@ export function createDream(options: {
   /** The ways a base can vary in one thing, each as its question and two sides. */
   function pairOptions(
     ownerId: string,
-    base: NonNullable<ReturnType<typeof pairBase>>,
+    base: NonNullable<Awaited<ReturnType<typeof pairBase>>>,
     profiles: DreamProfile[],
   ) {
     const { input, profile } = base;
@@ -2445,7 +2444,7 @@ export function createDream(options: {
     access: DreamAccess,
     profiles: DreamProfile[],
   ): Promise<{ status: DreamStatus; reason?: string } | null> {
-    const base = pairBase(ownerId, record, profiles);
+    const base = await pairBase(ownerId, record, profiles);
     if (!base) return null;
     const choices = pairOptions(ownerId, base, profiles);
     const { question, axis, sides } = drawn(
@@ -2524,10 +2523,8 @@ export function createDream(options: {
   /** Cancels Dream jobs that have not started, for these owners or all. */
   async function stopWaiting(owner?: string) {
     await Promise.all(
-      live()
-        .filter(
-          (job) => dreamJob(job) && waiting(job) && (owner === undefined || job.ownerId === owner),
-        )
+      store
+        .openDreamJobs(owner, true)
         .map((job) => options.cancel(job.ownerId, job.id).catch(() => undefined)),
     );
   }
@@ -2548,19 +2545,17 @@ export function createDream(options: {
       const reach = new Map<string, Promise<Reach>>();
       const stranded = await tracked("Dream: stranded jobs", () =>
         Promise.all(
-          live()
-            .filter((job) => dreamJob(job) && waiting(job))
-            .map(async (job) => {
-              const kind = kindOf(job.input);
-              const backend = job.resource.startsWith("provider:") ? "cloud" : "local";
-              const key = `${kind}:${backend}`;
-              if (!reach.has(key))
-                reach.set(
-                  key,
-                  options.online(kind, backend).then((online) => online.media),
-                );
-              return (await reach.get(key)) === "online" ? null : job;
-            }),
+          store.openDreamJobs(undefined, true).map(async (job) => {
+            const kind = kindOf(job);
+            const backend = job.resource.startsWith("provider:") ? "cloud" : "local";
+            const key = `${kind}:${backend}`;
+            if (!reach.has(key))
+              reach.set(
+                key,
+                options.online(kind, backend).then((online) => online.media),
+              );
+            return (await reach.get(key)) === "online" ? null : job;
+          }),
         ),
       );
       for (const job of stranded)
@@ -2594,7 +2589,7 @@ export function createDream(options: {
       }
       // Proposals wait while a Dream idea is being written, so the text model has one call at a time.
       const inbox = options.inbox;
-      if (inbox && !busy() && !live().some((job) => job.status === "writing"))
+      if (inbox && !busy() && !store.hasWritingJobs())
         for (const ownerId of owners)
           try {
             const { enabled, paused } = read(ownerId).settings;
@@ -2631,7 +2626,6 @@ export function createDream(options: {
       status: "done",
       uploaded: false,
       unlisted: false,
-      jobIds: [...store.jobIds(ownerId)],
       before: now() - calibrationAgeMs,
       ...query,
     });
@@ -2739,8 +2733,10 @@ export function createDream(options: {
     finished: wake,
     access: (ownerId: string) => options.access(ownerId),
     status(ownerId: string): { status: DreamStatus; reason?: string } {
-      const blocked = quick(ownerId, read(ownerId));
+      const record = read(ownerId);
+      const blocked = blockedBySettings(ownerId, record);
       if (blocked) return blocked;
+      if (!kinds(record.settings, today(ownerId)).length) return capped;
       const last = states.get(ownerId);
       if (last && ["unavailable", "waiting"].includes(last.status)) return last;
       return busy()
@@ -2846,7 +2842,7 @@ export function createDream(options: {
       }),
     /** Leaves a removed project's results in the deck or gallery without its project id. */
     detachProject(ownerId: string, projectId: string) {
-      if (live().some((job) => job.ownerId === ownerId && job.dream?.projectId === projectId))
+      if (store.openDreamJobs(ownerId).some((job) => job.projectId === projectId))
         throw failure("Wait for the project's active generations before undoing it.", 409);
       for (const item of options.gallery(ownerId, { dreamProject: projectId })) {
         const { projectId: _projectId, ...mark } = item.dream!;
@@ -2881,8 +2877,9 @@ export function createDream(options: {
         .filter((item) => gone(item.dream?.draft))
         .map((item) => String(item.id));
       await Promise.all(
-        live()
-          .filter((job) => job.ownerId === ownerId && dreamJob(job) && gone(job.dream?.draft))
+        store
+          .openDreamJobs(ownerId)
+          .filter((job) => gone(job.draft ?? undefined))
           .map((job) => options.cancel(ownerId, job.id).catch(() => undefined)),
       );
       if (ids.length) options.remove(ownerId, ids);
