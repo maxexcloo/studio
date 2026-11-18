@@ -148,107 +148,65 @@ test("Undo steps back through Dislike, Like and Accept, taking back each", async
     ]);
 });
 
-test("While You Were Away ranks each project's results, folds its misses and judges them", async ({
+test("Projects show what is new in each since the last visit, and the viewer judges it", async ({
   page,
   isMobile,
 }) => {
   await fixtures(page);
-  const result = (id: string, projectId: string, score: number, miss = "", createdAt = stamp) =>
-    dreamItem(id, {
-      createdAt,
-      dream: { ...dreamItem(id).dream, projectId },
-      review: { score, miss, model: "vision", at: stamp },
-    });
+  const constraints = { profiles: [], loras: true, aspect: "", resolution: "" };
+  const brief = { subjects: "", styles: "", avoid: "" };
+  const result = (id: string, projectId: string, createdAt: string) =>
+    dreamItem(id, { createdAt, dream: { ...dreamItem(id).dream, projectId } });
   const dream = await serveDream(page, {
     since: "2026-10-22T00:00:00.000Z",
     projects: [
-      { id: "beach", name: "Beach", brief: { subjects: "the sea", styles: "", avoid: "" } },
-      { id: "city", name: "City", brief: { subjects: "", styles: "", avoid: "" } },
+      { id: "beach", name: "Beach", brief, constraints },
+      { id: "city", name: "City", brief, constraints },
     ],
     unseen: [
-      result("wave", "beach", 9),
-      result("shore", "beach", 7),
-      result("indoors", "beach", 2, "Indoors; the brief asks for the sea."),
-      result("street", "city", 8, "", "2026-10-20T00:00:00.000Z"),
+      result("shore", "beach", "2026-10-23T00:00:00.000Z"),
+      result("wave", "beach", "2026-10-24T00:00:00.000Z"),
+      result("street", "city", "2026-10-20T00:00:00.000Z"),
       dreamItem("loose"),
     ],
   });
   await page.goto("/dream");
-  await showView(page, "Overview");
-  await expect(page.getByRole("heading", { name: "While You Were Away" })).toBeVisible();
-  await expect(page.getByText(/^4 new since /)).toBeVisible();
-  await expect(page.getByRole("heading", { level: 3, name: /^(Beach|City|Other)$/ })).toHaveText([
-    "Beach",
-    "City",
-    "Other",
-  ]);
-  const beach = page.getByRole("region", { name: "Beach" });
+  // The view menu always shows what waits, both kinds.
+  await expect(
+    page.getByRole("button", { name: "Dream View", exact: true }),
+  ).toHaveAccessibleDescription("4 images and 0 videos waiting");
+  await showView(page, "Projects");
+  await expect(page.getByText(/^2 new since /)).toBeVisible();
+  const beach = page.getByRole("region", { name: "Beach", exact: true });
+  await expect(beach.getByText("2 New", { exact: true })).toBeVisible();
+  // Newest first.
   const views = beach.getByRole("button", { name: /^View / });
-  await expect(views).toHaveCount(2);
   await expect(views.first()).toHaveAccessibleName("View Dream prompt wave");
-  await expect(beach.getByText("9/10")).toBeVisible();
+  const city = page.getByRole("region", { name: "City", exact: true });
+  await expect(city.getByRole("button", { name: "View Dream prompt street" })).toBeVisible();
+  await expect(city.getByText(/ New$/)).toHaveCount(0);
 
-  // Misses stay folded until asked for, with what they miss.
-  const misses = beach.getByRole("button", { name: "Misses (1)" });
-  await expect(misses).toHaveAttribute("aria-expanded", "false");
-  await misses.click();
-  await expect(beach.getByText("Indoors; the brief asks for the sea.")).toBeVisible();
-
-  // Dislike, Like and Accept judge in place.
-  await beach.getByRole("button", { name: "Accept Dream prompt wave", exact: true }).click();
-  await expect(beach.getByRole("button", { name: "View Dream prompt wave" })).toHaveCount(0);
-  await beach.getByRole("button", { name: "Dislike Dream prompt indoors", exact: true }).click();
-  await page
-    .getByRole("region", { name: "City" })
-    .getByRole("button", { name: "Like Dream prompt street", exact: true })
-    .click();
-
-  // Full screen has every choice and moves on to the next result after a verdict.
-  await beach.getByRole("button", { name: "View Dream prompt shore" }).click();
+  // The viewer has every choice and moves on to the next result after a verdict.
+  await views.first().click();
   const viewer = page.getByRole("dialog");
   await expect(viewer.getByRole("button", { name: "Generation Details" })).toBeFocused();
-  // In the item bar's order, every action named, the verdicts together at the end.
   if (!isMobile)
     await expect(
       viewer.getByRole("group", { name: "Dream Actions" }).getByRole("button"),
     ).toHaveText(["Animate", "Edit", "Recreate", "Dislike", "Like", "Accept"]);
-  await dreamAction(page, "More Like This");
-  await expect(viewer.getByRole("img", { name: "Dream prompt loose" })).toBeVisible();
-  await viewer
-    .getByRole("group", { name: "Dream Actions" })
-    .getByRole("button", { name: "Dislike", exact: true })
-    .click();
+  await dreamAction(page, "Accept");
+  await expect(viewer.getByRole("img", { name: "Dream prompt shore" })).toBeVisible();
+  await dreamAction(page, "Dislike");
+  await expect(viewer.getByRole("img", { name: "Dream prompt street" })).toBeVisible();
+  await dreamAction(page, "Like");
   await expect(viewer).toBeHidden();
-  await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nothing new since your last visit", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^View Dream prompt/ })).toHaveCount(0);
   expect(verdicts(dream)).toEqual([
     "POST /api/dream/wave/keep",
-    "POST /api/dream/indoors/discard",
+    "POST /api/dream/shore/discard",
     "POST /api/gallery/favorite",
-    "POST /api/dream/shore/more",
-    "POST /api/dream/loose/discard",
   ]);
-});
-
-test("While You Were Away shows a series as one set, in its order", async ({ page }) => {
-  await fixtures(page);
-  const shot = (id: string, index: number) =>
-    dreamItem(id, {
-      resultSet: { id: "night", title: "Mara · Diner, Midnight", index, source: "dream" },
-    });
-  await serveDream(page, { unseen: [shot("second", 1), dreamItem("loose"), shot("first", 0)] });
-  await page.goto("/dream");
-  await showView(page, "Overview");
-  const set = page.getByRole("group", { name: "Series: Mara · Diner, Midnight" });
-  await expect(set.getByText("· Series of 2")).toBeVisible();
-  const views = set.getByRole("button", { name: /^View / });
-  await expect(views).toHaveCount(2);
-  await expect(views.first()).toHaveAccessibleName("View Dream prompt first");
-  await expect(views.last()).toHaveAccessibleName("View Dream prompt second");
-  await expect(page.getByRole("button", { name: "View Dream prompt loose" })).toBeVisible();
-  await expect(set.getByRole("button", { name: "View Dream prompt loose" })).toHaveCount(0);
-  // Accepting one judges only that result.
-  await set.getByRole("button", { name: "Accept Dream prompt first", exact: true }).click();
-  await expect(views).toHaveCount(1);
 });
 
 test("On a phone held sideways, a deck card's caption stands beside its media", async ({
@@ -456,7 +414,6 @@ test("Dream navigation orders its views and History shows retained activity and 
   await expect(page.getByRole("menuitem")).toHaveText([
     "Images",
     "Videos",
-    "Overview",
     "Projects",
     "Taste",
     "Discards",
@@ -944,7 +901,9 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   await expect(page.getByRole("group", { name: "Which Image?", exact: true })).toBeVisible();
   // The view menu picks the deck's media.
   await showView(page, "Videos");
-  await expect(page.getByRole("button", { name: "Dream View", exact: true })).toHaveText("Videos");
+  await expect(page.getByRole("button", { name: "Dream View", exact: true })).toContainText(
+    "Videos",
+  );
   const pair = page.getByRole("group", { name: "Which Video?", exact: true });
   await expect(pair).toBeVisible();
   await pair.getByRole("button", { name: "View A", exact: true }).click();

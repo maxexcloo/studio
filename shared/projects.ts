@@ -83,17 +83,6 @@ export interface Review {
   /** A short hash of the brief it was checked against: a changed brief makes it due again. */
   brief?: string;
 }
-/** One project's unseen Dream results in While You Were Away. */
-export interface DigestGroup<Item> {
-  /** The project, or null for results without one (or whose project is gone). */
-  projectId: string | null;
-  name: string;
-  /** Fitting and unreviewed results: best score first, unreviewed after, newest first among equals. */
-  items: Item[];
-  /** Results that miss the brief, best score first, kept for the person to judge. */
-  misses: Item[];
-}
-
 /** The brief's free text as one line, "subjects …; age …"; "" when empty. */
 export function briefSummary(brief: Partial<ProjectBrief>) {
   return briefTexts

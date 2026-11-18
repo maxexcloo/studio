@@ -4,7 +4,6 @@ import { type RouteAccount, type RouteRun, directRoute } from "./direct-route.ts
 import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
 import type { InboxStore } from "./inbox.ts";
 import { type Projects, projectPatch } from "./projects.ts";
-import { digest } from "./review.ts";
 
 /** The caller's own Dream: settings, the unseen pool, verdicts, discards, projects and the Inbox. */
 export function registerDreamRoutes(
@@ -31,8 +30,6 @@ export function registerDreamRoutes(
     const { status = 500, message } = error as Error & { status?: number };
     return { status, payload: { ok: false, error: message } };
   };
-  // Single results, and a comparison's side whose other failed, show in While You Were Away;
-  // comparisons stay in the deck.
   const show = (ownerId: string) => {
     const access = dream.access(ownerId);
     const record = dream.read(ownerId);
@@ -40,16 +37,6 @@ export function registerDreamRoutes(
     return {
       settings: record.settings,
       unseen,
-      digest: digest(
-        unseen.filter(
-          (item) =>
-            !unseen.some(
-              (other) =>
-                other !== item && other.dream?.pair && other.dream.pair.id === item.dream?.pair?.id,
-            ),
-        ),
-        projects.list(ownerId),
-      ),
       since: record.visit?.since || null,
       today: dream.today(ownerId),
       spicyAvailable: Boolean(access?.uncensored),

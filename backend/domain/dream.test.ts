@@ -1027,7 +1027,7 @@ test("Projects share turns by how their results fare, with a floor for new ones;
   assert.ok(favoured.get("new")! > favoured.get("strong")!);
 });
 
-test("Dream's ideas take the account's active projects and While You Were Away groups them", async (t) => {
+test("Dream's ideas take the account's active projects, and visits record when the last one ended", async (t) => {
   const fx = fixture(t);
   const { dream, state, projects, dreamOnce } = fx;
   await dream.save("alice", { enabled: true });
@@ -1053,22 +1053,8 @@ test("Dream's ideas take the account's active projects and While You Were Away g
   assert.match(state.calls[0].system, /keep to its brief/);
   assert.doesNotMatch(state.calls[2].user, /Project brief/);
 
-  const [, last, first] = state.items;
-  last.review = { score: 9, miss: "", model: "m", at: "" };
-  first.review = { score: 2, miss: "people", model: "m", at: "" };
   const request = await serve(t, fx);
   const shown = (await request("")).body;
-  assert.deepEqual(
-    shown.digest.map((group: { name: string; items: DreamItem[]; misses: DreamItem[] }) => [
-      group.name,
-      group.items.map((item) => item.prompt),
-      group.misses.map((item) => item.prompt),
-    ]),
-    [
-      ["Beach", ["dream 2"], ["dream 1"]],
-      ["City", ["dream 3"], []],
-    ],
-  );
 
   // A visit answers when the one before it ended; views within half an hour are one visit.
   assert.equal(shown.since, null);

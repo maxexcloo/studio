@@ -4,6 +4,7 @@ import {
   Button,
   ScrollArea,
   Stack,
+  Text,
   Tooltip,
   getDefaultZIndex,
 } from "@mantine/core";
@@ -15,17 +16,29 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import type { Project } from "../../../../shared/projects";
 import { api } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { dateFormat } from "../../ui/dates";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup } from "../../ui/SettingRows";
 import { CardDialog } from "../characters/CardImages";
+import { MediaViewer } from "../gallery/MediaViewer";
 import { modelsQuery } from "../generation/GenerationProvider";
+import { type Verdict, viewerChoices } from "./choices";
+import { useJudge } from "./DreamDeck";
 import { ProjectCard } from "./ProjectCard";
 import { ProjectForm, blankProject, useSaveProject } from "./ProjectForm";
 import { ProjectInbox } from "./ProjectInbox";
 import { ProjectSheet } from "./ProjectSheet";
-import { inboxQuery, projectPath, projectsQuery } from "./queries";
+import { type DreamItem, dreamQuery, inboxQuery, projectPath, projectsQuery } from "./queries";
+
+const sinceFormat = dateFormat({
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 /** New Project or Edit for one project, saved by the person. */
 function ProjectEditor({ project, onClose }: { project?: Project; onClose: () => void }) {
@@ -45,9 +58,10 @@ function ProjectEditor({ project, onClose }: { project?: Project; onClose: () =>
 }
 
 /**
- * Dream's projects: the Inbox of what Dream proposes, then each project's card; a project opens in
- * its detail view at /dream/projects/:projectId. New Project stands in Dream's toolbar
- * (`actionTarget`).
+ * Dream's projects: how many of their results are new since the last visit, the Inbox of what
+ * Dream proposes, then each project's card with its results waiting for a verdict, which the
+ * viewer judges, moving on to the next after each; a project opens in its detail view at
+ * /dream/projects/:projectId. New Project stands in Dream's toolbar (`actionTarget`).
  */
 export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement | null }) {
   const client = useQueryClient();
@@ -59,6 +73,18 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
   const models = useQuery(modelsQuery);
   const [editing, setEditing] = useState<{ project?: Project }>();
   const [deleting, setDeleting] = useState<Project | null>(null);
+  const dream = useQuery(dreamQuery);
+  const [decided, setDecided] = useState<Set<string>>(() => new Set());
+  const [viewing, setViewing] = useState<string | null>(null);
+  const judge = useJudge(
+    (card) =>
+      card.kind === "dream" &&
+      setDecided((previous) => {
+        const next = new Set(previous);
+        next.delete(card.item.id);
+        return next;
+      }),
+  );
   const deletion = useMutation({
     meta: { inlineError: true },
     mutationFn: (project: Project) => api(projectPath(project), { method: "DELETE" }),
@@ -71,6 +97,28 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
     models.data?.profiles.find((profile) => profile.id === id)?.label || id;
   const list = projects.data?.projects || [];
   const empty = !list.length && inbox.isSuccess && !inbox.data.proposals.length;
+  // Each project's single results waiting for a verdict, newest first; comparisons stay in the deck.
+  const unseen = (projectId: string) =>
+    (dream.data?.unseen ?? [])
+      .filter(
+        (item) => item.dream?.projectId === projectId && !item.dream.pair && !decided.has(item.id),
+      )
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  const since = dream.data?.since ?? null;
+  const fresh = (items: DreamItem[]) =>
+    items.filter((item) => !since || String(item.createdAt || "") > since).length;
+  // The viewer flips through every project's waiting results, in the cards' order.
+  const order = list.flatMap((project) => unseen(project.id));
+  const newCount = fresh(order);
+  const current = viewing ? order.find((item) => item.id === viewing) : undefined;
+  if (viewing && !current) setViewing(null);
+  function act(item: DreamItem, verdict: Verdict) {
+    const index = order.findIndex((entry) => entry.id === item.id);
+    const next = order[index + 1] || order[index - 1];
+    setDecided((previous) => new Set(previous).add(item.id));
+    if (viewing === item.id) setViewing(next?.id ?? null);
+    judge.mutate({ card: { kind: "dream", key: item.id, item }, verdict });
+  }
   return (
     <>
       {actionTarget &&
@@ -109,6 +157,13 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
       ) : (
         <ScrollArea flex={1} mih={0}>
           <Stack w="100%" maw={760} mx="auto" gap="lg" pb="md">
+            {dream.isSuccess && list.length > 0 && (
+              <Text size="sm" c="dimmed">
+                {newCount
+                  ? `${newCount} new${since ? ` since ${sinceFormat.format(new Date(since))}` : ""}`
+                  : "Nothing new since your last visit"}
+              </Text>
+            )}
             <ProjectInbox projects={list} />
             {list.length > 0 && (
               <SettingGroup title="Projects">
@@ -118,7 +173,10 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
                       key={project.id}
                       project={project}
                       stats={projects.data.stats?.[project.id]}
+                      unseen={unseen(project.id)}
+                      fresh={fresh(unseen(project.id))}
                       profileLabel={profileLabel}
+                      onView={(item) => setViewing(item.id)}
                       onEdit={() => setEditing({ project })}
                       onDelete={() => {
                         deletion.reset();
@@ -131,6 +189,17 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
             )}
           </Stack>
         </ScrollArea>
+      )}
+      {current && (
+        <MediaViewer
+          item={current}
+          items={order}
+          navigate={(item) => setViewing(item.id)}
+          close={() => setViewing(null)}
+          actions={viewerChoices({ kind: "dream", key: current.id, item: current }, (choice) =>
+            act(current, choice as Verdict),
+          )}
+        />
       )}
       <ProjectSheet
         projectId={projectId}

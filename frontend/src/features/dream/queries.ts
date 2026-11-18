@@ -2,7 +2,7 @@ import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 import type { DreamSettings } from "../../../../shared/dream";
 import type { Inbox } from "../../../../shared/inbox";
-import type { DigestGroup, Project, ProjectStats } from "../../../../shared/projects";
+import type { Project, ProjectStats } from "../../../../shared/projects";
 import type { DreamActivity } from "../../../../shared/taste";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
@@ -30,8 +30,6 @@ export interface Dream {
   settings: DreamSettings;
   /** Finished results waiting for a verdict, oldest first. */
   unseen: DreamItem[];
-  /** The unseen single results per project, ranked, for While You Were Away. */
-  digest: DigestGroup<DreamItem>[];
   /** When the visit before this one ended; null on the first. */
   since: string | null;
   /** What Dream has made today, counted against the daily caps. */
