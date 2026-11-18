@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import type { Change } from "../../../../shared/suggestions";
 import type { MediaItem } from "../../types";
 import type { Action, ActionGroups } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
@@ -33,7 +32,7 @@ export interface PromptAssist {
 }
 
 /** A change asked for from a tile's Edit menu, which opens the viewer to ask it there. */
-export type ViewerAsk = { request: string } | { custom: true };
+export type ViewerAsk = { itemId: string; change: { request: string } | { custom: true } };
 
 /**
  * The viewer's prompt and its assistance. The field holds the item's prompt: editing it and
@@ -50,24 +49,13 @@ export function useViewerPrompt(
   const [prompt, setPrompt] = useState(original);
   const field = useRef<HTMLTextAreaElement>(null);
   const [review, setReview] = useEditReview();
-  const runNow = useRef<(proposal: Change) => void>(() => {});
   const ask = useItemChange<string>(item, {
     groups,
     iterate,
-    show: (proposal) => (review ? setPrompt(proposalText(proposal)) : runNow.current(proposal)),
+    review,
+    show: (proposal) => setPrompt(proposal ? proposalText(proposal) : original),
     restore: setPrompt,
   });
-  // Another item starts from its own prompt, without the last one's proposal.
-  const [shownItem, setShownItem] = useState(item.id);
-  if (shownItem !== item.id) {
-    setShownItem(item.id);
-    setPrompt(original);
-    ask.done();
-  }
-  runNow.current = (proposal) => {
-    ask.run(proposal.prompt, proposal);
-    setPrompt(original);
-  };
   // Under review the field shows the request while it is asked for.
   const pick = (request: string) => {
     if (review) setPrompt(request);
@@ -79,10 +67,10 @@ export function useViewerPrompt(
   const navigate = useNavigate();
   const asked = (location.state as { ask?: ViewerAsk } | null)?.ask;
   useEffect(() => {
-    if (!asked || !ask.available) return;
+    if (!asked || asked.itemId !== item.id || !ask.available) return;
     navigate(location, { replace: true, state: { ...location.state, ask: undefined } });
-    if ("custom" in asked) setCustomOpen(true);
-    else pick(asked.request);
+    if ("custom" in asked.change) setCustomOpen(true);
+    else pick(asked.change.request);
   }, [asked, ask.available]);
   const assistant = useQuery(assistantQuery).data;
   const custom = (

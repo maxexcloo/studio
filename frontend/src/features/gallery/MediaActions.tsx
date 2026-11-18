@@ -187,7 +187,7 @@ function takesReferences(profile: Profile | undefined, backend?: string) {
  */
 function useReferenceAction(item: MediaItem, onApplied: () => void): Action | null {
   const { profile, profiles, models, input, selectProfile } = useGeneration();
-  const reference = useGalleryReference();
+  const reference = useGalleryReference(item.id);
   const location = useLocation();
   const openComposer = useOpenComposer();
   if (!profile) return null;
@@ -461,10 +461,20 @@ export function useMediaActions(
     : [];
   // Edit asks the assistant for a change: in the viewer's prompt, or elsewhere by opening the
   // viewer to ask there (GalleryPage's item path, ViewerPrompt's `ask`).
-  const openViewer = (ask: ViewerAsk) => {
+  const openViewer = (ask: ViewerAsk["change"]) => {
     onApplied();
     const { chat, set, show, similar, turn } = (location.state as GalleryState | null) || {};
-    navigate(viewerPath(item), { state: { chat, set, show, similar, turn, viewer: true, ask } });
+    navigate(viewerPath(item), {
+      state: {
+        chat,
+        set,
+        show,
+        similar,
+        turn,
+        viewer: true,
+        ask: { itemId: item.id, change: ask },
+      },
+    });
   };
   const editAsk: EditAsk = edit ?? {
     pending: false,
