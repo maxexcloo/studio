@@ -28,6 +28,7 @@ import {
   upscaleEstimate,
 } from "./timings.js";
 import { upscaleLeftMs, upscaleWork } from "./upscale-timing.js";
+import { noteWorkerUpscale } from "./upscale.js";
 import { defaultWorkerId, isRadianceWorker, workerById } from "./workers.js";
 import { markWorkflowUsed } from "./workflow-catalogue.js";
 
@@ -599,6 +600,7 @@ async function runJob(id, body, { prepare = null, store } = {}) {
      * saved; they are kept at their generated size, their upscale record saying why.
      */
     const deliver = async (results, missed = null) => {
+      if (results.some(({ upscale }) => upscale)) noteWorkerUpscale(worker);
       // ComfyUI as a worker: the pictures move into Studio media before anything shows them.
       const moved = await ingestRunResults(worker, results, body.ownerId || "");
       results = moved.results;

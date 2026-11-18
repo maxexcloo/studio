@@ -235,8 +235,8 @@ export function createGenerationQueue({
       const account = job.ownerId ? accountAccessForId(job.ownerId) : undefined;
       if (!job.providerJobId && job.ownerId && !account?.authenticated)
         throw new Error("This account can no longer upscale images.");
-      const info = job.providerJobId ? null : (await loadComfyContext(job.backend)).info;
-      return runUpscaleJob(job.backend, job.id, job.input.upscaleBody, info, undefined, {
+      const context = job.providerJobId ? {} : await loadComfyContext(job.backend);
+      return runUpscaleJob(job.backend, job.id, job.input.upscaleBody, context, undefined, {
         ...callbacks,
         promptId: job.providerJobId,
         plan: job.input.upscalePlan,
