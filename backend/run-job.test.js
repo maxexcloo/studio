@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { temporaryFolder } from "./fixtures/temporary.js";
 import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 
 // A whole run against a stand-in ComfyUI: the graph is queued, progress
@@ -15,7 +13,10 @@ const fake = await startFakeComfy();
 process.env.STUDIO_WORKERS = JSON.stringify([
   { id: "primary", url: fake.url, capabilities: ["image", "video", "upscale", "models"] },
 ]);
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-run-"));
+process.env.STUDIO_DATA_DIR = temporaryFolder("studio-run-", async () => {
+  await fake.close();
+  flushWorkflowPreferences();
+});
 writeTestWorkflows(process.env.STUDIO_DATA_DIR);
 const { jobs, runJob } = await import("./jobs.js");
 const { setGallery, gallery: galleryRows } = await import("./fixtures/gallery.js");
@@ -25,7 +26,7 @@ const { openDatabase } = await import("./persistence/runtime.ts");
 const { createGenerationQueueAdapter } = await import("./domain/generation-adapter.ts");
 const { GenerationQueue } = await import("./domain/queue.ts");
 const { Store } = await import("./domain/store.ts");
-test.after(() => fake.close());
+const { flushWorkflowPreferences } = await import("./workflow-catalogue.js");
 
 const socketsBuiltIn = typeof WebSocket === "function";
 

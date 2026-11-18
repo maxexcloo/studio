@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
+import { temporaryFolder } from "./fixtures/temporary.js";
+
+process.env.STUDIO_DATA_DIR = temporaryFolder("studio-data-");
 const { generationSettings } = await import("./gallery/records.js");
 
 test("a reference that only guided is kept with the run, so a retry runs it the same way", () => {

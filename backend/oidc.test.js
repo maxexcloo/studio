@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-oidc-"));
+import { temporaryFolder } from "./fixtures/temporary.js";
+
+const temporary = temporaryFolder("studio-oidc-");
 process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
 process.env.STUDIO_MULTI_USER = "1";
 process.env.STUDIO_WORKERS = JSON.stringify([

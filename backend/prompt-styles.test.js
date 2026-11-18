@@ -1,14 +1,12 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 
 import { seedStyles } from "./assistant-presets.js";
+import { temporaryFolder } from "./fixtures/temporary.js";
 import { createPromptStyleStore } from "./prompt-styles.js";
 
-const store = () =>
-  createPromptStyleStore({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), "prompt-styles-")) });
+const store = () => createPromptStyleStore({ dataDir: temporaryFolder("studio-prompt-styles-") });
 
 test("a folder without styles has the seed until the first save records it", () => {
   const styles = store();

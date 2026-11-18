@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 
+import { temporaryFolder } from "./fixtures/temporary.js";
+
 // Each test file runs in its own process, so this data folder stays here.
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
+process.env.STUDIO_DATA_DIR = temporaryFolder("studio-data-");
 const { setGallery } = await import("./fixtures/gallery.js");
 const history = await import("./prompt-history.js");
 const { deleteRuntimeDocument, ownerDocumentName, readRuntimeDocument } =
