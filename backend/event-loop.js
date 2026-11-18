@@ -47,12 +47,24 @@ export function watchEventLoop({ intervalMs = 100, thresholdMs = 200 } = {}) {
     const now = performance.now();
     const stall = now - windowStart - intervalMs;
     if (stall > thresholdMs) {
-      const work = [...active]
+      // Work of one kind is counted on one line, from its earliest start, so a burst of it (a
+      // gallery's thumbnails) can't push the work that stalled off the list.
+      const kinds = new Map();
+      for (const entry of active) {
+        const key = `${name(entry)} (${entry.end ? "ended" : "running"}`;
+        const kind = kinds.get(key);
+        if (!kind) kinds.set(key, { key, at: entry.at, count: 1 });
+        else {
+          kind.count += 1;
+          kind.at = Math.min(kind.at, entry.at);
+        }
+      }
+      const work = [...kinds.values()]
         .sort((a, b) => b.at - a.at)
         .slice(0, 12)
         .map(
-          (entry) =>
-            `${name(entry)} (${entry.end ? "ended" : "running"}, started ${Math.round(now - entry.at)} ms ago)`,
+          ({ key, at, count }) =>
+            `${key}${count > 1 ? `, ${count} of them` : ""}, started ${Math.round(now - at)} ms ago)`,
         );
       logWarning("Event loop stalled", { ms: Math.round(stall), work });
     }
