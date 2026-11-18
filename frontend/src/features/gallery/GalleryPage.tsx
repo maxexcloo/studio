@@ -18,7 +18,7 @@ import {
 } from "@tanstack/react-query";
 import { ArrowUp, LayoutGrid, Rows3, SquareCheck } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { type Location, Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { type Location, Navigate, useLocation, useNavigate } from "react-router";
 
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem, MediaKind } from "../../types";
@@ -66,6 +66,7 @@ import {
   galleryPath,
   viewerItemId,
   viewerPath,
+  viewerPathId,
 } from "./viewerLink";
 
 import classes from "./GalleryPage.module.css";
@@ -129,7 +130,7 @@ function Gallery() {
   const linkedQuery = state?.q;
   // The viewer's item (`/images/<id>`): opening one adds a history entry, so Back closes it, and
   // flipping through items replaces it.
-  const itemId = useParams().id || "";
+  const itemId = viewerPathId(location.pathname);
   // A set link shows that MCP result set alone until its chip is removed.
   const setId = state?.set || "";
   // An MCP result link shows that chat's turn, or the whole chat (`show` "chat"), until its chip
