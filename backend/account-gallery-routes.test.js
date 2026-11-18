@@ -74,7 +74,9 @@ test("gallery pages and exact job reads return only the signed-in account's reco
     writing: { kind: "request", model: "writer", thinking: "long thoughts" },
   };
   const second = item("account-b", "job-b");
-  setGallery([first, second]);
+  // A Dream result awaiting its verdict is listed nowhere, but a result made from it links to it.
+  const dream = { ...item("account-a", "job-dream"), dream: { state: "unseen" } };
+  setGallery([first, second, dream]);
   const request = {
     studioAccount: {
       userId: "account-a",
@@ -95,6 +97,7 @@ test("gallery pages and exact job reads return only the signed-in account's reco
   const read = (id) => call(routes["/api/gallery/items/:id"], { ...request, params: { id } });
   assert.equal((await read(first.id)).item.writing.thinking, "long thoughts");
   assert.equal((await read(second.id)).item, undefined);
+  assert.equal((await read(dream.id)).item.id, dream.id);
   assert.deepEqual(
     (await call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-b" } })).items,
     [],

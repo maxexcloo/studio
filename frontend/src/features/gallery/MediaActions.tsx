@@ -30,6 +30,7 @@ import { post } from "../../api";
 import type { MediaItem, Profile } from "../../types";
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { copyText } from "../../ui/clipboard";
+import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
 import { useGroupFeature } from "../auth/AccountGate";
@@ -51,7 +52,7 @@ import {
   nextStepsQuery,
 } from "../taste/suggestions";
 import { AnimateDialog } from "./AnimateDialog";
-import { videoExport } from "./download";
+import { videoGif } from "./download";
 import { contextMenuActions, itemAction, itemActionGroups } from "./itemActions";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
@@ -334,8 +335,7 @@ export function useMediaActions(
   const rating = useMediaRating(item);
   const report = useReportIssue(item, iterate);
   const ready = item.status === "done" && Boolean(item.url);
-  const gif = ready ? videoExport(item, "gif") : null;
-  const loop = ready ? videoExport(item, "loop") : null;
+  const gif = ready ? videoGif(item) : null;
   const image = ready && item.type === "image";
   const video = ready && item.type === "video";
   const upscale = useUpscaleAction(item, {
@@ -484,7 +484,8 @@ export function useMediaActions(
   });
   // The assistant and the animate offers decide every option, so they show together.
   const optionsLoading = assistant.isPending || animation.isPending;
-  // More Like This, and the gallery ranked by likeness to this image (GalleryPage reads `similar`).
+  // Comparing this image and discovery from it, A–Z: More Like This, the gallery ranked by
+  // likeness to it (GalleryPage reads `similar`), and its comparisons.
   const discovery: Action[] = [
     ...moreLike,
     ...(image
@@ -498,9 +499,31 @@ export function useMediaActions(
               navigate("/images", { state: { similar: item.id } satisfies GalleryState });
             },
           },
+          // Stages this image's prompt across models in the composer.
+          {
+            id: "compare-models",
+            label: "Compare in Composer",
+            icon: icons.compare,
+            disabled: variants.isPending,
+            loading: variants.isPending,
+            onClick: () => variants.mutate(),
+          },
         ]
       : []),
-  ];
+    ...(image && comparison
+      ? [
+          {
+            id: "open-comparison",
+            label: "Open Comparison",
+            icon: icons.compareSideBySide,
+            onClick: () => {
+              onApplied();
+              navigate(`/compare/${comparison}`);
+            },
+          },
+        ]
+      : []),
+  ].sort((a, b) => compareNames(String(a.label), String(b.label)));
   const actions = [
     retry,
     (image || video) &&
@@ -600,11 +623,11 @@ export function useMediaActions(
             : [],
         }),
       }),
-    // Recreate runs the item again from here or compares it, then opens it in the composer. An
+    // Recreate runs the item again from here, or opens it in the composer. An
     // upload has only its suggested prompt; unfinished work opens its prompt.
     itemAction("recreate", {
       disabled: !ready && action.isPending,
-      loading: running === "regenerate" || running === "repeat" || variants.isPending,
+      loading: running === "regenerate" || running === "repeat",
       onClick: ready ? undefined : () => action.mutate("image"),
       menu: ready
         ? [
@@ -624,46 +647,19 @@ export function useMediaActions(
                     onClick: () => run({ kind: "repeat" }),
                   },
                 ],
-            [
-              ...(image && comparison
-                ? [
-                    {
-                      id: "open-comparison",
-                      label: "Open Comparison",
-                      icon: icons.compareSideBySide,
-                      onClick: () => {
-                        onApplied();
-                        navigate(`/compare/${comparison}`);
-                      },
-                    },
-                  ]
-                : []),
-            ],
-            [
-              // Stages this image's prompt across models in the composer.
-              ...(image
-                ? [
-                    {
-                      id: "compare-models",
-                      label: "Compare in Composer",
-                      icon: icons.compare,
-                      disabled: variants.isPending,
-                      onClick: () => variants.mutate(),
-                    },
-                  ]
-                : []),
-              recreateAction,
-            ],
+            [recreateAction],
           ]
         : undefined,
     }),
     upscale,
-    // The viewer prompt's assistance, then discovery from this item.
+    // The viewer prompt's assistance, then comparing and discovery; tile menus list the latter as
+    // a section of their own (contextMenuActions).
     (assist || discovery.length > 0) &&
       itemAction("ai", {
         onOpen: assist?.onOpen,
+        loading: variants.isPending,
         menu: assistMenu({
-          loading: assistant.isPending,
+          loading: Boolean(assist) && assistant.isPending,
           settings: assist?.settings,
           suggestions: assist?.suggestions,
           templates: assist?.templates ?? [],
@@ -716,33 +712,15 @@ export function useMediaActions(
             icon: TextQuote,
             onClick: () => void copyText(item.prompt || "", "Prompt"),
           },
+          // A video also downloads as a GIF, beside it rather than in a submenu.
+          ...(gif ? [{ id: "download-gif", label: "Download GIF", icon: Film, link: gif }] : []),
           ...(ready
             ? [
                 {
                   id: "download",
-                  label: "Download",
+                  label: gif ? "Download Video" : "Download",
                   icon: icons.download,
-                  link: gif && loop ? undefined : transfer.download,
-                  menu:
-                    gif && loop
-                      ? [
-                          [
-                            {
-                              id: "download-video",
-                              label: "Video",
-                              icon: icons.download,
-                              link: transfer.download,
-                            },
-                            { id: "download-gif", label: "GIF", icon: Film, link: gif },
-                            {
-                              id: "download-loop",
-                              label: "Back & Forth",
-                              icon: ArrowLeftRight,
-                              link: loop,
-                            },
-                          ],
-                        ]
-                      : undefined,
+                  link: transfer.download,
                 },
               ]
             : []),

@@ -139,11 +139,12 @@ test("Select All takes every match across pages, and the search and Liked stay w
   // The rest loaded in one larger page, within the same search and filter.
   const rest = requests.find((query) => query.get("limit") === "500");
   expect([rest?.get("q"), rest?.get("rating")]).toEqual(["Browse", "liked"]);
-  // With everything selected, Select None takes Select All's place.
-  await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveCount(0);
+  // The quick selects always show, disabled where they would change nothing.
+  await expect(page.getByRole("button", { name: "Select All", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Select Failed", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Select None", exact: true }).click();
   await expect(status).toHaveText("0 Selected");
-  await expect(page.getByRole("button", { name: "Select None", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Select None", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   await expect(status).toHaveText("65 Selected");
   if (test.info().project.use.isMobile) {
@@ -156,9 +157,11 @@ test("Select All takes every match across pages, and the search and Liked stay w
     await expect(actions.getByRole("button", { name: "Unlike", exact: true })).toBeInViewport({
       ratio: 1,
     });
+    // Phones end the selection with Select, which stays in sight while it applies.
+    await expect(select).toBeInViewport({ ratio: 1 });
     await expect(
       selection.getByRole("button", { name: "Clear Selection", exact: true }),
-    ).toBeInViewport({ ratio: 1 });
+    ).toHaveCount(0);
   }
   const unlike = page.waitForRequest("**/api/gallery/favorite");
   await selectionAction(page, "Unlike").click();
@@ -703,6 +706,11 @@ test("One notification shows at a time: a second dislike replaces the first, wit
       .click();
     await selectionAction(page, "Dislike").click();
     await expect.poll(() => state.gallery[index].rating).toBe("disliked");
+    // The selection ends as the dislike's notification shows.
+    await expect(page.getByRole("button", { name: "Select Items", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   }
   const banner = page.getByRole("alert").filter({ hasText: "Disliked and hidden" });
   await expect(banner).toHaveCount(1);
@@ -779,7 +787,8 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
     .getByRole("button", { name: "Select image: Browse Result 2", exact: true })
     .click({ modifiers: ["Shift"] });
   await expect(status).toHaveText("3 Selected");
-  await page.getByRole("button", { name: "Select In Progress", exact: true }).click();
+  await page.getByRole("button", { name: "Select None", exact: true }).click();
+  await page.getByRole("button", { name: /^Select image: Live Study$/i }).click();
   await expect(status).toHaveText("1 Selected");
   // A disabled action says why.
   await expect(selectionAction(page, "Delete")).toHaveAttribute("aria-disabled", "true");
@@ -1415,8 +1424,9 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await page.goto("/images");
   const filter = page.getByRole("button", { name: "Gallery Filters", exact: true });
   await expect(filter).toHaveAttribute("aria-expanded", "false");
-  await expect(page.getByRole("switch", { name: "Disliked", exact: true })).toHaveCount(0);
-  const disliked = page.getByRole("button", { name: "Disliked", exact: true });
+  // Disliked is a filter in the panel, leaving the toolbar Liked and Uploads.
+  await expect(page.getByRole("button", { name: "Disliked", exact: true })).toHaveCount(0);
+  const liked = page.getByRole("button", { name: "Liked", exact: true });
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toBeVisible();
@@ -1432,20 +1442,18 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await expect(page.getByRole("menuitem", { name: "Download", exact: true })).toBeVisible();
   await selectionAction(page, "Share").click();
   await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
-  await expect(disliked).toBeInViewport({ ratio: 1 });
+  await expect(liked).toBeInViewport({ ratio: 1 });
   await expect(filter).toBeInViewport({ ratio: 1 });
   await filter.click();
   await expect(page.getByRole("combobox", { name: "Models", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   const search = await toolbarSearch(page);
   await search.fill("Browse");
-  await page.getByRole("button", { name: "Liked", exact: true }).click();
-  await disliked.click();
-  await expect(disliked).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Liked", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
+  await liked.click();
+  await filter.click();
+  await page.getByRole("switch", { name: "Disliked", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(liked).toHaveAttribute("aria-pressed", "false");
   await expect
     .poll(() => {
       const query = new URLSearchParams(state.galleryRequests.at(-1));
@@ -1453,15 +1461,16 @@ test("Desktop gallery controls stay available while scrolling and rating changes
     })
     .toEqual(["Browse", "disliked"]);
   await expect(search).toHaveValue("Browse");
-  await expect(
-    page.getByRole("button", { name: "Remove Disliked Filter", exact: true }),
-  ).toHaveCount(0);
+  const dislikedChip = page.getByRole("button", { name: "Remove Disliked Filter", exact: true });
+  await expect(dislikedChip).toBeVisible();
   await filter.click();
   await page.getByText("Week", { exact: true }).click();
   await page.getByRole("switch", { name: "Comparisons", exact: true }).click();
   await page.keyboard.press("Escape");
+  // Clear All takes the panel's filters, Disliked included, and leaves Liked to its toggle.
   await page.getByRole("button", { name: "Clear All", exact: true }).click();
-  await expect(disliked).toHaveAttribute("aria-pressed", "true");
+  await expect(dislikedChip).toHaveCount(0);
+  await liked.click();
   await filter.click();
   await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();
   await expect(page.getByRole("switch", { name: "Comparisons", exact: true })).not.toBeChecked();
@@ -1474,7 +1483,7 @@ test("Desktop gallery controls stay available while scrolling and rating changes
       const query = new URLSearchParams(state.galleryRequests.at(-1));
       return [query.get("q"), query.get("rating"), query.has("since"), query.has("comparisons")];
     })
-    .toEqual(["", "disliked", false, false]);
+    .toEqual(["", "liked", false, false]);
 });
 
 test("Incoming results wait behind New Results while scrolled, keeping loaded pages, the scroll anchor and selection", async ({

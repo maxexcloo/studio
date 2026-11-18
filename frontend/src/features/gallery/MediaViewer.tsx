@@ -224,6 +224,7 @@ export function MediaViewer({
   related = items,
   total,
   navigate,
+  follow,
   onReturnFocus,
   actions,
   itemLabel,
@@ -238,6 +239,8 @@ export function MediaViewer({
   /** How many items match, where `items` are only those loaded so far. */
   total?: number;
   navigate?: (item: MediaItem) => void;
+  /** Opens a result Details links to as a step of its own; elsewhere the link leaves for the gallery. */
+  follow?: (item: MediaItem) => void;
   onReturnFocus?: (item: MediaItem) => void;
   /** The opening surface's own actions, in place of the item's prompt field and actions. */
   actions?: ViewerActions;
@@ -439,10 +442,10 @@ export function MediaViewer({
       item={displayed}
       related={related}
       open={
-        navigate &&
+        follow &&
         ((next) => {
           setCompare(false);
-          navigate(next);
+          follow(next);
         })
       }
     />

@@ -29,6 +29,7 @@ import { useGroupFeature } from "../auth/AccountGate";
 import { identityNote } from "../characters/identity";
 import { charactersQuery, promptCardsQuery } from "../characters/queries";
 import { useStartCard } from "../characters/useCardFrom";
+import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { backendLabel, isProfile, profileName, shownProfileName } from "../generation/payload";
@@ -99,6 +100,8 @@ export function MediaDetailsMetadata({ item }: { item: MediaItem }) {
 }
 
 type Row = [label: string, value: string];
+const sortRows = <T extends [string, unknown]>(rows: T[]) =>
+  [...rows].sort(([a], [b]) => compareNames(a, b));
 /** A reference the run took: the role it ran as and, where recorded, how strongly it applied. */
 interface RanReference {
   id: string;
@@ -173,8 +176,7 @@ function generationDetails(
     unused: settings.maskSkipped
       ? ["Mask: nothing in it was painted, so this ran as an edit of the whole picture."]
       : [],
-    // Every recorded input, the run's own choices before the model's parts; Copy Settings copies
-    // the same rows.
+    // Every recorded input, which Details and Copy Settings both list A–Z.
     settings: rows([
       // The backend a combined profile ran on.
       ["Backend", settings.profileBackend ? backendLabel(String(settings.profileBackend)) : ""],
@@ -263,12 +265,12 @@ export function useSettingsText(item: MediaItem) {
       details.references.length &&
         `References: ${details.references.map(referenceText).join(", ")}`,
       ...details.unused.map((note) => `Not Used: ${note}`),
-      ...[
+      ...sortRows([
         ...details.settings,
         ...details.output.filter(([label]) =>
           ["Dimensions", "Duration", "Frames", "FPS"].includes(label),
         ),
-      ].map(([label, value]) => `${label}: ${value}`),
+      ]).map(([label, value]) => `${label}: ${value}`),
     ]
       .filter(Boolean)
       .join("\n");
@@ -352,8 +354,8 @@ function PartLabel({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Face Check's finding for a result made with a character, naming the character, and whether it is
- * the automatic redo of a result whose face drifted.
+ * Output › Face Check's finding for a result made with a character, naming the character, and
+ * whether it is the automatic redo of a result whose face drifted.
  */
 function FaceCheck({ identity, faceRedo }: Pick<MediaItem, "identity" | "faceRedo">) {
   const characters = useQuery(charactersQuery);
@@ -361,11 +363,14 @@ function FaceCheck({ identity, faceRedo }: Pick<MediaItem, "identity" | "faceRed
     characters.data?.find((card) => card.id === identity?.characterId)?.name || "the character";
   return (
     <Stack gap={2}>
-      <PartLabel>Face Check</PartLabel>
-      {faceRedo && <Text size="sm">Redone automatically after the face drifted.</Text>}
       {identity && (
-        <Text size="sm" c={identity.drifted ? "orange" : undefined}>
+        <Text span inherit c={identity.drifted ? "orange" : undefined}>
           {identityNote(identity, name)}
+        </Text>
+      )}
+      {faceRedo && (
+        <Text span inherit>
+          Redone automatically after the face drifted.
         </Text>
       )}
     </Stack>
@@ -548,8 +553,16 @@ function DetailsPrompt({ item }: { item: MediaItem }) {
   );
 }
 
-/** Label and value rows, the label column dimmed. */
-function Section({ title, rows }: { title: string; rows: [string, React.ReactNode][] }) {
+/** Label and value rows A–Z by label, unless `inOrder`, the label column dimmed. */
+function Section({
+  title,
+  rows,
+  inOrder = false,
+}: {
+  title: string;
+  rows: [string, React.ReactNode][];
+  inOrder?: boolean;
+}) {
   if (!rows.length) return null;
   return (
     <DetailSection title={title}>
@@ -561,7 +574,7 @@ function Section({ title, rows }: { title: string; rows: [string, React.ReactNod
         horizontalSpacing={0}
       >
         <Table.Tbody>
-          {rows.map(([label, value]) => (
+          {(inOrder ? rows : sortRows(rows)).map(([label, value]) => (
             <Table.Tr key={label}>
               <Table.Th w={96} bg="transparent" fw={400} c="dimmed">
                 {label}
@@ -591,6 +604,12 @@ function galleryReference(id: string, items: MediaItem[]) {
   return items.find((candidate) => candidate.url === key || candidate.id === key);
 }
 
+/**
+ * A followed result opens in the gallery's viewer as a step of its own, so closing it returns to
+ * the result it was followed from, here or on another page.
+ */
+const followed = { viewer: true };
+
 /** A link's click that `open` shows in this viewer instead, leaving other clicks to the link. */
 const openHere =
   (item: MediaItem, open?: (item: MediaItem) => void) => (event: React.MouseEvent) => {
@@ -608,6 +627,7 @@ function RelatedLinks({ items, open }: { items: MediaItem[]; open?: (item: Media
           key={related.id}
           component={Link}
           to={viewerPath(related)}
+          state={followed}
           size="sm"
           ta="left"
           onClick={openHere(related, open)}
@@ -652,6 +672,7 @@ function ReferenceLink({
     <UnstyledButton
       component={Link}
       to={target}
+      state={followed}
       aria-label={`Open ${reference.role}`}
       onClick={source && openHere(source, open)}
     >
@@ -690,7 +711,8 @@ export function MediaDetails({
   const size = useMediaSize(url);
   const details = useGenerationDetails(item, url && size.isPending ? null : size.data);
   const context = item.resultSet?.context;
-  // Where it came from, what it is part of, then what was made from it.
+  const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
+  // Where it came from, what it is part of and what was made from it, A–Z.
   const lineage = (
     [
       ["From", related.source && <RelatedLinks key="from" items={[related.source]} open={open} />],
@@ -702,7 +724,17 @@ export function MediaDetails({
           </Anchor>
         ),
       ],
-      ["Set", item.resultSet?.title],
+      // A comparison's result links to its comparison.
+      [
+        comparison ? "Comparison" : "Set",
+        comparison ? (
+          <Anchor key="set" component={Link} to={`/compare/${comparison}`} size="sm">
+            {item.resultSet?.title || "Open Comparison"}
+          </Anchor>
+        ) : (
+          item.resultSet?.title
+        ),
+      ],
       [
         "Series",
         context?.series && (
@@ -729,7 +761,12 @@ export function MediaDetails({
         </DetailSection>
       )}
       <DetailsPrompt item={item} />
-      <Section title="Lineage" rows={lineage} />
+      {/* One link needs no label of its own. */}
+      {lineage.length === 1 ? (
+        <DetailSection title="Lineage">{lineage[0][1]}</DetailSection>
+      ) : (
+        <Section title="Lineage" rows={lineage} />
+      )}
       {!!details.loras.length && (
         <DetailSection title="LoRAs">
           {details.loras.map((lora) => (
@@ -747,41 +784,49 @@ export function MediaDetails({
       {!!(
         details.references.length ||
         details.unused.length ||
-        contextCards.some(({ key }) => context?.[key]) ||
-        faceCheck
+        contextCards.some(({ key }) => context?.[key])
       ) && (
         <DetailSection title="References">
-          {details.references.map((reference) => {
-            const source = galleryReference(reference.id, [
-              ...(loaded || []),
-              ...(related.source ? [related.source] : []),
-            ]);
-            return (
-              <Group key={`${reference.role}:${reference.id}`} gap="sm" wrap="nowrap">
-                <ReferenceLink reference={reference} source={source} open={open} />
-                <Stack gap={0}>
-                  <Text size="sm">{reference.role}</Text>
-                  {reference.strength && (
-                    <Text size="xs" c="dimmed">
-                      {reference.strength}
-                    </Text>
-                  )}
-                </Stack>
-              </Group>
-            );
-          })}
+          {/* Thumbnails alone, in the run's order; each names its role to assistive technology. */}
+          {details.references.length > 0 && (
+            <Group gap="xs">
+              {details.references.map((reference) => (
+                <ReferenceLink
+                  key={`${reference.role}:${reference.id}`}
+                  reference={reference}
+                  source={galleryReference(reference.id, [
+                    ...(loaded || []),
+                    ...(related.source ? [related.source] : []),
+                  ])}
+                  open={open}
+                />
+              ))}
+            </Group>
+          )}
           {details.unused.map((note) => (
             <Text key={note} size="sm" c="yellow">
               Not used: {note}
             </Text>
           ))}
           <ContextCards item={item} />
-          {faceCheck && <FaceCheck identity={item.identity} faceRedo={item.faceRedo} />}
         </DetailSection>
       )}
       <Section title="Settings" rows={details.settings} />
-      <Section title="Output" rows={details.output} />
-      <Section title="Timing" rows={details.timing} />
+      <Section
+        title="Output"
+        rows={[
+          ...details.output,
+          ...(faceCheck
+            ? [
+                [
+                  "Face Check",
+                  <FaceCheck key="face" identity={item.identity} faceRedo={item.faceRedo} />,
+                ] as [string, React.ReactNode],
+              ]
+            : []),
+        ]}
+      />
+      <Section title="Timing" rows={details.timing} inOrder />
     </Stack>
   );
 }
