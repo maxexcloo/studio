@@ -100,7 +100,7 @@ function ReferenceRole({
   );
 }
 
-/** A composer's row of chips, wrapping onto as many lines as they need. */
+/** A composer's row of chips, wrapping onto as many lines as they need except in the phone sheet. */
 export function ChipRail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className={classes.rail} role="group" aria-label={label}>

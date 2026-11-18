@@ -143,7 +143,7 @@ export function PromptFields({
   const idea = offerIdeas ? ideas.tool : undefined;
   return (
     <>
-      <div className={classes.area} data-fill={fill || undefined}>
+      <div className={classes.area} data-fill={fill || undefined} data-text-box="prompt">
         <TextBox
           ref={textareaRef}
           tools={[idea, assistant.action, history.action].filter((tool) => !!tool)}
@@ -203,7 +203,7 @@ const NegativePrompt = memo(function NegativePrompt({
     onPick: (negative) => onChange({ negative }),
   });
   return (
-    <div className={classes.negative} data-fill={fill || undefined}>
+    <div className={classes.negative} data-fill={fill || undefined} data-text-box="negative">
       <TextBox
         tools={[history.action]}
         popups={history.popup}

@@ -74,7 +74,7 @@ export function PopupHeading({
   return (
     <Group className={classes.heading} justify="space-between" gap="xs" mih={28} wrap="nowrap">
       <Group gap="xs" wrap="nowrap" miw={0}>
-        <Text fw={500} truncate>
+        <Text fw={600} truncate>
           {title}
         </Text>
         {detail}
