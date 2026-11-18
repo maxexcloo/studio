@@ -85,6 +85,8 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
     .locator('input[type="file"]')
     .setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: clip! });
   await expect.poll(() => uploads.length).toBe(2);
+  // Placing the upload can return phones to the stack by itself.
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true }).first()).toBeVisible();
   await closeReferences(page);
   await pressGenerate(page, "Generate Video");
   await expect.poll(() => state.jobs.length).toBe(1);
