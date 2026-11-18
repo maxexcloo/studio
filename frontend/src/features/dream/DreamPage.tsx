@@ -22,7 +22,6 @@ import { LoadingState } from "../../ui/LoadingState";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
-import { TasteIssues } from "../taste/TasteIssues";
 import { TasteProfile } from "../taste/TasteProfile";
 import { TasteReflection } from "../taste/TasteReflection";
 import { DiscardedDreams } from "./DiscardedDreams";
@@ -112,8 +111,9 @@ export function DreamPage() {
   }, [client]);
   const save = useDreamSettings();
   // Dream opens on the deck at /dream; each other view has its own path, so reload and Back keep
-  // it.
-  const param = useParams().view;
+  // it. A project's detail view (/dream/projects/:projectId) opens over Projects.
+  const params = useParams();
+  const param = params.projectId ? "projects" : params.view;
   const view = views.find((name) => name === param) ?? "deck";
   const navigate = useNavigate();
   const setView = (next: (typeof views)[number]) =>
@@ -218,7 +218,6 @@ export function DreamPage() {
         phone ? (
           <ScrollArea flex={1} mih={0} w="100%">
             <Stack gap="lg">
-              <TasteIssues />
               <TasteProfile />
               <TasteReflection />
             </Stack>
@@ -233,7 +232,6 @@ export function DreamPage() {
             classNames={{ viewport: classes.taste }}
           >
             <Stack gap="lg">
-              <TasteIssues />
               <TasteProfile />
               <TasteReflection />
             </Stack>

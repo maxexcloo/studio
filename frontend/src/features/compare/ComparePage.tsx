@@ -25,7 +25,7 @@ import { plural } from "../../ui/plural";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
-import { projectPath, projectsQuery } from "../dream/queries";
+import { inboxQuery } from "../dream/queries";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { galleryKey } from "../gallery/queries";
@@ -63,9 +63,13 @@ export function ComparePage() {
         await post("/api/gallery/favorite", { ids: [item.id], rating: "liked" });
       return result;
     },
-    onSuccess: ({ brief, ...result }) => {
+    onSuccess: ({ proposal, ...result }) => {
       client.setQueryData(comparisonQuery(id).queryKey, result);
-      if (brief) briefChanged(brief);
+      // The pick changes nothing yet: it waits in Dream's Inbox, which nothing here shows.
+      if (proposal) {
+        void client.invalidateQueries({ queryKey: inboxQuery.queryKey });
+        notifications.show({ message: `Proposed for ${proposal.name}'s brief in Dream's Inbox` });
+      }
     },
     onSettled: () =>
       Promise.all(
@@ -74,32 +78,6 @@ export function ComparePage() {
         ),
       ),
   });
-  const undoBrief = useMutation({
-    mutationFn: (projectId: string) => post(projectPath({ id: projectId }, "undo"), {}),
-    onSuccess: () => client.invalidateQueries({ queryKey: projectsQuery.queryKey }),
-  });
-  /** The pick's addition to the project's brief, with Undo. */
-  function briefChanged({ projectId, name }: NonNullable<Comparison["brief"]>) {
-    void client.invalidateQueries({ queryKey: projectsQuery.queryKey });
-    const notification = notifications.show({
-      autoClose: 10000,
-      message: (
-        <Group justify="space-between" wrap="nowrap">
-          <Text size="sm">Added to {name}'s brief</Text>
-          <Button
-            size="compact-sm"
-            variant="subtle"
-            onClick={() => {
-              notifications.hide(notification);
-              undoBrief.mutate(projectId);
-            }}
-          >
-            Undo
-          </Button>
-        </Group>
-      ),
-    });
-  }
   const use = useMutation({ mutationFn: (item: MediaItem) => stage.useThis(item) });
   const compareAgain = useMutation({ mutationFn: () => stage.again(again) });
   // 1–4 pick that variant as the winner (again to clear it), unless typing or a layer is above.

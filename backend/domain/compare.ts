@@ -25,9 +25,9 @@ export interface ComparisonRecord {
   /** The exact winning image, including when several variants share one job. */
   winnerItemId?: string;
   votedAt?: string;
-  /** The one thing the variants vary (variants of a result, "lighting"), which a pick adds to the brief. */
+  /** The one thing the variants vary (variants of a result, "lighting"), which a pick proposes for the brief. */
   axis?: string;
-  /** The project whose brief the pick updates, where the run came from an attached chat. */
+  /** The project whose brief the pick is proposed for, where the run came from an attached chat. */
   projectId?: string;
 }
 type GalleryItem = QueueMedia & {
@@ -91,12 +91,15 @@ export function registerCompareRoutes(
     numbered(items: GalleryItem[]): GalleryItem[];
     /** Hears the winning image and other finished variants, for the taste profile; must not throw. */
     voted?(ownerId: string, winner: GalleryItem, others: GalleryItem[]): void;
-    /** Adds an axis comparison's pick to its project's brief, answering what changed, or null. */
+    /**
+     * Proposes an axis comparison's pick for its project's brief in Dream's Inbox, answering the
+     * project, or null where nothing would change.
+     */
     picked?(
       record: ComparisonRecord,
       choice: string,
-      by: "chat" | "studio",
-    ): { projectId: string; name: string; styles: string } | null;
+      by: "chat" | "you",
+    ): { projectId: string; name: string } | null;
   },
 ) {
   const { store } = options;
@@ -470,7 +473,7 @@ export function registerCompareRoutes(
     else delete record.winnerItemId;
     record.votedAt = new Date().toISOString();
     options.write(records);
-    let brief = null;
+    let proposal = null;
     if (winner) {
       const others = variants.filter((item): item is GalleryItem =>
         Boolean(item && item.id !== winner.id && item.status === "done"),
@@ -479,8 +482,8 @@ export function registerCompareRoutes(
       // The letter variants of a result lead with stays out of the brief.
       const label = record.labels?.[variants.indexOf(winner)]?.replace(/^[A-J] · /, "");
       if (record.axis && record.projectId && label)
-        brief = options.picked?.(record, label, by === "chat" ? "chat" : "studio") ?? null;
+        proposal = options.picked?.(record, label, by === "chat" ? "chat" : "you") ?? null;
     }
-    return { status: 200, payload: { ...show(record, items), ...(brief ? { brief } : {}) } };
+    return { status: 200, payload: { ...show(record, items), ...(proposal ? { proposal } : {}) } };
   });
 }

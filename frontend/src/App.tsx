@@ -88,14 +88,17 @@ function Workspace() {
                 </Suspense>
               }
             />
-            <Route
-              path="/dream/:view?"
-              element={
-                <Suspense fallback={<LoadingState fill label="Loading Dream" />}>
-                  <DreamPage />
-                </Suspense>
-              }
-            />
+            {["/dream/:view?", "/dream/projects/:projectId"].map((path) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <Suspense fallback={<LoadingState fill label="Loading Dream" />}>
+                    <DreamPage />
+                  </Suspense>
+                }
+              />
+            ))}
             <Route path="*" element={<Navigate to="/images" replace />} />
           </Routes>
         </div>

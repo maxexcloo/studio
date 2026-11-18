@@ -7,7 +7,6 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { CardThumbnails, LibraryCard } from "./CardImages";
-import { CardSuggestions } from "./CardSuggestions";
 import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import { sheetViews } from "./CharacterEditor";
@@ -16,9 +15,8 @@ import { useCardFrom } from "./useCardFrom";
 import { useCardInComposer } from "./useCardInComposer";
 
 /**
- * Library › Characters: every card the account keeps, to search, edit and delete, after the cards
- * Dream suggests (CardSuggestions). Use as Character opens here, starting a new card from its
- * image (useCardFrom).
+ * Library › Characters: every card the account keeps, to search, edit and delete. Use as Character
+ * opens here, starting a new card from its image (useCardFrom).
  */
 export function LibraryCharacters({ heading }: { heading: ReactNode }) {
   const characters = useQuery(charactersQuery);
@@ -45,7 +43,6 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
         />
       </SectionHeader>
       {start.error && <Alert color="red">{start.error.message}</Alert>}
-      {!words && <CardSuggestions kind="characters" />}
       {characters.isPending ? (
         <LoadingState fill label="Loading Characters" />
       ) : characters.error ? (

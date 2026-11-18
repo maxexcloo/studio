@@ -1,4 +1,5 @@
 import {
+  Activity,
   Blend,
   Bookmark,
   ChevronLeft,
@@ -19,6 +20,7 @@ import {
   EyeOff,
   Files,
   Flag,
+  FolderOpen,
   GalleryHorizontalEnd,
   Gauge,
   ImageUp,
@@ -51,6 +53,7 @@ import {
   ScrollText,
   Settings,
   Share,
+  ShieldCheck,
   Shirt,
   SlidersHorizontal,
   TextCursorInput,
@@ -122,6 +125,8 @@ export const icons = {
   openAll: GalleryHorizontalEnd,
   /** An outfit card (Library › Outfits). */
   outfit: Shirt,
+  /** A Dream project's pacing: its share of turns, pausing it or varying its results. */
+  pacing: Activity,
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: CirclePause,
@@ -131,6 +136,8 @@ export const icons = {
   preview: Maximize2,
   /** Moving to the previous item, as `next`. */
   previous: ChevronLeft,
+  /** A Dream project: Dream › Projects and a proposal for a new one. */
+  project: FolderOpen,
   /** Editing a prompt and the composer's settings. */
   prompt: SlidersHorizontal,
   /** Running an item again (Recreate). */
@@ -148,6 +155,8 @@ export const icons = {
   retry: RotateCw,
   /** Showing a written prompt for editing before it runs (Review Prompt). */
   review: ScanText,
+  /** A taste rule, a limit every prompt keeps, as Dream's Inbox proposes one. */
+  rule: ShieldCheck,
   /** A scene card (Library › Scenes). */
   scene: MapPinned,
   settings: Settings,

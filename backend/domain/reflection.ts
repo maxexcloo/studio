@@ -82,7 +82,10 @@ export function samenessOf(items: ReflectionItem[], likeness: Likeness) {
 export function daysOf(items: ReflectionItem[], zone: string, limited: boolean) {
   const dayOf = new Intl.DateTimeFormat("en-CA", { timeZone: zone, dateStyle: "short" });
   const finished = items.filter(
-    (item) => item.status === "done" && item.createdAt && item.dream?.state !== "unseen",
+    (item) =>
+      item.status === "done" &&
+      item.createdAt &&
+      !["unseen", "draft"].includes(item.dream?.state || ""),
   );
   const oldest = finished.at(-1)?.createdAt;
   const cut = limited && oldest ? dayOf.format(new Date(oldest)) : "";

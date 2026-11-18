@@ -224,7 +224,7 @@ test("the project tool creates, attaches, updates and shows a chat's project", a
   assert.match(updated.note, /undo/);
   // The chat's change is the one Undo restores on the Dream page.
   const [stored] = projects.list(owner);
-  assert.equal(stored.previous.by, "chat");
+  assert.equal(stored.changes[0].by, "chat");
   assert.deepEqual(stored.previous.constraints.profiles, [turbo.id]);
   assert.deepEqual((await call({ action: "detach" })).project, null);
   assert.equal((await call({ action: "attach", project: "coast" })).project.name, "Coast");

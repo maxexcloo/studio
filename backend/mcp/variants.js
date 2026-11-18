@@ -29,10 +29,9 @@ export function registerVariantsTool({ tool, server, media, owner, refs, chat, r
         const winner = voted.variants.find(({ jobId }) => jobId === voted.vote);
         return mcpJson({
           picked: winner?.label,
-          ...(voted.brief
+          ...(voted.proposal
             ? {
-                brief: voted.brief,
-                note: `Tell the user ${voted.brief.name}'s brief now keeps this ${voted.axis}; they can undo it on Studio's Dream page.`,
+                note: `Tell the user Dream now proposes this ${voted.axis} for ${voted.proposal.name}'s brief; they can accept it in Studio's Dream › Projects Inbox.`,
               }
             : {}),
         });

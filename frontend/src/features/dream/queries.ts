@@ -1,8 +1,8 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import type { CardKind } from "../../../../shared/characters";
 import type { DreamSettings } from "../../../../shared/dream";
-import type { DigestGroup, Project } from "../../../../shared/projects";
+import type { Inbox } from "../../../../shared/inbox";
+import type { DigestGroup, Project, ProjectStats } from "../../../../shared/projects";
 import type { DreamActivity } from "../../../../shared/taste";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
@@ -105,29 +105,27 @@ export const dreamWhen = ({ settings, today, status }: Dream) =>
 
 export const projectsQuery = queryOptions({
   queryKey: ["dream", "projects"],
-  queryFn: () => api<{ projects: Project[] }>("/api/dream/projects"),
+  queryFn: () =>
+    api<{ projects: Project[]; stats: Record<string, ProjectStats<DreamItem>> }>(
+      "/api/dream/projects",
+    ),
 });
 export const projectPath = (project: { id: string }, action = "") =>
   `/api/dream/projects/${encodeURIComponent(project.id)}${action && `/${action}`}`;
+/** A project's results for its detail view, newest first. */
+export const projectResultsQuery = (projectId: string) =>
+  queryOptions({
+    queryKey: ["dream", "projects", projectId, "results"],
+    queryFn: () => api<{ items: DreamItem[] }>(projectPath({ id: projectId }, "results")),
+  });
 
-/**
- * A recurring character, outfit or scene Dream proposes from liked results (backend/domain/dream.ts),
- * with the results it recurs in.
- */
-export interface CardSuggestion {
-  id: string;
-  kind: CardKind;
-  name: string;
-  description: string;
-  items: MediaItem[];
-}
-export const suggestionsQuery = queryOptions({
-  queryKey: ["dream", "suggestions"],
-  queryFn: async () =>
-    (await api<{ suggestions: CardSuggestion[] }>("/api/dream/suggestions")).suggestions,
+/** What Dream proposes in Dream › Projects' Inbox (backend/domain/inbox.ts). */
+export const inboxQuery = queryOptions({
+  queryKey: ["dream", "inbox"],
+  queryFn: () => api<Inbox<DreamItem>>("/api/dream/inbox"),
 });
-export const suggestionPath = (suggestion: { id: string }, action: "accept" | "dismiss") =>
-  `/api/dream/suggestions/${encodeURIComponent(suggestion.id)}/${action}`;
+export const proposalPath = (proposal: { id: string }, action: "accept" | "dismiss" | "undo") =>
+  `/api/dream/inbox/${encodeURIComponent(proposal.id)}/${action}`;
 
 export const historyQuery = (media: DreamMedia) =>
   queryOptions({

@@ -177,6 +177,15 @@ export function createCard(account, kind, fields) {
   return card;
 }
 
+/** Deletes one of the account's `kind` cards; answers whether it was there. */
+export function deleteCard(ownerId, kind, id) {
+  const cards = listCards(kind, ownerId);
+  const rest = cards.filter((card) => card.id !== id);
+  if (rest.length === cards.length) return false;
+  save(kind, ownerId, rest);
+  return true;
+}
+
 /** Why the account may not use cards, as a route's answer, or null. */
 export const refusal = (account) => {
   if (!account) return localRefusal(account);
@@ -237,12 +246,8 @@ export function registerCardRoutes(app) {
       return reply(200, account, card);
     });
 
-    route("DELETE", `/api/${kind}/:id`, (_account, ownerId, { params }) => {
-      const cards = listCards(kind, ownerId);
-      const rest = cards.filter((card) => card.id !== params.id);
-      if (rest.length === cards.length) return missing;
-      save(kind, ownerId, rest);
-      return { status: 200, payload: { ok: true } };
-    });
+    route("DELETE", `/api/${kind}/:id`, (_account, ownerId, { params }) =>
+      deleteCard(ownerId, kind, params.id) ? { status: 200, payload: { ok: true } } : missing,
+    );
   }
 }

@@ -37,7 +37,13 @@ import { listenForAgentSignIn } from "./agent-sign-in.js";
 import { animateProfile, dreamVideoProfile } from "./animate-profile.js";
 import { createAssistantContext } from "./assistant-context.js";
 import { promptAssistantOff, registerAssistantRoutes } from "./assistant-routes.js";
-import { refusal as cardRefusal, createCard, listCards, registerCardRoutes } from "./cards.js";
+import {
+  refusal as cardRefusal,
+  createCard,
+  deleteCard,
+  listCards,
+  registerCardRoutes,
+} from "./cards.js";
 import { createCharacterSheets } from "./character-sheets.js";
 import { configuredBackends, setParkedCheck } from "./comfy/backends.js";
 import {
@@ -68,8 +74,9 @@ import { createFaceRedo } from "./domain/face-redo.ts";
 import { createFinishing, registerFinishingRoutes } from "./domain/finishing.ts";
 import { registerIdlePassRoutes } from "./domain/idle-work.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
-import { createIssues, registerIssueRoutes } from "./domain/issues.ts";
-import { createProjects, stylesWithChoice } from "./domain/projects.ts";
+import { createInbox } from "./domain/inbox.ts";
+import { createIssues } from "./domain/issues.ts";
+import { createProjects } from "./domain/projects.ts";
 import { createReflection, registerReflectionRoutes } from "./domain/reflection.ts";
 import { createReview } from "./domain/review.ts";
 import { registerMaintenanceRoutes, registerQueueRoutes } from "./domain/routes.ts";
@@ -812,29 +819,22 @@ registerCompareRoutes(app, {
       ),
     ]);
   },
-  // Undo on the Dream page (or the vote's notification) restores the brief it replaced.
-  picked: ({ ownerId, projectId, axis }, choice, by) => {
-    const project = projects.list(ownerId).find((entry) => entry.id === projectId);
-    if (!project) return null;
-    const styles = stylesWithChoice(project.brief.styles, axis, choice);
-    if (styles === project.brief.styles) return null;
-    projects.update(ownerId, project.id, { brief: { styles } }, by);
-    return { projectId: project.id, name: project.name, styles };
-  },
+  // A pick proposes the project's new styles in Dream's Inbox; nothing changes until accepted.
+  picked: ({ ownerId, projectId, axis }, choice, by) =>
+    inbox.picked(ownerId, projectId, axis, choice, by),
 });
 registerTasteRoutes(app, { taste });
 const mcpRecords = mcpOwnership(runtimeDatabase(dataDir));
-registerIssueRoutes(app, {
-  issues: createIssues({
-    dataDir,
-    taste,
-    recent: (ownerId, since) =>
-      galleryItems({ ownerId, type: "image", status: "done", since, limit: 400 }),
-    request: (jobId) => mcpRecords.prompt(jobId)?.request || "",
-    writer: tasteWriter,
-    promptWriter: textWriter,
-    updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
-  }),
+// Recurring issues (domain/issues.ts) propose rules in Dream's Inbox.
+const issues = createIssues({
+  dataDir,
+  taste,
+  recent: (ownerId, since) =>
+    galleryItems({ ownerId, type: "image", status: "done", since, limit: 400 }),
+  request: (jobId) => mcpRecords.prompt(jobId)?.request || "",
+  writer: tasteWriter,
+  promptWriter: textWriter,
+  updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
 });
 // Image Search is built further down; requests reach it only once Studio has started.
 registerReflectionRoutes(app, {
@@ -884,6 +884,11 @@ registerSuggestionRoutes(app, {
 // Dream (domain/dream.ts): idle-time results from each account's taste and resolved settings.
 // It only queues work; it never places GPU workloads.
 const projects = createProjects({ dataDir });
+/** The account's cards of each kind, or null where it may not use Characters. */
+const accountCards = (ownerId) => {
+  if (cardRefusal(ownerId ? accountAccessForId(ownerId) : undefined)) return null;
+  return Object.fromEntries(Object.keys(cardKinds).map((kind) => [kind, listCards(kind, ownerId)]));
+};
 const dream = createDream({
   dataDir,
   overrides: dreamOverrides,
@@ -1038,20 +1043,37 @@ const dream = createDream({
       height,
     });
   },
-  cards: (ownerId) => {
-    if (cardRefusal(ownerId ? accountAccessForId(ownerId) : undefined)) return null;
-    return Object.fromEntries(
-      Object.keys(cardKinds).map((kind) => [kind, listCards(kind, ownerId)]),
-    );
+  cards: accountCards,
+  inbox: {
+    propose: (ownerId) => inbox.propose(ownerId),
+    drafts: (ownerId) => inbox.drafts(ownerId),
   },
-  createCard,
   minorAge,
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });
+// Dream › Projects' Inbox (domain/inbox.ts): what Dream proposes while idle, applied once accepted.
+const inbox = createInbox({
+  dataDir,
+  projects,
+  taste,
+  issues: (ownerId) => issues.read(ownerId).issues,
+  writer: assistantEngine,
+  text: textWriter,
+  online: textOnline,
+  cards: accountCards,
+  createCard,
+  deleteCard,
+  reference: (account, itemId) => referenceAssetForAccount(account, itemId),
+  minorAge,
+  likeness: (a, b) => imageSearch.likeness(a, b),
+  dream,
+  items: (ownerId, ids) => resultNumbers.numbered(galleryItems({ ownerId, ids })),
+});
 registerDreamRoutes(app, {
   dream,
   projects,
+  inbox,
   listed: (items) => resultNumbers.numbered(items).map(listedRecord),
 });
 // Idle for background work: no live job but Dream's. Dream yields to all of it, so review,
