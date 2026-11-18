@@ -392,7 +392,7 @@ test("The stack's preset field saves, loads and renames LoRA presets, marks edit
   await expect(detail).toBeChecked();
   await expect(page.getByRole("switch", { name: "Enable Soft Style", exact: true })).toHaveCount(0);
   await detail.uncheck();
-  await expect(page.getByText("Edited", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeEnabled();
   await name.click();
   await page.getByRole("option", { name: "Soft Look Two", exact: true }).click();
   await expect(
@@ -400,7 +400,7 @@ test("The stack's preset field saves, loads and renames LoRA presets, marks edit
   ).toBeVisible();
   await page.getByRole("button", { name: "Replace", exact: true }).click();
   await expect(name).toHaveValue("Soft Look Two");
-  await expect(page.getByText("Edited", { exact: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeDisabled();
   expect(state.presets[0].input.loras).toEqual(portrait);
   expect(state.jobs).toHaveLength(0);
 });

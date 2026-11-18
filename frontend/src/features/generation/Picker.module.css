@@ -7,11 +7,13 @@
    rather than squeezing the header. */
 .sheetHeader {
   flex-shrink: 0;
+  flex-wrap: wrap;
   gap: var(--mantine-spacing-xs);
   touch-action: none;
 }
 
-/* The title and its detail take the room before the heading's actions and Close. */
+/* The title and its detail take the room before the heading's actions and Close, unless a saved
+   name fills it. */
 .sheetTitle {
   display: flex;
   flex: 1;
@@ -20,8 +22,22 @@
   min-width: 0;
 }
 
+.sheetTitle:has(+ .name) {
+  flex: none;
+}
+
 .heading button {
   flex-shrink: 0;
+}
+
+.nameInput {
+  text-overflow: ellipsis;
+}
+
+/* A saved name's question drops under its heading's row. */
+.confirm {
+  flex-basis: 100%;
+  order: 1;
 }
 
 .sheetBody {

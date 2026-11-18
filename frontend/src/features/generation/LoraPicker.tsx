@@ -47,7 +47,6 @@ import {
   PickerHeader,
   PickerTile,
   PopupHeading,
-  SaveButton,
   SavedName,
   SortMenu,
   useNaming,
@@ -197,8 +196,7 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
           if (!opened) setAdding(false);
         }}
         target={trigger}
-        detail={<StackCount value={value} onChange={onChange} picker={picker} />}
-        actions={<StackSave value={value} onChange={onChange} picker={picker} />}
+        name={<StackPreset value={value} onChange={onChange} picker={picker} />}
         {...clear}
         leading={
           <ChipPopup
@@ -508,24 +506,10 @@ function useStackDraft({ value, onChange, picker }: LoraPickerProps) {
 }
 
 /**
- * The stack's Save Preset, beside its heading or in the phone sheet's header: it updates the current
- * preset's LoRAs, or names a new preset of only LoRAs.
+ * The stack's preset, in its heading or the phone sheet's header: its name, the presets with LoRAs
+ * for this family, and their edits. Save updates the current preset's LoRAs, or names a new preset
+ * of only LoRAs.
  */
-function StackSave(props: LoraPickerProps) {
-  const { input, presets, current, edited } = useStackDraft(props);
-  return (
-    <SaveButton
-      noun="Preset"
-      naming={props.picker.naming}
-      current={current}
-      edited={edited}
-      disabled={!input.loras.length || !presets.isSuccess}
-      onUpdate={(preset) => presets.update(preset, { ...preset.input, loras: input.loras })}
-    />
-  );
-}
-
-/** The stack's preset: its name, the presets with LoRAs for this family, and their edits. */
 function StackPreset(props: LoraPickerProps) {
   const { picker } = props;
   const { input, update, presets, records, family, current, edited } = useStackDraft(props);
@@ -533,6 +517,7 @@ function StackPreset(props: LoraPickerProps) {
     picker.setPresetId(preset.id);
     update(preset.input.loras.map((lora) => ({ ...lora })));
   };
+  if (!input.loras.length && !records.length) return null;
   return (
     <SavedName
       noun="Preset"
@@ -540,7 +525,7 @@ function StackPreset(props: LoraPickerProps) {
       records={records}
       current={current}
       edited={edited}
-      canSave={input.loras.length > 0}
+      canSave={input.loras.length > 0 && presets.isSuccess}
       // Only LoRAs no preset holds are lost by loading another, so only those ask first.
       replaces={(preset) =>
         input.loras.length && (!current || edited)
@@ -558,48 +543,24 @@ function StackPreset(props: LoraPickerProps) {
           })
           .then((preset) => picker.setPresetId(preset.id))
       }
+      onUpdate={(preset) => presets.update(preset, { ...preset.input, loras: input.loras })}
       onRename={presets.rename}
       onDelete={presets.remove}
     />
   );
 }
 
-/** The stack's enabled LoRAs against the profile's limit, beside its heading. */
-function StackCount(props: LoraPickerProps) {
-  const { input, profile } = useStackDraft(props);
-  const enabledCount = input.loras.filter((lora) => lora.enabled !== false).length;
-  if (!profile?.maxLoras) return null;
-  return (
-    <Text
-      span
-      size="xs"
-      c={enabledCount > profile.maxLoras ? "yellow" : "dimmed"}
-      style={{ whiteSpace: "nowrap" }}
-      aria-label={`${enabledCount} of ${profile.maxLoras} Enabled`}
-    >
-      {enabledCount}/{profile.maxLoras}
-    </Text>
-  );
-}
-
 /**
- * The stack's name, then the chosen LoRAs in order. Desktop heads its column Stack; the phone
- * sheet is the stack itself, so its header carries the count and actions instead.
+ * The chosen LoRAs in order. Desktop heads its column Stack, with the preset; the phone sheet is
+ * the stack itself, so its header carries the preset instead.
  */
 function LoraStack(props: LoraPickerProps) {
   const phone = usePhone();
-  const { input, profile, update, metadata, title, compatible, records } = useStackDraft(props);
+  const { input, profile, update, metadata, title, compatible } = useStackDraft(props);
   const enabledCount = input.loras.filter((lora) => lora.enabled !== false).length;
   return (
     <>
-      {!phone && (
-        <PopupHeading
-          title="Stack"
-          detail={<StackCount {...props} />}
-          actions={<StackSave {...props} />}
-        />
-      )}
-      {(!!input.loras.length || !!records.length) && <StackPreset {...props} />}
+      {!phone && <PopupHeading title="Stack" name={<StackPreset {...props} />} />}
       {/* With nothing chosen, the empty state centres in the pane. */}
       {!input.loras.length ? (
         <EmptyState fill>Choose LoRAs or a preset.</EmptyState>
