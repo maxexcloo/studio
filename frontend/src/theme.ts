@@ -235,11 +235,11 @@ export function studioTheme({
         }),
       }),
       AppShell: AppShell.extend({
+        classNames: { header: classes.shellHeader },
         styles: {
           root: { "--app-shell-border-color": "var(--studio-glass-border)" } as CSSProperties,
           aside: chrome,
           footer: chrome,
-          header: { ...chrome, paddingTop: "env(safe-area-inset-top)" },
           navbar: chrome,
         },
       }),
