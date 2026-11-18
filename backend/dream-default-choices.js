@@ -17,7 +17,7 @@ const retired = {
 /**
  * The migrate-runtime step that ends the Dream defaults administrators saved in Settings: each
  * account without its own choice for one saves the default as its choice, so no account's Dream
- * changes, and the defaults leave the settings document. Settings › Dream forces nothing until an
+ * changes, and the defaults leave the settings document. Settings › Generation forces nothing until an
  * administrator sets an override. Plans by default; `apply` writes. A second run finds nothing.
  */
 export function dreamDefaultChoices(dataDir, { apply = false } = {}) {

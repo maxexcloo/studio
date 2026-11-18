@@ -281,8 +281,8 @@ test("Administrators save and verify per-user cloud and uncensored access throug
   await expect(
     member.getByRole("combobox", { name: "Access Group for member@example.test", exact: true }),
   ).toHaveValue("Member Cloud");
-  // The toolbar spells its actions out.
-  await expect(page.getByText("New User", { exact: true })).toBeVisible();
+  // Desktop toolbars spell their actions out; phones show their icons alone, on the description's line.
+  await expect(page.getByRole("button", { name: "New User", exact: true })).toBeVisible();
   await member
     .getByRole("button", { name: "Actions for member@example.test", exact: true })
     .click();
@@ -359,6 +359,17 @@ test("Administrators change roles, reset passwords and delete galleries, account
       .getByRole("button", { name: "Actions for admin@example.test", exact: true }),
   ).toHaveCount(0);
 
+  await member
+    .getByRole("button", { name: "Actions for member@example.test", exact: true })
+    .click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Make Administrator",
+    "Reset Password",
+    "Disable",
+    /^Delete Gallery/,
+    "Delete User",
+  ]);
+  await page.keyboard.press("Escape");
   await menu("Make Administrator");
   const promote = page.getByRole("dialog", { name: "Make Administrator", exact: true });
   await promote.getByRole("button", { name: "Make Administrator", exact: true }).click();

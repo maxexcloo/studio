@@ -389,8 +389,11 @@ export function studioTheme({
       PasswordInput: PasswordInput.extend({
         vars: () => ({ root: touch ? { "--psi-button-size": rem(bar) } : {} }),
       }),
+      // Outside presses close popups through ui/popupClicks.ts; Mantine's own check runs on
+      // mousedown alone, which a tap also sends, so a touch's start stays the scroll lock's.
       Popover: Popover.extend({
         defaultProps: {
+          clickOutsideEvents: ["mousedown"],
           floatingStrategy: "fixed",
           middlewares: popupMiddlewares,
           transitionProps: popupTransition,

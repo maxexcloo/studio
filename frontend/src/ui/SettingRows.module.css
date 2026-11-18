@@ -18,6 +18,15 @@
   flex: 1;
   min-width: 0;
 }
+/* Phones give a row's picker and its buttons one full-width row: the picker fills it. */
+:where([data-phone]) .controls:has([aria-haspopup="listbox"]) {
+  flex-basis: 100%;
+}
+:where([data-phone]) .controls > :has([aria-haspopup="listbox"]),
+:where([data-phone]) .controls > [aria-haspopup="listbox"] {
+  flex: 1;
+  min-width: 0;
+}
 /* A segmented choice is as tall as the Selects in the rows around it. */
 @media not (pointer: coarse) {
   .wide > :global(.mantine-SegmentedControl-root) {

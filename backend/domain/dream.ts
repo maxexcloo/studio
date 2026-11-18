@@ -2892,7 +2892,10 @@ export function createDream(options: {
         (key) => key in overrides && patch[key] !== overrides[key],
       );
       if (forced)
-        throw failure(`An administrator set ${forced} for every account in Settings › Dream.`, 409);
+        throw failure(
+          `An administrator set ${forced} for every account in Settings › Generation.`,
+          409,
+        );
       const record = read(ownerId);
       // Turning Dream on resumes it too.
       record.settings = { ...record.settings, ...(patch.enabled && { paused: false }), ...patch };

@@ -88,9 +88,11 @@ recur across features.
   checkboxes select records or form options. Number fields commit on blur or
   Enter. Free text, passwords and record editing use a dialog with Save.
   Selects and segmented choices sit in `wide` rows (segmented ones
-  `fullWidth`): one width on desktop, the full row under the label on phones.
-  A row's actions are plain compact buttons named by their verb, never a
-  dropdown.
+  `fullWidth`): one width on desktop, the full row under the label on phones,
+  where a picker and its row's buttons share that row, the picker filling it.
+  Profile and model choices use the composer's picker (`ProfileSelect`) as a
+  field. A row's actions are plain compact buttons named by their verb, never
+  a dropdown.
 - Every dialog, sheet and chip popup ends with one right-aligned
   `DialogFooter` of real buttons: any default secondary actions, Cancel, then
   one filled primary, which follows the secondaries alone (Done, Close) where

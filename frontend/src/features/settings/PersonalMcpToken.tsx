@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Text } from "@mantine/core";
+import { Alert, Badge, Button, Group, Text } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
@@ -106,10 +106,22 @@ export function PersonalMcpToken() {
               "Rotate it in the Danger Zone to view. This token was created before Studio kept tokens to show again."
             ) : (
               <>
-                <Text span size="xs" ff="monospace" style={{ wordBreak: "break-all" }}>
-                  {shown ? token : "•".repeat(24)}
-                </Text>
-                <br />
+                {/* The token with its actions at the end of its line, cut short on narrow rows. */}
+                <Group component="span" gap="xs" wrap="nowrap" my={4}>
+                  <Text span size="xs" ff="monospace" truncate flex={1} miw={0}>
+                    {shown ? token : "•".repeat(24)}
+                  </Text>
+                  <Button
+                    size="compact-sm"
+                    variant="default"
+                    leftSection={shown ? <icons.hide size={16} /> : <icons.show size={16} />}
+                    disabled={!token}
+                    onClick={() => setShown(!shown)}
+                  >
+                    {shown ? "Hide" : "Show"}
+                  </Button>
+                  <CopyButton size="compact-sm" text={token} aria-label="Copy Token" />
+                </Group>
                 Created {formatDateTime(status.data.createdAt)}.
               </>
             )
@@ -125,20 +137,6 @@ export function PersonalMcpToken() {
             >
               Create
             </Button>
-          )}
-          {enabled && status.data?.viewable && (
-            <>
-              <Button
-                size="compact-sm"
-                variant="default"
-                leftSection={shown ? <icons.hide size={16} /> : <icons.show size={16} />}
-                disabled={!token}
-                onClick={() => setShown(!shown)}
-              >
-                {shown ? "Hide" : "Show"}
-              </Button>
-              <CopyButton size="compact-sm" text={token} aria-label="Copy Token" />
-            </>
           )}
         </SettingRow>
         <SettingRow
