@@ -569,11 +569,16 @@ export class McpMedia {
   promptRecord(jobId) {
     return this.rows.prompt(jobId) ?? null;
   }
-  /** Outputs the account's unfinished MCP jobs will make. */
+  /** Images the account's unfinished MCP jobs are expected to make. */
   async pendingOutputs(owner, signal) {
     const { jobs = [] } = await this.request("GET", "/api/queue", undefined, owner, { signal });
     return jobs
-      .filter((job) => !terminal.has(job.status) && this.rows.jobOwner(job.id) === owner)
+      .filter(
+        (job) =>
+          job.input?.kind === "image" &&
+          !terminal.has(job.status) &&
+          this.rows.jobOwner(job.id) === owner,
+      )
       .reduce((sum, job) => sum + (Number(job.input?.count) || 1), 0);
   }
   /**
@@ -828,7 +833,7 @@ export class McpMedia {
               ...(record.assistant ? { assistant: record.assistant } : {}),
               ...(record.conversation ? { chat: record.conversation } : {}),
               ...(record.turn ? { turn: record.turn } : {}),
-              ...(profile.kind === "video" ? { kind: "video" } : {}),
+              kind: profile.kind,
             });
             queued.push({
               job_id: result.jobId,
@@ -2294,7 +2299,7 @@ export class McpMedia {
    * first (a conversation's All Results link shows the whole chat), with a job's own result open
    * in the viewer. Studio's sign-in decides who sees them.
    */
-  studioUrl(claims) {
+  async studioUrl(claims) {
     const jobId = claims.all ? this.rows.latestRefs(claims.scope, 1)[0]?.jobId : claims.jobId;
     const record = (jobId && this.promptRecord(jobId)) || {};
     const params = new URLSearchParams();
@@ -2305,7 +2310,14 @@ export class McpMedia {
     }
     // Studio moves these parameters into the page's history state (GalleryPage cleanLocation).
     const number = !claims.all && this.numberOf(claims.jobId);
-    return `${this.publicUrl}/${record.kind === "video" ? "videos" : "images"}${number ? `/${number}` : ""}${params.size ? `?${params}` : ""}`;
+    const kind =
+      record.kind ||
+      (!claims.all && jobId
+        ? await this.job(claims.owner, jobId)
+            .then((job) => job.kind)
+            .catch(() => undefined)
+        : undefined);
+    return `${this.publicUrl}/${kind === "video" ? "videos" : "images"}${number ? `/${number}` : ""}${params.size ? `?${params}` : ""}`;
   }
   summary(job) {
     return Object.fromEntries(

@@ -632,7 +632,7 @@ export function registerMcpRoutes(
       if (claims.page || claims.all)
         return res
           .set({ "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" })
-          .redirect(302, media.studioUrl(claims));
+          .redirect(302, await media.studioUrl(claims));
       const read = (jobId, index) =>
         accountMode
           ? media.signedResult(claims.owner, jobId, index)
