@@ -28,7 +28,7 @@ export const galleryTabs: { value: Tab; label: string }[] = [
 /**
  * The gallery's images to choose from, as the References sheet and the card editors show them: the
  * picker header (the gallery's tabs and any `more` after them, search, Filter ▾ and `actions`),
- * then the tiles, each with a Preview, paged and virtualised as they scroll in the room they are
+ * then any `notice` under it, so the header keeps its place across tabs, then the tiles, each with a Preview, paged and virtualised as they scroll in the room they are
  * given, keeping their place in `browser`; `onLayer` hears while a preview is open.
  * Render inside a flex column that bounds its height.
  */
@@ -39,6 +39,7 @@ export function GalleryChoices({
   browser,
   enabled,
   actions,
+  notice,
   tile,
   onLayer,
 }: {
@@ -49,6 +50,7 @@ export function GalleryChoices({
   browser: ReferenceBrowser;
   enabled: boolean;
   actions?: ReactNode;
+  notice?: ReactNode;
   /** Each image's tile: its accessible label, from `name`, whether it is chosen and what a tap does. */
   tile: (
     item: MediaItem,
@@ -146,6 +148,7 @@ export function GalleryChoices({
           />
         }
       />
+      {notice}
       {/* Loading and empty states fill the space under the header, centred in it. */}
       {listing.isPending && !leadingTile ? (
         <LoadingState fill label="Loading Images" />
