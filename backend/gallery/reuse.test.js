@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -19,12 +18,7 @@ const url = (filename) =>
   `/comfy/view?${new URLSearchParams({ filename, subfolder: "", type: "media" })}`;
 
 test("completed videos use their encoded dimensions instead of requested aspect or resolution", async (context) => {
-  let encoder;
-  try {
-    encoder = createRequire(import.meta.url)("ffmpeg-static");
-  } catch {
-    encoder = "ffmpeg";
-  }
+  const encoder = "ffmpeg";
   try {
     execFileSync(encoder, ["-version"], { stdio: "ignore" });
   } catch {
@@ -79,9 +73,8 @@ test("completed videos use their encoded dimensions instead of requested aspect 
 });
 
 test("an Extend is saved joined onto the video it continued", async (context) => {
-  let encoder;
+  const encoder = "ffmpeg";
   try {
-    encoder = createRequire(import.meta.url)("ffmpeg-static");
     execFileSync(encoder, ["-version"], { stdio: "ignore" });
   } catch {
     context.skip("Video encoder unavailable");
