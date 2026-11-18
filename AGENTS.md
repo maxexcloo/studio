@@ -86,7 +86,8 @@ recur across features.
 - Settings use `SettingGroup` and `SettingRow`. Switches apply on/off settings
   immediately and optimistically, rolling back or refetching after failure;
   checkboxes select records or form options. Number fields commit on blur or
-  Enter. Free text, passwords and record editing use a dialog with Save.
+  Enter. Free text, passwords and record editing use a dialog with Save,
+  except a section that is one form (Chat Brief), which edits in place.
   Selects and segmented choices sit in `wide` rows (segmented ones
   `fullWidth`): one width on desktop, the full row under the label on phones.
   A row's actions are plain compact buttons named by their verb, never a
@@ -113,7 +114,9 @@ recur across features.
 ### Actions & Menus
 
 - Search clears only its query; filters preserve it. Toolbars show search as a
-  field; phones open it from an icon.
+  field; phones open it from an icon. A Library or Settings list's Filter
+  popover shows each filter's choices inline as chips (`FilterChoices`), All
+  first, never a dropdown.
 - Named controls that open a picker or menu show ▾ (Animate ▾, Copy ▾), small
   beside an action bar's icon; ⋯ already means more, so it never carries one.
   Icon-only controls use accessible names and tooltips.

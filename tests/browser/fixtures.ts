@@ -1059,7 +1059,7 @@ export async function editDefinition(page: Page, kind: "Profile" | "Guide") {
     .getByRole("button", { name: /^Actions for / })
     .first()
     .click();
-  await page.getByRole("menuitem", { name: `Edit ${kind}`, exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   return editor;
 }
 

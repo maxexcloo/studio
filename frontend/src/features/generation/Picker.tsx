@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Combobox,
+  FileButton,
   FocusTrap,
   Group,
   Image,
@@ -48,6 +49,7 @@ import { usePhone, useTouch } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import { FilterButton } from "../gallery/GalleryFilters";
 import { escapePanel, fittedPopup } from "./chip";
+import { uploadTypes } from "./references";
 
 import classes from "./Picker.module.css";
 
@@ -375,6 +377,41 @@ export function PickerGrid({
       style={style}
     >
       {children}
+    </div>
+  );
+}
+
+/** The first tile of a picker's Uploads: chooses image files to upload, named by `label`. */
+export function UploadTile({
+  label,
+  disabled,
+  loading,
+  onFiles,
+}: {
+  label: string;
+  disabled: boolean;
+  loading: boolean;
+  onFiles: (files: File[]) => void;
+}) {
+  return (
+    <div role="listitem" className={classes.uploadTile}>
+      <FileButton accept={uploadTypes.join(",")} multiple onChange={onFiles}>
+        {(props) => (
+          <Button
+            {...props}
+            className={classes.upload}
+            variant="default"
+            aria-label={label}
+            loading={loading}
+            disabled={disabled || loading}
+          >
+            <Stack align="center" gap="xs">
+              <icons.upload size={22} aria-hidden />
+              <span>Upload</span>
+            </Stack>
+          </Button>
+        )}
+      </FileButton>
     </div>
   );
 }

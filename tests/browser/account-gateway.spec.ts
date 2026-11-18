@@ -286,7 +286,7 @@ test("Administrators save and verify per-user cloud and uncensored access throug
   await member
     .getByRole("button", { name: "Actions for member@example.test", exact: true })
     .click();
-  await page.getByRole("menuitem", { name: "Disable User", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Disable", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Disable User", exact: true })
     .getByRole("button", { name: "Disable", exact: true })
@@ -406,12 +406,12 @@ test("Administrators change roles, reset passwords and delete galleries, account
   const actions = (name: string) =>
     page.getByRole("button", { name: `Actions for ${name}`, exact: true }).click();
   await actions("Users");
-  await expect(page.getByRole("menuitem", { name: "Delete Group", exact: true })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "Delete", exact: true })).toBeDisabled();
   await page.keyboard.press("Escape");
   await actions("Empty");
   await page
     .getByRole("menu", { name: "Actions for Empty" })
-    .getByRole("menuitem", { name: "Delete Group", exact: true })
+    .getByRole("menuitem", { name: "Delete", exact: true })
     .click();
   await page
     .getByRole("dialog", { name: "Delete Group", exact: true })
@@ -433,7 +433,7 @@ test("A member turns the Cloud Models its group grants off for itself, leaving C
   await expect(where).toBeVisible();
   // Only what the group grants can be turned off.
   await expect(page.getByRole("region", { name: "Models", exact: true })).toHaveCount(0);
-  const images = where.getByRole("radiogroup", { name: "Images", exact: true });
+  const images = where.getByRole("radiogroup", { name: "Images Default", exact: true });
   await expect(images.getByRole("radio", { name: "Cloud" })).toBeChecked();
   const cloud = where.getByRole("switch", { name: "Cloud Models", exact: true });
   await expect(cloud).toBeChecked();
@@ -442,9 +442,9 @@ test("A member turns the Cloud Models its group grants off for itself, leaving C
   await expect.poll(() => state.preferences.preferences.cloudModels).toBe(false);
   // Nothing then chooses Cloud: only the Local defaults remain.
   await expect(where.getByRole("radiogroup")).toHaveCount(0);
-  await expect(where.getByRole("combobox", { name: /Cloud Default$/ })).toHaveCount(0);
+  await expect(where.getByRole("combobox", { name: /Cloud Model$/ })).toHaveCount(0);
   await expect(
-    where.getByRole("combobox", { name: "Videos Local Default", exact: true }),
+    where.getByRole("combobox", { name: "Videos Default Local Model", exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(cloud).not.toBeChecked();

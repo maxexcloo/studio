@@ -1,10 +1,15 @@
-import { ActionIcon, Alert, Badge, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Alert, Badge, Menu, Stack, Text, Tooltip } from "@mantine/core";
 import { type ReactNode, useState } from "react";
 
 import { copyText } from "../../ui/clipboard";
 import { DataTable, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
-import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import {
+  FilterChoices,
+  SectionHeader,
+  SectionToolbar,
+  ToolbarAction,
+} from "../../ui/SectionToolbar";
 import { usePhone } from "../../ui/usePhone";
 import { modelFamilyLabel } from "../generation/modelFamily";
 
@@ -189,34 +194,18 @@ export function LibraryCatalogueTable({
           onQueryChange={setQuery}
           filters={
             <>
-              <Select
-                label="Family"
-                placeholder="All Families"
-                data={families}
-                value={family}
-                onChange={setFamily}
-                clearable
-                searchable
-                openOnFocus={false}
-                comboboxProps={{ withinPortal: false }}
-                data-mantine-stop-propagation
-              />
+              <FilterChoices label="Family" data={families} value={family} onChange={setFamily} />
               {models && (
-                <Select
+                <FilterChoices
                   label="Type"
-                  placeholder="All Types"
                   data={unique(items.map(resourceType))}
                   value={type}
                   onChange={setType}
-                  clearable
-                  comboboxProps={{ withinPortal: false }}
-                  data-mantine-stop-propagation
                 />
               )}
               {withModelType && (
-                <Select
+                <FilterChoices
                   label="Model Type"
-                  placeholder="All Model Types"
                   data={[
                     { value: "original", label: "Original" },
                     { value: "finetune", label: "Fine-Tune" },
@@ -224,9 +213,6 @@ export function LibraryCatalogueTable({
                   ]}
                   value={modelType}
                   onChange={setModelType}
-                  clearable
-                  comboboxProps={{ withinPortal: false }}
-                  data-mantine-stop-propagation
                 />
               )}
             </>
@@ -400,16 +386,37 @@ export function LibraryCatalogueTable({
           const source = item.links?.civitaiCom || item.links?.hf || item.links?.civitaiRed;
           const latest = item.update?.latest;
           const free = item.update?.freeAlternative;
+          // Edit, then the rest A–Z.
           return (
             <>
+              {onEdit && (
+                <>
+                  <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => onEdit(item)}>
+                    Edit
+                  </Menu.Item>
+                  <Menu.Divider />
+                </>
+              )}
+              <Menu.Item
+                leftSection={<icons.copy size={16} />}
+                onClick={() => void copyText(item.file || item.key, "File name")}
+              >
+                Copy File Name
+              </Menu.Item>
+              {source && (
+                <Menu.Item
+                  leftSection={<icons.external size={16} />}
+                  component="a"
+                  href={source}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open Source Page
+                </Menu.Item>
+              )}
               {onTest && item.installed && item.folder === "loras" && (
                 <Menu.Item leftSection={<icons.compare size={16} />} onClick={() => onTest(item)}>
                   Test LoRA
-                </Menu.Item>
-              )}
-              {onEdit && (
-                <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => onEdit(item)}>
-                  Edit Catalogue Entry
                 </Menu.Item>
               )}
               {onUpdate &&
@@ -435,23 +442,6 @@ export function LibraryCatalogueTable({
                     {latest?.unavailable?.note || "This update cannot be downloaded."}
                   </Menu.Item>
                 ))}
-              <Menu.Item
-                leftSection={<icons.copy size={16} />}
-                onClick={() => void copyText(item.file || item.key, "File name")}
-              >
-                Copy File Name
-              </Menu.Item>
-              {source && (
-                <Menu.Item
-                  leftSection={<icons.external size={16} />}
-                  component="a"
-                  href={source}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open Source Page
-                </Menu.Item>
-              )}
             </>
           );
         }}
