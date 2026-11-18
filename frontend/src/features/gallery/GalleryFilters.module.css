@@ -67,8 +67,3 @@
     margin-inline-end: 0;
   }
 }
-
-/* The view's switches sit on the panel's right edge, their labels on the left. */
-.toggles :global(.mantine-Switch-body) {
-  justify-content: space-between;
-}

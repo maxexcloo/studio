@@ -2,9 +2,9 @@ import {
   Alert,
   Button,
   Center,
+  Group,
   SegmentedControl,
   Stack,
-  Switch,
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
@@ -32,7 +32,7 @@ import { useGenerationActions } from "../generation/GenerationProvider";
 import type { OpenComposerState } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import { useTileCaptions } from "../settings/accountPreferences";
-import { emptyGalleryFilters } from "./GalleryFilters";
+import { FilterToggle, emptyGalleryFilters } from "./GalleryFilters";
 import { GalleryImport, droppedFiles, useGalleryUpload } from "./GalleryImport";
 import { GallerySelectionBar } from "./GallerySelectionBar";
 import { GalleryToolbar } from "./GalleryToolbar";
@@ -706,39 +706,34 @@ function Gallery() {
             />
           }
           toggles={
-            <>
+            <Group gap={6} role="group" aria-label="Show">
               {kind === "image" && (
-                <Switch
+                <FilterToggle
                   label="Comparisons"
-                  labelPosition="left"
-                  checked={filters.comparisons}
-                  onChange={(event) =>
-                    setFilters({ ...filters, comparisons: event.currentTarget.checked })
-                  }
+                  on={filters.comparisons}
+                  onToggle={() => setFilters({ ...filters, comparisons: !filters.comparisons })}
                 />
               )}
               {/* Disliked items show only here; it turns Liked and Uploads off. */}
-              <Switch
+              <FilterToggle
                 label="Disliked"
-                labelPosition="left"
-                checked={filters.rating === "disliked"}
-                onChange={(event) =>
+                on={filters.rating === "disliked"}
+                onToggle={() =>
                   setFilters({
                     ...filters,
-                    rating: event.currentTarget.checked ? "disliked" : "",
+                    rating: filters.rating === "disliked" ? "" : "disliked",
                     uploads: false,
                   })
                 }
               />
               {view === "grid" && (
-                <Switch
+                <FilterToggle
                   label="Originals Only"
-                  labelPosition="left"
-                  checked={originalsOnly}
-                  onChange={(event) => setOriginalsOnly(event.currentTarget.checked)}
+                  on={originalsOnly}
+                  onToggle={() => setOriginalsOnly(!originalsOnly)}
                 />
               )}
-            </>
+            </Group>
           }
           actions={
             <>
