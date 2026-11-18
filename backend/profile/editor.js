@@ -282,7 +282,7 @@ export function revertEditableProfile(
   const store = profileStore({ workflowsDir: userWorkflowsDir });
   const old = store.version(id, version);
   // A version from before a rename names the old id; it comes back as this one.
-  if (old.id !== id && store.canonical(old.id) === id) {
+  if (old.id !== id) {
     const raw = JSON.parse(old.text);
     raw.studio = { ...raw.studio, id };
     old.text = `${JSON.stringify(raw, null, 2)}\n`;

@@ -22,14 +22,12 @@ test("A backend projection uses only its own recipe and image modes", () => {
     editReferences: true,
     keepsCharacters: true,
     imageModes: { reference: { defaults: { cfg: 4 } } },
-    aliases: ["old-profile"],
   };
   const selected = profileForBackend(profile, "comfyui")!;
   expect(selected.recipe).toBeUndefined();
   expect(selected.editReferences).toBeUndefined();
   expect(selected.keepsCharacters).toBeUndefined();
   expect(selected.imageModes).toBeUndefined();
-  expect(selected.aliases).toEqual(["old-profile"]);
 });
 
 test("Switching image backends changes reference capacity and preserves an oversized draft", async ({

@@ -6,7 +6,7 @@ import { families } from "./family-catalogue.js";
 import { galleryItems } from "./gallery/store.js";
 import { loraInfos } from "./lora/info.js";
 import { accountMayUseLoras, loraAllowed, modelsForAccount } from "./model/catalogue.js";
-import { canonicalProfileId, livePrompting } from "./profile/store.js";
+import { livePrompting } from "./profile/store.js";
 import { bytesForReferenceAccount, captionForReferenceAccount } from "./references.js";
 import { defaultWorkerId } from "./workers.js";
 
@@ -51,7 +51,7 @@ export function createAssistantContext({ catalogueModels, installedLoras }) {
   // Learning from likes: the account's six newest liked prompts on the same family, and their LoRAs.
   const liked = async (req, profile) => {
     const families = new Map((await profiles(req)).map((item) => [item.id, item.family]));
-    const same = (item, id = canonicalProfileId(item.settings?.profileId)) =>
+    const same = (item, id = item.settings?.profileId) =>
       id === profile.id || (profile.family && families.get(id) === profile.family);
     const items = galleryItems({
       ...ownedQuery(req.studioAccount),
@@ -95,8 +95,9 @@ export function createAssistantContext({ catalogueModels, installedLoras }) {
    * cloud model) takes edits as instructions, plain image-to-image as a full description.
    */
   async function target(account, profileId) {
-    const id = canonicalProfileId(profileId);
-    const profile = (await profiles({ studioAccount: account })).find((item) => item.id === id);
+    const profile = (await profiles({ studioAccount: account })).find(
+      (item) => item.id === profileId,
+    );
     if (!profile) return null;
     const family = families[String(profile.family || "").replaceAll("-", "_")];
     const edits =

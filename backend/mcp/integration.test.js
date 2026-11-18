@@ -1269,68 +1269,8 @@ test("Models uses only this studio, filters readiness and kind, and returns deta
   );
 });
 
-test("Models and Generate keep an old per-backend id's controls after the default changes", async (t) => {
-  const f = await fixture(t);
-  const previous = process.env.STUDIO_DATA_DIR;
-  process.env.STUDIO_DATA_DIR = f.dataDir;
-  t.after(() => {
-    if (previous === undefined) delete process.env.STUDIO_DATA_DIR;
-    else process.env.STUDIO_DATA_DIR = previous;
-  });
-  const workflows = path.join(f.dataDir, "workflows");
-  fs.mkdirSync(workflows, { recursive: true });
-  fs.writeFileSync(
-    path.join(workflows, ".studio-aliases.json"),
-    JSON.stringify({
-      "old-comfy": { to: "combined", backend: "comfyui" },
-    }),
-  );
-  const comfy = {
-    ...imageProfile,
-    id: "custom:combined",
-    backend: "comfyui",
-    maxLoras: 8,
-    defaults: { ...imageProfile.defaults, width: 2048, height: 2048 },
-    mediaInputs: Array.from({ length: 10 }, (_, i) => ({ id: `reference-${i + 1}` })),
-  };
-  await f.profiles([
-    {
-      ...comfy,
-      backend: "radiance",
-      maxLoras: 4,
-      defaults: { ...comfy.defaults, width: 1536, height: 1536 },
-      mediaInputs: comfy.mediaInputs.slice(0, 4),
-      backendOptions: [
-        { id: "radiance", label: "Radiance", ready: true },
-        { id: "comfyui", label: "ComfyUI", ready: true, profile: comfy },
-      ],
-    },
-  ]);
-  const client = await f.client();
-  const detail = data(await call(client, "models", { profile_id: "custom:old-comfy" }));
-  assert.equal(detail.backend, "comfyui");
-  assert.equal(detail.references.max, 10);
-  assert.equal(detail.controls.loras.max, 8);
-  await call(client, "generate", { profile_id: "custom:old-comfy", prompts: ["A fox"] });
-  assert.equal(f.submitted[0].profileBackend, "comfyui");
-  assert.equal(f.submitted[0].width, 2048);
-});
-
 test("Models and Generate follow the run's backend: its sizes, reference limit and LoRA backend", async (t) => {
   const f = await fixture(t);
-  const previous = process.env.STUDIO_DATA_DIR;
-  process.env.STUDIO_DATA_DIR = f.dataDir;
-  t.after(() => {
-    if (previous === undefined) delete process.env.STUDIO_DATA_DIR;
-    else process.env.STUDIO_DATA_DIR = previous;
-  });
-  const workflows = path.join(f.dataDir, "workflows");
-  fs.mkdirSync(workflows, { recursive: true });
-  // A retired profile resolves to the one that replaced it and is never listed.
-  fs.writeFileSync(
-    path.join(workflows, ".studio-aliases.json"),
-    JSON.stringify({ "qwen-retired": { to: "qwen" } }),
-  );
   const slots = (count) => Array.from({ length: count }, (_, i) => ({ id: `reference-${i + 1}` }));
   const comfy = {
     ...imageProfile,
@@ -1368,8 +1308,7 @@ test("Models and Generate follow the run's backend: its sizes, reference limit a
   assert.deepEqual(data(await call(client, "models", { kind: "image" })).image, [
     "custom:qwen — Qwen · Fast",
   ]);
-  const detail = data(await call(client, "models", { profile_id: "custom:qwen-retired" }));
-  assert.equal(detail.id, "custom:qwen");
+  const detail = data(await call(client, "models", { profile_id: "custom:qwen" }));
   assert.equal(detail.backend, "radiance");
   assert.equal(detail.lora_backend, "ComfyUI (not ready)");
   assert.deepEqual(detail.references.by_backend, { ComfyUI: 10, Radiance: 4 });

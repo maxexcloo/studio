@@ -2,7 +2,6 @@
 // record only: nothing is tracked beyond what Studio already keeps about its own outputs.
 import { isCloudProfile } from "../shared/profiles.ts";
 import { galleryRuns } from "./gallery/store.js";
-import { canonicalProfileId } from "./profile/store.js";
 
 /**
  * What these gallery items made: finished outputs, images and videos, the cloud jobs among them
@@ -48,15 +47,11 @@ export async function recentRuns() {
  */
 export function profileStats(items = [], now = Date.now()) {
   const stats = new Map();
-  // Each recorded id resolves once: resolving reads the alias file's state.
-  const canonical = new Map();
   for (const item of items) {
     if (item?.status !== "done" && item?.status !== "failed") continue;
     const at = Date.parse(item.createdAt || "");
     if (!(now - at < 30 * dayMs)) continue;
-    const id = item.settings?.profileId;
-    if (!canonical.has(id)) canonical.set(id, canonicalProfileId(id));
-    const profile = canonical.get(id);
+    const profile = item.settings?.profileId;
     if (!profile) continue;
     const entry = stats.get(profile) || {
       runs: 0,

@@ -4,7 +4,6 @@
  * commit it. Studio never writes Git itself.
  *
  *   profiles/<id>.json    every profile file Studio holds, exactly as on disk
- *   profile-aliases.json  merged profile ids and the profile each became, when there are any
  *   prompting.json        the guide store without its `meta`
  *   models.json           the restore manifest, when there is one
  *   EXPORT.json           what changed, each item's origin and the unreviewed AI drafts
@@ -21,8 +20,6 @@ import { hashOf, validId } from "./store.js";
 
 const exportsKept = 20;
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
-const sorted = (value) =>
-  Object.fromEntries(Object.entries(value || {}).sort(([a], [b]) => a.localeCompare(b)));
 
 /**
  * The bundle's files and summary, without writing anything. `profiles` and `guides` are the
@@ -80,9 +77,6 @@ export function buildExport({
       hash,
     });
   }
-  const aliases = profiles.aliases();
-  if (Object.keys(aliases).length)
-    files.push({ name: "profile-aliases.json", body: json(sorted(aliases)), date: now });
   const store = guides.read();
   if (store) {
     const { meta = {}, ...config } = store;

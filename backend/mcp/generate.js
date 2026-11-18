@@ -28,7 +28,6 @@ import { upscaleQualities } from "../../shared/upscale.ts";
 import { accessFeatures } from "../account-policy.js";
 import { minorAgeRefusal } from "../minor-age.js";
 import { savedDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
-import { canonicalProfileId } from "../profile/store.js";
 import { promptStyleStore } from "../prompt-styles.js";
 import {
   clip,
@@ -752,23 +751,21 @@ export function registerGenerateTools({
         });
       }
       /** One profile's guide gist, defaults, controls and LoRAs, or the profiles its words name. */
-      const describe = async (value) => {
-        const profile_id = canonicalProfileId(value);
+      const describe = async (profile_id) => {
         let profiles = all;
         if (!profiles.some((profile) => profile.id === profile_id))
           profiles = localUnlessAsked(profiles, { name: profile_id });
         // Words that name several models ("klein", "flux") list them instead of choosing one.
-        const named = findProfile(profiles, value);
+        const named = findProfile(profiles, profile_id);
         const matches = named
           ? []
           : searchProfiles(wanted ? profilesNearTier(profiles, wanted) : profiles, profile_id);
         if (matches.length > 1) return listed(matches);
-        const { profile: listedProfile, note: tierNote } = named
+        const { profile, note: tierNote } = named
           ? named.id === profile_id
             ? { profile: named, note: "" }
             : withinFamily(profiles, named, wanted)
-          : namedInTier(profiles, value, wanted);
-        const profile = media.profileForBackend(listedProfile, listedProfile.namedBackend);
+          : namedInTier(profiles, profile_id, wanted);
         const infos =
           profile.options?.loras?.length && profile.capabilities?.lora !== false
             ? await media.loraInfos(owner)
@@ -820,13 +817,7 @@ export function registerGenerateTools({
             ? profile.backendOptions.find(
                 (option) =>
                   option.id ===
-                  runBackend(
-                    profile.backendOptions,
-                    listedProfile.backend,
-                    listedProfile.namedBackend,
-                    false,
-                    true,
-                  ),
+                  runBackend(profile.backendOptions, profile.backend, "", false, true),
               )
             : null;
         const modes =
@@ -865,10 +856,10 @@ export function registerGenerateTools({
           ...(workerState[profile.availability]
             ? { state: workerState[profile.availability] }
             : {}),
-          // A combined profile: the backend it runs on (an old per-backend id names its own) and the others it has.
+          // A combined profile: the backend it runs on and the others it has.
           ...(profile.backend
             ? {
-                backend: profile.namedBackend || profile.backend,
+                backend: profile.backend,
                 backends: profile.backendOptions.map((option) => option.label),
                 ...(loraBackend
                   ? {
@@ -1401,11 +1392,10 @@ export function registerGenerateTools({
     // profile's reply names it for a run with LoRAs or one that leaves the default backend.
     targets = targets.map((target) => {
       const profile = media.runProfile(target.profile, {
-        backend: target.profile.namedBackend,
         references: references > 0,
         loras: Boolean(args.loras?.length),
       });
-      const moved = !target.profile.namedBackend && profile.backend !== target.profile.backend;
+      const moved = profile.backend !== target.profile.backend;
       const backend =
         target.profile.backend && (args.loras?.length || moved)
           ? `${profile.label || profile.id} runs on ${profileBackendLabels[profile.backend] || profile.backend}${args.loras?.length ? " with LoRAs" : " with references"}${profile.ready === false ? `, which isn't ready${profile.readyReason ? ` (${profile.readyReason})` : ""}` : ""}. `
@@ -1486,7 +1476,6 @@ export function registerGenerateTools({
                       }
                     : {}),
                 profile_id: profile.id,
-                ...(profile.namedBackend ? { profile_backend: profile.namedBackend } : {}),
               };
               const start =
                 card?.referenceIds.length && !room

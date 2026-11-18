@@ -9,7 +9,7 @@ import { type Merge, definitionsKey, duplicateProfilesQuery, profileStatsQuery }
 
 /**
  * Library › Profiles › Merge Duplicate Profiles: previews same-named profiles that run the same
- * definition, then keeps the newer id and records the older one as its alias (profile/merge.js).
+ * definition, then keeps the newer id and removes the older one (profile/merge.js).
  */
 export function MergeDuplicateProfiles({
   opened,
@@ -63,8 +63,8 @@ export function MergeDuplicateProfiles({
           {count ? (
             <>
               <Text size="sm">
-                Each older profile is removed and its ID becomes an alias of the kept one, so
-                results, presets and links keep working.
+                Each older profile is removed. Results, presets and links made with it show it as
+                missing.
               </Text>
               <List size="sm" spacing={4}>
                 {data!.merges.map((item) => (

@@ -83,16 +83,16 @@ test("reference mode and the reference-capable backend own timing and limits", (
   assert.equal(animationInput(input, combined, 10).frames, 243);
 });
 
-test("extending keeps its exact profile or alias on Fast and Quality; Cloud and unavailable profiles resolve anew", () => {
+test("extending keeps its exact profile on Fast and Quality; Cloud and unavailable profiles resolve anew", () => {
   const item = {
     id: "clip",
     url: "sample.mp4",
     status: "done",
     type: "video",
     model: "other",
-    settings: { profileId: "old-h3" },
+    settings: { profileId: local.id },
   } as MediaItem;
-  const own = { ...local, aliases: ["old-h3"] };
+  const own = local;
   assert.equal(retainedAnimationProfile([cloud, own], item, "local"), own);
   assert.equal(retainedAnimationProfile([cloud, own], item), own);
   assert.equal(retainedAnimationProfile([cloud, own], item, "cloud"), undefined);

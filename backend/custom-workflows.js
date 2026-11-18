@@ -10,7 +10,6 @@ import {
 } from "../shared/profiles.ts";
 import { dataDir } from "./data-dir.js";
 import { writeJsonFile } from "./json-store.js";
-import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { isFastH3 } from "./providers/radiance.ts";
 import { chainReferenceSlots } from "./reference-chains.js";
 import { isObject } from "./values.js";
@@ -479,7 +478,7 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
   const items = [];
   // profile/store.js keeps each Studio profile's version and AI-Drafted marker beside them.
   const versions = readJson(path.join(dir, ".studio-meta.json")) || {};
-  // Dotfiles beside the profiles (.studio-meta.json, .studio-aliases.json) are Studio's records, not workflows.
+  // Dotfiles beside the profiles (.studio-meta.json) are Studio's records, not workflows.
   const files = fs.existsSync(dir)
     ? fs.readdirSync(dir).filter((name) => name.endsWith(".json") && !name.startsWith("."))
     : [];
@@ -593,12 +592,8 @@ export function loadCustomWorkflows() {
   return workflows;
 }
 
-/**
- * The workflow a profile id names (merged ids resolve), on `backend` when it is one of the
- * profile's; an old per-backend id of a combined profile runs on its own backend.
- */
-export function getCustomWorkflow(requested, backend = profileAliasBackend(requested)) {
-  const profileId = canonicalProfileId(requested);
+/** The workflow a profile id names, on `backend` when it is one of the profile's. */
+export function getCustomWorkflow(profileId, backend = "") {
   const workflow = loadCustomWorkflows().find(
     (workflow) =>
       workflow.profileId === profileId ||
