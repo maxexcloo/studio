@@ -316,13 +316,18 @@ test("Animate offers motions written for the image, then its templates and Custo
   });
 });
 
-test("No ideas or suggestions show when Studio has none", async ({ page }) => {
+test("Suggestions show why Studio has none, and no ideas show", async ({ page }) => {
   await openViewer(page);
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const menu = await viewerPromptMenu(page);
-  await expect(menu.getByRole("menuitem", { name: "No Suggestions", exact: true })).toBeDisabled();
+  await expect(
+    menu.getByRole("menuitem", {
+      name: "Like a few results so Studio learns your taste.",
+      exact: true,
+    }),
+  ).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toHaveCount(0);
   await closeTextEditor(page, "Prompt");
