@@ -91,7 +91,7 @@ export function PopupHeading({
 /**
  * A chip's popup. Its heading holds the title, any `detail` and its compact subtle record `actions`,
  * on desktop as in the phone sheet's header beside Close. Its footer is the shared `DialogFooter`:
- * at most one `secondary` action that adds content (Add), then `onClear` as the shared ✕, then the
+ * at most one `leading` action that adds content (Add) at the left edge, then `onClear` as the shared ✕, then the
  * `primary`. Choices apply as they are made, so the footer ends with Done where it has no
  * `primary`, and desktop shows one only where it has an action besides Done.
  * An `aside`, such as the LoRA stack, starts with its own `PopupHeading`: desktop shows it as a
@@ -114,7 +114,7 @@ export function ChipPopup({
   trap = true,
   withinPortal = true,
   floating = false,
-  secondary,
+  leading,
   onClear,
   clearDisabled,
   primary,
@@ -137,7 +137,7 @@ export function ChipPopup({
   withinPortal?: boolean;
   /** A popover on phones too, instead of a full-screen sheet. */
   floating?: boolean;
-  secondary?: ReactNode;
+  leading?: ReactNode;
   onClear?: () => void;
   clearDisabled?: boolean;
   primary?: ReactNode;
@@ -148,7 +148,7 @@ export function ChipPopup({
   const touch = useTouch();
   const close = () => onOpenedChange(false);
   const footer = (
-    <DialogFooter secondary={secondary}>
+    <DialogFooter leading={leading}>
       {onClear && <ClearButton disabled={clearDisabled} onClear={onClear} />}
       {primary || <Button onClick={close}>Done</Button>}
     </DialogFooter>
@@ -238,7 +238,7 @@ export function ChipPopup({
             </Stack>
             {aside && <div className={classes.aside}>{aside}</div>}
           </div>
-          {(secondary || onClear || primary) && footer}
+          {(leading || onClear || primary) && footer}
         </Stack>
       </Popover.Dropdown>
     </Popover>

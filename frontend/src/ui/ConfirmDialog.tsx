@@ -1,25 +1,29 @@
-import { Alert, Button, FocusTrap, Group, Modal, Stack, Text } from "@mantine/core";
+import { Alert, Box, Button, FocusTrap, Group, Modal, Stack, Text } from "@mantine/core";
 import { type ReactNode, useRef } from "react";
 
 /**
  * Every dialog's and sheet's footer, at the right: any `secondary` actions (default buttons, such
- * as Check or Add), Cancel, then its one filled primary action (`children`). Without `onCancel`,
- * where there is nothing to cancel, the action (Done, Close) follows the secondary ones.
+ * as Check), Cancel, then its one filled primary action (`children`). Without `onCancel`, where
+ * there is nothing to cancel, the action (Done, Close) follows the secondary ones. A `leading`
+ * action that adds content (Add, Upload) sits apart at the left edge, keeping the row on one line.
  */
 export function DialogFooter({
   pending,
   onCancel,
+  leading,
   secondary,
   children,
 }: {
   pending?: boolean;
   onCancel?: () => void;
+  leading?: ReactNode;
   secondary?: ReactNode;
   children: ReactNode;
 }) {
   // A phone's full-screen dialog pins it to the bottom, in sight while the body scrolls (theme).
   return (
-    <Group justify="flex-end" gap="xs" data-dialog-footer>
+    <Group justify="flex-end" gap="xs" wrap={leading ? "nowrap" : undefined} data-dialog-footer>
+      {leading && <Box me="auto">{leading}</Box>}
       {secondary}
       {onCancel && (
         <Button variant="default" disabled={pending} onClick={onCancel}>
