@@ -1736,6 +1736,7 @@ test("Work still generating and videos take the same swipes as a picture", async
   await expect(status).toBeVisible();
   const touch = await page.context().newCDPSession(page);
   async function swipeLeft(target: Locator) {
+    await expect(target).toBeVisible();
     const box = (await target.boundingBox())!;
     const x = box.x + box.width / 2;
     const y = box.y + box.height / 2;
