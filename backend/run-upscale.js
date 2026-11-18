@@ -34,7 +34,7 @@ export function dropsAutoUpscale({
  * goes ahead without one. The face pass is a nicety: without what it needs the
  * upscale still runs.
  */
-export function planRunUpscale(graph, body, info, customWorkflow = null) {
+export function planRunUpscale(graph, body, info, customWorkflow = null, stats) {
   const quality = normalizeQuality(body.autoUpscale?.quality);
   const target = Number(body.autoUpscale?.target) || 0;
   const label = targetLabels[target] || tierLabels[quality] || "";
@@ -74,7 +74,11 @@ export function planRunUpscale(graph, body, info, customWorkflow = null) {
   let lastError = null;
   for (const attempt of attempts) {
     try {
-      const embedded = embedUpscale(graph, attempt, info, { phase });
+      const embedded = embedUpscale(graph, attempt, info, {
+        phase,
+        worker: body.comfyBackend,
+        stats,
+      });
       if (!embedded)
         return { skipped: "This workflow saves no image for Smart upscale to work on", quality };
       // The embedded save nodes arrive after the run's own prefix rewrite.

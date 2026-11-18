@@ -57,6 +57,7 @@ import { useGenerationActions } from "./GenerationProvider";
 import { loraInfoQuery } from "./LoraPicker";
 import { isProfile, profileName, shownProfileName } from "./payload";
 import { WritingStream } from "./PromptWriting";
+import { queuePollInterval } from "./queuePolling";
 import { referenceLabel } from "./references";
 import type { QueueRowDrag } from "./SortableQueue";
 
@@ -86,8 +87,7 @@ export const queueQuery = queryOptions({
   // Every in-app submit (composer, viewer) invalidates this query; an idle queue still checks
   // often, so work started elsewhere (an MCP client, another tab) shows, and the gallery with it,
   // without the window regaining focus.
-  refetchInterval: (query) =>
-    query.state.data?.jobs.some((job) => !terminalStatuses.has(job.status)) ? 1500 : 3000,
+  refetchInterval: (query) => queuePollInterval(query.state.data?.jobs),
   // Polls pause while the tab is hidden, so returning checks at once, however fresh the data.
   refetchOnWindowFocus: "always",
 });

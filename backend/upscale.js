@@ -73,6 +73,16 @@ const ditTiers = {
 };
 const vaeFile = "ema_vae_fp16.safetensors";
 
+// SeedVR2 keys its model cache by loader node ID, including across prompts.
+const ditLoader = "studio_seedvr2_dit";
+const vaeLoader = "studio_seedvr2_vae";
+const upscaleCacheWindowMs = 10 * 60_000;
+const lastUpscaleByWorker = new Map();
+
+export function noteWorkerUpscale(worker, now = Date.now()) {
+  lastUpscaleByWorker.set(worker, now);
+}
+
 const presets = {
   fast: { preScale: 1, targetScale: 1.5, maxShort: 1280, blocksToSwap: 16, tileSize: 768 },
   // Smaller VAE tiles reduce memory peaks while an image model remains loaded.
@@ -396,7 +406,7 @@ function devicesFor(info, nodeClass) {
   return { device, offload };
 }
 
-export function upscaleGraph(body, info = {}) {
+export function upscaleGraph(body, info = {}, { worker, stats, now = Date.now() } = {}) {
   const plan = upscalePlan(body);
   const have = available(info);
   const dit = resolveDit(plan.quality, have);
@@ -405,6 +415,17 @@ export function upscaleGraph(body, info = {}) {
   const ditDevices = devicesFor(info, "SeedVR2LoadDiTModel");
   const vaeDevices = devicesFor(info, "SeedVR2LoadVAEModel");
   const swap = ditDevices.offload !== "none";
+  const ditBytes = modelFiles[path.basename(dit.file)]?.bytes;
+  const vaeBytes = modelFiles[path.basename(vae.file)]?.bytes;
+  const ram = stats?.system;
+  // SeedVR2 refuses to cache without an offload device. Free memory, not the total, since other
+  // workers and Radiance share the host; unknown sizes or stats compare false.
+  const keepModels =
+    swap &&
+    vaeDevices.offload !== "none" &&
+    now - lastUpscaleByWorker.get(worker) < upscaleCacheWindowMs &&
+    ram?.ram_total >= 32 * 1024 ** 3 &&
+    ram?.ram_free >= 8 * (ditBytes + vaeBytes);
   const graph = {};
   graph["1"] = { class_type: "LoadImage", inputs: { image: String(body.imageName || "") } };
   const video = body.mediaType === "video";
@@ -422,7 +443,7 @@ export function upscaleGraph(body, info = {}) {
       class_type: "ImageScaleBy",
       inputs: { image: source, upscale_method: "bicubic", scale_by: plan.preScale },
     },
-    3: {
+    [ditLoader]: {
       class_type: "SeedVR2LoadDiTModel",
       inputs: {
         model: dit.file,
@@ -430,11 +451,11 @@ export function upscaleGraph(body, info = {}) {
         blocks_to_swap: swap ? plan.blocksToSwap : 0,
         swap_io_components: swap,
         offload_device: ditDevices.offload,
-        cache_model: false,
+        cache_model: keepModels,
         attention_mode: "sdpa",
       },
     },
-    4: {
+    [vaeLoader]: {
       class_type: "SeedVR2LoadVAEModel",
       inputs: {
         model: vae.file,
@@ -447,15 +468,15 @@ export function upscaleGraph(body, info = {}) {
         decode_tile_overlap: 128,
         tile_debug: "false",
         offload_device: vaeDevices.offload,
-        cache_model: false,
+        cache_model: keepModels,
       },
     },
     5: {
       class_type: "SeedVR2VideoUpscaler",
       inputs: {
         image: ["2", 0],
-        dit: ["3", 0],
-        vae: ["4", 0],
+        dit: [ditLoader, 0],
+        vae: [vaeLoader, 0],
         seed: Number(body.seed || crypto.randomInt(1, 2 ** 31)),
         resolution: plan.resolution,
         max_resolution: plan.maxResolution,
@@ -504,7 +525,10 @@ function relink(value, prefix, source) {
     typeof value[0] === "string" &&
     Number.isInteger(value[1])
   ) {
-    return value[0] === "1" ? source : [`${prefix}${value[0]}`, value[1]];
+    const [id, slot] = value;
+    if (id === "1") return source;
+    if (id === ditLoader || id === vaeLoader) return value;
+    return [`${prefix}${id}`, slot];
   }
   return value;
 }
@@ -518,7 +542,7 @@ function relink(value, prefix, source) {
  * Returns the new graph and which save each upscale belongs to, or null when
  * the graph saves no image.
  */
-export function embedUpscale(graph, body, info = {}, { phase = "" } = {}) {
+export function embedUpscale(graph, body, info = {}, { phase = "", worker, stats } = {}) {
   const saves = Object.entries(graph || {}).filter(
     ([, node]) => node?.class_type === "SaveImage" && Array.isArray(node.inputs?.images),
   );
@@ -528,7 +552,7 @@ export function embedUpscale(graph, body, info = {}, { phase = "" } = {}) {
   let plan = null;
   saves.forEach(([saveId, save], index) => {
     const prefix = `studio_up${index}_`;
-    const built = upscaleGraph({ ...body, imageName: "" }, info);
+    const built = upscaleGraph({ ...body, imageName: "" }, info, { worker, stats });
     plan = built.plan;
     for (const [id, node] of Object.entries(built.graph)) {
       if (id === "1") continue;
@@ -538,7 +562,8 @@ export function embedUpscale(graph, body, info = {}, { phase = "" } = {}) {
           relink(value, prefix, save.inputs.images),
         ]),
       );
-      next[`${prefix}${id}`] = {
+      const shared = id === ditLoader || id === vaeLoader;
+      next[shared ? id : `${prefix}${id}`] = {
         ...node,
         inputs,
         _meta: {

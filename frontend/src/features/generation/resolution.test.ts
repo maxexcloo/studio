@@ -8,7 +8,7 @@ import {
   withResolution,
 } from "../../../../shared/resolution.ts";
 import type { GenerationInput, Profile } from "../../types";
-import { generationInput } from "./payload.ts";
+import { generationInput, profileShape } from "./payload.ts";
 
 const profile = {
   kind: "image",
@@ -95,6 +95,23 @@ const listedProfile: Profile = {
   defaults: { width: 2048, height: 2048 },
   capabilities: {},
 };
+
+test("switching profiles keeps the exact shape or its closest ratio on a log scale", () => {
+  const wider = { label: "3:1", w: 1536, h: 512 };
+  const square = { label: "1:1", w: 1024, h: 1024 };
+  const next = { ...listedProfile, aspectPresets: [square, wider] };
+  const previous = {
+    kind: "image" as const,
+    profileId: "previous-model",
+    width: 928,
+    height: 512,
+  };
+  assert.equal(profileShape(previous, next), wider);
+  assert.equal(profileShape({ ...previous, width: 512 }, next), square);
+  assert.equal(profileShape({ ...previous, kind: "video" }, next), undefined);
+  assert.equal(profileShape({ ...previous, profileId: "" }, next), undefined);
+  assert.equal(profileShape(previous, listedProfile), undefined);
+});
 const draft: GenerationInput = {
   ...input,
   kind: "image",

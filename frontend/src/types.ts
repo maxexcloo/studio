@@ -248,7 +248,14 @@ export type QueueJob = Omit<SharedQueueJob, "input" | "items" | "outputs" | "pro
   items: MediaItem[];
   outputs: MediaItem[];
   /** Generation steps, or while the prompt is written its streamed thinking and prompt. */
-  progress?: { value?: number; max?: number; phase?: string; thinking?: string; prompt?: string };
+  progress?: {
+    value?: number;
+    max?: number;
+    phase?: string;
+    steps?: boolean;
+    thinking?: string;
+    prompt?: string;
+  };
 };
 export interface Account {
   id: string;

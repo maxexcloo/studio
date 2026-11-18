@@ -493,7 +493,7 @@ export function createGenerationSubmission({
    * node list is out of reach the run still goes ahead, without the upscale.
    */
   async function smartUpscalePrepare(graph, body) {
-    const { info } = await loadComfyContext(body.comfyBackend).catch(() => ({ info: null }));
+    const { info, stats } = await loadComfyContext(body.comfyBackend).catch(() => ({}));
     if (!info)
       return {
         skipped: "Smart upscale couldn't check ComfyUI's nodes",
@@ -502,7 +502,7 @@ export function createGenerationSubmission({
     const customWorkflow = String(body.model || "").startsWith("custom:")
       ? getCustomWorkflow(body.model, body.profileBackend)
       : null;
-    return planRunUpscale(graph, body, info, customWorkflow);
+    return planRunUpscale(graph, body, info, customWorkflow, stats);
   }
   return {
     submitGeneration,

@@ -2,8 +2,14 @@ import "./fixtures/sample-profiles.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { faceDetailSource, modelFiles, upscaleGraph, upscalePlan, upscaleStatus } =
-  await import("./upscale.js");
+const {
+  faceDetailSource,
+  modelFiles,
+  noteWorkerUpscale,
+  upscaleGraph,
+  upscalePlan,
+  upscaleStatus,
+} = await import("./upscale.js");
 
 // Shaped like the real /object_info: V3 combos, and offload_device is an optional input.
 const combo = (values) => ["COMBO", { options: values }];
@@ -32,6 +38,40 @@ const registryListing = {
   dit: ["seedvr2_ema_3b_fp8_e4m3fn.safetensors", "seedvr2_ema_7b_fp16.safetensors"],
   vae: ["ema_vae_fp16.safetensors"],
 };
+
+test("SeedVR2 caches only on a recently used worker with enough reported RAM for its weights", () => {
+  const worker = "gpu-one";
+  const info = infoWith(registryListing);
+  const ram = (gib, free = gib) => ({
+    system: { ram_total: gib * 1024 ** 3, ram_free: free * 1024 ** 3 },
+  });
+  const graphFor = (options, quality = "fast") =>
+    upscaleGraph({ width: 1024, height: 1024, quality }, info, { worker, now: 1000, ...options })
+      .graph;
+  const caches = (options, quality) => {
+    const graph = graphFor(options, quality);
+    return [
+      graph.studio_seedvr2_dit.inputs.cache_model,
+      graph.studio_seedvr2_vae.inputs.cache_model,
+    ];
+  };
+  assert.deepEqual(caches({ stats: ram(32) }), [false, false]);
+  noteWorkerUpscale(worker, 500);
+  assert.deepEqual(caches({ stats: ram(32) }), [true, true]);
+  assert.deepEqual(caches({ stats: ram(31) }), [false, false]);
+  assert.deepEqual(caches({ stats: ram(64, 16) }), [false, false]);
+  assert.deepEqual(caches({}), [false, false]);
+  assert.deepEqual(caches({ worker: "gpu-two", stats: ram(32) }), [false, false]);
+  assert.deepEqual(caches({ stats: ram(32), now: 600_500 }), [false, false]);
+  assert.deepEqual(caches({ stats: ram(64) }, "high"), [false, false]);
+  assert.deepEqual(caches({ stats: ram(128) }, "high"), [true, true]);
+  const mac = upscaleGraph(
+    { width: 1024, height: 1024, quality: "fast" },
+    infoWith({ ...registryListing, devices: ["mps"], offloads: ["none", "mps"] }),
+    { worker, now: 1000, stats: ram(64) },
+  ).graph;
+  assert.equal(mac.studio_seedvr2_dit.inputs.cache_model, false, "caching needs an offload device");
+});
 
 test("the worker's listing decides what is installed", () => {
   const status = upscaleStatus(infoWith(registryListing), "fast");
@@ -65,19 +105,19 @@ test("the graph uses the machine's own device and skips block swap without an of
     { width: 1024, height: 1024, quality: "fast" },
     infoWith({ ...registryListing, devices: ["mps"], offloads: ["none", "mps"] }),
   ).graph;
-  assert.equal(mac["3"].inputs.device, "mps");
-  assert.equal(mac["3"].inputs.offload_device, "none");
-  assert.equal(mac["4"].inputs.offload_device, "none");
+  assert.equal(mac.studio_seedvr2_dit.inputs.device, "mps");
+  assert.equal(mac.studio_seedvr2_dit.inputs.offload_device, "none");
+  assert.equal(mac.studio_seedvr2_vae.inputs.offload_device, "none");
   assert.equal(mac["5"].inputs.offload_device, "none");
-  assert.equal(mac["3"].inputs.blocks_to_swap, 0);
-  assert.equal(mac["3"].inputs.swap_io_components, false);
+  assert.equal(mac.studio_seedvr2_dit.inputs.blocks_to_swap, 0);
+  assert.equal(mac.studio_seedvr2_dit.inputs.swap_io_components, false);
   const cuda = upscaleGraph(
     { width: 1024, height: 1024, quality: "fast" },
     infoWith(registryListing),
   ).graph;
-  assert.equal(cuda["3"].inputs.device, "cuda:0");
-  assert.equal(cuda["3"].inputs.offload_device, "cpu");
-  assert.equal(cuda["3"].inputs.blocks_to_swap, 16);
+  assert.equal(cuda.studio_seedvr2_dit.inputs.device, "cuda:0");
+  assert.equal(cuda.studio_seedvr2_dit.inputs.offload_device, "cpu");
+  assert.equal(cuda.studio_seedvr2_dit.inputs.blocks_to_swap, 16);
 });
 
 test("the terminal install clones the worker's pinned pack and installs its requirements", async () => {
