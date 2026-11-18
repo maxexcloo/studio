@@ -280,7 +280,7 @@ export function AppearanceControls() {
 
 export function AppearanceMenu() {
   return (
-    <Popover width={290} position="bottom-end" offset={18} shadow="md" trapFocus>
+    <Popover width={290} position="bottom-end" shadow="md" trapFocus>
       <PopupTooltip label="Appearance">
         <Popover.Target>
           <ActionIcon aria-label="Appearance" variant="subtle" color="gray">

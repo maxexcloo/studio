@@ -1,6 +1,11 @@
 .bar {
   position: relative;
 }
+/* A phone held sideways keeps the logo and menu clear of the notch. */
+.header {
+  padding-inline: max(var(--mantine-spacing-lg), env(safe-area-inset-left))
+    max(var(--mantine-spacing-lg), env(safe-area-inset-right));
+}
 .modes {
   position: absolute;
   left: 50%;
@@ -32,6 +37,11 @@
 /* Compact phone controls retain their touch height in one centred header row. */
 :where(:root[data-phone]) .bar {
   gap: 0 !important;
+}
+
+:where(:root[data-phone]) .header {
+  padding-inline: max(var(--mantine-spacing-sm), env(safe-area-inset-left))
+    max(var(--mantine-spacing-sm), env(safe-area-inset-right));
 }
 
 :where(:root[data-phone]) .home {
