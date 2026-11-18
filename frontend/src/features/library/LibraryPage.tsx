@@ -9,14 +9,12 @@ import { LibraryPromptCards } from "../characters/LibraryPromptCards";
 import { useStageComparison } from "../compare/variants";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { CatalogueEditor } from "./CatalogueEditor";
-import { LibraryChatBrief } from "./ChatBrief";
 import {
   LibraryCatalogueTable,
   type LibraryItem,
   freeUpdate,
   libraryItemCategory,
 } from "./LibraryCatalogueTable";
-import { LibraryDownloads } from "./LibraryDownloads";
 import { LibraryImports } from "./LibraryImports";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 import { LibraryPresets } from "./LibraryPresets";
@@ -118,7 +116,6 @@ export function LibraryPage() {
         onUpdateAll={
           admin && items.some(freeUpdate) ? () => update.mutate({ all: true }) : undefined
         }
-        checkingUpdates={update.isPending && !update.variables}
         updateNote={updateNote || undefined}
         inventoryError={catalogue.data?.inventoryError}
         onEdit={admin ? setEditing : undefined}
@@ -139,13 +136,9 @@ export function LibraryPage() {
           ),
           guides: (heading) => <GuideDefinitions heading={heading} />,
           loras: catalogueSection("loras"),
-          chatBrief: (heading) => <LibraryChatBrief heading={heading} />,
           presets: (heading) => <LibraryPresets heading={heading} />,
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
           promptStyles: (heading) => <PromptStyles heading={heading} />,
-          downloads: (heading) => (
-            <LibraryDownloads heading={heading} active={activeSection === "downloads"} />
-          ),
           files: catalogueSection("files"),
         }}
       />

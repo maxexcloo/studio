@@ -1,7 +1,7 @@
 // A chat's project (domain/projects.ts): the project tool, and how generate keeps to its brief and constraints.
 import { z } from "zod";
 
-import { briefSummary } from "../../shared/chat-brief.ts";
+import { briefSummary } from "../../shared/projects.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { maxJobsPerCall } from "./controls.js";
 import { mcpJson } from "./media.js";
@@ -220,50 +220,13 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
       },
     };
   };
-  /**
-   * The project tool's brief action: the user's own brief for all chats, from the fields it shares
-   * with a project's (subjects, styles), with ethnicity, age and body. avoid, profiles and
-   * lora_names set the taste profile's own Dislikes, Models and LoRAs ("" or [] hands one back to
-   * what Studio learns). Only what is given changes.
-   */
-  const accountBriefAction = async ({ avoid, profiles, lora_names, ...change }, signal) => {
-    const all = await media.profiles("all", owner).catch(() => []);
-    const listed = avoid
-      ?.split(/[,;\n]+/)
-      .map((term) => term.trim())
-      .filter(Boolean);
-    const own = (list) => (list.length ? list : null);
-    const preferences = {
-      ...(listed ? { avoid: own(listed) } : {}),
-      ...(profiles ? { models: own(await profileIds(profiles)) } : {}),
-      ...(lora_names ? { loras: own(lora_names) } : {}),
-    };
-    const [{ brief }, taste] = await Promise.all([
-      Object.keys(change).length
-        ? api("PATCH", "/api/chat-brief", change, signal)
-        : api("GET", "/api/chat-brief", undefined, signal),
-      Object.keys(preferences).length ? api("PUT", "/api/taste", { preferences }, signal) : null,
-    ]);
-    const label = (id) => all.find((profile) => profile.id === id)?.label || id;
-    return mcpJson({
-      user_brief: brief,
-      ...(taste
-        ? { avoid: taste.avoid, profiles: taste.models.map(label), lora_names: taste.loras }
-        : {}),
-      ...(Object.keys(change).length || taste
-        ? {
-            note: "Saved in Studio (Library › Chat Brief, Dream › Taste). MCP generation never applies it: keep writing prompts from the chat.",
-          }
-        : {}),
-    });
-  };
   tool(
     server,
     "project",
     "project",
-    `The chat's project and constraints. show lists projects; attach (project), create, update (only changes) or detach. brief edits the saved account brief and taste only when the user explicitly asks to save lasting preferences ("" clears). Saved account preferences never constrain MCP generation.`,
+    `The chat's project and constraints. show lists projects; attach (project), create, update (only changes) or detach.`,
     {
-      action: z.enum(["show", "attach", "create", "update", "detach", "brief"]).optional(),
+      action: z.enum(["show", "attach", "create", "update", "detach"]).optional(),
       project: z.string().optional(),
       name: z.string().optional(),
       subjects: z.string().optional(),
@@ -296,18 +259,6 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
       },
       signal,
     ) => {
-      if (action === "brief")
-        return accountBriefAction(
-          {
-            ...brief,
-            ...Object.fromEntries(
-              Object.entries({ ethnicity, age, body: bodyType, profiles, lora_names }).filter(
-                ([, value]) => value !== undefined,
-              ),
-            ),
-          },
-          signal,
-        );
       Object.assign(
         brief,
         Object.fromEntries(
@@ -339,7 +290,6 @@ export function registerProjectTool({ tool, server, media, owner, chat, namedInT
       const current = (await api("POST", "/api/dream/projects/activity", { chat: need() }, signal))
         .project;
       if (action === "show") {
-        // The saved account brief stays out: MCP generation never applies it.
         const { projects } = await api("GET", "/api/dream/projects", undefined, signal);
         return mcpJson({
           project: await shown(current),

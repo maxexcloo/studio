@@ -1,8 +1,10 @@
-import type { ChatBrief } from "./chat-brief.ts";
 import type { Resolution } from "./resolution.ts";
 
+/** A project brief's free-text fields, in the order its one-line summary lists them. */
+const briefTexts = ["subjects", "ethnicity", "age", "body", "styles", "rules"] as const;
+
 /** What a project's work shows, how it looks and what it leaves out. */
-export interface ProjectBrief extends ChatBrief {
+export interface ProjectBrief extends Partial<Record<(typeof briefTexts)[number], string>> {
   subjects: string;
   styles: string;
   avoid: string;
@@ -56,4 +58,12 @@ export interface DigestGroup<Item> {
   items: Item[];
   /** Results that miss the brief, best score first, kept for the person to judge. */
   misses: Item[];
+}
+
+/** The brief's free text as one line, "subjects …; age …"; "" when empty. */
+export function briefSummary(brief: Partial<ProjectBrief>) {
+  return briefTexts
+    .filter((key) => brief[key])
+    .map((key) => `${key} ${brief[key]}`)
+    .join("; ");
 }

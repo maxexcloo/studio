@@ -56,22 +56,6 @@ export const downloadsQuery = queryOptions({
   queryFn: () => api<DownloadState>("/api/models/downloads"),
 });
 
-export interface Merge {
-  from: string;
-  to: string;
-  name: string;
-}
-export interface DuplicatePreview {
-  hash: string;
-  merges: Merge[];
-  differing: { name: string; ids: string[]; differences: string[] }[];
-  unresolved: { name: string; ids: string[]; reason: string }[];
-}
-export const duplicateProfilesQuery = queryOptions({
-  queryKey: ["profile-duplicates"],
-  queryFn: () => api<DuplicatePreview>("/api/profiles/duplicates"),
-});
-
 /** Library › Imports' records, newest first. */
 export const importsQuery = queryOptions({
   queryKey: ["imports"],

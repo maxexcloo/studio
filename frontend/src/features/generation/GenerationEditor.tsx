@@ -1,5 +1,4 @@
 import {
-  ActionIcon,
   Alert,
   Button,
   Center,
@@ -407,36 +406,15 @@ export function GenerationEditor({
                 </Button>
               </Tooltip>
               {fill && (
-                <>
-                  <Button
-                    className={classes.typing}
-                    variant="default"
-                    radius="xl"
-                    // The text keeps focus until the press ends, so the bar keeps Done under it.
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => (document.activeElement as HTMLElement | null)?.blur()}
-                  >
-                    Done
-                  </Button>
-                  <Tooltip
-                    label={blockedReason || label}
-                    events={{ hover: true, focus: true, touch: true }}
-                  >
-                    <ActionIcon
-                      className={classes.typing}
-                      type="submit"
-                      radius="xl"
-                      size={44}
-                      aria-label={label}
-                      loading={pending}
-                      // The text keeps focus until the press ends, so the bar keeps this icon.
-                      onMouseDown={(event) => event.preventDefault()}
-                      {...blockedProps(blockedReason)}
-                    >
-                      <ArrowUp size={20} />
-                    </ActionIcon>
-                  </Tooltip>
-                </>
+                <Button
+                  className={classes.typing}
+                  radius="xl"
+                  // The text keeps focus until the press ends, so the bar keeps Done under it.
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => (document.activeElement as HTMLElement | null)?.blur()}
+                >
+                  Done
+                </Button>
               )}
             </Group>
           </Group>

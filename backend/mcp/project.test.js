@@ -164,7 +164,6 @@ function projectTool(t, chat = "chat-a") {
   const media = {
     profiles: async () => [turbo, quality, video],
     async request(method, route, body) {
-      if (route === "/api/chat-brief") return { brief: {} };
       const [, id, action] = /^\/api\/dream\/projects(?:\/([^/?]+))?(?:\/(\w+))?/.exec(route);
       if (id === "attach") return { project: projects.attach(owner, body.chat, body.projectId) };
       if (id === "activity") return { project: projects.activity(owner, body.chat) };

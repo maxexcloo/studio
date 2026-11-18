@@ -86,8 +86,7 @@ recur across features.
 - Settings use `SettingGroup` and `SettingRow`. Switches apply on/off settings
   immediately and optimistically, rolling back or refetching after failure;
   checkboxes select records or form options. Number fields commit on blur or
-  Enter. Free text, passwords and record editing use a dialog with Save,
-  except a section that is one form (Chat Brief), which edits in place.
+  Enter. Free text, passwords and record editing use a dialog with Save.
   Selects and segmented choices sit in `wide` rows (segmented ones
   `fullWidth`): one width on desktop, the full row under the label on phones.
   A row's actions are plain compact buttons named by their verb, never a
@@ -200,7 +199,7 @@ recur across features.
   the text's end, never over its lines. Typing gives the text the top of the
   screen, without the sheet's header, above one action bar: the box's menu,
   Copy and Clear/Reset/Undo as icons, then Done, which returns to the sheet,
-  and Generate's icon, in place of the output and Clear. There Reset returns
+  in place of the output, Clear and Generate. There Reset returns
   to the text the box had when typing began. Other phone text boxes open the
   shared full-screen editor, and AI tools stay beside the text before it
   opens. That editor shows Copy, Clear/Reset/Undo and More above the

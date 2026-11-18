@@ -79,14 +79,18 @@ test("A phone text menu stays a menu and a tap outside returns to the composer u
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper fox");
   const menu = await promptMenu(page, "Prompt");
-  const generate = page.getByRole("button", { name: "Generate Image", exact: true });
+  const done = page
+    .getByRole("group", { name: "Generation Actions", exact: true })
+    .getByRole("button", { name: "Done", exact: true });
   await expect(menu).toBeVisible();
   expect((await menu.boundingBox())!.width).toBeLessThan(page.viewportSize()!.width);
-  // The first tap outside only closes the menu.
-  await generate.tap();
+  // The first tap outside only closes the menu, leaving the typing bar.
+  await done.tap();
   await expect(page.getByRole("menu")).toBeHidden();
+  await expect(done).toBeVisible();
+  await done.tap();
   expect(state.jobs).toHaveLength(0);
-  await generate.tap();
+  await page.getByRole("button", { name: "Generate Image", exact: true }).tap();
   await expect.poll(() => state.jobs.length).toBe(1);
 });
 

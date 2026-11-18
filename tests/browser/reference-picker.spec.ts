@@ -9,6 +9,7 @@ import {
   image,
   openReferenceChoices,
   pickerTab,
+  pressGenerate,
   profiles,
   serveProfiles,
   showReferenceStack,
@@ -92,7 +93,7 @@ test("Reference slots fill by tap, targeted drop and paste, and pasted files lis
   ).toBeVisible();
   await expect(picker.getByRole("button", { name: /reference: Alpha/ })).toHaveCount(0);
   await closeReferences(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toEqual([
     { assetId: "asset-alpha", slot: "start" },
@@ -224,7 +225,7 @@ test("Reference slots preserve optional End-only inputs and reuse one asset in t
   await page.getByRole("button", { name: "Slot 2 · End", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Slot Source", exact: true }).click();
   await closeReferences(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toEqual([
     { assetId: "asset-slot-source", slot: "end" },
@@ -245,7 +246,7 @@ test("Reference slots preserve optional End-only inputs and reuse one asset in t
     .getByRole("button", { name: "Use reference: Slot Source", exact: true })
     .click();
   await closeReferences(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.referenceAssets).toEqual([
     { assetId: "asset-slot-source", slot: "start" },
@@ -277,7 +278,7 @@ test("Owned uploads can be reused from the Uploads filter without another upload
   await showUploads(page);
   await page.getByRole("button", { name: "Use reference: Upload 1", exact: true }).click();
   await closeReferences(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toEqual([
     { assetId: "asset-past-upload", slot: "image" },
@@ -482,7 +483,7 @@ test("The first Uploads tile keeps its target through cancellation and failure, 
   await pickerTab(page, "References", "Gallery");
   await picker.getByRole("button", { name: "Use reference: Alpha", exact: true }).click();
   await closeReferences(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toEqual([
     { assetId: "asset-alpha", slot: "start" },

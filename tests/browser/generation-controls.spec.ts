@@ -12,6 +12,7 @@ import {
   loadSaved,
   openPresets,
   openReferenceChoices,
+  pressGenerate,
   profiles,
   promptMenu,
   renamePreset,
@@ -62,7 +63,7 @@ test("Changing the second encoder and weight type preserves the first encoder in
     // Choosing nested options keeps the Settings open.
     await expect(clip).toHaveValue("clip-exact.safetensors");
   });
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.textEncoder).toBe("clip-exact.safetensors");
   expect(state.jobs[0].input.textEncoders).toEqual([
@@ -194,7 +195,7 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
   await expect(page.getByRole("textbox", { name: "Width", exact: true })).toHaveValue("1280");
   await expect(page.getByRole("textbox", { name: "Height", exact: true })).toHaveValue("768");
   await size.click();
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input).toMatchObject({
     width: 1280,
@@ -258,7 +259,7 @@ test("A saved End-only preset restores its explicit slot without creating a Star
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Arrive at the closing frame",
   );
-  await page.getByRole("button", { name: "Generate Video", exact: true }).click();
+  await pressGenerate(page, "Generate Video");
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "asset-ending", slot: "end" }]);
   expect(state.jobs[0].input.referenceDetails).toHaveLength(1);
@@ -323,7 +324,7 @@ test("LoRA presets keep their family, order, strengths and disabled entries thro
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Reuse the refined LoRA preset");
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.loras).toEqual([
     { ...original[0], strength: 1.25, enabled: true },
@@ -372,7 +373,7 @@ test("Clear restores profile defaults and random seed; masked inputs load as Pai
   // A saved mask shows as Paint, whatever role the preset stored.
   const role = page.getByRole("radiogroup", { name: "Reference Role", exact: true });
   await expect(role.getByRole("radio", { name: "Paint", exact: true })).toBeChecked();
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expandComposer(page);
@@ -386,7 +387,7 @@ test("Clear restores profile defaults and random seed; masked inputs load as Pai
     await expect(page.getByRole("textbox", { name: "Steps", exact: true })).toHaveValue("20");
   });
   await prompt.fill("A fresh bird without inherited styling");
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
     profileId: profiles[0].id,
@@ -452,7 +453,7 @@ test("LoRA trigger words toggle and published source links work in the gallery e
   await expect(source).toHaveAttribute("rel", "noopener noreferrer");
   expect(state.jobs).toHaveLength(0);
   await closeLoras(page);
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   // The prompt field never gets the words; the run carries the choice.
   expect(state.jobs[0].input.prompt).toBe("A delicate bird");
@@ -481,18 +482,18 @@ test("Generation actions stay in place while the prompt grows and pickers open",
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.fill("Keep the actions in reach");
-  const generate = page.getByRole("button", { name: "Generate Image", exact: true });
-  await expect(generate).toBeInViewport();
-  const initial = await generate.boundingBox();
+  const actions = page.getByRole("group", { name: "Generation Actions", exact: true });
+  await expect(actions).toBeInViewport();
+  const initial = await actions.boundingBox();
   if (isMobile)
     expect(initial!.y + initial!.height).toBeGreaterThan(page.viewportSize()!.height - 48);
   const long = Array.from({ length: 24 }, (_, line) => `Detail ${line + 1}`).join("\n");
   await prompt.fill(long);
-  await expect(generate).toBeInViewport();
-  expect(Math.abs((await generate.boundingBox())!.y - initial!.y)).toBeLessThan(1);
+  await expect(actions).toBeInViewport();
+  expect(Math.abs((await actions.boundingBox())!.y - initial!.y)).toBeLessThan(1);
   await page.setViewportSize({ ...page.viewportSize()!, height: 600 });
-  await expect(generate).toBeInViewport();
-  expect((await generate.boundingBox())!.y + initial!.height).toBeLessThanOrEqual(600);
+  await expect(actions).toBeInViewport();
+  expect((await actions.boundingBox())!.y + initial!.height).toBeLessThanOrEqual(600);
   await openReferenceChoices(page);
   await page
     .getByRole("button", {
@@ -501,7 +502,7 @@ test("Generation actions stay in place while the prompt grows and pickers open",
     })
     .click();
   await closeReferences(page);
-  await generate.click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toHaveLength(1);
   expect(state.jobs[0].input.prompt).toBe(long);
@@ -580,7 +581,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
   await expect(aspect).toHaveText("16:9 · 2K");
   await page.getByRole("combobox", { name: "Count", exact: true }).click();
   await page.getByRole("option", { name: "2 Images", exact: true }).click();
-  await page.getByRole("button", { name: "Generate Images", exact: true }).click();
+  await pressGenerate(page, "Generate Images");
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input).toMatchObject({
     operation: "image",
@@ -895,7 +896,7 @@ test("Image presets draw at the chosen resolution within profile constraints", a
   await expect(resolution.getByRole("radio", { name: "4K", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(aspect).toHaveText("Landscape · 1K");
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input).toMatchObject({
     width: 1024,
@@ -946,7 +947,7 @@ test("The composer's draft survives a reload", async ({ page }) => {
   await expect(prompt).toHaveValue("A copper bird at dusk");
 });
 
-test("The phone Generate sheet fits the screen and keeps Generate above the keyboard", async ({
+test("The phone Generate sheet fits the screen and keeps its action bar above the keyboard", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Phones only");
@@ -956,12 +957,13 @@ test("The phone Generate sheet fits the screen and keeps Generate above the keyb
   const sheet = page.getByRole("dialog", { name: "Generate", exact: true });
   const prompt = sheet.getByRole("textbox", { name: "Prompt", exact: true });
   const generate = sheet.getByRole("button", { name: "Generate Image", exact: true });
+  const done = sheet.getByRole("button", { name: "Done", exact: true });
   // Opening the sheet leaves the keyboard down until the prompt is tapped.
   await expect(prompt).not.toBeFocused();
   await prompt.click();
   await expect(prompt).toBeFocused();
   await prompt.fill("A copper fox in a misty forest at dawn, cinematic light, ".repeat(20));
-  // Only the prompt's own text scrolls, and Generate sits at the bottom of the screen.
+  // Only the prompt's own text scrolls, and the bar with Done sits at the bottom of the screen.
   const scrolls = () =>
     sheet.evaluate((root) =>
       [root, ...root.querySelectorAll<HTMLElement>("*")].some(
@@ -971,8 +973,8 @@ test("The phone Generate sheet fits the screen and keeps Generate above the keyb
           element.scrollHeight > element.clientHeight,
       ),
     );
-  const generateBottom = async () => {
-    const box = (await generate.boundingBox())!;
+  const barBottom = async () => {
+    const box = (await done.boundingBox())!;
     return box.y + box.height;
   };
   for (const [width, height] of [
@@ -982,9 +984,9 @@ test("The phone Generate sheet fits the screen and keeps Generate above the keyb
   ]) {
     await page.setViewportSize({ width, height });
     await expect.poll(scrolls).toBe(false);
-    await expect.poll(generateBottom).toBeGreaterThan(height - 40);
+    await expect.poll(barBottom).toBeGreaterThan(height - 40);
   }
-  // The keyboard shortens the visual viewport and lifts the bar with Generate above it.
+  // The keyboard shortens the visual viewport and lifts the bar above it.
   await page.evaluate(() => {
     const height = window.innerHeight - 300;
     Object.defineProperty(window.visualViewport, "height", {
@@ -993,7 +995,7 @@ test("The phone Generate sheet fits the screen and keeps Generate above the keyb
     });
     window.visualViewport!.dispatchEvent(new Event("resize"));
   });
-  await expect.poll(generateBottom).toBeLessThanOrEqual(932 - 300);
+  await expect.poll(barBottom).toBeLessThanOrEqual(932 - 300);
   await expect.poll(scrolls).toBe(false);
   // iOS also scrolls the page to the text: the sheet moves down with the visible viewport and the
   // bar still ends at its bottom, neither behind the keyboard nor short of it.
@@ -1006,8 +1008,8 @@ test("The phone Generate sheet fits the screen and keeps Generate above the keyb
       window.visualViewport!.dispatchEvent(new Event("scroll"));
     }, offset);
   await scrollTo(100);
-  await expect.poll(generateBottom).toBeLessThanOrEqual(100 + 932 - 300);
-  await expect.poll(generateBottom).toBeGreaterThan(100 + 932 - 300 - 60);
+  await expect.poll(barBottom).toBeLessThanOrEqual(100 + 932 - 300);
+  await expect.poll(barBottom).toBeGreaterThan(100 + 932 - 300 - 60);
   await scrollTo(0);
   // Typing keeps the whole screen while a browser's toolbar folds away above the keyboard; only
   // the keyboard dropping (Android's Back keeps focus) ends it.
@@ -1027,6 +1029,8 @@ test("The phone Generate sheet fits the screen and keeps Generate above the keyb
   await visible(0);
   await expect(typing).toHaveCount(0);
   await visible(300);
+  // Done returns to the sheet, whose bar ends with Generate.
+  await done.click();
   await generate.click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.prompt).toContain("A copper fox");
@@ -1056,9 +1060,9 @@ test("Typing in the phone Generate sheet gives the prompt the screen above one b
   await expect(bar.getByRole("group", { name: "Prompt Tools", exact: true })).toHaveCount(0);
   await prompt.click();
   await prompt.fill("A copper fox in a misty forest at dawn, cinematic light, ".repeat(20));
-  // Typing puts AI, Copy and Clear in the bar as icons, with Done and Generate, in place of the
-  // output; Recent Prompts stays in the AI menu. The bar ends where it did, the header gives the
-  // text the top of the screen, and the text, scrolled to its end, ends above the bar.
+  // Typing puts AI, Copy and Clear in the bar as icons, then Done, in place of the output, Clear
+  // and Generate; Recent Prompts stays in the AI menu. The bar ends where it did, the header gives
+  // the text the top of the screen, and the text, scrolled to its end, ends above the bar.
   await expect(bar.getByRole("group", { name: "Prompt Tools", exact: true })).toBeVisible();
   await expect
     .poll(() =>
@@ -1068,7 +1072,7 @@ test("Typing in the phone Generate sheet gives the prompt the screen above one b
     )
     .toEqual(["AI Prompt Actions", "Copy", "Clear"]);
   await expect(output).toBeHidden();
-  await expect(bar.getByRole("button", { name: "Generate Image", exact: true })).toBeVisible();
+  await expect(bar.getByRole("button", { name: "Generate Image", exact: true })).toBeHidden();
   const done = bar.getByRole("button", { name: "Done", exact: true });
   await expect(done).toBeVisible();
   await expect.poll(async () => Math.abs((await bottom()) - resting)).toBeLessThanOrEqual(2);
@@ -1277,7 +1281,7 @@ test("A default that gave way to the other side says so on queuing", async ({ pa
   );
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A quiet harbour");
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await pressGenerate(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   await expect(page.getByRole("alert").filter({ hasText: note })).toBeVisible();
 });

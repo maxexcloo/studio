@@ -324,7 +324,7 @@ export function createUpdateChecker({
     const current = load();
     const item = current.byEntry[key];
     if (item?.state !== "available")
-      throw new Error("No update is available for that file. Check Updates first.");
+      throw new Error("No update is available for that file. Choose Updates › Check first.");
     const choice = alternative ? item.freeAlternative : item.latest;
     if (!choice) throw new Error("That update has no free version.");
     if (!choice.spec)

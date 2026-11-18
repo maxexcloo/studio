@@ -118,8 +118,6 @@ const mcpBearerRoutes = [
   ["POST", /^\/api\/dream\/projects(?:\/attach|\/activity)?$/],
   ["PUT", /^\/api\/dream\/projects\/[\w-]+$/],
   ["GET", /^\/api\/taste$/],
-  ["GET", /^\/api\/chat-brief$/],
-  ["PATCH", /^\/api\/chat-brief$/],
   ["PUT", /^\/api\/taste$/],
   ["DELETE", /^\/api\/taste$/],
   ["POST", /^\/api\/taste\/refresh$/],
