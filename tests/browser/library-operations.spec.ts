@@ -134,6 +134,11 @@ test("The queue lists model downloads to stop, resume, retry or discard one at a
           return route.fulfill({ status: 409, json: { ok: false, error: parkedError } });
         }
         state.paused = state.paused.filter((item) => item.id !== id);
+        state.recent = state.recent.map((item) =>
+          item.id === id && item.status === "paused"
+            ? { ...item, status: "cancelled", receivedBytes: 0 }
+            : item,
+        );
       } else if (path.endsWith("/cancel")) {
         if (failCancel) {
           failCancel = false;
@@ -145,11 +150,11 @@ test("The queue lists model downloads to stop, resume, retry or discard one at a
         expect(id).toBe(active.id);
         state.active = null;
         state.paused.push({ ...active, status: "paused" });
+        state.recent.unshift({ ...active, status: "paused" });
       } else {
         const source = [...state.paused, ...state.recent].find((item) => item.id === id);
         expect(source).toBeTruthy();
         state.paused = state.paused.filter((item) => item.id !== id);
-        state.recent = state.recent.filter((item) => item.id !== id);
         state.queued.push({ ...source, status: "queued" });
       }
     }
