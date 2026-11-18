@@ -154,7 +154,7 @@ test("a run with LoRAs moves to the stack's model, records it, and takes the ada
   ]);
 });
 
-test("more references than one card holds move to the model's two-GPU twin where the worker lists one", () => {
+test("a size and references one card can't hold move to the model's two-GPU twin where the worker lists one", () => {
   const profile = raw(undefined, "radiance-refs");
   profile.studio.controls.model = { node: "1", input: "model" };
   profile.studio.defaults = { model: "noctq-v4-iq8r" };
@@ -165,21 +165,26 @@ test("more references than one card holds move to the model's two-GPU twin where
     control: { node: "1", input: `images.image_${n}` },
   }));
   saveImportedWorkflow(profile);
-  const run = (count, models) =>
+  const twin = ["noctq-v4-iq8r", "noctq-v4-iq8r-refs"];
+  const run = (count, models, side = 1024) =>
     sanitizeGenerateBody(
       {
         workflow: "custom:radiance-refs",
         model: "custom:radiance-refs",
         prompt,
         seed: 1,
+        width: side,
+        height: side,
         referenceAssets: slots
           .slice(0, count)
           .map((n) => ({ slot: `ref-${n}`, assetId: `asset-${n}` })),
       },
       radianceInfo(models.map((id) => ({ id }))),
     ).modelName;
-  assert.equal(run(3, ["noctq-v4-iq8r", "noctq-v4-iq8r-refs"]), "noctq-v4-iq8r");
-  assert.equal(run(4, ["noctq-v4-iq8r", "noctq-v4-iq8r-refs"]), "noctq-v4-iq8r-refs");
+  // One card holds three references at up to 1344 a side.
+  assert.equal(run(3, twin, 1344), "noctq-v4-iq8r");
+  assert.equal(run(4, twin), "noctq-v4-iq8r-refs");
+  assert.equal(run(0, twin, 2048), "noctq-v4-iq8r-refs");
   assert.equal(run(4, ["noctq-v4-iq8r"]), "noctq-v4-iq8r");
 });
 
