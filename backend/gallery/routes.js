@@ -19,7 +19,7 @@ import { galleryStats } from "../stats.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
 import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
 import { compareGalleryItems } from "./order.js";
-import { listedRecord, makePendingItems } from "./records.js";
+import { listedRecord, makePendingItems, storedChatRecord } from "./records.js";
 import {
   cleanupGalleryState,
   filterVisibleGallery,
@@ -213,8 +213,11 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     // `comparisons` keeps results that are in one of the account's comparisons.
     const inComparison = query.comparisons === "1" ? compared(account?.userId || "") : null;
     // `chat` keeps one MCP conversation's results and `turn` one turn of it (an MCP result link).
-    const chat = one(query.chat);
-    const turn = chat && one(query.turn);
+    const scope = storedChatRecord({ conversationId: query.chat, turnId: query.turn });
+    const chat = scope?.conversationId;
+    const turn = scope?.turnId;
+    if ((query.chat && !chat) || (query.turn && !turn))
+      return { status: 400, payload: { error: "Supply a valid chat and turn." } };
     const fromChat = (item) =>
       !chat || (item.chat?.conversationId === chat && (!turn || item.chat.turnId === turn));
     // Unfinished work shows only as the account chooses (Settings › Preferences › Gallery): none,

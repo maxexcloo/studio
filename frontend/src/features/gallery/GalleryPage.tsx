@@ -471,9 +471,9 @@ function Gallery() {
     (item: MediaItem, run?: string) => {
       setFocusItem(null);
       setRun(run);
-      const { set, similar } = latest.current.state || {};
+      const { chat, set, show, similar, turn } = latest.current.state || {};
       void routerNavigate(viewerPath(item), {
-        state: { set, similar, viewer: true } satisfies PageState,
+        state: { chat, set, show, similar, turn, viewer: true } satisfies PageState,
       });
     },
     [routerNavigate],

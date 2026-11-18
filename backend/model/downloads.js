@@ -318,9 +318,14 @@ export function discardDownload(spec) {
     modelLibraryWorker()?.url ||
     "";
   cancelDownload(spec.id);
-  return workerModelFile({ ...spec, workerUrl }, "discard").then(() =>
-    refreshWorkerModels({ force: true, workerUrl }),
-  );
+  return workerModelFile({ ...spec, workerUrl }, "discard").then(() => {
+    for (const entry of recent) {
+      if (entry.folder !== spec.folder || entry.file !== spec.file) continue;
+      if (entry.status === "paused") entry.status = "cancelled";
+      if (["cancelled", "failed"].includes(entry.status)) entry.receivedBytes = 0;
+    }
+    return refreshWorkerModels({ force: true, workerUrl });
+  });
 }
 
 /** Studio keeps provider credentials; only streamed weights and resume metadata reach the worker. */

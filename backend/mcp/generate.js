@@ -1153,9 +1153,9 @@ export function registerGenerateTools({
     const unfinished = preview ? 0 : await media.pendingOutputs(owner, signal);
     const waitingNote =
       unfinished === 1
-        ? "1 chat image was already waiting in Studio; these queue after it. "
+        ? "1 other chat image is still unfinished in Studio. "
         : unfinished
-          ? `${unfinished} chat images were already waiting in Studio; these queue after them. `
+          ? `${unfinished} other chat images are still unfinished in Studio. `
           : "";
     if (args.reference_asset_ids)
       args.reference_asset_ids = await Promise.all(

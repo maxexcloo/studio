@@ -209,9 +209,11 @@ export function loraStrengthChoices(info: LoraStrengthInfo) {
   const step =
     [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10].find((each) => (max - min) / each <= 8) ?? 10;
   const round = (value: number) => Math.round(value * 100) / 100;
-  const values = new Set([min, max, loraDefaultStrength(info)].map(round));
-  for (let index = Math.ceil(min / step - 1e-9); index * step <= max + 1e-9; index++)
-    values.add(round(index * step));
+  const values = new Set([min, max, loraDefaultStrength(info)]);
+  for (let index = Math.ceil(min / step - 1e-9); index * step <= max + 1e-9; index++) {
+    const value = round(index * step);
+    if (value >= min && value <= max) values.add(value);
+  }
   values.delete(0);
   return [...values].sort((a, b) => a - b);
 }
@@ -219,7 +221,7 @@ export function loraStrengthChoices(info: LoraStrengthInfo) {
 /** A strength sweep's starting picks: without the LoRA, then its default and the choices beside it. */
 export function loraStrengthSweep(info: LoraStrengthInfo) {
   const choices = loraStrengthChoices(info);
-  const at = choices.indexOf(Math.round(loraDefaultStrength(info) * 100) / 100);
+  const at = choices.indexOf(loraDefaultStrength(info));
   const start = Math.max(0, Math.min(at - 1, choices.length - 3));
   return [0, ...choices.slice(start, start + 3)];
 }

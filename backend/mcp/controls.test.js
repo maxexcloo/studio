@@ -10,7 +10,18 @@ import {
   mcpLoras,
   prepareLoras,
   resolveLoraName,
+  varyLoras,
 } from "./controls.js";
+
+test("MCP variations stay inside a LoRA's narrow strength range", () => {
+  const name = "style.safetensors";
+  const infos = { [name]: { strengthRange: { min: 0.72, max: 0.74, default: 0.73 } } };
+  const stack = [{ name, strength: 0.73 }];
+  assert.deepEqual(
+    [0, 1, 2].map((position) => varyLoras(stack, infos, position)[0].strength),
+    [0.73, 0.725, 0.735],
+  );
+});
 
 const profile = {
   id: "image:sdxl",

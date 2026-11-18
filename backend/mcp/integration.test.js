@@ -1628,27 +1628,30 @@ test("Generate accepts prompts sent as one JSON string", async (t) => {
   assert.equal(f.submitted.length, 2);
 });
 
-test("Generate queues behind the account's unfinished chat images and says how many wait", async (t) => {
+test("Generate admits another call and reports the account's unfinished chat images", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   // Studio's own work doesn't count, only this account's MCP images.
   const running = () =>
     f.queue({
-      jobs: [...f.jobs.values(), { id: "composer-job", settings: { count: 4 } }].map((job) => ({
-        id: job.id,
-        status: "running",
-        input: { count: job.settings.count },
-      })),
+      jobs: [...f.jobs.values(), { id: "composer-job", settings: { count: 4, kind: "image" } }].map(
+        (job) => ({
+          id: job.id,
+          status: "running",
+          input: { count: job.settings.count, kind: job.settings.kind },
+        }),
+      ),
       paused: { mine: false, all: false },
     });
   await generate(client, { prompts: ["A tree", "A flower"], count: 8 });
+  await generate(client, { profile_id: videoProfile.id, prompts: ["Waves rolling in"] });
   running();
   await generate(client, { prompts: ["A pond"], count: 2 });
   running();
   const queued = f.submitted.length;
   assert.match(
     texts(await call(client, "generate", { kind: "image", prompts: ["A hill"] })),
-    /18 chat images were already waiting in Studio; these queue after them\./,
+    /18 other chat images are still unfinished in Studio\./,
   );
   assert.equal(f.submitted.length, queued + 1);
 });
@@ -2694,6 +2697,23 @@ test("background Result collects a later completion without another submission",
   });
   assert.deepEqual(links(preview), links(result), "the same output keeps its short link");
   assert.equal(f.submitted.length, 1);
+});
+
+test("Older video job links open the Videos viewer without kind in prompt metadata", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const {
+    jobs: [job],
+  } = await generate(client, {
+    profile_id: videoProfile.id,
+    prompts: ["Waves rolling in"],
+  });
+  const rows = ownership(f.dataDir);
+  const { kind: _kind, ...record } = rows.prompt(job.job_id);
+  rows.setPrompt(job.job_id, record);
+  const opened = await fetch(localLink(f, job.link), { redirect: "manual" });
+  assert.equal(opened.status, 302);
+  assert.equal(opened.headers.get("location"), "https://studio.example.test/videos/1");
 });
 
 test("explicit status waiting has a bounded deadline and terminal jobs return without waiting", async (t) => {
@@ -4554,6 +4574,8 @@ test("Search finds the account's own finished work through the gallery search, a
   assert.match(texts(liked.result), /\) ♥/);
   // Dates are whole days, and Studio's cursor passes whatever its length.
   const cursor = "v2|".padEnd(600, "x");
+  await failure(alice, "search", { before: "2026-02-30" });
+  await failure(alice, "search", { after: "2026-13-01" });
   await search(alice, { query: "red", before: "2026-11-10", after: "2026-11-01", cursor });
   assert.deepEqual(f.requests.findLast((request) => request.path === "/gallery").query, {
     q: "red",

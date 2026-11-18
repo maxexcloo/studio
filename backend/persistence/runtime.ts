@@ -188,6 +188,22 @@ export function writeRuntimeDocument(dataDir: string, name: string, value: unkno
     .run(name, JSON.stringify(value));
 }
 
+/** Commits a set of related document changes together. */
+export function writeRuntimeDocuments(
+  dataDir: string,
+  documents: Iterable<readonly [string, unknown]>,
+): void {
+  const db = runtimeDatabase(dataDir);
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const [name, value] of documents) writeRuntimeDocument(dataDir, name, value);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 /** readRuntimeDocument, except a folder without a database stays without one, so dry runs read through this. */
 export function savedDocument(dataDir: string, name: string): unknown {
   return fs.existsSync(databaseFile(dataDir)) ? readRuntimeDocument(dataDir, name) : undefined;

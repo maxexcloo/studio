@@ -670,7 +670,8 @@ export function varyLoras(stack, infos = {}, position = 0) {
       };
       const centre = Math.min(range.max, Math.max(range.min, lora.strength));
       const target = [centre, (range.min + centre) / 2, (centre + range.max) / 2][position % 3];
-      return { ...lora, strength: Math.round(target * 20) / 20 };
+      const rounded = Math.round(target * 20) / 20;
+      return { ...lora, strength: rounded >= range.min && rounded <= range.max ? rounded : target };
     });
 }
 

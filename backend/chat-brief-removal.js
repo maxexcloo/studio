@@ -1,5 +1,5 @@
 import { maxTasteRule, tasteLimits } from "../shared/taste.ts";
-import { ownerDocuments, savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
+import { ownerDocuments, savedDocument, writeRuntimeDocuments } from "./persistence/runtime.ts";
 
 /**
  * The migrate-runtime step that removes each account's retired chat brief (`chatBrief` in its
@@ -41,7 +41,11 @@ export function chatBriefRemoval(dataDir, { apply = false } = {}) {
       { name: `taste:${owner}`, value: { ...taste, preferences } },
     ];
   });
-  if (apply) for (const { name, value } of changed) writeRuntimeDocument(dataDir, name, value);
+  if (apply && changed.length)
+    writeRuntimeDocuments(
+      dataDir,
+      changed.map(({ name, value }) => [name, value]),
+    );
   return {
     applied: apply,
     accounts: changed.filter(({ name }) => name.startsWith("preferences:")).length,

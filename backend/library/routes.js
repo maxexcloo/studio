@@ -44,6 +44,7 @@ import { downloadState } from "../model/downloads.js";
 import { fromChat, localRefusal } from "../route-access.js";
 import { loadSharp } from "../sharp-loader.js";
 import { refreshWorkerModels, workerInventory, workerModelFile } from "../worker-models.js";
+import { modelLibraryWorker } from "../workers.js";
 import { catalogueKinds, splitCatalogueKey } from "./catalogue.js";
 import { startLibraryDownload } from "./downloads.js";
 import { createImportEngine, importStore, publicImport, staleImport } from "./imports.js";
@@ -172,6 +173,7 @@ export async function matchImageResource(item, { installed = {}, entries = {}, j
 async function removeInstalled(want) {
   if (!want?.file || !Object.hasOwn(catalogueKinds, want.folder))
     throw new Error("That isn't a model file Studio manages.");
+  if (!modelLibraryWorker()) return { removed: false, reachable: false };
   const names = subfolders[want.folder] || [want.folder];
   const reachable = await refreshWorkerModels({ force: true }).then(
     () => true,
@@ -765,11 +767,9 @@ export function registerLibraryRoutes(
       file,
       sha256: entry.sha256 || "",
     });
-    // While ComfyUI is parked the entry still goes; a file the last known inventory lists stays.
-    const kept =
-      !reachable &&
-      Boolean((await latestInstalled().catch(() => ({ files: {} }))).files[folder]?.includes(file));
-    if (folder === "loras" && !kept) forget(file);
+    const inventory = reachable ? null : await latestInstalled().catch(() => null);
+    const kept = inventory?.files[folder]?.includes(file);
+    if (folder === "loras" && reachable) forget(file);
     catalogue().edit(key, { removed: true }, { by: by(account), origin: origin(account, "admin") });
     return ok({
       key,
@@ -778,7 +778,11 @@ export function registerLibraryRoutes(
         ? {
             note: "ComfyUI isn't running, so the file can't be deleted; the entry is removed and the file stays. Start it in Settings › Workers, undo and remove again to delete the file.",
           }
-        : {}),
+        : !reachable
+          ? {
+              note: "The file could not be checked. The entry is removed. Start ComfyUI in Settings › Workers, undo and remove again to check the file.",
+            }
+          : {}),
     });
   });
   route("GET", "/api/library/updates", async () =>
