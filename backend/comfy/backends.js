@@ -104,15 +104,30 @@ export const noteWorkerProfiles = (id, profiles = []) => {
   inventories.set(id, next);
 };
 
+// A catalogue read asks runsOnRadiance for every profile, backend and worker, and each lookup checks
+// the whole profile folder, so answers hold until the turn ends.
+let radianceAnswers;
+
 /**
  * Whether profile `profileId` runs on Radiance nodes on `backend` (its default without one), and so
  * only on a Radiance worker; every other profile runs only on ComfyUI workers.
  */
 export function runsOnRadiance(profileId, backend = "") {
-  const graph = profileId ? getCustomWorkflow(profileId, backend || undefined)?.graph : null;
-  return Object.values(graph || {}).some((node) =>
-    [radianceImageNode, radianceVideoNode].includes(node?.class_type),
-  );
+  if (!radianceAnswers) {
+    radianceAnswers = new Map();
+    setImmediate(() => (radianceAnswers = undefined));
+  }
+  const key = `${profileId}\n${backend}`;
+  if (!radianceAnswers.has(key)) {
+    const graph = profileId ? getCustomWorkflow(profileId, backend || undefined)?.graph : null;
+    radianceAnswers.set(
+      key,
+      Object.values(graph || {}).some((node) =>
+        [radianceImageNode, radianceVideoNode].includes(node?.class_type),
+      ),
+    );
+  }
+  return radianceAnswers.get(key);
 }
 
 /** The workers of the kind (Radiance or ComfyUI) that runs `profileId` on `backend`. */
