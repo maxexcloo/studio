@@ -138,7 +138,9 @@ export function DreamPreview({
           ctrlKey ||
           metaKey ||
           shiftKey ||
-          (event.target as Element).closest("video")
+          (event.target as Element).closest(
+            'video,input,textarea,select,[contenteditable="true"],[role="slider"]',
+          )
         )
           return;
         event.preventDefault();
