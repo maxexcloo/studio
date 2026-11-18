@@ -32,6 +32,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { usePhone } from "../../ui/usePhone";
 import { useAccount } from "../auth/AccountGate";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
@@ -530,6 +531,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
   const self = useAccount().data?.account?.id;
   const { admin, refresh } = useAdministration();
   const gatewayChange = useGatewayChange();
+  const phone = usePhone();
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [acting, setActing] = useState<{ action: UserAction; account: Account } | null>(null);
@@ -587,6 +589,26 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
   const defaultGroup = data.accessProfiles.find(
     (group) => group.id === data.defaultAccessProfileId,
   );
+  const groupCell = (account: Account) =>
+    account.role === "user" ? (
+      <Select
+        aria-label={`Access Group for ${account.username}`}
+        size="xs"
+        value={account.accessProfileId || null}
+        placeholder="Choose Group"
+        data={groups}
+        allowDeselect={false}
+        w={{ base: 140, sm: 200 }}
+        flex="none"
+        onChange={(accessProfileId) =>
+          accessProfileId && change.mutate({ id: account.id, patch: { accessProfileId } })
+        }
+      />
+    ) : (
+      <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+        All Groups
+      </Text>
+    );
   const target = acting?.account;
   const promote = target?.role === "user";
   return (
@@ -618,9 +640,13 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
             sortValue: (account) => account.username,
             cell: (account) => (
               <>
-                <Text size="sm" fw={500} truncate>
-                  {account.username}
-                </Text>
+                {/* Phones keep the group on the name's line. */}
+                <Group gap="xs" wrap="nowrap" justify="space-between">
+                  <Text size="sm" fw={500} truncate miw={0}>
+                    {account.username}
+                  </Text>
+                  {phone && groupCell(account)}
+                </Group>
                 <Group gap={4} mt={4}>
                   {(account.disabled || account.role === "administrator") && (
                     <Badge miw="max-content" color={account.disabled ? "red" : "gray"}>
@@ -644,27 +670,10 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
           {
             key: "group",
             header: "Access Group",
+            hideOnPhone: true,
             sortValue: (account) =>
               account.role === "user" ? groupOf(account)?.name : "All Groups",
-            cell: (account) =>
-              account.role === "user" ? (
-                <Select
-                  aria-label={`Access Group for ${account.username}`}
-                  size="xs"
-                  value={account.accessProfileId || null}
-                  placeholder="Choose Group"
-                  data={groups}
-                  allowDeselect={false}
-                  w={{ base: 140, sm: 200 }}
-                  onChange={(accessProfileId) =>
-                    accessProfileId && change.mutate({ id: account.id, patch: { accessProfileId } })
-                  }
-                />
-              ) : (
-                <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-                  All Groups
-                </Text>
-              ),
+            cell: groupCell,
           },
           {
             key: "usage",
@@ -695,6 +704,29 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
           if (own && !identitiesOf(account).length && !account.passwordSignIn) return null;
           return (
             <>
+              {account.disabled && (
+                <Menu.Item
+                  leftSection={<UserCheck size={16} />}
+                  onClick={() => change.mutate({ id: account.id, patch: { disabled: false } })}
+                >
+                  Enable
+                </Menu.Item>
+              )}
+              {!own && (
+                <Menu.Item
+                  leftSection={
+                    account.role === "user" ? <ShieldCheck size={16} /> : <UserRound size={16} />
+                  }
+                  onClick={act("role")}
+                >
+                  {account.role === "user" ? "Make Administrator" : "Make User"}
+                </Menu.Item>
+              )}
+              {account.passwordSignIn && (
+                <Menu.Item leftSection={<KeyRound size={16} />} onClick={act("password")}>
+                  Reset Password
+                </Menu.Item>
+              )}
               {identitiesOf(account).map(({ identity }, _, links) => (
                 <Menu.Item
                   key={identity}
@@ -711,29 +743,6 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                   )}
                 </Menu.Item>
               ))}
-              {!own && (
-                <Menu.Item
-                  leftSection={
-                    account.role === "user" ? <ShieldCheck size={16} /> : <UserRound size={16} />
-                  }
-                  onClick={act("role")}
-                >
-                  {account.role === "user" ? "Make Administrator" : "Make User"}
-                </Menu.Item>
-              )}
-              {account.passwordSignIn && (
-                <Menu.Item leftSection={<KeyRound size={16} />} onClick={act("password")}>
-                  Reset Password
-                </Menu.Item>
-              )}
-              {account.disabled && (
-                <Menu.Item
-                  leftSection={<UserCheck size={16} />}
-                  onClick={() => change.mutate({ id: account.id, patch: { disabled: false } })}
-                >
-                  Enable
-                </Menu.Item>
-              )}
               {!own && (
                 <>
                   <Menu.Divider />

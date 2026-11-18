@@ -6,11 +6,11 @@ import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
+import { DreamPreferences } from "../dream/DreamSettings";
 import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { AboutStudio } from "./AboutStudio";
 import { GroupsAdmin, UsersAdmin } from "./AccountAdmin";
-import { DreamAdministration } from "./DreamAdministration";
 import { GenerationSettings } from "./GenerationSettings";
 import { IntegrationSettings } from "./IntegrationSettings";
 import { MaintenanceSettings } from "./MaintenanceSettings";
@@ -73,7 +73,7 @@ export function SettingsPage() {
           </Stack>
         ),
         preferences: <Preferences />,
-        dream: <DreamAdministration />,
+        dream: <DreamPreferences />,
         generation: <GenerationSettings />,
         groups: (heading) => <GroupsAdmin heading={heading} />,
         integrations: <IntegrationSettings />,

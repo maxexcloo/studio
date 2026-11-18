@@ -6,7 +6,7 @@ import {
   useWorkspaceSection,
   visibleSections,
 } from "../../ui/WorkspaceSections";
-import { useAccount, useIsAdmin } from "../auth/AccountGate";
+import { useAccount, useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
 // Personal sections, then administration, each alphabetical, with Integrations and About apart at
 // the end.
@@ -17,24 +17,22 @@ const settingSections = {
     icon: UserRound,
     group: "Personal",
   },
+  dream: {
+    label: "Dream",
+    description: "What Dream makes for you and where it runs.",
+    icon: icons.dream,
+    group: "Personal",
+  },
   preferences: {
     label: "Preferences",
     description: "How Studio works for you, saved with your account.",
     icon: icons.settings,
     group: "Personal",
   },
-  dream: {
-    label: "Dream",
-    description:
-      "Dream settings forced on every account, which can't change them; Per Account leaves each account free.",
-    icon: icons.dream,
-    admin: true,
-    group: "Administration",
-  },
   generation: {
     label: "Generation",
     description:
-      "The profiles new drafts start on for everyone, and deleting any account's failed items.",
+      "The profiles new drafts start on and the Dream settings forced on everyone, and deleting any account's failed items.",
     icon: Boxes,
     admin: true,
     group: "Administration",
@@ -87,10 +85,15 @@ const multiUserOnly = new Set(["groups", "users"]);
 export function useSettingsNavigation() {
   const multi = useAccount().data?.mode === "multi-user";
   const admin = useIsAdmin();
+  const dream = useGroupFeature("dream");
   return {
     admin,
     multi,
-    options: visibleSections(settingSections, admin, (key) => multi || !multiUserOnly.has(key)),
+    options: visibleSections(
+      settingSections,
+      admin,
+      (key) => (multi || !multiUserOnly.has(key)) && (key !== "dream" || dream),
+    ),
   };
 }
 /** The open Settings section, or "" outside Settings. */

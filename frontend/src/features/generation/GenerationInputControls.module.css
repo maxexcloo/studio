@@ -71,6 +71,21 @@
   max-width: 8rem;
 }
 
+/* A chip select's list, capped to the screen, shrinks its options to scroll under the search. */
+.fittedList {
+  display: flex;
+  flex-direction: column;
+}
+
+/* A select field's current choice fills its row, cut short with an ellipsis. */
+.fieldLabel {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: start;
+}
+
 /* A chip popup capped to the screen (`fittedPopup`) scrolls its content. The dropdown itself
    doesn't clip, so a nested Select's list, positioned against it, still shows in full. A scroller
    clips both axes, so it reaches 4px into the dropdown's padding: rings and focus outlines on

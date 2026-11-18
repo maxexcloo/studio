@@ -1,8 +1,7 @@
-import { Alert, SegmentedControl, Stack } from "@mantine/core";
+import { SegmentedControl } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
 import type { DreamOverride } from "../../../../shared/dream";
-import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
 
@@ -17,12 +16,12 @@ const backends = [
 const backendNote =
   "Uses ready models allowed for the account; waits if this backend is unavailable. Cloud needs access to a ready cloud model.";
 
-/** Settings › Dream: the settings an administrator forces on every account. */
+/** Settings › Generation › Dream: the Dream settings an administrator forces on every account. */
 export function DreamAdministration() {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
-  if (deployment.isPending) return <LoadingState label="Loading Dream" fill />;
-  if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
+  // Settings › Generation shows it once the deployment has loaded.
+  if (!deployment.data) return null;
   const row = (
     name: DreamOverride,
     label: string,
@@ -50,18 +49,16 @@ export function DreamAdministration() {
     );
   };
   return (
-    <Stack gap="lg">
-      <SettingGroup title="Overrides">
-        {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
-        {row(
-          "spicy",
-          "Spicy",
-          "Allow explicit themes, only for accounts with Uncensored Models access.",
-          onOff,
-        )}
-        {row("imageBackend", "Images", `Where Dream's images run. ${backendNote}`, backends)}
-        {row("videoBackend", "Videos", `Where Dream's videos run. ${backendNote}`, backends)}
-      </SettingGroup>
-    </Stack>
+    <SettingGroup title="Dream">
+      {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
+      {row(
+        "spicy",
+        "Spicy",
+        "Allow explicit themes, only for accounts with Uncensored Models access.",
+        onOff,
+      )}
+      {row("imageBackend", "Images", `Where Dream's images run. ${backendNote}`, backends)}
+      {row("videoBackend", "Videos", `Where Dream's videos run. ${backendNote}`, backends)}
+    </SettingGroup>
   );
 }

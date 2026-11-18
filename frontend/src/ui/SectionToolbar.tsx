@@ -13,7 +13,7 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
-import { type LucideIcon, Search } from "lucide-react";
+import { Check, ChevronDown, type LucideIcon, Search } from "lucide-react";
 import { type ComponentPropsWithRef, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { menuWidth } from "../theme";
@@ -38,21 +38,87 @@ export function SectionHeader({ heading, children }: { heading: ReactNode; child
 }
 
 /**
- * A section's create or primary action: filled and labelled, at the end of its toolbar. It passes
+ * A section's create or primary action at the end of its toolbar: filled and labelled on desktop,
+ * its icon alone on phones (with ▾ where it opens a menu), as the toolbar's other icons. It passes
  * other props on, so it can be a menu's target.
  */
 export function ToolbarAction({
   label,
   icon: Icon,
+  rightSection,
+  variant,
   ...props
 }: { label: string; icon: LucideIcon } & Omit<
   ComponentPropsWithRef<typeof Button<"button">>,
   "children"
 >) {
+  const phone = usePhone();
+  if (phone)
+    return (
+      <Tooltip label={label}>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          aria-label={label}
+          w={rightSection ? "auto" : undefined}
+          px={rightSection ? 4 : undefined}
+          {...(props as ComponentPropsWithRef<typeof ActionIcon<"button">>)}
+        >
+          <Icon size={18} />
+          {rightSection && <ChevronDown size={12} />}
+        </ActionIcon>
+      </Tooltip>
+    );
   return (
-    <Button size="compact-sm" leftSection={<Icon size={16} />} {...props}>
+    <Button
+      size="compact-sm"
+      leftSection={<Icon size={16} />}
+      rightSection={rightSection}
+      variant={variant}
+      {...props}
+    >
       {label}
     </Button>
+  );
+}
+
+/** On phones a toolbar's views are a menu named by the current one (Installed ▾). */
+function ViewMenu({
+  label,
+  views,
+  view,
+  onViewChange,
+}: {
+  label: string;
+  views: { value: string; label: string }[];
+  view?: string;
+  onViewChange?: (value: string) => void;
+}) {
+  return (
+    <Menu position="bottom-end" width={menuWidth}>
+      <Menu.Target>
+        <Button
+          size="compact-sm"
+          variant="subtle"
+          color="gray"
+          aria-label={`${label} View`}
+          rightSection={<ChevronDown size={12} />}
+        >
+          {views.find((item) => item.value === view)?.label}
+        </Button>
+      </Menu.Target>
+      <Menu.Dropdown>
+        {views.map((item) => (
+          <Menu.Item
+            key={item.value}
+            rightSection={item.value === view ? <Check size={14} /> : undefined}
+            onClick={() => onViewChange?.(item.value)}
+          >
+            {item.label}
+          </Menu.Item>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
   );
 }
 
@@ -106,10 +172,10 @@ export function FilterChoices({
 }
 
 /**
- * Library and Settings lists share one toolbar: segmented views on the left, then search (a field,
- * or on phones an icon that expands into one), one filter popover, then behind a divider the
- * section's own actions: `more` by name under ⋯, then `actions`, ending with the filled create
- * action. Escape leaves search, keeping the query, or closes the filters;
+ * Library and Settings lists share one toolbar, on one line: segmented views (on phones a menu
+ * named by the current view), then search (a field, or on phones an icon that expands into one
+ * across the header), one filter popover, then behind a divider the section's own actions: `more`
+ * by name under ⋯, then `actions`, ending with the create action (`ToolbarAction`). Escape leaves search, keeping the query, or closes the filters;
  * `data-mantine-stop-propagation` keeps that Escape from also closing the modal.
  */
 export function SectionToolbar({
@@ -171,30 +237,30 @@ export function SectionToolbar({
         w={expanded ? "100%" : "13rem"}
       />
     );
-  // Phones never cut a view's choice off: short of room, the views take their own row.
-  const segments = views && (
-    <ScrollingSegments
-      className={phone ? classes.views : undefined}
-      aria-label={`${label} View`}
-      size={phone ? "xs" : "sm"}
-      radius="xl"
-      fullWidth={phone}
-      data={views}
-      value={view}
-      onChange={onViewChange}
-    />
-  );
+  const segments =
+    views &&
+    (phone ? (
+      <ViewMenu label={label} views={views} view={view} onViewChange={onViewChange} />
+    ) : (
+      <ScrollingSegments
+        aria-label={`${label} View`}
+        radius="xl"
+        data={views}
+        value={view}
+        onChange={onViewChange}
+      />
+    ));
+  // A phone's open search takes the header's full width, under the description.
   if (searching && phone && onQueryChange)
     return (
-      <Group className={classes.enter} gap="xs" mih={44}>
-        {segments}
+      <Group className={`${classes.enter} ${classes.searching}`} gap="xs" mih={44}>
         {search(true)}
       </Group>
     );
   return (
-    <Group className={classes.enter} gap="xs" mih={44} wrap={phone ? "wrap" : "nowrap"}>
+    <Group className={classes.enter} gap="xs" mih={44} wrap="nowrap" justify="flex-end">
       {segments}
-      <Group gap={4} ml="auto" wrap="nowrap">
+      <Group gap={4} wrap="nowrap">
         {onQueryChange &&
           (phone ? (
             <Tooltip label={`Search ${label}`}>
@@ -297,7 +363,7 @@ export function SectionToolbar({
           </Menu>
         )}
         {actions && (
-          <Group gap="xs" ml="xs" wrap="nowrap">
+          <Group gap={phone ? 4 : "xs"} ml={phone ? 0 : "xs"} wrap="nowrap">
             {actions}
           </Group>
         )}

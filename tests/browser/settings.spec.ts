@@ -31,8 +31,8 @@ test("Settings follow the settled section order and run maintenance and worker r
   // Personal, then Administration, each alphabetical, with Integrations and About apart.
   const order = [
     "Account",
-    "Preferences",
     "Dream",
+    "Preferences",
     "Generation",
     "Groups",
     "Maintenance",
@@ -52,7 +52,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   if ((page.viewportSize()?.width || 1440) >= 768)
     await expect(
       page.getByRole("group", { name: "Administration", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(2, 8));
+    ).toHaveText(order.slice(3, 8));
   await section(page, "Settings", "Generation");
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
@@ -305,12 +305,18 @@ test("Settings › Preferences saves where each kind runs and its default models
   const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
   // Text's defaults offer the gateway's models on their own side, Studio's until one is chosen.
   const textCloud = where.getByRole("combobox", { name: "Text Default Cloud Model", exact: true });
-  await expect(textCloud).toHaveValue("");
+  await expect(textCloud).toHaveText("Studio's Default");
   await textCloud.click();
-  await expect(page.getByRole("option")).toHaveText(["Auto · Cloud", "Uncensored · Cloud"]);
-  await page.getByRole("option", { name: "Uncensored · Cloud", exact: true }).click();
+  const options = page.getByRole("listbox").getByRole("option");
+  await expect(options).toHaveText(["Studio's Default", "Auto · Cloud", "Uncensored · Cloud"]);
+  // The list scrolls inside the Settings modal and its choice applies at once.
+  await options.last().scrollIntoViewIfNeeded();
+  await options.last().click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBe("cloud/uncensored");
-  await expect(textCloud).toHaveValue("Uncensored · Cloud");
+  await expect(textCloud).toHaveText("Uncensored · Cloud");
+  await textCloud.click();
+  await options.first().click();
+  await expect.poll(() => state.preferences.preferences.textCloud).toBeNull();
   const area = (kind: string) =>
     where.getByRole("radiogroup", { name: `${kind} Default`, exact: true });
   const choose = (name: string, choice: string) =>
@@ -540,7 +546,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
     .getByRole("button", { name: "Actions for Restart Text", exact: true })
     .first()
     .click();
-  await page.getByRole("menuitem", { name: "View Log", exact: true }).click();
+  await page.getByRole("menuitem", { name: "View Logs", exact: true }).click();
   const log = page.getByRole("dialog", { name: "Runtime Log", exact: true });
   await expect(log.getByLabel("Change Steps", { exact: true })).toContainText(
     /Stopping Text\.\n.*Done\./,
@@ -568,7 +574,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
     .getByRole("row", { name: "Text", exact: true })
     .getByRole("button", { name: "Actions for Text", exact: true })
     .click();
-  await page.getByRole("menuitem", { name: "View Log", exact: true }).click();
+  await page.getByRole("menuitem", { name: "View Logs", exact: true }).click();
   const workloadLog = page.getByRole("dialog", { name: "Text Log", exact: true });
   await expect(workloadLog.getByLabel("Pod Log", { exact: true })).toContainText("Listening.");
   await workloadLog.getByRole("tab", { name: "Changes", exact: true }).click();
@@ -602,6 +608,13 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
     .getByRole("row", { name: "Image", exact: true })
     .getByRole("button", { name: "Actions for Image", exact: true })
     .click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Start",
+    "Stop",
+    "Restart",
+    "View Logs",
+    "Cancel Queue",
+  ]);
   await expect(page.getByRole("menuitem", { name: "Start", exact: true })).toBeDisabled();
   await expect(page.getByRole("menuitem", { name: "Cancel Queue", exact: true })).toBeDisabled();
   await page.getByRole("menuitem", { name: "Stop", exact: true }).click();
@@ -780,7 +793,7 @@ test("Workers benchmark a running local text model and list each run's figures",
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
   const menu = async (label: string) => {
     await table.getByRole("button", { name: `Actions for ${label}`, exact: true }).click();
-    await expect(page.getByRole("menuitem", { name: "View Log", exact: true })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "View Logs", exact: true })).toBeVisible();
     return page.getByRole("menuitem", { name: "Benchmark", exact: true });
   };
   const closeMenu = async () => {
@@ -914,13 +927,13 @@ test("Settings › Maintenance switches follow at once and settle back after a f
   await expect(toggle).toBeChecked();
 });
 
-test("Settings › Dream forces a setting on every account and hands it back to each account", async ({
+test("Settings › Generation forces a Dream setting on every account and hands it back to each account", async ({
   page,
 }) => {
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
-  await page.goto("/settings#dream");
-  const images = page.getByRole("radiogroup", { name: "Dream Images" });
+  await page.goto("/settings#generation");
+  const images = page.getByRole("radiogroup", { name: "Dream Images", exact: true });
   const spicy = page.getByRole("radiogroup", { name: "Dream Spicy" });
   const choice = (group: typeof images, name: string) =>
     group.getByRole("radio", { name, exact: true });
@@ -932,7 +945,7 @@ test("Settings › Dream forces a setting on every account and hands it back to 
   await expect(choice(images, "Cloud")).toBeChecked();
   await expect(choice(spicy, "Off")).toBeChecked();
   await expect(
-    choice(page.getByRole("radiogroup", { name: "Dream Videos" }), "Per Account"),
+    choice(page.getByRole("radiogroup", { name: "Dream Videos", exact: true }), "Per Account"),
   ).toBeChecked();
   await spicy.getByText("Per Account", { exact: true }).click();
   await page.reload();
