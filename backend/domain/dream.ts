@@ -933,10 +933,10 @@ export function createDream(options: {
       Math.max(diversity.floor, 1 - (used.get(key) || 0) / Math.max(jobs.length, 1));
   }
   /**
-   * Profiles whose last `failStreak` Dream jobs within `failWindowMs` all failed on their worker, so
+   * Profiles whose last `streak` Dream jobs within `failWindowMs` all failed on their worker, so
    * Dream stops spending ideas on them until those failures age out.
    */
-  function failingProfiles(ownerId: string) {
+  function failingProfiles(ownerId: string, streak = failStreak) {
     const outcomes = new Map<string, string[]>();
     for (const job of store.jobsSince(ownerId, new Date(now() - failWindowMs).toISOString())) {
       if (!dreamJob(job) || !["completed", "failed"].includes(job.status)) continue;
@@ -948,8 +948,8 @@ export function createDream(options: {
     return new Set(
       [...outcomes]
         .filter(([, statuses]) => {
-          const last = statuses.slice(-failStreak);
-          return last.length === failStreak && last.every((status) => status === "failed");
+          const last = statuses.slice(-streak);
+          return last.length === streak && last.every((status) => status === "failed");
         })
         .map(([id]) => id),
     );
@@ -2153,6 +2153,11 @@ export function createDream(options: {
       return miss("The source video's model isn't ready.");
     if (isCloudProfile(profile) !== (record.settings.videoBackend === "cloud"))
       return miss("No video model is ready.");
+    // A failed video can take its worker down with it, so one failure sets its profile aside.
+    if (failingProfiles(ownerId, 1).has(profile.id))
+      return miss(
+        `Dream's last video on ${profile.label || profile.id} failed; it waits to try again.`,
+      );
     const slot =
       profile.mediaInputs?.find((input) => input.role === "start") || profile.mediaInputs?.[0];
     const spicy = spicyShare(record, access);

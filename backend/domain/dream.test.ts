@@ -2120,6 +2120,28 @@ test("A Dream video skips a source that left the gallery and animates the next",
   assert.match(dream.status("alice").reason!, /^Dream videos animate a kept or liked/);
 });
 
+test("A failed Dream video sets its profile aside rather than sending the next one", async (t) => {
+  const { dream, store, live, generated } = fixture(t, profiles);
+  await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
+  for (const id of ["first", "second"])
+    generated({
+      id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      prompt: `still ${id}`,
+      dream: { prompt: "", why: "", at: "", state: "kept" },
+    });
+  await dream.tick();
+  // Its prompt was written: the worker failed it.
+  const [job] = live("alice");
+  const writing = { ...(job.input.writing as object), prompt: "a fox turns" };
+  store.save({ ...job, status: "failed", input: { ...job.input, writing } });
+  await dream.tick();
+  assert.equal(live("alice").length, 0);
+  assert.match(dream.status("alice").reason!, /last video on .* failed/);
+});
+
 test("administrator overrides win over account choices, which they leave saved, and lock them", async (t) => {
   const { dream, projects, state, dataDir, dreamOnce } = fixture(t);
   await dream.save("alice", { spicy: true, dailyImages: 12 });
