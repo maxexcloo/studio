@@ -42,12 +42,14 @@
 }
 
 /* The shared phone bar's controls share its width; on this row, sized to its content, they would
-   collapse onto their icons, so each takes a fixed width, its ▾ clear in its corner. */
+   collapse onto their icons, so each takes a fixed width, its ▾ clear in its corner. A width rather
+   than a flex basis, so WebKit counts it when sizing the row. */
 :root[data-phone]
   .header
   .actions
   :is(:global(.mantine-ActionIcon-root), :global(.mantine-Button-root)) {
-  flex: 0 0 36px;
+  flex: none;
+  width: 36px;
 }
 
 .divider {
