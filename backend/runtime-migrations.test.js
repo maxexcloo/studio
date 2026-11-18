@@ -46,6 +46,14 @@ test("the migrations route answers administrators with every step's plan, and lo
     whereWorkRuns: { applied, accounts: 0 },
     localTextAuto: { applied, accounts: 0 },
     profileAliases: { applied, aliases: 0, records: 0, renames: {} },
+    flux2Records: {
+      applied,
+      records: 0,
+      modelFile: 0,
+      profileName: 0,
+      textEncoder: 0,
+      unresolved: 0,
+    },
     // Needs Studio stopped, so the running server only plans it.
     runtimeSettings: { applied: false, settings: 0 },
   });
@@ -58,7 +66,7 @@ test("the migrations route answers administrators with every step's plan, and lo
     body: { ok: true, apply: true, steps: steps(true) },
   });
   assert.deepEqual(lines, [
-    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do; spicyPrompts: 0 nothing to do; chatBriefFavourites: 0 nothing to do; imageSizeDefaults: 0 nothing to do; whereWorkRuns: 0 nothing to do; localTextAuto: 0 nothing to do; profileAliases: 0 nothing to do; runtimeSettings: 0 nothing to do",
-    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do; spicyPrompts: 0 nothing to do; chatBriefFavourites: 0 nothing to do; imageSizeDefaults: 0 nothing to do; whereWorkRuns: 0 nothing to do; localTextAuto: 0 nothing to do; profileAliases: 0 nothing to do; runtimeSettings: 0 nothing to do",
+    "[migrations] Dry run: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do; spicyPrompts: 0 nothing to do; chatBriefFavourites: 0 nothing to do; imageSizeDefaults: 0 nothing to do; whereWorkRuns: 0 nothing to do; localTextAuto: 0 nothing to do; profileAliases: 0 nothing to do; flux2Records: 0 nothing to do; runtimeSettings: 0 nothing to do",
+    "[migrations] Apply: dreamAnimationStars: 0 nothing to do; mcpOwnership: 0 nothing to do; galleryRatings: 0 nothing to do; characterGenerated: 0 nothing to do; legacyShapes: 0 nothing to do; loraStacks: 0 nothing to do; dreamDefaultChoices: 0 nothing to do; tasteDislikes: 0 nothing to do; spicyPrompts: 0 nothing to do; chatBriefFavourites: 0 nothing to do; imageSizeDefaults: 0 nothing to do; whereWorkRuns: 0 nothing to do; localTextAuto: 0 nothing to do; profileAliases: 0 nothing to do; flux2Records: 0 nothing to do; runtimeSettings: 0 nothing to do",
   ]);
 });
