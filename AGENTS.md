@@ -183,11 +183,11 @@ recur across features.
 - Shared chip popups (`ChipPopup`) anchor on desktop and open full-screen
   sheets on phones where the content needs the room; small forms stay
   `floating`. Their heading (`PopupHeading`, or the sheet's header beside
-  Close) holds the title and any count, then compact subtle record actions
-  (Save). Their footer holds at most one leading action that adds content (Add),
-  then Clear and the primary; choices apply as made, so the footer ends with
-  Done where there is no other primary. A saved record's name is one
-  `SavedName` combobox.
+  Close) is one row: the title and any count, then any saved record's
+  `SavedName` combobox filling the row with its Save and ⋯ menu, then compact
+  subtle record actions (Remove). Their footer holds at most one
+  leading action that adds content (Add), then Clear and the primary; choices
+  apply as made, so the footer ends with Done where there is no other primary.
 - On phones, overlays keep their actions at the bottom and always in sight:
   full-screen dialogs and sheets take the page's solid surface and pin their
   `DialogFooter` above the safe area while the content between scrolls, with

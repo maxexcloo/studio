@@ -59,26 +59,35 @@ import classes from "./Picker.module.css";
  */
 
 /**
- * A popup's or column's heading: its title and any `detail`, then its compact subtle record actions
- * (such as Save) at the end.
+ * A popup's or column's heading: its title and any `detail`, then a saved record's `name` (its
+ * `SavedName`) filling the row, then any compact subtle `actions` at the end.
  */
 export function PopupHeading({
   title,
   detail,
+  name,
   actions,
 }: {
   title: string;
   detail?: ReactNode;
+  name?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
-    <Group className={classes.heading} justify="space-between" gap="xs" mih={28} wrap="nowrap">
-      <Group gap="xs" wrap="nowrap" miw={0}>
+    <Group
+      className={classes.heading}
+      justify="space-between"
+      gap="xs"
+      mih={28}
+      wrap={name ? "wrap" : "nowrap"}
+    >
+      <Group gap="xs" wrap="nowrap" miw={0} flex={name ? "none" : undefined}>
         <Text fw={600} truncate>
           {title}
         </Text>
         {detail}
       </Group>
+      {name}
       {actions && (
         <Group gap="xs" wrap="nowrap">
           {actions}
@@ -89,8 +98,8 @@ export function PopupHeading({
 }
 
 /**
- * A chip's popup. Its heading holds the title, any `detail` and its compact subtle record `actions`,
- * on desktop as in the phone sheet's header beside Close. Its footer is the shared `DialogFooter`:
+ * A chip's popup. Its heading holds the title, any `detail`, any saved record's `name` and any
+ * compact subtle `actions` in one row, on desktop as in the phone sheet's header beside Close. Its footer is the shared `DialogFooter`:
  * at most one `leading` action that adds content (Add) at the left edge, then `onClear` as the shared ✕, then the
  * `primary`. Choices apply as they are made, so the footer ends with Done where it has no
  * `primary`, and desktop shows one only where it has an action besides Done.
@@ -104,6 +113,7 @@ export function PopupHeading({
 export function ChipPopup({
   title,
   detail,
+  name,
   opened,
   onOpenedChange,
   target,
@@ -123,6 +133,8 @@ export function ChipPopup({
 }: {
   title: string;
   detail?: ReactNode;
+  /** The `SavedName` of the record the popup edits. */
+  name?: ReactNode;
   opened: boolean;
   onOpenedChange: (opened: boolean) => void;
   target: ReactNode;
@@ -191,6 +203,7 @@ export function ChipPopup({
                 <Modal.Title>{title}</Modal.Title>
                 {detail}
               </div>
+              {name}
               {actions}
               <Modal.CloseButton aria-label={`Close ${title}`} />
             </Modal.Header>
@@ -229,7 +242,7 @@ export function ChipPopup({
         <Stack gap="sm">
           <div className={aside ? classes.columns : undefined}>
             <Stack gap="sm">
-              <PopupHeading title={title} detail={detail} actions={actions} />
+              <PopupHeading title={title} detail={detail} name={name} actions={actions} />
               {children}
             </Stack>
             {aside && <div className={classes.aside}>{aside}</div>}
@@ -780,7 +793,12 @@ function ReplaceConfirm({
   onReplace: () => void;
 }) {
   return (
-    <Group className={classes.reveal} justify="space-between" gap="xs" p="xs">
+    <Group
+      className={`${classes.reveal} ${classes.confirm}`}
+      justify="space-between"
+      gap="xs"
+      p="xs"
+    >
       <Text size="sm">{message}</Text>
       <Group gap="xs">
         <Button variant="default" onClick={onCancel}>
@@ -809,48 +827,13 @@ type Naming = ReturnType<typeof useNaming>;
 const ignore = () => {};
 
 /**
- * Save for the current preset: it updates the record the draft came from when the draft has
- * changed, or names a new one in the name field.
- */
-export function SaveButton<T extends SavedItem>({
-  noun,
-  naming,
-  current,
-  edited,
-  disabled,
-  onUpdate,
-}: {
-  noun: string;
-  naming: Naming;
-  current?: T;
-  edited: boolean;
-  disabled: boolean;
-  onUpdate: (record: T) => Promise<unknown>;
-}) {
-  return (
-    <Button
-      size="compact-sm"
-      variant="subtle"
-      aria-label={`Save ${noun}`}
-      disabled={disabled || (!!current && !edited)}
-      onClick={() =>
-        current
-          ? onUpdate(current).then(() => naming.flashSaved(true), ignore)
-          : naming.name("save")
-      }
-    >
-      Save
-    </Button>
-  );
-}
-
-/**
- * A saved record's name as a combobox: it shows the current record's name, or Unsaved, marked
- * Edited once the draft differs and Saved for a moment after saving. Its list loads a saved record,
- * asking first where `replaces` says what it would replace; typing searches the list or names the
- * draft to save it as new or rename the current record. Names stay unique; duplicates from before
- * show when each was saved. Its menu holds `menu` (such as what a preset saves), then Rename, Save
- * as New and Delete.
+ * A saved record's name as a combobox, for a popup heading's `name`: it shows the current record's
+ * name, or Unsaved. Its list loads a saved record, asking first, under the heading, where
+ * `replaces` says what it would replace; typing searches the list or names the draft to save it as
+ * new or rename the current record. Names stay unique; duplicates from before show when each was
+ * saved. Save beside it updates the current record once the draft differs from it, or names a new
+ * one in the field, and reads Saved for a moment after saving. Its menu holds `menu` (such as what
+ * a preset saves), then Rename and Delete.
  */
 export function SavedName<T extends SavedItem>({
   noun,
@@ -863,6 +846,7 @@ export function SavedName<T extends SavedItem>({
   menu,
   onLoad,
   onSave,
+  onUpdate,
   onRename,
   onDelete,
 }: {
@@ -871,13 +855,14 @@ export function SavedName<T extends SavedItem>({
   records: T[];
   current?: T;
   edited: boolean;
-  /** Whether the draft holds anything to save. */
+  /** Whether the draft holds anything to save, and the saved records have loaded. */
   canSave: boolean;
   /** What loading `record` asks first, or nothing when the draft has nothing unsaved. */
   replaces: (record: T) => string | undefined;
   menu?: ReactNode;
   onLoad: (record: T) => void;
   onSave: (name: string) => Promise<unknown>;
+  onUpdate: (record: T) => Promise<unknown>;
   onRename: (record: T, name: string) => Promise<unknown>;
   onDelete: (record: T) => void;
 }) {
@@ -936,36 +921,34 @@ export function SavedName<T extends SavedItem>({
     if (message) setConfirming({ record, message });
     else onLoad(record);
   };
-  const marker = naming.saved ? "Saved" : edited && "Edited";
   return (
-    <Stack gap="xs">
-      <Group gap="xs" wrap="nowrap">
-        <Combobox store={combobox} withinPortal={false} onOptionSubmit={submit}>
+    <>
+      <Group className={classes.name} gap="xs" wrap="nowrap" flex="1 1 0" miw={0}>
+        {/* The list outgrows the field, which shares its heading's row. */}
+        <Combobox
+          store={combobox}
+          withinPortal={false}
+          width={menuWidth}
+          position="bottom-start"
+          onOptionSubmit={submit}
+        >
           <Combobox.Target withExpandedAttribute>
             <InputBase
               ref={naming.field}
+              size="sm"
               flex={1}
               miw={0}
+              classNames={{ input: classes.nameInput }}
               aria-label={`${noun} Name`}
               placeholder={`Unsaved ${noun}`}
               value={text ?? current?.name ?? ""}
               data-mantine-stop-propagation
-              rightSection={
-                <Group gap={4} wrap="nowrap">
-                  {marker && (
-                    <Text size="xs" c={naming.saved ? "green" : "dimmed"}>
-                      {marker}
-                    </Text>
-                  )}
-                  <Combobox.Chevron />
-                </Group>
-              }
-              rightSectionWidth={marker ? 80 : undefined}
+              rightSection={<Combobox.Chevron />}
               rightSectionPointerEvents="none"
               onClick={() => combobox.openDropdown()}
               onFocus={(event) => {
                 event.currentTarget.select();
-                combobox.openDropdown();
+                if (mode) combobox.openDropdown();
               }}
               onBlur={() => combobox.closeDropdown()}
               onChange={(event) => {
@@ -1015,6 +998,19 @@ export function SavedName<T extends SavedItem>({
             </Combobox.Options>
           </Combobox.Dropdown>
         </Combobox>
+        <Button
+          size="compact-sm"
+          variant="subtle"
+          aria-label={`Save ${noun}`}
+          disabled={!canSave || (!!current && !edited)}
+          onClick={() =>
+            current
+              ? onUpdate(current).then(() => naming.flashSaved(true), ignore)
+              : naming.name("save")
+          }
+        >
+          {naming.saved ? "Saved" : "Save"}
+        </Button>
         <Menu position="bottom-end" width={menuWidth} withinPortal={false} returnFocus={false}>
           <PopupTooltip label={`${noun} Actions`}>
             <Menu.Target>
@@ -1059,6 +1055,6 @@ export function SavedName<T extends SavedItem>({
           }}
         />
       )}
-    </Stack>
+    </>
   );
 }

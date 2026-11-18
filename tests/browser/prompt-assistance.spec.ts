@@ -52,10 +52,9 @@ test("Saving and updating a preset never submits a generation, and the name show
   await prompt.fill("A copper bird with blue wings");
   await openPresets(page);
   await expect(name).toHaveValue("Copper Study");
-  await expect(page.getByText("Edited", { exact: true })).toBeVisible();
+  await expect(save).toBeEnabled();
   await save.click();
   await expect.poll(() => state.presets[0].input.prompt).toBe("A copper bird with blue wings");
-  await expect(page.getByText("Edited", { exact: true })).toBeHidden();
   await expect(save).toBeDisabled();
   expect(state.presets).toHaveLength(1);
   expect(state.jobs).toHaveLength(0);
@@ -69,7 +68,7 @@ test("Saving and updating a preset never submits a generation, and the name show
   await expect(name).toBeHidden();
   await page.getByRole("button", { name: "Presets", exact: true }).click();
   await expect(name).toHaveValue("Copper Study");
-  await expect(page.getByText("Edited", { exact: true })).toBeHidden();
+  await expect(save).toBeDisabled();
 });
 
 test("Stopping held assistance retains the draft and unblocks generation", async ({ page }) => {
