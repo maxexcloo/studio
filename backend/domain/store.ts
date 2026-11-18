@@ -46,6 +46,9 @@ export type OwnedJob = Omit<QueueJob, "dream"> &
     replacementJobId?: string;
     /** Queued again automatically after its first run failed (queue.ts `again`); it isn't again. */
     retried?: true;
+    /** When the scheduler admitted the job and when Studio first began saving its results. */
+    admittedAt?: number;
+    savingAt?: number;
   };
 /** One job of a request, as `Store.enqueueAll` queues it. */
 export interface QueuedCopy {
@@ -756,6 +759,8 @@ export function publicJob({
   cancelRequested: _cancelRequested,
   cleared: _cleared,
   replacementJobId: _replacementJobId,
+  admittedAt: _admittedAt,
+  savingAt: _savingAt,
   priority,
   dream: _dream,
   faceRedo: _faceRedo,

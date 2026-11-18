@@ -12,7 +12,7 @@ interface RouteInput {
 }
 /** A route's answer: JSON, or a file's bytes with any headers of its own. */
 type RouteAnswer =
-  | DomainResponse
+  | (DomainResponse & { onJsonSent?: (syncMs: number) => void })
   | { status: number; content: Buffer; mime: string; headers?: Record<string, string> };
 export type RouteRun = (
   account: RouteAccount,
@@ -57,7 +57,12 @@ export function directRoute(app: object, method: string, path: string, run: Rout
       if (answer.headers) res.set(answer.headers);
       return res.status(answer.status).type(answer.mime).send(answer.content);
     }
-    return res.status(answer.status).json(answer.payload);
+    const response = res.status(answer.status);
+    if (!answer.onJsonSent) return response.json(answer.payload);
+    const started = performance.now();
+    const sent = response.json(answer.payload);
+    answer.onJsonSent(performance.now() - started);
+    return sent;
   });
 }
 

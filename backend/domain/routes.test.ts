@@ -7,6 +7,7 @@ import express from "express";
 
 import type {
   QueueCancelAllResponse,
+  QueueResponse,
   QueueRetryResponse,
   UnfinishedJob,
 } from "../../shared/queue.ts";
@@ -247,7 +248,7 @@ test("Retry admits distinct owned failures in order and leaves refused jobs avai
   }
 });
 
-test("The queue shows a job's gallery records, else its own results", async () => {
+test("The queue hydrates full and changed results and logs one aggregate poll profile", async (t) => {
   const store = new Store(openDatabase(":memory:"));
   const session = store.createSession("alice");
   const own = { id: "own", url: "/media/own.png" };
@@ -275,13 +276,46 @@ test("The queue shows a job's gallery records, else its own results", async () =
   await once(server, "listening");
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/queue`;
   try {
-    const { jobs } = (await (await fetch(base)).json()) as {
-      jobs: { id: string; items: unknown[]; outputs: unknown[] }[];
-    };
+    const log = t.mock.method(console, "log", () => {});
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const { jobs } = (await (await fetch(base)).json()) as QueueResponse;
     const shown = new Map(jobs.map((job) => [job.id, job]));
     assert.deepEqual(shown.get(saved.id)?.items, [record]);
     assert.deepEqual(shown.get(saved.id)?.outputs, []);
     assert.deepEqual(shown.get(bare.id)?.items, [own]);
+    const delta = (await (await fetch(`${base}?since=2099-01-01`)).json()) as QueueResponse;
+    assert.deepEqual(delta.jobs, []);
+    assert.deepEqual(
+      delta.ids,
+      jobs.map((job) => job.id),
+    );
+
+    assert.equal(log.mock.callCount(), 0);
+    t.mock.timers.tick(60_000);
+    assert.equal(log.mock.callCount(), 1);
+    const line = String(log.mock.calls[0].arguments[0]);
+    const prefix = "Queue poll profile ";
+    assert.ok(line.includes(prefix));
+    const data = JSON.parse(line.split(prefix)[1]);
+    const { requests, deltaRequests, listedJobs, returnedJobs, slowest, ...timings } = data;
+    assert.deepEqual(
+      { requests, deltaRequests, listedJobs, returnedJobs },
+      {
+        requests: 2,
+        deltaRequests: 1,
+        listedJobs: 4,
+        returnedJobs: 2,
+      },
+    );
+    assert.deepEqual(Object.keys(timings), ["totalListMs", "totalHydrateMs", "totalJsonSendMs"]);
+    assert.deepEqual(Object.keys(slowest), ["totalMs", "listMs", "hydrateMs", "jsonSendMs"]);
+    assert.ok(
+      [...Object.values(timings), ...Object.values(slowest)].every(
+        (value) => Number.isFinite(value) && Number(value) >= 0,
+      ),
+    );
+    t.mock.timers.tick(60_000);
+    assert.equal(log.mock.callCount(), 1);
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
