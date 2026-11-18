@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { type Locator, type Page, expect, test } from "@playwright/test";
 
 import { dreamItem, fixtures, section, serveDream, stamp } from "./fixtures";
@@ -1017,9 +1019,17 @@ test("The Inbox accepts, edits then accepts, dismisses with a reason and clears 
 
 test("Dream keeps Images and Videos separate through deck, preview, history and discards", async ({
   page,
-}) => {
+}, testInfo) => {
   await fixtures(page);
-  const video = (id: string) => dreamItem(id, { type: "video" });
+  const format = testInfo.project.use.browserName === "webkit" ? "mp4" : "webm";
+  const clip = readFileSync(new URL(`./media/dream-preview.${format}`, import.meta.url), "base64");
+  const video = (id: string) =>
+    dreamItem(id, {
+      type: "video",
+      url: `data:video/${format};base64,${clip}#${id}`,
+      width: 32,
+      height: 18,
+    });
   const dream = await serveDream(page, {
     enabled: false,
     calibration: [dreamItem("image-a"), video("video-a"), dreamItem("image-b"), video("video-b")],
@@ -1039,15 +1049,18 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   const pair = page.getByRole("group", { name: "Which Video?", exact: true });
   await expect(pair).toBeVisible();
   await pair.getByRole("button", { name: "View A", exact: true }).click();
-  const viewer = page.getByRole("dialog");
+  const viewer = page.getByRole("dialog", { name: "Preview", exact: true });
   await expect(viewer).toBeVisible();
   const player = viewer.locator("video");
   const close = viewer.getByRole("button", { name: "Close Preview", exact: true });
   await expect(player).toHaveCount(1);
-  await player.dispatchEvent("keydown", { key: "ArrowRight" });
   await expect(player).toHaveAttribute("aria-label", "Dream prompt video-a");
+  await expect(player).toHaveAttribute("src", /#video-a$/);
+  await expect(player).toHaveJSProperty("videoWidth", 32);
   await close.press("ArrowRight");
   await expect(player).toHaveAttribute("aria-label", "Dream prompt video-b");
+  await expect(player).toHaveAttribute("src", /#video-b$/);
+  await expect(player).toHaveJSProperty("videoWidth", 32);
   expect(dream.requests).toEqual([]);
   await close.click();
   await expect(pair.getByRole("button", { name: "View B", exact: true })).toBeFocused();
