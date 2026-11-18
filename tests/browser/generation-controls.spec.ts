@@ -1012,6 +1012,16 @@ test("The phone Generate sheet fits the screen and keeps its action bar above th
   await scrollTo(100);
   await expect.poll(barBottom).toBeLessThanOrEqual(100 + 932 - 300);
   await expect.poll(barBottom).toBeGreaterThan(100 + 932 - 300 - 60);
+  // The page never shows above the moved sheet: its backdrop there is the page's solid surface.
+  const above = () =>
+    page.evaluate(() => {
+      const hit = document.elementFromPoint(5, 50);
+      return hit?.closest(".mantine-Drawer-root") &&
+        getComputedStyle(hit).backgroundColor === getComputedStyle(document.body).backgroundColor
+        ? "covered"
+        : hit?.className;
+    });
+  await expect.poll(above).toBe("covered");
   await scrollTo(0);
   // Typing keeps the whole screen while a browser's toolbar folds away above the keyboard; only
   // the keyboard dropping (Android's Back) ends it, letting the text go.
@@ -1057,11 +1067,20 @@ test("Typing in the phone Generate sheet gives the prompt the screen above one b
     const box = (await bar.boundingBox())!;
     return Math.round(box.y + box.height);
   };
-  // At rest the text stands alone, without its tools, and the bar holds the output and Generate.
+  // At rest the text keeps only its AI menu, and the bar holds the output and Generate.
   await expect.poll(bottom).toBeLessThanOrEqual(page.viewportSize()!.height);
   const resting = await bottom();
   await expect(output).toBeVisible();
   await expect(tools).toHaveCount(0);
+  // The menu opens from the text's corner and leaves the keyboard down.
+  await sheet.getByRole("button", { name: "AI Prompt Actions", exact: true }).click();
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  await expect(prompt).not.toBeFocused();
+  await expect(sheet.locator("[data-typing]")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(sheet).toBeVisible();
   await prompt.click();
   await prompt.fill("A copper fox in a misty forest at dawn, cinematic light, ".repeat(20));
   // Typing puts AI, Copy and Clear in the bar as icons, then Done, in place of the output, Clear

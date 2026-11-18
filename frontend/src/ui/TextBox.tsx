@@ -175,15 +175,20 @@ export function TextBox({
   const [active, setActive] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   // Only a box in the bar's own surface, not one in a dialog opened from it, joins the bar. Such a
-  // box shows its tools only there, while typing; at rest the text alone fills its room.
+  // box shows its tools there while typing.
   const barred =
     mobile &&
     inline &&
     bar !== null &&
     bar.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]');
   const inBar = barred && active ? bar : null;
+  // At rest it keeps only an AI menu, in the text's corner as on desktop.
+  const restingAi = barred && !active && ai && !hideTools;
   const spins =
-    tools !== undefined && (!phone || editing || ai) && !hideTools && (!barred || active);
+    tools !== undefined &&
+    (!phone || editing || ai) &&
+    !hideTools &&
+    (!barred || active || restingAi);
   const description =
     busy && !spins ? (
       <span className={classes.busy} role="status">
@@ -417,11 +422,12 @@ export function TextBox({
         if (phone && !props.readOnly && !props.disabled) setEditing(true);
       }}
       // While the phone editor is open, it alone carries the actions.
-      rightSection={editing ? undefined : inside ? boxTools : rightSection}
-      {...(inside && {
-        rightSectionWidth: "auto",
+      rightSection={editing ? undefined : inside ? boxTools : restingAi ? menu : rightSection}
+      {...((inside || restingAi) && {
+        // The resting AI menu's section keeps its default width, which the text's padding reserves.
+        rightSectionWidth: inside ? "auto" : undefined,
         rightSectionPointerEvents: "all" as const,
-        rightSectionProps: { style: { alignItems: "flex-start", paddingTop: 4 } },
+        rightSectionProps: { style: { alignItems: "flex-start", paddingTop: inside ? 4 : 0 } },
       })}
       {...(oneLine && {
         maxRows: resting ? 1 : props.maxRows,
@@ -568,10 +574,6 @@ export function TextBox({
             aria-label={title}
             style={
               {
-                // Opaque, unlike the glass theme surface, so the page never shows through.
-                background: "var(--mantine-color-body)",
-                backdropFilter: "none",
-                WebkitBackdropFilter: "none",
                 translate: keyboard.top ? `0 ${keyboard.top}px` : undefined,
                 "--keyboard-inset": `${keyboard.inset}px`,
               } as CSSProperties
