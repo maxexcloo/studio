@@ -193,9 +193,7 @@ export function ReferencePicker({
     const gallery = data.getData(galleryReferenceType);
     if (data.files.length && !cell && !gallery) return uploadFiles([...data.files], into);
     if (gallery && !cell) return addGalleryItem(JSON.parse(gallery), into);
-    if (cell) {
-      if (into) moveReference(cell, into);
-    }
+    if (cell && into) moveReference(cell, into);
     settle();
   }
   const uploadTile = (
