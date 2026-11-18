@@ -114,6 +114,7 @@ test("The queue lists model downloads to stop, resume, retry or discard one at a
         status: "done",
         finishedAt: "2026-10-23T10:00:00.000Z",
       },
+      { ...failed, id: "completed", file: "completed.safetensors" },
     ] as any[],
   };
   const requests: { path: string; id: string; discard?: boolean }[] = [];
