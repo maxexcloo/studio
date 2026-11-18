@@ -1,14 +1,4 @@
-import {
-  Alert,
-  Button,
-  Group,
-  Modal,
-  MultiSelect,
-  ScrollArea,
-  Stack,
-  TagsInput,
-  Text,
-} from "@mantine/core";
+import { Alert, Button, Group, Modal, MultiSelect, Stack, TagsInput, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -272,7 +262,7 @@ function TasteEditor({
 }
 
 /** The taste profile: each field learnt from feedback until the person sets it. */
-export function TasteProfile({ fill = false }: { fill?: boolean }) {
+export function TasteProfile() {
   const phone = usePhone();
   const client = useQueryClient();
   const taste = useQuery(tasteQuery);
@@ -313,7 +303,6 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
     <>
       <SettingGroup
         title="Taste Profile"
-        fill={fill}
         toolbar={
           <Button
             size="compact-sm"
@@ -326,55 +315,53 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
           </Button>
         }
       >
-        <ScrollArea flex={fill ? 1 : undefined} mih={0}>
-          <Stack gap="xs">
-            {taste.isPending && <LoadingState label="Loading Taste" />}
-            {data && (
-              <>
-                <Text size="xs" c="dimmed">
-                  {learnt(data) ||
-                    "Nothing learnt yet. Like, compare or iterate on results and Studio picks up your taste."}
-                </Text>
-                {fieldKeys.map((key) => (
-                  <SettingRow
-                    key={key}
-                    label={`${fieldLabels[key]}${!own(key) && Object.hasOwn(data.preferences, key) ? " · Your Edit" : ""}`}
-                    description={
-                      <Text span size="sm" c="text" style={{ overflowWrap: "anywhere" }}>
-                        {text(data, key) || "None"}
-                      </Text>
-                    }
-                  />
-                ))}
-              </>
-            )}
-            {error && <Alert color="red">{error.message}</Alert>}
-            <Group gap="xs">
-              {data?.writer && (
-                <Button
-                  variant="default"
-                  leftSection={<icons.refresh size={16} />}
-                  loading={refresh.isPending}
-                  disabled={!data.signals}
-                  onClick={() => refresh.mutate()}
-                >
-                  Refresh
-                </Button>
-              )}
+        <Stack gap="xs">
+          {taste.isPending && <LoadingState label="Loading Taste" />}
+          {data && (
+            <>
+              <Text size="xs" c="dimmed">
+                {learnt(data) ||
+                  "Nothing learnt yet. Like, compare or iterate on results and Studio picks up your taste."}
+              </Text>
+              {fieldKeys.map((key) => (
+                <SettingRow
+                  key={key}
+                  label={`${fieldLabels[key]}${!own(key) && Object.hasOwn(data.preferences, key) ? " · Your Edit" : ""}`}
+                  description={
+                    <Text span size="sm" c="text" style={{ overflowWrap: "anywhere" }}>
+                      {text(data, key) || "None"}
+                    </Text>
+                  }
+                />
+              ))}
+            </>
+          )}
+          {error && <Alert color="red">{error.message}</Alert>}
+          <Group gap="xs">
+            {data?.writer && (
               <Button
-                variant="subtle"
-                color="red"
-                leftSection={<icons.clear size={16} />}
-                disabled={
-                  !data || (!data.summary && !data.signals && !Object.keys(data.preferences).length)
-                }
-                onClick={() => setClearing(true)}
+                variant="default"
+                leftSection={<icons.refresh size={16} />}
+                loading={refresh.isPending}
+                disabled={!data.signals}
+                onClick={() => refresh.mutate()}
               >
-                Clear
+                Refresh
               </Button>
-            </Group>
-          </Stack>
-        </ScrollArea>
+            )}
+            <Button
+              variant="subtle"
+              color="red"
+              leftSection={<icons.clear size={16} />}
+              disabled={
+                !data || (!data.summary && !data.signals && !Object.keys(data.preferences).length)
+              }
+              onClick={() => setClearing(true)}
+            >
+              Clear
+            </Button>
+          </Group>
+        </Stack>
       </SettingGroup>
       <Modal
         id="taste-editor"
