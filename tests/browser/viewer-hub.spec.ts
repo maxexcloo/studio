@@ -1217,6 +1217,48 @@ test("Copy ▾ lists Details then Prompt, and each copies its text", async ({ pa
     );
 });
 
+test("A touch that travels over a menu never chooses an item; a tap does", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Touch handling");
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    document.execCommand = (command: string) => {
+      const selected = document.activeElement as HTMLTextAreaElement;
+      if (command !== "copy" || selected?.tagName !== "TEXTAREA") return false;
+      (window as any).copied = selected.value;
+      return true;
+    };
+  });
+  await seed(page);
+  await viewerAction(page, "Share");
+  const menu = page.getByRole("menu");
+  const copy = menu.getByRole("menuitem", { name: "Copy Prompt", exact: true });
+  // The events Safari sends for a swipe that could not scroll: a click still follows.
+  await copy.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const pointer = (type: string, dy: number) =>
+      node.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          pointerId: 7,
+          pointerType: "touch",
+          isPrimary: true,
+          clientX: box.x + box.width / 2,
+          clientY: box.y + box.height / 2 + dy,
+        }),
+      );
+    pointer("pointerdown", 0);
+    pointer("pointermove", -40);
+    pointer("pointerup", -40);
+    node.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+  });
+  await expect(menu).toBeVisible();
+  expect(await page.evaluate(() => (window as any).copied)).toBeUndefined();
+  await copy.tap();
+  await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("An amber bird");
+});
+
 test("Near-misses beside the viewer's controls keep it open; the empty stage closes it", async ({
   page,
 }) => {
