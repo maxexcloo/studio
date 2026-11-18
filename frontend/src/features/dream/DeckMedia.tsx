@@ -2,35 +2,55 @@ import { type RefObject, useEffect, useState } from "react";
 
 import type { MediaItem } from "../../types";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
+import { covers, useBoxShape } from "./mediaFit";
 
-/** A card's picture, or while `playing` its video, muted; `useInSync` plays a card's videos. */
+import classes from "./DreamPage.module.css";
+
+/** A blurred, dimmed copy of media shown whole, so no flat bars frame it. */
+export function MediaBackdrop({ src }: { src?: string }) {
+  if (!src) return null;
+  return <img className={classes.backdrop} src={src} alt="" aria-hidden draggable={false} />;
+}
+
+/**
+ * A card's picture, or while `playing` its video, muted; `useInSync` plays a card's videos. It fills
+ * its box where little is cropped (`covers`), and otherwise shows whole over its `MediaBackdrop`;
+ * the choice follows the recorded size alone, so it holds while the media loads.
+ */
 export function DeckMedia({ item, playing = false }: { item: MediaItem; playing?: boolean }) {
   const source = mediaSource(item);
+  const { ref, box } = useBoxShape<HTMLDivElement>();
   const [failedVideo, setFailedVideo] = useState<string>();
   const [failedImage, setFailedImage] = useState<string>();
+  const cover = !!source.width && !!source.height && covers(source.width / source.height, box);
   const video = item.type === "video" ? playbackUrl(source.url) : undefined;
-  if (video && playing && failedVideo !== video)
-    return (
-      <video
-        src={video}
-        poster={source.thumbnailUrl}
-        aria-label={item.prompt || "Dream video"}
-        muted
-        playsInline
-        preload="auto"
-        onError={() => setFailedVideo(video)}
-      />
-    );
   const image = video ? source.thumbnailUrl : source.displayUrl;
-  if (!image || failedImage === image) return null;
+  const still = image && failedImage !== image ? image : undefined;
   return (
-    <img
-      src={image}
-      alt={item.prompt || (item.type === "video" ? "Dream video" : "Dream image")}
-      draggable={false}
-      decoding="async"
-      onError={() => setFailedImage(image)}
-    />
+    <div ref={ref} className={classes.fit} data-cover={cover || undefined}>
+      {!cover && <MediaBackdrop src={still} />}
+      {video && playing && failedVideo !== video ? (
+        <video
+          src={video}
+          poster={source.thumbnailUrl}
+          aria-label={item.prompt || "Dream video"}
+          muted
+          playsInline
+          preload="auto"
+          onError={() => setFailedVideo(video)}
+        />
+      ) : (
+        still && (
+          <img
+            src={still}
+            alt={item.prompt || (item.type === "video" ? "Dream video" : "Dream image")}
+            draggable={false}
+            decoding="async"
+            onError={() => setFailedImage(still)}
+          />
+        )
+      )}
+    </div>
   );
 }
 

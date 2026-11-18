@@ -23,14 +23,17 @@ const holdTime = 500;
  * The top card follows a finger or pointer, tilting with the drag while motion is on, and flies
  * out past a third of its width in a direction `hints` names (the word showing while dragging that way); below that it
  * springs back. A tap calls `onTap` with the element pressed, and a hold or a second finger (a
- * pinch) calls `onHold` with it; its release does nothing more. Buttons and keys fly it out the
- * same way through `fly`. Motion follows the shared animation-speed token; with Off or reduced
- * motion it decides without animating.
+ * pinch) calls `onHold` with it; its release does nothing more. Presses on controls, scrolling
+ * text (`data-scrolls`) or zoomed media (`data-zoomed`) stay theirs, and a `still` card never
+ * follows. Buttons and keys fly it out the same way through `fly`. Motion follows the shared
+ * animation-speed token; with Off or reduced motion it decides without animating.
  */
 export function SwipeCard({
   children,
   depth,
   paused = false,
+  still = false,
+  full = false,
   fly,
   onSwipe,
   onTap,
@@ -43,6 +46,9 @@ export function SwipeCard({
   /** 0 for the top card, 1 for the one waiting beneath it. */
   depth: number;
   paused?: boolean;
+  still?: boolean;
+  /** Edge to edge, filling the preview. */
+  full?: boolean;
   fly?: RefObject<Fly | null>;
   onSwipe?: (direction: Direction) => void;
   onTap?: (target: HTMLElement) => void;
@@ -66,6 +72,7 @@ export function SwipeCard({
     vy: number;
   } | null>(null);
   const leaving = useRef(false);
+  const dragged = useRef(false);
   const holding = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(holding.current), []);
   useInSync(card, !depth && !paused);
@@ -146,22 +153,34 @@ export function SwipeCard({
   return (
     <Paper
       ref={card}
-      withBorder
-      radius="lg"
+      withBorder={!full}
+      radius={full ? 0 : "lg"}
       className={classes.card}
       data-depth={depth}
       data-pair={pair || undefined}
+      data-full={full || undefined}
       role="group"
       aria-roledescription="card"
       aria-label={label}
       aria-hidden={depth ? true : undefined}
+      inert={depth ? true : undefined}
       onPointerDown={(event) => {
-        if (depth || leaving.current || event.button !== 0) return;
+        if (depth || still || leaving.current || event.button !== 0) return;
         if (drag.current && drag.current.id !== event.pointerId) return hold();
-        if ((event.target as HTMLElement).closest("button, a")) return;
+        dragged.current = false;
+        const pressed = event.target as HTMLElement;
+        // A zoomable picture is itself a button, and swipes like any other media.
+        const control = pressed.closest("button, a");
+        if (
+          (control &&
+            !(control.closest("[data-zoom-mode]") && !control.closest("[data-zoom-controls]"))) ||
+          pressed.closest("[data-scrolls], [data-zoomed]")
+        )
+          return;
         clearTimeout(holding.current);
         holding.current = setTimeout(hold, holdTime);
-        event.currentTarget.setPointerCapture(event.pointerId);
+        // Captured where pressed, so the media beneath (its zoom) still sees the press through.
+        pressed.setPointerCapture(event.pointerId);
         event.currentTarget.style.transition = "none";
         drag.current = {
           id: event.pointerId,
@@ -202,6 +221,7 @@ export function SwipeCard({
           settle();
           return onTap?.(target);
         }
+        dragged.current = true;
         const threshold = event.currentTarget.offsetWidth / 3;
         const direction = lean(dx, dy);
         const vertical = direction === "up" || direction === "down";
@@ -218,6 +238,13 @@ export function SwipeCard({
         if (!drag.current) return;
         drag.current = null;
         settle();
+      }}
+      // The click a drag's release may send is not a tap.
+      onClickCapture={(event) => {
+        if (!dragged.current || event.detail === 0) return;
+        dragged.current = false;
+        event.preventDefault();
+        event.stopPropagation();
       }}
     >
       {children}
