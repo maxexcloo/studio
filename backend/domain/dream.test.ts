@@ -2075,6 +2075,12 @@ test("Dream videos animate liked stills for most videos and Dream's keeps for th
   state.videoRefusal = "No video model can animate images.";
   assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").reason, state.videoRefusal);
+  // A missing model isn't asked for again until the video profiles change or an hour passes.
+  state.videoRefusal = "";
+  assert.equal(await dreamOnce(), undefined);
+  assert.equal(dream.status("alice").reason, "No video model can animate images.");
+  state.clock += 3_600_000;
+  assert.ok(await dreamOnce());
   assert.deepEqual(walks(), [], "Dream never walks the whole gallery");
 });
 
