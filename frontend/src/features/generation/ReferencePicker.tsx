@@ -461,7 +461,7 @@ export function ReferencePicker({
         target={trigger}
         detail={count}
         {...clear}
-        secondary={
+        leading={
           <ChipPopup
             title="Add References"
             width="100%"

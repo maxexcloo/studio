@@ -94,7 +94,9 @@ recur across features.
 - Every dialog, sheet and chip popup ends with one right-aligned
   `DialogFooter` of real buttons: any default secondary actions, Cancel, then
   one filled primary, which follows the secondaries alone (Done, Close) where
-  there is nothing to cancel. An anchored chip popup (desktop, or `floating`)
+  there is nothing to cancel. An action that adds content (Add, Upload) is the
+  footer's `leading` action instead, alone at its left edge on one row, phones
+  included. An anchored chip popup (desktop, or `floating`)
   whose only button would be Done has no footer and closes on outside click
   or Escape; phone sheets keep Done. A primary is its bare verb (Save,
   Compare, Create), adding a noun only where the verb alone is ambiguous. Clearing a
@@ -176,7 +178,7 @@ recur across features.
   sheets on phones where the content needs the room; small forms stay
   `floating`. Their heading (`PopupHeading`, or the sheet's header beside
   Close) holds the title and any count, then compact subtle record actions
-  (Save). Their footer holds at most one secondary that adds content (Add),
+  (Save). Their footer holds at most one leading action that adds content (Add),
   then Clear and the primary; choices apply as made, so the footer ends with
   Done where there is no other primary. A saved record's name is one
   `SavedName` combobox.

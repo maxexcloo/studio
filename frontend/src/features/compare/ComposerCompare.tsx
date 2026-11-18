@@ -200,7 +200,7 @@ export function CompareMenu() {
           </Button>
         )
       }
-      secondary={
+      leading={
         <Button
           variant="default"
           leftSection={<icons.duplicate size={16} />}
