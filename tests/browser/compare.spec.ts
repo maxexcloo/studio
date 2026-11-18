@@ -594,6 +594,6 @@ test("Variants of a result show their numbers, the axis they vary and propose a 
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   if (testInfo.project.use.isMobile)
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-  await expect(page.getByText("Dimensions", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("File Size", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("cell", { name: "#13", exact: true })).toHaveCount(0);
 });

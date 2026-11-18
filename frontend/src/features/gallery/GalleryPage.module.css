@@ -46,7 +46,8 @@
    filter or selection applies. */
 .toolbar {
   z-index: 5;
-  margin-inline: calc(-1 * var(--app-shell-padding));
+  /* Flush under the header, as it sticks, so its controls sit centred in its band. */
+  margin: calc(-1 * var(--app-shell-padding)) calc(-1 * var(--app-shell-padding)) 0;
   padding: var(--mantine-spacing-xs) var(--app-shell-padding);
   background: var(--studio-glass-chrome);
   backdrop-filter: var(--studio-glass-filter);
