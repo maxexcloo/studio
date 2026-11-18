@@ -1,4 +1,4 @@
-import { Button, Group, Menu, Stack, Text } from "@mantine/core";
+import { Button, Group, Menu, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
@@ -12,7 +12,7 @@ import { useRemembered } from "../auth/useRemembered";
 import { iconChipProps } from "./chip";
 import { defaultProfile, initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
 import { generationInput } from "./payload";
-import { ChipPopup, SaveButton, SavedName, useNaming } from "./Picker";
+import { ChipPopup, SavedName, useNaming } from "./Picker";
 import {
   type Preset,
   type PresetPart,
@@ -164,7 +164,7 @@ export function PresetPicker({
       title="Presets"
       tooltip
       position="top-end"
-      width={360}
+      width={400}
       floating
       opened={opened}
       onOpenedChange={setOpened}
@@ -180,28 +180,15 @@ export function PresetPicker({
       }
       onClear={() => select()}
       clearDisabled={!selection.presetId}
-      actions={
-        <SaveButton
-          noun="Preset"
-          naming={naming}
-          current={selected}
-          edited={edited}
-          disabled={!canSave || !presets.isSuccess}
-          onUpdate={(preset) => presets.update(preset, presetInput(current(), preset.parts))}
-        />
-      }
-    >
-      <Stack gap="sm" flex={1} mih={0}>
-        {presets.isPending ? (
-          <LoadingState label="Loading Presets" />
-        ) : (
+      name={
+        !presets.isPending && (
           <SavedName
             noun="Preset"
             naming={naming}
             records={records}
             current={selected}
             edited={edited}
-            canSave={canSave}
+            canSave={canSave && presets.isSuccess}
             replaces={(preset) => (loading(preset).replaces ? replaceMessage(preset) : undefined)}
             menu={
               <>
@@ -251,6 +238,7 @@ export function PresetPicker({
                 })
                 .then(select)
             }
+            onUpdate={(preset) => presets.update(preset, presetInput(current(), preset.parts))}
             onRename={(preset, title) =>
               presets.rename(preset, title).then(() => select({ ...preset, title }))
             }
@@ -259,13 +247,18 @@ export function PresetPicker({
               select();
             }}
           />
-        )}
-        {presets.error && (
+        )
+      }
+    >
+      {presets.isPending ? (
+        <LoadingState label="Loading Presets" />
+      ) : (
+        presets.error && (
           <Text c="red" size="sm">
             {presets.error.message}
           </Text>
-        )}
-      </Stack>
+        )
+      )}
     </ChipPopup>
   );
 }
