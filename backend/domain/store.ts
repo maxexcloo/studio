@@ -340,12 +340,13 @@ export class Store {
   /**
    * The owner's queue as it lists, in queue order: every unfinished job, every failed one not
    * cleared, and the newest `listedFinishedJobs` of the rest. Nothing is deleted: an older job
-   * stays readable by its ID.
+   * stays readable by its ID. With `results` false, records leave out their `items` and
+   * `outputs`, which copy each result's gallery record twice over.
    */
-  queueJobs(ownerId: string): OwnedJob[] {
+  queueJobs(ownerId: string, { results = true } = {}): OwnedJob[] {
     return this.db
       .prepare(
-        `SELECT record FROM studio_queue WHERE owner_id = ? AND (
+        `SELECT ${results ? "record" : "json_remove(record, '$.items', '$.outputs') AS record"} FROM studio_queue WHERE owner_id = ? AND (
           status IN (${placeholders(openStatuses)})
           OR (status = 'failed' AND json_extract(record, '$.cleared') IS NULL)
           OR rowid IN (SELECT rowid FROM studio_queue WHERE owner_id = ? AND status IN (${placeholders(terminalStatuses)})
