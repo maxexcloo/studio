@@ -486,12 +486,13 @@ function rewriteInstructions({
     .join("\n");
 }
 
-// Bifrost's local/ and cloud/ routers define both `auto` and `uncensored`; any other model is kept.
+// Bifrost's cloud/ router defines both `auto` and `uncensored`; local/auto is uncensored itself, and
+// any other model is kept.
 function uncensoredAlias(model, explicit) {
-  return explicit && model.endsWith("/auto") ? model.replace(/\/auto$/, "/uncensored") : model;
+  return explicit && model === "cloud/auto" ? "cloud/uncensored" : model;
 }
 
-/** Whether a gateway text model is uncensored, as its name says (`cloud/uncensored`, `local/uncensored`). */
+/** Whether a gateway text model is uncensored, as its name says (`cloud/uncensored`, `local/qwen3.8-27b-uncensored`). */
 export const uncensoredText = (model) => /uncensored/i.test(model);
 
 /**
@@ -524,7 +525,7 @@ export function createAssistant(
    * The Bifrost model a call asks for, given the account's text `writer` (account-policy.js
    * `promptWriter`): on Local, while a workload serves text, its Local default, else the running
    * local text model; otherwise its Cloud default, else the cloud model. An uncensored default the
-   * account may not use gives way. Without a chosen default the uncensored alias is asked for when
+   * account may not use gives way. Without a chosen default Cloud asks for its uncensored alias when
    * `explicit` or the account may use uncensored models. Work for no account uses the cloud model.
    */
   async function modelFor(task, explicit = false, writer) {
