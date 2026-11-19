@@ -450,7 +450,9 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   await expect(preview).toBeVisible();
   await expect(preview.getByRole("img", { name: fullPrompt, exact: true })).toBeVisible();
   const header = preview.getByRole("group", { name: "Viewer Header", exact: true });
-  await expect(header.getByText("148 / 150", { exact: true })).toBeVisible();
+  await expect(header.getByRole("status", { name: "Current Result", exact: true })).toHaveText(
+    "148 / 150",
+  );
   await expect(header.getByText("Reference Model", { exact: true })).toBeVisible();
   await expect(preview.getByRole("group", { name: "Generation Actions" })).toHaveCount(0);
   await page.keyboard.press("Escape");

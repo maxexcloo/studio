@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { type Locator, expect, test } from "@playwright/test";
 
 import { mediaTitle } from "../../frontend/src/features/gallery/mediaLabels";
 import {
@@ -15,6 +15,9 @@ import {
   toolbarSearch,
   touch,
 } from "./fixtures";
+
+const currentResult = (viewer: Locator) =>
+  viewer.getByRole("status", { name: "Current Result", exact: true });
 const results = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
     id: `browse-${index}`,
@@ -160,14 +163,14 @@ test("The viewer loads the next page as it nears the last loaded result and coun
   const nextPage = page.waitForResponse((response) => response.url().includes("cursor=next"));
   await page.goto("/images/browse-59");
   const viewer = page.getByRole("dialog");
-  await expect(viewer.getByText("60 / 61", { exact: true })).toBeVisible();
+  await expect(currentResult(viewer)).toHaveText("60 / 61");
   // Navigation stops at the last loaded result, so the step waits for the page it loaded to show.
   await nextPage;
   await expect(async () => {
     await page.keyboard.press("ArrowRight");
     await expect(page).toHaveURL(/\/images\/browse-60/, { timeout: 500 });
   }).toPass();
-  await expect(viewer.getByText("61 / 61", { exact: true })).toBeVisible();
+  await expect(currentResult(viewer)).toHaveText("61 / 61");
 });
 
 test("Select All takes every match across pages, and the search and Liked stay while selecting", async ({
@@ -621,7 +624,7 @@ test("Runs fan a stacked run out in place and open it to flip through", async ({
   await run.getByRole("button", { name: "Open image: Bird Study 2", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   // A run's result flips through that run alone, as Open All does from its first.
-  await expect(viewer.getByText(/^\d \/ 3$/)).toBeVisible();
+  await expect(currentResult(viewer)).toHaveText(/^\d \/ 3$/);
   if (!testInfo.project.use.isMobile) {
     // Following a source is a separate history step. Back returns to the run's own neighbours.
     await viewer
@@ -631,12 +634,12 @@ test("Runs fan a stacked run out in place and open it to flip through", async ({
     await expect(page).toHaveURL(/\/images\/browse-0$/);
     await page.goBack();
     await expect(page).toHaveURL(/\/images\/run-2$/);
-    await expect(viewer.getByText(/^\d \/ 3$/)).toBeVisible();
+    await expect(currentResult(viewer)).toHaveText(/^\d \/ 3$/);
   }
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await run.getByRole("button", { name: "Open All", exact: true }).click();
   await expect(viewer.getByRole("img", { name: "Bird study 0", exact: true })).toBeVisible();
-  await expect(viewer.getByText("1 / 3", { exact: true })).toBeVisible();
+  await expect(currentResult(viewer)).toHaveText("1 / 3");
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await run.getByRole("button", { name: "Close Run", exact: true }).click();
   await expect(run).toBeHidden();
@@ -646,12 +649,10 @@ test("Runs fan a stacked run out in place and open it to flip through", async ({
   await expect(page.getByRole("radio", { name: "Runs" })).toBeChecked();
 });
 
-test("An MCP result set is one titled run whose viewer names each result's place and jumps along its strip", async ({
+test("An MCP result set is one titled run whose viewer announces each result and jumps along its strip", async ({
   page,
-}, testInfo) => {
-  // Phones show only the place; Details names the set.
-  const place = (title: string, index: number) =>
-    testInfo.project.use.isMobile ? `${index} / 3` : `${title} · ${index} / 3`;
+}) => {
+  const place = (title: string, index: number) => `${title} · ${index} / 3`;
   const state = await fixtures(page);
   const set = { id: "set-a", title: "Variety Test", source: "LibreChat" };
   const untitled = mediaTitle({ prompt: "Set prompt 1, detailed" });
@@ -692,25 +693,24 @@ test("An MCP result set is one titled run whose viewer names each result's place
     `Open image: ${untitled}`,
     "Open image: Fox Wizard",
   ]);
-  // The viewer names the result's place in its set and jumps along the set's strip.
+  // The viewer announces the result's place while navigating the set's strip.
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const current = currentResult(viewer);
   // WebKit can drop a tap while the run's tiles are still fanning out.
   await expect(async () => {
     if (!(await viewer.isVisible()))
       await run.getByRole("button", { name: "Open All", exact: true }).click();
-    await expect(viewer.getByText(place("Bear Hug", 1), { exact: true })).toBeVisible({
-      timeout: 1000,
-    });
+    await expect(current).toHaveText(place("Bear Hug", 1), { timeout: 1000 });
   }).toPass();
   const strip = viewer.getByRole("list", { name: "Set: Variety Test", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(3);
   await strip.getByRole("listitem", { name: "Show Fox Wizard (3 of 3)", exact: true }).click();
-  await expect(viewer.getByText(place("Fox Wizard", 3), { exact: true })).toBeVisible();
+  await expect(current).toHaveText(place("Fox Wizard", 3));
   await expect(
     viewer.getByRole("img", { name: "Set prompt 0, detailed", exact: true }),
   ).toBeVisible();
   await strip.getByRole("listitem", { name: `Show ${untitled} (2 of 3)`, exact: true }).click();
-  await expect(viewer.getByText(place(untitled, 2), { exact: true })).toBeVisible();
+  await expect(current).toHaveText(place(untitled, 2));
 });
 
 test("Select Set picks a set's results to upscale together", async ({ page }) => {
@@ -1784,7 +1784,7 @@ test("A result loaded at the front is reachable to the left of an open viewer", 
   state.gallery.push(...results(3));
   await page.goto("/images/browse-0");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await expect(viewer.getByText("1 / 3", { exact: true })).toBeVisible();
+  await expect(currentResult(viewer)).toHaveText("1 / 3");
   const [first] = results(1);
   state.gallery.unshift({ ...first, id: "viewer-arrival", prompt: "New Arrival" });
   state.jobs.push({
@@ -1799,11 +1799,11 @@ test("A result loaded at the front is reachable to the left of an open viewer", 
     updatedAt: stamp,
   });
 
-  await expect(viewer.getByText("2 / 4", { exact: true })).toBeVisible();
+  await expect(currentResult(viewer)).toHaveText("2 / 4");
   await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
   await page.keyboard.press("ArrowLeft");
   await expect(viewer.getByRole("img", { name: "New Arrival", exact: true })).toBeVisible();
-  await expect(viewer.getByText("1 / 4", { exact: true })).toBeVisible();
+  await expect(currentResult(viewer)).toHaveText("1 / 4");
   await page.keyboard.press("ArrowRight");
   await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
 });
@@ -1837,7 +1837,7 @@ test("Returning after more than a page of incoming results leaves no gap before 
   });
   await page.goto("/images/browse-0");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
+  await expect(currentResult(viewer)).toHaveText("1 / 10");
   await expect.poll(() => cursors.length).toBe(2);
   const visibility = (hidden: boolean) =>
     page.evaluate((hidden) => {
@@ -1861,12 +1861,12 @@ test("Returning after more than a page of incoming results leaves no gap before 
     release();
   }
   await expect.poll(() => cursors.length).toBe(previousReads + 2);
-  await expect(viewer.getByText("66 / 75", { exact: true })).toBeVisible();
+  await expect(currentResult(viewer)).toHaveText("66 / 75");
   await expect(page).toHaveURL(/\/images\/browse-0$/);
   expect(cursors.slice(previousReads)).toEqual(["", "60"]);
   await page.keyboard.press("ArrowLeft");
   await expect(viewer.getByRole("img", { name: "Away 64", exact: true })).toBeVisible();
-  await expect(viewer.getByText("65 / 75", { exact: true })).toBeVisible();
+  await expect(currentResult(viewer)).toHaveText("65 / 75");
   await page.keyboard.press("ArrowRight");
   await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
   await page.keyboard.press("ArrowRight");
