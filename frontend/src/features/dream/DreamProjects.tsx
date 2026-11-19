@@ -145,6 +145,9 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
   return (
     <>
       {actionTarget &&
+        !projects.isPending &&
+        (list.length > 0 || !inbox.isPending) &&
+        !empty &&
         createPortal(
           <Tooltip label="New Project">
             <ActionIcon
