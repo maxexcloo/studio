@@ -423,7 +423,7 @@ export function registerLibraryRoutes(
     if (!engine)
       return {
         available: false,
-        reason: "Set up the prompt assistant in Settings › Integrations to describe images.",
+        reason: "The prompt assistant must be configured to describe images.",
       };
     try {
       return (await engine.supportsVision())

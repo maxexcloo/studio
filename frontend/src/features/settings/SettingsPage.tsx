@@ -13,7 +13,6 @@ import { runtimeQueueQuery, runtimeStatusQuery } from "../runtime/RuntimeWorkloa
 import { AboutStudio } from "./AboutStudio";
 import { GroupsAdmin, UsersAdmin } from "./AccountAdmin";
 import { GenerationSettings } from "./GenerationSettings";
-import { IntegrationSettings } from "./IntegrationSettings";
 import { MaintenanceSettings } from "./MaintenanceSettings";
 import { OwnAccount } from "./OwnAccount";
 import { Preferences } from "./Preferences";
@@ -100,7 +99,6 @@ export function SettingsPage() {
           dream: <DreamPreferences />,
           generation: <GenerationSettings />,
           groups: (heading) => <GroupsAdmin heading={heading} />,
-          integrations: <IntegrationSettings />,
           maintenance: <MaintenanceSettings onOpenUnfinished={unfinished.open} />,
           users: (heading) => <UsersAdmin heading={heading} />,
           workers: (heading) => (

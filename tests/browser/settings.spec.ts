@@ -28,7 +28,7 @@ test("Settings follow the settled section order and run maintenance and worker r
     if (new URL(request.url()).pathname === "/api/services/status") statusReads++;
   });
   await page.goto("/settings");
-  // Personal, then Administration, each alphabetical, with Integrations and About apart.
+  // Personal, then Administration, each alphabetical, with About last.
   const order = [
     "Account",
     "Dream",
@@ -39,7 +39,6 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Maintenance",
     "Users",
     "Workers",
-    "Integrations",
     "About",
   ];
   if ((page.viewportSize()?.width || 1440) < 768) {
@@ -53,7 +52,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   if ((page.viewportSize()?.width || 1440) >= 768)
     await expect(
       page.getByRole("group", { name: "Administration", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(4, -2));
+    ).toHaveText(order.slice(4, -1));
   await section(page, "Settings", "Generation");
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
@@ -953,11 +952,6 @@ test("Settings › Maintenance switches follow at once and settle back after a f
             locked: false,
           },
         ],
-        integrations: {
-          civitai: { token: { set: false } },
-          huggingFace: { token: { set: false } },
-          assistant: { available: false },
-        },
       },
     });
   });

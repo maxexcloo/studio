@@ -22,7 +22,7 @@ import classes from "./WorkspaceSections.module.css";
 
 /**
  * One Library or Settings section; `admin` sections are hidden from other accounts, `group` names the
- * run of sections it belongs to (Personal, Administration), `apart` sections (Integrations, About)
+ * run of sections it belongs to (Personal, Administration), `apart` sections
  * come last and sit at the foot of the desktop navigation below a divider, and the `initial` one
  * opens first instead of the first listed.
  */
