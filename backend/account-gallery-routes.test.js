@@ -99,6 +99,23 @@ test("library review pages only the owner's eligible media in a stable seeded or
   assert.notDeepEqual((await read({ seed: "second" })).items, all.items);
   assert.equal((await read({}, null)).remaining, 0);
 
+  const videos = await read({ media: "video" });
+  assert.deepEqual(
+    videos.items,
+    all.items.filter(({ type }) => type === "video"),
+  );
+  assert.equal(videos.remaining, 1);
+
+  const images = await read({ media: "image", limit: 2 });
+  const moreImages = await read({ media: "image", cursor: images.nextCursor });
+  assert.equal(images.remaining, candidates.length - 1);
+  assert.equal(moreImages.remaining, images.remaining - images.items.length);
+  assert.deepEqual(
+    [...images.items, ...moreImages.items],
+    all.items.filter(({ type }) => type === "image"),
+  );
+  assert.ok((await read({ media: "text" })).error);
+
   const first = await read({ limit: 2 });
   galleryStore.setGalleryRatings([first.items[1].id], "liked", "account-a");
   const rest = await read({ cursor: first.nextCursor });
