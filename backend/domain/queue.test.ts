@@ -121,6 +121,76 @@ test("conflicting work waits until outputs save; independent cloud work proceeds
   }
 });
 
+test("Waiting positions follow tier, model affinity and manual moves at dispatch", async (t) => {
+  const { store, queue, submitted, observations } = fixture();
+  t.after(() => store.close());
+  const owner = "alice";
+  const session = store.createSession(owner);
+  const add = (model: string, priority: number = queuePriority.manual) =>
+    store.enqueue(owner, session.id, { model }, "image", undefined, "worker:gpu", undefined, {
+      priority,
+    });
+  const running = add("warm");
+  await queue.tick();
+  const cold = add("cold");
+  const mcp = add("warm", queuePriority.mcp);
+  const warm = add("warm");
+  const later = add("warm");
+  await queue.tick();
+
+  assert.deepEqual(
+    store.movable(owner).map(({ id }) => id),
+    [cold.id, mcp.id, warm.id, later.id],
+  );
+  assert.deepEqual(
+    [cold, mcp, warm, later].map(({ id }) => queue.queuePosition(id)),
+    [3, 4, 1, 2],
+  );
+  assert.equal(store.move(owner, [later.id], 2), true);
+  await queue.tick();
+  assert.deepEqual(
+    [cold, mcp, warm, later].map(({ id }) => queue.queuePosition(id)),
+    [3, 4, 2, 1],
+  );
+
+  observations.set(running.id, { status: "completed" });
+  await queue.tick();
+  assert.deepEqual(submitted, [running.id, later.id]);
+});
+
+test("Waiting positions reflect the spare slot's reordered list during eligibility", async () => {
+  const { store, queue, adapter, submitted } = fixture();
+  const checking = deferred();
+  const allow = deferred();
+  adapter.slots = () => 2;
+  const session = store.createSession("alice");
+  const add = (model: string) =>
+    store.enqueue("alice", session.id, { model }, "image", undefined, "worker:gpu");
+  const first = add("a");
+  const other = add("b");
+  const same = add("a");
+  adapter.eligible = async (job) => {
+    if (job.id === same.id) {
+      checking.resolve();
+      await allow.promise;
+    }
+    return undefined;
+  };
+  const dispatch = queue.tick();
+  try {
+    await checking.promise;
+    assert.deepEqual(submitted, [first.id]);
+    assert.equal(queue.queuePosition(first.id), undefined);
+    assert.equal(queue.queuePosition(same.id), 1);
+    assert.equal(queue.queuePosition(other.id), 2);
+  } finally {
+    allow.resolve();
+    await dispatch;
+    store.close();
+  }
+  assert.deepEqual(submitted, [first.id, same.id]);
+});
+
 test("A worker restart keeps work ended when an in-flight provider response arrives", async (t) => {
   for (const stage of ["submit", "observe"] as const) {
     const { store, queue, adapter, events } = fixture();

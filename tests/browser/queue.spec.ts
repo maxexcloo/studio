@@ -2,6 +2,60 @@ import { expect, test } from "@playwright/test";
 
 import { fixtures, image, serveRetries, signIn, stamp } from "./fixtures";
 
+test("the visible queue puts running work first and follows dispatch order within each worker", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  const jobs = [
+    ["Cold Job", "waiting", "radiance"],
+    ["Parallel Job", "waiting", "comfyui"],
+    ["Warm Job", "waiting", "radiance"],
+    ["Active Job", "running", "radiance"],
+  ].map(([id, status, backend]) => ({
+    id,
+    jobId: id,
+    status,
+    backend,
+    operation: "image",
+    input: {
+      prompt: id,
+      ...(backend === "radiance" && { profileName: "Krea 2 Turbo · Radiance" }),
+    },
+    ...(id === "Active Job" && {
+      progress: { phase: "generating", max: 8, value: 2, steps: true, etaMs: 20000 },
+    }),
+    ...(id === "Cold Job" && { reason: "Waiting for the model to load." }),
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  }));
+  await page.route(/\/api\/queue(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        jobs,
+        ids: jobs.map(({ id }) => id),
+        paused: { mine: false, all: false },
+        queuePositions: { "Warm Job": 1, "Parallel Job": 1, "Cold Job": 2 },
+        queueOrder: ["Warm Job", "Parallel Job", "Cold Job"],
+      },
+    }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const labels = queue.getByText(/^(Active|Warm|Parallel|Cold) Job$/);
+  await expect(labels).toHaveText(["Active Job", "Warm Job", "Parallel Job", "Cold Job"]);
+  await expect(
+    queue.getByText("Generating – Krea 2 Turbo · Step 2 of 8 · About 20s Left", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    queue.getByText("Waiting – Krea 2 Turbo · #2 in Radiance Queue", { exact: true }),
+  ).toBeVisible();
+  await expect(queue.getByText("Waiting for the model to load.", { exact: true })).toBeVisible();
+});
+
 test("the queue pauses, resumes and reorders the account's waiting work", async ({ page }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
@@ -45,11 +99,7 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
   const queue = page.getByRole("dialog", { name: "Generations", exact: true });
   const order = () => queue.getByText(/^(running-job|first|second|third)$/).allTextContents();
   await expect.poll(order).toEqual(["running-job", "first", "second", "third"]);
-  // Phones keep the row to its title and a short status; the model shows in its details.
-  const phone = test.info().project.use.isMobile;
-  await expect(
-    queue.getByText(phone ? "Generating" : "Image Quality · Generating", { exact: true }),
-  ).toBeVisible();
+  await expect(queue.getByText("Generating – Image Quality", { exact: true })).toBeVisible();
 
   // An administrator's one Pause holds every account's work.
   await queue.getByRole("button", { name: "Pause Queue", exact: true }).click();
@@ -118,7 +168,10 @@ test("a request's jobs group as one set that moves and stops together", async ({
     input: {
       prompt: id,
       kind: "image",
-      ...(queueSet && { resultSet: { id: "result-set", title: "Fox Studies", index: 0 } }),
+      ...(queueSet && {
+        profileName: "Krea 2 Turbo · Radiance",
+        resultSet: { id: "result-set", title: "Fox Studies", index: 0 },
+      }),
     },
     ...(queueSet && { queueSet }),
     items: [],
@@ -139,6 +192,7 @@ test("a request's jobs group as one set that moves and stops together", async ({
   await expect(queue.getByText("Generations (2)", { exact: true })).toBeVisible();
   const set = queue.getByRole("button", { name: /^Fox Studies/ });
   await expect(set).toContainText("1 of 3 Done");
+  await expect(set).toContainText("Queued – Krea 2 Turbo");
   // Dragging has loaded once the handles work, so the rows stay mounted.
   const handles = queue.getByRole("button", { name: "Drag to Reorder", exact: true });
   await expect(handles.first()).toBeEnabled();
@@ -383,8 +437,9 @@ test("while work runs the queue polls only for changes and still shows the work 
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
   const queue = page.getByRole("dialog", { name: "Generations", exact: true });
-  await expect(queue.getByText(/Generating$/)).toBeVisible();
+  const generating = queue.getByText("Generating – Image Quality", { exact: true });
+  await expect(generating).toBeVisible();
   await polled;
   job.status = "completed";
-  await expect(queue.getByText(/Generating$/)).toHaveCount(0);
+  await expect(generating).toHaveCount(0);
 });

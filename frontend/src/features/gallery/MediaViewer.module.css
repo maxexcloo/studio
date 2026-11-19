@@ -265,6 +265,11 @@
   height: 40px;
 }
 
+.variationProgress {
+  position: absolute;
+  inset: auto 0 0;
+}
+
 .variation[data-entering] {
   animation: arrive var(--studio-motion-duration) var(--studio-ease-enter);
 }

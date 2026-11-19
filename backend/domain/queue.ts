@@ -193,6 +193,7 @@ export class GenerationQueue {
   private loaded = new Map<string, OwnedJob>();
   /** Jobs whose prompt is being written, to abort on cancel or stop. */
   private writing = new Map<string, AbortController>();
+  private positions = new Map<string, number>();
   /** Each running job's last progress and when it changed, to find a stalled run. */
   private progressSeen = new Map<string, { key: string; at: number }>();
   /** The clock stalls are measured by (tests move it). */
@@ -250,6 +251,14 @@ export class GenerationQueue {
   /** Forgets what a resource has loaded: its worker stopped, restarted or went offline. */
   unload(resource: string) {
     this.loaded.delete(resource);
+  }
+
+  isWriting(id: string) {
+    return this.writing.has(id);
+  }
+
+  queuePosition(id: string) {
+    return this.positions.get(id);
   }
 
   start() {
@@ -468,19 +477,31 @@ export class GenerationQueue {
     const ownWaiting = all.some(
       (item) => waitingNow(item) && (item.priority ?? queuePriority.manual) < queuePriority.dream,
     );
-    const groups = new Map<string, OwnedJob[]>();
-    for (const job of all.filter(
-      (item) => waitingNow(item) && !(ownWaiting && item.priority === queuePriority.dream),
-    )) {
-      if (occupied.has(job.resource)) {
-        wait(job, "Waiting for earlier work to finish and save its outputs.");
-      } else if (!this.scheduling.has(job.resource)) {
-        const group = groups.get(job.resource) || [];
-        group.push(job);
-        groups.set(job.resource, group);
+    const waiting = new Map<string, OwnedJob[]>();
+    const heldBack = new Map<string, OwnedJob[]>();
+    const writers: OwnedJob[] = [];
+    for (const job of all) {
+      if (!pendingStatuses.has(job.status) || isStarted(job)) continue;
+      if (job.status === "writing") {
+        if (!this.isWriting(job.id)) writers.push(job);
+      } else {
+        const ready = waitingNow(job);
+        const dreamWaits = ownWaiting && job.priority === queuePriority.dream;
+        if (ready && dreamWaits) wait(job, "Waiting for user work to start.");
+        const group = ready && !dreamWaits ? waiting : heldBack;
+        const jobs = group.get(job.resource) ?? [];
+        jobs.push(job);
+        group.set(job.resource, jobs);
       }
     }
-    if (!groups.size) return;
+    this.positions.clear();
+    const showOrder = (jobs: OwnedJob[]) =>
+      jobs.forEach((job, index) => this.positions.set(job.id, index + 1));
+    const tier = (job: OwnedJob) => job.priority ?? queuePriority.manual;
+    showOrder(writers.sort((a, b) => Number(held(a)) - Number(held(b)) || tier(a) - tier(b)));
+    for (const [resource, jobs] of heldBack)
+      if (!waiting.has(resource)) showOrder(jobs.sort((a, b) => rank(a) - rank(b)));
+    if (!waiting.size) return;
     // Lower tiers wait while higher ones are queued (no aging); the stable sort keeps FIFO within a tier.
     // Within a tier, jobs reusing what the resource holds go first: the model and LoRAs of a job
     // running there or the last one it ran, then its model alone. A resource with several slots
@@ -492,8 +513,8 @@ export class GenerationQueue {
     const overtaken = new Set<string>();
     for (let index = all.length - 1; index >= 0; index--) {
       const job = all[index];
-      if (!groups.has(job.resource)) continue;
-      const key = JSON.stringify([job.resource, job.priority ?? queuePriority.manual]);
+      if (!waiting.has(job.resource)) continue;
+      const key = JSON.stringify([job.resource, tier(job)]);
       const count = laterStarts.get(key) ?? 0;
       if (isStarted(job)) laterStarts.set(key, count + 1);
       else if (count >= reuseBypassLimit) overtaken.add(job.id);
@@ -505,12 +526,22 @@ export class GenerationQueue {
       return jobs.sort((a, b) => rank(a) - rank(b) || cost(a) - cost(b));
     };
     await Promise.all(
-      [...groups].map(async ([resource, candidates]) => {
+      [...waiting].map(async ([resource, candidates]) => {
+        const fifo = new Set(candidates.filter((job) => overtaken.has(job.id)).map(rank));
+        const next = order(resource, [...candidates], fifo);
+        const deferred = (heldBack.get(resource) ?? []).sort((a, b) => rank(a) - rank(b));
+        const skipped: OwnedJob[] = [];
+        const showRemaining = () => showOrder([...next, ...skipped, ...deferred]);
+        showRemaining();
+        if (occupied.has(resource)) {
+          for (const job of candidates)
+            wait(job, "Waiting for earlier work to finish and save its outputs.");
+          return;
+        }
+        if (this.scheduling.has(resource)) return;
         // Resource groups run independently. A slow cloud request or offline worker cannot hold the scheduler.
         this.scheduling.add(resource);
         let room = free(resource);
-        const fifo = new Set(candidates.filter((job) => overtaken.has(job.id)).map(rank));
-        const next = order(resource, [...candidates], fifo);
         try {
           while (!this.stopped && next.length) {
             let job = next.shift()!;
@@ -521,6 +552,7 @@ export class GenerationQueue {
               !videos.some((video) => modelOf(video.input) === modelOf(job.input))
             ) {
               wait(job, videoModelReason);
+              skipped.push(job);
               continue;
             }
             const active = running.get(resource);
@@ -548,17 +580,22 @@ export class GenerationQueue {
             if (this.stopped) return;
             job = this.store.job(job.ownerId, job.id)!;
             if (job.status === "cancelled") {
+              this.positions.delete(job.id);
               await this.adapter.settled?.(job);
               continue;
             }
             // Paused while its eligibility was checked: the next tick marks it Paused.
-            if (this.held()(job)) continue;
+            if (this.held()(job)) {
+              skipped.push(job);
+              continue;
+            }
             // One local video runs at a time across workers: two at once on one-GPU workers sharing a
             // node run it out of system memory. A two-GPU worker holds the node alone, so it never
             // meets this. Synchronous from here to "starting", so two workers' passes can't both start.
             if (!reason && localVideo(job) && this.videoRunning(job.id)) reason = videoWaitReason;
             if (reason) {
               wait(job, reason);
+              skipped.push(job);
               continue;
             }
             job = this.store.save({
@@ -568,6 +605,7 @@ export class GenerationQueue {
               admittedAt: this.now(),
             });
             // Persist starting before crossing the provider boundary: interrupted responses are never resubmitted.
+            this.positions.delete(job.id);
             this.acceptedIds.add(job.id);
             this.loaded.set(resource, job);
             this.submitting.add(job.id);
@@ -603,6 +641,7 @@ export class GenerationQueue {
             if (--room > 0) {
               running.set(resource, [...(running.get(resource) ?? []), job]);
               order(resource, next, fifo);
+              showRemaining();
               continue;
             }
             for (const pending of candidates) {

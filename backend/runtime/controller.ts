@@ -2,11 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 
 import {
-  type RuntimeJob,
   type RuntimeOperation,
   type RuntimePodLog,
   type RuntimePreview,
   type RuntimeQueueCancel,
+  type RuntimeQueueStatus,
   type RuntimeStatus,
   type WorkloadPhase,
 } from "../../shared/runtime.ts";
@@ -72,8 +72,8 @@ export interface RuntimeStore {
 
 /** The generation queue's work on each workload (generation-queue.js). */
 export interface WorkloadQueue {
-  /** A workload's accepted jobs, and how many more wait to start on it. */
-  load(workload: string): { jobs: RuntimeJob[]; queued: number };
+  /** Each workload's accepted jobs and a preview of the queue waiting to start. */
+  load(workloads: string[]): RuntimeQueueStatus["workloads"];
   /** The most urgent tier (lowest `priority`) of unpaused work waiting to start on a workload; Infinity if none. */
   waitingTier(workload: string): number;
   /** Cancels every queued and running job routed to a workload. */
@@ -313,6 +313,10 @@ export class RuntimeController {
     return states;
   }
 
+  queueStatus(): RuntimeQueueStatus {
+    return { workloads: this.queue?.load(this.workloads.map(({ id }) => id)) ?? {} };
+  }
+
   async observe(): Promise<RuntimeStatus> {
     const observed = await Promise.all(
       this.workloads.map((workload) =>
@@ -327,6 +331,7 @@ export class RuntimeController {
       if ("state" in entry && holds(entry.state))
         used[entry.workload.pool] = (used[entry.workload.pool] ?? 0) + entry.workload.gpus;
     const swaps = this.swaps;
+    const loads = this.queueStatus().workloads;
     return {
       ...(swaps ? { swaps } : {}),
       pools: Object.entries(this.pools).map(([id, capacity]) => ({
@@ -338,7 +343,7 @@ export class RuntimeController {
       history: structuredClone(this.record.operations.slice(0, 20)),
       workloads: observed.map((entry) => {
         const { workload } = entry;
-        const load = this.queue?.load(workload.id);
+        const load = loads[workload.id];
         const base = {
           id: workload.id,
           label: workload.label,
@@ -850,8 +855,13 @@ export class RuntimeController {
   async restartWhenIdle(signal?: AbortSignal) {
     for (const [id, due] of this.memoryRestarts) {
       if (signal?.aborted || this.current || this.claimed) return;
-      const load = this.queue?.load(id);
-      if (this.active.get(id) || load?.queued || this.now() - (this.usedAt.get(id) ?? 0) < quietMs)
+      const load = this.queue?.load([id])[id];
+      if (
+        this.active.get(id) ||
+        load?.queued ||
+        load?.jobs.some((job) => job.status === "writing") ||
+        this.now() - (this.usedAt.get(id) ?? 0) < quietMs
+      )
         continue;
       const workload = this.workload(id);
       const state = await this.engine.state(workload);

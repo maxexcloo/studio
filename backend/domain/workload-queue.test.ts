@@ -63,13 +63,15 @@ test("Settings › Workers lists a workload's accepted work, drops stale leases 
   job("saving", "radiance", { status: "saving" });
   job("elsewhere", "comfyui", { status: "running" });
   const work = start();
-  const load = work.load("radiance");
+  const load = work.load(["radiance"]).radiance;
   assert.deepEqual(
     load.jobs.map((item) => [item.id, item.status, item.title, item.cancelling ?? false]),
     [
       ["running", "running", "Prompt running", false],
       ["cancelling", "running", "Prompt cancelling", true],
       ["saving", "saving", "Prompt saving", false],
+      ["queued", "queued", "Prompt queued", false],
+      ["admitting", "waiting", "Prompt admitting", false],
     ],
   );
   assert.equal(load.queued, 2);
