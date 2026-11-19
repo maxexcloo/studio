@@ -68,13 +68,11 @@ test("Library card ratings hide with Undo and feed the References sort", async (
   await expect.poll(names).toEqual(["Mara", "Ada"]);
   await rate("Dislike");
   await expect.poll(names).toEqual(["Ada"]);
-  await page.getByRole("button", { name: "Filter Characters", exact: true }).click();
-  const filters = page.getByRole("dialog", { name: "Filter Characters", exact: true });
-  await filters.getByText("Disliked", { exact: true }).click();
-  await filters.getByRole("button", { name: "Done", exact: true }).click();
-  await expect.poll(names).toEqual(["Mara"]);
+  await sort.click();
+  await page.getByRole("menuitemradio", { name: "Disliked First", exact: true }).click();
+  await expect.poll(names).toEqual(["Mara", "Ada"]);
   await rate("Restore");
-  await expect(actions).toHaveCount(0);
+  await expect.poll(names).toEqual(["Ada", "Mara"]);
 
   // The picker and Library remember their own order.
   await page.goto("/images");

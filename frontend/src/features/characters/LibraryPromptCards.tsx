@@ -8,7 +8,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SortMenu } from "../../ui/SortMenu";
 import { LibraryCard } from "./CardImages";
-import { CardRatingFilter, cardSortLabels, listedCards, useCardListing } from "./cardListing";
+import { cardSortLabels, listedCards, useCardListing } from "./cardListing";
 import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCardDialogs";
 import { type PromptCardKind, promptCardsQuery } from "./queries";
 import { useCardFrom } from "./useCardFrom";
@@ -33,7 +33,7 @@ export function LibraryPromptCards({
   const use = useCardInComposer();
   const [query, setQuery] = useState("");
   const order = useCardListing("library", kind);
-  const cards = listedCards(listing.data, query, order);
+  const cards = listedCards(listing.data, query, order.sort);
   return (
     <>
       <SectionHeader heading={heading}>
@@ -41,9 +41,6 @@ export function LibraryPromptCards({
           label={label}
           query={query}
           onQueryChange={listing.data?.length ? setQuery : undefined}
-          filters={<CardRatingFilter {...order} />}
-          filterCount={Number(order.disliked)}
-          onClearFilters={() => order.setDisliked(false)}
           actions={
             <>
               <SortMenu
@@ -68,9 +65,7 @@ export function LibraryPromptCards({
       ) : listing.error ? (
         <Alert color="red">{listing.error.message}</Alert>
       ) : !cards.length ? (
-        <EmptyState>
-          {query.trim() ? "No Matches" : order.disliked ? `No Disliked ${label}` : `No ${label}`}
-        </EmptyState>
+        <EmptyState>{query.trim() ? "No Matches" : `No ${label}`}</EmptyState>
       ) : (
         <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} role="list" aria-label={label}>
           {cards.map((card) => (

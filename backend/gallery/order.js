@@ -49,7 +49,8 @@ export function compareGalleryUnits(a, b, sort) {
       (a.time === null || b.time === null ? descending(a.time, b.time) : a.time - b.time) ||
       compareGalleryKeys(a, b)
     );
-  if (sort === "liked") return Number(b.liked) - Number(a.liked) || compareGalleryKeys(a, b);
+  if (sort === "liked" || sort === "disliked")
+    return Number(b[sort]) - Number(a[sort]) || compareGalleryKeys(a, b);
   return compareGalleryKeys(a, b);
 }
 

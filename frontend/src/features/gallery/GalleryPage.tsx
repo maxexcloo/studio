@@ -780,7 +780,7 @@ function Gallery() {
             items={items}
             results={resultsKey}
             versions={versions}
-            byDay={!similar && sort !== "liked"}
+            byDay={!similar && sort !== "liked" && sort !== "disliked"}
             focusItem={focusItem}
             open={openItem}
             selection={selection}
