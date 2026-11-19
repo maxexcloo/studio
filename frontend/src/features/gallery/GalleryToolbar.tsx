@@ -206,7 +206,6 @@ export function GalleryToolbar({
           {results}
         </Text>
       )}
-      {!phone && <ZoomSlider />}
       <SortMenu
         label="Sort Gallery"
         labels={gallerySortLabels}
@@ -214,6 +213,7 @@ export function GalleryToolbar({
         onChange={onSortChange}
         withinPortal
       />
+      {!phone && <ZoomSlider />}
       {actions}
     </Group>
   );
