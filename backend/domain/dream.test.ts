@@ -1632,6 +1632,53 @@ test("Calibration offers the account's older Studio generations, unjudged first,
   );
 });
 
+test("Dream counts match the deck while off, paired, and after a verdict or Undo", async (t) => {
+  const fx = fixture(t);
+  const { generated, state } = fx;
+  const at = new Date(state.clock).toISOString();
+  for (const side of [0, 1] as const)
+    generated({
+      id: `video-${side}`,
+      jobId: `job-video-${side}`,
+      ownerId: "alice",
+      type: "video",
+      status: "done",
+      dream: {
+        prompt: "A river",
+        at,
+        why: "",
+        state: "unseen",
+        pair: {
+          id: "river",
+          side,
+          question: "Which Video?",
+          label: side ? "Slow" : "Fast",
+          axis: "profile",
+          value: side ? "slow" : "fast",
+        },
+      },
+    });
+  const request = await serve(t, fx);
+  const count = async () => (await request("/count")).body;
+  const deck = async () => (await request("")).body;
+  const off = await deck();
+  assert.equal(off.settings.enabled, false);
+  assert.equal(off.unseen.length, 2);
+  assert.deepEqual(await count(), { unseen: 0, images: 0, videos: 0, active: false });
+
+  assert.equal((await request("/settings", { enabled: true }, "PUT")).status, 200);
+  assert.equal((await deck()).unseen.length, 2);
+  assert.deepEqual(await count(), { unseen: 1, images: 0, videos: 1, active: true });
+
+  assert.equal((await request("/settings", { paused: true }, "PUT")).status, 200);
+  assert.deepEqual(await count(), { unseen: 1, images: 0, videos: 1, active: false });
+  assert.equal((await request("/pairs/river/answer", { answer: "a" })).status, 200);
+  assert.equal((await deck()).unseen.length, 0);
+  assert.deepEqual(await count(), { unseen: 0, images: 0, videos: 0, active: false });
+  assert.equal((await request("/undo", { ids: ["video-0", "video-1"] })).status, 200);
+  assert.deepEqual(await count(), { unseen: 1, images: 0, videos: 1, active: false });
+});
+
 test("Deck calibration and its rating are saved or undone together", async (t) => {
   const fx = fixture(t);
   const { dream, generated, state, taste } = fx;

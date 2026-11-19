@@ -1,4 +1,4 @@
-import { dreamDefaults, dreamSettingError } from "../../shared/dream.ts";
+import { dreamCardCounts, dreamDefaults, dreamSettingError } from "../../shared/dream.ts";
 import { maxDismissReason } from "../../shared/inbox.ts";
 import { type RouteAccount, type RouteRun, directRoute } from "./direct-route.ts";
 import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
@@ -66,23 +66,11 @@ export function registerDreamRoutes(
   // The header's badge: results waiting for a verdict, a comparison counting once, and whether
   // Dream is running, so the count can change.
   route("GET", "/api/dream/count", (account) => {
-    const { enabled, paused } = dream.read(owner(account)).settings;
-    const unseen = dream.unseen(owner(account));
-    // A pair counts once, like a single card.
-    const cards = (type?: string) =>
-      new Set(
-        unseen
-          .filter((item) => !type || item.type === type)
-          .map((item) => item.dream?.pair?.id ?? item.id),
-      ).size;
+    const ownerId = owner(account);
+    const { settings } = dream.read(ownerId);
     return {
       status: 200,
-      payload: {
-        unseen: cards(),
-        images: cards("image"),
-        videos: cards("video"),
-        active: enabled && !paused,
-      },
+      payload: dreamCardCounts(settings.enabled ? dream.unseen(ownerId) : [], settings),
     };
   });
   route("POST", "/api/dream/visit", (account) => ({

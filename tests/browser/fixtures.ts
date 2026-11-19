@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 
 import { type Locator, type Page, expect } from "@playwright/test";
 
-import { dreamDefaults, dreamOverrideKeys } from "../../shared/dream";
+import { dreamCardCounts, dreamDefaults, dreamOverrideKeys } from "../../shared/dream";
 import type { QueueRetryResponse } from "../../shared/queue";
 
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
@@ -1521,22 +1521,8 @@ export async function serveDream(
           ),
         },
       });
-    // As the backend: a pair counts once, like a single card.
-    const cards = (type?: string) =>
-      new Set(
-        state.unseen
-          .filter((item) => !type || item.type === type)
-          .map((item) => item.dream?.pair?.id ?? item.id),
-      ).size;
     if (path === "/api/dream/count")
-      return route.fulfill({
-        json: {
-          unseen: cards(),
-          images: cards("image"),
-          videos: cards("video"),
-          active: state.settings.enabled && !state.settings.paused,
-        },
-      });
+      return route.fulfill({ json: dreamCardCounts(state.unseen, state.settings) });
     if (path === "/api/dream/settings") {
       Object.assign(state.settings, body);
       return route.fulfill({ json: show() });

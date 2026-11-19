@@ -230,6 +230,7 @@ export function DreamDeck({
   items,
   decided,
   setDecided,
+  returnItems,
   libraryItems,
   libraryWaiting,
   media,
@@ -240,6 +241,7 @@ export function DreamDeck({
   items: DreamItem[];
   decided: Set<string>;
   setDecided: Dispatch<SetStateAction<Set<string>>>;
+  returnItems: (items: DreamItem[]) => void;
   libraryItems?: MediaItem[];
   libraryWaiting: boolean;
   media: DreamMedia;
@@ -260,8 +262,6 @@ export function DreamDeck({
   const [picked, setPicked] = useState<{ key: string; side: 0 | 1 } | null>(null);
   // This session's judgements that Undo can take back, newest last.
   const [history, setHistory] = useState<Judgement[]>([]);
-  // Dream results Undo returned, shown until the next read lists them again.
-  const [returned, setReturned] = useState<DreamItem[]>([]);
   /** Puts a card back on the deck, after a failed verdict or an Undo. */
   const restore = (card: DeckCard) => {
     setCurrent(card);
@@ -282,10 +282,6 @@ export function DreamDeck({
     },
     (card) => decide(card),
   );
-  const unseen = [
-    ...items,
-    ...returned.filter((item) => !items.some((listed) => listed.id === item.id)),
-  ].filter((item) => !decided.has(item.id));
   const gallery = useCalibration(pairsOnly ? 2 : 1, decided, media, !libraryItems);
   const libraryCards: DeckCard[] = (libraryItems || [])
     .slice(0, 3)
@@ -294,7 +290,7 @@ export function DreamDeck({
     ? current?.kind === "library" && libraryItems.some((item) => item.id === current.key)
       ? [current, ...libraryCards.filter((card) => card.key !== current.key)].slice(0, 3)
       : libraryCards
-    : deckCards(unseen, gallery.items, judged, { pairsOnly, media, current });
+    : deckCards(items, gallery.items, judged, { pairsOnly, media, current });
   const [top] = cards;
   if (top !== current) setCurrent(top);
   const shown =
@@ -331,9 +327,8 @@ export function DreamDeck({
     setHistory((previous) => previous.slice(0, -1));
     setPicked(null);
     const { card } = last;
-    if (card.kind === "dream") setReturned((previous) => [...previous, card.item]);
-    else if (card.kind === "pair" && card.pairId)
-      setReturned((previous) => [...previous, ...(card.items as DreamItem[])]);
+    if (card.kind === "dream") returnItems([card.item]);
+    else if (card.kind === "pair" && card.pairId) returnItems(card.items as DreamItem[]);
     restore(card);
     setJudged((previous) => previous - 1);
     takeBack.mutate(last);
