@@ -56,15 +56,24 @@ export function GenerationSettings({
     key: keyof GenerationInput & string,
     label: string,
     range: ReturnType<typeof controlRange>,
-    description?: string,
+    hint?: string,
   ) {
     if (!range) return;
     fields.push({
       label,
       control: (
         <NumberInput
-          label={label}
-          description={description}
+          label={
+            <>
+              {label}
+              {hint && (
+                <Text span size="xs" c="dimmed" ml="xs" aria-hidden>
+                  {hint}
+                </Text>
+              )}
+            </>
+          }
+          aria-description={hint}
           value={typeof input[key] === "number" ? (input[key] as number) : ""}
           onChange={(value) => onChange({ [key]: value })}
           {...range}
