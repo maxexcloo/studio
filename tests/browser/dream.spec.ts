@@ -119,11 +119,11 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await expect(current(page)).toContainText("Because you like one.");
   await expect(current(page)).toContainText("Dream prompt one");
 
-  // Round buttons rate the card; Undo stands beside the view menu.
+  // Undo stands before the card’s round verdict buttons.
   const bar = page.getByRole("group", { name: "Dream Actions" });
   await expect
     .poll(() => bar.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)))
-    .toEqual(["Dislike", "Like", "Accept"]);
+    .toEqual(["Undo", "Dislike", "Like", "Accept"]);
   const undo = page.getByRole("button", { name: "Undo", exact: true });
   await expect(undo).toBeDisabled();
   await page.keyboard.press("ArrowRight");
@@ -285,7 +285,11 @@ test("Suggest can queue a library item variation at its source", async ({ page }
     });
   });
   await page.goto("/dream/library");
-  await page.getByRole("button", { name: "Suggest", exact: true }).click();
+  const actions = page.getByRole("group", { name: "Dream Actions" });
+  await expect(actions.getByRole("button").first()).toHaveAccessibleName("Undo");
+  const suggest = actions.getByRole("button").last();
+  await expect(suggest).toHaveAccessibleName("Suggest");
+  await suggest.click();
   const submitted = page.waitForRequest(
     (request) =>
       request.method() === "POST" &&
@@ -481,8 +485,10 @@ test("Dream settings an administrator forces stay locked for the account", async
 
 test("An empty disabled video deck counts no held results, then counts verdicts and Undo", async ({
   page,
+  isMobile,
 }) => {
   await fixtures(page);
+  if (isMobile) await page.setViewportSize({ width: 320, height: 720 });
   await serveDream(page, { enabled: false, unseen: [dreamItem("held-video", { type: "video" })] });
   let releaseKeep!: () => void;
   const keep = new Promise<void>((resolve) => (releaseKeep = resolve));
@@ -498,10 +504,25 @@ test("An empty disabled video deck counts no held results, then counts verdicts 
   await page.getByRole("button", { name: "Turn On", exact: true }).click();
   await expect(current(page)).toBeVisible();
   await expect(view).toHaveAccessibleDescription("0 images and 1 video waiting");
-  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  const card = current(page);
+  const actions = page.getByRole("group", { name: "Dream Actions" });
+  if (isMobile) {
+    const media = (await page.getByLabel("Dream Media", { exact: true }).boundingBox())!;
+    const header = (await view.boundingBox())!;
+    const preview = (await card.getByRole("button", { name: "View", exact: true }).boundingBox())!;
+    const sound = (await card.getByRole("button", { name: "Mute", exact: true }).boundingBox())!;
+    const cardBox = (await card.boundingBox())!;
+    expect(media.y).toBeLessThan(header.y + header.height);
+    expect(media.x).toBeGreaterThanOrEqual(header.x + header.width);
+    expect(sound.x).toBeGreaterThanOrEqual(preview.x + preview.width);
+    expect((await actions.boundingBox())!.y).toBeGreaterThanOrEqual(cardBox.y + cardBox.height);
+  }
+  await actions.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(view).toHaveAccessibleDescription("0 images and 0 videos waiting");
   releaseKeep();
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  const undo = actions.getByRole("button", { name: "Undo", exact: true });
+  await expect(undo).toBeInViewport();
+  await undo.click();
   await expect(view).toHaveAccessibleDescription("0 images and 1 video waiting");
   await expect(current(page)).toBeVisible();
 });
@@ -717,7 +738,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
         .getByRole("button")
         .evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Neither", "This Image", "Like", "Both"]);
+    .toEqual(["Undo", "Neither", "This Image", "Like", "Both"]);
 
   // A side opens in the preview; closing it returns to the same comparison.
   await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
@@ -747,9 +768,11 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   expect(dream.requests.length).toBe(2);
   await viewer.getByRole("button", { name: "This Image", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  // Undo stands in the toolbar, beside the view menu.
+  // Undo remains available when the deck is empty.
   const undo = page.getByRole("button", { name: "Undo", exact: true });
-  await expect(undo.locator("xpath=../..")).toHaveClass(/toolbar/);
+  await expect(
+    page.getByRole("group", { name: "Dream Actions" }).getByRole("button", { name: "Undo" }),
+  ).toBeEnabled();
   await undo.click();
   await expect(third).toContainText("Guidance 3");
   await page.getByRole("button", { name: "Both", exact: true }).click();
@@ -949,6 +972,45 @@ test("The preview judges the top card with swipes and its buttons, and Undo step
     .toEqual(["POST /api/dream/one/keep", "POST /api/dream/undo", "POST /api/dream/one/discard"]);
 });
 
+test("Dream fullscreen closes from the letterbox and leaves the image interactive", async ({
+  page,
+  isMobile,
+}) => {
+  await fixtures(page);
+  const image =
+    "data:image/svg+xml," +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="200"><rect width="1200" height="200" fill="#335"/></svg>',
+    );
+  const dream = await serveDream(page, {
+    unseen: [dreamItem("wide", { url: image, thumbnailUrl: image, width: 1200, height: 200 })],
+  });
+  await page.goto("/dream");
+  const open = current(page).getByRole("button", { name: "View", exact: true });
+  await open.click();
+  const preview = page.getByRole("dialog", { name: "Preview", exact: true });
+  const card = preview.getByRole("group", { name: "Current Dream", exact: true });
+  const picture = card
+    .getByRole("button", { name: "Change Image Zoom", exact: true })
+    .getByRole("img", { name: "Dream prompt wide", exact: true });
+  await expect(picture).toBeVisible();
+  const stage = (await card.boundingBox())!;
+  const media = (await picture.boundingBox())!;
+  const x = stage.x + stage.width / 2;
+  expect(stage.y + stage.height).toBeGreaterThan(media.y + media.height);
+  const y = (stage.y + stage.height + media.y + media.height) / 2;
+  if (isMobile) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
+  await expect(preview).toBeHidden();
+  await expect(open).toBeFocused();
+
+  await open.click();
+  if (isMobile) await picture.tap();
+  else await picture.click();
+  await expect(preview).toBeVisible();
+  expect(verdicts(dream)).toEqual([]);
+});
+
 test("A comparison keeps its layout while its pictures load", async ({ page }) => {
   await fixtures(page);
   let release!: () => void;
@@ -1083,6 +1145,7 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
 
   await page.getByRole("button", { name: "New Project", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "New Project", exact: true });
+  await expect(editor.getByRole("button", { name: "Cancel", exact: true })).toHaveCount(0);
   const name = editor.getByRole("textbox", { name: "Name", exact: true });
   const avoid = editor.getByRole("textbox", { name: "Avoid", exact: true });
   const done = editor.getByRole("button", { name: "Done", exact: true });

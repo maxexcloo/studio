@@ -26,31 +26,14 @@
   max-height: 52rem;
   margin-bottom: var(--mantine-spacing-xs);
 }
-/* An upright phone gives the deck the whole screen below the toolbar: the page reaches the bottom
-   safe area, through the shell's bottom padding, and the answers float over the card's scrim. */
+/* The phone deck uses the shell's bottom padding for its own safe-area action row. */
 :where(:root[data-phone]:not([data-phone="sideways"])) .page {
-  position: relative;
-  height: calc(
-    100dvh - var(--app-shell-header-offset, 68px) - var(--app-shell-padding, 1rem) -
-      env(safe-area-inset-bottom)
-  );
+  height: calc(100dvh - var(--app-shell-header-offset, 68px) - var(--app-shell-padding, 1rem));
   margin-bottom: calc(-1 * var(--app-shell-padding, 1rem));
 }
 :where(:root[data-phone]:not([data-phone="sideways"])) .stage {
   max-height: none;
-}
-:where(:root[data-phone]:not([data-phone="sideways"])) .page > .buttons {
-  position: absolute;
-  inset: auto 0 var(--mantine-spacing-sm);
-  z-index: 1;
-  padding-bottom: 0;
-  pointer-events: none;
-}
-:where(:root[data-phone]:not([data-phone="sideways"])) .stage .overlay {
-  padding-bottom: calc(58px + 2 * var(--mantine-spacing-sm));
-}
-:where(:root[data-phone]:not([data-phone="sideways"])) .stage .pair {
-  padding-bottom: calc(66px + 2 * var(--mantine-spacing-sm));
+  margin-bottom: 0;
 }
 .card {
   position: absolute;
@@ -217,7 +200,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--mantine-spacing-md);
+  gap: min(var(--mantine-spacing-md), 2%);
   padding-bottom: calc(var(--mantine-spacing-xs) + env(safe-area-inset-bottom));
 }
 .answer {
@@ -312,11 +295,6 @@
   background: var(--studio-glass-raised);
   cursor: zoom-in;
 }
-.view {
-  position: absolute;
-  top: var(--mantine-spacing-sm);
-  right: var(--mantine-spacing-sm);
-}
 /* One side above the other where that wastes less room (mediaFit.ts's besideFits). */
 .pair[data-stacked] {
   grid-template-columns: minmax(0, 1fr);
@@ -325,6 +303,7 @@
 /* A phone held sideways keeps a comparison's full height for its sides: the question stands beside
    them, scrolling when it outgrows the card. */
 :where(:root[data-phone="sideways"]) .card {
+  --card-caption-width: min(16rem, 40%);
   flex-direction: row;
 }
 :where(:root[data-phone="sideways"]) .card > .caption {
@@ -339,7 +318,7 @@
 :where(:root[data-phone="sideways"]) .card:not([data-full]) .overlay {
   position: static;
   order: 1;
-  width: min(16rem, 40%);
+  width: var(--card-caption-width);
   padding-top: 0;
   overflow-y: auto;
   background: rgb(0 0 0 / 0.85);
@@ -387,23 +366,16 @@
   background: var(--studio-glass-chrome);
   border-top: 1px solid var(--studio-glass-border);
 }
-.previewButtons .buttons {
-  gap: min(var(--mantine-spacing-md), 2%);
-}
-/* Only the controls, and their popups, take touches over the deck's media. */
-:where(:root[data-phone]:not([data-phone="sideways"])) .page > .buttons > * {
-  pointer-events: auto;
-}
-:where(:root[data-phone]:not([data-phone="sideways"])) .page > .buttons .answer {
-  background: var(--studio-glass-raised);
-  -webkit-backdrop-filter: var(--studio-glass-filter);
-  backdrop-filter: var(--studio-glass-filter);
-}
-
 .choice[data-selected] .side {
   outline: 1px solid var(--mantine-primary-color-filled);
 }
 
+.cardControls {
+  position: absolute;
+  inset-block-start: var(--mantine-spacing-sm);
+  inset-inline-end: calc(var(--card-caption-width, 0px) + var(--mantine-spacing-sm));
+  z-index: 1;
+}
 .videoAudio {
   position: absolute;
   top: calc(env(safe-area-inset-top) + var(--mantine-spacing-xl) + 1.5rem);

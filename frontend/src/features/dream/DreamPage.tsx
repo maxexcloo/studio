@@ -125,7 +125,6 @@ export function DreamPage() {
   const [libraryDecided, setLibraryDecided] = useState<Set<string>>(() => new Set());
   const [returned, setReturned] = useState<DreamItem[]>([]);
   const [histories, setHistories] = useState<Partial<Record<string, Judgement[]>>>({});
-  const [undoTarget, setUndoTarget] = useState<HTMLDivElement | null>(null);
   const [actionTarget, setActionTarget] = useState<HTMLDivElement | null>(null);
   const client = useQueryClient();
   const dream = useQuery(dreamQuery);
@@ -191,6 +190,7 @@ export function DreamPage() {
   const selector = view !== "projects" && view !== "taste" && (
     <SegmentedControl
       aria-label="Dream Media"
+      size={phone ? "xs" : undefined}
       value={media}
       onChange={(value) => setMedia(value as DreamMedia)}
       data={(["image", "video"] as const).map((kind) => ({
@@ -201,12 +201,12 @@ export function DreamPage() {
   );
   return (
     <div className={classes.page}>
-      <Group className={classes.toolbar} gap="sm" wrap="nowrap">
+      <Group className={classes.toolbar} gap={phone ? 4 : "sm"} wrap="nowrap">
         <Menu position="bottom-start">
           <PopupTooltip label="Dream View">
             <Menu.Target>
               <Button
-                size="compact-md"
+                size={phone ? "compact-sm" : "compact-md"}
                 variant="subtle"
                 color="gray"
                 aria-label="Dream View"
@@ -232,8 +232,7 @@ export function DreamPage() {
             ))}
           </Menu.Dropdown>
         </Menu>
-        {!phone && selector}
-        <div ref={setUndoTarget} style={{ display: "contents" }} />
+        {selector}
         <Group gap={4} wrap="nowrap" ml="auto">
           <div ref={setActionTarget} style={{ display: "contents" }} />
           {data?.settings.enabled && (
@@ -251,7 +250,6 @@ export function DreamPage() {
           )}
         </Group>
       </Group>
-      {phone && selector}
       {view === "discarded" ? (
         <DiscardedDreams key={media} media={media} />
       ) : view === "history" ? (
@@ -308,7 +306,6 @@ export function DreamPage() {
               library.isFetchingNextPage ||
               (library.hasNextPage && !library.isFetchNextPageError))
           }
-          undoTarget={undoTarget}
           empty={
             reviewing ? (
               library.isError ? (

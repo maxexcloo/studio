@@ -18,7 +18,7 @@ const clamp = (value: number) => Math.max(0, Math.min(1, value));
 // A flick this fast (px/ms) decides even below the distance threshold.
 const flick = 0.6;
 // A press that moves less than this is a tap.
-const tap = 6;
+export const tapDistance = 6;
 // A still press this long (ms) is a hold.
 const holdTime = 500;
 
@@ -37,6 +37,7 @@ export function SwipeCard({
   paused = false,
   previewSide,
   video,
+  view,
   still = false,
   full = false,
   fly,
@@ -53,12 +54,13 @@ export function SwipeCard({
   paused?: boolean;
   previewSide?: number;
   video?: boolean;
+  view?: ReactNode;
   still?: boolean;
   /** Edge to edge, filling the preview. */
   full?: boolean;
   fly?: RefObject<Fly | null>;
   onSwipe?: (direction: Direction, target: HTMLElement) => void;
-  onTap?: (target: HTMLElement) => void;
+  onTap?: (target: HTMLElement, x: number, y: number) => void;
   onHold?: (target: HTMLElement) => void;
   label: string;
   hints: Partial<Record<Direction, string>>;
@@ -211,7 +213,8 @@ export function SwipeCard({
         if (!current || current.id !== event.pointerId) return;
         const dx = event.clientX - current.x;
         const dy = event.clientY - current.y;
-        if (Math.abs(dx) >= tap || Math.abs(dy) >= tap) clearTimeout(holding.current);
+        if (Math.abs(dx) >= tapDistance || Math.abs(dy) >= tapDistance)
+          clearTimeout(holding.current);
         const elapsed = Math.max(1, event.timeStamp - current.t);
         drag.current = {
           ...current,
@@ -227,11 +230,11 @@ export function SwipeCard({
         const current = drag.current;
         if (!current || current.id !== event.pointerId) return;
         clearTimeout(holding.current);
-        const { dx, dy, vx, vy, target } = current;
-        if (Math.abs(dx) < tap && Math.abs(dy) < tap) {
+        const { x, y, dx, dy, vx, vy, target } = current;
+        if (Math.abs(dx) < tapDistance && Math.abs(dy) < tapDistance) {
           drag.current = null;
           settle();
-          return onTap?.(target);
+          return onTap?.(target, x, y);
         }
         dragged.current = true;
         const threshold = event.currentTarget.offsetWidth / 3;
@@ -260,13 +263,14 @@ export function SwipeCard({
       }}
     >
       {children}
-      {playing && (
+      {(view || playing) && (
         <Group
-          className={classes.videoAudio}
+          className={view ? classes.cardControls : classes.videoAudio}
           gap="xs"
           wrap="nowrap"
           onPointerDown={(event) => event.stopPropagation()}
         >
+          {view}
           {chooseAudio && (
             <SegmentedControl
               aria-label="Comparison Audio"
@@ -279,11 +283,17 @@ export function SwipeCard({
               ]}
             />
           )}
-          <Tooltip label={soundLabel}>
-            <ActionIcon variant="default" aria-label={soundLabel} onClick={() => setMuted(!muted)}>
-              {muted ? <icons.mute size={16} /> : <icons.sound size={16} />}
-            </ActionIcon>
-          </Tooltip>
+          {playing && (
+            <Tooltip label={soundLabel}>
+              <ActionIcon
+                variant="default"
+                aria-label={soundLabel}
+                onClick={() => setMuted(!muted)}
+              >
+                {muted ? <icons.mute size={16} /> : <icons.sound size={16} />}
+              </ActionIcon>
+            </Tooltip>
+          )}
         </Group>
       )}
       {play && <VideoPlayButton play={play} />}
