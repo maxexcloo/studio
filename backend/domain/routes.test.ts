@@ -525,6 +525,9 @@ test("Unfinished Items puts working jobs first, keeps queue order and lets admin
     settled: async (job: { id: string }) => void settled.push(job.id),
   } as never);
   t.mock.method(queue, "isWriting", (id: string) => id === writing.id);
+  t.mock.method(queue, "queuePosition", (id: string) =>
+    id === queued.id ? 1 : id === waiting.id ? 2 : undefined,
+  );
   let admin = false;
   const app = express();
   app.use(express.json());
@@ -559,8 +562,8 @@ test("Unfinished Items puts working jobs first, keeps queue order and lets admin
     assert.deepEqual(await listed(), [
       ["alice", "a fox", "running"],
       ["alice", "writing a prompt", "writing"],
-      ["bob", "an owl", "waiting"],
       ["bob", "a hare", "queued"],
+      ["bob", "an owl", "waiting"],
       ["alice", "awaiting a prompt", "writing"],
     ]);
     for (const job of [waiting, writing, awaitingPrompt])
