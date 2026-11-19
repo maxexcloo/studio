@@ -1,4 +1,4 @@
-import { type Locator, expect, test } from "@playwright/test";
+import { type Locator, type Route, expect, test } from "@playwright/test";
 
 import { mediaTitle } from "../../frontend/src/features/gallery/mediaLabels";
 import {
@@ -549,6 +549,20 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
+  let releaseRefresh!: () => void;
+  const heldRefresh = new Promise<void>((resolve) => {
+    releaseRefresh = resolve;
+  });
+  let refreshing = false;
+  const holdRefresh = async (route: Route) => {
+    if (attempts.length) {
+      refreshing = true;
+      await heldRefresh;
+    }
+    await route.fallback();
+  };
+  await page.route("**/api/gallery?**", holdRefresh);
+  await page.route(/\/api\/queue(?:\?.*)?$/, holdRefresh);
   const attempts: string[][] = [];
   let failSecond = true;
   await serveRetries(page, state, async (ids) => {
@@ -577,12 +591,14 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
     await retry.dispatchEvent("click");
     await expect.poll(() => attempts).toEqual([["batch-a", "batch-b"]]);
     release();
-    // Only the item whose retry failed stays selected.
+    // The selection settles on admission while the gallery and queue refresh.
+    await expect.poll(() => refreshing).toBe(true);
     await expect(selection.getByRole("status")).toHaveText("1 Selected");
     expect(attempts).toEqual([["batch-a", "batch-b"]]);
     await expect(
       page.getByRole("checkbox", { name: "Select Failed Third", exact: true }),
     ).toBeChecked();
+    releaseRefresh();
     // The accepted retry's new tiles replace its failed ones.
     await expect(
       page.getByRole("checkbox", { name: "Select Failed First", exact: true }),
@@ -594,6 +610,7 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
     expect(attempts).toEqual([["batch-a", "batch-b"], ["batch-b"]]);
   } finally {
     release();
+    releaseRefresh();
   }
 });
 
