@@ -1,30 +1,43 @@
 import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import { failure } from "../../api";
 import type { MediaItem } from "../../types";
 import { mediaIdentity } from "./mediaSource";
+import type { GalleryQuickSelect } from "./queries";
+
+interface QuickMatches {
+  items: MediaItem[];
+  match: GalleryQuickSelect;
+}
 
 /**
- * Selection acts on loaded records, including across virtualised rows. A group (a run in Runs)
- * toggles together. As in a file manager, Shift selects from the last clicked item to the group in
- * loaded order, replacing the selection, and Shift with Ctrl or Cmd adds the range to it. The
- * result stays the same object until the selection or the items change, so tiles skip renders.
- * `selectMatching` (Select All and the like) covers every match of the search and filters: while
- * `more.complete` is false it has `more.load` load the rest first. A new search or filter empties
- * the selection without ending it.
+ * Tile and range selection act on loaded records. Quick selects can also keep a snapshot of
+ * matching records outside the loaded pages. A scope change empties the selection without ending it.
  */
 export function useGallerySelection(
   items: MediaItem[],
   resetKey: string,
-  more: { complete: boolean; load: () => Promise<boolean> },
+  more: {
+    ready: boolean;
+    complete: boolean;
+    load: (match: GalleryQuickSelect, signal: AbortSignal) => Promise<MediaItem[]>;
+  },
 ) {
   const [selected, setSelected] = useState<Set<string> | null>(null);
-  const [pending, setPending] = useState<{ match: (item: MediaItem) => boolean } | null>(null);
+  const [pending, setPending] = useState<GalleryQuickSelect | null>(null);
+  const [snapshot, setSnapshot] = useState<QuickMatches | null>(null);
+  const request = useRef<AbortController | null>(null);
   const anchor = useRef<string | null>(null);
   const ids = useMemo(() => items.map((item) => item.id).join("\n"), [items]);
   useEffect(() => {
     setSelected((current) => current && new Set());
+    setSnapshot(null);
     setPending(null);
     anchor.current = null;
+    return () => {
+      request.current?.abort();
+      request.current = null;
+    };
   }, [resetKey]);
   const previousItems = useRef(items);
   useEffect(() => {
@@ -38,24 +51,26 @@ export function useGallerySelection(
     setSelected((current) => {
       if (!current) return current;
       const next = new Set(
-        [...current].flatMap((id) => (visible.has(id) ? id : replacements.get(id) || [])),
+        [...current].flatMap((id) =>
+          visible.has(id) || !replacements.has(id) ? id : replacements.get(id) || [],
+        ),
       );
       return next.size === current.size && [...next].every((id) => current.has(id))
         ? current
         : next;
     });
   }, [ids]);
-  // Once every match has loaded, the waiting quick select applies to all of them.
-  useEffect(() => {
-    if (!pending || !more.complete) return;
-    setSelected(new Set(items.filter(pending.match).map((item) => item.id)));
-    setPending(null);
-  }, [pending, more.complete, items]);
-  // The latest loader, so a new one doesn't make a new selection object and rerender every tile.
+  // Keep the loader current without passing its changing identity down to every tile.
   const load = useRef(more.load);
   load.current = more.load;
   return useMemo(() => {
+    function cancelQuickSelect() {
+      request.current?.abort();
+      request.current = null;
+      setPending(null);
+    }
     function toggle(group: MediaItem[]) {
+      cancelQuickSelect();
       anchor.current = group[group.length - 1]?.id ?? null;
       setSelected((current) => {
         const next = new Set(current || []);
@@ -67,36 +82,70 @@ export function useGallerySelection(
         return next;
       });
     }
+    const loaded = new Map(items.map((item) => [item.id, item]));
+    const selectedItems = [];
+    if (selected) {
+      const seen = new Set<string>();
+      for (const item of [...(snapshot?.items || []), ...items])
+        if (selected.has(item.id) && !seen.has(item.id)) {
+          seen.add(item.id);
+          selectedItems.push(loaded.get(item.id) || item);
+        }
+    }
+    const known = more.complete ? items : snapshot?.match === "all" ? snapshot.items : undefined;
     return {
+      scope: resetKey,
       selecting: selected !== null,
       selected: selected || new Set<string>(),
-      selectedItems: selected ? items.filter((item) => selected.has(item.id)) : [],
-      /** Whether every match of the search and filters is selected. */
-      all: more.complete && items.length > 0 && items.every((item) => selected?.has(item.id)),
-      /** Whether every match of the search and filters has loaded. */
-      complete: more.complete,
-      items,
-      /** Whether a quick select is waiting for the rest of the matches to load. */
-      loading: pending !== null,
+      selectedItems,
+      all: Boolean(known?.length && known.every((item) => selected?.has(item.id))),
+      noFailed:
+        known !== undefined &&
+        !known.some((item) => (loaded.get(item.id) || item).status === "failed"),
+      quickReady: more.ready,
+      pending,
       start: () => setSelected((current) => current || new Set()),
       end: () => {
         setSelected(null);
-        setPending(null);
+        setSnapshot(null);
+        cancelQuickSelect();
         anchor.current = null;
       },
       toggle,
       /** Select None: empties the selection without ending it. */
       clear: () => {
         setSelected(new Set());
-        setPending(null);
+        setSnapshot(null);
+        cancelQuickSelect();
         anchor.current = null;
       },
-      select: (match: (item: MediaItem) => boolean) =>
-        setSelected(new Set(items.filter(match).map((item) => item.id))),
-      selectMatching: (match: (item: MediaItem) => boolean) => {
+      select: (match: (item: MediaItem) => boolean) => {
+        cancelQuickSelect();
+        setSnapshot(null);
+        setSelected(new Set(items.filter(match).map((item) => item.id)));
+      },
+      selectMatching: async (match: GalleryQuickSelect) => {
+        if (!more.ready || request.current) return;
+        const matches = (item: MediaItem) => match === "all" || item.status === "failed";
+        if (more.complete) {
+          setSnapshot(null);
+          setSelected(new Set(items.filter(matches).map((item) => item.id)));
+          return;
+        }
         setSelected((current) => current || new Set());
-        setPending({ match });
-        void load.current().then((loaded) => loaded || setPending(null));
+        const controller = new AbortController();
+        request.current = controller;
+        setPending(match);
+        try {
+          const matchesInScope = await load.current(match, controller.signal);
+          if (controller.signal.aborted) return;
+          setSnapshot({ items: matchesInScope, match });
+          setSelected(new Set(matchesInScope.filter(matches).map((item) => item.id)));
+        } catch (error) {
+          if (!controller.signal.aborted) failure(error);
+        } finally {
+          if (request.current === controller) cancelQuickSelect();
+        }
       },
       retain: (ids: string[]) => setSelected(new Set(ids)),
       /** Handles a tile click when it selects; returns false when the tile should open instead. */
@@ -116,10 +165,11 @@ export function useGallerySelection(
           end = Math.max(from, ...indexes);
         const range = items.slice(start, end + 1).map((entry) => entry.id);
         const adding = event.ctrlKey || event.metaKey;
+        cancelQuickSelect();
         setSelected((current) => new Set([...(adding ? current || [] : []), ...range]));
         return true;
       },
     };
-  }, [selected, items, pending, more.complete]);
+  }, [selected, items, pending, snapshot, more.complete, more.ready, resetKey]);
 }
 export type GallerySelection = ReturnType<typeof useGallerySelection>;

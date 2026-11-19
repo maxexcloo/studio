@@ -50,6 +50,57 @@ const unique = (values) =>
     a.localeCompare(b),
   );
 
+/** The selection bar needs action and lineage data, without the gallery's display data. */
+function selectionRecord(item) {
+  const {
+    id,
+    jobId,
+    index,
+    status,
+    type,
+    url,
+    width,
+    height,
+    rating,
+    uploaded,
+    suggestedPrompt,
+    prompt,
+    negative,
+    settings,
+    model,
+    filename,
+    outputName,
+    parentItemId,
+    derived,
+    upscaleActive,
+    upscale,
+  } = item;
+  return {
+    id,
+    jobId,
+    index,
+    status,
+    type,
+    url,
+    width,
+    height,
+    rating,
+    uploaded,
+    suggestedPrompt,
+    title: item.resultSet?.variation || item.title,
+    prompt,
+    negative,
+    settings,
+    model,
+    filename,
+    outputName,
+    parentItemId,
+    derived,
+    upscaleActive,
+    ...(upscaleActive && upscale?.url && { upscale: { url: upscale.url } }),
+  };
+}
+
 // Summaries of an account's whole gallery cost a walk over it, so each is kept until it changes,
 // and while results keep arriving it is rebuilt at most once a minute: a filter menu a minute behind
 // is fine, a walk after every result is not.
@@ -205,7 +256,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     cleanupGalleryState(store);
     const type = String(query.type || "");
     const limit = Number(query.limit || 0);
-    const cursor = String(query.cursor || "");
+    const selection = ["all", "failed"].includes(query.select) ? query.select : undefined;
+    const cursor = selection ? "" : String(query.cursor || "");
     const includeFailed = query.includeFailed !== "0";
     const requestedSort = one(query.sort);
     const sort = Object.hasOwn(gallerySortLabels, requestedSort) ? requestedSort : "newest";
@@ -249,6 +301,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
           type,
           limit: limit || 200,
           cursor,
+          selection,
           includeFailed,
           uploads: query.uploads === "1",
           query: {
@@ -263,11 +316,11 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
             ...(Number.isFinite(before) && { before }),
             ...(words.length && { contains: words }),
           },
-          // The account and every parameter but the page's own name the filter's count.
+          // Selection and paging share the same search membership.
           filterKey: JSON.stringify([
             account?.userId ?? "",
             work,
-            Object.entries(query).filter(([key]) => key !== "cursor" && key !== "limit"),
+            Object.entries(query).filter(([key]) => !["cursor", "limit", "select"].includes(key)),
           ]),
           filter:
             inComparison || search
@@ -285,7 +338,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     // leads with them. Dream's stays in its own pool; an upscale has no tile.
     const retried = new Set();
     const queued =
-      work !== "queued" || cursor || similarTo || query.uploads === "1"
+      selection === "failed" || work !== "queued" || cursor || similarTo || query.uploads === "1"
         ? []
         : store
             .openJobs(account?.userId || "")
@@ -320,7 +373,11 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     // or none until it starts when its place is on a later page.
     const leading = queued.filter((item) => sort !== "newest" || !retried.has(item.jobId));
     const items = [...page.items];
+    const firstPageLimit = Math.max(1, Math.min(500, limit || 200));
+    const firstPageEnd =
+      selection && items.length > firstPageLimit ? items[firstPageLimit - 1] : null;
     for (const item of queued.filter((item) => sort === "newest" && retried.has(item.jobId))) {
+      if (firstPageEnd && compareGalleryItems(item, firstPageEnd) >= 0) continue;
       const at = items.findIndex((listed) => compareGalleryItems(item, listed) < 0);
       if (at >= 0) items.splice(at, 0, item);
       else if (!page.hasMore) items.push(item);
@@ -329,7 +386,9 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       status: 200,
       payload: {
         ...page,
-        items: resultNumbers.numbered([...leading, ...items]).map(listedRecord),
+        items: selection
+          ? [...leading, ...items].map(selectionRecord)
+          : resultNumbers.numbered([...leading, ...items]).map(listedRecord),
       },
     };
   });

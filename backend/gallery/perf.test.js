@@ -135,6 +135,42 @@ test("paging through a search serves every match once, testing each item once", 
   assert.equal(tested, 5000, `each item is tested once across ${pages} pages`);
 });
 
+test("failed selection reuses search and rank membership and reads beyond the first page", () => {
+  const items = bigGallery(5000);
+  setGallery(items);
+  let tested = 0;
+  const listing = {
+    filter: () => ++tested > 0,
+    filterKey: "ranked search",
+    rank: (item) => item.settings.seed,
+    limit: 60,
+  };
+  const page = pageGallery(listing);
+  assert.ok(page.hasMore);
+  const failed = pageGallery({ ...listing, selection: "failed" });
+  assert.deepEqual(
+    failed.items.map(({ id }) => id),
+    items
+      .filter(({ status }) => status === "failed")
+      .reverse()
+      .map(({ id }) => id),
+  );
+  assert.equal(tested, items.length, "quick selection reuses the listing's membership");
+});
+
+test("sparse failed selection keeps a set's position in the gallery", () => {
+  const items = bigGallery(500);
+  items[0].resultSet = { id: "set-a" };
+  items[496].resultSet = { id: "set-a" };
+  setGallery(items);
+  const listing = pageGallery({ selection: "all" });
+  assert.equal(listing.items[1].id, items[0].id);
+  assert.deepEqual(
+    pageGallery({ selection: "failed" }).items.map(({ id }) => id),
+    listing.items.filter(({ status }) => status === "failed").map(({ id }) => id),
+  );
+});
+
 test("a change to the gallery shows on the next page request", () => {
   setGallery(bigGallery(1000));
   assert.equal(pageGallery({ limit: 5 }).totalApprox, 1000);
