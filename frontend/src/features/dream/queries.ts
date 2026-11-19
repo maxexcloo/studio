@@ -67,18 +67,6 @@ export const discardedQuery = (media: DreamMedia) =>
     initialPageParam: "",
     getNextPageParam: (page) => page.nextCursor || undefined,
   });
-/**
- * Older gallery images to calibrate the taste profile with, unjudged first. Each round is a new
- * random draw, kept apart from `["dream"]` so judging a card never reshuffles the deck.
- */
-export const calibrationQuery = (round: number, media: DreamMedia) =>
-  queryOptions({
-    queryKey: ["dream-calibration", media, round],
-    queryFn: () => api<{ items: MediaItem[] }>(`/api/dream/calibration?media=${media}&limit=12`),
-    staleTime: Infinity,
-    // A later visit draws afresh rather than replaying images already judged.
-    gcTime: 0,
-  });
 export const libraryReviewQuery = (seed: string, media: DreamMedia) =>
   infiniteQueryOptions({
     queryKey: ["dream-library-review", seed, media],
