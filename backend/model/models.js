@@ -269,14 +269,33 @@ export function sizedRange(range, familyStep) {
   };
 }
 
+/** A combined profile's listing exposes the LoRAs of the backend its LoRA runs use. */
+export function profileWithBackendOptions(profile, backendOptions) {
+  const id = runBackend(backendOptions, profile.backend, undefined, false, true);
+  const loraRun = backendOptions.find((option) => option.id === id)?.profile;
+  const loraFields =
+    id !== profile.backend && loraRun
+      ? {
+          capabilities: { ...profile.capabilities, lora: loraRun.capabilities.lora },
+          options: { ...profile.options, loras: loraRun.options.loras },
+          maxLoras: loraRun.maxLoras,
+          loraAdapter: loraRun.loraAdapter,
+          loraBase: loraRun.loraBase,
+          loraNote: loraRun.loraNote,
+        }
+      : {};
+  return { ...profile, ...loraFields, backendOptions };
+}
+
 /**
  * `profileBackends` (`{"custom:<id>": backend}`) builds those combined profiles on another of their
  * backends, as a run that asked for it validates against.
+ * The merged catalogue needs a combined profile's observations even when all its options fail.
  */
 export function inferModels(
   info,
   stats = {},
-  { configuredOnly = false, profileBackends = {} } = {},
+  { configuredOnly = false, includeUnavailableBackends = false, profileBackends = {} } = {},
 ) {
   const missingCoreImageNodes = missingNodes(info, [
     "KSampler",
@@ -285,11 +304,13 @@ export function inferModels(
     "SaveImage",
   ]);
   // A Radiance worker runs only Radiance nodes (providers/radiance.ts).
-  if (!configuredOnly && missingCoreImageNodes.length && !info?.[radianceImageNode]) {
-    return emptyModelResult({
-      reason: `ComfyUI is missing required image nodes: ${missingCoreImageNodes.join(", ")}`,
-    });
-  }
+  const missingCore = !configuredOnly && missingCoreImageNodes.length && !info?.[radianceImageNode];
+  const incomplete = missingCore
+    ? emptyModelResult({
+        reason: `ComfyUI is missing required image nodes: ${missingCoreImageNodes.join(", ")}`,
+      })
+    : null;
+  if (incomplete && !includeUnavailableBackends) return incomplete;
   const clips = optionsFor(info, "CLIPLoader", "clip_name");
   const clipTypes = optionsFor(info, "CLIPLoader", "type");
   const vaes = optionsFor(info, "VAELoader", "vae_name");
@@ -310,7 +331,7 @@ export function inferModels(
     const missing = missingNodes(info, workflow.requiredNodes);
     return missing.length
       ? `missing ${missing.join(", ")} on this worker`
-      : workflowOptionIssues(workflow, info).join(" ");
+      : workflowOptionIssues(workflow, info).join(" ") || incomplete?.reason || "";
   };
   const profileForWorkflow = (workflow) => {
     const defaults = workflow.defaults || {};
@@ -559,6 +580,7 @@ export function inferModels(
 
   for (const listed of loadCustomWorkflows()) {
     if (usesGrokMedia(listed)) continue;
+    if (incomplete && !listed.backendIds?.length) continue;
     const variants = new Map(
       (listed.backendIds || []).map((id) => [
         id,
@@ -581,23 +603,13 @@ export function inferModels(
       };
     });
     // Keep the chosen backend explicit; its alternatives carry their own controls and limits.
-    if (profile.ready === false && !backendOptions.some((option) => option.ready)) continue;
-    // A run with LoRAs may move to another backend (runBackend), so the listing offers its LoRAs.
-    const loraRun =
-      profile.backend &&
-      variants.get(runBackend(backendOptions, workflow.backend, undefined, false, true));
-    const loraFields =
-      loraRun && loraRun !== profile
-        ? {
-            capabilities: { ...profile.capabilities, lora: loraRun.capabilities.lora },
-            options: { ...profile.options, loras: loraRun.options.loras },
-            maxLoras: loraRun.maxLoras,
-            loraAdapter: loraRun.loraAdapter,
-            loraBase: loraRun.loraBase,
-            loraNote: loraRun.loraNote,
-          }
-        : {};
-    profiles.push({ ...profile, ...loraFields, ...(profile.backend ? { backendOptions } : {}) });
+    if (
+      profile.ready === false &&
+      !(includeUnavailableBackends && backendOptions.length) &&
+      !backendOptions.some((option) => option.ready)
+    )
+      continue;
+    profiles.push(profile.backend ? profileWithBackendOptions(profile, backendOptions) : profile);
   }
 
   const imageProfiles = profiles.filter((profile) => profile.kind === "image");
@@ -610,6 +622,7 @@ export function inferModels(
       list[0]
     )?.id || "";
   return {
+    ...incomplete,
     imageModels: imageProfiles.map((profile) => ({ label: profile.label, value: profile.id })),
     videoModels: videoProfiles.map((profile) => ({ label: profile.label, value: profile.id })),
     profiles,
