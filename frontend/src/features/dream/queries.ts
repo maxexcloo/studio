@@ -121,6 +121,7 @@ export const projectResultsQuery = (projectId: string) =>
 export const inboxQuery = queryOptions({
   queryKey: ["dream", "inbox"],
   queryFn: () => api<Inbox<DreamItem>>("/api/dream/inbox"),
+  refetchInterval: 60_000,
 });
 export const proposalPath = (proposal: { id: string }, action: "accept" | "dismiss" | "undo") =>
   `/api/dream/inbox/${encodeURIComponent(proposal.id)}/${action}`;
