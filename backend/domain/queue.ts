@@ -12,7 +12,7 @@ import {
 import { logEvent, logWarning } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 import { logFailure } from "./log-failure.ts";
-import { type OwnedJob, Store, everyone, queuePriority } from "./store.ts";
+import { type OwnedJob, type QueuedCopy, Store, everyone, queuePriority } from "./store.ts";
 
 export interface JobObservation {
   status: QueueStatus;
@@ -664,32 +664,22 @@ export class GenerationQueue {
     );
     const target = others.find((resource) => !busy.has(resource)) ?? others[0];
     if (!target) return;
-    const retry = this.again(job, target);
-    logEvent(`Queued stalled job ${job.id} again as ${retry.id} on ${target}`);
+    const retry = this.again(failed, target);
+    if (retry)
+      logEvent("Retry for stalled job", {
+        job: job.id,
+        replacement: retry.id,
+        worker: retry.resource,
+      });
   }
 
   /**
    * Queues a failed job once more on its own or another resource, keeping its tier, set and Dream
    * origin; a job queued again this way only fails the next time.
    */
-  again(job: OwnedJob, resource = job.resource): OwnedJob {
-    const retry = this.store.enqueue(
-      job.ownerId,
-      job.sessionId,
-      job.input,
-      job.operation,
-      job.parentJobId,
-      resource,
-      undefined,
-      {
-        priority: job.priority,
-        queueSet: job.queueSet,
-        parentItemId: job.parentItemId,
-        ...(job.dream ? { dream: job.dream } : {}),
-        ...(job.faceRedo ? { faceRedo: job.faceRedo } : {}),
-      },
-    );
-    return this.store.save({ ...retry, retried: true });
+  again(job: OwnedJob, resource = job.resource): OwnedJob | undefined {
+    if (job.retried) return;
+    return this.requeue(job, { id: job.id, automatic: true }, resource);
   }
 
   /** Whether another local video job has started and not yet finished and saved. */
@@ -916,16 +906,11 @@ export class GenerationQueue {
   retry(ownerId: string, id: string, clear = false): OwnedJob | undefined {
     const job = this.store.job(ownerId, id);
     if (!job || job.status !== "failed") return;
-    const original = clear && !job.cleared ? { ...job, cleared: true } : job;
-    if (job.replacementJobId) {
-      if (original !== job) this.store.save(original);
-      return this.store.job(ownerId, job.replacementJobId);
-    }
-    return this.requeue(job, original);
+    return this.requeue(job, { id: job.id, clear });
   }
 
   /** Queues the job's input again as a new job, in the job's set and its place in the gallery. */
-  requeue(job: OwnedJob, replaces?: OwnedJob): OwnedJob {
+  requeue(job: OwnedJob, replaces?: QueuedCopy["replaces"], resource = job.resource): OwnedJob {
     const listed = job.items.find((item) => typeof item.createdAt === "string")?.createdAt as
       | string
       | undefined;
@@ -935,12 +920,20 @@ export class GenerationQueue {
       job.input,
       job.operation,
       job.parentJobId,
-      job.resource,
+      resource,
       undefined,
       {
         parentItemId: job.parentItemId,
         queueSet: job.queueSet,
         galleryAt: job.galleryAt || listed || job.createdAt,
+        ...(replaces
+          ? {
+              priority: job.priority,
+              queueBatch: job.queueBatch,
+              dream: job.dream,
+              faceRedo: job.faceRedo,
+            }
+          : {}),
       },
       replaces,
     );

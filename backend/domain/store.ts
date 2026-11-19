@@ -58,7 +58,7 @@ export interface QueuedCopy {
   resource?: string;
   requestedId?: string;
   origin?: QueueOrigin;
-  replaces?: OwnedJob;
+  replaces?: { id: string; clear?: boolean; automatic?: boolean };
 }
 interface UserPreset {
   id: string;
@@ -220,6 +220,12 @@ export class Store {
           origin = {},
           replaces,
         }) => {
+          const original = replaces && this.job(ownerId, replaces.id);
+          if (replaces && original?.status !== "failed") throw new Error("Failed job not found.");
+          if (original?.replacementJobId) {
+            if (replaces?.clear && !original.cleared) this.save({ ...original, cleared: true });
+            return this.job(ownerId, original.replacementJobId)!;
+          }
           if (parentJobId && !this.job(ownerId, parentJobId))
             throw new Error("Parent generation not found.");
           const stamp = now();
@@ -246,6 +252,7 @@ export class Store {
             ...(origin.dream ? { dream: origin.dream } : {}),
             ...(origin.faceRedo ? { faceRedo: origin.faceRedo } : {}),
             ...(origin.galleryAt ? { galleryAt: origin.galleryAt } : {}),
+            ...(replaces?.automatic ? { retried: true } : {}),
             // A prompt the assistant writes is the item's first stage (queue.ts); it then queues.
             status: awaitsWriting(input) ? "writing" : "queued",
             reason: "",
@@ -258,7 +265,12 @@ export class Store {
           this.db
             .prepare("INSERT INTO studio_queue VALUES (?, ?, ?, ?, ?, ?)")
             .run(id, ownerId, sessionId, stamp, job.status, JSON.stringify(job));
-          if (replaces) this.save({ ...replaces, replacementJobId: id });
+          if (original)
+            this.save({
+              ...original,
+              replacementJobId: id,
+              ...(replaces?.clear ? { cleared: true } : {}),
+            });
           return job;
         },
       );
