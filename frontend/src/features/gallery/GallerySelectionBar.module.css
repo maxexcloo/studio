@@ -6,7 +6,6 @@
   flex-wrap: wrap;
   align-items: center;
   column-gap: 8px;
-  min-height: 44px;
 }
 
 .count {
@@ -27,6 +26,7 @@
    so the row sits as far from the rule as from the row above. */
 :root[data-phone] .header {
   flex-wrap: nowrap;
+  min-height: 44px;
   overflow-x: auto;
   scrollbar-width: none;
   margin-bottom: calc(-1 * var(--mantine-spacing-xs));

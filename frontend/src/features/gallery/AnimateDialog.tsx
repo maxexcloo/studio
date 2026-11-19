@@ -102,7 +102,7 @@ export function AnimateDialog({
         >
           <Stack>
             <TextBox
-              label="Instruction"
+              aria-label="Instruction"
               placeholder="What should happen in the video?"
               autosize
               minRows={3}

@@ -63,23 +63,22 @@ import { useItemMutation } from "./useItemMutation";
 import {
   type AnimateOffers,
   type AnimateRequest,
-  type EditAsk,
   type Iteration,
   animateProfileQuery,
   typedPrompt,
   useAnimateLengthSetting,
   useAnimateReview,
   useAnimateTemplates,
-  useEditReview,
   useMediaAction,
   useMediaIteration,
+  useMediaReview,
 } from "./useMediaAction";
 import { useMediaRating } from "./useMediaRating";
 import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
 import { type VideoEdit, useVideoEdit } from "./videoEdits";
 import { type GalleryState, galleryKind, viewerPath } from "./viewerLink";
-import type { PromptAssist, ViewerAsk } from "./ViewerPrompt";
+import type { ViewerAsk, ViewerChange, ViewerDraftActions } from "./ViewerPrompt";
 
 /**
  * An action whose options come to one runs that option itself, so no submenu holds just one.
@@ -252,10 +251,8 @@ function useCardActions(item: MediaItem, onApplied: () => void): Action[] {
 interface MediaActionOptions {
   transfer: MediaTransferActions;
   compare?: boolean;
-  /** How Edit asks for a change: the viewer's prompt. Without it, Edit's choices open the viewer. */
-  edit?: EditAsk;
-  /** The viewer prompt's assistance, leading the AI menu. */
-  assist?: PromptAssist | null;
+  /** The viewer's current draft and its editor. Else a prompt change opens the viewer first. */
+  draft?: ViewerDraftActions;
   /** Queues a new run; the viewer's joins its strip. Defaults to queueing it directly. */
   iterate?: (iteration: Iteration) => void;
   onApplied?: () => void;
@@ -279,8 +276,7 @@ export function useMediaActions(
   {
     transfer,
     compare,
-    edit,
-    assist,
+    draft,
     iterate,
     onApplied = () => {},
     onCompare,
@@ -308,7 +304,8 @@ export function useMediaActions(
   const reference = useReferenceAction(item, onApplied);
   const cards = useCardActions(item, onApplied);
   const recreate = useRecreateAction(item, onApplied);
-  // An upload has only its suggested prompt to recreate.
+  const changedPrompt = draft?.changedPrompt;
+  // An upload has only its recorded or suggested prompt to recreate.
   const recreateAction = item.uploaded
     ? recreate
     : {
@@ -316,7 +313,7 @@ export function useMediaActions(
         label: "Recreate in Composer",
         icon: icons.prompt,
         disabled: action.isPending,
-        onClick: () => action.mutate("image"),
+        onClick: () => action.mutate({ operation: "image", prompt: changedPrompt }),
       };
   const saveFrame = useSaveFrame(item);
   const videoEdit = useVideoEdit(item);
@@ -465,9 +462,8 @@ export function useMediaActions(
         },
       ]
     : [];
-  // Edit asks the assistant for a change: in the viewer's prompt, or elsewhere by opening the
-  // viewer to ask there (GalleryPage's item path, ViewerPrompt's `ask`).
-  const openViewer = (ask: ViewerAsk["change"]) => {
+  // A tile starts the same prompt change by opening the item's viewer.
+  const openViewer = (mode: ViewerChange, change: ViewerAsk["change"]) => {
     onApplied();
     const { chat, set, show, similar, turn } = (location.state as GalleryState | null) || {};
     navigate(viewerPath(item), {
@@ -478,26 +474,74 @@ export function useMediaActions(
         similar,
         turn,
         viewer: true,
-        ask: { itemId: item.id, change: ask },
+        ask: { itemId: item.id, action: mode, change } satisfies ViewerAsk,
       },
     });
   };
-  const editAsk: EditAsk = edit ?? {
-    pending: false,
-    pick: (request) => openViewer({ request }),
-    custom: () => openViewer({ custom: true }),
-  };
-  const [editReview, setEditReview] = useEditReview();
-  const editAssisted = !edit && assisted && ready && Boolean(item.jobId);
-  // Tile suggestions load when Edit opens; the viewer prompt owns its own suggestions.
-  const [stepsFor, setStepsFor] = useState<string>();
+  const pick = (mode: ViewerChange, request: string) =>
+    draft ? draft.pick(mode, request) : openViewer(mode, { request });
+  const [reviewChanges, setReviewChanges] = useMediaReview();
+  const canChange = ready && !item.uploaded && Boolean(item.jobId);
+  const assistedChanges = canChange && assisted;
+  // Capture a viewer's draft only when its menu opens, so typing doesn't ask for new suggestions.
+  const [suggestions, setSuggestions] = useState<{
+    id: string;
+    mode: ViewerChange;
+    prompt?: string;
+  }>();
+  const suggestionPrompt = suggestions?.id === item.id ? suggestions.prompt : undefined;
   const steps = useChangeSuggestions({
-    query: nextStepsQuery(item.jobId ?? "", undefined, item.id),
-    fresh: () => askNextSteps(item.jobId!, true, undefined, item.id),
-    enabled: editAssisted && image && stepsFor === item.id,
-    disabled: editAsk.pending,
-    onPick: editAsk.pick,
+    query: nextStepsQuery(item.jobId ?? "", suggestionPrompt, item.id),
+    fresh: () => askNextSteps(item.jobId!, true, suggestionPrompt, item.id),
+    enabled: assistedChanges && image && suggestions?.id === item.id,
+    disabled: draft?.pending,
+    onPick: (request) => {
+      if (suggestions && !draft?.pending) pick(suggestions.mode, request);
+    },
   });
+  const openChanges = (mode: ViewerChange) => () =>
+    setSuggestions({ id: item.id, mode, prompt: draft?.suggestionPrompt });
+  const changeMenu = (mode: ViewerChange, others: ActionGroups, last: Action[]) =>
+    assistMenu({
+      loading: canChange && assistant.isPending,
+      settings: assistedChanges
+        ? [
+            {
+              id: "review",
+              label: "Review Prompt",
+              icon: icons.review,
+              checked: reviewChanges,
+              keepOpen: true,
+              onClick: () => setReviewChanges(!reviewChanges),
+            },
+          ]
+        : [],
+      suggestions: assistedChanges && image ? steps.group : [],
+      templates: assistedChanges
+        ? (assistant.data?.changes ?? []).map((change) => ({
+            id: `change:${change.id}`,
+            label: change.label,
+            icon: icons.assistant,
+            disabled: draft?.pending,
+            onClick: () => pick(mode, change.instruction),
+          }))
+        : [],
+      others,
+      last: [
+        ...(assistedChanges
+          ? [
+              {
+                id: "custom",
+                label: "Custom…",
+                icon: icons.custom,
+                disabled: draft?.pending,
+                onClick: () => (draft ? draft.custom(mode) : openViewer(mode, { custom: true })),
+              },
+            ]
+          : []),
+        ...last,
+      ],
+    });
   // The assistant and the animate offers decide every option, so they show together.
   const optionsLoading = assistant.isPending || animation.isPending;
   // Discovery from this image, A–Z: More Like This, the gallery ranked by likeness to it
@@ -552,141 +596,97 @@ export function useMediaActions(
                   label: "Extend in Composer",
                   icon: FastForward,
                   disabled: animateDisabled,
-                  onClick: () => action.mutate("extend"),
+                  onClick: () => action.mutate({ operation: "extend" }),
                 }
               : {
                   id: "animate-composer",
                   label: "Animate in Composer",
                   icon: icons.prompt,
                   disabled: animateDisabled,
-                  onClick: () => action.mutate("animate"),
+                  onClick: () => action.mutate({ operation: "animate" }),
                 },
           ],
         }),
       }),
-    // Edit asks the assistant for a change, reuses the item elsewhere, or for a video saves an
-    // edit as a new version, the original staying.
+    // An image edit uses the result as its reference. A video's Edit saves a new version.
     ready &&
       itemAction("edit", {
-        loading: videoEdit.isPending || editAsk.pending,
-        onOpen: image && !edit ? () => setStepsFor(item.id) : undefined,
-        menu: assistMenu({
-          loading: assistant.isPending,
-          settings: editAssisted
-            ? [
-                {
-                  id: "review",
-                  label: "Review Prompt",
-                  icon: icons.review,
-                  checked: editReview,
-                  keepOpen: true,
-                  onClick: () => setEditReview(!editReview),
-                },
-              ]
-            : [],
-          suggestions: editAssisted && image ? steps.group : [],
-          // Library's fixed changes, asked for as a suggestion's request is.
-          templates: editAssisted
-            ? (assistant.data?.changes ?? []).map((change) => ({
-                id: `change:${change.id}`,
-                label: change.label,
-                icon: icons.assistant,
-                disabled: editAsk.pending,
-                onClick: () => editAsk.pick(change.instruction),
-              }))
-            : [],
-          custom: editAssisted
-            ? [
-                {
-                  id: "custom",
-                  label: "Custom…",
-                  icon: icons.custom,
-                  disabled: editAsk.pending,
-                  onClick: editAsk.custom,
-                },
-              ]
-            : [],
-          others: image
-            ? [[...cards.slice(0, 2), ...(reference ? [reference] : []), ...cards.slice(2)]]
-            : [
-                [saveFrame, ...(reference ? [reference] : [])],
-                [
-                  editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
-                  editAction("reverse", "Reverse", Rewind, "reverse"),
-                  editAction("slow-motion", "Slow Motion", Snail, "slow"),
-                  editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
-                ],
-              ],
-          last: image
-            ? [
+        loading: videoEdit.isPending || Boolean(image && draft?.pending),
+        onOpen: image && canChange ? openChanges("edit") : undefined,
+        menu: image
+          ? changeMenu(
+              "edit",
+              [[...cards.slice(0, 2), ...(reference ? [reference] : []), ...cards.slice(2)]],
+              [
                 {
                   id: "edit-image",
                   label: "Edit in Composer",
                   icon: icons.edit,
                   disabled: action.isPending,
-                  onClick: () => action.mutate("refine"),
+                  onClick: () => action.mutate({ operation: "refine", prompt: changedPrompt }),
                 },
-              ]
-            : [],
-        }),
+              ],
+            )
+          : [
+              [saveFrame, ...(reference ? [reference] : [])],
+              [
+                editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
+                editAction("reverse", "Reverse", Rewind, "reverse"),
+                editAction("slow-motion", "Slow Motion", Snail, "slow"),
+                editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
+              ],
+            ],
       }),
-    // Recreate runs the item again from here, or opens it in the composer. An
-    // upload has only its suggested prompt; unfinished work opens its prompt.
+    // Recreate uses the draft prompt with the recorded settings, preserving the original inputs.
     itemAction(ready ? "recreate" : "edit", {
       disabled: !ready && action.isPending,
-      loading: running === "regenerate" || running === "repeat" || variants.isPending,
-      onClick: ready ? undefined : () => action.mutate("image"),
-      menu: ready
-        ? [
-            item.uploaded
-              ? []
-              : [
+      loading:
+        running === "regenerate" || running === "repeat" || variants.isPending || draft?.pending,
+      onClick: ready
+        ? undefined
+        : () => action.mutate({ operation: "image", prompt: changedPrompt }),
+      onOpen: image && canChange ? openChanges("recreate") : undefined,
+      menu: !ready
+        ? undefined
+        : item.uploaded
+          ? [[recreateAction]]
+          : changeMenu(
+              "recreate",
+              [
+                [
                   {
                     id: "new-seed",
                     label: "Run Again",
                     icon: Shuffle,
-                    onClick: () => run({ kind: "regenerate" }),
+                    disabled: changedPrompt === "",
+                    onClick: () => run({ kind: "regenerate", prompt: changedPrompt }),
                   },
                   {
                     id: "exact-repeat",
                     label: "Run Again, Same Seed",
                     icon: Repeat,
-                    onClick: () => run({ kind: "repeat" }),
+                    disabled: changedPrompt === "",
+                    onClick: () => run({ kind: "repeat", prompt: changedPrompt }),
                   },
                 ],
-            [
-              // Stages this image's prompt across models in the composer.
-              ...(image && !item.uploaded
-                ? [
-                    {
-                      id: "compare-models",
-                      label: "Compare in Composer",
-                      icon: icons.compare,
-                      disabled: variants.isPending,
-                      loading: variants.isPending,
-                      onClick: () => variants.mutate(),
-                    },
-                  ]
-                : []),
-              recreateAction,
-            ],
-          ]
-        : undefined,
+                image
+                  ? [
+                      {
+                        id: "compare-models",
+                        label: "Compare in Composer",
+                        icon: icons.compare,
+                        disabled: variants.isPending,
+                        loading: variants.isPending,
+                        onClick: () => variants.mutate(),
+                      },
+                    ]
+                  : [],
+              ],
+              [recreateAction],
+            ),
     }),
     upscale,
-    // The viewer prompt's assistance, when present, precedes comparing and discovery.
-    (assist || discovery.length > 0) &&
-      itemAction("ai", {
-        onOpen: assist?.onOpen,
-        menu: assistMenu({
-          loading: Boolean(assist) && assistant.isPending,
-          settings: assist?.settings,
-          suggestions: assist?.suggestions,
-          templates: assist?.templates ?? [],
-          custom: assist?.custom,
-          last: discovery,
-        }),
-      }),
+    discovery.length > 0 && itemAction("ai", { menu: [discovery] }),
     ready &&
       itemAction("like", {
         pressed: item.rating === "liked",
@@ -809,11 +809,7 @@ export function MediaActionMenu({
 }: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
   const groups = useMediaActions(item, options).flatMap((group) =>
     group.some(({ id }) => id === "ai" || id === "share")
-      ? group.map((action) =>
-          action.menu
-            ? [{ id: action.id, label: action.label, heading: true }, ...action.menu.flat()]
-            : [action],
-        )
+      ? group.map((action) => action.menu?.flat() ?? [action])
       : [group],
   );
   return (

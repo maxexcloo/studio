@@ -101,7 +101,7 @@ async function* turns<Item>(items: Iterable<Item>) {
 /**
  * Text-model work on finished gallery records while Studio is idle (no live job but Dream's and no
  * text work), newest first. Outside a pass a trickle takes new items one at a
- * time, at most one every 10 s and `dailyItems` a day (the server's local day). A pass runs flat
+ * time, at most one every 10 s, with a daily limit unless disabled. A pass runs flat
  * out, `passConcurrency` at a time, until every item is done or it is stopped; `continuous` work
  * is always in a pass and keeps no saved state. Either yields the moment work appears: the calls
  * are aborted and those items are tried again later. Only for owners `allowed` to use the prompt
@@ -134,6 +134,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
   /** Does the work for one item and saves it, unless `signal` aborted first; throws with the reason. */
   run(item: Item, signal: AbortSignal): Promise<void>;
   continuous?: boolean;
+  dailyCap?: false;
   load?(): IdleDocument | null;
   persist?(document: IdleDocument): void;
   now?: () => number;
@@ -239,7 +240,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
     if (!all) {
       if (time - last < spacingMs) return "spaced";
       if (trickle.day !== day(time)) trickle = { day: day(time), count: 0 };
-      if (trickle.count >= dailyItems) return "capped";
+      if (options.dailyCap !== false && trickle.count >= dailyItems) return "capped";
     }
     const reason = await options.unavailable();
     if (reason) {
