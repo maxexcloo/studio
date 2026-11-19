@@ -10,8 +10,10 @@ import {
   UndoButton,
   proposalText,
   proposedClass,
+  useChangeSuggestions,
 } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
+import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import { useItemChange } from "./useItemChange";
 import { type Iteration, typedPrompt, useMediaReview } from "./useMediaAction";
 
@@ -106,11 +108,31 @@ export function ViewerPrompt({
 }) {
   const { item, original, prompt, setPrompt, field, ask, custom } = state;
   const change = ask.proposal;
-  const video = item.type === "video";
   const running = pending?.kind === "prompt";
+  const [requested, setRequested] = useState<{ itemId: string; prompt?: string }>();
+  const queried = requested?.itemId === item.id && requested;
+  const base = queried ? queried.prompt : undefined;
+  const suggestions = useChangeSuggestions({
+    query: nextStepsQuery(item.jobId ?? "", base, item.id),
+    fresh: () => askNextSteps(item.jobId!, true, base, item.id),
+    enabled: ask.available && Boolean(queried),
+    disabled: ask.pending,
+    onPick: (request) => ask.send(request, prompt, "recreate", undefined, true),
+  });
+  const editorTools = ask.available
+    ? [
+        {
+          ...suggestions.action,
+          onOpen: () => {
+            const typed = ask.typed ?? prompt;
+            setRequested({ itemId: item.id, prompt: typed !== original ? typed : undefined });
+          },
+        },
+      ]
+    : undefined;
   const submit = change
     ? {
-        label: "Run",
+        label: ask.previewing ? "Generate" : "Run",
         disabled: !prompt.trim(),
         onSubmit: () => {
           ask.run(prompt);
@@ -156,20 +178,29 @@ export function ViewerPrompt({
       <TextBox
         ref={field}
         aria-label="Prompt"
-        placeholder={`Describe the ${video ? "video" : "image"}`}
+        placeholder="Prompt…"
         variant="unstyled"
         autosize
         oneLine
         minRows={1}
         maxRows={4}
         className={change ? `${classes.prompt} ${proposedClass}` : classes.prompt}
-        description={change && <ProposalLabel proposal={change} before={original} />}
+        description={
+          change && (
+            <ProposalLabel
+              proposal={change}
+              before={original}
+              labels={ask.previewing ? { recreate: "Generate" } : undefined}
+            />
+          )
+        }
         value={prompt}
         readOnly={change?.action === "upscale"}
         onChange={setPrompt}
         onKeyDown={keys}
         tools={[]}
-        reset={original}
+        editorTools={editorTools}
+        reset={change ? prompt : original}
         send={send}
         busy={ask.pending ? "Asking for a Change…" : undefined}
         submit={sends}

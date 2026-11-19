@@ -1,4 +1,4 @@
-import { Drawer, type DrawerProps, FocusTrap } from "@mantine/core";
+import { Drawer, type DrawerProps, FocusTrap, VisuallyHidden } from "@mantine/core";
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { useMotionDuration } from "./Appearance";
@@ -26,6 +26,7 @@ type SheetProps = Pick<
   id?: string;
   title: string;
   hidden?: boolean;
+  fieldTitles?: Record<string, string>;
   children: (typing: SheetTyping) => ReactNode;
 };
 
@@ -36,7 +37,15 @@ const sheetField = (panel: HTMLElement, target: unknown) =>
     : undefined;
 
 /** A full-height phone drawer whose inline text editor follows the keyboard. */
-export function TextEntrySheet({ id, title, hidden, onClose, children, ...props }: SheetProps) {
+export function TextEntrySheet({
+  id,
+  title,
+  hidden,
+  fieldTitles,
+  onClose,
+  children,
+  ...props
+}: SheetProps) {
   const generatedId = useId();
   const sheetId = id ?? generatedId;
   const duration = useMotionDuration();
@@ -65,17 +74,31 @@ export function TextEntrySheet({ id, title, hidden, onClose, children, ...props 
     setField(undefined);
   });
 
+  const fieldTitle = field && fieldTitles?.[field];
   return (
     <Drawer
       {...props}
       id={sheetId}
       onClose={closeWhenTop(sheetId, onClose)}
-      title={title}
-      closeButtonProps={{ "aria-label": `Close ${title}` }}
+      title={
+        fieldTitle ? (
+          <>
+            <VisuallyHidden>{title}</VisuallyHidden>
+            <span aria-hidden>{fieldTitle}</span>
+          </>
+        ) : (
+          title
+        )
+      }
+      closeButtonProps={{ "aria-label": `Close ${fieldTitle || title}` }}
       position="bottom"
       size="100%"
       transitionProps={{ duration }}
-      classNames={{ content: classes.sheet, header: classes.header, body: classes.body }}
+      classNames={{
+        content: classes.sheet,
+        header: fieldTitle ? undefined : classes.header,
+        body: classes.body,
+      }}
       styles={{
         content: {
           translate: keyboard.top ? `0 ${keyboard.top}px` : undefined,
