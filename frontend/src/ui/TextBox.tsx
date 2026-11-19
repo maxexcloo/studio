@@ -321,7 +321,7 @@ export function TextBox({
           )}
         </Menu.Target>
       </PopupTooltip>
-      <Menu.Dropdown style={{ overflowY: "auto" }}>
+      <Menu.Dropdown style={{ overflowY: "auto", overscrollBehavior: "contain" }}>
         {listed.map((tool, index) => (
           <Fragment key={tool.id}>
             {index > 0 && <Menu.Divider />}

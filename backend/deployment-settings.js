@@ -66,7 +66,7 @@ export const catalogueFlags = [
   flag(
     "STUDIO_PROMPT_IDEAS",
     "Prompt Ideas",
-    "The assistant model offers prompt ideas from each account's taste in an empty prompt's AI menu.",
+    "The assistant offers ideas in the composer's AI menu for an empty prompt or a draft with applied cards.",
   ),
   flag(
     "STUDIO_SUGGESTED_PROMPTS",

@@ -1,6 +1,12 @@
 import { queryOptions } from "@tanstack/react-query";
 
-import type { Change, ChangeAction, NextStep, Suggestions } from "../../../../shared/suggestions";
+import type {
+  Change,
+  ChangeAction,
+  NextStep,
+  PromptIdea,
+  Suggestions,
+} from "../../../../shared/suggestions";
 import { post } from "../../api";
 import type { MediaKind } from "../../types";
 
@@ -12,15 +18,21 @@ const cached = {
   retry: false,
 } as const;
 
-/** Prompt ideas for an empty composer, from the account's taste profile; `fresh` asks for others. */
-export const askPromptIdeas = (kind: MediaKind, fresh = false) =>
-  post<Suggestions<string>>("/api/suggestions", { surface: "composer", kind, fresh });
-
-/** The empty composer's prompt ideas, which its prompt's AI menu offers. */
-export const promptIdeasQuery = (kind: MediaKind) =>
+/** The composer's AI menu offers ideas for an empty prompt or a draft with applied cards. */
+export const promptIdeasQuery = (
+  kind: MediaKind,
+  cards?: { cardIds: string[]; prompt: string },
+  fresh = false,
+) =>
   queryOptions({
-    queryKey: ["suggestions", "composer", kind],
-    queryFn: () => askPromptIdeas(kind),
+    queryKey: ["suggestions", "composer", kind, cards],
+    queryFn: () =>
+      post<Suggestions<PromptIdea>>("/api/suggestions", {
+        surface: "composer",
+        kind,
+        ...cards,
+        fresh,
+      }),
     ...cached,
   });
 
