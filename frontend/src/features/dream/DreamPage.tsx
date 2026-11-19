@@ -9,10 +9,11 @@ import {
   Stack,
   Text,
   Tooltip,
+  VisuallyHidden,
 } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronDown } from "lucide-react";
-import { Fragment, useEffect, useState } from "react";
+import { Check, ChevronDown, Image as ImageIcon, Video } from "lucide-react";
+import { Fragment, useEffect, useId, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { post } from "../../api";
@@ -26,7 +27,6 @@ import { TasteProfile } from "../taste/TasteProfile";
 import { TasteReflection } from "../taste/TasteReflection";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamDeck } from "./DreamDeck";
-import { DreamDigest } from "./DreamDigest";
 import { DreamHistory } from "./DreamHistory";
 import { DreamProjects } from "./DreamProjects";
 import { lockedByAdministrator, useDreamSettings } from "./DreamSettings";
@@ -89,12 +89,12 @@ function Empty({ dream }: { dream: Dream }) {
   );
 }
 
-const views = ["deck", "overview", "projects", "taste", "discarded", "history"] as const;
+const views = ["deck", "projects", "taste", "discarded", "history"] as const;
 
 /**
- * Dream: the deck of unseen results, comparisons and calibration, with its pause;
- * While You Were Away as the overview per project, the projects, the discards or the taste profile.
- * Opening it counts as a visit.
+ * Dream shows unseen results, comparisons and calibration in the deck, with counts of images
+ * and videos awaiting a verdict. Projects shows what is new in each project. Opening Dream counts
+ * as a visit.
  */
 export function DreamPage() {
   const phone = usePhone();
@@ -121,26 +121,24 @@ export function DreamPage() {
   const mediaLabels = { image: "Images", video: "Videos" };
   const viewLabels = {
     deck: mediaLabels[media],
-    overview: "Overview",
     projects: "Projects",
     taste: "Taste",
     discarded: "Discards",
     history: "History",
   };
   const data = dream.data;
-  const groups = (data?.digest ?? [])
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => item.type === media),
-      misses: group.misses.filter((item) => item.type === media),
-    }))
-    .filter((group) => group.items.length || group.misses.length);
   // Unseen cards of each kind, so new work on the other kind is never hidden.
   const unseen = { image: count.data?.images, video: count.data?.videos };
   const counted = (kind: DreamMedia) =>
     unseen[kind] ? `${mediaLabels[kind]} (${unseen[kind]})` : mediaLabels[kind];
+  const waitingId = useId();
+  const plural = (number: number, noun: string) => `${number} ${noun}${number === 1 ? "" : "s"}`;
+  const waiting = count.data && {
+    images: plural(count.data.images, "image"),
+    videos: plural(count.data.videos, "video"),
+  };
   // The deck takes its media from the view menu; the other views that list media switch here.
-  const selector = ["overview", "discarded", "history"].includes(view) && (
+  const selector = ["discarded", "history"].includes(view) && (
     <SegmentedControl
       aria-label="Dream Media"
       value={media}
@@ -167,12 +165,33 @@ export function DreamPage() {
                 variant="subtle"
                 color="gray"
                 aria-label="Dream View"
+                aria-describedby={waiting ? waitingId : undefined}
                 rightSection={<ChevronDown size={14} />}
               >
                 {viewLabels[view]}
+                {/* Always in sight, so new work on either kind shows from every view. */}
+                {count.data && waiting && (
+                  <Group component="span" gap={4} wrap="nowrap" c="dimmed" ml={8} aria-hidden>
+                    {phone ? (
+                      <>
+                        <ImageIcon size={14} />
+                        {count.data.images} ·
+                        <Video size={14} />
+                        {count.data.videos}
+                      </>
+                    ) : (
+                      `· ${waiting.images} · ${waiting.videos}`
+                    )}
+                  </Group>
+                )}
               </Button>
             </Menu.Target>
           </PopupTooltip>
+          {waiting && (
+            <VisuallyHidden id={waitingId}>
+              {`${waiting.images} and ${waiting.videos} waiting`}
+            </VisuallyHidden>
+          )}
           <Menu.Dropdown>
             {(["image", "video"] as const).map((kind) =>
               item(counted(kind), view === "deck" && media === kind, () => {
@@ -243,12 +262,6 @@ export function DreamPage() {
         <Alert color="red" title="Couldn't Load Dream">
           {dream.error.message}
         </Alert>
-      ) : view === "overview" ? (
-        groups.length ? (
-          <DreamDigest key={media} groups={groups} since={data!.since} />
-        ) : (
-          <Empty dream={data!} />
-        )
       ) : (
         <DreamDeck
           key={media}

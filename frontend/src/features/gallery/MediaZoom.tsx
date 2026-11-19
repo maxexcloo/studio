@@ -16,18 +16,23 @@ export function useMediaZoom({
   height,
   disabled = false,
   resetKey,
+  rest = "Fit",
 }: {
   width: number;
   height: number;
   disabled?: boolean;
   resetKey?: string;
+  /** Where the picture opens and a double tap returns: whole, or filling the viewport. */
+  rest?: "Fit" | "Fill";
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const picture = useRef<HTMLButtonElement>(null);
   const transform = useRef<ReactZoomPanPinchRef>(null);
   const percentage = useRef<HTMLSpanElement>(null);
-  const modeRef = useRef<Mode>("Fit");
-  const [mode, setMode] = useState<Mode>("Fit");
+  const modeRef = useRef<Mode>(rest);
+  const [mode, setMode] = useState<Mode>(rest);
+  /** Whether the picture shows whole or at rest, rather than zoomed in. */
+  const resting = (current = modeRef.current) => current === "Fit" || current === rest;
   const duration = useMotionDuration();
   const [recent, flash] = useFlash();
   const revealControls = () => flash(true);
@@ -62,14 +67,26 @@ export function useMediaZoom({
   function toggleAt(x: number, y: number) {
     const api = transform.current;
     if (!api) return;
-    if (modeRef.current === "Fit") {
+    if (modeRef.current === rest) {
       changeMode("Custom");
       void api.zoomToPoint(api.state.scale * 2.5, x, y, duration);
     } else {
-      changeMode("Fit");
-      layout("Fit");
+      changeMode(rest);
+      layout(rest);
     }
     revealControls();
+  }
+  /** A pinch that ends at or below the resting size settles back to rest. */
+  function settle() {
+    const api = transform.current;
+    const node = viewport.current;
+    if (!api || !node || resting()) return;
+    const across = node.clientWidth / width;
+    const down = node.clientHeight / height;
+    const restScale = rest === "Fill" ? Math.max(across, down) : Math.min(across, down, 1);
+    if (api.state.scale > restScale * 1.02) return;
+    changeMode(rest);
+    layout(rest);
   }
   function manualZoom() {
     changeMode("Custom");
@@ -81,9 +98,9 @@ export function useMediaZoom({
     else void transform.current?.zoomIn(0.2, duration);
   }
   useLayoutEffect(() => {
-    changeMode("Fit");
-    layout("Fit", 0);
-  }, [resetKey]);
+    changeMode(rest);
+    layout(rest, 0);
+  }, [resetKey, rest]);
   // Lays out while the image loads too, so its placeholder already sits where the image will.
   useLayoutEffect(() => {
     const observer = new ResizeObserver(() => layout(modeRef.current, 0));
@@ -131,12 +148,14 @@ export function useMediaZoom({
     percentage,
     modeRef,
     mode,
+    resting,
     duration,
     disabled,
     recent,
     cycle,
     toggleAt,
     manualZoom,
+    settle,
     revealControls,
     zoom,
     onTransform,

@@ -19,7 +19,7 @@ import type { Verdict } from "./choices";
 import { type DeckCard, type PairDeckCard, cardIds, deckCards } from "./deck";
 import { DeckButtons } from "./DeckButtons";
 import { DeckMedia } from "./DeckMedia";
-import { Caption, DreamPreview } from "./DreamPreview";
+import { CardText, DreamPreview, PreviewFace, PreviewSides } from "./DreamPreview";
 import { PairContent } from "./PairCard";
 import {
   type DreamItem,
@@ -214,13 +214,13 @@ export function DreamDeck({
 }) {
   const phone = usePhone();
   const touch = useTouch();
-  // A phone held sideways gives the caption its own scrolling column, so it shows in full.
+  // A phone held sideways gives the text its own scrolling column, so it shows in full.
   const sideways = useSideways();
   const [current, setCurrent] = useState<DeckCard>();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
   const [judged, setJudged] = useState(0);
-  // The id of the top card's item open in the preview.
-  const [viewing, setViewing] = useState<string | null>(null);
+  // The top card open in the preview, and a comparison's side shown there.
+  const [viewing, setViewing] = useState<{ key: string; side: number } | null>(null);
   // The side a tap chose, outlined while its card leaves.
   const [picked, setPicked] = useState<{ key: string; side: 0 | 1 } | null>(null);
   // This session's judgements that Undo can take back, newest last.
@@ -257,6 +257,7 @@ export function DreamDeck({
   if (top !== current) setCurrent(top);
   usePrefetch(cards[2]);
   const fly = useRef<Fly | null>(null);
+  const previewFly = useRef<Fly | null>(null);
   const busy = useRef(false);
 
   /** Takes the card off the deck. */
@@ -289,20 +290,21 @@ export function DreamDeck({
     setJudged((previous) => previous - 1);
     takeBack.mutate(last);
   }
-  /** Flies the top card out its way, then commits the verdict or answer. */
+  /** Flies the top card out its way, on the deck or in the preview, then commits the verdict. */
   async function act(choice: Verdict | PairAnswer) {
     if (!top || busy.current) return;
     busy.current = true;
+    const out = (viewing ? previewFly : fly).current;
     try {
       if (top.kind === "pair") {
         if (!(choice in answerDirections)) return;
         if (choice === "a" || choice === "b")
           setPicked({ key: top.key, side: choice === "a" ? 0 : 1 });
-        await fly.current?.(answerDirections[choice as PairAnswer]);
+        await out?.(answerDirections[choice as PairAnswer]);
         return commit({ card: top, verdict: choice as PairAnswer });
       }
       if (!(choice in directions)) return;
-      await fly.current?.(directions[choice]);
+      await out?.(directions[choice]);
       commit({ card: top, verdict: choice as Verdict });
     } finally {
       busy.current = false;
@@ -313,58 +315,128 @@ export function DreamDeck({
     top?.kind === "pair"
       ? answers[direction]
       : ({ left: "discard", right: "keep", up: "like", down: null } as const)[direction];
-  const keyRef = useRef(intent);
-  keyRef.current = intent;
-  const actRef = useRef(act);
-  actRef.current = act;
-  const undoRef = useRef(undo);
-  undoRef.current = undo;
+  /** Arrow keys judge and U or Z undoes, on the deck and in its preview. */
+  function respond(event: KeyboardEvent) {
+    const direction = keyDirections[event.key];
+    const undoKey = event.key === "u" || event.key === "z";
+    if (
+      (!direction && !undoKey) ||
+      event.defaultPrevented ||
+      event.altKey ||
+      event.metaKey ||
+      event.ctrlKey
+    )
+      return;
+    const target = event.target as HTMLElement;
+    if (target.closest("input, textarea, select, [contenteditable='true'], [role='slider']"))
+      return;
+    if (undoKey) return undo();
+    const choice = intent(direction);
+    if (!choice) return;
+    event.preventDefault();
+    void act(choice);
+  }
+  const respondRef = useRef(respond);
+  respondRef.current = respond;
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      const direction = keyDirections[event.key];
-      const undoKey = event.key === "u" || event.key === "z";
-      if (
-        (!direction && !undoKey) ||
-        event.defaultPrevented ||
-        event.altKey ||
-        event.metaKey ||
-        event.ctrlKey
-      )
-        return;
-      const target = event.target as HTMLElement;
-      if (target.closest("input, textarea, select, [contenteditable='true']")) return;
-      if (layerAbove(null, event)) return;
-      if (undoKey) return undoRef.current();
-      const choice = keyRef.current(direction);
-      if (!choice) return;
-      event.preventDefault();
-      void actRef.current(choice);
+      if (!layerAbove(null, event)) respondRef.current(event);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // The preview shows the top card; an answer there closes it and plays out on the deck.
-  const shown = !top ? [] : top.kind === "pair" ? top.items : [top.item];
-  const side = shown.findIndex((item) => item.id === viewing);
-  if (viewing && side < 0) setViewing(null);
-  const preview = top && side >= 0 && (
-    <DreamPreview
-      card={top}
-      side={side}
-      close={(itemId) => {
-        // The preview mounts open, so Mantine has no opening to return focus from.
-        flushSync(() => setViewing(null));
-        document
-          .querySelector<HTMLElement>(`[data-depth="0"] [data-preview-id="${CSS.escape(itemId)}"]`)
-          ?.focus({ preventScroll: true });
-      }}
-      act={(choice) => {
-        setViewing(null);
-        void act(choice);
-      }}
-    />
-  );
+  // The preview follows the top card, opening a comparison on its first side.
+  if (viewing && !top) setViewing(null);
+  else if (viewing && top && viewing.key !== top.key) setViewing({ key: top.key, side: 0 });
+  const open = (card: DeckCard, side = 0) => setViewing({ key: card.key, side });
+  /** Opens the side of a comparison pressed, or a single card. */
+  const openPressed = (card: DeckCard, target: HTMLElement) =>
+    open(card, Number(target.closest<HTMLElement>("[data-side]")?.dataset.side ?? 0));
+  function closePreview() {
+    if (!viewing || !top) return;
+    const item = top.kind === "pair" ? top.items[viewing.side] : top.item;
+    // The preview mounts open, so Mantine has no opening to return focus from.
+    flushSync(() => setViewing(null));
+    document
+      .querySelector<HTMLElement>(`[data-depth="0"] [data-preview-id="${CSS.escape(item.id)}"]`)
+      ?.focus({ preventScroll: true });
+  }
+  /** The deck's card, or with `full` the preview's, for the top card or the one beneath. */
+  const swipeCard = (card: DeckCard, full: boolean) => {
+    const isTop = card === top;
+    const playing = isTop && (full || !viewing);
+    const side = isTop && viewing ? viewing.side : 0;
+    return (
+      <SwipeCard
+        key={card.key}
+        depth={isTop ? 0 : 1}
+        paused={!playing}
+        previewSide={full && card.kind === "pair" ? side : undefined}
+        // A comparison's preview swipes between its sides, and answers with its buttons.
+        still={full && card.kind === "pair"}
+        full={full}
+        fly={full ? previewFly : fly}
+        pair={card.kind === "pair"}
+        label={cardLabel(card, isTop)}
+        hints={
+          card.kind === "pair"
+            ? full
+              ? {}
+              : { left: "A", right: "B", up: "Both", down: "Neither" }
+            : { left: "Dislike", right: "Accept", up: "Like" }
+        }
+        onTap={full ? undefined : (target) => openPressed(card, target)}
+        onHold={full ? undefined : (target) => openPressed(card, target)}
+        onSwipe={(direction) => {
+          const choice = card.kind === "pair" ? answers[direction] : intent(direction);
+          if (!choice) return;
+          commit({ card, verdict: choice } as Judgement);
+        }}
+      >
+        {card.kind === "pair" ? (
+          full ? (
+            <PreviewSides card={card} side={side} setSide={(side) => open(card, side)} />
+          ) : (
+            <PairContent
+              card={card}
+              top={isTop}
+              playing={playing}
+              picked={picked?.key === card.key ? picked.side : undefined}
+              view={(side) => open(card, side)}
+            />
+          )
+        ) : full ? (
+          <PreviewFace item={card.item} dreamt={card.kind === "dream"} />
+        ) : (
+          <>
+            <div className={classes.media}>
+              <DeckMedia item={card.item} playing={playing} />
+              {card.kind === "calibration" && (
+                <Badge className={classes.label} variant="default">
+                  From Your Gallery
+                </Badge>
+              )}
+              {isTop && (
+                <Tooltip label="View">
+                  <ActionIcon
+                    className={classes.view}
+                    variant="default"
+                    aria-label="View"
+                    data-preview-id={card.item.id}
+                    onClick={() => open(card)}
+                  >
+                    <icons.preview size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </div>
+            <CardText item={card.item} dreamt={card.kind === "dream"} full={sideways} />
+          </>
+        )}
+      </SwipeCard>
+    );
+  };
   // Undo stands beside the view menu, so it stays in reach with the deck empty too.
   const undoButton =
     undoTarget &&
@@ -390,90 +462,11 @@ export function DreamDeck({
         {undoButton}
       </>
     );
-  const view = (item: MediaItem) => (
-    <Tooltip label="View">
-      <ActionIcon
-        className={classes.view}
-        variant="default"
-        aria-label="View"
-        data-preview-id={item.id}
-        onClick={() => setViewing(item.id)}
-      >
-        <icons.preview size={16} />
-      </ActionIcon>
-    </Tooltip>
-  );
+  const stack = (full: boolean) => [next, top].map((card) => card && swipeCard(card, full));
   return (
     <>
       <div className={classes.stage} aria-hidden={!!viewing} inert={!!viewing}>
-        {[next, top].map(
-          (card) =>
-            card && (
-              <SwipeCard
-                key={card.key}
-                depth={card === top ? 0 : 1}
-                paused={!!viewing}
-                fly={fly}
-                pair={card.kind === "pair"}
-                label={cardLabel(card, card === top)}
-                hints={
-                  card.kind === "pair"
-                    ? { left: "A", right: "B", up: "Both", down: "Neither" }
-                    : {
-                        left: "Dislike",
-                        right: "Accept",
-                        up: "Like",
-                      }
-                }
-                onTap={(target) => {
-                  if (card.kind !== "pair") return setViewing(card.item.id);
-                  const side = target.closest<HTMLElement>("[data-side]")?.dataset.side;
-                  setViewing(card.items[Number(side ?? 0)].id);
-                }}
-                onHold={(target) => {
-                  if (card.kind !== "pair") return setViewing(card.item.id);
-                  const side = target.closest<HTMLElement>("[data-side]")?.dataset.side;
-                  setViewing(card.items[Number(side ?? 0)].id);
-                }}
-                onSwipe={(direction) => {
-                  const choice = card.kind === "pair" ? answers[direction] : intent(direction);
-                  if (!choice) return;
-                  commit({ card, verdict: choice } as Judgement);
-                }}
-              >
-                {card.kind === "pair" ? (
-                  <PairContent
-                    card={card}
-                    top={card === top}
-                    playing={card === top && !viewing}
-                    picked={picked?.key === card.key ? picked.side : undefined}
-                    view={(side) => setViewing(card.items[side].id)}
-                  />
-                ) : (
-                  <>
-                    <div className={classes.media}>
-                      <DeckMedia item={card.item} playing={card === top && !viewing} />
-                      {card.kind === "calibration" && (
-                        <Badge className={classes.label} variant="default">
-                          From Your Gallery
-                        </Badge>
-                      )}
-                      {card === top && view(card.item)}
-                    </div>
-                    {card.kind === "dream" ? (
-                      <Caption item={card.item} full={sideways} />
-                    ) : (
-                      <div className={classes.caption}>
-                        <Text size="xs" c="dimmed" lineClamp={sideways ? undefined : 2}>
-                          {card.item.prompt}
-                        </Text>
-                      </div>
-                    )}
-                  </>
-                )}
-              </SwipeCard>
-            ),
-        )}
+        {stack(false)}
       </div>
       <DeckButtons card={top} act={(choice) => void act(choice)} hidden={!!viewing} />
       {!phone && !touch && (
@@ -484,7 +477,29 @@ export function DreamDeck({
         </Text>
       )}
       {undoButton}
-      {preview}
+      {viewing && (
+        <DreamPreview
+          card={top}
+          side={viewing.side}
+          canUndo={history.length > 0}
+          close={closePreview}
+          act={(choice) => void act(choice)}
+          undo={undo}
+          onKeyDown={(event) => {
+            // A comparison's sides step with the arrows; its answers are its buttons.
+            if (top.kind !== "pair") return respond(event.nativeEvent);
+            const step = ({ ArrowLeft: -1, ArrowRight: 1 } as Record<string, number>)[event.key];
+            const { altKey, ctrlKey, metaKey, shiftKey } = event;
+            if (!step || altKey || ctrlKey || metaKey || shiftKey || event.defaultPrevented) return;
+            if ((event.target as Element).closest("[role='slider']")) return;
+            event.preventDefault();
+            const side = viewing.side + step;
+            if (side >= 0 && side < top.items.length) open(top, side);
+          }}
+        >
+          {stack(true)}
+        </DreamPreview>
+      )}
     </>
   );
 }
