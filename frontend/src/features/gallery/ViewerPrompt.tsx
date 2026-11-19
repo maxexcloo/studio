@@ -200,7 +200,7 @@ export function ViewerPrompt({
         onKeyDown={keys}
         tools={[]}
         editorTools={editorTools}
-        reset={original}
+        reset={change ? prompt : original}
         send={send}
         busy={ask.pending ? "Asking for a Change…" : undefined}
         submit={sends}
