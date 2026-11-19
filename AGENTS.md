@@ -142,7 +142,8 @@ recur across features.
   menus, the viewer and the selection bar. `MediaActions.tsx` owns their availability and
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
   The context menu shows the AI and Share options in labelled sections. Other
-  submenus match in bar and menu, and assistant menus share `assistMenu`.
+  actions match in bar and menu. AI and Share appear as unlabelled sections
+  in context menus, and assistant menus share `assistMenu`.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
   phone media item bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and
@@ -210,8 +211,7 @@ recur across features.
   Clear are left to the browser, and a box starting from its own text shows
   Reset, then Undo, as one icon beside it while it can act. The button is ⋯,
   or the AI icon when the box has an AI tool; the AI icon (`icons.assistant`)
-  marks everything AI does. The viewer's prompt keeps its AI tools in the
-  bar's AI menu and its send beside the text.
+  marks everything AI does. The viewer keeps its prompt send beside the text.
   Composer fields edit in place: at rest the phone Generate sheet's prompt,
   and its Negative Prompt when shown, share the room between its heading and
   the chips, which wrap onto as many rows as they need; each box shows only
