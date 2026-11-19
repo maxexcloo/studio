@@ -103,6 +103,7 @@ export const noteWorkerProfiles = (id, profiles = []) => {
   if (dropped.length) logWarning("Worker no longer offers profiles", { worker: id, dropped });
   inventories.set(id, next);
 };
+export const forgetWorkerProfiles = (id) => inventories.delete(id);
 
 // A catalogue read asks runsOnRadiance for every profile, backend and worker, and each lookup checks
 // the whole profile folder, so answers hold until the turn ends.
@@ -148,14 +149,21 @@ export function routeJob(
   { profileId = "", backend = "", prefers = [], loads = new Map(), model = "", last = false } = {},
 ) {
   const key = profileOnBackendKey(profileId, backend);
+  const workers = workersFor(profileId, backend);
+  const hasModel = (id) => (profileId && inventories.has(id) ? inventories.get(id).has(key) : null);
+  const candidates = backend
+    ? workers.filter(
+        (worker) => worker.capabilities.includes(capability) && hasModel(worker.id) !== false,
+      )
+    : workers;
   return pickWorker(capability, {
-    workers: workersFor(profileId, backend),
+    workers: candidates.length ? candidates : workers,
     prefers,
     load: (id) => loads.get(`worker:${id}`) || null,
     model,
     last,
     online: workerReachable,
-    hasModel: (id) => (profileId && inventories.has(id) ? inventories.get(id).has(key) : null),
+    hasModel,
   });
 }
 
@@ -196,50 +204,80 @@ export function routeProfile(profile, options = {}) {
   return worker;
 }
 
-const isLocalVideoProfile = (profile) => capabilityForProfile(profile) === "video";
+export const matchesWorkerBackend = (worker, profile, backend) =>
+  runsOnRadiance(profile.id, backend) === isRadianceWorker(worker);
 
 /**
  * Whether `worker` may run `profile`: local video on video workers, everything else on image
  * workers, and on a Radiance worker only what one of its backends runs on Radiance.
  */
 export const allowedProfile = (worker, profile) =>
-  worker.capabilities.includes(isLocalVideoProfile(profile) ? "video" : "image") &&
-  (profile.backendOptions?.map((option) => option.id) || [""]).some(
-    (backend) => runsOnRadiance(profile.id, backend) === isRadianceWorker(worker),
+  worker.capabilities.includes(capabilityForProfile(profile)) &&
+  (profile.backendOptions?.map((option) => option.id) || [""]).some((backend) =>
+    matchesWorkerBackend(worker, profile, backend),
   );
+
+const readinessRank = (ready) => (ready === true ? 2 : ready === false ? 0 : 1);
+
+function mergeProfile(entries) {
+  const { profile } = entries[0];
+  if (!profile.backendOptions?.length) return profile;
+
+  const observations = new Map();
+  for (const entry of entries) {
+    for (const option of entry.profile.backendOptions || []) {
+      if (!matchesWorkerBackend(entry.worker, entry.profile, option.id)) continue;
+      const kept = observations.get(option.id);
+      if (!kept || readinessRank(option.ready) > readinessRank(kept.option.ready))
+        observations.set(option.id, { option, profile: entry.profile });
+    }
+  }
+
+  const backendOptions = profile.backendOptions.map((option) => {
+    const observed = observations.get(option.id);
+    if (observed) return observed.option;
+    // No worker can report on this option. Keep the definition for routing's no-worker check.
+    return {
+      ...option,
+      ready: undefined,
+      reason: undefined,
+      ...(option.profile && {
+        profile: { ...option.profile, ready: undefined, readyReason: undefined },
+      }),
+    };
+  });
+  const selected = observations.get(profile.backend);
+  if (!selected)
+    return {
+      ...profile,
+      availability: undefined,
+      readiness: undefined,
+      ready: false,
+      readyReason: noWorkerMessage(capabilityForProfile(profile)),
+      backendOptions,
+    };
+  return {
+    ...selected.profile,
+    backendOptions,
+  };
+}
 
 /**
  * One catalogue from every worker's own: each worker contributes the profiles
  * its capabilities allow (local video from video workers; images and
- * provider-backed runs from image workers), the first worker in list order
- * winning a profile both have. `entries` is `[{ worker, models }]`, in list
- * order, for the workers that answered; `empty` stands in when none did.
+ * provider-backed runs from image workers). Each combined option takes its
+ * best observation from workers that can run it, with ties in list order.
  */
 export function mergeWorkerModels(entries, empty = {}) {
-  const seen = new Map();
-  const profiles = [];
+  const byProfile = new Map();
   for (const { worker, models } of entries) {
     for (const profile of models.profiles || []) {
       if (!allowedProfile(worker, profile)) continue;
-      const index = seen.get(profile.id);
-      if (index === undefined) {
-        seen.set(profile.id, profiles.length);
-        profiles.push(profile);
-        continue;
-      }
-      // A combined profile is ready where any worker runs its backend: that worker's entry wins.
-      const kept = profiles[index];
-      if (!kept.backendOptions?.length) continue;
-      const backendOptions = kept.backendOptions.map((option) => {
-        const other = profile.backendOptions?.find((candidate) => candidate.id === option.id);
-        return option.ready || !other || other.ready === undefined ? option : other;
-      });
-      profiles[index] = {
-        ...(kept.ready === false && profile.ready !== false ? profile : kept),
-        backendOptions,
-      };
+      if (!byProfile.has(profile.id)) byProfile.set(profile.id, []);
+      byProfile.get(profile.id).push({ worker, profile });
     }
   }
+  const profiles = [...byProfile.values()].map(mergeProfile);
   const images = profiles.filter((profile) => profile.kind === "image");
   const videos = profiles.filter((profile) => profile.kind === "video");
   const first = (capability) =>
@@ -250,17 +288,25 @@ export function mergeWorkerModels(entries, empty = {}) {
     list[0]?.id ||
     "";
   const base =
-    entries.find(({ models }) => models.profiles?.length)?.models || entries[0]?.models || empty;
+    entries.find(({ models }) => models.profiles?.length && !models.reason)?.models ||
+    entries.find(({ models }) => models.profiles?.length)?.models ||
+    entries[0]?.models ||
+    empty;
   const result = {
     ...base,
     profiles,
     imageModels: images.map((profile) => ({ label: profile.label, value: profile.id })),
     videoModels: videos.map((profile) => ({ label: profile.label, value: profile.id })),
     defaults: {
-      imageModel: selected(images, first("image")?.defaults?.imageModel),
+      imageModel: selected(
+        images,
+        process.env.STUDIO_DEFAULT_IMAGE_PROFILE || first("image")?.defaults?.imageModel,
+      ),
       videoModel: selected(
         videos,
-        first("video")?.defaults?.videoModel || first("image")?.defaults?.videoModel,
+        process.env.STUDIO_DEFAULT_VIDEO_PROFILE ||
+          first("video")?.defaults?.videoModel ||
+          first("image")?.defaults?.videoModel,
       ),
     },
     capabilities: {
