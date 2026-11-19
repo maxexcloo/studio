@@ -89,12 +89,18 @@ export function createRuntimeRouter(
     "/benchmarks",
     handle(() => benchmarks.list()),
   );
+  router.get(
+    "/workloads/:id/benchmark-models",
+    handle(async (request) => ({ models: await benchmarks.models(String(request.params.id)) })),
+  );
   router.post(
     "/benchmarks",
-    handle(
-      (request) => benchmarks.start(String(request.body?.workload ?? ""), requestedBy(request)),
-      202,
-    ),
+    handle((request) => {
+      const model = request.body?.model;
+      if (model !== undefined && typeof model !== "string")
+        throw new RuntimeRequestError("Choose an available text model.");
+      return benchmarks.start(String(request.body?.workload ?? ""), requestedBy(request), model);
+    }, 202),
   );
   router.get(
     "/benchmarks/:id/logs",

@@ -12,6 +12,7 @@ import {
 import { Dices } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
+import { isCloudVideoProfile } from "../../../../shared/profiles";
 import { titleCase } from "../../../../shared/titles";
 import type { GenerationInput, Profile } from "../../types";
 import { compareNames } from "../../ui/DataTable";
@@ -56,15 +57,24 @@ export function GenerationSettings({
     key: keyof GenerationInput & string,
     label: string,
     range: ReturnType<typeof controlRange>,
-    description?: string,
+    hint?: string,
   ) {
     if (!range) return;
     fields.push({
       label,
       control: (
         <NumberInput
-          label={label}
-          description={description}
+          label={
+            <>
+              {label}
+              {hint && (
+                <Text span size="xs" c="dimmed" ml="xs" aria-hidden>
+                  {hint}
+                </Text>
+              )}
+            </>
+          }
+          aria-description={hint}
           value={typeof input[key] === "number" ? (input[key] as number) : ""}
           onChange={(value) => onChange({ [key]: value })}
           {...range}
@@ -81,7 +91,7 @@ export function GenerationSettings({
   number("cfg", "Guidance", controlRange(profile, "cfg", { min: 0, max: 30, step: 0.5 }));
   if (capabilities.denoise === true)
     number("denoise", "Denoise", controlRange(profile, "denoise", { min: 0, max: 1, step: 0.05 }));
-  if (duration)
+  if (duration && !isCloudVideoProfile(profile))
     number("duration", "Duration (Seconds)", controlRange(profile, "duration", { min: 1 }));
   if (frames) number("frames", "Frames", controlRange(profile, "frames", { min: 1 }), seconds);
   if (fps) number("fps", "FPS", controlRange(profile, "fps", { min: 1, max: 120 }));

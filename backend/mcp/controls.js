@@ -1,5 +1,6 @@
 import {
   guidingRoles,
+  isCloudVideoProfile,
   loraCompatibility,
   loraDefaultStrength,
   loraRejection,
@@ -125,7 +126,7 @@ export function mcpControls(profile) {
       ),
       note: "One per reference_asset_ids entry, in order; only these slots take one.",
     };
-  if (slots.length && profile.aspectPolicy === "reference")
+  if (slots.length && profile.aspectPolicy === "reference" && !isCloudVideoProfile(profile))
     controls.reference_role = {
       options: ["edit", "reference"],
       note: "Requires reference_asset_ids. edit (the default) draws at the reference's proportions, whatever size is asked; reference only guides, and the asked size applies.",

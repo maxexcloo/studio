@@ -1,22 +1,19 @@
 import { isCloudProfile } from "../shared/profiles.ts";
 import { profileImageSize, referenceImageSize } from "./generation-defaults.js";
 import { chooseProfile, takesFirstFrame, tierDistance, tierOf } from "./mcp/tiers.js";
-import { videoAspect } from "./providers/cliproxy.ts";
 
 /**
  * The video's size from its first frame: the image's proportions at the profile's default pixel
- * count, within its limits; for Grok, the nearest aspect it accepts.
+ * count and within its limits. Grok takes the first frame's aspect directly.
  */
 export function frameSize(profile, width, height) {
   const mode = { ...profile, ...profile.imageModes?.reference };
   const budget = profileImageSize(mode);
-  if (!isCloudProfile(profile)) {
-    const scale = Math.sqrt((budget.width * budget.height) / (width * height));
-    return referenceImageSize(mode, { width: width * scale, height: height * scale });
-  }
-  const [a, b] = videoAspect(width, height).split(":").map(Number);
-  const unit = Math.round(Math.sqrt((budget.width * budget.height) / (a * b)));
-  return { width: a * unit, height: b * unit };
+  const scale = Math.sqrt((budget.width * budget.height) / (width * height));
+  const scaled = { width: width * scale, height: height * scale };
+  return isCloudProfile(profile)
+    ? { width: Math.round(scaled.width), height: Math.round(scaled.height) }
+    : referenceImageSize(mode, scaled);
 }
 
 /**

@@ -2,13 +2,12 @@ import { SegmentedControl, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
 import { isCloudProfile } from "../../../../shared/profiles";
-import { titleCase } from "../../../../shared/titles";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
-import { ChipOption, ChipSelect } from "../generation/ChipSelect";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { ProfileSelect } from "../generation/ProfilePicker";
 import { assistantQuery } from "../generation/PromptAssistant";
+import { TextModelSelect } from "../generation/TextModelSelect";
 import {
   type SidePreference,
   type WorkKind,
@@ -43,7 +42,7 @@ export function WhereWorkRuns() {
   const account = useAccount().data;
   const status = useQuery(preferencesQuery).data;
   const profiles = useQuery(modelsQuery).data?.profiles;
-  const textModels = useQuery(assistantQuery).data?.models;
+  const assistant = useQuery(assistantQuery).data;
   const save = useSavePreferences();
   if (!status) return null;
   const { preferences } = status;
@@ -55,27 +54,18 @@ export function WhereWorkRuns() {
     const name = `${sideLabel} Model`;
     const value = preferences[key] ?? null;
     const choose = (choice: string | null) => save.mutate({ [key]: choice || null });
-    const text = (textModels || []).filter(
+    const text = (assistant?.models || []).filter(
       (model) => model.startsWith("local/") === (side === "local"),
     );
     return (
       <SettingRow key={key} wide label={name} description="Used until you pick another model.">
         {kind === "text" ? (
-          <ChipSelect
-            field
+          <TextModelSelect
             name={name}
-            searchable
-            nothingFoundMessage="No Matches"
-            data={[
-              { value: "", label: studioDefault },
-              ...text.map((model) => ({ value: model, label: textModelName(model) })),
-            ]}
-            value={value ?? ""}
-            renderOption={({ option, checked }) => (
-              <ChipOption label={option.label} checked={checked} />
-            )}
+            models={text}
+            unset={studioDefault}
+            value={value}
             onChange={choose}
-            label={value ? textModelName(value) : studioDefault}
           />
         ) : (
           <ProfileSelect
@@ -104,7 +94,10 @@ export function WhereWorkRuns() {
                 aria-label="Default"
                 fullWidth
                 data={sides}
-                value={preferences[kind] || (kind === "text" ? "cloud" : "local")}
+                value={
+                  preferences[kind] ||
+                  (kind === "text" ? assistant?.defaultTextSide || "cloud" : "local")
+                }
                 onChange={(side) => save.mutate({ [kind]: side as SidePreference })}
               />
             </SettingRow>
@@ -116,11 +109,3 @@ export function WhereWorkRuns() {
     </Stack>
   );
 }
-
-const brands: Record<string, string> = { deepseek: "DeepSeek", glm: "GLM", mimo: "MiMo" };
-const titled = (word: string) => brands[word] ?? titleCase(word);
-/** A gateway alias by its readable name: `cloud/glm-flash` reads GLM Flash · Cloud. */
-const textModelName = (id: string) => {
-  const [side, name = ""] = id.split("/");
-  return `${name.split("-").map(titled).join(" ")} · ${titled(side)}`;
-};

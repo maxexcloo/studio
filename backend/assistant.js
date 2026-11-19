@@ -20,9 +20,9 @@ import { replyTitle, titleRule } from "../shared/titles.ts";
  *
  * It uses the gateway credentials (STUDIO_ASSISTANT_URL, _KEY) and asks Bifrost for a model
  * (`model()`) where the account runs text (its Text preference and that side's default model):
- * Local asks for the local text model while a workload serving it runs, and Cloud, the default,
- * STUDIO_ASSISTANT_CLOUD_MODEL, as does work for no account. A call to the local text model makes a
- * shared GPU worker swap out the image model it is generating with, so only that choice reaches it.
+ * Local is available while a workload serves text. Studio's default profile applies on its side,
+ * behind account choices, with the running local model and STUDIO_ASSISTANT_CLOUD_MODEL as
+ * fallbacks. A local text call makes a shared GPU worker swap out its current image model.
  * For an account with uncensored access a base `…/auto` alias becomes `…/uncensored`.
  * Structured calls turn reasoning off with `reasoning_effort` (`reasoningEfforts`).
  * Settings are read on every call, so a model picked in Settings applies at once.
@@ -31,6 +31,7 @@ import { replyTitle, titleRule } from "../shared/titles.ts";
  * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
  * or the LoRA pre-filter.
  */
+import { defaultTextProfileKey, defaultTextSide } from "./account-preferences.js";
 import { familyUpsampler, maxInstructionCharacters } from "./assistant-presets.js";
 import { logger } from "./crash-log.js";
 import { captionCharacters, captionInstructions, captionTags } from "./domain/captions.ts";
@@ -526,21 +527,22 @@ export function createAssistant(
     return resolved;
   };
 
-  /**
-   * The Bifrost model a call asks for, given the account's text `writer` (account-policy.js
-   * `promptWriter`): on Local, while a workload serves text, its Local default, else the running
-   * local text model; otherwise its Cloud default, else the cloud model. An uncensored default the
-   * account may not use gives way. Without a chosen default Cloud asks for its uncensored alias when
-   * `explicit` or the account may use uncensored models. Work for no account uses the cloud model.
-   */
+  /** A personal choice wins, then Studio's profile if it serves the chosen side and is allowed. */
   async function modelFor(task, explicit = false, writer) {
-    const local = writer?.side === "local" && (await localText());
-    const chosen = local ? writer.local : writer?.cloud;
+    const side = defaultTextSide(environment);
+    const local = (writer?.side ?? side) === "local" && (await localText());
+    const chosen = local ? writer?.local : writer?.cloud;
     if (chosen && (writer.uncensored || !uncensoredText(chosen))) return chosen;
-    return uncensoredAlias(
-      local ? local.model : settings().cloud,
-      explicit || Boolean(writer?.uncensored),
-    );
+    const configured = environment[defaultTextProfileKey];
+    const fallback =
+      configured &&
+      side === (local ? "local" : "cloud") &&
+      ((writer?.uncensored ?? explicit) || !uncensoredText(configured))
+        ? configured
+        : local
+          ? local.model
+          : settings().cloud;
+    return uncensoredAlias(fallback, explicit || Boolean(writer?.uncensored));
   }
 
   /** Whether the model calls take reads images: a local one as its workload says, any other always. */

@@ -189,6 +189,7 @@ export async function fixtures(page: Page) {
   };
 
   const deploymentDream = dreamOverridesFixture();
+  let deploymentTextProfile = "";
   const administration = {
     accounts: [
       {
@@ -276,6 +277,7 @@ export async function fixtures(page: Page) {
       if (method === "POST") {
         const setting = Object.values(deploymentDream).find((entry) => entry.key === body.key);
         if (setting) setting.value = body.value;
+        if (body.key === "STUDIO_DEFAULT_TEXT_PROFILE") deploymentTextProfile = body.value;
       }
       const setting = (key: string) => ({
         key,
@@ -288,6 +290,12 @@ export async function fixtures(page: Page) {
         defaults: {
           image: setting("STUDIO_DEFAULT_IMAGE_PROFILE"),
           video: setting("STUDIO_DEFAULT_VIDEO_PROFILE"),
+          text: {
+            ...setting("STUDIO_DEFAULT_TEXT_PROFILE"),
+            configured: deploymentTextProfile,
+            effective: deploymentTextProfile || "cloud/auto",
+          },
+          textModels: ["cloud/auto", "local/auto"],
           profiles: [],
         },
         catalogue: [],
