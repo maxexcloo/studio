@@ -136,6 +136,7 @@ export function LibraryCatalogueTable({
   updateNote,
   inventoryError,
   onEdit,
+  onDelete,
   updatePending = false,
 }: {
   heading: ReactNode;
@@ -154,6 +155,7 @@ export function LibraryCatalogueTable({
   /** What the last update check or update did. */
   updateNote?: string;
   onEdit?: (item: LibraryItem) => void;
+  onDelete?: (item: LibraryItem) => void;
   updatePending?: boolean;
 }) {
   const phone = usePhone();
@@ -387,14 +389,16 @@ export function LibraryCatalogueTable({
           const source = item.links?.civitaiCom || item.links?.hf || item.links?.civitaiRed;
           const latest = item.update?.latest;
           const free = item.update?.freeAlternative;
-          // Edit, then the rest A–Z.
+          const edit = onEdit && (
+            <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => onEdit(item)}>
+              Edit
+            </Menu.Item>
+          );
           return (
             <>
-              {onEdit && (
+              {models && edit && (
                 <>
-                  <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => onEdit(item)}>
-                    Edit
-                  </Menu.Item>
+                  {edit}
                   <Menu.Divider />
                 </>
               )}
@@ -443,6 +447,21 @@ export function LibraryCatalogueTable({
                     {latest?.unavailable?.note || "This update cannot be downloaded."}
                   </Menu.Item>
                 ))}
+              {!models && (edit || onDelete) && (
+                <>
+                  <Menu.Divider />
+                  {edit}
+                  {onDelete && (
+                    <Menu.Item
+                      color="red"
+                      leftSection={<icons.delete size={16} />}
+                      onClick={() => onDelete(item)}
+                    >
+                      Delete
+                    </Menu.Item>
+                  )}
+                </>
+              )}
             </>
           );
         }}

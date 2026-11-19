@@ -14,7 +14,7 @@
  *   GET  /api/library/placement?key=          where model files live, and where one file sits
  *   PATCH /api/library/catalogue {key, patch} edit one catalogue entry; the reply has the previous values
  *   POST /api/library/catalogue/undo {key}    undo its newest change (recorded as a change of its own)
- *   POST /api/library/catalogue/remove {key}  remove an entry no profile uses and its installed file (undo restores the entry)
+ *   POST /api/library/catalogue/remove {key}  remove an unused catalogue entry or installed LoRA (undo restores the entry)
  *   POST /api/library/imports/image           {image: data URL, name}: a dropped PNG, WebP or JPEG
  *   GET  /api/library/imports/:id/picture     an image import's own picture
  *   POST /api/library/imports/:id/describe    describe an imported image with the vision model (a new record)
@@ -743,9 +743,12 @@ export function registerLibraryRoutes(
   route("POST", "/api/library/catalogue/remove", async (account, { body }) => {
     const key = String(body?.key || "");
     const entry = catalogue().entry(key);
-    if (!entry)
-      return { status: 404, payload: { ok: false, error: "That entry isn't in the catalogue." } };
     const { folder, file } = splitCatalogueKey(key);
+    if (!entry && (folder !== "loras" || !(await latestInstalled()).files.loras?.includes(file)))
+      return {
+        status: 404,
+        payload: { ok: false, error: "That entry is no longer in the library." },
+      };
     const users = await references({ folder, file }, { includePresets: folder !== "loras" });
     if (users.length)
       return {
@@ -755,12 +758,25 @@ export function registerLibraryRoutes(
     const { removed, reachable = true } = await removeFile({
       folder,
       file,
-      sha256: entry.sha256 || "",
+      sha256: entry?.sha256 || "",
     });
+    if (!entry && !reachable)
+      return {
+        status: 503,
+        payload: {
+          ok: false,
+          error: "The model library is unavailable. Try again when it is running.",
+        },
+      };
     const inventory = reachable ? null : await latestInstalled().catch(() => null);
     const kept = inventory?.files[folder]?.includes(file);
     if (folder === "loras" && reachable) forget(file);
-    catalogue().edit(key, { removed: true }, { by: by(account), origin: origin(account, "admin") });
+    if (entry)
+      catalogue().edit(
+        key,
+        { removed: true },
+        { by: by(account), origin: origin(account, "admin") },
+      );
     return ok({
       key,
       fileRemoved: removed,

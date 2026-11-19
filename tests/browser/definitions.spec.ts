@@ -355,7 +355,9 @@ test("A combined profile's Backend select is a saved edit that switches what the
   expect(studio.description).toBeUndefined();
 });
 
-test("The Profiles toolbar groups search and filter, then More and importing", async ({ page }) => {
+test("The Profiles toolbar gives Download All its own link beside Import Workflow", async ({
+  page,
+}) => {
   await fixtures(page);
   await page.goto("/images");
   await openNav(page, "Library");
@@ -366,17 +368,17 @@ test("The Profiles toolbar groups search and filter, then More and importing", a
   const search = toolbar.getByLabel("Search Profiles", { exact: true });
   const filter = toolbar.getByRole("button", { name: "Filter Profiles", exact: true });
   const divider = toolbar.getByRole("separator");
-  const more = toolbar.getByRole("button", { name: "More Profiles Actions", exact: true });
+  const download = toolbar.getByRole("link", { name: "Download All", exact: true });
   const importing = toolbar.getByRole("button", { name: "Import Workflow", exact: true });
-  const controls = search.or(filter).or(divider).or(more).or(importing);
+  const controls = search.or(filter).or(divider).or(download).or(importing);
   await expect(controls).toHaveCount(5);
   await expect(controls.nth(0)).toHaveAccessibleName("Search Profiles");
   await expect(controls.nth(1)).toHaveAccessibleName("Filter Profiles");
   await expect(controls.nth(2)).toHaveRole("separator");
-  await expect(controls.nth(3)).toHaveAccessibleName("More Profiles Actions");
+  await expect(controls.nth(3)).toHaveAccessibleName("Download All");
   await expect(controls.nth(4)).toHaveAccessibleName("Import Workflow");
-  await more.click();
-  await expect(page.getByRole("menuitem")).toHaveText(["Download All"]);
+  await expect(download).toHaveAttribute("href", "/api/profiles/export");
+  await expect(download).toHaveAttribute("download", "");
 });
 
 test("Import Workflow opens a workflow, and a row's Duplicate copies its profile under a new ID", async ({
@@ -462,13 +464,19 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
   ]) {
     await section(page, "Library", part);
     await page.getByRole("button", { name: `Actions for ${row}`, exact: true }).click();
+    const menu = page.getByRole("menu", { name: `Actions for ${row}`, exact: true });
+    const entries =
+      part === "Profiles"
+        ? ["Copy ID", "Download", "Duplicate…", "Edit", "Delete"]
+        : ["Copy ID", "Download", "Edit", "Delete"];
+    await expect(menu.getByRole("menuitem")).toHaveText(entries);
     const download = page.waitForEvent("download");
     await page.getByRole("menuitem", { name: item, exact: true }).click();
     expect((await download).suggestedFilename()).toBe(file);
   }
 });
 
-test("Prompt Styles filter, switch and edit the assistant's alphabetical options", async ({
+test("Prompt Styles sort by type and then name, and can be filtered and edited", async ({
   page,
 }) => {
   await fixtures(page);
@@ -503,6 +511,12 @@ test("Prompt Styles filter, switch and edit the assistant's alphabetical options
   await openNav(page, "Library");
   await section(page, "Library", "Prompt Styles");
   const table = page.getByRole("table", { name: "Prompt Styles", exact: true });
+  await expect(table.getByRole("row").locator("td:first-child p:first-child")).toHaveText([
+    "Cinematic Camera",
+    "Candid",
+    "Spicy Uncensored",
+  ]);
+  await table.getByRole("columnheader", { name: "Name", exact: true }).getByRole("button").click();
   await expect(table.getByRole("row").locator("td:first-child p:first-child")).toHaveText([
     "Candid",
     "Cinematic Camera",

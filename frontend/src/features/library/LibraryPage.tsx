@@ -1,13 +1,17 @@
 import { Alert } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 
 import { post } from "../../api";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { WorkspaceSections, useWorkspaceSection } from "../../ui/WorkspaceSections";
 import { LibraryCharacters } from "../characters/LibraryCharacters";
 import { LibraryPromptCards } from "../characters/LibraryPromptCards";
 import { useStageComparison } from "../compare/variants";
-import { useGenerationActions } from "../generation/GenerationProvider";
+import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
+import { loraLibraryQuery } from "../generation/loraLibrary";
+import { loraInfoQuery } from "../generation/LoraPicker";
 import { CatalogueEditor } from "./CatalogueEditor";
 import {
   LibraryCatalogueTable,
@@ -33,6 +37,7 @@ export function LibraryPage() {
   const { admin, options } = useLibraryNavigation();
   const { profiles } = useGenerationActions();
   const [editing, setEditing] = useState<LibraryItem | null>(null);
+  const [deleting, setDeleting] = useState<LibraryItem | null>(null);
   const client = useQueryClient();
   const { active: activeSection } = useWorkspaceSection(options);
   const catalogueActive = ["files", "loras"].includes(activeSection);
@@ -44,6 +49,22 @@ export function LibraryPage() {
       query.state.data?.items.some((item) => item.applied?.state === "downloading")
         ? 2000
         : false,
+  });
+  const remove = useMutation({
+    meta: { inlineError: true },
+    mutationFn: (item: LibraryItem) =>
+      post<{ note?: string }>("/api/library/catalogue/remove", { key: item.key }),
+    onSuccess: ({ note }) => {
+      for (const query of [catalogueQuery, loraInfoQuery, loraLibraryQuery, modelsQuery])
+        void client.invalidateQueries({ queryKey: query.queryKey });
+      setDeleting(null);
+      if (note)
+        notifications.show({
+          color: "yellow",
+          title: "LoRA Deletion Needs Attention",
+          message: note,
+        });
+    },
   });
   const compare = useStageComparison();
   // Test LoRA compares the LoRA's strengths on the sample prompt of an import that brought it,
@@ -119,6 +140,14 @@ export function LibraryPage() {
         updateNote={updateNote || undefined}
         inventoryError={catalogue.data?.inventoryError}
         onEdit={admin ? setEditing : undefined}
+        onDelete={
+          admin && section === "loras"
+            ? (item) => {
+                remove.reset();
+                setDeleting(item);
+              }
+            : undefined
+        }
         updatePending={update.isPending}
       />
     );
@@ -145,6 +174,18 @@ export function LibraryPage() {
       {editing && (
         <CatalogueEditor item={editing} families={families} close={() => setEditing(null)} />
       )}
+      <ConfirmDialog
+        opened={Boolean(deleting)}
+        title="Delete LoRA"
+        action="Delete"
+        pending={remove.isPending}
+        error={remove.error?.message}
+        onConfirm={() => deleting && remove.mutate(deleting)}
+        onClose={() => setDeleting(null)}
+      >
+        Delete {deleting?.title || deleting?.file || deleting?.key} from the catalogue and remove
+        its installed file?
+      </ConfirmDialog>
     </>
   );
 }
