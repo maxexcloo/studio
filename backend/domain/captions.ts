@@ -43,7 +43,7 @@ export const captionVersion = createHash("sha256")
  * while it reads images.
  */
 export function createCaptioner(options: {
-  /** The Settings › Generation switch (STUDIO_GALLERY_CAPTIONS). */
+  /** The Settings › Maintenance switch (STUDIO_GALLERY_CAPTIONS). */
   enabled(): boolean;
   writer: CaptionWriter | null;
   idle(): boolean;
@@ -67,7 +67,8 @@ export function createCaptioner(options: {
   return createIdleWork<CaptionItem>({
     ...options,
     name: "Gallery captions",
-    off: "Gallery Captions is off in Settings › Generation.",
+    dailyCap: false,
+    off: "Gallery Captions is off in Settings › Maintenance.",
     async unavailable() {
       if (!writer) return "No assistant model is configured.";
       vision.local = await writer.supportsVision({ side: "local", uncensored: false });

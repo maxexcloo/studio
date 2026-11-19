@@ -1063,16 +1063,16 @@ export async function promptMenu(scope: Page | Locator, box: string) {
   return page.getByRole("menu");
 }
 
-/** The viewer prompt's assistance: the bar's AI. */
-export function viewerPromptAssist(page: Page) {
+/** Edit or Recreate in the viewer's action bar. */
+export function viewerChangeButton(page: Page, action: "Edit" | "Recreate" = "Edit") {
   return page
     .getByRole("dialog", { name: "Generation", exact: true })
-    .getByRole("button", { name: "AI", exact: true });
+    .getByRole("button", { name: action, exact: true });
 }
 
-/** Opens the viewer prompt's assistance menu. */
-export async function viewerPromptMenu(page: Page) {
-  await viewerPromptAssist(page).click();
+/** Opens the viewer's prompt-change options. */
+export async function viewerChangeMenu(page: Page, action?: "Edit" | "Recreate") {
+  await viewerChangeButton(page, action).click();
   return page.getByRole("menu");
 }
 

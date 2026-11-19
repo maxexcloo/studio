@@ -1,5 +1,5 @@
 import { Box } from "@mantine/core";
-import { type Ref, type RefObject, useRef } from "react";
+import { type Ref, type RefObject } from "react";
 
 import type { MediaItem } from "../../types";
 import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "../../ui/ActionBar";
@@ -74,14 +74,11 @@ export function MediaViewerActions({
 }) {
   const transfer = useMediaTransfer(item, true);
   const { handlers, dialogs } = useMediaDialogs(item, iterate);
-  // Edit's changes run through the viewer's own actions (an Upscale), read once they exist.
-  const current = useRef<ActionGroups>([]);
-  const prompt = useViewerPrompt(item, { groups: () => current.current, iterate });
+  const prompt = useViewerPrompt(item, iterate);
   const groups = useMediaActions(item, {
     transfer,
     compare,
-    edit: prompt.edit,
-    assist: prompt.assist,
+    draft: prompt.draft,
     iterate,
     onApplied,
     onCompare,
@@ -91,7 +88,6 @@ export function MediaViewerActions({
     onVersionChange,
     retryInStage: !item.url,
   });
-  current.current = groups;
   if (shortcuts) shortcuts.current = groups;
   return (
     <ActionBarSurface

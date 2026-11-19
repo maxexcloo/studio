@@ -25,10 +25,9 @@ interface PromptDescriber {
 
 /**
  * Suggests prompts for finished items without one, such as uploads, as continuous idle work
- * (domain/idle-work.ts), newest first. A text model that reads images describes the picture (a
- * video's first frame); otherwise the item's caption is written up as a prompt, and an item
- * without one waits. Kept apart from the item's own prompt. Only for owners `allowed` to use the
- * prompt assistant.
+ * (domain/idle-work.ts), newest first. Uses the stored caption when available, or describes
+ * the picture (a video's first frame) if the model can read images. Kept apart from the item's
+ * own prompt. Only for owners `allowed` to use the prompt assistant.
  */
 export function createPromptSuggester(options: {
   /** The Settings › Maintenance switch (STUDIO_SUGGESTED_PROMPTS). */
@@ -68,11 +67,12 @@ export function createPromptSuggester(options: {
       (vision[options.text(item.ownerId || "").side] || Boolean(item.caption?.text)),
     async run(item, signal) {
       const text = options.text(item.ownerId || "");
-      const image = vision[text.side] ? await options.image(item) : null;
+      const hint = item.caption?.text || "";
+      const image = !hint && vision[text.side] ? await options.image(item) : null;
       if (signal.aborted) return;
       const reply = await writer!.describe({
         images: image ? [image] : [],
-        hint: item.caption?.text || "",
+        hint,
         title: item.source?.title || "",
         explicit: options.explicit?.(item.ownerId || "") ?? false,
         signal,
