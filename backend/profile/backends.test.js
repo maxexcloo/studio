@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import { runBackend } from "../../shared/profiles.ts";
+import { startFakeComfy } from "../fixtures/fake-comfy.js";
+import { radianceInfo } from "../providers/radiance.ts";
+import { reloadWorkers } from "../workers.js";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-profile-backends-"));
 process.env.STUDIO_DATA_DIR = temporary;
@@ -17,6 +21,9 @@ const { guideStore, profileStore } = await import("./store.js");
 const { getCustomWorkflow, metadataFromJson, userWorkflowsDir } =
   await import("../custom-workflows.js");
 const { inferModels } = await import("../model/models.js");
+const { createModelCatalogue } = await import("../model/catalogue.js");
+const { createGenerationSubmission } = await import("../generation-routes.js");
+const { putGalleryItems } = await import("../gallery/store.js");
 const { mergeWorkerModels, moveTargets, noteWorkerProfiles, noteWorkerReachable, routeJob } =
   await import("../comfy/backends.js");
 const { readEditableProfile, saveEditableProfile, validateProfileText } =
@@ -214,7 +221,7 @@ test("readiness follows the selected backend, with the reason, and never falls b
     assert.ok(!listed.some((profile) => profile.id === "custom:combined"));
     // The worker's inventory names each backend it can run, so routing follows the run's backend.
     noteWorkerProfiles("second", [comfyOnly]);
-    noteWorkerProfiles("primary", [everything]);
+    noteWorkerProfiles("primary", [comfyOnly]);
     assert.equal(
       routeJob("image", { profileId: "custom:combined", backend: "comfyui" })?.id,
       "primary",
@@ -244,16 +251,174 @@ test("readiness follows the selected backend, with the reason, and never falls b
     assert.deepEqual(targets(false), ["primary", "second"]);
     noteWorkerReachable("primary", true);
     assert.deepEqual(targets(true), ["primary"]);
-    // Two workers' catalogues: the one where the selected backend is ready wins.
+    // Each backend takes its own worker's catalogue.
+    const radianceNodes = radianceInfo([]);
+    const { RadianceImageGenerate: _imageNode, ...missingImage } = radianceNodes;
+    const radiance = inferModels(radianceNodes).profiles.find(({ id }) => id === "custom:combined");
+    const unreadyRadiance = inferModels(
+      missingImage,
+      {},
+      { includeUnavailableBackends: true },
+    ).profiles.find(({ id }) => id === "custom:combined");
+    const radianceWorker = { id: "radiance", backend: "radiance", capabilities: ["image"] };
     const merged = mergeWorkerModels([
       { worker: { id: "second", capabilities: ["image"] }, models: { profiles: [comfyOnly] } },
-      { worker: { id: "primary", capabilities: ["image"] }, models: { profiles: [everything] } },
+      {
+        worker: radianceWorker,
+        models: { profiles: [unreadyRadiance] },
+      },
+      {
+        worker: { ...radianceWorker, id: "spare" },
+        models: { profiles: [radiance] },
+      },
     ]).profiles.find((profile) => profile.id === "custom:combined");
     assert.equal(merged.ready, undefined);
     assert.ok(merged.backendOptions.every((option) => option.ready));
   } finally {
     fs.rmSync(path.join(userWorkflowsDir, "combined.json"));
   }
+});
+
+test("combined admission queues parked variants and keeps worker, reference and permission checks", async (t) => {
+  const info = { ...comfyNodes };
+  const comfy = await startFakeComfy({ objectInfo: info });
+  t.after(() => comfy.close());
+  let radianceReads = 0;
+  const radiance = http.createServer((_request, response) => {
+    radianceReads++;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ data: [] }));
+  });
+  await new Promise((resolve) => radiance.listen(0, "127.0.0.1", resolve));
+  t.after(() => {
+    radiance.closeAllConnections();
+    radiance.close();
+  });
+
+  const workers = [
+    { id: "comfy", url: comfy.url, capabilities: ["image", "video"] },
+    {
+      id: "radiance",
+      url: `http://127.0.0.1:${radiance.address().port}`,
+      backend: "radiance",
+      capabilities: ["image"],
+    },
+    {
+      id: "spare",
+      url: "http://127.0.0.1:11",
+      backend: "radiance",
+      capabilities: ["image"],
+    },
+  ];
+  const previousWorkers = process.env.STUDIO_WORKERS;
+  const previousDefault = process.env.STUDIO_DEFAULT_IMAGE_PROFILE;
+  process.env.STUDIO_DEFAULT_IMAGE_PROFILE = "custom:combined";
+  const configure = (entries) => {
+    process.env.STUDIO_WORKERS = JSON.stringify(entries);
+    reloadWorkers();
+  };
+  t.after(() => {
+    configure(JSON.parse(previousWorkers));
+    if (previousDefault === undefined) delete process.env.STUDIO_DEFAULT_IMAGE_PROFILE;
+    else process.env.STUDIO_DEFAULT_IMAGE_PROFILE = previousDefault;
+    fs.rmSync(path.join(userWorkflowsDir, "combined.json"));
+  });
+
+  const raw = structuredClone(combinedRaw());
+  raw.studio.backends.radiance.graph[3] = { class_type: "MissingRadianceNode", inputs: {} };
+  raw.studio.backends.comfyui.mediaInputs = [
+    {
+      id: "comfy-reference",
+      kind: "image",
+      label: "Comfy Reference",
+      control: { node: "3", input: "image" },
+      required: true,
+    },
+  ];
+  write("combined", JSON.stringify(raw));
+  putGalleryItems([
+    {
+      id: "owned",
+      ownerId: "artist",
+      type: "image",
+      status: "done",
+      url: "/fixture.png",
+      createdAt: "2026-11-19T00:00:00Z",
+    },
+  ]);
+  const artist = {
+    authenticated: true,
+    userId: "artist",
+    role: "user",
+    generationProfiles: ["custom:combined"],
+    features: { loras: false },
+  };
+  const request = (input = {}) => ({
+    kind: "image",
+    profileId: "custom:combined",
+    prompt: "A lighthouse",
+    ...input,
+  });
+  let parked = new Set(["radiance", "spare"]);
+  const catalogue = createModelCatalogue({
+    store: { workerModels: () => undefined, saveWorkerModels: () => {} },
+    runtime: { controller: { workloads: workers, parked: async () => parked } },
+  });
+  const routes = createGenerationSubmission(catalogue);
+  configure(workers.slice(0, 2));
+  const waiting = (backend) => ({ status: 200, payload: { ok: true, backend, waiting: true } });
+  const { models } = await catalogue.mediaModels();
+  const profile = models.profiles.find(({ id }) => id === "custom:combined");
+  assert.equal(models.defaults.imageModel, profile.id);
+  assert.equal(profile.availability, "parked");
+  assert.equal(profile.ready, undefined);
+  assert.equal(profile.readyReason, undefined);
+  assert.equal(profile.defaults.width, 1536);
+  assert.equal(profile.backendOptions.find(({ id }) => id === "radiance").ready, undefined);
+  assert.deepEqual(await routes.validateInput(request(), artist), waiting("radiance"));
+  assert.equal(radianceReads, 0);
+  assert.equal(
+    (await routes.validateInput(request(), { ...artist, generationProfiles: [] })).status,
+    403,
+  );
+  assert.match(
+    (await routes.validateInput(request({ loras: [{ name: "style.safetensors" }] }), artist))
+      .payload.error,
+    /LoRAs are off/,
+  );
+
+  parked = new Set(["spare"]);
+  const missing = await routes.validateInput(request(), artist);
+  assert.equal(missing.status, 409);
+  assert.match(missing.payload.error, /missing MissingRadianceNode/);
+  assert.notEqual((await catalogue.mediaModels()).models.defaults.imageModel, profile.id);
+  assert.ok(radianceReads > 0);
+
+  configure(workers);
+  assert.deepEqual(await routes.validateInput(request(), artist), waiting("spare"));
+  assert.equal(routeJob("image", { profileId: profile.id, backend: profile.backend })?.id, "spare");
+
+  configure(workers.slice(0, 1));
+  const noWorker = await routes.validateInput(request(), artist);
+  assert.equal(noWorker.status, 503);
+  assert.equal(noWorker.payload.reason, "no-worker");
+  assert.notEqual((await catalogue.mediaModels()).models.defaults.imageModel, profile.id);
+
+  configure(workers.slice(0, 2));
+  parked = new Set(["comfy"]);
+  const alternate = (referenceAssets) => request({ profileBackend: "comfyui", referenceAssets });
+  assert.deepEqual(
+    await routes.validateInput(alternate([{ slot: "comfy-reference", assetId: "owned" }]), artist),
+    waiting("comfy"),
+  );
+  assert.match((await routes.validateInput(alternate([]), artist)).payload.error, /is required/);
+  const unowned = await routes.validateInput(
+    alternate([{ slot: "comfy-reference", assetId: "owned" }]),
+    { ...artist, userId: "other" },
+  );
+  assert.equal(unowned.status, 400);
+  assert.match(unowned.payload.error, /belonging to this account/);
+  assert.ok(comfy.requests.every(({ method }) => method === "GET"));
 });
 
 test("backend choices include their own reference slots, controls and defaults", () => {
