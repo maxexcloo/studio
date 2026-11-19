@@ -135,7 +135,7 @@ export function ProjectForm({
   typing?: SheetTyping;
   error?: string;
   onSubmit: (content: ProjectContent) => void;
-  onClose: () => void;
+  onClose?: () => void;
 }) {
   const models = useQuery(modelsQuery);
   const loras = useQuery(loraInfoQuery);

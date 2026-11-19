@@ -62,7 +62,7 @@ function ProjectEditor({
       onSubmit={({ name, brief, constraints }) =>
         save.mutate({ name, brief, constraints }, { onSuccess: onClose })
       }
-      onClose={onClose}
+      onClose={project ? onClose : undefined}
     />
   );
 }

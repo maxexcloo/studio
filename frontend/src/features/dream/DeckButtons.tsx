@@ -34,6 +34,22 @@ const looks: Record<string, { glyph: ReactNode; color: MantineColor }> = {
   shown: { glyph: <icons.winner size={30} strokeWidth={2.5} />, color: "blue" },
 };
 
+export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+  return (
+    <Tooltip label="Undo">
+      <ActionIcon
+        variant="default"
+        radius="xl"
+        aria-label="Undo"
+        disabled={disabled}
+        onClick={onClick}
+      >
+        <icons.undo size={18} />
+      </ActionIcon>
+    </Tooltip>
+  );
+}
+
 /**
  * The deck's answers as large round buttons under the card, as dating apps have them: a single
  * card's Dislike, Like and Accept, or a comparison's Neither, A, B and Both. Where one side is
