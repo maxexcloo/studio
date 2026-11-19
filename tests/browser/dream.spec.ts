@@ -1017,6 +1017,48 @@ test("The Inbox accepts, edits then accepts, dismisses with a reason and clears 
   });
 });
 
+test("Projects shows and accepts new card proposals while the Inbox stays open", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await fixtures(page);
+  const dream = await serveDream(page);
+  await page.goto("/dream/projects");
+  await expect(page.getByText("No Projects", { exact: true })).toBeVisible();
+
+  const cards = [
+    { kind: "characters", name: "Mara", description: "Red hair and freckles" },
+    { kind: "outfits", name: "Green Cloak", description: "A long wool cloak" },
+    { kind: "scenes", name: "Harbour", description: "A harbour at dusk" },
+  ];
+  dream.proposals = cards.map((card) => ({
+    id: card.kind,
+    kind: "card",
+    title: card.name,
+    why: "In two images you liked",
+    at: stamp,
+    change: { card },
+    evidence: [dreamItem("first"), dreamItem("second")],
+  }));
+  await page.clock.fastForward("02:00");
+  const inbox = page.getByRole("region", { name: "Inbox (3)", exact: true });
+  await expect(inbox).toBeVisible();
+
+  for (const card of cards) {
+    const proposal = page.getByRole("article", { name: card.name, exact: true });
+    await expect(proposal).toContainText(card.description);
+    await expect(proposal.getByRole("button", { name: /^Preview / })).toHaveCount(2);
+    await proposal.getByRole("button", { name: "Accept", exact: true }).click();
+    await expect(proposal).toBeHidden();
+    expect(dream.requests.at(-1)).toEqual({
+      method: "POST",
+      path: `/api/dream/inbox/${card.kind}/accept`,
+      body: {},
+    });
+  }
+  await expect(page.getByText("No Projects", { exact: true })).toBeVisible();
+});
+
 test("Dream keeps Images and Videos separate through deck, preview, history and discards", async ({
   page,
 }, testInfo) => {
