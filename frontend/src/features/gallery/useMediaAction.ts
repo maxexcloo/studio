@@ -55,14 +55,8 @@ export const useAnimateLength = () => useRemembered<number | null>("animate-leng
 
 /** Animate's Review Prompt: templates write the prompt for editing before it runs; off until chosen. */
 export const useAnimateReview = () => useRemembered<boolean>("animate-review", false);
-/** Edit's Review Prompt: a change's proposal fills the viewer's prompt before it runs; off until chosen. */
-export const useEditReview = () => useRemembered<boolean>("viewer-review-first", false);
-/** How Edit asks for a change: the viewer asks in its prompt field; a tile opens the viewer to. */
-export interface EditAsk {
-  pending: boolean;
-  pick: (request: string) => void;
-  custom: () => void;
-}
+/** A change's proposal fills the viewer's prompt before it runs when Review Prompt is on. */
+export const useMediaReview = () => useRemembered<boolean>("viewer-review-first", false);
 /** The prompt as typed, for the prompt field: Studio adds LoRA trigger words only to the run. */
 export const typedPrompt = (item: MediaItem) =>
   typeof item.settings?.typedPrompt === "string" ? item.settings.typedPrompt : item.prompt || "";
@@ -286,7 +280,7 @@ export function useMediaAction(item: MediaItem, prepared?: () => void) {
   const [seconds] = useAnimateLength();
   const openComposer = useOpenComposer();
   return useItemMutation(item.id, "prepare", {
-    mutationFn: async (operation: Operation) => {
+    mutationFn: async ({ operation, prompt }: { operation: Operation; prompt?: string }) => {
       const { profile, choice, draft, note } = await mediaDraft(
         item,
         operation,
@@ -301,7 +295,7 @@ export function useMediaAction(item: MediaItem, prepared?: () => void) {
           : undefined;
       const message = note || choice?.note || cloud;
       if (message) notifications.show({ message });
-      setDraft(draft);
+      setDraft(prompt === undefined ? draft : { ...draft, input: { ...draft.input, prompt } });
       prepared?.();
       // The gallery composer opens on the page for the draft's kind (an Animate draft lands in Videos).
       openComposer(draft.input.kind);
@@ -320,8 +314,7 @@ export function useAnimateTemplates() {
   return assistant?.available ? assistant.themes : [];
 }
 export type Iteration =
-  | { kind: "regenerate" }
-  | { kind: "repeat" }
+  | { kind: "regenerate" | "repeat"; prompt?: string }
   | { kind: "animate"; theme: string; instruction?: string; written?: WrittenPrompt }
   | { kind: "prompt"; prompt: string; operation: PromptOperation; sameSeed?: boolean };
 /** A motion prompt the assistant wrote for review, as edited: it runs exactly as given. */
@@ -367,7 +360,7 @@ export function useIterate() {
       ));
     // An animation that can't run where the account prefers says where it runs instead.
     if (note || choice?.note) notifications.show({ message: note || choice?.note });
-    const prompt = given?.prompt ?? (animate ? (written?.prompt ?? "") : draft.input.prompt);
+    const prompt = animate ? (written?.prompt ?? "") : (iteration.prompt ?? draft.input.prompt);
     const repeat = iteration.kind === "repeat";
     const sameSeed = repeat || Boolean(given?.sameSeed);
     // A given prompt keeps the item's Count, as the composer would; an edit or animation runs once.

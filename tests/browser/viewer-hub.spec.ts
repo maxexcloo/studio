@@ -13,7 +13,7 @@ import {
   serveProfiles,
   stamp,
   viewerAction,
-  viewerPromptMenu,
+  viewerChangeMenu,
 } from "./fixtures";
 
 async function seed(
@@ -165,9 +165,7 @@ test("A video's prompt field runs its edited prompt again as a video", async ({ 
   expect(state.jobs.at(-1)!.input.kind ?? "video").toBe("video");
 });
 
-test("Custom… turns a change in plain words into the chosen action's prompt in place, to run or undo", async ({
-  page,
-}) => {
+test("Edit and Recreate share Custom and review each operation separately", async ({ page }) => {
   const asked: any[] = [];
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
@@ -178,7 +176,7 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
         json: {
           suggestions: [
             {
-              action: "edit",
+              action: body.actions[0],
               label: "Night Version",
               request: body.request,
               prompt: "An amber bird at night",
@@ -188,22 +186,21 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
       });
     }),
   );
-  await viewerPromptMenu(page);
+  await viewerChangeMenu(page);
   await page.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
   await page.keyboard.press("Escape");
   const surface = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
-  // Edit and AI open the same dialog and keep its last request.
-  const askForChange = async (request?: string) => {
-    if (request) await viewerAction(page, "Edit");
-    else await viewerPromptMenu(page);
+  // Edit and Recreate open the same dialog and keep its last request.
+  const askForChange = async (mode: "Edit" | "Recreate", request?: string) => {
+    await viewerChangeMenu(page, mode);
     await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
     const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
     if (request) await custom.getByRole("textbox", { name: "Change", exact: true }).fill(request);
     await custom.getByRole("button", { name: "Ask", exact: true }).click();
     await closeTextEditor(page, "Prompt");
   };
-  await askForChange("make it night");
+  await askForChange("Edit", "make it night");
   // The proposal replaces the prompt in place under the chosen action and what it changed; Undo
   // restores the prompt.
   await expect(field).toHaveValue("An amber bird at night");
@@ -214,7 +211,7 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
       surface: "change",
       jobId: "job-hub",
       request: "make it night",
-      actions: ["edit", "recreate", "animate", "upscale"],
+      actions: ["edit"],
       prompt: "An amber bird",
       itemId: "hub",
     },
@@ -222,7 +219,11 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
   await surface.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(field).toHaveValue("An amber bird");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
-  await askForChange();
+  await askForChange("Recreate");
+  await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveText("Recreate");
+  expect(asked.at(-1)).toMatchObject({ actions: ["recreate"], request: "make it night" });
+  await surface.getByRole("button", { name: "Undo", exact: true }).click();
+  await askForChange("Edit");
   await expect(field).toHaveValue("An amber bird at night");
   expect(state.jobs).toHaveLength(1);
   await surface.getByRole("button", { name: "Run", exact: true }).click();
@@ -230,7 +231,11 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
   expect(state.jobs[1]).toMatchObject({
     operation: "refine",
     parentItemId: "hub",
-    input: { prompt: "An amber bird at night", count: 1 },
+    input: {
+      prompt: "An amber bird at night",
+      count: 1,
+      referenceAssets: [{ assetId: "asset-hub", slot: "image" }],
+    },
   });
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });
@@ -332,7 +337,7 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
       });
     }),
   );
-  await viewerPromptMenu(page);
+  await viewerChangeMenu(page);
   await page.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   await closeTextEditor(page, "Prompt");
@@ -344,7 +349,7 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
       surface: "change",
       jobId: "job-hub",
       request: "add rain",
-      actions: ["edit", "recreate", "animate", "upscale"],
+      actions: ["edit"],
       prompt: "An amber bird",
       itemId: "hub",
     },
@@ -391,7 +396,7 @@ test("A delayed automatic change runs on its source without closing the next ima
     });
   });
   try {
-    await viewerPromptMenu(page);
+    await viewerChangeMenu(page, "Recreate");
     const requested = page.waitForRequest(
       (request) =>
         request.url().endsWith("/api/suggestions") && request.postDataJSON()?.surface === "change",
@@ -403,14 +408,15 @@ test("A delayed automatic change runs on its source without closing the next ima
     const prompt = viewer.getByRole("textbox", { name: "Prompt", exact: true });
     await expect(picture).toBeVisible();
     await expect(prompt).toHaveValue("An ivory fox");
-    await expect(viewer.getByRole("button", { name: "Edit", exact: true })).not.toHaveAttribute(
+    await expect(viewer.getByRole("button", { name: "Recreate", exact: true })).not.toHaveAttribute(
       "data-loading",
     );
     release();
     await expect.poll(() => state.jobs.length).toBe(2);
     expect(state.jobs[1]).toMatchObject({
+      operation: "image",
       parentItemId: "hub",
-      input: { prompt: "An amber bird in rain" },
+      input: { prompt: "An amber bird in rain", referenceAssets: [] },
     });
     await expect(picture).toBeVisible();
     await expect(prompt).toHaveValue("An ivory fox");
@@ -763,24 +769,31 @@ test("More Like This Set is offered only for a result in a set", async ({ page }
   );
 });
 
-test("Run Again and Recreate draw a new seed; only Run Again, Same Seed keeps it", async ({
+test("Recreate keeps an edited viewer prompt and changes the seed only when requested", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  // Recreate queues both Run Agains at once; Recreate in Composer loads the composer.
+  const edited = "An amber bird over the harbour";
+  const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  const phone = page.viewportSize()!.width < 768;
+  if (phone) await field.click();
+  const editor = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
+  await editor.getByRole("textbox", { name: "Prompt", exact: true }).fill(edited);
+  await closeTextEditor(page, "Prompt");
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
-  expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
+  expect(state.jobs[1]).toMatchObject({
+    operation: "image",
+    input: { prompt: edited, seed: "", steps: 28, referenceAssets: [] },
+  });
   await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again, Same Seed", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
-  expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
+  expect(state.jobs[2].input).toMatchObject({ prompt: edited, seed: 1234567, steps: 28 });
   await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect(viewer).toBeHidden();
-  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
-    "An amber bird",
-  );
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(edited);
   await expect(page.getByRole("button", { name: /^Clear Seed/ })).toHaveCount(0);
 });
 
