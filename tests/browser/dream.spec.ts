@@ -23,7 +23,7 @@ async function previewDetails(preview: Locator, phone: boolean) {
     : preview.getByRole("complementary", { name: "Generation Details", exact: true });
 }
 async function closeDetails(preview: Locator, panel: Locator, phone: boolean) {
-  if (phone) await panel.getByRole("button", { name: "Close Details", exact: true }).click();
+  if (phone) await panel.getByRole("button", { name: "Close Details", exact: true }).press("Enter");
   else await preview.getByRole("button", { name: "Generation Details", exact: true }).click();
   await expect(panel).toBeHidden();
 }

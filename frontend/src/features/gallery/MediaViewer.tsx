@@ -169,7 +169,10 @@ function ViewerVideo({
         onClick={(event) => event.stopPropagation()}
       />
       {refused && (
-        <VideoPlayButton play={() => void player.current?.play().catch(() => undefined)} />
+        <VideoPlayButton
+          {...swipe}
+          play={() => void player.current?.play().catch(() => undefined)}
+        />
       )}
     </>
   );
