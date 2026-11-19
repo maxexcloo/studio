@@ -1,7 +1,6 @@
 import { type Card, type CardKind, compareCardLikes } from "../../../../shared/characters";
 import { gallerySortLabels } from "../../../../shared/gallery-sort";
 import { compareNames } from "../../ui/DataTable";
-import { FilterChoices } from "../../ui/SectionToolbar";
 import { useRemembered } from "../auth/useRemembered";
 
 export const cardSortLabels = {
@@ -11,47 +10,27 @@ export const cardSortLabels = {
 };
 export type CardSort = keyof typeof cardSortLabels;
 
-type CardListing = { sort?: CardSort; disliked?: boolean };
+type CardListing = { sort?: CardSort };
 const listingsDefault: Partial<Record<CardKind, CardListing>> = {};
 
 export function useCardListing(surface: "library" | "references", kind: CardKind) {
   const [listings, setListings] = useRemembered(`card-listing:${surface}`, listingsDefault);
-  const { sort = surface === "references" ? "liked" : "newest", disliked = false } =
-    listings[kind] ?? {};
-  const update = (change: CardListing) =>
-    setListings((previous) => ({ ...previous, [kind]: { ...previous[kind], ...change } }));
   return {
-    sort,
-    disliked,
-    setSort: (sort: CardSort) => update({ sort }),
-    setDisliked: (disliked: boolean) => update({ disliked }),
+    sort: listings[kind]?.sort ?? (surface === "references" ? "liked" : "newest"),
+    setSort: (sort: CardSort) => setListings((previous) => ({ ...previous, [kind]: { sort } })),
   };
-}
-
-export function CardRatingFilter({
-  disliked,
-  setDisliked,
-}: Pick<ReturnType<typeof useCardListing>, "disliked" | "setDisliked">) {
-  return (
-    <FilterChoices
-      label="Rating"
-      data={[{ value: "disliked", label: "Disliked" }]}
-      value={disliked ? "disliked" : null}
-      onChange={(value) => setDisliked(value === "disliked")}
-    />
-  );
 }
 
 export function listedCards<T extends Pick<Card, "name" | "description" | "createdAt" | "rating">>(
   cards: T[] | undefined,
   query: string,
-  { sort, disliked }: { sort: CardSort; disliked: boolean },
+  sort: CardSort,
 ) {
   const words = query.trim().toLocaleLowerCase();
   // Records are stored in creation order, which also breaks ties between identical timestamps.
   const matches = (cards ?? []).filter(
     (card) =>
-      (card.rating === "disliked") === disliked &&
+      (sort === "disliked" || card.rating !== "disliked") &&
       (!words || `${card.name} ${card.description}`.toLocaleLowerCase().includes(words)),
   );
   const newest = (a: T, b: T) => (b.createdAt || "").localeCompare(a.createdAt || "");
@@ -63,6 +42,10 @@ export function listedCards<T extends Pick<Card, "name" | "description" | "creat
       return matches.sort((a, b) => compareNames(b.name, a.name));
     case "liked":
       return matches.sort((a, b) => compareCardLikes(a, b) || newest(a, b));
+    case "disliked":
+      return matches.sort(
+        (a, b) => Number(b.rating === "disliked") - Number(a.rating === "disliked") || newest(a, b),
+      );
     case "oldest":
       return matches.sort((a, b) => newest(b, a));
     default:

@@ -128,7 +128,7 @@ test("Select Failed can retry a cleared offscreen job and retains a refusal", as
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
-  await page.getByRole("button", { name: "Select Failed", exact: true }).click();
+  await page.getByRole("button", { name: "Failed", exact: true }).click();
   const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
   await expect(status).toHaveText("3 Selected");
   expect(picks).toEqual(["failed"]);
@@ -212,7 +212,7 @@ test("Select All takes every match across pages, and the search and Liked stay w
   await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(
     "Browse",
   );
-  await page.getByRole("button", { name: "Select All", exact: true }).click();
+  await page.getByRole("button", { name: "All", exact: true }).click();
   const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
   await expect(status).toHaveText("65 Selected");
   const quick = requests.filter((query) => query.has("select"));
@@ -221,19 +221,19 @@ test("Select All takes every match across pages, and the search and Liked stay w
   ]);
   expect(requests.filter((query) => query.get("cursor"))).toEqual([]);
   // The quick selects always show, disabled where they would change nothing.
-  await expect(page.getByRole("button", { name: "Select All", exact: true })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Select Failed", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "Select None", exact: true }).click();
+  await expect(page.getByRole("button", { name: "All", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Failed", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "None", exact: true }).click();
   await expect(status).toHaveText("0 Selected");
-  await expect(page.getByRole("button", { name: "Select None", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "Select All", exact: true }).click();
+  await expect(page.getByRole("button", { name: "None", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "All", exact: true }).click();
   await expect(status).toHaveText("65 Selected");
   if (test.info().project.use.isMobile) {
     const selection = page.getByRole("group", { name: "Gallery Selection", exact: true });
     const actions = selection.getByRole("group", { name: "Selected Item Actions", exact: true });
     // One row that scrolls sideways, starting at the count and quick selects.
     await expect(status).toBeInViewport({ ratio: 1 });
-    await expect(page.getByRole("button", { name: "Select None", exact: true })).toBeInViewport({
+    await expect(page.getByRole("button", { name: "None", exact: true })).toBeInViewport({
       ratio: 1,
     });
     await page.evaluate(() => window.scrollBy(0, 800));
@@ -565,7 +565,7 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
   try {
     await page.goto("/images");
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
-    await page.getByRole("button", { name: "Select All", exact: true }).click();
+    await page.getByRole("button", { name: "All", exact: true }).click();
     const selection = page.getByRole("group", { name: "Gallery Selection", exact: true });
     await expect(selection.getByRole("status")).toHaveText("4 Selected");
     const retry = selectionAction(page, "Retry");
@@ -847,7 +847,7 @@ test("One notification shows at a time: a second dislike replaces the first, wit
       "false",
     );
   }
-  const banner = page.getByRole("alert").filter({ hasText: "Disliked and hidden" });
+  const banner = page.getByRole("alert").filter({ hasText: "Disliked" });
   await expect(banner).toHaveCount(1);
   await banner.getByRole("button", { name: "Undo", exact: true }).click();
   await expect.poll(() => state.gallery[1].rating).toBeUndefined();
@@ -922,7 +922,7 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
     .getByRole("button", { name: "Select image: Browse Result 2", exact: true })
     .click({ modifiers: ["Shift"] });
   await expect(status).toHaveText("3 Selected");
-  await page.getByRole("button", { name: "Select None", exact: true }).click();
+  await page.getByRole("button", { name: "None", exact: true }).click();
   await page.getByRole("button", { name: /^Select image: Live Study$/i }).click();
   await expect(status).toHaveText("1 Selected");
   // A disabled action says why.
@@ -934,7 +934,7 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
   await expect(status).toHaveCount(0);
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
-  await page.getByRole("button", { name: "Select Failed", exact: true }).click();
+  await page.getByRole("button", { name: "Failed", exact: true }).click();
   await expect(status).toHaveText("1 Selected");
   await page
     .getByRole("button", { name: "Select image: Browse Result 3", exact: true })
@@ -1007,7 +1007,7 @@ test("Download takes a selection of any size as one archive", async ({ page }, t
   );
   await page.goto("/images");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
-  await page.getByRole("button", { name: "Select All", exact: true }).click();
+  await page.getByRole("button", { name: "All", exact: true }).click();
   const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
   await expect(status).toHaveText("700 Selected");
   const [download] = await Promise.all([
@@ -1135,11 +1135,7 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   ).toBeVisible();
   await selectionAction(page, "Upscale").click();
   await expect(page.getByRole("menu")).toHaveCount(0);
-  // The selects sit beside the count; phones name them by what they select.
-  await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveText(
-    phone ? "All" : "Select All",
-  );
-  await page.getByRole("button", { name: "Select All", exact: true }).click();
+  await page.getByRole("button", { name: "All", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
   // Phones that share natively offer Share beside Download; elsewhere Share is Download itself.
   const sharing = phone && (await page.evaluate(() => typeof navigator.share === "function"));
@@ -1157,7 +1153,7 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   // Each finished action ends the selection.
   await expect(page.getByRole("status")).toHaveCount(0);
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
-  await page.getByRole("button", { name: "Select All", exact: true }).click();
+  await page.getByRole("button", { name: "All", exact: true }).click();
   await selectionAction(page, "Delete").click();
   await page
     .getByRole("dialog", { name: "Delete Selected Items", exact: true })
@@ -1579,7 +1575,7 @@ test("Desktop gallery controls stay available while scrolling and rating changes
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
-  await page.getByRole("button", { name: "Select All", exact: true }).click();
+  await page.getByRole("button", { name: "All", exact: true }).click();
   await expect(
     page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
   ).toHaveText("90 Selected");

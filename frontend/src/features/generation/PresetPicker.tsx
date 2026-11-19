@@ -189,6 +189,7 @@ export function PresetPicker({
             current={selected}
             edited={edited}
             canSave={canSave && presets.isSuccess}
+            saveButton={false}
             replaces={(preset) => (loading(preset).replaces ? replaceMessage(preset) : undefined)}
             menu={
               <>

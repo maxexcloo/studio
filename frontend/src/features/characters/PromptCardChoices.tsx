@@ -24,7 +24,6 @@ export function PromptCardChoices({
   kind,
   query,
   sort,
-  disliked,
   prompt,
   parts,
   onChange,
@@ -33,7 +32,6 @@ export function PromptCardChoices({
   kind: PromptCardKind;
   query: string;
   sort: CardSort;
-  disliked: boolean;
   prompt: string;
   parts?: CardParts;
   onChange: (prompt: string, parts: CardParts) => void;
@@ -42,7 +40,7 @@ export function PromptCardChoices({
   const { noun } = promptCardText[kind];
   const listing = useQuery(promptCardsQuery(kind));
   const dialogs = usePromptCardDialogs(kind, onLayer);
-  const cards = listedCards(listing.data, query, { sort, disliked });
+  const cards = listedCards(listing.data, query, sort);
   if (listing.isPending) return <LoadingState fill label={`Loading ${noun}s`} />;
   if (listing.error) return <Alert color="red">{listing.error.message}</Alert>;
   const applied = (card: PromptCard) => promptCardApplied(kind, card, prompt, parts);

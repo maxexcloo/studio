@@ -792,8 +792,7 @@ const ignore = () => {};
  * name, or Unsaved. Its list loads a saved record, asking first, under the heading, where
  * `replaces` says what it would replace; typing searches the list or names the draft to save it as
  * new or rename the current record. Names stay unique; duplicates from before show when each was
- * saved. Save beside it updates the current record once the draft differs from it, or names a new
- * one in the field, and reads Saved for a moment after saving. Its menu holds `menu` (such as what
+ * saved. The current record can be updated from the list or a Save button. Its menu holds `menu` (such as what
  * a preset saves), then Rename and Delete.
  */
 export function SavedName<T extends SavedItem>({
@@ -803,6 +802,7 @@ export function SavedName<T extends SavedItem>({
   current,
   edited,
   canSave,
+  saveButton = true,
   replaces,
   menu,
   onLoad,
@@ -818,6 +818,7 @@ export function SavedName<T extends SavedItem>({
   edited: boolean;
   /** Whether the draft holds anything to save, and the saved records have loaded. */
   canSave: boolean;
+  saveButton?: boolean;
   /** What loading `record` asks first, or nothing when the draft has nothing unsaved. */
   replaces: (record: T) => string | undefined;
   menu?: ReactNode;
@@ -847,6 +848,8 @@ export function SavedName<T extends SavedItem>({
         .filter((record) => text === null || key(record.name).includes(key(typed)))
         .sort((a, b) => compareNames(a.name, b.name));
   const actions: { value: string; label: string }[] = [];
+  if (!saveButton && current && edited && canSave && !typed && !mode)
+    actions.push({ value: "\0update", label: `Update ${noun}` });
   if (typed && !taken) {
     if (mode !== "rename" && canSave)
       actions.push({ value: "\0save", label: `Save as New ${noun} “${typed}”` });
@@ -867,6 +870,10 @@ export function SavedName<T extends SavedItem>({
   }, [text]);
   const submit = async (value: string) => {
     combobox.closeDropdown();
+    if (value === "\0update") {
+      if (current) await onUpdate(current).then(() => naming.flashSaved(true), ignore);
+      return;
+    }
     if (value === "\0save") {
       await onSave(typed).then(() => naming.flashSaved(true), ignore);
       return;
@@ -959,19 +966,27 @@ export function SavedName<T extends SavedItem>({
             </Combobox.Options>
           </Combobox.Dropdown>
         </Combobox>
-        <Button
-          size="compact-sm"
-          variant="subtle"
-          aria-label={`Save ${noun}`}
-          disabled={!canSave || (!!current && !edited)}
-          onClick={() =>
-            current
-              ? onUpdate(current).then(() => naming.flashSaved(true), ignore)
-              : naming.name("save")
-          }
-        >
-          {naming.saved ? "Saved" : "Save"}
-        </Button>
+        {saveButton ? (
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            aria-label={`Save ${noun}`}
+            disabled={!canSave || (!!current && !edited)}
+            onClick={() =>
+              current
+                ? onUpdate(current).then(() => naming.flashSaved(true), ignore)
+                : naming.name("save")
+            }
+          >
+            {naming.saved ? "Saved" : "Save"}
+          </Button>
+        ) : (
+          naming.saved && (
+            <Text size="xs" c="dimmed" role="status">
+              Saved
+            </Text>
+          )
+        )}
         <Menu position="bottom-end" width={menuWidth} withinPortal={false} returnFocus={false}>
           <PopupTooltip label={`${noun} Actions`}>
             <Menu.Target>

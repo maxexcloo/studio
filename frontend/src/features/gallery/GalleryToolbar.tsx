@@ -185,13 +185,6 @@ export function GalleryToolbar({
           toggles={toggles}
         />
       </ChipPopup>
-      <SortMenu
-        label="Sort Gallery"
-        labels={gallerySortLabels}
-        value={sort}
-        onChange={onSortChange}
-        withinPortal
-      />
       <FilterToggle
         label="Liked"
         icon={icons.like}
@@ -214,6 +207,13 @@ export function GalleryToolbar({
         </Text>
       )}
       {!phone && <ZoomSlider />}
+      <SortMenu
+        label="Sort Gallery"
+        labels={gallerySortLabels}
+        value={sort}
+        onChange={onSortChange}
+        withinPortal
+      />
       {actions}
     </Group>
   );

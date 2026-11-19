@@ -413,10 +413,14 @@ export function MediaViewer({
   const gestureClick = useRef(false);
   const [compare, setCompare] = useState(false);
   const [details, setDetails] = useRemembered("viewer-details", true);
+  const [previewDetails, setPreviewDetails] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const detailsOpen = phone ? sheet : bare ? previewDetails : details;
   // A touch tap on the media hides the chrome around it, as Photos does, until the viewer closes.
   const [chromeHidden, setChromeHidden] = useState(false);
-  const toggleChrome = () => setChromeHidden((hidden) => !hidden);
+  const toggleChrome = () => {
+    if (!bare) setChromeHidden((hidden) => !hidden);
+  };
   // Navigation replaces the media, and focus on it would fall out of the viewer beyond its keys.
   const stage = useRef<HTMLDivElement>(null);
   const containStage = useCallback((view: HTMLDivElement | null) => {
@@ -542,7 +546,7 @@ export function MediaViewer({
     },
     [],
   );
-  const detailsSurface = !bare && (
+  const detailsSurface = (
     <ViewerDetails
       item={displayed}
       title={mediaTitle(item)}
@@ -554,8 +558,9 @@ export function MediaViewer({
           follow(next);
         })
       }
-      opened={phone ? sheet : details}
+      opened={detailsOpen}
       phone={phone}
+      zIndex={bare ? getDefaultZIndex("max") : undefined}
       close={() => setSheet(false)}
       bottomBar={bar}
     />
@@ -563,6 +568,7 @@ export function MediaViewer({
   const toggleDetails = () => {
     setChromeHidden(false);
     if (phone) setSheet(true);
+    else if (bare) setPreviewDetails((open) => !open);
     else setDetails((open) => !open);
   };
   // Escape brings hidden chrome back before it closes the viewer.
@@ -576,7 +582,6 @@ export function MediaViewer({
     });
     if (direction === "down") close();
     else if (direction === "up") {
-      if (bare) return false;
       setSheet(phone);
       if (phone) setChromeHidden(false);
     } else return Boolean(move(direction === "left" ? 1 : -1));
@@ -723,7 +728,7 @@ export function MediaViewer({
         >
           <div className={classes.main}>
             <ViewerChrome
-              item={bare ? undefined : displayed}
+              item={displayed}
               label={
                 canNavigate && itemLabel ? (
                   <Badge {...viewerBadge}>{itemLabel(item)}</Badge>
@@ -744,9 +749,8 @@ export function MediaViewer({
                   </Badge>
                 ) : null
               }
-              details={
-                bare ? undefined : { opened: phone ? sheet : details, phone, toggle: toggleDetails }
-              }
+              details={{ opened: detailsOpen, phone, toggle: toggleDetails }}
+              focusClose={bare}
               closeLabel={bare ? "Close Preview" : "Close Generation"}
               close={close}
             />

@@ -100,18 +100,15 @@ export const unavailableFor = (profile: Profile | undefined, info?: LoraInfo) =>
   profile?.loraAdapter === "radiance-tags-v1" ? info?.unavailableReason : undefined;
 
 const ratingOrder = (rating?: Rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);
-/** The LoRA choices' orders: by rating (the default every LoRA list shares), use or name. */
-type LoraSort = "used" | "rating" | "name-asc" | "name-desc";
-const loraSortLabels: Record<LoraSort, string> = {
+const loraSortLabels = {
   used: "Most Used",
-  rating: "Rating",
+  "least-used": "Least Used",
+  rating: "Liked First",
+  disliked: "Disliked First",
   "name-asc": "Name A–Z",
   "name-desc": "Name Z–A",
 };
-/** Every LoRA list's order: liked, then unrated, then disliked, each by title. */
-const byRating =
-  (ratings: Record<string, Rating>, title: (file: string) => string) => (a: string, b: string) =>
-    ratingOrder(ratings[a]) - ratingOrder(ratings[b]) || compareNames(title(a), title(b));
+type LoraSort = keyof typeof loraSortLabels;
 
 export function useLoraPicker() {
   const [opened, setOpened] = useState(false);
@@ -314,7 +311,7 @@ function useLoraDraft({ value, onChange }: Omit<LoraPickerProps, "picker">) {
   };
 }
 
-/** The LoRAs to choose from: search, family and sort over the list; Rating leads with the liked. */
+/** The LoRAs to choose from, with search and family filters. */
 function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   const { input, profile, update, info, metadata, title } = useLoraDraft({
     value,
@@ -354,13 +351,25 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
             .toLowerCase()
             .includes(terms)),
     )
-    .sort(
-      picker.loraSort === "rating"
-        ? byRating(ratings, title)
-        : picker.loraSort === "used"
-          ? (a, b) => (uses[b] || 0) - (uses[a] || 0) || compareNames(title(a), title(b))
-          : (a, b) => (picker.loraSort === "name-desc" ? -1 : 1) * compareNames(title(a), title(b)),
-    );
+    .sort((a, b) => {
+      const byName = compareNames(title(a), title(b));
+      const usage = (uses[b] ?? 0) - (uses[a] ?? 0);
+      const rating = ratingOrder(ratings[a]) - ratingOrder(ratings[b]);
+      switch (picker.loraSort) {
+        case "used":
+          return usage || byName;
+        case "least-used":
+          return -usage || byName;
+        case "rating":
+          return rating || byName;
+        case "disliked":
+          return -rating || byName;
+        case "name-desc":
+          return -byName;
+        default:
+          return byName;
+      }
+    });
   const selected = new Set(input.loras.map((lora) => lora.name));
   const toggle = (file: string) =>
     update(
