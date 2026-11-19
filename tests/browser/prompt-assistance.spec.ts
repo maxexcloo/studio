@@ -44,18 +44,18 @@ test("Saving and updating a preset never submits a generation, and the name show
   await saveCurrent(page, "Copper Study");
   await expect.poll(() => state.presets.length).toBe(1);
   expect(state.jobs).toHaveLength(0);
-  // Saved shows where it happened, and Save waits for a change.
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
-  const save = page.getByRole("button", { name: "Save Preset", exact: true });
-  await expect(save).toBeDisabled();
+  const update = page.getByRole("option", { name: "Update Preset", exact: true });
   await closePresets(page);
   await prompt.fill("A copper bird with blue wings");
   await openPresets(page);
   await expect(name).toHaveValue("Copper Study");
-  await expect(save).toBeEnabled();
-  await save.click();
+  await name.click();
+  await update.click();
   await expect.poll(() => state.presets[0].input.prompt).toBe("A copper bird with blue wings");
-  await expect(save).toBeDisabled();
+  await name.click();
+  await expect(update).toHaveCount(0);
+  await name.press("Escape");
   expect(state.presets).toHaveLength(1);
   expect(state.jobs).toHaveLength(0);
   await page.reload();
@@ -68,7 +68,8 @@ test("Saving and updating a preset never submits a generation, and the name show
   await expect(name).toBeHidden();
   await page.getByRole("button", { name: "Presets", exact: true }).click();
   await expect(name).toHaveValue("Copper Study");
-  await expect(save).toBeDisabled();
+  await name.click();
+  await expect(update).toHaveCount(0);
 });
 
 test("Stopping held assistance retains the draft and unblocks generation", async ({ page }) => {

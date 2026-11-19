@@ -338,6 +338,12 @@ test("Gallery and References sort media through separate remembered choices", as
   await closeReferences(page);
   await openReferenceChoices(page);
   await expect(options.first()).toHaveAccessibleName("Use reference: Beta");
+  await closeReferences(page);
+  state.gallery[0].rating = "disliked";
+  await page.getByRole("button", { name: "Sort Gallery", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "Disliked First", exact: true }).click();
+  await expect(gallery.first()).toHaveAccessibleName("Open image: Alpha");
+  await expect(gallery).toHaveCount(2);
 });
 
 test("The reference grid pages and virtualises as it scrolls, and a tile previews above it", async ({
@@ -351,6 +357,7 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
     type: "image",
     status: "done",
     prompt: index === 147 ? fullPrompt : `Result ${index}`,
+    settings: { profileName: "Reference Model" },
     url: image,
     thumbnailUrl: image,
     width: 1024,
@@ -399,7 +406,7 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   // Only the tiles near the view render.
   await expect(grid.getByRole("button", { name: "Use reference: Result 0" })).toHaveCount(0);
   expect(await grid.getByRole("listitem").count()).toBeLessThan(150);
-  // Preview opens the image in the bare viewer above the picker, without details or actions.
+  // Preview opens the image and its details above the picker.
   // Space on a tile opens it too on touch screens; on desktop it shows the image beside the tile,
   // as hovering Preview does. Choosing stays a tap.
   const tile = grid.getByRole("button", { name: "Use reference: Result 148", exact: true });
@@ -413,8 +420,21 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
   await expect(preview).toBeVisible();
   await expect(preview.getByRole("img", { name: fullPrompt, exact: true })).toBeVisible();
-  await expect(preview.getByText("148 / 150", { exact: true })).toBeVisible();
-  await expect(preview.getByRole("button", { name: "Generation Details" })).toHaveCount(0);
+  const header = preview.getByRole("group", { name: "Viewer Header", exact: true });
+  await expect(header.getByText("148 / 150", { exact: true })).toBeVisible();
+  await expect(header.getByText("Reference Model", { exact: true })).toBeVisible();
+  const details = header.getByRole("button", { name: "Generation Details", exact: true });
+  await details.click();
+  if (test.info().project.use.isMobile) {
+    const closeDetails = page.getByRole("button", { name: "Close Details", exact: true });
+    await expect(closeDetails).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(closeDetails).toBeHidden();
+    await expect(preview).toBeVisible();
+  } else {
+    await expect(preview.getByRole("complementary", { name: "Generation Details" })).toBeVisible();
+    await details.click();
+  }
   await expect(preview.getByRole("group", { name: "Generation Actions" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();

@@ -71,7 +71,7 @@ const dates: { value: GalleryDate; label: string; chip: string; days: number }[]
  */
 export interface GalleryFilterValues extends Record<Facet, string[]> {
   date: GalleryDate;
-  /** Liked or disliked items only; disliked ones show nowhere else. */
+  /** Limit the results to liked or disliked items. */
   rating: Rating | "";
   /** Uploaded images instead of generations: the gallery leaves uploads out until this is on. */
   uploads: boolean;
@@ -450,6 +450,8 @@ export function ShowToggles({
   return (
     <Input.Wrapper label="Show">
       <Group gap={6} mt={4} role="group" aria-label="Show">
+        {rate("liked", "Liked")}
+        {rate("disliked", "Disliked")}
         {kind === "image" && (
           <FilterToggle
             label="Comparisons"
@@ -457,8 +459,6 @@ export function ShowToggles({
             onToggle={() => onChange({ ...value, comparisons: !value.comparisons })}
           />
         )}
-        {rate("liked", "Liked")}
-        {rate("disliked", "Disliked")}
         {onOriginalsOnly && (
           <FilterToggle
             label="Originals Only"

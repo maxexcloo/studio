@@ -57,8 +57,8 @@ interface RatingChange {
 
 /**
  * Likes, dislikes or clears items at once in every cached view and rolls back if the server
- * refuses. A dislike leaves every list but Disliked at once, and taking one back leaves Disliked;
- * lists filtered by rating, and the gallery after a dislike changes, then refetch.
+ * refuses. It removes items from rating filters or lists that hide dislikes as needed, then
+ * refreshes listings whose membership or order can change.
  */
 export function useRatings() {
   const cache = useQueryClient();
@@ -80,7 +80,12 @@ export function useRatings() {
       cache.setQueriesData<Pages>(
         {
           queryKey: galleryKey,
-          predicate: (query) => (listRating(query) === "disliked") !== (rating === "disliked"),
+          predicate: (query) => {
+            const filter = listRating(query);
+            if (filter) return filter !== rating;
+            const showsDisliked = query.queryKey.at(-1) === "disliked" && !query.queryKey[4];
+            return !showsDisliked && rating === "disliked";
+          },
         },
         (data) =>
           data?.pages
@@ -101,7 +106,8 @@ export function useRatings() {
       void cache.invalidateQueries({
         predicate: (query) =>
           Boolean(listRating(query)) ||
-          (query.queryKey[0] === galleryKey[0] && query.queryKey.at(-1) === "liked") ||
+          (query.queryKey[0] === galleryKey[0] &&
+            ["liked", "disliked"].includes(String(query.queryKey.at(-1)))) ||
           (rating !== "liked" && String(query.queryKey[0]) === "gallery"),
       }),
   });
@@ -120,9 +126,7 @@ export function showDisliked(count: number, undo: () => void) {
     autoClose: 8000,
     message: (
       <Group justify="space-between" wrap="nowrap">
-        <Text size="sm">
-          {count === 1 ? "Disliked and hidden" : `${count} disliked and hidden`}
-        </Text>
+        <Text size="sm">{count === 1 ? "Disliked" : `${count} disliked`}</Text>
         <Button
           size="compact-sm"
           variant="subtle"

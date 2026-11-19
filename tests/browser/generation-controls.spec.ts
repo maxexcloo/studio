@@ -671,7 +671,8 @@ test("References, masking, settings and runtime presets remain editable", async 
   await closePresets(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An updated amber bird");
   await openPresets(page);
-  await page.getByRole("button", { name: "Save Preset", exact: true }).click();
+  await page.getByRole("combobox", { name: "Preset Name", exact: true }).click();
+  await page.getByRole("option", { name: "Update Preset", exact: true }).click();
   await expect.poll(() => state.presets[0].input.prompt).toBe("An updated amber bird");
   await renamePreset(page, "Updated Bird Study");
   await expect.poll(() => state.presets[0].title).toBe("Updated Bird Study");

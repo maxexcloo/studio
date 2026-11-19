@@ -648,14 +648,18 @@ export async function fixtures(page: Page) {
       });
     if (path === "/api/gallery") {
       galleryRequests.push(url.search);
+      const rating = url.searchParams.get("rating");
+      const sort = url.searchParams.get("sort");
+      const similar = url.searchParams.get("similar");
       const items = gallery.filter(
         (i) =>
           (url.searchParams.get("select") !== "failed" || i.status === "failed") &&
           (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
           (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
           Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
-          (i.rating === "disliked") === (url.searchParams.get("rating") === "disliked") &&
-          (url.searchParams.get("rating") !== "liked" || i.rating === "liked") &&
+          (rating
+            ? i.rating === rating
+            : (!similar && sort === "disliked") || i.rating !== "disliked") &&
           (!url.searchParams.has("tag") ||
             url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
           (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")) &&
@@ -668,13 +672,11 @@ export async function fixtures(page: Page) {
             )),
       );
       // Similar ranks the image first.
-      const similar = url.searchParams.get("similar");
-      const sort = url.searchParams.get("sort");
       if (similar) items.sort((a, b) => Number(b.id === similar) - Number(a.id === similar));
       else if (sort === "oldest")
         items.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
-      else if (sort === "liked")
-        items.sort((a, b) => Number(b.rating === "liked") - Number(a.rating === "liked"));
+      else if (sort === "liked" || sort === "disliked")
+        items.sort((a, b) => Number(b.rating === sort) - Number(a.rating === sort));
       return respond({ items, hasMore: false, nextCursor: "", totalApprox: items.length });
     }
     // Character, outfit and scene cards, their images shown as reference assets.
@@ -1253,20 +1255,16 @@ export async function saveCurrent(page: Page, name: string, toggle: string[] = [
       await page.getByRole("menuitem", { name: part, exact: true }).click();
     await page.keyboard.press("Escape");
   }
-  await page.getByRole("button", { name: "Save Preset", exact: true }).click();
   const field = page.getByRole("combobox", { name: "Preset Name", exact: true });
-  await expect(field).toBeFocused();
+  await field.click();
   await field.fill(name);
-  await expect(
-    page.getByRole("option", { name: `Save as New Preset “${name}”`, exact: true }),
-  ).toBeVisible();
-  await field.press("Enter");
+  await page.getByRole("option", { name: `Save as New Preset “${name}”`, exact: true }).click();
   await expect(field).toHaveValue(name);
 }
 
 /** Opens the Presets picker unless it is already open. */
 export async function openPresets(page: Page) {
-  if (!(await page.getByRole("button", { name: "Save Preset", exact: true }).isVisible()))
+  if (!(await page.getByRole("dialog", { name: "Presets", exact: true }).isVisible()))
     await page.getByRole("button", { name: "Presets", exact: true }).click();
 }
 

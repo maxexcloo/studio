@@ -17,6 +17,7 @@ export function ViewerDetails({
   phone,
   close,
   bottomBar,
+  zIndex,
   children,
 }: {
   item: MediaItem;
@@ -27,6 +28,7 @@ export function ViewerDetails({
   phone: boolean;
   close: () => void;
   bottomBar?: RefObject<HTMLDivElement | null>;
+  zIndex?: number;
   children?: ReactNode;
 }) {
   const id = useId();
@@ -58,6 +60,7 @@ export function ViewerDetails({
         opened={opened}
         onClose={closeWhenTop(id, close)}
         position="bottom"
+        zIndex={zIndex}
         size="80%"
         radius="lg"
         title={title}

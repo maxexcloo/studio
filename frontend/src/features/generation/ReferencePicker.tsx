@@ -10,7 +10,7 @@ import { SortMenu } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
-import { CardRatingFilter, cardSortLabels, useCardListing } from "../characters/cardListing";
+import { cardSortLabels, useCardListing } from "../characters/cardListing";
 import { CharacterChoices } from "../characters/CharacterChoices";
 import { PromptCardChoices } from "../characters/PromptCardChoices";
 import { chipProps } from "./chip";
@@ -289,9 +289,6 @@ export function ReferencePicker({
           onTabChange={(tab) => browse({ tab })}
           query={cardQuery}
           onQueryChange={setCardQuery}
-          filters={<CardRatingFilter {...cardOrder} />}
-          filterCount={Number(cardOrder.disliked)}
-          onClearFilters={() => cardOrder.setDisliked(false)}
           actions={
             <SortMenu
               label="Sort References"
@@ -307,7 +304,6 @@ export function ReferencePicker({
           kind={tab}
           query={cardQuery}
           sort={cardOrder.sort}
-          disliked={cardOrder.disliked}
           prompt={prompt.value}
           parts={input.cardParts}
           onChange={(prompt, cardParts) => {
@@ -324,7 +320,6 @@ export function ReferencePicker({
         <CharacterChoices
           query={cardQuery}
           sort={cardOrder.sort}
-          disliked={cardOrder.disliked}
           references={references}
           prompt={prompt.value}
           parts={input.cardParts}
