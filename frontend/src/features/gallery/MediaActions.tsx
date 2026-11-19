@@ -503,7 +503,6 @@ export function useMediaActions(
     setSuggestions({ id: item.id, mode, prompt: draft?.suggestionPrompt });
   const changeMenu = (mode: ViewerChange, others: ActionGroups, last: Action[]) =>
     assistMenu({
-      loading: canChange && assistant.isPending,
       settings: assistedChanges
         ? [
             {
@@ -611,7 +610,7 @@ export function useMediaActions(
     // An image edit uses the result as its reference. A video's Edit saves a new version.
     ready &&
       itemAction("edit", {
-        loading: videoEdit.isPending || Boolean(image && draft?.pending),
+        loading: videoEdit.isPending,
         onOpen: image && canChange ? openChanges("edit") : undefined,
         menu: image
           ? changeMenu(
@@ -640,8 +639,7 @@ export function useMediaActions(
     // Recreate uses the draft prompt with the recorded settings, preserving the original inputs.
     itemAction(ready ? "recreate" : "edit", {
       disabled: !ready && action.isPending,
-      loading:
-        running === "regenerate" || running === "repeat" || variants.isPending || draft?.pending,
+      loading: running === "regenerate" || running === "repeat" || variants.isPending,
       onClick: ready
         ? undefined
         : () => action.mutate({ operation: "image", prompt: changedPrompt }),
