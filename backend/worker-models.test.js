@@ -84,7 +84,9 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
     server.close();
   });
   const url = `http://127.0.0.1:${server.address().port}`;
-  useWorker(url);
+  useWorker("http://127.0.0.1:1");
+  process.env.STUDIO_MODEL_LIBRARY_URL = url;
+  t.after(() => delete process.env.STUDIO_MODEL_LIBRARY_URL);
   await worker.refreshWorkerModels({ force: true });
 
   const nativeFetch = globalThis.fetch;
@@ -112,6 +114,9 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   assert.equal(finished?.status, "done", finished?.error);
+  assert.deepEqual(worker.installedWorkerFiles(worker.workerInventory()), {
+    loras: ["model.safetensors"],
+  });
   const upload = requests.find((item) => item.path.includes("/upload?"));
   assert.equal(new URL(upload.path, url).searchParams.get("sha256"), sha256);
   assert.equal(
@@ -158,6 +163,7 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
   holdInventory = true;
   const pending = worker.refreshWorkerModels({ force: true });
   while (!releaseInventory) await new Promise((resolve) => setTimeout(resolve, 1));
+  delete process.env.STUDIO_MODEL_LIBRARY_URL;
   useWorker("http://127.0.0.1:1");
   releaseInventory();
   await pending;

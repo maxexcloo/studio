@@ -380,6 +380,50 @@ test("Update All applies every free update in one request", async ({ page }) => 
   expect(requests).toEqual([{ all: true }]);
 });
 
+test("An available LoRA can be installed from the catalogue and moves to Installed", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const key = "loras/film.safetensors";
+  let state = "available";
+  await page.route("**/api/library/items", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            key,
+            title: "Film Grain",
+            file: "film.safetensors",
+            folder: "loras",
+            kind: "lora",
+            installed: state === "installed",
+            installable: state !== "installed",
+            ...(state === "downloading" ? { install: { state } } : {}),
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/library/catalogue/install", (route) => {
+    expect(route.request().postDataJSON()).toEqual({ key });
+    state = "downloading";
+    return route.fulfill({ json: { ok: true, id: "install-film", status: state } });
+  });
+  await page.goto("/images");
+  await openNav(page, "Library");
+  await section(page, "Library", "LoRAs");
+  await chooseView(page, "LoRAs", "Available");
+  const table = page.getByRole("table", { name: "Library LoRAs", exact: true });
+  const row = table.getByRole("row", { name: /Film Grain/ });
+  await row.getByRole("button", { name: "Actions for Film Grain", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Install", exact: true }).click();
+  await expect(row).toContainText("Installing");
+  state = "installed";
+  await expect(row).toHaveCount(0);
+  await chooseView(page, "LoRAs", "Installed");
+  await expect(row).toContainText("Installed");
+});
+
 test("A checkpoint profile draft can be retried after failure and refreshed into the model choices", async ({
   page,
 }) => {

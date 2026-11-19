@@ -9,6 +9,12 @@ checkout into `/root/ComfyUI/custom_nodes/` during the worker build.
 The image starts ComfyUI on port 8188 with arguments from `CLI_ARGS`. Supply
 model directories and GPU placement in the deployment, owned by kubelab.
 
+For model transfers independent of GPU placement, start the same image with
+`--model-library` and mount the workers' shared ComfyUI model folder read-write at
+`STUDIO_MODEL_LIBRARY_DIR`. Set the same nonempty `STUDIO_WORKER_TOKEN` as Studio,
+then set `STUDIO_MODEL_LIBRARY_URL` in Studio to this service's internal HTTP
+address on port 8188. The worker answers the readiness probe at `/studio/worker`.
+
 Studio starts and stops workers by scaling their Kubernetes deployments between 0
 and 1 replicas; see
 [runtime control](../README.md#runtime-control) for

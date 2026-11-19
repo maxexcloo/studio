@@ -22,6 +22,11 @@ import { parkedWorkers } from "../runtime/services.ts";
 import { sharedRequests } from "../shared-requests.js";
 import { profileStats, recentRuns } from "../stats.js";
 import {
+  dedicatedModelLibrary,
+  installedWorkerFiles,
+  refreshWorkerModels,
+} from "../worker-models.js";
+import {
   defaultWorkerId,
   isRadianceWorker,
   listWorkers,
@@ -123,6 +128,9 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
   /** A Radiance worker's context: its two nodes, listing the models it serves, and their states. */
   async function fetchRadianceContext(worker, signal) {
     let models;
+    const library = dedicatedModelLibrary()
+      ? refreshWorkerModels({ signal: AbortSignal.timeout(2000) }).catch(() => null)
+      : null;
     try {
       models = await new RadianceClient(worker.url).models(signal);
       noteComfyReachable(worker.id);
@@ -133,8 +141,12 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     }
     contextFailures.delete(worker.id);
     // Radiance's native per-model inventory endpoint would load a cold model.
+    const inventory = await library;
     const result = {
-      info: radianceInfo(models, installedLoras()),
+      info: radianceInfo(
+        models,
+        inventory ? installedWorkerFiles(inventory).loras || [] : installedLoras(),
+      ),
       stats: { radiance: models },
       fetchedAt: Date.now(),
     };
