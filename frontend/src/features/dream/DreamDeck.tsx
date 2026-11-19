@@ -253,6 +253,7 @@ export function DreamDeck({
   usePrefetch(cards[2]);
   const fly = useRef<Fly | null>(null);
   const previewFly = useRef<Fly | null>(null);
+  const backdropTap = useRef(false);
   const busy = useRef(false);
 
   /** Takes the card off the deck. */
@@ -361,8 +362,8 @@ export function DreamDeck({
       .querySelector<HTMLElement>(`[data-depth="0"] [data-preview-id="${CSS.escape(item.id)}"]`)
       ?.focus({ preventScroll: true });
   }
-  function closeFromBackdrop(target: HTMLElement, x: number, y: number) {
-    if (isPreviewBackdrop(target, x, y) && !layerAbove(target)) closePreview();
+  function tapBackdrop(target: HTMLElement, x: number, y: number) {
+    backdropTap.current = isPreviewBackdrop(target, x, y);
   }
   /** The deck's card, or with `full` the preview's, for the top card or the one beneath. */
   const swipeCard = (card: DeckCard, full: boolean) => {
@@ -403,7 +404,7 @@ export function DreamDeck({
               : { left: "A", right: "B", up: "Like", down: "Neither" }
             : { left: "Dislike", right: "Accept", up: "Like", ...(full && { down: "Close" }) }
         }
-        onTap={full ? closeFromBackdrop : (target) => openPressed(card, target)}
+        onTap={full ? tapBackdrop : (target) => openPressed(card, target)}
         onHold={full ? undefined : (target) => openPressed(card, target)}
         onSwipe={(direction, target) => {
           if (full && direction === "down") return closePreview();
@@ -424,7 +425,7 @@ export function DreamDeck({
               playing={playing}
               setSide={(side) => open(card, side)}
               onClose={closePreview}
-              onTap={closeFromBackdrop}
+              onTap={tapBackdrop}
               onLike={isTop ? () => void act("like") : undefined}
             />
           ) : (
@@ -504,6 +505,7 @@ export function DreamDeck({
           side={viewing.side}
           canUndo={history.length > 0}
           close={closePreview}
+          backdropTap={backdropTap}
           act={(choice) => void act(choice)}
           undo={undo}
           suggest={suggest}

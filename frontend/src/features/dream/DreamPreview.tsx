@@ -4,6 +4,7 @@ import {
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
+  type RefObject,
   Suspense,
   lazy,
   useId,
@@ -262,6 +263,7 @@ export function DreamPreview({
   canUndo,
   children,
   close,
+  backdropTap,
   act,
   undo,
   suggest,
@@ -272,12 +274,14 @@ export function DreamPreview({
   canUndo: boolean;
   children: ReactNode;
   close: () => void;
+  backdropTap: RefObject<boolean>;
   act: (choice: Choice["choice"]) => void;
   undo: () => void;
   suggest?: ReactNode;
   onKeyDown: (event: KeyboardEvent) => void;
 }) {
   const id = useId();
+  const closeIfTop = closeWhenTop(id, close);
   const phone = usePhone();
   const [details, setDetails] = useState(false);
   const bottomBar = useRef<HTMLDivElement>(null);
@@ -288,7 +292,7 @@ export function DreamPreview({
     <Modal
       id={id}
       opened
-      onClose={closeWhenTop(id, close)}
+      onClose={closeIfTop}
       fullScreen
       withCloseButton={false}
       padding={0}
@@ -308,7 +312,20 @@ export function DreamPreview({
     >
       <div className={viewerClasses.layout}>
         <div className={`${viewerClasses.main} ${classes.previewMain}`}>
-          <div className={classes.previewStage}>{children}</div>
+          <div
+            className={classes.previewStage}
+            onPointerDownCapture={() => {
+              backdropTap.current = false;
+            }}
+            onClick={(event) => {
+              if (!event.detail || !backdropTap.current) return;
+              backdropTap.current = false;
+              // Wait for the tap's click so it cannot take the returned focus away.
+              closeIfTop();
+            }}
+          >
+            {children}
+          </div>
           <ViewerChrome
             item={item}
             label={
