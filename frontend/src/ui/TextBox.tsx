@@ -57,7 +57,8 @@ export const TextToolsBar = createContext<HTMLElement | null>(null);
 export function TextBox({
   value,
   onChange,
-  tools,
+  tools: fieldTools,
+  editorTools,
   send,
   busy,
   popups,
@@ -76,6 +77,8 @@ export function TextBox({
   onChange: (value: string) => void;
   /** The box's tools menu; AI uses the magic icon, other tools More. */
   tools?: Action[];
+  /** Additional tools for the separate phone editor, without adding them beside the field. */
+  editorTools?: Action[];
   /** The send, and a proposal's Undo, which stay beside the text. */
   send?: ReactNode;
   /** Popups its tools open (Recent Prompts), anchored at the box's end where the ⋯ stands. */
@@ -107,6 +110,7 @@ export function TextBox({
   const mobile = usePhone();
   const phone = mobile && !inline;
   const [editing, setEditing] = useState(false);
+  const tools = editing ? (editorTools ?? fieldTools) : fieldTools;
   const ai = tools?.some((tool) => tool.id === "assistant" || tool.icon === icons.assistant);
   const focusTool = (event: MouseEvent) => {
     if (!ai || editing || document.activeElement?.tagName === "TEXTAREA") keepFocus(event);
@@ -156,7 +160,7 @@ export function TextBox({
       ]
     : [];
   const edit = !mobile && reset !== undefined && !clear.disabled ? clear : undefined;
-  const editButtons = edits.map((action) => (
+  const editButton = (action: Action) => (
     <Button
       key={action.id}
       onMouseDown={keepFocus}
@@ -171,7 +175,8 @@ export function TextBox({
       {action.icon && <action.icon size={16} className={classes.editIcon} />}
       <span className={classes.editText}>{action.label}</span>
     </Button>
-  ));
+  );
+  const editButtons = edits.map(editButton);
   const bar = useContext(TextToolsBar);
   const [active, setActive] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -276,7 +281,7 @@ export function TextBox({
   );
   const visible = useVisibleRect(menuOpened);
   const bounds = { padding: 12, rootBoundary: visible ?? ("viewport" as const) };
-  const menu = !menuless && tools !== undefined && (
+  const menu = tools && tools.length > 0 && (
     <Menu
       // In place at rest, the button stands at the text's top, so the menu drops from it.
       position={mobile && inline && !inBar ? "bottom-end" : "top-end"}
@@ -325,7 +330,6 @@ export function TextBox({
               color="gray"
               size="compact-xs"
               aria-label={`More ${title} Actions`}
-              disabled={tools.length === 0}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
               leftSection={busy ? <Loader size={16} /> : undefined}
@@ -339,7 +343,6 @@ export function TextBox({
               variant="subtle"
               color="gray"
               aria-label={`${ai ? "AI" : "More"} ${title} Actions`}
-              disabled={tools.length === 0}
               aria-busy={Boolean(busy) || undefined}
               aria-description={busy}
             >
@@ -493,40 +496,39 @@ export function TextBox({
       {(tools || send || submit || rightSection) && (
         <div className={classes.toolbar} onMouseDown={keepFocus}>
           <div className={classes.editActions} role="group" aria-label={`${title} Tools`}>
-            {editButtons}
             {menu}
+            {edits.filter((action) => action.id !== "clear").map(editButton)}
             {!tools && !send && rightSection}
           </div>
-          {!submit && send && <div className={classes.sends}>{send}</div>}
-          {submit && (
-            <div className={classes.sends}>
-              {submit?.map((each, index) => {
-                const primary = index === submit.length - 1;
-                const Glyph = each.icon ?? ArrowUp;
-                return (
-                  <Button
-                    key={each.label}
-                    aria-label={each.label}
-                    className={primary ? undefined : classes.secondarySend}
-                    variant={primary ? "filled" : "light"}
-                    radius="xl"
-                    size="compact-xs"
-                    leftSection={primary ? undefined : <Glyph size={16} />}
-                    rightSection={primary ? <Glyph size={16} /> : undefined}
-                    disabled={each.disabled}
-                    // Sending before the keyboard drops keeps the text's blur from closing first.
-                    onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      if (!each.keepOpen) close();
-                      each.onSubmit();
-                    }}
-                  >
-                    {each.label}
-                  </Button>
-                );
-              })}
-            </div>
-          )}
+          <div className={classes.sends}>
+            {edits.filter((action) => action.id === "clear").map(editButton)}
+            {!submit && send}
+            {submit?.map((each, index) => {
+              const primary = index === submit.length - 1;
+              const Glyph = each.icon ?? ArrowUp;
+              return (
+                <Button
+                  key={each.label}
+                  aria-label={each.label}
+                  className={primary ? undefined : classes.secondarySend}
+                  variant={primary ? "filled" : "light"}
+                  radius="xl"
+                  size={primary ? undefined : "compact-xs"}
+                  leftSection={primary ? undefined : <Glyph size={16} />}
+                  rightSection={primary ? <Glyph size={16} /> : undefined}
+                  disabled={each.disabled}
+                  // Sending before the keyboard drops keeps the text's blur from closing first.
+                  onPointerDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    if (!each.keepOpen) close();
+                    each.onSubmit();
+                  }}
+                >
+                  {each.label}
+                </Button>
+              );
+            })}
+          </div>
         </div>
       )}
       {popups && <div className={classes.anchor}>{popups}</div>}

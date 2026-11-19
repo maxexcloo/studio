@@ -26,9 +26,12 @@ export function useItemChange<T extends string>(
 ) {
   const video = item.type === "video";
   const assistant = useQuery(assistantQuery);
-  const [change, setChange] = useState<{ proposal: Change; typed: T; profileId?: string } | null>(
-    null,
-  );
+  const [change, setChange] = useState<{
+    proposal: Change;
+    typed: T;
+    profileId?: string;
+    preview: boolean;
+  } | null>(null);
   const ask = useItemMutation(item.id, "ask-change", {
     mutationFn: async ({
       request,
@@ -40,6 +43,7 @@ export function useItemChange<T extends string>(
       typed: T;
       action?: ChangeAction;
       profileId?: string;
+      preview: boolean;
     }) => {
       const actions: ChangeAction[] = action
         ? [action]
@@ -48,15 +52,15 @@ export function useItemChange<T extends string>(
           : ["edit", "recreate", "animate"];
       return askChange(item.jobId!, request, actions, typed, item.id, profileId);
     },
-    onSuccess: (answer, { profileId }) => {
+    onSuccess: (answer, { profileId, preview }) => {
       if (answer.reason) notifications.show({ message: answer.reason });
-      else if (!review) {
+      else if (!preview) {
         const proposal = answer.suggestions[0];
         run(proposal.prompt, proposal, profileId);
       }
     },
   });
-  function run(prompt: string, proposal: Change, profileId?: string) {
+  function run(prompt: string, proposal: Change, profileId?: string, preview = false) {
     const action = proposal.action;
     // An image's animation, as proposed, has Animate's writer word the request for the video
     // model; a prompt the person edited runs as they wrote it.
@@ -68,7 +72,7 @@ export function useItemChange<T extends string>(
         prompt: prompt.trim(),
         operation:
           action === "edit" ? "refine" : action === "animate" && !video ? "animate" : "image",
-        sameSeed: action === "recreate",
+        sameSeed: action === "recreate" && !preview,
         ...(action === "edit" && profileId && { profileId }),
       });
     setChange(null);
@@ -81,16 +85,17 @@ export function useItemChange<T extends string>(
     pending: ask.isPending,
     proposal: change?.proposal,
     typed: change?.typed,
-    send(request: string, text: T, action?: ChangeAction, editProfileId?: string) {
+    previewing: change?.preview,
+    send(request: string, text: T, action?: ChangeAction, editProfileId?: string, preview = false) {
       const typed = change?.typed ?? text;
       const profileId = action === "edit" ? editProfileId : undefined;
       ask.mutate(
-        { request: request.trim(), typed, action, profileId },
+        { request: request.trim(), typed, action, profileId, preview: review || preview },
         {
           onSuccess: (answer) => {
-            if (!review || answer.reason) return;
+            if ((!review && !preview) || answer.reason) return;
             const [proposal] = answer.suggestions;
-            setChange({ proposal, typed, profileId });
+            setChange({ proposal, typed, profileId, preview });
             show(proposal);
           },
         },
@@ -101,7 +106,7 @@ export function useItemChange<T extends string>(
       setChange(null);
     },
     run(prompt: string) {
-      if (change) run(prompt, change.proposal, change.profileId);
+      if (change) run(prompt, change.proposal, change.profileId, change.preview);
     },
   };
 }
