@@ -5,7 +5,7 @@ import { api } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
 import { NumberSetting } from "../../ui/NumberSetting";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { type Dream, type DreamSettings, dreamCountQuery, dreamQuery, dreamWhen } from "./queries";
+import { type Dream, type DreamSettings, dreamCountQuery, dreamQuery } from "./queries";
 
 /** Notes a setting an administrator forces on every account (Settings › Generation). */
 export const lockedByAdministrator = "Set by an administrator.";
@@ -55,15 +55,10 @@ export function DreamPreferences() {
       />
     </SettingRow>
   );
-  const number = (
-    key: "dailyImages" | "dailyVideos",
-    label: string,
-    max: number,
-    description: string,
-  ) => (
-    <SettingRow label={label} description={description}>
+  const number = (key: "dailyImages" | "dailyVideos", max: number, description: string) => (
+    <SettingRow label="Daily Amount" description={description}>
       <NumberSetting
-        label={label}
+        label="Daily Amount"
         value={settings[key]}
         min={0}
         max={max}
@@ -72,15 +67,15 @@ export function DreamPreferences() {
       />
     </SettingRow>
   );
-  const backend = (key: "imageBackend" | "videoBackend", label: string) => (
+  const backend = (key: "imageBackend" | "videoBackend") => (
     <SettingRow
       wide
-      label={`${label} Run On`}
+      label="Processing"
       description={`Uses ready models allowed for your account. Waits if unavailable.${note(key)}`}
     >
       <SegmentedControl
         role="radiogroup"
-        aria-label={`Dream ${label} Run On`}
+        aria-label="Processing"
         fullWidth
         value={settings[key]}
         disabled={locked(key) || !settings[key === "imageBackend" ? "images" : "videos"]}
@@ -95,26 +90,23 @@ export function DreamPreferences() {
   return (
     <>
       <SettingGroup title="Dream">
-        <Text size="xs" c="dimmed">
-          {dreamWhen(dream.data)}
-        </Text>
         {dream.data.reason && (
           <Text size="xs" c="dimmed" role="status" aria-label="Dream Status">
             {dream.data.reason}
           </Text>
         )}
-        {toggle("enabled", "Dream", "Make new images from your taste in idle time.")}
+        {toggle("enabled", "Enable", "Make new images from your taste in idle time.")}
         {dream.data.spicyAvailable && toggle("spicy", "Spicy", "Allow explicit themes.")}
       </SettingGroup>
       <SettingGroup title="Images">
-        {toggle("images", "Images", "Make new images.")}
-        {number("dailyImages", "Images per Day", 500, "The most images Dream makes a day.")}
-        {backend("imageBackend", "Images")}
+        {toggle("images", "Enable", "Make new images.")}
+        {number("dailyImages", 500, "The most images Dream makes a day.")}
+        {backend("imageBackend")}
       </SettingGroup>
       <SettingGroup title="Videos">
-        {toggle("videos", "Videos", "Animate kept or liked images too.")}
-        {number("dailyVideos", "Videos per Day", 100, "The most videos Dream makes a day.")}
-        {backend("videoBackend", "Videos")}
+        {toggle("videos", "Enable", "Animate kept or liked images too.")}
+        {number("dailyVideos", 100, "The most videos Dream makes a day.")}
+        {backend("videoBackend")}
       </SettingGroup>
       {save.error && (
         <Alert color="red" title="Couldn't Save Dream Settings">

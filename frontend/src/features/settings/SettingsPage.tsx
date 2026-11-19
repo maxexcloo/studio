@@ -19,6 +19,7 @@ import { OwnAccount } from "./OwnAccount";
 import { Preferences } from "./Preferences";
 import { useSettingsNavigation } from "./SettingsNavigation";
 import { UnfinishedItems } from "./UnfinishedItems";
+import { WhereWorkRuns } from "./WhereWorkRuns";
 
 const workerQueries = [
   servicesStatusQuery.queryKey,
@@ -95,6 +96,7 @@ export function SettingsPage() {
             </Stack>
           ),
           preferences: <Preferences />,
+          "where-work-runs": <WhereWorkRuns />,
           dream: <DreamPreferences />,
           generation: <GenerationSettings />,
           groups: (heading) => <GroupsAdmin heading={heading} />,

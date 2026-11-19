@@ -388,23 +388,23 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await page.goto("/settings");
   await section(page, "Settings", "Dream");
   const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
-  await expect(settings).toContainText("Dream is paused · 12 of 40 today");
-  const videos = settings.getByRole("switch", { name: "Videos", exact: true });
+  const imageSettings = settings.getByRole("region", { name: "Images", exact: true });
+  const videoSettings = settings.getByRole("region", { name: "Videos", exact: true });
+  const videos = videoSettings.getByRole("switch", { name: "Enable", exact: true });
+  const videoAmount = videoSettings.getByRole("textbox", { name: "Daily Amount", exact: true });
+  await expect(videoAmount).toBeDisabled();
   await videos.click({ force: true });
   await expect(videos).toBeChecked();
-  await expect(settings).toContainText("12 of 40 today · 1 of 4 videos");
-  const images = settings.getByRole("textbox", { name: "Images per Day" });
+  await expect(videoAmount).toBeEnabled();
+  const images = imageSettings.getByRole("textbox", { name: "Daily Amount", exact: true });
   await images.fill("200");
   await images.press("Enter");
   await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeVisible();
   await expect
     .poll(() => dream.requests.map((request) => request.body))
     .toEqual([{ enabled: true }, { paused: true }, { videos: true }, { dailyImages: 200 }]);
-  await expect(settings).toContainText("Dream is paused · 12 of 200 today");
-  // Images per Day follows Images, as Videos per Day follows Videos.
-  await settings.getByRole("switch", { name: "Images", exact: true }).click({ force: true });
+  await imageSettings.getByRole("switch", { name: "Enable", exact: true }).click({ force: true });
   await expect(images).toBeDisabled();
-  await expect(settings).toContainText("Dream is paused · 1 of 4 videos");
   await expect.poll(() => dream.settings.images).toBe(false);
 });
 
@@ -421,10 +421,15 @@ test("Dream settings an administrator forces stay locked for the account", async
   await expect(page.getByRole("button", { name: "Turn On", exact: true })).toHaveCount(0);
   await page.goto("/settings#dream");
   const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
-  await expect(settings.getByRole("switch", { name: "Dream", exact: true })).toBeDisabled();
   await expect(
     settings
-      .getByRole("radiogroup", { name: "Dream Images Run On" })
+      .getByRole("region", { name: "Dream", exact: true })
+      .getByRole("switch", { name: "Enable", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    settings
+      .getByRole("region", { name: "Images", exact: true })
+      .getByRole("radiogroup", { name: "Processing", exact: true })
       .getByRole("radio", { name: "Cloud", exact: true }),
   ).toBeDisabled();
   await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeEnabled();
