@@ -1,9 +1,10 @@
-import { ActionIcon, Badge, Group, Modal, Text, Tooltip, VisuallyHidden } from "@mantine/core";
+import { Badge, Group, Modal, Text, VisuallyHidden } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import {
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
+  type RefObject,
   Suspense,
   lazy,
   useId,
@@ -14,7 +15,6 @@ import {
 
 import { loraName } from "../../../../shared/profiles";
 import type { MediaItem } from "../../types";
-import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { mediaTitle } from "../gallery/mediaLabels";
@@ -25,11 +25,12 @@ import { ViewerDetails } from "../gallery/ViewerDetails";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import type { Choice } from "./choices";
 import type { DeckCard, PairDeckCard } from "./deck";
-import { DeckButtons } from "./DeckButtons";
+import { DeckButtons, DeckUndo } from "./DeckButtons";
 import { DeckMedia, MediaBackdrop } from "./DeckMedia";
 import { covers, useBoxShape } from "./mediaFit";
 import { sideLabel } from "./PairCard";
 import type { DreamItem } from "./queries";
+import { tapDistance } from "./SwipeCard";
 
 import viewerClasses from "../gallery/MediaViewer.module.css";
 import classes from "./DreamPage.module.css";
@@ -135,6 +136,28 @@ export function PreviewFace({ item, active = true }: { item: MediaItem; active?:
   );
 }
 
+/** Whether the press was on the stage's letterbox, outside the picture or video. */
+export function isPreviewBackdrop(target: HTMLElement, x: number, y: number) {
+  if (target.closest("button, a, [data-zoomed], [data-zoom-controls]")) return false;
+  const fit = target.closest<HTMLElement>(`.${classes.fit}`);
+  if (!fit) return false;
+  const media = fit.querySelector<HTMLVideoElement | HTMLImageElement>(
+    ":scope > video, :scope > img:not([aria-hidden])",
+  );
+  // ZoomImage's picture has its own footprint. An unzoomable video or still fills a contain box.
+  if (!media) return true;
+  if (fit.dataset.cover) return false;
+  const width = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth;
+  const height = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight;
+  if (!width || !height) return false;
+  const rect = media.getBoundingClientRect();
+  const scale = Math.min(rect.width / width, rect.height / height);
+  return (
+    Math.abs(x - (rect.x + rect.width / 2)) > (width * scale) / 2 ||
+    Math.abs(y - (rect.y + rect.height / 2)) > (height * scale) / 2
+  );
+}
+
 /**
  * A comparison's sides in the preview, one at a time: a sideways swipe over media at rest follows
  * the finger to the other side, while zoomed media pans instead.
@@ -145,6 +168,7 @@ export function PreviewSides({
   playing,
   setSide,
   onClose,
+  onTap,
   onLike,
 }: {
   card: PairDeckCard;
@@ -152,6 +176,7 @@ export function PreviewSides({
   playing: boolean;
   setSide: (side: number) => void;
   onClose: () => void;
+  onTap: (target: HTMLElement, x: number, y: number) => void;
   onLike?: () => void;
 }) {
   const strip = useRef<HTMLDivElement>(null);
@@ -177,6 +202,12 @@ export function PreviewSides({
         : undefined;
     if (direction === "down") return onClose();
     if (direction === "up" && onLike) return onLike();
+    if (
+      event.type === "pointerup" &&
+      !from.drag &&
+      Math.hypot(event.clientX - from.x, event.clientY - from.y) < tapDistance
+    )
+      return onTap(event.target as HTMLElement, from.x, from.y);
     const next = direction === "left" ? side + 1 : direction === "right" ? side - 1 : side;
     if (next !== side && next >= 0 && next < card.items.length) setSide(next);
     else place(0, true);
@@ -186,6 +217,7 @@ export function PreviewSides({
       ref={strip}
       className={classes.previewSides}
       onPointerDown={(event) => {
+        if (event.button !== 0) return;
         // A second finger pinches.
         if (press.current) {
           press.current = null;
@@ -231,6 +263,7 @@ export function DreamPreview({
   canUndo,
   children,
   close,
+  backdropTap,
   act,
   undo,
   suggest,
@@ -241,12 +274,14 @@ export function DreamPreview({
   canUndo: boolean;
   children: ReactNode;
   close: () => void;
+  backdropTap: RefObject<boolean>;
   act: (choice: Choice["choice"]) => void;
   undo: () => void;
   suggest?: ReactNode;
   onKeyDown: (event: KeyboardEvent) => void;
 }) {
   const id = useId();
+  const closeIfTop = closeWhenTop(id, close);
   const phone = usePhone();
   const [details, setDetails] = useState(false);
   const bottomBar = useRef<HTMLDivElement>(null);
@@ -257,7 +292,7 @@ export function DreamPreview({
     <Modal
       id={id}
       opened
-      onClose={closeWhenTop(id, close)}
+      onClose={closeIfTop}
       fullScreen
       withCloseButton={false}
       padding={0}
@@ -277,7 +312,20 @@ export function DreamPreview({
     >
       <div className={viewerClasses.layout}>
         <div className={`${viewerClasses.main} ${classes.previewMain}`}>
-          <div className={classes.previewStage}>{children}</div>
+          <div
+            className={classes.previewStage}
+            onPointerDownCapture={() => {
+              backdropTap.current = false;
+            }}
+            onClick={(event) => {
+              if (!event.detail || !backdropTap.current) return;
+              backdropTap.current = false;
+              // Wait for the tap's click so it cannot take the returned focus away.
+              closeIfTop();
+            }}
+          >
+            {children}
+          </div>
           <ViewerChrome
             item={item}
             label={
@@ -304,19 +352,7 @@ export function DreamPreview({
               hidden={false}
               shown={card.kind === "pair" ? side : undefined}
               trailing={suggest}
-              leading={
-                <Tooltip label="Undo">
-                  <ActionIcon
-                    variant="default"
-                    radius="xl"
-                    aria-label="Undo"
-                    disabled={!canUndo}
-                    onClick={undo}
-                  >
-                    <icons.undo size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              }
+              leading={<DeckUndo disabled={!canUndo} onClick={undo} />}
             />
           </div>
         </div>

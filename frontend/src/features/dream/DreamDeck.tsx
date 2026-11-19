@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Button, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Box, Text, Tooltip } from "@mantine/core";
 import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   type Dispatch,
@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { createPortal, flushSync } from "react-dom";
+import { flushSync } from "react-dom";
 
 import { failure, post } from "../../api";
 import type { MediaItem } from "../../types";
@@ -24,9 +24,15 @@ import { useOpenComposer } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import type { Verdict } from "./choices";
 import { type DeckCard, type PairDeckCard, cardIds, deckCards } from "./deck";
-import { DeckButtons } from "./DeckButtons";
+import { DeckButtons, DeckUndo } from "./DeckButtons";
 import { DeckMedia } from "./DeckMedia";
-import { CardText, DreamPreview, PreviewFace, PreviewSides } from "./DreamPreview";
+import {
+  CardText,
+  DreamPreview,
+  PreviewFace,
+  PreviewSides,
+  isPreviewBackdrop,
+} from "./DreamPreview";
 import { LibrarySuggest } from "./LibrarySuggest";
 import { PairContent } from "./PairCard";
 import {
@@ -187,7 +193,6 @@ export function DreamDeck({
   libraryWaiting,
   media,
   empty,
-  undoTarget,
 }: {
   items: DreamItem[];
   setDecided: Dispatch<SetStateAction<Set<string>>>;
@@ -198,7 +203,6 @@ export function DreamDeck({
   libraryWaiting: boolean;
   media: DreamMedia;
   empty: ReactNode;
-  undoTarget: HTMLDivElement | null;
 }) {
   const phone = usePhone();
   const touch = useTouch();
@@ -249,6 +253,7 @@ export function DreamDeck({
   usePrefetch(cards[2]);
   const fly = useRef<Fly | null>(null);
   const previewFly = useRef<Fly | null>(null);
+  const backdropTap = useRef(false);
   const busy = useRef(false);
 
   /** Takes the card off the deck. */
@@ -357,6 +362,9 @@ export function DreamDeck({
       .querySelector<HTMLElement>(`[data-depth="0"] [data-preview-id="${CSS.escape(item.id)}"]`)
       ?.focus({ preventScroll: true });
   }
+  function tapBackdrop(target: HTMLElement, x: number, y: number) {
+    backdropTap.current = isPreviewBackdrop(target, x, y);
+  }
   /** The deck's card, or with `full` the preview's, for the top card or the one beneath. */
   const swipeCard = (card: DeckCard, full: boolean) => {
     const isTop = card === top;
@@ -372,6 +380,20 @@ export function DreamDeck({
         // A comparison's preview swipes between its sides, and answers with its buttons.
         still={full && card.kind === "pair"}
         full={full}
+        view={
+          !full && isTop && card.kind !== "pair" ? (
+            <Tooltip label="View">
+              <ActionIcon
+                variant="default"
+                aria-label="View"
+                data-preview-id={card.item.id}
+                onClick={() => open(card)}
+              >
+                <icons.preview size={16} />
+              </ActionIcon>
+            </Tooltip>
+          ) : undefined
+        }
         fly={full ? previewFly : fly}
         pair={card.kind === "pair"}
         label={cardLabel(card, isTop)}
@@ -382,7 +404,7 @@ export function DreamDeck({
               : { left: "A", right: "B", up: "Like", down: "Neither" }
             : { left: "Dislike", right: "Accept", up: "Like", ...(full && { down: "Close" }) }
         }
-        onTap={full ? undefined : (target) => openPressed(card, target)}
+        onTap={full ? tapBackdrop : (target) => openPressed(card, target)}
         onHold={full ? undefined : (target) => openPressed(card, target)}
         onSwipe={(direction, target) => {
           if (full && direction === "down") return closePreview();
@@ -403,6 +425,7 @@ export function DreamDeck({
               playing={playing}
               setSide={(side) => open(card, side)}
               onClose={closePreview}
+              onTap={tapBackdrop}
               onLike={isTop ? () => void act("like") : undefined}
             />
           ) : (
@@ -427,19 +450,6 @@ export function DreamDeck({
                   Rate Your Library
                 </Badge>
               )}
-              {isTop && (
-                <Tooltip label="View">
-                  <ActionIcon
-                    className={classes.view}
-                    variant="default"
-                    aria-label="View"
-                    data-preview-id={card.item.id}
-                    onClick={() => open(card)}
-                  >
-                    <icons.preview size={16} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
             </div>
             <CardText item={card.item} dreamt={card.kind === "dream"} full={sideways} />
           </>
@@ -447,27 +457,14 @@ export function DreamDeck({
       </SwipeCard>
     );
   };
-  // Undo stands beside the view menu, so it stays in reach with the deck empty too.
-  const undoButton =
-    undoTarget &&
-    createPortal(
-      <Button
-        size="compact-sm"
-        variant="subtle"
-        color="gray"
-        leftSection={<icons.undo size={14} />}
-        disabled={!history.length}
-        onClick={undo}
-      >
-        Undo
-      </Button>,
-      undoTarget,
-    );
+  const undoButton = <DeckUndo disabled={!history.length} onClick={undo} />;
   if (!top)
     return (
       <>
         {libraryWaiting ? <LoadingState fill label="Loading Library" /> : empty}
-        {undoButton}
+        <Box role="group" aria-label="Dream Actions" className={classes.buttons} mt="auto">
+          {undoButton}
+        </Box>
       </>
     );
   const suggest =
@@ -491,6 +488,7 @@ export function DreamDeck({
         card={top}
         act={(choice) => void act(choice)}
         hidden={!!viewing}
+        leading={undoButton}
         trailing={viewing ? undefined : suggest}
         shown={top.kind === "pair" ? shown : undefined}
       />
@@ -501,13 +499,13 @@ export function DreamDeck({
             : "← Dislike · → Accept · ↑ Like · U Undo"}
         </Text>
       )}
-      {undoButton}
       {viewing && (
         <DreamPreview
           card={top}
           side={viewing.side}
           canUndo={history.length > 0}
           close={closePreview}
+          backdropTap={backdropTap}
           act={(choice) => void act(choice)}
           undo={undo}
           suggest={suggest}
