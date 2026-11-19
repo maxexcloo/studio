@@ -190,12 +190,24 @@ export function registerQueueRoutes(
     const ownerId = ownerOf(account);
     const pauses = store.pauses();
     const jobs = listed(store, ownerId, { results: false });
+    const failedSets = new Set<string>();
+    const mixedSets = new Set<string>();
+    for (const job of jobs) {
+      if (!job.queueSet || job.priority === queuePriority.dream) continue;
+      if (job.status === "failed") failedSets.add(job.queueSet);
+      else if (job.status !== "cancelled") mixedSets.add(job.queueSet);
+    }
+    const clearableFailedSets = store.clearableFailedSets(
+      ownerId,
+      [...failedSets].filter((set) => !mixedSets.has(set)),
+    );
     const listedAt = performance.now();
     const since = typeof query.since === "string" ? query.since : undefined;
     const payload = {
       jobs: queued(ownerId, since ? jobs.filter((job) => job.updatedAt >= since) : jobs),
       ...(since ? { ids: jobs.map((job) => job.id) } : {}),
       paused: { mine: pauses.has(ownerId), all: pauses.has(everyone) },
+      clearableFailedSets,
     } satisfies QueueResponse;
     const listMs = listedAt - started;
     const hydrateMs = performance.now() - listedAt;
@@ -286,6 +298,27 @@ export function registerQueueRoutes(
     const failed = listed(store, ownerOf(account)).filter((job) => job.status === "failed");
     failed.forEach((job) => clear(store, job));
     return { status: 200, payload: { cleared: failed.length } };
+  });
+  directRoute(app, "POST", "/api/queue/sets/:set/clear-failed", (account, { params }) => {
+    const ownerId = ownerOf(account);
+    const set = params.set;
+    store.db.exec("BEGIN IMMEDIATE");
+    try {
+      if (!store.clearableFailedSets(ownerId, [set]).length) {
+        store.db.exec("ROLLBACK");
+        return {
+          status: 409,
+          payload: { error: "Only sets with failed work alone can be cleared." },
+        };
+      }
+      const failed = store.failedSetJobs(ownerId, set);
+      failed.forEach((job) => clear(store, job));
+      store.db.exec("COMMIT");
+      return { status: 200, payload: { cleared: failed.length } };
+    } catch (error) {
+      store.db.exec("ROLLBACK");
+      throw error;
+    }
   });
   directRoute(app, "POST", "/api/queue/:id/clear", (account, { params }) => {
     const job = store.job(ownerOf(account), params.id);

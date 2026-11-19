@@ -444,6 +444,32 @@ export class Store {
       .map((row) => JSON.parse(row.record as string));
   }
 
+  /** Some completed members may have aged out of the queue listing. */
+  clearableFailedSets(ownerId: string, sets: string[]): string[] {
+    if (!sets.length) return [];
+    return this.db
+      .prepare(
+        `SELECT json_extract(record, '$.queueSet') AS set_id FROM studio_queue INDEXED BY studio_queue_set
+          WHERE owner_id = ? AND json_extract(record, '$.queueSet') IN (SELECT value FROM json_each(?))
+          GROUP BY set_id
+          HAVING count(*) FILTER (WHERE status NOT IN ('failed', 'cancelled')) = 0
+            AND count(*) FILTER (WHERE status = 'failed' AND json_extract(record, '$.cleared') IS NULL) > 0`,
+      )
+      .all(ownerId, JSON.stringify(sets))
+      .map((row) => String(row.set_id));
+  }
+
+  failedSetJobs(ownerId: string, set: string): OwnedJob[] {
+    return this.db
+      .prepare(
+        `SELECT record FROM studio_queue INDEXED BY studio_queue_set
+          WHERE owner_id = ? AND json_extract(record, '$.queueSet') = ?
+          AND status = 'failed' AND json_extract(record, '$.cleared') IS NULL`,
+      )
+      .all(ownerId, set)
+      .map((row) => JSON.parse(row.record as string));
+  }
+
   /** Jobs by ID, whoever owns them: for what the server itself already knows by ID. */
   jobsById(ids: string[]): OwnedJob[] {
     if (!ids.length) return [];
