@@ -300,11 +300,6 @@ export async function fixtures(page: Page) {
         },
         catalogue: [],
         dream: deploymentDream,
-        integrations: {
-          civitai: { token: { set: false } },
-          huggingFace: { token: { set: false } },
-          assistant: { available: false },
-        },
       });
     }
     if (path.match(/^\/api\/accounts\/profiles\/[^/]+$/) && method === "DELETE") {

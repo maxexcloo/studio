@@ -11,7 +11,7 @@ import express from "express";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-assistant-routes-"));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_ENV_FILE = path.join(dir, "studio-env");
-const { registerAssistantRoutes, assistantIntegration, assistantRecord, imageFromDataUrl } =
+const { registerAssistantRoutes, deploymentTextModel, assistantRecord, imageFromDataUrl } =
   await import("./assistant-routes.js");
 const { createAssistant } = await import("./assistant.js");
 const { builtInAccessProfile, effectiveAccountAccess } = await import("./account-policy.js");
@@ -312,12 +312,9 @@ test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; draf
   );
 });
 
-test("Settings › Integrations shows the gateway's state and the model Studio's own calls use", async () => {
-  assert.deepEqual(await assistantIntegration({ environment, engine }), {
-    available: true,
-    model: "cloud/auto",
-  });
-  assert.equal((await assistantIntegration({ environment: {}, engine: null })).available, false);
+test("Settings shows the model Studio's own text calls use", async () => {
+  assert.equal(await deploymentTextModel({ environment, engine }), "cloud/auto");
+  assert.equal(await deploymentTextModel({ environment: {}, engine: null }), "");
   assert.deepEqual(imageFromDataUrl("data:image/png;base64,AAAA"), {
     mime: "image/png",
     data: "AAAA",

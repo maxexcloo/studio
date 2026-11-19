@@ -120,22 +120,13 @@ export function assistantRecord(value, loras = []) {
   };
 }
 
-/**
- * Settings › Integrations › Prompt Assistant: whether the gateway is set, and the model Studio's
- * own calls use now.
- */
-export async function assistantIntegration({ environment = process.env, engine }) {
-  let problem = "";
+/** The effective default model Studio uses for background text work. */
+export async function deploymentTextModel({ environment = process.env, engine }) {
   try {
-    if (gatewaySettings(environment) && engine)
-      return { available: true, model: await engine.model("title") };
-  } catch (error) {
-    problem = error.message;
+    return gatewaySettings(environment) && engine ? await engine.model("title") : "";
+  } catch {
+    return "";
   }
-  return {
-    available: false,
-    note: problem || "Set STUDIO_ASSISTANT_URL, _KEY and _CLOUD_MODEL to use the prompt assistant.",
-  };
 }
 
 /**

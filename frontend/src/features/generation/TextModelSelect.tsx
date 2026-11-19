@@ -6,7 +6,13 @@ const titled = (word: string) => brands[word] ?? titleCase(word);
 /** A gateway alias by its readable name. */
 export const textModelName = (id: string) => {
   const [side, name = ""] = id.split("/");
-  return `${name.split("-").map(titled).join(" ")} · ${titled(side)}`;
+  const words = name.split("-");
+  if (words.at(-1) === "uncensored") {
+    words.pop();
+    const location = `${titled(side)} - Uncensored`;
+    return words.length ? `${words.map(titled).join(" ")} · ${location}` : location;
+  }
+  return `${words.map(titled).join(" ")} · ${titled(side)}`;
 };
 
 export function TextModelSelect({

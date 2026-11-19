@@ -1,7 +1,6 @@
 import { dreamOverrideKeys, dreamSettingError } from "../shared/dream.ts";
 import { defaultTextProfileKey } from "./account-preferences.js";
-import { assistantIntegration, textModels } from "./assistant-routes.js";
-import { civitaiTokenStatus } from "./civitai/access.js";
+import { deploymentTextModel, textModels } from "./assistant-routes.js";
 import {
   catalogueFlags,
   defaultProfileKeys,
@@ -12,7 +11,6 @@ import {
   saveFlag,
   settingSource,
 } from "./deployment-settings.js";
-import { hfTokenValue } from "./hf-access.js";
 import { requireAdmin } from "./route-access.js";
 
 /**
@@ -45,23 +43,18 @@ export function registerDeploymentRoutes(
       effective: effective || "",
       ...settingSource(key),
     });
-    const assistant = await assistantIntegration({ engine: assistantEngine });
+    const text = await deploymentTextModel({ engine: assistantEngine });
     res.json({
       ok: true,
       defaults: {
         image: defaultFor("STUDIO_DEFAULT_IMAGE_PROFILE", models.defaults?.imageModel),
         video: defaultFor("STUDIO_DEFAULT_VIDEO_PROFILE", models.defaults?.videoModel),
-        text: defaultFor(defaultTextProfileKey, assistant.model),
+        text: defaultFor(defaultTextProfileKey, text),
         textModels: assistantEngine ? await textModels(assistantEngine, workloadModels()) : [],
         profiles,
       },
       catalogue: catalogueFlags.map(describeFlag),
       dream: describeDreamOverrides(),
-      integrations: {
-        civitai: { token: civitaiTokenStatus() },
-        huggingFace: { token: { set: Boolean(hfTokenValue()) } },
-        assistant,
-      },
     });
   });
 
