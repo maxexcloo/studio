@@ -18,7 +18,7 @@ import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { DataTable } from "../../ui/DataTable";
+import { DataTable, filterTableRows } from "../../ui/DataTable";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -80,6 +80,26 @@ interface SubstituteRow {
   index: number;
 }
 
+const wantedFile = (resource: Resource) => `${resource.want?.folder || ""}/${fileName(resource)}`;
+const substituteKey = ({ record, resource }: SubstituteRow) =>
+  JSON.stringify([record.id, wantedFile(resource), resource.substitute?.file]);
+const substituteSearch = ({ record, resource }: SubstituteRow) => [
+  nameOf(record),
+  fileName(resource),
+  resource.substitute?.file,
+];
+const chooseSubstitute = (row: SubstituteRow, accept: boolean, bulk = false) =>
+  post<{ import: ImportRecord }>(
+    `/api/library/imports/${encodeURIComponent(row.record.id)}/substitute`,
+    {
+      index: row.index,
+      accept,
+      ...(bulk && {
+        expected: { file: wantedFile(row.resource), substitute: row.resource.substitute?.file },
+      }),
+    },
+  );
+
 /**
  * Library › Imports: shared model and recipe imports grouped by what they need, with Download
  * Missing, substitutes to accept or reject and Clear Stale; Library › Downloads follows the files.
@@ -97,6 +117,7 @@ export function LibraryImports({
   const [url, setUrl] = useState("");
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState<ImportRecord | null>(null);
   const [cleared, flashCleared] = useFlash<number>();
@@ -162,12 +183,47 @@ export function LibraryImports({
   });
   const substitute = useMutation({
     mutationFn: ({ row, accept }: { row: SubstituteRow; accept: boolean }) =>
-      post(`/api/library/imports/${encodeURIComponent(row.record.id)}/substitute`, {
-        index: row.index,
-        accept,
-      }),
-    onSuccess: refresh,
+      chooseSubstitute(row, accept),
+    onSuccess: (_result, { row }) => {
+      selectSubstitutes([substituteKey(row)], false);
+      refresh();
+    },
   });
+  const accept = useMutation({
+    mutationFn: async (rows: SubstituteRow[]) => {
+      const failed = new Map<string, string>();
+      // Each decision saves the whole import. Finish one before writing the next.
+      for (const row of rows) {
+        try {
+          await chooseSubstitute(row, true, true);
+        } catch (error) {
+          failed.set(substituteKey(row), error instanceof Error ? error.message : String(error));
+        }
+      }
+      return failed;
+    },
+    onSuccess: (failed) => {
+      setSelected(new Set(failed.keys()));
+      refresh();
+      if (failed.size)
+        notifications.show({
+          color: "red",
+          title: "Couldn't Accept Substitutes",
+          message: [...new Set(failed.values())].join(" "),
+        });
+    },
+  });
+  const deciding = substitute.isPending || accept.isPending;
+  function selectSubstitutes(keys: string[], checked: boolean) {
+    setSelected((previous) => {
+      const next = new Set(previous);
+      for (const key of keys) {
+        if (checked) next.add(key);
+        else next.delete(key);
+      }
+      return next;
+    });
+  }
   const clearStale = useMutation({
     mutationFn: () => post<{ cleared: number }>("/api/library/imports/clear-stale"),
     onSuccess: (result) => {
@@ -188,7 +244,7 @@ export function LibraryImports({
   const records = imports.data?.imports || [];
   const stale = records.filter((record) => record.stale).length;
   const failed = importing.error || uploading.error;
-  const substitutes = records
+  const offered = records
     .filter((record) => record.audit === "substitute")
     .flatMap((record) =>
       (record.resources || []).flatMap((resource, index) =>
@@ -197,6 +253,9 @@ export function LibraryImports({
           : [],
       ),
     );
+  const substitutes = [...new Map(offered.map((row) => [substituteKey(row), row])).values()];
+  const visibleSubstitutes = filterTableRows(substitutes, query, substituteSearch);
+  const selectedSubstitutes = visibleSubstitutes.filter((row) => selected.has(substituteKey(row)));
   const importActions = (record: ImportRecord) => (
     <>
       <Menu.Item leftSection={<icons.details size={16} />} onClick={() => setReviewId(record.id)}>
@@ -358,18 +417,28 @@ export function LibraryImports({
           if (!rows.length) return null;
           if (audit === "substitute")
             return (
-              <SettingGroup key={audit} title={`${title} · ${substitutes.length}`}>
+              <SettingGroup
+                key={audit}
+                title={`${title} · ${substitutes.length}`}
+                toolbar={
+                  <Button
+                    size="compact-sm"
+                    variant="default"
+                    leftSection={<Check size={16} />}
+                    loading={accept.isPending}
+                    disabled={deciding || !selectedSubstitutes.length}
+                    onClick={() => accept.mutate(selectedSubstitutes)}
+                  >
+                    Accept Selected
+                  </Button>
+                }
+              >
                 <DataTable
                   label="Substitutes"
-                  rows={substitutes}
-                  rowKey={(row) => `${row.record.id}:${row.index}`}
+                  rows={visibleSubstitutes}
+                  rowKey={substituteKey}
                   rowName={(row) => `${nameOf(row.record)}: ${fileName(row.resource)}`}
-                  query={query}
-                  searchText={(row) => [
-                    nameOf(row.record),
-                    fileName(row.resource),
-                    row.resource.substitute?.file,
-                  ]}
+                  selection={{ selected, onChange: selectSubstitutes, disabled: deciding }}
                   empty="No Matches"
                   compact
                   columns={[
@@ -409,14 +478,14 @@ export function LibraryImports({
                     <>
                       <Menu.Item
                         leftSection={<Check size={16} />}
-                        disabled={substitute.isPending}
+                        disabled={deciding}
                         onClick={() => substitute.mutate({ row, accept: true })}
                       >
                         Accept
                       </Menu.Item>
                       <Menu.Item
                         leftSection={<X size={16} />}
-                        disabled={substitute.isPending}
+                        disabled={deciding}
                         onClick={() => substitute.mutate({ row, accept: false })}
                       >
                         Reject
@@ -424,6 +493,7 @@ export function LibraryImports({
                       <Menu.Divider />
                       <Menu.Item
                         leftSection={<icons.details size={16} />}
+                        disabled={deciding}
                         onClick={() => setReviewId(row.record.id)}
                       >
                         Review

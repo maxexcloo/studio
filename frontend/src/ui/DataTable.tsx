@@ -1,6 +1,7 @@
 import {
   ActionIcon,
   Button,
+  Checkbox,
   Group,
   Menu,
   Stack,
@@ -35,6 +36,17 @@ interface DataColumn<T> {
   main?: boolean;
 }
 type Sort = { key: string; descending: boolean };
+type SearchText<T> = (row: T) => (string | number | undefined | null | false)[];
+
+export function filterTableRows<T>(rows: T[], query: string, searchText?: SearchText<T>) {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return terms.length && searchText
+    ? rows.filter((row) => {
+        const text = searchText(row).filter(Boolean).join(" ").toLowerCase();
+        return terms.every((term) => text.includes(term));
+      })
+    : rows;
+}
 
 /** Natural name order for every name sort: case, accents and punctuation aside, numbers by value. */
 export const compareNames = new Intl.Collator(undefined, {
@@ -63,6 +75,7 @@ export function DataTable<T>({
   rowName,
   columns,
   rowActions,
+  selection,
   query = "",
   searchText,
   initialSort,
@@ -78,9 +91,14 @@ export function DataTable<T>({
   columns: DataColumn<T>[];
   /** Menu items for the row, or null when it has none. */
   rowActions?: (row: T) => ReactNode;
+  selection?: {
+    selected: ReadonlySet<string>;
+    onChange: (keys: string[], checked: boolean) => void;
+    disabled?: boolean;
+  };
   query?: string;
   /** The text the query matches; every word of the query must appear. */
-  searchText?: (row: T) => (string | number | undefined | null | false)[];
+  searchText?: SearchText<T>;
   initialSort?: Sort;
   /** Shown when there are no rows; a query that hides every row shows No Matches. */
   empty: string;
@@ -99,14 +117,7 @@ export function DataTable<T>({
     (column) => !folded.includes(column) && !(phone && column.hideOnPhone),
   );
   if (loading) return <LoadingState label={loading} />;
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const matching =
-    terms.length && searchText
-      ? rows.filter((row) => {
-          const text = searchText(row).filter(Boolean).join(" ").toLowerCase();
-          return terms.every((term) => text.includes(term));
-        })
-      : rows;
+  const matching = filterTableRows(rows, query, searchText);
   if (!matching.length) {
     const line = rows.length ? "No Matches" : empty;
     return <EmptyState fill={compact}>{line}</EmptyState>;
@@ -119,6 +130,8 @@ export function DataTable<T>({
           return sort.descending && order ? -order : order;
         })
       : matching;
+  const keys = selection ? matching.map(rowKey) : [];
+  const allSelected = Boolean(selection && keys.every((key) => selection.selected.has(key)));
   const table = (
     <Table
       aria-label={label}
@@ -127,6 +140,18 @@ export function DataTable<T>({
     >
       <Table.Thead>
         <Table.Tr>
+          {selection && (
+            <Table.Th>
+              <Checkbox
+                size="sm"
+                aria-label={`Select All ${label}`}
+                checked={allSelected}
+                indeterminate={!allSelected && keys.some((key) => selection.selected.has(key))}
+                disabled={selection.disabled}
+                onChange={(event) => selection.onChange(keys, event.currentTarget.checked)}
+              />
+            </Table.Th>
+          )}
           {shown.map((column) => {
             const active = sort?.key === column.key;
             const Icon = !active ? ChevronsUpDown : sort.descending ? ChevronDown : ChevronUp;
@@ -176,8 +201,20 @@ export function DataTable<T>({
         {sorted.map((row) => {
           const name = rowName(row);
           const actions = rowActions?.(row);
+          const key = rowKey(row);
           return (
-            <Table.Tr key={rowKey(row)} aria-label={name}>
+            <Table.Tr key={key} aria-label={name}>
+              {selection && (
+                <Table.Td>
+                  <Checkbox
+                    size="sm"
+                    aria-label={`Select ${name}`}
+                    checked={selection.selected.has(key)}
+                    disabled={selection.disabled}
+                    onChange={(event) => selection.onChange([key], event.currentTarget.checked)}
+                  />
+                </Table.Td>
+              )}
               {shown.map((column) => (
                 <Table.Td
                   key={column.key}
