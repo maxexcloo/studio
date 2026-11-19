@@ -45,6 +45,7 @@ import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { useMediaRating } from "./useMediaRating";
 import { useVideoSound } from "./useVideoSound";
 import { playVideo } from "./videoPlayback";
+import { VideoPlayButton } from "./VideoPlayButton";
 import { ViewerChrome, viewerBadge } from "./ViewerChrome";
 import { ViewerDetails } from "./ViewerDetails";
 
@@ -116,14 +117,19 @@ function ViewerVideo({
   swipe: ReturnType<typeof useTouchSwipe>;
   onTap: () => void;
 }) {
-  const sound = useVideoSound();
+  const { muted, onVolumeChange } = useVideoSound();
+  const player = useRef<HTMLVideoElement>(null);
   const [controls, setControls] = useState(false);
   const [refused, setRefused] = useState(false);
-  const play = useCallback(
-    (media: HTMLVideoElement | null) =>
-      media ? playVideo(media, () => setRefused(true)) : undefined,
-    [],
-  );
+  const play = useCallback((media: HTMLVideoElement | null) => {
+    if (!media) return;
+    player.current = media;
+    const release = playVideo(media, () => setRefused(true));
+    return () => {
+      player.current = null;
+      release();
+    };
+  }, []);
   const hide = useRef(0);
   useEffect(() => () => clearTimeout(hide.current), []);
   const reveal = () => {
@@ -132,33 +138,40 @@ function ViewerVideo({
     hide.current = window.setTimeout(() => setControls(false), 2500);
   };
   return (
-    <video
-      ref={play}
-      {...sound}
-      data-media-id={id}
-      src={src}
-      poster={poster}
-      width={width}
-      height={height}
-      controls={controls || refused}
-      // Generated clips are short, so they repeat like a live photo.
-      loop
-      playsInline
-      className={classes.video}
-      onPointerMove={(event) => {
-        if (event.pointerType !== "touch") reveal();
-        swipe.onPointerMove(event);
-      }}
-      onPointerCancel={swipe.onPointerCancel}
-      onPointerDown={swipe.onPointerDown}
-      onPointerUp={(event) => {
-        if (!swipe.onPointerUp(event)) return;
-        if (!controls && !refused && !closingPopup()) onTap();
-        reveal();
-      }}
-      onFocus={reveal}
-      onClick={(event) => event.stopPropagation()}
-    />
+    <>
+      <video
+        ref={play}
+        muted={muted}
+        onVolumeChange={onVolumeChange}
+        onPlaying={() => setRefused(false)}
+        data-media-id={id}
+        src={src}
+        poster={poster}
+        width={width}
+        height={height}
+        controls={controls || refused}
+        // Generated clips are short, so they repeat like a live photo.
+        loop
+        playsInline
+        className={classes.video}
+        onPointerMove={(event) => {
+          if (event.pointerType !== "touch") reveal();
+          swipe.onPointerMove(event);
+        }}
+        onPointerCancel={swipe.onPointerCancel}
+        onPointerDown={swipe.onPointerDown}
+        onPointerUp={(event) => {
+          if (!swipe.onPointerUp(event)) return;
+          if (!controls && !refused && !closingPopup()) onTap();
+          reveal();
+        }}
+        onFocus={reveal}
+        onClick={(event) => event.stopPropagation()}
+      />
+      {refused && (
+        <VideoPlayButton play={() => void player.current?.play().catch(() => undefined)} />
+      )}
+    </>
   );
 }
 

@@ -1228,6 +1228,69 @@ test("Projects shows and accepts new card proposals while the Inbox stays open",
   await expect(page.getByText("No Projects", { exact: true })).toBeVisible();
 });
 
+test("Dream plays one comparison side with the viewer's sound choice", async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript(() => {
+    let playRequested = false;
+    document.addEventListener(
+      "click",
+      (event) => {
+        const target = event.target as Element;
+        if (target.closest("button")?.textContent?.trim() === "Play") playRequested = true;
+      },
+      true,
+    );
+    HTMLMediaElement.prototype.play = function () {
+      return playRequested || this.muted
+        ? Promise.resolve()
+        : Promise.reject(new DOMException("Autoplay blocked", "NotAllowedError"));
+    };
+  });
+  await fixtures(page);
+  const format = testInfo.project.use.browserName === "webkit" ? "mp4" : "webm";
+  const clip = readFileSync(new URL(`./media/dream-preview.${format}`, import.meta.url), "base64");
+  const video = (id: string) =>
+    dreamItem(id, {
+      type: "video",
+      url: `data:video/${format};base64,${clip}#${id}`,
+      width: 32,
+      height: 18,
+    });
+  await serveDream(page, {
+    enabled: false,
+    calibration: ["video-a", "video-b", "next-a", "next-b"].map(video),
+  });
+  await page.goto("/dream");
+  await showView(page, "Videos");
+  const pair = page.getByRole("group", { name: "Which Video?", exact: true });
+  const playerA = pair.locator("video").first();
+  const playerB = pair.locator("video").last();
+  await expect(pair.locator("video")).toHaveCount(2);
+  await expect(page.locator("video")).toHaveCount(2);
+  await expect(playerA).toHaveJSProperty("muted", false);
+  await expect(playerB).toHaveJSProperty("muted", true);
+  const play = pair.getByRole("button", { name: "Play", exact: true });
+  await expect(play).toBeVisible();
+  await play.click();
+  await expect(play).toBeHidden();
+
+  await pair.getByRole("radio", { name: "Audio B", exact: true }).press("Space");
+  await expect(playerA).toHaveJSProperty("muted", true);
+  await expect(playerB).toHaveJSProperty("muted", false);
+  await pair.getByRole("button", { name: "Mute", exact: true }).click();
+  await expect(playerB).toHaveJSProperty("muted", true);
+
+  await pair.getByRole("button", { name: "View B", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Preview" });
+  await expect(page.locator("video")).toHaveCount(1);
+  const player = viewer.locator("video");
+  await expect(player).toHaveAttribute("aria-label", "Dream prompt video-b");
+  await expect(player).toHaveJSProperty("muted", true);
+  await viewer.getByRole("button", { name: "Unmute", exact: true }).click();
+  await expect(player).toHaveJSProperty("muted", false);
+});
+
 test("Dream keeps Images and Videos separate through deck, preview, history and discards", async ({
   page,
   isMobile,

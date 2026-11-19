@@ -65,6 +65,8 @@ import {
   Trophy,
   Undo2,
   Upload,
+  Volume2,
+  VolumeX,
   WandSparkles,
   X,
 } from "lucide-react";
@@ -121,6 +123,7 @@ export const icons = {
   more: Ellipsis,
   /** Asking Dream for more in an item's direction (More Like This). */
   moreLikeThis: CopyPlus,
+  mute: VolumeX,
   /** Moving to the next item: the viewer's, a preview's and a comparison's arrows. */
   next: ChevronRight,
   /** Opening every result of a run in the viewer. */
@@ -170,6 +173,7 @@ export const icons = {
   /** Similar: the gallery ranked by likeness to an image. */
   similar: ScanSearch,
   sort: ArrowDownUp,
+  sound: Volume2,
   /** Stopping work: a stop sign rather than a bare square, which reads as a checkbox. */
   stop: CircleStop,
   undo: Undo2,

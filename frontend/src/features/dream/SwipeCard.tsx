@@ -1,8 +1,11 @@
-import { Paper } from "@mantine/core";
-import { type ReactNode, type RefObject, useEffect, useRef } from "react";
+import { ActionIcon, Group, Paper, SegmentedControl, Tooltip } from "@mantine/core";
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import { easing } from "../../theme";
 import { useMotionDuration } from "../../ui/Appearance";
+import { icons } from "../../ui/icons";
+import { useVideoSound } from "../gallery/useVideoSound";
+import { VideoPlayButton } from "../gallery/VideoPlayButton";
 import { useInSync } from "./DeckMedia";
 
 import classes from "./DreamPage.module.css";
@@ -33,6 +36,7 @@ export function SwipeCard({
   depth,
   paused = false,
   previewSide,
+  video,
   still = false,
   full = false,
   fly,
@@ -48,6 +52,7 @@ export function SwipeCard({
   depth: number;
   paused?: boolean;
   previewSide?: number;
+  video?: boolean;
   still?: boolean;
   /** Edge to edge, filling the preview. */
   full?: boolean;
@@ -77,7 +82,12 @@ export function SwipeCard({
   const dragged = useRef(false);
   const holding = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(holding.current), []);
-  useInSync(card, !depth && !paused, previewSide);
+  const [audioSide, setAudioSide] = useState("0");
+  const { muted, setMuted } = useVideoSound();
+  const playing = Boolean(video && !depth && !paused);
+  const chooseAudio = playing && pair && !full;
+  const play = useInSync(card, playing, previewSide, chooseAudio ? audioSide : undefined, muted);
+  const soundLabel = muted ? "Unmute" : "Mute";
   /** Ends the press as a hold: the card settles and the release opens nothing. */
   function hold() {
     clearTimeout(holding.current);
@@ -250,6 +260,33 @@ export function SwipeCard({
       }}
     >
       {children}
+      {playing && (
+        <Group
+          className={classes.videoAudio}
+          gap="xs"
+          wrap="nowrap"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {chooseAudio && (
+            <SegmentedControl
+              aria-label="Comparison Audio"
+              size="xs"
+              value={audioSide}
+              onChange={setAudioSide}
+              data={[
+                { label: "Audio A", value: "0" },
+                { label: "Audio B", value: "1" },
+              ]}
+            />
+          )}
+          <Tooltip label={soundLabel}>
+            <ActionIcon variant="default" aria-label={soundLabel} onClick={() => setMuted(!muted)}>
+              {muted ? <icons.mute size={16} /> : <icons.sound size={16} />}
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+      )}
+      {play && <VideoPlayButton play={play} />}
       {!depth &&
         (Object.entries(hints) as [Direction, string][]).map(([direction, hint]) => (
           <span key={direction} className={classes.hint} data-hint={direction} aria-hidden>

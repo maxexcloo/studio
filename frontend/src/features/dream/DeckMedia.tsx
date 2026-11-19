@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useState } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useState } from "react";
 
 import type { MediaItem } from "../../types";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
@@ -18,7 +18,7 @@ export function MediaBackdrop({ src }: { src?: string }) {
 }
 
 /**
- * A card's picture, or while `playing` its video, muted; `useInSync` plays a card's videos. It fills
+ * A card's picture, or while `playing` its video. It fills
  * its box where little is cropped (`covers`), and otherwise shows whole over its `MediaBackdrop`;
  * the choice follows the recorded size alone, so it holds while the media loads.
  */
@@ -40,7 +40,6 @@ export function DeckMedia({ item, playing = false }: { item: MediaItem; playing?
           src={video}
           poster={source.thumbnailUrl}
           aria-label={item.prompt || "Dream video"}
-          muted
           playsInline
           preload="auto"
           onError={() => setFailedVideo(video)}
@@ -61,68 +60,132 @@ export function DeckMedia({ item, playing = false }: { item: MediaItem; playing?
 }
 
 /**
- * Plays the videos under `root` together while `playing`: they start once all can play, and each
- * waits at its end until the last ends, so they loop from the start in step. They pause while the
+ * Starts the videos under `root` together once their metadata is ready, without waiting for
+ * browsers to preload frames. Each waits for the last to end so they loop together. They pause while the
  * tab is hidden.
  */
 export function useInSync(
   root: RefObject<HTMLElement | null>,
   playing: boolean,
-  previewSide?: number,
+  previewSide: number | undefined,
+  audioSide: string | undefined,
+  muted: boolean,
 ) {
+  const [retry, setRetry] = useState<{ side: number | undefined; play: () => void }>();
+  useLayoutEffect(() => {
+    if (!playing) return;
+    const videos = [...(root.current?.querySelectorAll("video") ?? [])];
+    const audible =
+      audioSide === undefined
+        ? videos[0]
+        : videos.find(
+            (video) => video.closest<HTMLElement>("[data-side]")?.dataset.side === audioSide,
+          );
+    for (const video of videos) if (video !== audible) video.muted = true;
+    if (audible) audible.muted = muted;
+  }, [root, playing, previewSide, audioSide, muted]);
   useEffect(() => {
     const videos = [...(root.current?.querySelectorAll("video") ?? [])];
+    setRetry(undefined);
     if (!playing || !videos.length) return;
     const failed = new Set<HTMLVideoElement>();
     const playable = () =>
       videos.filter((video) => video.isConnected && !video.error && !failed.has(video));
     let started = false;
-    const start = (active: HTMLVideoElement[]) => {
-      started = true;
-      for (const video of active) {
-        video.currentTime = 0;
-        video.play().catch(() => undefined);
-      }
-    };
+    let blocked = false;
+    let starting = false;
+    let attempt = 0;
+    function showPlay() {
+      blocked = true;
+      for (const video of videos) video.pause();
+      setRetry({ side: previewSide, play: () => start(playable(), !started) });
+    }
+    function start(active: HTMLVideoElement[], restart: boolean) {
+      if (document.hidden || starting || !active.length) return;
+      starting = true;
+      const current = ++attempt;
+      const starts = active.map((video) => {
+        if (restart) video.currentTime = 0;
+        return video.play();
+      });
+      void Promise.all(starts).then(
+        () => {
+          if (current !== attempt) return;
+          starting = false;
+          started = true;
+          blocked = false;
+          setRetry(undefined);
+        },
+        () => {
+          if (current !== attempt) return;
+          starting = false;
+          if (!document.hidden) showPlay();
+        },
+      );
+    }
     const advance = () => {
-      if (document.hidden) return;
+      if (document.hidden || blocked || starting) return;
       const active = playable();
       if (
         active.length &&
         (started
           ? active.every((video) => video.ended)
-          : active.every((video) => video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA))
+          : active.every((video) => video.readyState >= HTMLMediaElement.HAVE_METADATA))
       )
-        start(active);
+        start(active, true);
     };
     const error = (event: Event) => {
       failed.add(event.currentTarget as HTMLVideoElement);
       advance();
     };
+    const pause = (event: Event) => {
+      const video = event.currentTarget as HTMLVideoElement;
+      if (
+        started &&
+        !blocked &&
+        !document.hidden &&
+        video.isConnected &&
+        !video.ended &&
+        !video.error
+      ) {
+        ++attempt;
+        starting = false;
+        showPlay();
+      }
+    };
     const visibility = () => {
       if (document.hidden) {
+        ++attempt;
+        starting = false;
         videos.forEach((video) => video.pause());
         return;
       }
-      if (started)
-        for (const video of playable()) if (!video.ended) video.play().catch(() => undefined);
+      if (!blocked && started)
+        start(
+          playable().filter((video) => !video.ended),
+          false,
+        );
       advance();
     };
     for (const video of videos) {
-      video.addEventListener("canplay", advance);
+      video.addEventListener("loadedmetadata", advance);
       video.addEventListener("ended", advance);
       video.addEventListener("error", error);
+      video.addEventListener("pause", pause);
     }
     document.addEventListener("visibilitychange", visibility);
     advance();
     return () => {
+      ++attempt;
       document.removeEventListener("visibilitychange", visibility);
       for (const video of videos) {
-        video.removeEventListener("canplay", advance);
+        video.removeEventListener("loadedmetadata", advance);
         video.removeEventListener("ended", advance);
         video.removeEventListener("error", error);
+        video.removeEventListener("pause", pause);
         video.pause();
       }
     };
   }, [root, playing, previewSide]);
+  return playing && retry?.side === previewSide ? retry?.play : undefined;
 }
