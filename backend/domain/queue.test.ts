@@ -1234,6 +1234,68 @@ test("pending cancellation avoids submission and failed retries get distinct IDs
   }
 });
 
+test("a manual retry and Radiance recovery share one durable replacement in either order", async (t) => {
+  for (const automaticFirst of [false, true]) {
+    await t.test(automaticFirst ? "recovery first" : "manual first", () => {
+      const { store, queue, adapter, submitted } = fixture();
+      try {
+        const session = store.createSession("alice");
+        const parent = store.enqueue("alice", session.id, {}, "image");
+        const origin = {
+          priority: automaticFirst ? queuePriority.dream : queuePriority.mcp,
+          ...(automaticFirst
+            ? { dream: { prompt: "A bird", why: "Explore birds", at: parent.createdAt } }
+            : { queueSet: "set", queueBatch: "batch" }),
+          parentItemId: "source-result",
+          faceRedo: true as const,
+        };
+        const failed = store.save({
+          ...store.enqueue(
+            "alice",
+            session.id,
+            { prompt: "A bird" },
+            "refine",
+            parent.id,
+            "worker:radiance",
+            undefined,
+            origin,
+          ),
+          status: "failed",
+          reason: "Radiance: host memory cannot be pinned.",
+          items: [{ createdAt: "2026-11-19T01:00:00.000Z" }],
+        });
+        const manual = () => queue.retry("alice", failed.id, true)!;
+        const recover = () => queue.again(failed)!;
+        const first = automaticFirst ? recover() : manual();
+        assert.equal(store.job("alice", failed.id)?.cleared, automaticFirst ? undefined : true);
+        const second = automaticFirst ? manual() : recover();
+        assert.equal(second.id, first.id);
+        assert.equal(second.retried, automaticFirst ? true : undefined);
+        assert.equal(second.resource, "worker:radiance");
+        assert.equal(second.sessionId, session.id);
+        assert.equal(second.parentJobId, parent.id);
+        assert.equal(second.galleryAt, failed.items[0].createdAt);
+        assert.equal(second.input.clientJobId, second.id);
+        for (const [key, value] of Object.entries(origin))
+          assert.deepEqual(second[key as keyof OwnedJob], value, key);
+        assert.equal(store.job("alice", failed.id)?.replacementJobId, second.id);
+        assert.equal(store.job("alice", failed.id)?.cleared, true);
+
+        const restored = new GenerationQueue(store, adapter);
+        assert.equal(restored.retry("alice", failed.id, true)?.id, second.id);
+        assert.equal(restored.again(failed)?.id, second.id);
+        assert.deepEqual(
+          store.openJobs("alice").map((job) => job.id),
+          [parent.id, second.id],
+        );
+        assert.deepEqual(submitted, []);
+      } finally {
+        store.close();
+      }
+    });
+  }
+});
+
 test("a slow submission does not block a later independent resource or duplicate acceptance", async () => {
   const { store, queue, adapter, submitted } = fixture();
   const started = deferred();
