@@ -1,0 +1,42 @@
+.fields {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fields[data-typing-field] {
+  overflow: clip;
+}
+
+.fields[data-typing-field] > :not([hidden]) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.fields[data-typing-field] :global(.mantine-Textarea-input) {
+  min-height: 0;
+}
+
+.footer {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+  margin-inline: calc(-1 * var(--mantine-spacing-md));
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md)
+    max(
+      var(--mantine-spacing-md),
+      env(safe-area-inset-bottom),
+      calc(var(--keyboard-inset, 0px) + var(--mantine-spacing-xs))
+    );
+  border-top: 1px solid var(--studio-glass-border);
+}
+
+.tools {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
