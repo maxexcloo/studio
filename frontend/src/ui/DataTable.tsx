@@ -114,7 +114,6 @@ export function DataTable<T>({
     <Table
       aria-label={label}
       verticalSpacing="xs"
-      highlightOnHover
       classNames={{ th: classes.cell, td: classes.cell }}
     >
       <Table.Thead>

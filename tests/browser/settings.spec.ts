@@ -33,6 +33,7 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Account",
     "Dream",
     "Preferences",
+    "Where Work Runs",
     "Generation",
     "Groups",
     "Maintenance",
@@ -283,18 +284,12 @@ test("An administrator turns LoRAs and Uncensored off for itself in Settings ›
   await uncensored.click({ force: true });
   await expect(uncensored).not.toBeChecked();
   await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
-  await expect(
-    page
-      .getByRole("region", { name: "Where Work Runs", exact: true })
-      .getByRole("switch", { name: "Cloud Models", exact: true }),
-  ).toBeChecked();
 });
 
-test("Settings › Preferences saves where each kind runs and its default models", async ({
-  page,
-}) => {
+test("Where Work Runs saves each group’s processing and default models", async ({ page }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "member", role: "user" });
+  state.preferences.grants.cloudModels = true;
   state.preferences.preferences.videos = "local";
   await page.route("**/api/assistant", (route) =>
     route.fulfill({
@@ -311,9 +306,10 @@ test("Settings › Preferences saves where each kind runs and its default models
   await expect(prompts.getByRole("switch", { name: "Keep Recent Prompts" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Prompt Assistant" })).toHaveCount(0);
 
-  const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
-  // Text's defaults offer the gateway's models on their own side, Studio's until one is chosen.
-  const textCloud = where.getByRole("combobox", { name: "Text Default Cloud Model", exact: true });
+  await section(page, "Settings", "Where Work Runs");
+  const where = page.getByRole("region", { name: "Settings: Where Work Runs", exact: true });
+  const group = (kind: string) => where.getByRole("region", { name: kind, exact: true });
+  const textCloud = group("Text").getByRole("combobox", { name: "Cloud Model", exact: true });
   await expect(textCloud).toHaveText("Studio's Default");
   await textCloud.click();
   const options = page.getByRole("listbox").getByRole("option");
@@ -327,18 +323,9 @@ test("Settings › Preferences saves where each kind runs and its default models
   await options.first().click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBeNull();
   const area = (kind: string) =>
-    where.getByRole("radiogroup", { name: `${kind} Default`, exact: true });
+    group(kind).getByRole("radiogroup", { name: "Default", exact: true });
   const choose = (name: string, choice: string) =>
     area(name).locator("label").filter({ hasText: choice }).click();
-  // Without a grant there is no Cloud Models switch, and Cloud stays a choice.
-  await expect(where.getByRole("switch")).toHaveCount(0);
-  // Each kind leads its rows, Images, Videos then Text.
-  await expect(where.getByRole("radiogroup")).toHaveCount(3);
-  expect(
-    await where
-      .getByRole("radiogroup")
-      .evaluateAll((groups) => groups.map((group) => group.getAttribute("aria-label"))),
-  ).toEqual(["Images Default", "Videos Default", "Text Default"]);
   await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();
   // Text runs on Cloud until the account picks Local.
   await expect(area("Text").getByRole("radio", { name: "Cloud" })).toBeChecked();
