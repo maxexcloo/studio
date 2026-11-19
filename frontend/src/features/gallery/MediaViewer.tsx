@@ -544,7 +544,8 @@ export function MediaViewer({
         if (!restoreFocus.current) return;
         const current = currentReturn.current;
         if (current.onReturnFocus) current.onReturnFocus(current.item);
-        else if (target?.isConnected) target.focus({ preventScroll: true });
+        else if (document.activeElement === document.body && target?.isConnected)
+          target.focus({ preventScroll: true });
       });
     },
     [],
