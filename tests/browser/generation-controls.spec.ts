@@ -378,8 +378,8 @@ test("LoRA presets keep their family, order, strengths and disabled entries thro
   ).toHaveValue("0.35");
   await enabled.check();
   await page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }).fill("1.25");
-  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeEnabled();
-  await page.getByRole("button", { name: "Save Preset", exact: true }).click();
+  await page.getByRole("combobox", { name: "Preset Name", exact: true }).click();
+  await page.getByRole("option", { name: "Update Preset", exact: true }).click();
   await expect
     .poll(() => state.presets[0].input.loras)
     .toEqual([{ ...original[0], strength: 1.25, enabled: true }, original[1]]);
