@@ -9,7 +9,7 @@ import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
 import { DreamPreferences } from "../dream/DreamSettings";
 import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
-import { runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
+import { runtimeQueueQuery, runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { AboutStudio } from "./AboutStudio";
 import { GroupsAdmin, UsersAdmin } from "./AccountAdmin";
 import { GenerationSettings } from "./GenerationSettings";
@@ -20,7 +20,11 @@ import { Preferences } from "./Preferences";
 import { useSettingsNavigation } from "./SettingsNavigation";
 import { UnfinishedItems } from "./UnfinishedItems";
 
-const workerQueries = [servicesStatusQuery.queryKey, runtimeStatusQuery.queryKey];
+const workerQueries = [
+  servicesStatusQuery.queryKey,
+  runtimeStatusQuery.queryKey,
+  runtimeQueueQuery.queryKey,
+];
 function WorkerSettings({
   heading,
   onOpenUnfinished,

@@ -24,6 +24,7 @@ import {
 } from "./providers/radiance.ts";
 import { preparedReference } from "./references.js";
 import { loadSharp } from "./sharp-loader.js";
+import { generationEstimate, recordGeneration } from "./timings.js";
 import { workerById } from "./workers.js";
 import { markWorkflowUsed } from "./workflow-catalogue.js";
 import { resolveImageMode } from "./workflow-modes.js";
@@ -90,8 +91,19 @@ async function storeOutput(id, index, bytes, type, ownerId) {
   };
 }
 
-function showProgress(id, phase, value = 0, max = 0) {
-  jobs.set(id, { ...jobs.get(id), progress: { value, max, node: "", phase, steps: max > 0 } });
+function showProgress(id, phase, progress = {}) {
+  if (ended(id)) return;
+  jobs.set(id, {
+    ...jobs.get(id),
+    progress: {
+      value: 0,
+      max: 0,
+      steps: false,
+      node: "",
+      phase: stopping(id) && phase !== "Saving" ? "Finishing accepted work" : phase,
+      ...progress,
+    },
+  });
 }
 
 function cancelledRun(id) {
@@ -103,8 +115,8 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const transient = (error) => !error.status || error.status >= 500 || error.status === 429;
 
 /** Radiance exposes residency per model. Sampling start for an individual image is unavailable. */
-async function timeModelLoad(client, model, marks, signal) {
-  while (!signal.aborted) {
+async function timeModelLoad(id, client, model, marks, signal) {
+  while (!signal.aborted && !ended(id)) {
     const models = await Promise.resolve()
       .then(() => client.models(AbortSignal.any([signal, AbortSignal.timeout(2000)])))
       .catch(() => []);
@@ -113,20 +125,47 @@ async function timeModelLoad(client, model, marks, signal) {
     if (state) {
       const now = Date.now();
       marks.initialModelState ??= state;
-      if (state === "loading") marks.loading ??= now;
+      if (state === "loading") {
+        marks.loading ??= now;
+        showProgress(id, "Loading Model");
+      }
       if (state === "resident") {
+        marks.ready = now;
         if (marks.initialModelState !== "resident") marks.resident = now;
         return;
       }
+      if (state !== "loading") showProgress(id, "Waiting for Model");
     }
     await delay(modelPollMs, undefined, { signal }).catch(() => undefined);
   }
 }
 
-async function withModelTiming(client, model, marks, request) {
+async function withModelTiming(id, client, model, marks, request, estimate) {
   if (!marks) return request;
   const timing = new AbortController();
-  void timeModelLoad(client, model, marks, timing.signal);
+  void (async () => {
+    await timeModelLoad(id, client, model, marks, timing.signal);
+    if (marks.ready === undefined || estimate === undefined || timing.signal.aborted) return;
+    showProgress(id, "Generating");
+    if (!estimate?.trusted || !estimate.totalMs) return;
+    const steps = estimate.steps > 0 && estimate.stepMs ? estimate.steps : 0;
+    const endsAt = marks.ready + estimate.totalMs;
+    while (!timing.signal.aborted && !ended(id)) {
+      const now = Date.now();
+      const elapsed = now - marks.ready;
+      const max = steps || 100;
+      const units = steps ? elapsed / estimate.stepMs : (elapsed * max) / estimate.totalMs;
+      showProgress(id, "Generating", {
+        value: Math.min(max - 1, Math.floor(units)),
+        max,
+        steps: Boolean(steps),
+        estimated: true,
+        ...(now < endsAt ? { endsAt } : {}),
+      });
+      if (now >= endsAt) return;
+      await delay(modelPollMs, undefined, { signal: timing.signal }).catch(() => undefined);
+    }
+  })();
   try {
     return await request;
   } finally {
@@ -142,22 +181,40 @@ async function runVideo(id, client, record, save, body, pollMs, marks) {
   let video;
   if (record.videoId) video = await client.video(record.videoId);
   else {
-    video = await withModelTiming(client, record.values.model, marks, client.createVideo(body));
+    video = await withModelTiming(id, client, record.values.model, marks, client.createVideo(body));
     if (marks) marks.created = Date.now();
     record.videoId = video.id;
     save();
   }
   jobs.set(id, { ...jobs.get(id), promptId: record.videoId });
+  let firstStep;
+  let lastStep;
+  let endsAt;
   while (video.status !== "completed") {
     if (ended(id)) throw new Error("Ended outside the run.");
     const failure = videoFailure(video);
     if (failure) throw Object.assign(new Error(failure), { terminal: true });
-    showProgress(
-      id,
-      stopping(id) ? "Finishing accepted work" : "Generating",
-      Number(video.progress) || 0,
-      100,
-    );
+    const percent = Number(video.progress) || 0;
+    const steps = Number(video.steps_total) || 0;
+    const value = Number(video.steps_done) || 0;
+    if (video.status === "queued") showProgress(id, "Waiting for Execution");
+    else if (percent >= 90 || (steps && value >= steps))
+      showProgress(id, "Decoding", { value: Math.min(99, percent), max: 100 });
+    else if (steps && value > 0) {
+      const now = Date.now();
+      firstStep ??= { at: now, value };
+      if (lastStep !== value && value > firstStep.value) {
+        const stepMs = (now - firstStep.at) / (value - firstStep.value);
+        endsAt = now + Math.round((steps - value) * stepMs);
+      }
+      lastStep = value;
+      showProgress(id, "Generating", {
+        value,
+        max: steps,
+        steps: true,
+        ...(endsAt > now ? { endsAt } : {}),
+      });
+    } else showProgress(id, "Generating", { value: percent, max: percent ? 100 : 0 });
     await pause(pollMs);
     try {
       video = await client.video(record.videoId);
@@ -203,6 +260,8 @@ export async function runRadianceJob(
 ) {
   const ownerId = body.ownerId || "";
   let record = store?.providerRecord(ownerId, id);
+  let imageTimingBody;
+  let imageEstimate;
   const save = () => store?.saveProviderRecord(ownerId, id, record);
   // A recovered run's earlier stages happened in another process, so only a fresh run is timed.
   const marks = recovered ? null : { start: Date.now() };
@@ -255,20 +314,32 @@ export async function runRadianceJob(
               },
             );
         if (stopping(id)) return cancelledRun(id);
-        showProgress(id, "Generating");
+        showProgress(id, "Waiting for Model");
         if (marks) marks.sent = Date.now();
         if (record.video)
           made = await runVideo(id, client, record, save, request.body, pollMs, marks);
-        else
+        else {
+          imageTimingBody = {
+            ...record.body,
+            model: record.values.model,
+            family: undefined,
+            profileBackend: undefined,
+            steps: record.values.steps,
+          };
+          imageEstimate = generationEstimate(imageTimingBody, { radiance: true, warm: true });
           made = await withModelTiming(
+            id,
             client,
             record.values.model,
             marks,
             client.images(request.route, request.body, AbortSignal.timeout(radianceWorkMs)),
+            imageEstimate,
           );
+        }
         if (marks) marks.received = Date.now();
         if (ended(id)) return;
       }
+      showProgress(id, "Saving");
       // Keep accepted bytes in this process while local storage is unavailable.
       for (const [index, bytes] of made.entries()) {
         for (;;) {
@@ -319,6 +390,20 @@ export async function runRadianceJob(
     markWorkflowUsed(record.body.profileId || record.body.model || record.body.workflow || "");
     setTerminalJob(id, { status: "done", outputs: completed });
     noteIngested([id]);
+    const runMs = span(marks?.ready, marks?.received);
+    if (imageTimingBody && runMs > 0) {
+      const steps = Number(imageTimingBody.steps) || 0;
+      recordGeneration({
+        body: imageTimingBody,
+        result: {
+          runMs,
+          ...(steps > 0 ? { steps, stepMs: runMs / steps, setupMs: 0, tailMs: 0 } : {}),
+        },
+        predicted: imageEstimate,
+        radiance: true,
+        warm: true,
+      });
+    }
     if (record.videoId) await client.deleteVideo(record.videoId).catch(() => null);
   } catch (error) {
     if (ended(id)) return;

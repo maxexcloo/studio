@@ -40,6 +40,10 @@ export function createRuntimeRouter(
     "/",
     handle(() => controller.observe()),
   );
+  router.get(
+    "/queue",
+    handle(() => controller.queueStatus()),
+  );
   router.post(
     "/preview",
     // `start` previews starting one of these workloads beside what runs; `workloads` is a complete placement.

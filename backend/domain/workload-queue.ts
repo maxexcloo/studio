@@ -1,5 +1,5 @@
 import { activeStatuses, terminalStatuses } from "../../shared/queue.ts";
-import type { RuntimeQueueCancel } from "../../shared/runtime.ts";
+import type { RuntimeJob, RuntimeQueueCancel } from "../../shared/runtime.ts";
 import type { WorkloadQueue } from "../runtime/controller.ts";
 import type { GenerationQueue } from "./queue.ts";
 import { type OwnedJob, everyone, queuePriority } from "./store.ts";
@@ -34,22 +34,47 @@ export function workloadQueue({
   const { store } = queue;
   const on = (workload: string) =>
     store.openJobs().filter((job) => workloads(job).includes(workload));
+  const waitingLimit = 20;
+  const row = (job: OwnedJob, queuePosition?: number): RuntimeJob => ({
+    id: job.id,
+    title:
+      String(job.input.prompt || "")
+        .trim()
+        .slice(0, 80) || `Untitled ${job.operation}`,
+    status: job.status,
+    since: job.admittedAt === undefined ? job.createdAt : new Date(job.admittedAt).toISOString(),
+    ...(job.reason ? { reason: job.reason } : {}),
+    ...(queuePosition === undefined ? {} : { queuePosition }),
+    ...(activeStatuses.has(job.status) && job.progress ? { progress: job.progress } : {}),
+    ...(job.cancelRequested ? { cancelling: true as const } : {}),
+  });
   return {
-    load(workload) {
-      const jobs = on(workload);
-      return {
-        jobs: jobs.filter(acceptedWork).map((job) => ({
-          id: job.id,
-          title:
-            String(job.input.prompt || "")
-              .trim()
-              .slice(0, 80) || `Untitled ${job.operation}`,
-          status: job.status,
-          since: job.updatedAt,
-          ...(job.cancelRequested ? { cancelling: true as const } : {}),
-        })),
-        queued: jobs.filter((job) => !acceptedWork(job)).length,
-      };
+    load(ids) {
+      const groups = new Map(
+        ids.map((id) => [id, { active: [] as OwnedJob[], waiting: [] as OwnedJob[] }]),
+      );
+      for (const job of store.openJobs())
+        for (const id of workloads(job)) {
+          const group = groups.get(id);
+          if (group)
+            (acceptedWork(job) || queue.isWriting(job.id) ? group.active : group.waiting).push(job);
+        }
+      const place = (job: OwnedJob) => queue.queuePosition(job.id) ?? Infinity;
+      return Object.fromEntries(
+        [...groups].map(([id, { active, waiting }]) => [
+          id,
+          {
+            jobs: [
+              ...active.map((job) => row(job)),
+              ...waiting
+                .sort((a, b) => place(a) - place(b))
+                .slice(0, waitingLimit)
+                .map((job) => row(job, queue.queuePosition(job.id))),
+            ],
+            queued: waiting.length,
+          },
+        ]),
+      );
     },
     waitingTier(workload) {
       const pauses = store.pauses();

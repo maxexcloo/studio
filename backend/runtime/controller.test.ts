@@ -489,20 +489,19 @@ function fakeQueue(stale: { release(): void }[] = []) {
     tiers,
     queue: {
       waitingTier: (id: string) => tiers.get(id) ?? Infinity,
-      load: (id: string) =>
-        id === "radiance"
-          ? {
-              jobs: [
-                {
-                  id: "job-1",
-                  title: "A lighthouse",
-                  status: "running" as const,
-                  since: "2026-10-27T00:00:00Z",
-                },
-              ],
-              queued: 2,
-            }
-          : { jobs: [], queued: 0 },
+      load: () => ({
+        radiance: {
+          jobs: [
+            {
+              id: "job-1",
+              title: "A lighthouse",
+              status: "running" as const,
+              since: "2026-10-27T00:00:00Z",
+            },
+          ],
+          queued: 2,
+        },
+      }),
       cancel: async (id: string) => {
         calls.push(`cancel ${id}`);
         return { cancelled: 2, cancelling: 1 };
@@ -621,7 +620,7 @@ test("Radiance short of host memory restarts once idle and quiet, then queues th
   const retried: string[] = [];
   controller.useQueue({
     waitingTier: () => Infinity,
-    load: () => ({ jobs: [], queued: waiting }),
+    load: () => ({ radiance: { jobs: [], queued: waiting } }),
     cancel: async () => ({ cancelled: 0, cancelling: 0 }),
     releaseStale: () => {},
     end: async () => {},

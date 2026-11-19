@@ -483,6 +483,7 @@ test("Dream is off until turned on, queues one hidden job per account only while
     ownsItem: () => false,
     queue: {
       tick: async () => undefined,
+      queuePosition: () => undefined,
       cancel: async (ownerId: string, jobId: string) =>
         store.save({ ...store.job(ownerId, jobId)!, status: "cancelled" }),
     } as unknown as GenerationQueue,

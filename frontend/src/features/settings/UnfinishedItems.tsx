@@ -14,7 +14,8 @@ import { SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
-import { queueQuery, statusLabels } from "../generation/Queue";
+import { statusLabels } from "../generation/JobProgress";
+import { queueQuery } from "../generation/Queue";
 import { accountAdminQuery } from "./AccountAdmin";
 
 const unfinishedQuery = queryOptions({

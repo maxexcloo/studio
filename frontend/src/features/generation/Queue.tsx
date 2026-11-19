@@ -1,4 +1,3 @@
-import { arrayMove } from "@dnd-kit/helpers";
 import {
   ActionIcon,
   Alert,
@@ -36,10 +35,8 @@ import {
   type QueueResponse,
   activeStatuses,
   pausedReason,
-  pendingStatuses,
   terminalStatuses,
 } from "../../../../shared/queue";
-import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
 import { formatBytes } from "../../ui/bytes";
@@ -48,16 +45,17 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
-import { usePhone } from "../../ui/usePhone";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
 import { useTryAgain } from "../gallery/useTryAgain";
 import type { ModelDownload } from "../library/queries";
 import { downloadActions, useDownloadAction } from "../library/useModelDownloads";
 import { useGenerationActions } from "./GenerationProvider";
+import { JobProgressBar, jobReason, jobStatus } from "./JobProgress";
 import { loraInfoQuery } from "./LoraPicker";
-import { isProfile, profileName, shownProfileName } from "./payload";
+import { isProfile, shownProfileName } from "./payload";
 import { WritingStream } from "./PromptWriting";
+import { jobsInDispatchOrder, movableJob, moveWaitingJobs } from "./queueOrder";
 import { queuePollInterval } from "./queuePolling";
 import { referenceLabel } from "./references";
 import type { QueueRowDrag } from "./SortableQueue";
@@ -89,9 +87,23 @@ export const queueQuery = queryOptions({
   // often, so work started elsewhere (an MCP client, another tab) shows, and the gallery with it,
   // without the window regaining focus.
   refetchInterval: (query) => queuePollInterval(query.state.data?.jobs),
+  select: (listing) =>
+    listing.queuePositions
+      ? {
+          ...listing,
+          jobs: listing.jobs.map((job) => withQueuePosition(job, listing.queuePositions)),
+        }
+      : listing,
   // Polls pause while the tab is hidden, so returning checks at once, however fresh the data.
   refetchOnWindowFocus: "always",
 });
+
+export function withQueuePosition(job: QueueJob, positions: QueueResponse["queuePositions"]) {
+  const queuePosition =
+    positions && Object.hasOwn(positions, job.id) ? positions[job.id] : undefined;
+  return job.queuePosition === queuePosition ? job : { ...job, queuePosition };
+}
+
 /** One of the account's jobs, however old: the queue lists only its latest finished ones. */
 export const queueJobQuery = (id: string) =>
   queryOptions({
@@ -268,23 +280,6 @@ function RowButton({
     </Tooltip>
   );
 }
-/** Title Case job states for the queue, tiles and the viewer. */
-export const statusLabels: Record<QueueJob["status"], string> = {
-  writing: "Writing Prompt",
-  queued: "Queued",
-  waiting: "Waiting for a Worker",
-  starting: "Starting",
-  running: "Generating",
-  saving: "Saving",
-  completed: "Completed",
-  failed: "Failed",
-  cancelled: "Cancelled",
-};
-/** A generation's progress as a percentage, or 0 while it has no steps to count. */
-export const progressPercent = (progress: QueueJob["progress"]) =>
-  progress?.max ? Math.max(0, Math.min(100, ((progress.value ?? 0) / progress.max) * 100)) : 0;
-/** What dragging reorders: the account's own work not yet started; Dream's waits at its own tier. */
-const movableJob = (job: QueueJob) => !job.dream && pendingStatuses.has(job.status);
 const loadSortable = () => import("./SortableQueue");
 const SortableQueue = lazy(loadSortable);
 /**
@@ -373,22 +368,6 @@ function QueueJobDetails({
   );
 }
 
-/** A worker's progress phase ("Loading model") in Title Case, as Studio's labels are. */
-export const phaseLabel = (phase: unknown) => titleCase(String(phase || ""));
-
-/** A job's state in short: Upscaling for a running upscale, then its progress or phase. */
-function shortStatus(job: QueueJob) {
-  const percent = progressPercent(job.progress);
-  return [
-    job.operation === "upscale" && job.status === "running"
-      ? "Upscaling"
-      : statusLabels[job.status],
-    percent ? `${Math.round(percent)}%` : phaseLabel(job.progress?.phase),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-
 /**
  * A row's leading slot, the same width on every row: its drag handle where it can move, else its
  * kind icon.
@@ -434,6 +413,23 @@ function RowLead({
 const kindIcon = (job: QueueJob, failed: boolean) =>
   failed ? CircleAlert : job.input?.kind === "video" ? Video : Image;
 
+function queueProfile(job: QueueJob, profiles: Profile[]) {
+  const recorded = job.items?.[0]?.settings;
+  const profile = profiles.find((entry) =>
+    isProfile(entry, recorded?.profileId || job.input?.profileId),
+  );
+  const model = shownProfileName(
+    String(
+      recorded?.profileName ||
+        job.input?.profileName ||
+        profile?.displayName ||
+        profile?.label ||
+        "",
+    ),
+  );
+  return { profile, model };
+}
+
 function QueueRow({
   job,
   sortable,
@@ -446,19 +442,12 @@ function QueueRow({
 }) {
   const [opened, setOpened] = useState(false);
   const detailsId = useId();
-  const phone = usePhone();
   const failed = job.status === "failed";
   const Kind = kindIcon(job, failed);
-  // The profile it runs on, by its short name.
-  const profile = useGenerationActions().profiles.find((entry) =>
-    isProfile(entry, job.input?.profileId),
-  );
-  // Phones keep the title and a short status (and Paused, or why it failed); the model and any other
-  // reason are in the details.
-  const reasonShown = !phone || failed || job.reason === pausedReason;
-  const status = phone
-    ? [shortStatus(job), reasonShown && job.reason].filter(Boolean).join(" · ")
-    : [profile && profileName(profile), shortStatus(job), job.reason].filter(Boolean).join(" · ");
+  const { profile, model } = queueProfile(job, useGenerationActions().profiles);
+  const paused = job.reason === pausedReason;
+  const reason = jobReason(job);
+  const status = [jobStatus(job, { model }), paused && reason].filter(Boolean).join(" · ");
   return (
     <div ref={drag?.elementRef} className={classes.row}>
       <Group wrap="nowrap" gap="sm" py="xs">
@@ -480,10 +469,16 @@ function QueueRow({
                   Dream
                 </Badge>
               )}
-              <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={phone ? 1 : 2}>
+              <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
                 {status}
               </Text>
             </Group>
+            {reason && !paused && (
+              <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2} title={reason}>
+                {reason}
+              </Text>
+            )}
+            <JobProgressBar job={job} />
           </Stack>
         </UnstyledButton>
         {failed && <ClearJob job={job} />}
@@ -495,7 +490,7 @@ function QueueRow({
         </div>
       )}
       <Collapse id={detailsId} expanded={opened} keepMounted={false}>
-        <QueueJobDetails job={job} profile={profile} reason={reasonShown ? "" : job.reason} />
+        <QueueJobDetails job={job} profile={profile} reason={paused ? "" : job.reason} />
       </Collapse>
     </div>
   );
@@ -556,21 +551,15 @@ const resultSetOf = (input: QueueJob["input"]) =>
   input?.resultSet as { title?: string; variation?: string } | undefined;
 
 /**
- * The queue's rows in order: each set of several jobs one group, where its first shown job is,
- * Dream's jobs each their own row, after everyone else's.
+ * The queue's rows in dispatch order, with each set where its first shown job is.
  */
-export function queueEntries(all: QueueJob[]): QueueEntry[] {
-  const entries = groupedEntries(
+export function queueEntries(all: QueueJob[], waiting?: string[]): QueueEntry[] {
+  return groupedEntries(
     all,
-    shownJobs(all),
+    jobsInDispatchOrder(all, waiting),
     (job) => (job.dream ? undefined : job.queueSet),
     (input) => String(resultSetOf(input)?.title || input?.prompt || "Generations"),
   );
-  // Dream's work waits below everyone's own, so it lists last too.
-  return [
-    ...entries.filter((entry) => !entry.jobs[0].dream),
-    ...entries.filter((entry) => entry.jobs[0].dream),
-  ];
 }
 
 /**
@@ -622,8 +611,11 @@ function QueueSetRow({
   const Kind = kindIcon(members[0], !unfinished.length && failed.length > 0);
   // The set's state as its leading unfinished job's: one running, else the first waiting.
   const lead =
-    members.find((job) => activeStatuses.has(job.status)) ??
-    members.find((job) => !terminalStatuses.has(job.status));
+    entry.jobs.find((job) => activeStatuses.has(job.status)) ??
+    entry.jobs.find((job) => !terminalStatuses.has(job.status));
+  const { profiles } = useGenerationActions();
+  const model = lead && queueProfile(lead, profiles).model;
+  const reason = lead && jobReason(lead);
   const stop = async () => {
     setBusy("stop");
     await Promise.allSettled(unfinished.map((id) => action.mutateAsync({ id, action: "cancel" })));
@@ -660,14 +652,23 @@ function QueueSetRow({
                 {title}
               </Text>
               <Text size="xs" c="dimmed" lineClamp={1}>
-                {[
-                  lead && shortStatus(lead),
-                  `${done} of ${total} Done`,
-                  failed.length && `${failed.length} Failed`,
-                ]
+                {[`${done} of ${total} Done`, failed.length && `${failed.length} Failed`]
                   .filter(Boolean)
                   .join(" · ")}
               </Text>
+              {lead && (
+                <>
+                  <Text size="xs" c="dimmed" lineClamp={2}>
+                    {jobStatus(lead, { model })}
+                  </Text>
+                  {reason && (
+                    <Text size="xs" c="dimmed" lineClamp={2} title={reason}>
+                      {reason}
+                    </Text>
+                  )}
+                  <JobProgressBar job={lead} />
+                </>
+              )}
             </Stack>
             <ChevronDown
               size={16}
@@ -949,8 +950,8 @@ export function Queue({ downloads }: { downloads: ModelDownload[] }) {
   useEffect(() => void loadSortable(), []);
   if (queue.error) return <Alert color="red">{queue.error.message}</Alert>;
   if (queue.isPending) return <LoadingState label="Loading Generations" fill />;
-  const { paused } = queue.data;
-  const jobs = shownJobs(queue.data.jobs);
+  const { paused, jobs: saved, queueOrder } = queue.data;
+  const jobs = shownJobs(saved);
   if (!jobs.length && !downloads.length) {
     // An empty queue still offers the one action that lets work start again.
     const pause = pauseControl(paused, everyone);
@@ -973,7 +974,7 @@ export function Queue({ downloads }: { downloads: ModelDownload[] }) {
       </EmptyState>
     );
   }
-  const entries = queueEntries(queue.data.jobs);
+  const entries = queueEntries(saved, queueOrder);
   const waiting = (entry: QueueEntry) => entry.jobs.filter(movableJob);
   const movable = entries.filter((entry) => waiting(entry).length > 0);
   const sortable = movable.length > 1;
@@ -993,29 +994,31 @@ export function Queue({ downloads }: { downloads: ModelDownload[] }) {
     ) : (
       jobRow(entry.jobs[0], drag, sortable && movable.includes(entry))
     );
-  // A set's waiting work moves as one, in its order, to `to` among the waiting entries. The new
-  // order shows at once; the refetch after the move settles it, a failed one included.
+  // The drop targets a visible row. Move beside that row in saved order, which dispatch may reorder.
   function move(entry: QueueEntry, to: number) {
-    const order = arrayMove(movable, movable.indexOf(entry), to).flatMap(waiting);
-    const at = order.indexOf(waiting(entry)[0]);
-    const ids = order.map((job) => job.id);
-    client.setQueryData(queueQuery.queryKey, (data) => {
-      if (!data) return data;
-      const pending = data.jobs.filter(movableJob);
-      const byId = new Map(pending.map((job) => [job.id, job]));
-      const next = ids.map((id) => byId.get(id)).filter((job) => job !== undefined);
-      if (next.length !== pending.length) return data;
-      const jobs = [...data.jobs];
-      pending.forEach((job, index) => {
-        jobs[data.jobs.indexOf(job)] = next[index];
+    const destination = movable[to];
+    if (!destination || destination === entry) return;
+    const moved = moveWaitingJobs(
+      saved,
+      waiting(entry),
+      destination.jobs,
+      to > movable.indexOf(entry),
+    );
+    if (!moved) return;
+    if (!queueOrder)
+      client.setQueryData(queueQuery.queryKey, (data) => {
+        if (!data) return data;
+        let index = 0;
+        return {
+          ...data,
+          jobs: data.jobs.map((job) => (movableJob(job) ? moved.order[index++] : job)),
+        };
       });
-      return { ...data, jobs };
-    });
     void action
       .mutateAsync(
         entry.set
-          ? { id: "", set: entry.set.id, action: "move", to: at }
-          : { id: entry.id, action: "move", to: at },
+          ? { id: "", set: entry.set.id, action: "move", to: moved.at }
+          : { id: entry.id, action: "move", to: moved.at },
       )
       .catch(() => client.invalidateQueries({ queryKey: queueQuery.queryKey }));
   }

@@ -7,6 +7,7 @@ import type {
   RuntimeOperation,
   RuntimePreview,
   RuntimeQueueCancel,
+  RuntimeQueueStatus,
   RuntimeStatus,
   WorkloadPhase,
 } from "../../../../shared/runtime";
@@ -18,7 +19,8 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
-import { statusLabels } from "../generation/Queue";
+import { JobProgressBar, jobReason, jobStatus } from "../generation/JobProgress";
+import { useSettingsSection } from "../settings/SettingsNavigation";
 import { BenchmarkDialog, benchmarksQuery } from "./Benchmarks";
 import { LogDialog, LogText, PodLog, logTime, useRequester } from "./RuntimeLogs";
 
@@ -27,6 +29,14 @@ export const runtimeStatusQuery = queryOptions({
   queryFn: () => api<RuntimeStatus>("/api/runtime"),
   // Follow a running change closely; otherwise refresh with the service status.
   refetchInterval: (query) => (query.state.data?.operation ? 2000 : 15000),
+});
+export const runtimeQueueQuery = queryOptions({
+  queryKey: ["runtime-queue"],
+  queryFn: () => api<RuntimeQueueStatus>("/api/runtime/queue"),
+  refetchInterval: ({ state }) =>
+    Object.values(state.data?.workloads ?? {}).some(({ jobs, queued }) => jobs.length || queued)
+      ? 2000
+      : 15000,
 });
 /** Applies a previewed placement; the signature proves nothing changed since the preview. */
 export const applyPlacement = (plan: RuntimePreview) =>
@@ -110,9 +120,25 @@ function changePhase(
 
 const shortDateTime = dateFormat({ dateStyle: "short", timeStyle: "short" });
 
-/** An accepted job as its workload's row lists it: where it stands, since when, and its prompt. */
-const jobLine = (job: RuntimeJob) =>
-  `${job.cancelling ? "Cancelling" : statusLabels[job.status]} since ${shortDateTime.format(new Date(job.since))}: ${job.title}`;
+function WorkloadJob({ job }: { job: RuntimeJob }) {
+  const reason = jobReason(job);
+  return (
+    <Stack gap={2} py={2}>
+      <Text size="xs" lineClamp={1} title={job.title}>
+        {job.title}
+      </Text>
+      <Text size="xs" c="dimmed" title={shortDateTime.format(new Date(job.since))}>
+        {jobStatus(job)}
+      </Text>
+      {reason && (
+        <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
+          {reason}
+        </Text>
+      )}
+      <JobProgressBar job={job} />
+    </Stack>
+  );
+}
 
 /** A change's steps as timestamped lines, then how it ended once it has. */
 function logText(entry: RuntimeOperation) {
@@ -241,7 +267,9 @@ const sameSet = (a: string[], b: string[]) =>
 export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> }) {
   const client = useQueryClient();
   const phone = usePhone();
+  const active = useSettingsSection() === "workers";
   const status = useQuery(runtimeStatusQuery);
+  const live = useQuery({ ...runtimeQueueQuery, enabled: active && status.isSuccess });
   const [selection, setSelection] = useState<string[] | null>(null);
   const [preview, setPreview] = useState<RuntimePreview | null>(null);
   const [restarting, setRestarting] = useState<string | null>(null);
@@ -252,7 +280,12 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   const [benchmarkId, setBenchmarkId] = useState("");
   const benchmarks = useQuery(benchmarksQuery).data;
   const benchmarking = benchmarks?.runs.some((run) => run.status === "running");
-  const refresh = () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey });
+  const refresh = () =>
+    Promise.all(
+      [runtimeStatusQuery, runtimeQueueQuery].map(({ queryKey }) =>
+        client.invalidateQueries({ queryKey }),
+      ),
+    );
   const previewing = useMutation({
     mutationFn: (workloads: string[]) =>
       post<RuntimePreview>("/api/runtime/preview", { workloads }),
@@ -302,7 +335,11 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   });
   if (status.isPending) return <LoadingState label="Loading GPU Workloads" />;
   if (status.error) return <Alert color="red">{status.error.message}</Alert>;
-  const { workloads, operation, history } = status.data;
+  const { operation, history } = status.data;
+  const workloads = status.data.workloads.map((item) => {
+    const work = live.data?.workloads[item.id];
+    return work ? { ...item, ...work } : item;
+  });
   const label = (id: string) => workloads.find((item) => item.id === id)?.label ?? id;
   const restartTarget = workloads.find((item) => item.id === restarting);
   // A change waiting for Radiance's work to stop it can stop it now instead.
@@ -367,28 +404,30 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
                 item.reason ||
                 // A stopped workload isn't failing, whatever its shared endpoint says.
                 (item.phase !== "parked" && reasons[item.id]) ||
-                (!item.jobs &&
+                (!item.jobs?.length &&
                   item.acceptedOperations > 0 &&
                   `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`);
-              // What it runs, which a change stopping it waits for, then what waits for it.
-              const work = [
-                ...(item.jobs ?? []).map(jobLine),
-                ...(item.queued ? [`${item.queued} queued`] : []),
-              ];
               return (
                 <>
                   <Text size="sm" fw={500}>
                     {item.label}
                   </Text>
-                  {[note, ...work].filter(Boolean).map((line, index) => (
+                  {note && (
                     <Text
-                      key={index}
                       size="xs"
-                      c={short && index === 0 ? "red" : "dimmed"}
+                      c={short ? "red" : "dimmed"}
                       style={{ overflowWrap: "anywhere" }}
                     >
-                      {line}
+                      {note}
                     </Text>
+                  )}
+                  {item.queued ? (
+                    <Text size="xs" c="dimmed">
+                      {item.queued} Queued
+                    </Text>
+                  ) : null}
+                  {item.jobs?.map((job) => (
+                    <WorkloadJob key={job.id} job={job} />
                   ))}
                 </>
               );
@@ -468,7 +507,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
             <Menu.Item
               color="red"
               leftSection={<icons.clear size={16} />}
-              disabled={!item.jobs && !item.queued}
+              disabled={!item.jobs?.length && !item.queued}
               onClick={() => setQueueId(item.id)}
             >
               Cancel Queue

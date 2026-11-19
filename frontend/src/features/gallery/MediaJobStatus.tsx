@@ -1,20 +1,11 @@
-import {
-  Alert,
-  Button,
-  Group,
-  Loader,
-  Paper,
-  Progress,
-  Stack,
-  Text,
-  ThemeIcon,
-} from "@mantine/core";
+import { Alert, Button, Group, Loader, Paper, Stack, Text, ThemeIcon } from "@mantine/core";
 import { CircleAlert } from "lucide-react";
 
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem } from "../../types";
+import { JobProgressBar, jobReason, jobStatus, statusLabels } from "../generation/JobProgress";
 import { WritingStream } from "../generation/PromptWriting";
-import { QueueJobAction, progressPercent, statusLabels, useQueue } from "../generation/Queue";
+import { QueueJobAction, useQueue } from "../generation/Queue";
 
 import classes from "./MediaJobStatus.module.css";
 
@@ -36,7 +27,7 @@ export function MediaJobStatus({
   const cancelled = status === "cancelled";
   const active = job && !terminalStatuses.has(job.status);
   const progress = job?.progress;
-  const reason = job?.reason || savedError;
+  const reason = (job && jobReason(job)) || savedError;
   const queueError = item.jobId ? queue.error : null;
 
   if (!loading && !active && !cancelled) {
@@ -108,25 +99,14 @@ export function MediaJobStatus({
         />
       )}
       <Text size="lg" fw={600} ta="center">
-        {loading
-          ? "Loading Generation Status"
-          : job
-            ? statusLabels[job.status]
-            : statusLabels.cancelled}
+        {loading ? "Loading Generation Status" : job ? jobStatus(job) : statusLabels.cancelled}
       </Text>
       {reason && (
         <Text size="sm" c="dimmed" ta="center" style={{ overflowWrap: "anywhere" }}>
           {reason}
         </Text>
       )}
-      {progress && active && job?.status !== "writing" && (
-        <Progress
-          aria-label="Generation Progress"
-          w="100%"
-          value={progressPercent(progress)}
-          animated
-        />
-      )}
+      {active && <JobProgressBar job={job} />}
       {active && job?.status === "writing" && <WritingStream progress={progress} />}
       {queueError && (
         <Alert color="red" title="Couldn't Load Generation Status">
