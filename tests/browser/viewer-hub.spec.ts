@@ -1404,6 +1404,7 @@ test("An opened video the browser won't play shows its still and its controls", 
   const video = page.getByRole("dialog", { name: "Generation", exact: true }).locator("video");
   await expect(video).toHaveAttribute("poster", image);
   await expect(video).toHaveAttribute("controls");
+  await expect(page.getByRole("button", { name: "Play", exact: true })).toBeVisible();
   await expect(video).toHaveJSProperty("muted", false);
 });
 

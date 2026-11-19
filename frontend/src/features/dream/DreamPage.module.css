@@ -413,3 +413,10 @@
 .choice[data-selected] .side {
   outline: 1px solid var(--mantine-primary-color-filled);
 }
+
+.videoAudio {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + var(--mantine-spacing-xl) + 1.5rem);
+  inset-inline-end: calc(env(safe-area-inset-right) + var(--mantine-spacing-sm));
+  z-index: 1;
+}
