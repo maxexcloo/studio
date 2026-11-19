@@ -1108,7 +1108,7 @@ test("A queue item streams its prompt's thinking; the result keeps it collapsed 
   // The queue item, as a fresh page loads it.
   await page.goto("/images");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   await expect(queue.getByText("Writing Prompt", { exact: true })).toBeVisible();
   await expect(queue.getByText("Wings first, then", { exact: true })).toBeVisible();
   await expect(queue.getByText("The bird spreads its wings", { exact: true })).toBeVisible();

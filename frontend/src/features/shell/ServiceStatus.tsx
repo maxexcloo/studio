@@ -49,7 +49,7 @@ export function StatusAction() {
   useEffect(() => {
     void client.invalidateQueries({ queryKey: servicesStatusQuery.queryKey });
   }, [client, runningKey]);
-  const title = "Generations";
+  const title = "Queue";
   const downloads = useModelDownloads();
   const count = (queue.data ? queueEntries(queue.data.jobs).length : 0) + downloads.length;
   const heading = count ? `${title} (${count})` : title;

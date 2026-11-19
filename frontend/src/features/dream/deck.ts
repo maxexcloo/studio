@@ -2,20 +2,19 @@ import type { MediaItem } from "../../types";
 import type { DreamItem, DreamMedia } from "./queries";
 
 /**
- * A pair asks its question about two images: a Dream comparison (`pairId`, alike but for the one
- * thing `labels` name) or two gallery images for calibration.
+ * A Dream comparison asks about two results alike except for the difference the labels name.
  */
 export type PairDeckCard = {
   kind: "pair";
   key: string;
-  items: [MediaItem, MediaItem];
+  items: [DreamItem, DreamItem];
   question: string;
-  pairId?: string;
+  pairId: string;
   labels?: [string, string];
 };
 export type DeckCard =
   | { kind: "dream"; key: string; item: DreamItem }
-  | { kind: "calibration" | "library"; key: string; item: MediaItem }
+  | { kind: "library"; key: string; item: MediaItem }
   | PairDeckCard;
 
 /** The finished Dream results as cards: both sides of a comparison make one pair card. */
@@ -51,56 +50,31 @@ function dreamCards(dream: DreamItem[]): DeckCard[] {
 export const cardIds = (card: DeckCard) =>
   card.kind === "pair" ? card.items.map((item) => item.id) : [card.item.id];
 
-/**
- * Newest unseen Dream results come first, with genuine comparisons kept together. The active
- * card stays until judged; arrivals take the next places. Gallery calibration follows only
- * after unseen Dream results, pairing every fourth card, or every card while Dream is off.
- */
+/** Newest unseen Dream results first, keeping genuine comparisons and the active card together. */
 export function deckCards(
   dream: DreamItem[],
-  calibration: MediaItem[],
-  judged: number,
   {
     depth = 3,
-    pairsOnly = false,
     media = "image",
     current,
-  }: { depth?: number; pairsOnly?: boolean; media?: DreamMedia; current?: DeckCard } = {},
+  }: { depth?: number; media?: DreamMedia; current?: DeckCard } = {},
 ) {
-  const dreamed = pairsOnly ? [] : dream.filter((item) => item.type === media);
-  const gallery = calibration.filter((item) => item.type === media);
-  const pool =
-    current?.kind === "dream" || (current?.kind === "pair" && current.pairId) ? dreamed : gallery;
-  const held =
-    current && cardIds(current).every((id) => pool.some((item) => item.id === id))
+  const streamed = dream.filter((item) => item.type === media);
+  const active =
+    current &&
+    current.kind !== "library" &&
+    cardIds(current).every((id) => streamed.some((item) => item.id === id))
       ? current
       : undefined;
-  const heldIds = new Set(held ? cardIds(held) : []);
+  const activeIds = new Set(active ? cardIds(active) : []);
   const unseen = dreamCards(
-    dreamed
-      .filter((item) => !heldIds.has(item.id))
+    streamed
+      .filter((item) => !activeIds.has(item.id))
       .sort((a, b) =>
         String(b.createdAt || b.dream?.at || "").localeCompare(
           String(a.createdAt || a.dream?.at || ""),
         ),
       ),
   );
-  const remaining = gallery.filter((item) => !heldIds.has(item.id));
-  const cards: DeckCard[] = held ? [held] : [];
-  for (let count = judged + cards.length; cards.length < depth; count++) {
-    if (unseen.length) cards.push(unseen.shift()!);
-    else if ((pairsOnly || count % 4 === 3) && remaining.length >= 2) {
-      const items = remaining.splice(0, 2) as [MediaItem, MediaItem];
-      cards.push({
-        kind: "pair",
-        key: `${items[0].id}+${items[1].id}`,
-        items,
-        question: media === "video" ? "Which Video?" : "Which Image?",
-      });
-    } else if (remaining.length && !pairsOnly) {
-      const item = remaining.shift()!;
-      cards.push({ kind: "calibration", key: item.id, item });
-    } else break;
-  }
-  return cards;
+  return (active ? [active, ...unseen] : unseen).slice(0, depth);
 }

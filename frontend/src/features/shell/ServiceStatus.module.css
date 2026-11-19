@@ -39,8 +39,3 @@
 .summary {
   border-radius: var(--mantine-radius-sm);
 }
-@media (hover: hover) {
-  .summary:hover {
-    background: var(--mantine-color-default-hover);
-  }
-}

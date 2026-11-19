@@ -118,6 +118,10 @@
   }
 }
 
+.columned[data-centre-tools] > .tools {
+  align-self: center;
+}
+
 /* A tool's popup opens from the box's end, where the ⋯ stands. */
 .anchor {
   position: absolute;

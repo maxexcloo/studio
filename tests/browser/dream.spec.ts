@@ -9,6 +9,22 @@ async function showView(page: Page, name: string | RegExp) {
   await page.getByRole("button", { name: "Dream View", exact: true }).click();
   await page.getByRole("menuitem", { name, exact: true }).click();
 }
+async function showMedia(page: Page, name: "Images" | "Videos") {
+  await page.getByRole("radio", { name: new RegExp(`^${name}\\b`) }).press("Space");
+}
+function comparison(
+  id: string,
+  question: string,
+  ...items: [ReturnType<typeof dreamItem>, ReturnType<typeof dreamItem>]
+) {
+  return items.map((item, side) => ({
+    ...item,
+    dream: {
+      ...item.dream,
+      pair: { id, side, question, label: side ? "Later" : "Earlier" },
+    },
+  }));
+}
 /** Uses the shared Details panel on desktop and its sheet on phones. */
 async function previewDetails(preview: Locator, phone: boolean) {
   const toggle = preview.getByRole("button", { name: "Generation Details", exact: true });
@@ -155,7 +171,7 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
         .getByRole("button")
         .evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Dislike", "Like", "Accept"]);
+    .toEqual(["Undo", "Dislike", "Like", "Accept"]);
   await preview.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(preview).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
@@ -177,7 +193,9 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   expect(dream.requests[6].body).toEqual({ ids: ["three"], rating: "liked" });
 });
 
-test("Images and Videos each continue into their own paged library review", async ({ page }) => {
+test("Dream and Library keep separate Images and Videos, with paged review and Undo", async ({
+  page,
+}) => {
   await fixtures(page);
   const library = [
     dreamItem("library-old", { dream: undefined, settings: undefined }),
@@ -192,22 +210,30 @@ test("Images and Videos each continue into their own paged library review", asyn
   await page.goto("/dream");
   await expect(current(page)).toBeVisible();
   await expect(current(page)).toContainText("last-image");
+  await expect(page.getByRole("radio", { name: "Images (1)", exact: true })).toBeChecked();
   await page.getByRole("button", { name: "Accept", exact: true }).click();
-  const image = page.getByRole("group", { name: "Current Gallery Image" });
   const video = page.getByRole("group", { name: "Current Gallery Video" });
+  const image = page.getByRole("group", { name: "Current Gallery Image" });
+  const undo = page.getByRole("button", { name: "Undo", exact: true });
+  await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
+  await expect(image).toHaveCount(0);
+
+  await showMedia(page, "Videos");
+  await expect(current(page)).toContainText("last-video");
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  await showView(page, "Library");
+  await expect(page).toHaveURL(/\/dream\/library$/);
+  await expect(page.getByRole("radio", { name: "Videos (1)", exact: true })).toBeChecked();
+  await expect(video).toContainText("library-video");
+  await expect(undo).toBeDisabled();
+  await page.getByRole("button", { name: "Like", exact: true }).click();
+  await expect(page.getByText("Library Review Complete")).toBeVisible();
+  await expect.poll(() => dream.library[1].rating).toBe("liked");
+
+  await showMedia(page, "Images");
+  await expect(page.getByRole("radio", { name: "Images (3)", exact: true })).toBeChecked();
   await expect(image).toContainText("library-old");
-  await expect(image).toContainText("Rate Your Library");
-  await expect(image.getByRole("button", { name: "Suggest" })).toHaveCount(0);
-  const view = page.getByRole("button", { name: "Dream View" });
-  await view.click();
-  await expect(view).toContainText("Images");
-  await expect(
-    page.getByRole("menuitem", { name: "Images", exact: true }),
-  ).toHaveAccessibleDescription("Rate Your Library (3)");
-  await expect(
-    page.getByRole("menuitem", { name: "Videos (1)", exact: true }),
-  ).toHaveAccessibleDescription("Rate Your Library (1)");
-  await page.keyboard.press("Escape");
+  await expect(undo).toBeDisabled();
 
   await page.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(image).toContainText("library-image");
@@ -219,7 +245,6 @@ test("Images and Videos each continue into their own paged library review", asyn
   await expect(page.getByText("Library Review Complete")).toBeVisible();
   await expect.poll(() => dream.library[3].rating).toBe("disliked");
 
-  const undo = page.getByRole("button", { name: "Undo", exact: true });
   await undo.click();
   await expect(image).toContainText("library-third");
   await expect.poll(() => dream.library[3].rating).toBeUndefined();
@@ -229,21 +254,16 @@ test("Images and Videos each continue into their own paged library review", asyn
   await undo.click();
   await expect(image).toContainText("library-old");
   await expect.poll(() => dream.reviewed.has("library-old")).toBe(false);
-  await undo.click();
-  await expect(current(page)).toContainText("last-image");
-
-  await showView(page, "Videos (1)");
-  await expect(current(page)).toContainText("last-video");
-  await page.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(video).toContainText("library-video");
-  await expect(view).toContainText("Videos");
-  await page.getByRole("button", { name: "Like", exact: true }).click();
-  await expect(page.getByText("Library Review Complete")).toBeVisible();
-  await expect.poll(() => dream.library[1].rating).toBe("liked");
+  await showMedia(page, "Videos");
   await undo.click();
   await expect(video).toContainText("library-video");
   await expect.poll(() => dream.library[1].rating).toBeUndefined();
-  await showView(page, "Images (1)");
+
+  await showView(page, "Dream");
+  await undo.click();
+  await expect(current(page)).toContainText("last-video");
+  await showMedia(page, "Images");
+  await undo.click();
   await expect(current(page)).toContainText("last-image");
 });
 
@@ -264,7 +284,7 @@ test("Suggest can queue a library item variation at its source", async ({ page }
       },
     });
   });
-  await page.goto("/dream");
+  await page.goto("/dream/library");
   await page.getByRole("button", { name: "Suggest", exact: true }).click();
   const submitted = page.waitForRequest(
     (request) =>
@@ -381,9 +401,9 @@ test("On a phone held sideways, a deck card's caption stands beside its media", 
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Only touch screens hold a phone sideways.");
   await fixtures(page);
-  await serveDream(page, { calibration: [{ ...dreamItem("one"), dream: undefined }] });
+  await serveDream(page, { library: [dreamItem("one", { dream: undefined })] });
   await page.setViewportSize({ width: 844, height: 390 });
-  await page.goto("/dream");
+  await page.goto("/dream/library");
   await expect(page.locator(":root")).toHaveAttribute("data-phone", "sideways");
   const current = page.getByRole("group", { name: "Current Gallery Image", exact: true });
   const card = (await current.boundingBox())!;
@@ -471,7 +491,7 @@ test("An empty disabled video deck counts no held results, then counts verdicts 
     await route.fallback();
   });
   await page.goto("/dream");
-  await showView(page, "Videos");
+  await showMedia(page, "Videos");
   const view = page.getByRole("button", { name: "Dream View", exact: true });
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
   await expect(view).toHaveAccessibleDescription("0 images and 0 videos waiting");
@@ -486,29 +506,19 @@ test("An empty disabled video deck counts no held results, then counts verdicts 
   await expect(current(page)).toBeVisible();
 });
 
-test("While Dream is off, the deck compares gallery images in pairs", async ({ page }) => {
+test("Library review stays available while Dream is off", async ({ page }) => {
   await fixtures(page);
-  const gallery = ["g1", "g2", "g3", "g4", "g5"].map((id) => ({
-    ...dreamItem(id),
-    dream: undefined,
-  }));
-  const dream = await serveDream(page, {
+  await serveDream(page, {
     enabled: false,
     unseen: [dreamItem("fox")],
-    calibration: gallery,
+    library: [dreamItem("library-image", { dream: undefined })],
   });
   await page.goto("/dream");
-  await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
-  await page.keyboard.press("ArrowLeft");
-  await expect.poll(() => dream.requests.length).toBe(1);
-  await page.getByRole("button", { name: "Both", exact: true }).click();
-  // The image left over makes no card, and Dream's own results wait until it is on.
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
-  await expect.poll(() => dream.requests.length).toBe(2);
-  expect(dream.requests.map((request) => request.body)).toEqual([
-    { liked: ["g1"], passed: ["g2"] },
-    { liked: ["g3", "g4"] },
-  ]);
+  await showView(page, "Library");
+  await expect(page.getByRole("group", { name: "Current Gallery Image" })).toContainText(
+    "Dream prompt library-image",
+  );
 });
 
 test("Taste displays readable preferences and saves explicit edits separately", async ({
@@ -529,8 +539,32 @@ test("Taste displays readable preferences and saves explicit edits separately", 
       signals: 40,
     },
   });
+  const sameness = { recent: null, earlier: null, converging: false, examples: [] };
+  await page.route("**/api/taste/reflection?*", (route) =>
+    route.fulfill({
+      json: {
+        sameness: { made: sameness, liked: sameness },
+        days: [19, 18, 17, 16].map((day) => ({
+          day: `2026-11-${day}`,
+          profileId: "image:test",
+          profileName: "Image Quality",
+          model: "test.safetensors",
+          made: 10,
+          liked: 2,
+          disliked: 1,
+        })),
+      },
+    }),
+  );
   await page.goto("/dream");
   await showView(page, "Taste");
+  const history = page.getByRole("region", { name: "History", exact: true });
+  const historyRows = history.getByRole("table", { name: "History", exact: true }).getByRole("row");
+  await expect(historyRows).toHaveCount(4);
+  await history.getByRole("button", { name: "Show All", exact: true }).click();
+  await expect(historyRows).toHaveCount(5);
+  await history.getByRole("button", { name: "Show Less", exact: true }).click();
+  await expect(historyRows).toHaveCount(4);
   const profile = page.getByRole("region", { name: "Taste Profile" });
   await expect(profile.getByText(/foxes in snow/)).toBeVisible();
   await expect(profile.getByText("Image Quality", { exact: true })).toBeVisible();
@@ -611,12 +645,12 @@ test("Dream navigation orders its views and History shows retained activity and 
   await page.goto("/dream");
   await page.getByRole("button", { name: "Dream View", exact: true }).click();
   await expect(page.getByRole("menuitem")).toHaveText([
-    "Images",
-    "Videos",
+    "Dream",
+    "Library",
     "Projects",
     "Taste",
-    "Discards",
     "History",
+    "Discards",
   ]);
   await page.getByRole("menuitem", { name: "History", exact: true }).click();
   await expect(page).toHaveURL(/\/dream\/history$/);
@@ -630,7 +664,7 @@ test("Dream navigation orders its views and History shows retained activity and 
   await expect(history.getByText("both 20 Steps and 40 Steps", { exact: true })).toBeVisible();
   await page.reload();
   await expect(history).toBeVisible();
-  await showView(page, "Images");
+  await showView(page, "Dream");
   await expect(page).toHaveURL(/\/dream$/);
 });
 
@@ -646,45 +680,6 @@ test("Dream says why it can't run in Settings › Dream, not over the deck", asy
       .getByRole("region", { name: "Settings: Dream", exact: true })
       .getByRole("status", { name: "Dream Status" }),
   ).toContainText("The text model is offline.");
-});
-
-test("Calibration judges gallery images, singly and as a pair", async ({ page }) => {
-  await fixtures(page);
-  const gallery = ["g1", "g2", "g3", "g4", "g5"].map((id) => ({
-    ...dreamItem(id),
-    dream: undefined,
-  }));
-  const dream = await serveDream(page, { calibration: gallery });
-  await page.goto("/dream");
-  const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
-  await expect(card).toContainText("From Your Gallery");
-  await expect(
-    page
-      .getByRole("group", { name: "Dream Actions", exact: true })
-      .getByRole("button", { name: "Dislike", exact: true }),
-  ).toBeVisible();
-  await page.keyboard.press("ArrowRight");
-  await expect(card).toContainText("Dream prompt g2");
-  // Dislike rates the gallery image too, hiding it.
-  await page.getByRole("button", { name: "Dislike", exact: true }).click();
-  await expect(card).toContainText("Dream prompt g3");
-  await page.keyboard.press("ArrowRight");
-  // Every fourth card is a pair.
-  // Tapping opens the preview; its explicit choice remains undoable.
-  await page.getByRole("button", { name: "View B", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "This Image", exact: true }).click();
-  await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  // Dislike applies its rating in the same calibration request.
-  await expect
-    .poll(() => dream.requests)
-    .toEqual(
-      [
-        { liked: ["g1"] },
-        { passed: ["g2"], rating: "disliked" },
-        { liked: ["g3"] },
-        { liked: ["g5"], passed: ["g4"] },
-      ].map((body) => ({ method: "POST", path: "/api/dream/calibration", body })),
-    );
 });
 
 test("A Dream comparison asks its question and answers with swipes, keys and buttons", async ({
@@ -890,7 +885,7 @@ test("The preview swipes between a comparison's sides and answers with the deck'
     .poll(() =>
       answers.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Neither", "This Image", "Like", "Both"]);
+    .toEqual(["Undo", "Neither", "This Image", "Like", "Both"]);
   await answers.getByRole("button", { name: "This Image", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
@@ -919,7 +914,10 @@ test("The preview judges the top card with swipes and its buttons, and Undo step
     page.viewportSize()!.width * 0.45,
   );
   await expect(card.getByRole("img", { name: "Dream prompt two", exact: true })).toBeVisible();
-  await preview.getByRole("button", { name: "Undo", exact: true }).click();
+  await preview
+    .getByRole("group", { name: "Dream Actions", exact: true })
+    .getByRole("button", { name: "Undo", exact: true })
+    .click();
   await expect(card.getByRole("img", { name: "Dream prompt one", exact: true })).toBeVisible();
   const details = await previewDetails(preview, isMobile);
   await expect(details).toContainText("Dream prompt one");
@@ -1142,6 +1140,7 @@ test("New Project suggests an empty brief field and Undo restores it", async ({
     return route.fulfill({ json: { text: "Soft morning light by the harbour." } });
   });
   await page.goto("/dream/projects");
+  await expect(page.getByText("No Projects", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "New Project", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "New Project", exact: true });
   const name = editor.getByRole("textbox", { name: "Name", exact: true });
@@ -1339,11 +1338,13 @@ test("Dream plays one comparison side with the viewer's sound choice", async ({
       height: 18,
     });
   await serveDream(page, {
-    enabled: false,
-    calibration: ["video-a", "video-b", "next-a", "next-b"].map(video),
+    unseen: [
+      ...comparison("video", "Which Video?", video("video-a"), video("video-b")),
+      ...comparison("next", "Which Video?", video("next-a"), video("next-b")),
+    ],
   });
   await page.goto("/dream");
-  await showView(page, "Videos");
+  await showMedia(page, "Videos");
   const pair = page.getByRole("group", { name: "Which Video?", exact: true });
   const playerA = pair.locator("video").first();
   const playerB = pair.locator("video").last();
@@ -1362,7 +1363,7 @@ test("Dream plays one comparison side with the viewer's sound choice", async ({
   await pair.getByRole("button", { name: "Mute", exact: true }).click();
   await expect(playerB).toHaveJSProperty("muted", true);
 
-  await pair.getByRole("button", { name: "View B", exact: true }).click();
+  await pair.getByRole("button", { name: "View B · Later", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Preview" });
   await expect(page.locator("video")).toHaveCount(1);
   const player = viewer.locator("video");
@@ -1392,8 +1393,10 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
       },
     });
   const dream = await serveDream(page, {
-    enabled: false,
-    calibration: [dreamItem("image-a"), video("video-a"), dreamItem("image-b"), video("video-b")],
+    unseen: [
+      ...comparison("image-pair", "Which Image?", dreamItem("image-a"), dreamItem("image-b")),
+      ...comparison("video-pair", "Which Video?", video("video-a"), video("video-b")),
+    ],
     discarded: [dreamItem("discard-image"), video("discard-video")],
     history: [
       { at: stamp, action: "Kept", item: { title: "Image History", media: "image" } },
@@ -1402,14 +1405,10 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   });
   await page.goto("/dream");
   await expect(page.getByRole("group", { name: "Which Image?", exact: true })).toBeVisible();
-  // The view menu picks the deck's media.
-  await showView(page, "Videos");
-  await expect(page.getByRole("button", { name: "Dream View", exact: true })).toContainText(
-    "Videos",
-  );
+  await showMedia(page, "Videos");
+  await expect(page.getByRole("radio", { name: "Videos (1)", exact: true })).toBeChecked();
   const pair = page.getByRole("group", { name: "Which Video?", exact: true });
-  await expect(pair).toContainText("Which Video? · From Your Gallery");
-  await pair.getByRole("button", { name: "View A", exact: true }).click();
+  await pair.getByRole("button", { name: "View A · Earlier", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Preview", exact: true });
   await expect(viewer).toBeVisible();
   const player = viewer.locator("video");
@@ -1439,7 +1438,7 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   await closeDetails(viewer, nextDetails, isMobile);
   expect(dream.requests).toEqual([]);
   await close.click();
-  await expect(pair.getByRole("button", { name: "View B", exact: true })).toBeFocused();
+  await expect(pair.getByRole("button", { name: "View B · Later", exact: true })).toBeFocused();
   await showView(page, "History");
   await expect(page.getByText("Video History", { exact: true })).toBeVisible();
   await expect(page.getByText("Image History", { exact: true })).toBeHidden();
@@ -1452,9 +1451,10 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   ).toBeHidden();
   await page.reload();
   await expect(page.getByRole("radio", { name: "Videos", exact: true })).toBeChecked();
-  await showView(page, "Videos");
+  await showView(page, "Dream");
   await expect(pair).toBeVisible();
-  await page.getByRole("button", { name: "B", exact: true }).click();
+  await pair.getByRole("button", { name: "Select B · Later", exact: true }).click();
+  await page.getByRole("button", { name: "This Image", exact: true }).click();
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
   await showView(page, "History");
   await expect
@@ -1462,15 +1462,13 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
     .toEqual([
       {
         method: "POST",
-        path: "/api/dream/calibration",
-        body: { liked: ["video-b"], passed: ["video-a"] },
+        path: "/api/dream/pairs/video-pair/answer",
+        body: { answer: "b" },
       },
     ]);
 });
 
-test("new Dream generations follow the active comparison, survive Undo and precede calibration", async ({
-  page,
-}) => {
+test("new Dream generations follow the active comparison and survive Undo", async ({ page }) => {
   await fixtures(page);
   const dated = (id: string, day: number) =>
     dreamItem(id, {
@@ -1486,7 +1484,6 @@ test("new Dream generations follow the active comparison, survive Undo and prece
     });
   const dream = await serveDream(page, {
     unseen: [dated("old", 1), dated("middle", 5), ...pair("original", 10)],
-    calibration: [dreamItem("gallery-a"), dreamItem("gallery-b")],
   });
   await page.goto("/dream");
   const original = page.getByRole("group", { name: "Which original?", exact: true });
@@ -1519,7 +1516,5 @@ test("new Dream generations follow the active comparison, survive Undo and prece
   await page.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(current(page)).toContainText("Dream prompt old");
   await page.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(
-    page.getByRole("group", { name: "Current Gallery Image", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
 });

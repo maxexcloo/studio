@@ -24,7 +24,7 @@ import type {
 } from "../../../../shared/runtime";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { DataTable } from "../../ui/DataTable";
+import { DataTable, HistoryTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -722,7 +722,6 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
 /** Settings › Workers › History: the runtime changes, the latest three until Show All. */
 export function RuntimeHistory() {
   const status = useQuery(runtimeStatusQuery).data;
-  const [allChanges, setAllChanges] = useState(false);
   const [logId, setLogId] = useState("");
   const who = useRequester();
   if (!status?.history.length) return null;
@@ -733,64 +732,57 @@ export function RuntimeHistory() {
       <Text size="sm" c="dimmed">
         Recent GPU changes, newest first, and who asked.
       </Text>
-      <Stack gap={4} align="flex-start">
-        <DataTable
-          label="Runtime Changes"
-          rows={allChanges ? history : history.slice(0, 3)}
-          rowKey={(entry) => entry.id}
-          rowName={change}
-          empty="No Changes"
-          rowActions={(entry) => (
-            <Menu.Item leftSection={<icons.log size={16} />} onClick={() => setLogId(entry.id)}>
-              View Logs
-            </Menu.Item>
-          )}
-          columns={[
-            {
-              key: "time",
-              header: "Time",
-              cell: (entry) => (
-                <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-                  {shortDateTime.format(new Date(entry.startedAt))}
-                </Text>
-              ),
-            },
-            {
-              key: "change",
-              header: "Change",
-              main: true,
-              cell: (entry) => (
-                <Text
-                  size="sm"
-                  truncate
-                  title={`${entry.error || entry.progress} · ${who(entry.requestedBy)}`}
-                >
-                  {change(entry)}
-                  {entry.error
-                    ? ` · ${entry.error}`
-                    : // Studio's own changes say why.
-                      entry.requestedBy.startsWith("automatic: ") &&
-                      ` · ${entry.requestedBy.slice("automatic: ".length)}`}
-                </Text>
-              ),
-            },
-            {
-              key: "result",
-              header: "Result",
-              cell: (entry) => (
-                <Badge color={operationColour(entry.status)} miw="max-content">
-                  {operationLabel(entry.status)}
-                </Badge>
-              ),
-            },
-          ]}
-        />
-        {history.length > 3 && (
-          <Button variant="subtle" size="compact-sm" onClick={() => setAllChanges(!allChanges)}>
-            {allChanges ? "Show Less" : "Show All"}
-          </Button>
+      <HistoryTable
+        label="Runtime Changes"
+        rows={history}
+        rowKey={(entry) => entry.id}
+        rowName={change}
+        empty="No Changes"
+        rowActions={(entry) => (
+          <Menu.Item leftSection={<icons.log size={16} />} onClick={() => setLogId(entry.id)}>
+            View Logs
+          </Menu.Item>
         )}
-      </Stack>
+        columns={[
+          {
+            key: "time",
+            header: "Time",
+            cell: (entry) => (
+              <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                {shortDateTime.format(new Date(entry.startedAt))}
+              </Text>
+            ),
+          },
+          {
+            key: "change",
+            header: "Change",
+            main: true,
+            cell: (entry) => (
+              <Text
+                size="sm"
+                truncate
+                title={`${entry.error || entry.progress} · ${who(entry.requestedBy)}`}
+              >
+                {change(entry)}
+                {entry.error
+                  ? ` · ${entry.error}`
+                  : // Studio's own changes say why.
+                    entry.requestedBy.startsWith("automatic: ") &&
+                    ` · ${entry.requestedBy.slice("automatic: ".length)}`}
+              </Text>
+            ),
+          },
+          {
+            key: "result",
+            header: "Result",
+            cell: (entry) => (
+              <Badge color={operationColour(entry.status)} miw="max-content">
+                {operationLabel(entry.status)}
+              </Badge>
+            ),
+          },
+        ]}
+      />
       <OperationLog
         entry={history.find((entry) => entry.id === logId)}
         change={change}
