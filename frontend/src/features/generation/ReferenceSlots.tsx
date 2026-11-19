@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Replace } from "lucide-react";
 import { type DragEvent, useState } from "react";
 
 import type { Profile, ReferenceAsset } from "../../types";
+import { contextMenuHandlers } from "../../ui/contextMenu";
 import { icons } from "../../ui/icons";
 import type { SlotLayout } from "./payload";
 import { dragPicture } from "./Picker";
@@ -45,6 +46,7 @@ export function ReferenceSlots({
   caption?: boolean;
   emptyLabel?: string;
 }) {
+  const [menuKey, setMenuKey] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const dropProps = (key: string, cellTarget: ReferenceTarget) => ({
     "data-over": over === key || undefined,
@@ -109,7 +111,15 @@ export function ReferenceSlots({
               const peers = group.assets;
               const position = peers.indexOf(asset);
               return (
-                <Menu key={key} withinPortal={false} position="bottom-start">
+                <Menu
+                  key={key}
+                  withinPortal={false}
+                  position="bottom-start"
+                  opened={menuKey === key}
+                  onChange={(open) =>
+                    setMenuKey((last) => (open ? key : last === key ? null : last))
+                  }
+                >
                   <Menu.Target>
                     <UnstyledButton
                       className={classes.cell}
@@ -123,6 +133,7 @@ export function ReferenceSlots({
                         if (picture?.naturalWidth) dragPicture(event.dataTransfer, picture);
                       }}
                       {...dropProps(key, cellTarget)}
+                      {...contextMenuHandlers(() => setMenuKey(key))}
                     >
                       <Image
                         src={asset.thumbnailUrl || asset.url}

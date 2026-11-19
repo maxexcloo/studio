@@ -448,9 +448,11 @@ test("LoRA trigger words toggle and published source links work in the gallery e
   await expect(inkbird).toBeChecked();
   await triggers.getByText("inkbird", { exact: true }).click();
   await expect(inkbird).not.toBeChecked();
-  const source = page.getByRole("link", { name: "View Source", exact: true });
+  await page.getByRole("button", { name: "Detail Slider Actions", exact: true }).click();
+  const source = page.getByRole("menuitem", { name: "View Source", exact: true });
   await expect(source).toHaveAttribute("href", sourceUrl);
   await expect(source).toHaveAttribute("rel", "noopener noreferrer");
+  await page.keyboard.press("Escape");
   expect(state.jobs).toHaveLength(0);
   await closeLoras(page);
   await pressGenerate(page);

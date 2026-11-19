@@ -17,6 +17,7 @@ import {
   Text,
   Tooltip,
   UnstyledButton,
+  VisuallyHidden,
   getDefaultZIndex,
   useCombobox,
 } from "@mantine/core";
@@ -771,13 +772,13 @@ function ReplaceConfirm({
   );
 }
 
-/** What a saved name's field and its Save share: naming it, and Saved shown for a moment. */
+/** Names a saved record and announces successful changes. */
 export function useNaming() {
-  const [naming, setNaming] = useState<"save" | "rename" | null>(null);
+  const [naming, setNaming] = useState<"rename" | null>(null);
   const field = useRef<HTMLInputElement>(null);
   const [saved, flashSaved] = useFlash();
-  /** Focuses the name field to save the draft as new or rename the current record. */
-  const name = (mode: "save" | "rename" | null) => {
+  /** Focuses the name field to rename the current record. */
+  const name = (mode: "rename" | null) => {
     setNaming(mode);
     if (mode) setTimeout(() => field.current?.focus());
   };
@@ -792,7 +793,7 @@ const ignore = () => {};
  * name, or Unsaved. Its list loads a saved record, asking first, under the heading, where
  * `replaces` says what it would replace; typing searches the list or names the draft to save it as
  * new or rename the current record. Names stay unique; duplicates from before show when each was
- * saved. The current record can be updated from the list or a Save button. Its menu holds `menu` (such as what
+ * saved. The current record can be updated from the list. Its menu holds `menu` (such as what
  * a preset saves), then Rename and Delete.
  */
 export function SavedName<T extends SavedItem>({
@@ -802,7 +803,6 @@ export function SavedName<T extends SavedItem>({
   current,
   edited,
   canSave,
-  saveButton = true,
   replaces,
   menu,
   onLoad,
@@ -818,7 +818,6 @@ export function SavedName<T extends SavedItem>({
   edited: boolean;
   /** Whether the draft holds anything to save, and the saved records have loaded. */
   canSave: boolean;
-  saveButton?: boolean;
   /** What loading `record` asks first, or nothing when the draft has nothing unsaved. */
   replaces: (record: T) => string | undefined;
   menu?: ReactNode;
@@ -848,15 +847,13 @@ export function SavedName<T extends SavedItem>({
         .filter((record) => text === null || key(record.name).includes(key(typed)))
         .sort((a, b) => compareNames(a.name, b.name));
   const actions: { value: string; label: string }[] = [];
-  if (!saveButton && current && edited && canSave && !typed && !mode)
+  if (current && edited && canSave && !typed && !mode)
     actions.push({ value: "\0update", label: `Update ${noun}` });
   if (typed && !taken) {
-    if (mode !== "rename" && canSave)
+    if (!mode && canSave)
       actions.push({ value: "\0save", label: `Save as New ${noun} “${typed}”` });
-    if (current && mode !== "save")
-      actions.push({ value: "\0rename", label: `Rename to “${typed}”` });
+    if (current) actions.push({ value: "\0rename", label: `Rename to “${typed}”` });
   }
-  if (mode === "rename") actions.reverse();
   const empty = mode
     ? typed
       ? "Name in Use"
@@ -966,27 +963,7 @@ export function SavedName<T extends SavedItem>({
             </Combobox.Options>
           </Combobox.Dropdown>
         </Combobox>
-        {saveButton ? (
-          <Button
-            size="compact-sm"
-            variant="subtle"
-            aria-label={`Save ${noun}`}
-            disabled={!canSave || (!!current && !edited)}
-            onClick={() =>
-              current
-                ? onUpdate(current).then(() => naming.flashSaved(true), ignore)
-                : naming.name("save")
-            }
-          >
-            {naming.saved ? "Saved" : "Save"}
-          </Button>
-        ) : (
-          naming.saved && (
-            <Text size="xs" c="dimmed" role="status">
-              Saved
-            </Text>
-          )
-        )}
+        <VisuallyHidden role="status">{naming.saved ? "Saved" : ""}</VisuallyHidden>
         <Menu position="bottom-end" width={menuWidth} withinPortal={false} returnFocus={false}>
           <PopupTooltip label={`${noun} Actions`}>
             <Menu.Target>
@@ -1009,7 +986,6 @@ export function SavedName<T extends SavedItem>({
             >
               Rename {noun}
             </Menu.Item>
-            <Menu.Divider />
             <Menu.Item
               color="red"
               leftSection={<icons.delete size={16} />}
