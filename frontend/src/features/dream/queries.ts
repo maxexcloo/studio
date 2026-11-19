@@ -79,6 +79,21 @@ export const calibrationQuery = (round: number, media: DreamMedia) =>
     // A later visit draws afresh rather than replaying images already judged.
     gcTime: 0,
   });
+export const libraryReviewQuery = (seed: string) =>
+  infiniteQueryOptions({
+    queryKey: ["dream-library-review", seed],
+    queryFn: ({ pageParam }) =>
+      api<{ items: MediaItem[]; nextCursor: string; remaining: number }>(
+        `/api/gallery/library-review?seed=${seed}&cursor=${pageParam}`,
+      ),
+    initialPageParam: "",
+    getNextPageParam: (page) => page.nextCursor || undefined,
+    staleTime: Infinity,
+    gcTime: 0,
+  });
+export const libraryReviewPath = (item: MediaItem) =>
+  `/api/gallery/library-review/${encodeURIComponent(item.id)}`;
+
 export const dreamItemPath = (item: { id: string }, action: string) =>
   `/api/dream/${encodeURIComponent(item.id)}/${action}`;
 export const pairAnswerPath = (pairId: string) =>

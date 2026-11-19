@@ -276,13 +276,15 @@ export function registerDreamRoutes(
     payload: { deleted: dream.deleteDiscards(owner(account)) },
   }));
   route("POST", "/api/dream/pairs/:pairId/answer", (account, { params, body }) => {
-    const answer = body?.answer;
+    const { answer, like } = body || {};
     if (!["a", "b", "both", "neither"].includes(answer as string))
       return { status: 400, payload: { ok: false, error: "Answer A, B, Both or Neither." } };
+    if (like !== undefined && (typeof like !== "boolean" || (like && !["a", "b"].includes(answer))))
+      return { status: 400, payload: { ok: false, error: "Choose one side to like." } };
     try {
       return {
         status: 200,
-        payload: { items: dream.answer(owner(account), params.pairId, answer as PairAnswer) },
+        payload: { items: dream.answer(owner(account), params.pairId, answer as PairAnswer, like) },
       };
     } catch (error) {
       return refuse(error);

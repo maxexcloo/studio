@@ -459,3 +459,12 @@
   justify-content: flex-end;
   padding-right: calc(env(safe-area-inset-right) + var(--mantine-spacing-md));
 }
+
+.suggest {
+  position: absolute;
+  top: var(--mantine-spacing-sm);
+  right: calc(var(--mantine-spacing-sm) + 3rem);
+}
+.choice[data-selected] .side {
+  outline: 1px solid var(--mantine-primary-color-filled);
+}

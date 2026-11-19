@@ -1894,6 +1894,10 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
   const pair = a.dream!.pair!.id;
   assert.equal((await request(`/pairs/${pair}/answer`, { answer: "maybe" })).status, 400);
   assert.equal(
+    (await request(`/pairs/${pair}/answer`, { answer: "both", like: true })).status,
+    400,
+  );
+  assert.equal(
     (await request(`/pairs/${pair}/answer`, { answer: "b" }, "POST", "bob")).status,
     404,
   );
@@ -1914,6 +1918,29 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
   // B won: it rates above A.
   const sideB = state.items.find((item) => item.dream?.pair?.side === 1)!;
   assert.equal(dream.read("alice").ratings![String(sideB.id)], 1516);
+  assert.equal(sideB.rating, undefined);
+
+  const sides = state.items.filter((item) => item.dream?.pair?.id === pair);
+  const undo = { ids: sides.map((item) => item.id) };
+  assert.equal((await request("/undo", undo)).status, 200);
+  assert.ok(sides.every((item) => item.dream?.state === "unseen"));
+  assert.deepEqual(dream.read("alice").ratings, {});
+  assert.equal((await request(`/pairs/${pair}/answer`, { answer: "b", like: true })).status, 200);
+  assert.equal(sideB.dream?.state, "kept");
+  assert.equal(sideB.rating, "liked");
+  assert.equal(dream.read("alice").ratings![String(sideB.id)], 1516);
+  assert.equal(
+    taste.read("alice").signals.filter((signal) => signal.kind === "preferred").length,
+    1,
+  );
+  assert.equal((await request("/undo", undo)).status, 200);
+  assert.ok(sides.every((item) => item.dream?.state === "unseen" && !item.rating));
+  assert.deepEqual(dream.read("alice").ratings, {});
+  assert.equal(
+    taste.read("alice").signals.filter((signal) => signal.kind === "preferred").length,
+    0,
+  );
+  assert.equal((await request(`/pairs/${pair}/answer`, { answer: "b" })).status, 200);
   // The same image never starts a second comparison.
   assert.deepEqual(dream.read("alice").compared, ["base"]);
 

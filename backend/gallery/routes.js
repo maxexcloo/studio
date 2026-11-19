@@ -35,10 +35,12 @@ import {
   hideGalleryItems,
   outputFileCandidates,
   pageGallery,
+  pageLibraryReview,
   removeGalleryItems,
   resultNumbers,
   searchWords,
   setGalleryRatings,
+  setLibraryReviewed,
   visibleGallery,
 } from "./store.js";
 
@@ -112,6 +114,18 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
    * single values.
    */
   const one = (value) => String((Array.isArray(value) ? value[0] : value) ?? "").slice(0, 200);
+
+  directRoute(app, "GET", "/api/gallery/library-review", (account, { query }) => {
+    const seed = one(query.seed);
+    const cursor = one(query.cursor);
+    if (!/^[-\w]{1,64}$/.test(seed) || (cursor && !/^[0-9a-f]{64}$/.test(cursor)))
+      return { status: 400, payload: { error: "Invalid library review seed or cursor." } };
+    const limit = Math.min(60, Math.max(1, Math.trunc(Number(query.limit)) || 24));
+    const page = ownedQuery(account)
+      ? pageLibraryReview(ownerIdForRequest({ studioAccount: account }), seed, cursor, limit)
+      : { items: [], nextCursor: "", remaining: 0 };
+    return { status: 200, payload: { ...page, items: page.items.map(listedRecord) } };
+  });
   const many = (value) =>
     (Array.isArray(value) ? value : [value])
       .map((item) => String(item ?? "").slice(0, 200))
@@ -363,6 +377,17 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
 
 /** `rated` hears which of the caller's items changed, and any issue reported, for the taste profile. */
 export function registerGalleryHistoryRoutes(app, { rated = () => {} } = {}) {
+  directRoute(app, "POST", "/api/gallery/library-review/:id", (account, { params, body }) => {
+    if (typeof body?.reviewed !== "boolean")
+      return { status: 400, payload: { error: "Specify whether the item was reviewed." } };
+    if (
+      !ownedQuery(account) ||
+      !setLibraryReviewed(ownerIdForRequest({ studioAccount: account }), params.id, body.reviewed)
+    )
+      return { status: 404, payload: { error: "That item is no longer available for review." } };
+    return { status: 200, payload: { ok: true } };
+  });
+
   // A selection is posted, as it may be too long for a URL, and downloads through a short-lived
   // link that only its own account can open.
   const selections = new Map();

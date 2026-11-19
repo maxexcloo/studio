@@ -130,6 +130,7 @@ type Rating = "liked" | "disliked" | null;
 interface DreamMark extends Omit<DreamOrigin, "state"> {
   state: DreamState;
   decidedAt?: string;
+  comparison?: { delta: number; previousRating: Rating; liked?: true };
 }
 export type DreamItem = QueueMedia & {
   number?: number;
@@ -2647,9 +2648,9 @@ export function createDream(options: {
   }
   /**
    * Keeps or discards a result: a discard is disliked, kept and hidden, and keeping it again takes
-   * the dislike back. `teach` is false where the caller teaches the taste profile.
+   * the dislike back.
    */
-  function decide(ownerId: string, itemId: string, state: "kept" | "discarded", teach = true) {
+  function decide(ownerId: string, itemId: string, state: "kept" | "discarded") {
     const item = find(ownerId, itemId);
     if (item.status !== "done") throw failure("That Dream result is not finished yet.", 409);
     const rating =
@@ -2660,10 +2661,9 @@ export function createDream(options: {
     const dream: DreamMark =
       item.dream!.state === state ? item.dream! : { ...item.dream!, state, decidedAt: stamp() };
     options.mark(ownerId, itemId, dream, rating);
-    if (teach)
-      options.taste.record(ownerId, [
-        tasteSignal(state === "kept" ? "keep" : "discard", item.jobId, itemValues(item)),
-      ]);
+    options.taste.record(ownerId, [
+      tasteSignal(state === "kept" ? "keep" : "discard", item.jobId, itemValues(item)),
+    ]);
     return { ...item, dream, rating };
   }
 
@@ -2790,26 +2790,48 @@ export function createDream(options: {
         .reverse();
     },
     /** Answers a comparison: A or B keeps that side, Both keeps both and Neither discards both. */
-    answer(ownerId: string, pairId: string, answer: PairAnswer) {
+    answer(ownerId: string, pairId: string, answer: PairAnswer, like = false) {
       const sides = pool(ownerId, "unseen")
         .filter((item) => item.dream?.pair?.id === pairId && item.status === "done")
         .sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side);
       if (sides.length !== 2) throw failure("That comparison is unavailable.", 404);
       const [a, b] = sides;
       const kept: DreamItem[] = { a: [a], b: [b], both: [a, b], neither: [] }[answer];
-      const items = sides.map((item) =>
-        decide(ownerId, String(item.id), kept.includes(item) ? "kept" : "discarded", false),
-      );
       const side = (item: DreamItem) => ({
         jobId: item.jobId,
         values: itemValues(item),
         label: item.dream!.pair!.label,
       });
-      options.taste.record(ownerId, [pairSignal(a.dream!.pair!, answer, side(a), side(b))]);
-      const record = read(ownerId);
-      rate(record, String(a.id), String(b.id), { a: 1, b: 0, both: 0.5, neither: 0.5 }[answer]);
-      write(ownerId, record);
-      return items;
+      return runtimeTransaction(options.dataDir, () => {
+        const record = read(ownerId);
+        const ids = sides.map((item) => String(item.id));
+        const previous = ids.map((id) => record.ratings?.[id] ?? elo.start);
+        rate(record, ids[0], ids[1], { a: 1, b: 0, both: 0.5, neither: 0.5 }[answer]);
+        const decidedAt = stamp();
+        const items = sides.map((item, index) => {
+          const keep = kept.includes(item);
+          const liked = like && keep;
+          const rating = keep && item.rating !== "disliked" ? item.rating : undefined;
+          const dream: DreamMark = {
+            ...item.dream!,
+            state: keep ? "kept" : "discarded",
+            decidedAt,
+            comparison: {
+              delta: record.ratings![ids[index]] - previous[index],
+              previousRating:
+                item.rating === "liked" || item.rating === "disliked" ? item.rating : null,
+              ...(liked && { liked: true }),
+            },
+          };
+          const settled = keep ? rating : "disliked";
+          options.mark(ownerId, ids[index], dream, settled);
+          if (liked) options.rate(ownerId, ids[index], "liked");
+          return { ...item, dream, rating: liked ? "liked" : settled };
+        });
+        options.taste.record(ownerId, [pairSignal(a.dream!.pair!, answer, side(a), side(b))], true);
+        write(ownerId, record);
+        return items;
+      });
     },
     /** Keeps a result and steers the next few ideas toward it. */
     more(ownerId: string, itemId: string) {
@@ -2985,6 +3007,7 @@ export function createDream(options: {
       if (rating !== undefined && items[0].status !== "done")
         throw failure("That result is no longer finished.", 409);
       runtimeTransaction(options.dataDir, () => {
+        const record = read(ownerId);
         const signals = options.taste.read(ownerId).signals;
         const jobIds = items.flatMap((item) => (item.jobId ? [String(item.jobId)] : []));
         const starts = items.flatMap((item) =>
@@ -2998,11 +3021,23 @@ export function createDream(options: {
         if (!calibration)
           for (const item of items)
             if (item.dream && item.dream.state !== "unseen") {
-              const { decidedAt: _, ...mark } = item.dream;
-              options.mark(ownerId, String(item.id), { ...mark, state: "unseen" }, undefined);
+              const { decidedAt: _, comparison, ...mark } = item.dream;
+              const id = String(item.id);
+              if (comparison && record.ratings) {
+                const restored = (record.ratings[id] ?? elo.start) - comparison.delta;
+                if (restored === elo.start) delete record.ratings[id];
+                else record.ratings[id] = restored;
+              }
+              if (comparison?.liked && item.rating === "liked")
+                options.rate(ownerId, id, comparison.previousRating);
+              options.mark(
+                ownerId,
+                id,
+                { ...mark, state: "unseen" },
+                comparison?.previousRating ?? undefined,
+              );
             }
         if (starts.length) options.taste.takeBack(ownerId, jobIds, starts.sort()[0]);
-        const record = read(ownerId);
         record.judged = (record.judged || []).filter((id) => !ids.includes(id));
         write(ownerId, record);
       });

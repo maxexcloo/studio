@@ -158,8 +158,9 @@ recur across features.
   the card reaches the bottom safe area with the buttons floating over it.
   Undo beside the view menu steps back through the session's judgements. Its preview is the same
   card full screen, zooming as the viewer does, with Undo, Close and the
-  buttons floating over it; its swipes judge too, except on a comparison,
-  where they move between the sides and This Image answers for the side shown.
+  buttons floating over it. On a comparison, This Image picks the shown side.
+  Like and the upward swipe pick and rate that side. Sideways swipes in the
+  preview switch sides.
 - A finished selection action ends the selection, keeping selected only the
   items it failed for; opening a menu does not. Quick selects take every
   match, not only loaded pages, and deletion confirms.
