@@ -13,11 +13,10 @@ export function useTryAgain(items: MediaItem[]) {
   const { mutateAsync } = useMutation({
     mutationKey: queueActionKey,
     mutationFn: (body: { ids: string[] }) => post<QueueRetryResponse>("/api/queue/retry", body),
-    onSettled: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: queueQuery.queryKey }),
-        client.invalidateQueries({ queryKey: galleryKey }),
-      ]),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: queueQuery.queryKey });
+      void client.invalidateQueries({ queryKey: galleryKey });
+    },
   });
 
   return useCallback(
