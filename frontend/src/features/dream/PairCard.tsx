@@ -36,12 +36,26 @@ export function PairContent({
   return (
     <>
       <div className={classes.caption}>
-        <Text fw={500} ta="center" lineClamp={sideways ? undefined : 1}>
+        <Text
+          fw={600}
+          size="sm"
+          ta="center"
+          truncate={!card.pairId}
+          lineClamp={sideways || !card.pairId ? undefined : 1}
+        >
           {card.question}
+          {!card.pairId && (
+            <Text span size="xs" fw={400} c="dimmed">
+              {" "}
+              · From Your Gallery
+            </Text>
+          )}
         </Text>
-        <Text size="xs" c="dimmed" ta="center" lineClamp={sideways ? undefined : 1}>
-          {card.pairId ? "Alike but for one thing" : "From your gallery"} · Tap to Look Closer
-        </Text>
+        {card.pairId && (
+          <Text size="xs" c="dimmed" ta="center">
+            Alike but for one thing
+          </Text>
+        )}
       </div>
       <div ref={pair} className={classes.pair} data-stacked={!beside || undefined}>
         {card.items.map((item, index) => {

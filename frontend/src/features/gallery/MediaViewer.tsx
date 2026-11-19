@@ -1,20 +1,14 @@
 import {
   ActionIcon,
   Badge,
-  Drawer,
-  FocusTrap,
   Group,
   Modal,
-  ScrollArea,
-  Stack,
-  Text,
   Tooltip,
   UnstyledButton,
   VisuallyHidden,
   getDefaultZIndex,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { X } from "lucide-react";
 import {
   type PointerEvent,
   Suspense,
@@ -34,14 +28,12 @@ import { ActionBarSurface, type ActionGroups, findAction, usualAction } from "..
 import { useMotionDuration } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { closeWhenTop, closingPopup, layerAbove } from "../../ui/popupClicks";
+import { closingPopup, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
-import { useGenerationActions } from "../generation/GenerationProvider";
 import { queueQuery } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { MediaDetails, MediaDetailsMetadata, recordedModel } from "./MediaDetails";
 import { MediaJobStatus } from "./MediaJobStatus";
 import { mediaTitle } from "./mediaLabels";
 import { mediaSource, playbackUrl } from "./mediaSource";
@@ -53,6 +45,8 @@ import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { useMediaRating } from "./useMediaRating";
 import { useVideoSound } from "./useVideoSound";
 import { playVideo } from "./videoPlayback";
+import { ViewerChrome, viewerBadge } from "./ViewerChrome";
+import { ViewerDetails } from "./ViewerDetails";
 
 import classes from "./MediaViewer.module.css";
 const MediaComparison = lazy(() =>
@@ -471,21 +465,6 @@ export function MediaViewer({
   }, [item.id]);
   // The phone details sheet opens above the action bar, which stays in reach without its prompt.
   const bar = useRef<HTMLDivElement>(null);
-  const [barOffset, setBarOffset] = useState(0);
-  useLayoutEffect(() => {
-    const element = bar.current;
-    if (!phone || !sheet || !element) return;
-    const measure = () =>
-      setBarOffset(Math.max(0, window.innerHeight - element.getBoundingClientRect().top));
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    window.addEventListener("resize", measure);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [phone, sheet, item.id]);
   const [ZoomImage] = useState(() => zoomImage || LazyZoomImage);
   const [deleting, setDeleting] = useState(false);
   const shortcutActions = useRef<ActionGroups>([]);
@@ -499,18 +478,8 @@ export function MediaViewer({
   const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
   const comparisonPath = comparison && `/compare/${comparison}`;
   const pathname = useLocation().pathname;
-  const { profiles } = useGenerationActions();
-  const model = bare ? "" : recordedModel(displayed, profiles);
-  const badge = {
-    variant: "default",
-    size: "lg",
-    radius: "xl",
-    style: glass,
-    fw: 500,
-    miw: 0,
-  } as const;
   const setBadge = {
-    ...badge,
+    ...viewerBadge,
     // Phones show only the place; Details names the set.
     children: phone
       ? `${members.findIndex((member) => member.id === item.id) + 1} / ${members.length}`
@@ -557,17 +526,22 @@ export function MediaViewer({
     },
     [],
   );
-  const detailsPanel = (
-    <MediaDetails
+  const detailsSurface = !bare && (
+    <ViewerDetails
       item={displayed}
+      title={mediaTitle(item)}
       related={related}
-      open={
+      follow={
         follow &&
         ((next) => {
           setCompare(false);
           follow(next);
         })
       }
+      opened={phone ? sheet : details}
+      phone={phone}
+      close={() => setSheet(false)}
+      bottomBar={bar}
     />
   );
   const toggleDetails = () => {
@@ -732,18 +706,11 @@ export function MediaViewer({
           data-chrome-hidden={chromeHidden || undefined}
         >
           <div className={classes.main}>
-            <Group
-              className={classes.topBar}
-              data-chrome
-              role="group"
-              aria-label="Viewer Header"
-              justify="space-between"
-              wrap="nowrap"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <Group gap={6} wrap="nowrap" miw={0}>
-                {canNavigate && itemLabel ? (
-                  <Badge {...badge}>{itemLabel(item)}</Badge>
+            <ViewerChrome
+              item={bare ? undefined : displayed}
+              label={
+                canNavigate && itemLabel ? (
+                  <Badge {...viewerBadge}>{itemLabel(item)}</Badge>
                 ) : item.resultSet ? (
                   comparisonPath && comparisonPath !== pathname ? (
                     <Badge
@@ -756,42 +723,17 @@ export function MediaViewer({
                     <Badge {...setBadge} />
                   )
                 ) : canNavigate ? (
-                  <Badge {...badge}>
+                  <Badge {...viewerBadge}>
                     {currentIndex + 1} / {Math.max(total ?? 0, viewable.length)}
                   </Badge>
-                ) : null}
-                {model && (
-                  <Badge {...badge} className={classes.modelBadge} title={model}>
-                    {model}
-                  </Badge>
-                )}
-              </Group>
-              <Group gap={6} wrap="nowrap" className={classes.topActions}>
-                {!bare && (
-                  <Tooltip label={phone ? "Details" : details ? "Hide Details" : "Show Details"}>
-                    <ActionIcon
-                      data-autofocus
-                      variant="default"
-                      aria-label="Generation Details"
-                      aria-expanded={phone ? sheet : details}
-                      onClick={toggleDetails}
-                    >
-                      <icons.details size={18} />
-                    </ActionIcon>
-                  </Tooltip>
-                )}
-                <Tooltip label="Close (Esc)">
-                  <ActionIcon
-                    data-autofocus={bare || undefined}
-                    variant="default"
-                    aria-label={bare ? "Close Preview" : "Close Generation"}
-                    onClick={close}
-                  >
-                    <X size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              </Group>
-            </Group>
+                ) : null
+              }
+              details={
+                bare ? undefined : { opened: phone ? sheet : details, phone, toggle: toggleDetails }
+              }
+              closeLabel={bare ? "Close Preview" : "Close Generation"}
+              close={close}
+            />
             <div ref={containStage} className={classes.stage} tabIndex={-1}>
               {showTogether ? (
                 // Each side opens alone; the current one, whose details show, is outlined.
@@ -987,55 +929,9 @@ export function MediaViewer({
               />
             )}
           </div>
-          {!phone && !bare && (
-            // The track opens at once so the stage re-centres while the panel slides in.
-            <div className={classes.asideTrack} data-open={details || undefined}>
-              <aside
-                className={classes.aside}
-                data-chrome
-                aria-label="Generation Details"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <ScrollArea h="100%" type="hover" offsetScrollbars>
-                  <Stack gap="lg" p="md" pt="lg">
-                    <Stack gap={2} miw={0}>
-                      <Text fw={600} lineClamp={2}>
-                        {mediaTitle(item)}
-                      </Text>
-                      <MediaDetailsMetadata item={displayed} />
-                    </Stack>
-                    {detailsPanel}
-                  </Stack>
-                </ScrollArea>
-              </aside>
-            </div>
-          )}
+          {!phone && detailsSurface}
         </div>
-        {phone && !bare && (
-          <Drawer
-            id="details-sheet"
-            opened={sheet}
-            onClose={closeWhenTop("details-sheet", () => setSheet(false))}
-            position="bottom"
-            size="80%"
-            radius="lg"
-            title={mediaTitle(item)}
-            closeButtonProps={{ "aria-label": "Close Details" }}
-            // The title scrolls away with the details instead of staying pinned.
-            styles={{
-              // The metadata sits close under the title, as on desktop.
-              header: { position: "static", paddingBottom: 0 },
-              inner: { bottom: barOffset },
-              overlay: { bottom: barOffset },
-            }}
-          >
-            <FocusTrap.InitialFocus />
-            <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
-              <MediaDetailsMetadata item={displayed} />
-              {detailsPanel}
-            </Stack>
-          </Drawer>
-        )}
+        {phone && detailsSurface}
       </Modal>
       <DeleteMediaDialog
         opened={deleting}

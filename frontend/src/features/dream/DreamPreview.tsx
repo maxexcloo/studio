@@ -1,4 +1,4 @@
-import { Badge, Button, CloseButton, Group, Modal, Text, VisuallyHidden } from "@mantine/core";
+import { Badge, Button, Group, Modal, Text, VisuallyHidden } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import {
   type KeyboardEvent,
@@ -6,6 +6,7 @@ import {
   type ReactNode,
   Suspense,
   lazy,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -14,8 +15,13 @@ import {
 import { loraName } from "../../../../shared/profiles";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
+import { closeWhenTop } from "../../ui/popupClicks";
+import { usePhone } from "../../ui/usePhone";
+import { mediaTitle } from "../gallery/mediaLabels";
 import { mediaSource } from "../gallery/mediaSource";
 import { dragAxis, swipeDirection } from "../gallery/swipe";
+import { ViewerChrome, viewerBadge } from "../gallery/ViewerChrome";
+import { ViewerDetails } from "../gallery/ViewerDetails";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import type { Choice } from "./choices";
 import type { DeckCard, PairDeckCard } from "./deck";
@@ -25,6 +31,7 @@ import { covers, useBoxShape } from "./mediaFit";
 import { sideLabel } from "./PairCard";
 import type { DreamItem } from "./queries";
 
+import viewerClasses from "../gallery/MediaViewer.module.css";
 import classes from "./DreamPage.module.css";
 
 const ZoomImage = lazy(() =>
@@ -32,15 +39,7 @@ const ZoomImage = lazy(() =>
 );
 
 /** Why Dream made a result, its prompt and the LoRAs it tried, each rated here; `full` unclamped. */
-export function Caption({
-  item,
-  full = false,
-  readOnly = false,
-}: {
-  item: DreamItem;
-  full?: boolean;
-  readOnly?: boolean;
-}) {
+function Caption({ item, full }: { item: DreamItem; full: boolean }) {
   const info = useQuery(loraInfoQuery);
   // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's Liked LoRAs.
   const loras = (Array.isArray(item.settings?.loras) ? item.settings.loras : [])
@@ -63,7 +62,7 @@ export function Caption({
             <Text size="xs" truncate>
               LoRA: {title}
             </Text>
-            {!readOnly && <LoraRatings file={file} title={title} />}
+            <LoraRatings file={file} title={title} />
           </Group>
         );
       })}
@@ -71,56 +70,26 @@ export function Caption({
   );
 }
 
-/**
- * A card's text over the bottom of its media on a dark scrim: a Dream result's caption, or a
- * gallery image's prompt alone. With `expand` a tap shows it all, scrolling within the scrim.
- */
+/** The deck's short caption over the media, or alongside it when held sideways. */
 export function CardText({
   item,
   dreamt,
-  readOnly = false,
-  expand = false,
   full = false,
 }: {
   item: MediaItem;
   dreamt: boolean;
-  readOnly?: boolean;
-  expand?: boolean;
-  /** All of it from the start, as in a sideways phone's text column. */
   full?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const text = dreamt ? (
-    <Caption item={item as DreamItem} full={full || expanded} readOnly={readOnly} />
-  ) : (
-    <div className={classes.caption}>
-      <Text size="sm" c="dimmed" lineClamp={full || expanded ? undefined : 2}>
-        {item.prompt}
-      </Text>
-    </div>
-  );
   return (
     <div className={classes.overlay}>
-      {expand ? (
-        <div
-          className={classes.overlayText}
-          role="button"
-          tabIndex={0}
-          aria-expanded={expanded}
-          aria-label={expanded ? "Show Less" : "Show More"}
-          // Expanded, the text scrolls rather than swiping the card.
-          data-scrolls={expanded || undefined}
-          onClick={() => setExpanded(!expanded)}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" && event.key !== " ") return;
-            event.preventDefault();
-            setExpanded(!expanded);
-          }}
-        >
-          {text}
-        </div>
+      {dreamt ? (
+        <Caption item={item as DreamItem} full={full} />
       ) : (
-        text
+        <div className={classes.caption}>
+          <Text size="sm" c="dimmed" lineClamp={full ? undefined : 2}>
+            {item.prompt}
+          </Text>
+        </div>
       )}
     </div>
   );
@@ -153,28 +122,16 @@ function PreviewImage({ item }: { item: MediaItem }) {
   );
 }
 
-/** One result's face in the preview: its media edge to edge, its text over the bottom. */
-export function PreviewFace({
-  item,
-  dreamt,
-  active = true,
-}: {
-  item: MediaItem;
-  dreamt: boolean;
-  /** A comparison's hidden side shows its still. */
-  active?: boolean;
-}) {
+/** A preview fills its stage. A comparison's hidden side shows a still. */
+export function PreviewFace({ item, active = true }: { item: MediaItem; active?: boolean }) {
   return (
-    <>
-      <div className={classes.media}>
-        {item.type === "image" ? (
-          <PreviewImage item={item} />
-        ) : (
-          <DeckMedia item={item} playing={active} />
-        )}
-      </div>
-      <CardText item={item} dreamt={dreamt} readOnly expand />
-    </>
+    <div className={classes.media}>
+      {item.type === "image" ? (
+        <PreviewImage item={item} />
+      ) : (
+        <DeckMedia item={item} playing={active} />
+      )}
+    </div>
   );
 }
 
@@ -255,18 +212,14 @@ export function PreviewSides({
           aria-hidden={index !== side}
           inert={index !== side}
         >
-          <PreviewFace item={item} dreamt={!!card.pairId} active={index === side} />
+          <PreviewFace item={item} active={index === side} />
         </section>
       ))}
     </div>
   );
 }
 
-/**
- * The top card full screen, with the next waiting behind (`children`, the deck's own swipe cards):
- * its media edge to edge with its text over the bottom, and the deck's answers, Undo and Close
- * floating over it. Answers and swipes judge here, and Undo steps back, as on the deck.
- */
+/** The deck's cards in the shared viewer chrome, with Dream's own verdicts and Undo. */
 export function DreamPreview({
   card,
   side,
@@ -286,10 +239,18 @@ export function DreamPreview({
   undo: () => void;
   onKeyDown: (event: KeyboardEvent) => void;
 }) {
+  const id = useId();
+  const phone = usePhone();
+  const [details, setDetails] = useState(false);
+  const bottomBar = useRef<HTMLDivElement>(null);
+  const picked = card.kind === "pair" ? card.items[side] : card.item;
+  const item = picked as DreamItem;
+  const title = mediaTitle(item);
   return (
     <Modal
+      id={id}
       opened
-      onClose={close}
+      onClose={closeWhenTop(id, close)}
       fullScreen
       withCloseButton={false}
       padding={0}
@@ -297,47 +258,72 @@ export function DreamPreview({
       removeScrollProps={{ allowPinchZoom: true }}
       classNames={{
         content: classes.previewContent,
-        header: classes.previewHeader,
-        body: classes.preview,
+        header: viewerClasses.header,
+        body: viewerClasses.body,
       }}
-      onKeyDown={onKeyDown}
+      onKeyDown={(event) => {
+        const target = event.target as HTMLElement;
+        if (!event.currentTarget.contains(target) || target.closest("aside") || (phone && details))
+          return;
+        onKeyDown(event);
+      }}
     >
-      <div className={classes.previewStage}>{children}</div>
-      <Group className={classes.previewTop} justify="space-between" wrap="nowrap">
-        {card.kind === "pair" ? (
-          <Badge variant="default" size="lg" radius="xl" fw={500} aria-live="polite">
-            {sideLabel(card, side)}
-          </Badge>
-        ) : (
-          <span />
-        )}
-        <Group gap="xs" wrap="nowrap">
-          <Button
-            size="compact-sm"
-            variant="default"
-            radius="xl"
-            leftSection={<icons.undo size={14} />}
-            disabled={!canUndo}
-            onClick={undo}
-          >
-            Undo
-          </Button>
-          <CloseButton
-            className={classes.previewClose}
-            radius="xl"
-            aria-label="Close Preview"
-            data-autofocus
-            onClick={close}
+      <div className={viewerClasses.layout}>
+        <div className={`${viewerClasses.main} ${classes.previewMain}`}>
+          <div className={classes.previewStage}>{children}</div>
+          <ViewerChrome
+            item={item}
+            label={
+              <>
+                {card.kind === "pair" && (
+                  <Badge {...viewerBadge} aria-live="polite">
+                    {sideLabel(card, side)}
+                  </Badge>
+                )}
+                <Badge {...viewerBadge} title={title}>
+                  {title}
+                </Badge>
+              </>
+            }
+            end={
+              <Button
+                size="compact-sm"
+                variant="default"
+                radius="xl"
+                leftSection={<icons.undo size={14} />}
+                disabled={!canUndo}
+                onClick={undo}
+              >
+                Undo
+              </Button>
+            }
+            details={{ phone, opened: details, toggle: () => setDetails((open) => !open) }}
+            close={close}
+            closeLabel="Close Preview"
+            focusClose
           />
-        </Group>
-      </Group>
-      <div className={classes.previewButtons}>
-        <DeckButtons
-          card={card}
-          act={act}
-          hidden={false}
-          shown={card.kind === "pair" ? side : undefined}
-        />
+          <div ref={bottomBar} className={classes.previewButtons}>
+            <DeckButtons
+              card={card}
+              act={act}
+              hidden={false}
+              shown={card.kind === "pair" ? side : undefined}
+            />
+          </div>
+        </div>
+        <ViewerDetails
+          item={item}
+          opened={details}
+          phone={phone}
+          close={() => setDetails(false)}
+          bottomBar={bottomBar}
+        >
+          {item.dream?.why && (
+            <Text size="sm" c="dimmed">
+              {item.dream.why}
+            </Text>
+          )}
+        </ViewerDetails>
       </div>
     </Modal>
   );
