@@ -195,15 +195,7 @@ function Gallery() {
     () => ({ search, kind, filters, similar, strictness, setId, chat, turn, sort }) as const,
     [search, kind, filters, similar, strictness, setId, chat, turn, sort],
   );
-  // The listing key (as JSON) whose every match a quick select is loading: its later pages,
-  // refetches included, then come 500 at a time.
-  const everyMatch = useRef("");
-  const listingQuery = useMemo(() => {
-    const options = galleryQuery(listing, (cursor) =>
-      cursor && everyMatch.current === JSON.stringify(options.queryKey) ? 500 : 60,
-    );
-    return options;
-  }, [listing]);
+  const listingQuery = useMemo(() => galleryQuery(listing), [listing]);
   const listingKey = listingQuery.queryKey;
   const gallery = useInfiniteQuery({
     ...listingQuery,
@@ -227,7 +219,7 @@ function Gallery() {
     queryFn: async ({ signal }) => {
       const held = client.getQueryData<InfiniteData<GalleryResultsPage, string>>(listingKey);
       const known = new Set(held?.pages.flatMap((page) => page.items.map(mediaIdentity)));
-      const first = await galleryPage(listing, "", 60, signal);
+      const first = await galleryPage(listing, "", signal);
       // If more than a page arrived while away, bridge to the held results sequentially so no
       // matches disappear between the fresh first page and the old continuation cursor.
       let edge = first;
@@ -236,7 +228,7 @@ function Gallery() {
         edge.hasMore &&
         !edge.items.some((item) => known.has(mediaIdentity(item)))
       ) {
-        edge = await galleryPage(listing, edge.nextCursor, 60, signal);
+        edge = await galleryPage(listing, edge.nextCursor, signal);
         first.items.push(...edge.items);
       }
       if (signal.aborted) return first;
@@ -439,16 +431,14 @@ function Gallery() {
   const [resultsKey, setResultsKey] = useState(() => JSON.stringify(listingKey));
   if (!gallery.isPlaceholderData && resultsKey !== JSON.stringify(listingKey))
     setResultsKey(JSON.stringify(listingKey));
-  const loadEveryMatch = useCallback(async () => {
-    everyMatch.current = JSON.stringify(listingKey);
-    let result = gallery;
-    while (result.hasNextPage && !result.isFetchNextPageError)
-      result = await result.fetchNextPage({ cancelRefetch: false });
-    return !result.hasNextPage;
-  }, [listingKey, gallery]);
-  const selection = useGallerySelection(items, JSON.stringify(listingKey), {
+  const selection = useGallerySelection(items, JSON.stringify([listingKey, query, grouped]), {
     complete: !gallery.hasNextPage,
-    load: loadEveryMatch,
+    ready: Boolean(gallery.data) && !gallery.isPlaceholderData && query === search,
+    load: async (match, signal) => {
+      // A failed version only counts if it represents its tree. Its source may be on any page.
+      const { items: records } = await galleryPage(listing, "", signal, grouped ? "all" : match);
+      return grouped ? versionGroups(records, queue || []).map((group) => group[0]) : records;
+    },
   });
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped || Boolean(similar);
@@ -589,7 +579,7 @@ function Gallery() {
           !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
         ) {
           event.preventDefault();
-          selection.selectMatching(() => true);
+          void selection.selectMatching("all");
         }
       }}
       // Files or folders dropped on the gallery (not on the composer, which takes references) upload.

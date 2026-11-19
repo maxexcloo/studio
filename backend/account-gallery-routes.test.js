@@ -202,6 +202,50 @@ test("gallery pages and exact job reads return only the signed-in account's reco
   );
 });
 
+test("quick selection reaches older matches within the same account, search and filters", async () => {
+  const ownerId = "selection-account";
+  const account = { userId: ownerId, role: "user", authenticated: true, features: {} };
+  const records = Array.from({ length: 1_205 }, (_, index) => ({
+    ...item(ownerId, `selection-${index}`),
+    createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+    prompt: "harbour dawn",
+    model: "match-model",
+    status: index < 2 ? "failed" : "done",
+    caption: { text: "display caption", tags: ["water"] },
+  }));
+  setGallery([
+    ...records,
+    { ...records[0], id: "another-owner", url: "", ownerId: "stranger" },
+    { ...records[0], id: "wrong-model", url: "", model: "other" },
+    { ...records[0], id: "wrong-prompt", url: "", prompt: "mountain" },
+    { ...records[0], id: "wrong-rating", url: "", rating: "disliked" },
+    { ...records[0], id: "wrong-type", url: "", type: "video" },
+  ]);
+  const listing = { type: "image", q: "harbour", model: "match-model", limit: "60" };
+  const get = (query, studioAccount = account) =>
+    call(routes["/api/gallery"], { studioAccount, query: { ...listing, ...query } });
+  const first = await get({});
+  assert.equal(first.items.length, 60);
+  assert.equal(first.hasMore, true);
+  assert.ok(first.items.every(({ status }) => status === "done"));
+  const failed = await get({ select: "failed" });
+  assert.deepEqual(
+    failed.items.map(({ id }) => id),
+    [records[1].id, records[0].id],
+  );
+  assert.equal(failed.hasMore, false);
+  const all = await get({ select: "all" });
+  assert.deepEqual(
+    all.items.map(({ id }) => id),
+    records.map(({ id }) => id).reverse(),
+  );
+  assert.equal(all.items[0].url, first.items[0].url);
+  assert.equal(all.items[0].caption, undefined);
+  assert.equal(all.items[0].number, undefined);
+  assert.deepEqual((await get({ select: "all" }, null)).items, []);
+  assert.deepEqual(await get({}), first, "quick selection leaves ordinary pagination intact");
+});
+
 test("viewer numbers resolve only the caller's output and survive its pending media ID", async () => {
   const ownerId = "viewer-account";
   const account = { userId: ownerId, role: "user", authenticated: true, features: {} };
@@ -651,15 +695,22 @@ test("queued work leads the first page, but a retry waits in its original's plac
     { ...item(ownerId, "newer"), createdAt: "2026-10-20T00:00:00.000Z" },
     { ...item(ownerId, "older"), createdAt: "2026-10-10T00:00:00.000Z" },
   ]);
-  const page = await call(routes["/api/gallery"], {
-    studioAccount: { userId: ownerId, role: "user", authenticated: true, features: {} },
-    query: {},
-  });
+  const get = (query) =>
+    call(routes["/api/gallery"], {
+      studioAccount: { userId: ownerId, role: "user", authenticated: true, features: {} },
+      query,
+    });
+  const page = await get({});
   assert.deepEqual(
     page.items.map((row) => row.jobId),
     [waiting.id, "newer", retry.id, "older"],
   );
   assert.equal(page.items[2].createdAt, retry.createdAt);
   assert.equal(page.items[2].galleryAt, retry.galleryAt);
+  assert.deepEqual(
+    (await get({ select: "all", limit: "1" })).items.map((row) => row.jobId),
+    [waiting.id, "newer", "older"],
+    "a quick select includes queued tiles in the list, leaving a retry beyond page one to start",
+  );
   for (const job of [waiting, retry]) queue.save({ ...job, status: "cancelled" });
 });

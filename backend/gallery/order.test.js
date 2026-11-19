@@ -72,9 +72,9 @@ test("a removed cursor continues through the bucket boundary and descending id t
 test("oldest and liked-first order all pages before slicing, keeping result sets together", () => {
   const resultSet = { id: "set" };
   setGallery([
-    item("old", "2026-01-01"),
+    item("old", "2026-01-01", { status: "failed" }),
     item("liked", "2026-01-02", { rating: "liked", resultSet }),
-    item("set-peer", "2026-01-03", { resultSet }),
+    item("set-peer", "2026-01-03", { status: "failed", resultSet }),
     item("new", "2026-01-04"),
     item("hidden", "2026-01-05", { rating: "disliked" }),
   ]);
@@ -87,6 +87,11 @@ test("oldest and liked-first order all pages before slicing, keeping result sets
     assert.equal(first.totalApprox, 4);
     assert.deepEqual(ids([...first.items, ...second.items]), expected);
     assert.equal(second.hasMore, false);
+    assert.deepEqual(ids(pageGallery({ sort, selection: "all", limit: 2 }).items), expected);
+    assert.deepEqual(
+      ids(pageGallery({ sort, selection: "failed", limit: 2 }).items),
+      expected.filter((id) => id === "old" || id === "set-peer"),
+    );
   }
 });
 

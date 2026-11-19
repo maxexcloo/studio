@@ -29,14 +29,16 @@ export interface GalleryListing {
   chat?: string;
   turn?: string;
 }
+export type GalleryQuickSelect = "all" | "failed";
+
 export function galleryPage(
   listing: GalleryListing,
   cursor: string,
-  limit = 60,
   signal?: AbortSignal,
+  selection?: GalleryQuickSelect,
 ) {
   const params = new URLSearchParams({
-    limit: String(limit),
+    limit: "60",
     cursor,
     q: listing.search,
     type: listing.kind,
@@ -50,13 +52,10 @@ export function galleryPage(
   if (listing.setId) params.set("set", listing.setId);
   if (listing.chat) params.set("chat", listing.chat);
   if (listing.chat && listing.turn) params.set("turn", listing.turn);
+  if (selection) params.set("select", selection);
   return api<GalleryResultsPage>(`/api/gallery?${params}`, { signal });
 }
-/** A gallery listing a page at a time; `limit` sizes each page after the first. */
-export const galleryQuery = (
-  listing: GalleryListing,
-  limit: (cursor: string) => number = () => 60,
-) =>
+export const galleryQuery = (listing: GalleryListing) =>
   infiniteQueryOptions({
     // The kind stays third: GalleryPage keeps results only while it matches.
     queryKey: [
@@ -70,7 +69,7 @@ export const galleryQuery = (
       listing.sort || "newest",
     ],
     initialPageParam: "",
-    queryFn: ({ pageParam, signal }) => galleryPage(listing, pageParam, limit(pageParam), signal),
+    queryFn: ({ pageParam, signal }) => galleryPage(listing, pageParam, signal),
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
   });
 
