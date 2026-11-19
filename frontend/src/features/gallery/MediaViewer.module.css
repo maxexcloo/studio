@@ -59,7 +59,8 @@
 .topBar {
   position: absolute;
   top: calc(var(--mantine-spacing-sm) + env(safe-area-inset-top));
-  inset-inline: var(--mantine-spacing-sm);
+  right: calc(var(--mantine-spacing-sm) + env(safe-area-inset-right));
+  left: calc(var(--mantine-spacing-sm) + env(safe-area-inset-left));
   z-index: 3;
   pointer-events: none;
 }
@@ -79,11 +80,6 @@
   overscroll-behavior-x: contain;
   /* It holds focus only for the viewer's keys while navigation replaces the focused media. */
   outline: none;
-}
-
-/* Desktop media keeps an even margin above and below instead of meeting the top edge. */
-:where(:root:not([data-phone])) .stage {
-  padding-block: var(--mantine-spacing-md);
 }
 
 /* The current media between its neighbours, which wait a gap beyond either edge. */
@@ -208,8 +204,7 @@
   align-items: center;
   gap: var(--mantine-spacing-xs);
   flex-shrink: 0;
-  padding: var(--mantine-spacing-xs) var(--mantine-spacing-md)
-    calc(var(--mantine-spacing-md) + env(safe-area-inset-bottom));
+  padding: 0 var(--mantine-spacing-md) calc(var(--mantine-spacing-md) + env(safe-area-inset-bottom));
 }
 
 .dock > * {
@@ -375,9 +370,12 @@
   padding-bottom: calc(var(--mantine-spacing-sm) + env(safe-area-inset-bottom));
 }
 
-/* A set's place shortens rather than pushing the top bar's buttons away. */
-.setPosition {
-  flex-shrink: 1;
+.modelBadge {
+  flex-shrink: 2;
+}
+
+.topActions {
+  flex-shrink: 0;
 }
 
 /* A touch tap on the media fades the chrome out and back. Hidden chrome stays in the accessibility
