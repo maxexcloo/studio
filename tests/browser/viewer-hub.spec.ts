@@ -198,7 +198,10 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
     const profileMenu = page.getByRole("menuitem", { name: "Profile", exact: true });
     if (isMobile) await profileMenu.click();
     else await profileMenu.hover();
-    await page.getByRole("menuitemradio", { name, exact: true }).click();
+    const choice = page.getByRole("menuitemradio", { name, exact: true });
+    await choice.click();
+    await expect(choice).toBeHidden();
+    await expect(profileMenu).toContainText(name);
   };
   // Edit and Recreate open the same dialog and keep its last request.
   const askForChange = async (mode: "Edit" | "Recreate", request?: string, profile?: string) => {
@@ -243,7 +246,6 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
   await editProfile("Automatic");
   const review = page.getByRole("menuitem", { name: "Review Prompt", exact: true });
   await page.keyboard.press("Escape");
-  if (await review.isVisible()) await page.keyboard.press("Escape");
   await expect(review).toBeHidden();
   await surface.getByRole("button", { name: "Run", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -1190,7 +1192,10 @@ test("Animate can pick a compatible profile over the saved default route", async
   if (isMobile) await profileMenu.click();
   else await profileMenu.hover();
   await expect(page.getByRole("menuitemradio", { name: "Automatic", exact: true })).toBeChecked();
-  await page.getByRole("menuitemradio", { name: "Motion Quality", exact: true }).click();
+  const localProfile = page.getByRole("menuitemradio", { name: "Motion Quality", exact: true });
+  await localProfile.click();
+  await expect(localProfile).toBeHidden();
+  await expect(profileMenu).toContainText("Motion Quality");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({

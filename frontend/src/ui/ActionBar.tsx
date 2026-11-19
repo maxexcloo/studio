@@ -148,11 +148,22 @@ const described = ({ label, description }: Action, describedBy: string) =>
  * The groups as Menu items; render inside a `Menu.Dropdown`. Options open as a submenu, or on
  * phones and touch screens expand in place under their item, never as a second floating layer.
  */
-export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
+export function ActionMenuItems({
+  groups,
+  onSelected,
+}: {
+  groups: ActionGroups;
+  onSelected?: () => void;
+}) {
   const phone = usePhone();
   const touch = useTouch();
   const inline = phone || touch;
   const [expanded, setExpanded] = useState<string | null>(null);
+  const selectionTrigger = useRef<HTMLButtonElement>(null);
+  const closeSelection = () => {
+    setExpanded(null);
+    selectionTrigger.current?.focus();
+  };
   const uid = useId();
   return shown(groups).map((group, index) => (
     <Fragment key={group[0].id}>
@@ -171,6 +182,9 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
           onClick,
         } = action;
         const describedBy = `${uid}-${id}`;
+        const radioMenu = action.menu?.some((group) =>
+          group.some((option) => option.selected !== undefined),
+        );
         if (action.heading) return <Menu.Label key={id}>{label}</Menu.Label>;
         if (action.choice)
           return (
@@ -196,6 +210,7 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                 leftSection={Icon && <Icon size={16} />}
                 rightSection={<ChevronDown size={14} className={classes.expand} />}
                 aria-expanded={open}
+                ref={radioMenu ? selectionTrigger : undefined}
                 {...described(action, describedBy)}
                 data-expanded={open || undefined}
                 disabled={disabled}
@@ -208,7 +223,10 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
               <Collapse expanded={open} keepMounted={false}>
                 <div role="group" aria-label={label} className={classes.inline}>
                   {note(action)}
-                  <ActionMenuItems groups={action.menu} />
+                  <ActionMenuItems
+                    groups={action.menu}
+                    onSelected={radioMenu ? closeSelection : undefined}
+                  />
                 </div>
               </Collapse>
             </Fragment>
@@ -221,6 +239,8 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
             <Menu.Sub
               key={id}
               position="right-start"
+              opened={radioMenu ? expanded === id : undefined}
+              onChange={radioMenu ? (next) => setExpanded(next ? id : null) : undefined}
               middlewares={
                 leaf
                   ? {
@@ -232,6 +252,7 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
             >
               <Menu.Sub.Target>
                 <Menu.Sub.Item
+                  ref={radioMenu ? selectionTrigger : undefined}
                   color={color}
                   leftSection={Icon && <Icon size={16} />}
                   disabled={disabled}
@@ -245,7 +266,10 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                 style={leaf ? { overflowY: "auto", overscrollBehavior: "contain" } : undefined}
               >
                 {note(action)}
-                <ActionMenuItems groups={action.menu} />
+                <ActionMenuItems
+                  groups={action.menu}
+                  onSelected={radioMenu ? closeSelection : undefined}
+                />
               </Menu.Sub.Dropdown>
             </Menu.Sub>
           );
@@ -287,7 +311,17 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
             {...described(action, describedBy)}
             disabled={disabled}
             closeMenuOnClick={!action.keepOpen}
-            {...(link && !disabled ? { component: "a" as const, ...link } : { onClick })}
+            {...(link && !disabled
+              ? { component: "a" as const, ...link }
+              : {
+                  onClick:
+                    selected === undefined || !onSelected
+                      ? onClick
+                      : () => {
+                          onClick?.();
+                          onSelected();
+                        },
+                })}
           >
             {itemLabel(action, describedBy)}
           </Menu.Item>
