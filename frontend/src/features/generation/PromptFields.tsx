@@ -171,9 +171,7 @@ export function PromptFields({
           variant="unstyled"
           aria-label="Prompt"
           data-autofocus={autoFocus || undefined}
-          placeholder={
-            input.kind === "image" ? "Describe the image" : "Describe the motion and camera"
-          }
+          placeholder="Prompt…"
           autosize={!fill}
           minRows={negative ? 4 : 3}
           maxRows={negative ? 4 : 10}
@@ -218,7 +216,7 @@ const NegativePrompt = memo(function NegativePrompt({
         classNames={{ input: classes.input }}
         variant="unstyled"
         aria-label="Negative Prompt"
-        placeholder="Negative prompt: what to leave out"
+        placeholder="Negative Prompt…"
         rows={2}
         inline={fill}
         value={value}
