@@ -76,7 +76,7 @@ export const icons = {
   /** Adding something: a new record, such as New Character, or a reference to an empty slot. */
   add: Plus,
   animate: Play,
-  /** Anything AI does: the prompt assistant, suggestions and variations. */
+  /** Prompt assistance, including suggestions and templates. */
   assistant: WandSparkles,
   /** Measuring a local text model's speed (Settings › Workers). */
   benchmark: Gauge,
@@ -121,7 +121,7 @@ export const icons = {
   log: ScrollText,
   loras: Puzzle,
   more: Ellipsis,
-  /** Asking Dream for more in an item's direction (More Like This). */
+  /** Variations following the direction of an item (More Like This). */
   moreLikeThis: CopyPlus,
   mute: VolumeX,
   /** Moving to the next item: the viewer's, a preview's and a comparison's arrows. */
@@ -170,7 +170,7 @@ export const icons = {
   sheet: LayoutDashboard,
   /** Revealing a hidden secret, such as the MCP token. */
   show: Eye,
-  /** Similar: the gallery ranked by likeness to an image. */
+  /** Image discovery and the gallery ranked by likeness to an image (Similar). */
   similar: ScanSearch,
   sort: ArrowDownUp,
   sound: Volume2,

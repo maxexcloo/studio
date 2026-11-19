@@ -366,7 +366,7 @@ export function useMediaActions(
                 {
                   id: "more-like-image",
                   label: "More Like This",
-                  icon: icons.assistant,
+                  icon: icons.moreLikeThis,
                   disabled: more.isPending,
                   onClick: () => more.mutate("image"),
                 },
@@ -377,7 +377,7 @@ export function useMediaActions(
                 {
                   id: "more-like-set",
                   label: "More Like This Set",
-                  icon: icons.assistant,
+                  icon: icons.moreLikeThis,
                   disabled: more.isPending,
                   onClick: () => more.mutate("set"),
                 },
