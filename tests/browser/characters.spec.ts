@@ -606,7 +606,9 @@ test("Make Sheet follows the card's sheet until its views show on the card", asy
   await views.getByRole("button", { name: "Preview Mara Front", exact: true }).click();
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
   await expect(preview.getByRole("img", { name: "Mara Front", exact: true })).toBeVisible();
-  await expect(preview.getByText("2 / 4", { exact: true })).toBeVisible();
+  await expect(preview.getByRole("status", { name: "Current Result", exact: true })).toHaveText(
+    "2 / 4",
+  );
   await page.keyboard.press("ArrowRight");
   await expect(preview.getByRole("img", { name: "Mara Side", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");

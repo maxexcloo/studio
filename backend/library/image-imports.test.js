@@ -247,7 +247,18 @@ test("a substitute lowers the grade to Close until accepted; rejecting it needs 
   assert.equal(publicImport(record).audit, "substitute", "until someone accepts it");
   // Download Missing skips the stand-in; choosing its row downloads the exact file.
   await assert.rejects(h.engine.downloadMissing(record.id), /Nothing is missing/);
-  const accepted = await h.engine.chooseSubstitute(record.id, 0, true);
+  const expected = {
+    file: "checkpoints/dreamshaper_8.safetensors",
+    substitute: "dreamshaper_9.safetensors",
+  };
+  await assert.rejects(
+    h.engine.chooseSubstitute(record.id, 0, true, {
+      ...expected,
+      substitute: "earlier.safetensors",
+    }),
+    /The substitute changed/,
+  );
+  const accepted = await h.engine.chooseSubstitute(record.id, 2, true, expected);
   assert.deepEqual(
     [accepted.resources[0].status, accepted.resources[0].accepted, publicImport(accepted).audit],
     ["substitute", true, "ready"],
