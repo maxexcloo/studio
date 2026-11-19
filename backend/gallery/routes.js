@@ -170,11 +170,14 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
   directRoute(app, "GET", "/api/gallery/library-review", (account, { query }) => {
     const seed = one(query.seed);
     const cursor = one(query.cursor);
+    const media = one(query.media);
     if (!/^[-\w]{1,64}$/.test(seed) || (cursor && !/^[0-9a-f]{64}$/.test(cursor)))
       return { status: 400, payload: { error: "Invalid library review seed or cursor." } };
+    if (media && media !== "image" && media !== "video")
+      return { status: 400, payload: { error: "Choose images or videos for library review." } };
     const limit = Math.min(60, Math.max(1, Math.trunc(Number(query.limit)) || 24));
     const page = ownedQuery(account)
-      ? pageLibraryReview(ownerIdForRequest({ studioAccount: account }), seed, cursor, limit)
+      ? pageLibraryReview(ownerIdForRequest({ studioAccount: account }), seed, cursor, limit, media)
       : { items: [], nextCursor: "", remaining: 0 };
     return { status: 200, payload: { ...page, items: page.items.map(listedRecord) } };
   });

@@ -477,7 +477,7 @@ export function DreamDeck({
               <DeckMedia item={card.item} playing={playing} />
               {(card.kind === "calibration" || card.kind === "library") && (
                 <Badge className={classes.label} variant="default">
-                  From Your Gallery
+                  {card.kind === "library" ? "Rate Your Library" : "From Your Gallery"}
                 </Badge>
               )}
               {isTop && (

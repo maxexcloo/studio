@@ -1463,9 +1463,12 @@ export async function serveDream(
       return route.fulfill({ json: { ok: true } });
     }
     const offset = Number(url.searchParams.get("cursor") || 0);
+    const media = url.searchParams.get("media");
     const entries = state.library
       .slice(offset)
-      .filter((item) => !item.rating && !state.reviewed.has(item.id));
+      .filter(
+        (item) => (!media || item.type === media) && !item.rating && !state.reviewed.has(item.id),
+      );
     const items = entries.slice(0, 2);
     const next = items.length ? state.library.indexOf(items.at(-1)) + 1 : 0;
     return route.fulfill({

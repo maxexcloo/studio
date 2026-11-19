@@ -177,50 +177,74 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   expect(dream.requests[6].body).toEqual({ ids: ["three"], rating: "liked" });
 });
 
-test("Dream continues into paged library review and Undo restores each rating", async ({
-  page,
-}) => {
+test("Images and Videos each continue into their own paged library review", async ({ page }) => {
   await fixtures(page);
   const library = [
     dreamItem("library-old", { dream: undefined, settings: undefined }),
     dreamItem("library-video", { dream: undefined, type: "video" }),
     dreamItem("library-image", { dream: undefined }),
+    dreamItem("library-third", { dream: undefined }),
   ];
-  const dream = await serveDream(page, { unseen: [dreamItem("last-dream")], library });
+  const dream = await serveDream(page, {
+    unseen: [dreamItem("last-image"), dreamItem("last-video", { type: "video" })],
+    library,
+  });
   await page.goto("/dream");
   await expect(current(page)).toBeVisible();
+  await expect(current(page)).toContainText("last-image");
   await page.getByRole("button", { name: "Accept", exact: true }).click();
   const image = page.getByRole("group", { name: "Current Gallery Image" });
   const video = page.getByRole("group", { name: "Current Gallery Video" });
   await expect(image).toContainText("library-old");
+  await expect(image).toContainText("Rate Your Library");
   await expect(image.getByRole("button", { name: "Suggest" })).toHaveCount(0);
   const view = page.getByRole("button", { name: "Dream View" });
   await view.click();
+  await expect(view).toContainText("Images");
   await expect(
-    page.getByRole("menuitem", { name: "Rate Your Library (3)", exact: true }),
-  ).toBeVisible();
+    page.getByRole("menuitem", { name: "Images", exact: true }),
+  ).toHaveAccessibleDescription("Rate Your Library (3)");
+  await expect(
+    page.getByRole("menuitem", { name: "Videos (1)", exact: true }),
+  ).toHaveAccessibleDescription("Rate Your Library (1)");
   await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(video).toContainText("library-video");
+  await expect(image).toContainText("library-image");
   await expect.poll(() => dream.reviewed.has("library-old")).toBe(true);
   await page.getByRole("button", { name: "Like", exact: true }).click();
-  await expect(image).toContainText("library-image");
-  await expect.poll(() => dream.library[1].rating).toBe("liked");
+  await expect(image).toContainText("library-third");
+  await expect.poll(() => dream.library[2].rating).toBe("liked");
   await page.getByRole("button", { name: "Dislike", exact: true }).click();
   await expect(page.getByText("Library Review Complete")).toBeVisible();
-  await expect.poll(() => dream.library[2].rating).toBe("disliked");
+  await expect.poll(() => dream.library[3].rating).toBe("disliked");
 
   const undo = page.getByRole("button", { name: "Undo", exact: true });
+  await undo.click();
+  await expect(image).toContainText("library-third");
+  await expect.poll(() => dream.library[3].rating).toBeUndefined();
   await undo.click();
   await expect(image).toContainText("library-image");
   await expect.poll(() => dream.library[2].rating).toBeUndefined();
   await undo.click();
-  await expect(video).toContainText("library-video");
-  await expect.poll(() => dream.library[1].rating).toBeUndefined();
-  await undo.click();
   await expect(image).toContainText("library-old");
   await expect.poll(() => dream.reviewed.has("library-old")).toBe(false);
+  await undo.click();
+  await expect(current(page)).toContainText("last-image");
+
+  await showView(page, "Videos (1)");
+  await expect(current(page)).toContainText("last-video");
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect(video).toContainText("library-video");
+  await expect(view).toContainText("Videos");
+  await page.getByRole("button", { name: "Like", exact: true }).click();
+  await expect(page.getByText("Library Review Complete")).toBeVisible();
+  await expect.poll(() => dream.library[1].rating).toBe("liked");
+  await undo.click();
+  await expect(video).toContainText("library-video");
+  await expect.poll(() => dream.library[1].rating).toBeUndefined();
+  await showView(page, "Images (1)");
+  await expect(current(page)).toContainText("last-image");
 });
 
 test("Suggest can queue a library item variation at its source", async ({ page }) => {
@@ -589,7 +613,6 @@ test("Dream navigation orders its views and History shows retained activity and 
   await expect(page.getByRole("menuitem")).toHaveText([
     "Images",
     "Videos",
-    "Rate Your Library (0)",
     "Projects",
     "Taste",
     "Discards",
