@@ -11,6 +11,22 @@ export const dreamDefaults = {
   videoBackend: "local" as "local" | "cloud",
 };
 export type DreamSettings = typeof dreamDefaults;
+/** Cards the Dream queue can show. A comparison is one card in its media kind. */
+export function dreamCardCounts(
+  items: readonly { id?: string; type?: string; dream?: { pair?: { id: string } } }[],
+  { enabled, paused }: Pick<DreamSettings, "enabled" | "paused">,
+) {
+  const count = (type: "image" | "video") =>
+    enabled
+      ? new Set(
+          items.filter((item) => item.type === type).map((item) => item.dream?.pair?.id ?? item.id),
+        ).size
+      : 0;
+  const images = count("image");
+  const videos = count("video");
+  return { unseen: images + videos, images, videos, active: enabled && !paused };
+}
+
 /**
  * The settings an administrator may force on every account (Settings › Generation), overriding each
  * account's own choice; unset leaves the account's choice.
