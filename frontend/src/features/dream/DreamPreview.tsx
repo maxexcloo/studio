@@ -186,10 +186,12 @@ export function PreviewSides({
   card,
   side,
   setSide,
+  onLike,
 }: {
   card: PairDeckCard;
   side: number;
   setSide: (side: number) => void;
+  onLike?: () => void;
 }) {
   const strip = useRef<HTMLDivElement>(null);
   const press = useRef<{ id: number; x: number; y: number; drag?: "x" | "y" } | null>(null);
@@ -212,6 +214,7 @@ export function PreviewSides({
       event.type === "pointerup"
         ? swipeDirection(event.clientX - from.x, event.clientY - from.y)
         : undefined;
+    if (direction === "up" && onLike) return onLike();
     const next = direction === "left" ? side + 1 : direction === "right" ? side - 1 : side;
     if (next !== side && next >= 0 && next < card.items.length) setSide(next);
     else place(0, true);

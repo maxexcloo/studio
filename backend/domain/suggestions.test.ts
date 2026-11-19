@@ -268,15 +268,20 @@ test("viewer next steps use the item's prompt and settings, with Title Case labe
   assert.match(calls[0][1].content, /Model: Flux 2\nSize: 1024 × 768\nLoRAs: film/);
   assert.match(calls[0][1].content, /What it shows: Fishing boats moored in pale fog\./);
   assert.equal(calls[0][1].images, 0);
-  assert.deepEqual(await suggestions.suggest("alice", { surface: "viewer", jobId: "job-video" }), {
-    suggestions: [],
-    reason: "Next steps are offered for finished images.",
-  });
   assert.equal(calls.length, 1);
   assert.doesNotMatch(calls[0][0].content, /Explicit content is allowed/);
   // An account with explicit wording gets steps that keep an explicit image explicit.
   await suggestions.suggest("bob", { surface: "viewer", jobId: "job-b" });
   assert.match(calls[1][0].content, /Explicit content is allowed[^\n]*never refuse/);
+});
+
+test("video next steps suggest concrete variations using the clip's saved prompt", async () => {
+  const { calls, suggestions } = fixture({ image: true });
+  const result = await suggestions.suggest("alice", { surface: "viewer", jobId: "job-video" });
+  assert.equal(result.suggestions.length, 2);
+  assert.match(calls[0][0].content, /concrete changes to the clip/);
+  assert.match(calls[0][1].content, /The video:\nModel: unknown\nPrompt: Waves/);
+  assert.equal(calls[0][1].images, 0);
 });
 
 test("viewer next steps read the image itself where the text model can", async () => {

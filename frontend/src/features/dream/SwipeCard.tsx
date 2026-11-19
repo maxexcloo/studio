@@ -52,7 +52,7 @@ export function SwipeCard({
   /** Edge to edge, filling the preview. */
   full?: boolean;
   fly?: RefObject<Fly | null>;
-  onSwipe?: (direction: Direction) => void;
+  onSwipe?: (direction: Direction, target: HTMLElement) => void;
   onTap?: (target: HTMLElement) => void;
   onHold?: (target: HTMLElement) => void;
   label: string;
@@ -233,7 +233,7 @@ export function SwipeCard({
           drag.current = null;
           return settle();
         }
-        void out(direction).then(() => onSwipe?.(direction));
+        void out(direction).then(() => onSwipe?.(direction, target));
       }}
       onPointerCancel={() => {
         clearTimeout(holding.current);

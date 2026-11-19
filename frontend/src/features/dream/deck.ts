@@ -15,7 +15,7 @@ export type PairDeckCard = {
 };
 export type DeckCard =
   | { kind: "dream"; key: string; item: DreamItem }
-  | { kind: "calibration"; key: string; item: MediaItem }
+  | { kind: "calibration" | "library"; key: string; item: MediaItem }
   | PairDeckCard;
 
 /** The finished Dream results as cards: both sides of a comparison make one pair card. */

@@ -222,7 +222,7 @@ function describeItem(item: SuggestionItem) {
 
 /**
  * Short, taste-led suggestions from the text model: prompt ideas for an empty composer, next-step
- * chips for a finished image in the viewer and motion ideas for animating it (`animate`), from its
+ * chips for a finished result in the viewer and motion ideas for animating an image (`animate`), from its
  * prompt, settings, caption and, where the running text model reads images, the image itself; the action
  * and prompt for a change asked for in plain words to a finished result (`change`) or to the
  * composer's draft (`draft`), never cached or saved; a `draft` without a request gets change ideas
@@ -352,14 +352,16 @@ export function createSuggestions({
         'Reply with JSON only: {"steps": [{"label": "<label>", "request": "<what happens>"}]}.',
       ],
       viewer: [
-        `You suggest changes to an image a person just made in a media studio, drawn from ${image ? "what the attached image shows, " : ""}its prompt and settings and their taste profile.`,
-        `Suggest ${maxSuggestions} useful, distinct concrete changes to what this image shows, spread across different areas (${stepAreas.join(", ")}; use only areas that fit the image), naming the specific change for this image, such as an outfit, an expression, a hairstyle, a pose or a place: never a vague style or mood tweak ("Cinematic", "Moodier", "More Detail").`,
+        `You suggest changes to a finished ${kind} a person made in a media studio, drawn from ${image ? "what the attached image shows, " : ""}its prompt and settings and their taste profile.`,
+        kind === "video"
+          ? `Suggest ${maxSuggestions} distinct, concrete changes to the clip (${angles(motionAngles, maxSuggestions)}), such as a slower pan or a different motion for the subject. Each changes one part of the clip and preserves its other details.`
+          : `Suggest ${maxSuggestions} useful, distinct concrete changes to what this image shows, spread across different areas (${stepAreas.join(", ")}; use only areas that fit the image), naming the specific change for this image, such as an outfit, an expression, a hairstyle, a pose or a place: never a vague style or mood tweak ("Cinematic", "Moodier", "More Detail").`,
         ...targetLines(target),
         applyChange,
         keepDescriptions,
         subjectFirst,
         contentRule(spicy),
-        suggestionChoices("image", spicy),
+        suggestionChoices(kind, spicy),
         americanEnglish,
         avoidFiller(),
         'Each has its area, a label of at most four words in Title Case naming the change (such as "Red Satin Dress", "Messy Bun", "Laughing" or "Rainy Street"), the change in a few plain words, and the full prompt rewritten with only that change applied, in the same style and language.',
@@ -462,13 +464,14 @@ export function createSuggestions({
     };
   }
 
-  /** Writes an image's next steps, different from those it has, and keeps them with it. */
+  /** Writes a result's next steps, different from those it has, and keeps them with it. */
   async function stepsFor(
     model: Writer,
     ownerId: string,
     source: SuggestionItem,
     options: { signal?: AbortSignal; image?: ModelImage | null; save?: boolean } = {},
   ): Promise<Suggestions> {
+    const kind = source.type === "video" ? "video" : "image";
     const writing = await target(ownerId, source).catch(() => null);
     const spicy = explicit(ownerId);
     const menu = JSON.stringify([
@@ -483,13 +486,13 @@ export function createSuggestions({
     const context = [
       ...tasteContext(ownerId).lines,
       "",
-      "The image:",
+      `The ${kind}:`,
       describeItem(source),
       ...(latest.length
         ? ["", `Already suggested (offer different ones): ${latest.join(", ")}`]
         : []),
     ];
-    const answer = await write(model, ownerId, "viewer", "image", context.join("\n"), {
+    const answer = await write(model, ownerId, "viewer", kind, context.join("\n"), {
       ...options,
       spicy,
       target: writing,
@@ -678,9 +681,11 @@ export function createSuggestions({
         if (typeof body.jobId !== "string" || !body.jobId) throw failure("Choose a result.", 400);
         source = item(ownerId, body.jobId, itemId);
         if (!source) throw failure("Result not found.", 404);
-        if (source.type === "video" || source.status !== "done")
+        if ((surface === "animate" && source.type === "video") || source.status !== "done")
           return empty(
-            `${surface === "animate" ? "Motion ideas" : "Next steps"} are offered for finished images.`,
+            surface === "animate"
+              ? "Motion ideas are offered for finished images."
+              : "Next steps are offered for finished results.",
           );
       }
       const model = writer(ownerId);
@@ -720,7 +725,8 @@ export function createSuggestions({
         }
         if (!(await online())) return empty("The text model is offline.");
         // Without the picture the steps still come from its prompt and caption.
-        const picture = source && (await image(source).catch(() => null));
+        const picture =
+          source && source.type !== "video" ? await image(source).catch(() => null) : null;
         if (source && surface === "viewer")
           return stepsFor(model, ownerId, source, { image: picture, save: !edited });
         const context = source
