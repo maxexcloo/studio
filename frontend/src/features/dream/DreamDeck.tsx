@@ -422,6 +422,7 @@ export function DreamDeck({
         key={card.key}
         depth={cards.indexOf(card)}
         paused={!playing}
+        video={(card.kind === "pair" ? card.items[0] : card.item).type === "video"}
         previewSide={full && card.kind === "pair" ? side : undefined}
         // A comparison's preview swipes between its sides, and answers with its buttons.
         still={full && card.kind === "pair"}
@@ -453,6 +454,7 @@ export function DreamDeck({
             <PreviewSides
               card={card}
               side={side}
+              playing={playing}
               setSide={(side) => open(card, side)}
               onLike={isTop && card.pairId ? () => void act("like") : undefined}
             />
@@ -468,7 +470,7 @@ export function DreamDeck({
             />
           )
         ) : full ? (
-          <PreviewFace item={card.item} />
+          <PreviewFace item={card.item} active={playing} />
         ) : (
           <>
             <div className={classes.media}>

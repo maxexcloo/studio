@@ -261,10 +261,12 @@ recur across features.
   comparison share `MediaZoom`. Display, thumbnails, sharing and downloads
   respect the saved original/upscale choice through `mediaSource`.
 - Reserve media dimensions, virtualise large galleries, lazy-load images and
-  avoid autoplaying tile videos; only the Dream Deck's top card plays its
-  videos, muted and in step. Release a closed viewer's player and pause
-  playback when the tab hides. Heavy tools load only when opened. Paging keeps
-  loaded results and offers retry on failure.
+  avoid autoplaying tile videos. Only the Dream Deck's top card plays its
+  videos, in step, with sound on by default and the viewer's explicit mute
+  choice remembered. A comparison plays audio from only the selected side.
+  Offer Play if autoplay is blocked. Release closed players and pause playback
+  when the tab hides. Heavy tools load only when opened. Paging keeps loaded
+  results and offers retry on failure.
 
 ### Data & Feedback
 
