@@ -54,7 +54,7 @@ interface SuggestionItem extends IdleItem {
   nextSteps?: SavedSteps;
 }
 /**
- * The model a result was made with, as its writer needs it: its label, prompting guide and how an
+ * The model that runs a change, as its writer needs it: its label, prompting guide and how an
  * edit's prompt is worded there, as an instruction (an edit model such as FLUX.2, Qwen or Grok) or
  * a full description of the result (plain image-to-image at partial denoise, such as Krea 2).
  */
@@ -267,8 +267,12 @@ export function createSuggestions({
   /** The switch for next steps, an image's and the composer draft's (STUDIO_NEXT_STEPS). */
   nextSteps: () => boolean;
   cards?: (ownerId: string) => Record<CardKind, Card[]> | null;
-  /** The model a finished result was made with, for the owner, or null where it isn't available. */
-  target?: (ownerId: string, item: SuggestionItem) => Promise<WritingTarget | null>;
+  /** The owner's selected Edit model or the one the result was made with. */
+  target?: (
+    ownerId: string,
+    item: SuggestionItem,
+    profileId?: string,
+  ) => Promise<WritingTarget | null>;
   /** The owner's text writer (account-policy.js `promptWriter`). */
   promptWriter?: (ownerId: string) => PromptWriter | undefined;
   /** The labels of a Prompt Styles kind's fixed options, which suggestions never repeat. */
@@ -545,10 +549,14 @@ export function createSuggestions({
     source: SuggestionItem | Draft,
     request: string,
     actions: ChangeAction[],
+    profileId?: string,
   ): Promise<Suggestions<Change>> {
     const draft = "draft" in source;
     const kind = draft ? source.kind : source.type === "video" ? "video" : "image";
-    const writing = draft ? null : await target(ownerId, source).catch(() => null);
+    const writing = draft ? null : await target(ownerId, source, profileId).catch(() => null);
+    if (profileId && !writing) return empty("The selected Edit profile is unavailable.");
+    const instruction =
+      actions.length === 1 && actions[0] === "edit" && writing?.edits === "instruction";
     const system = [
       draft
         ? `You carry out one change a person asks for to the draft prompt of a ${kind} they are about to make in a media studio.`
@@ -558,12 +566,12 @@ export function createSuggestions({
         (action) =>
           `- ${draft && action !== "upscale" ? draftGuides[action](kind) : actionGuides[action](kind, writing?.edits)}`,
       ),
-      "Write the prompt with the requested change applied, in the same style and language, and a label of at most four words in Title Case naming the change.",
+      instruction
+        ? "Write the edit instruction in the request's language, and a label of at most four words in Title Case naming the change."
+        : "Write the prompt with the requested change applied, in the same style and language, and a label of at most four words in Title Case naming the change.",
       ...targetLines(writing),
-      applyChange,
+      ...(!instruction ? [applyChange, keepDescriptions, subjectFirst] : []),
       fidelity,
-      keepDescriptions,
-      subjectFirst,
       contentRule(explicit(ownerId)),
       "Preserve the source subject's identity and species. Never invent an adult age or change the age to justify a sexualised change; ambiguous ages and nonhuman subjects must not be sexualised.",
       americanEnglish,
@@ -637,6 +645,7 @@ export function createSuggestions({
         prompt?: unknown;
         jobId?: unknown;
         itemId?: unknown;
+        profileId?: unknown;
         fresh?: unknown;
         request?: unknown;
         actions?: unknown;
@@ -669,6 +678,12 @@ export function createSuggestions({
           throw failure("Choose a result.", 400);
         if (!request) throw failure("Describe the change.", 400);
         if (!actions.length) throw failure("Choose the actions the change may take.", 400);
+        const profileId =
+          surface === "change" && actions.length === 1 && actions[0] === "edit"
+            ? body.profileId
+            : undefined;
+        if (profileId !== undefined && (typeof profileId !== "string" || !profileId))
+          throw failure("Choose an Edit profile.", 400);
         let source: SuggestionItem | Draft | undefined =
           surface === "draft"
             ? {
@@ -690,7 +705,7 @@ export function createSuggestions({
           return empty("The prompt assistant is not configured.");
         }
         if (!(await online())) return empty("The text model is offline.");
-        return change(model, ownerId, source, request, actions);
+        return change(model, ownerId, source, request, actions, profileId);
       }
       if (
         (surface === "composer" || surface === "draft") &&

@@ -24,6 +24,7 @@ function fixture(
     fixed?: Record<string, string[]>;
     edits?: "instruction" | "description";
     cards?: Parameters<typeof createSuggestions>[0]["cards"];
+    target?: Parameters<typeof createSuggestions>[0]["target"];
   } = {},
 ) {
   const calls: Message[][] = [];
@@ -94,14 +95,16 @@ function fixture(
     save: (item, nextSteps) => Object.assign(item, { nextSteps }),
     ideas: () => options.switches?.ideas ?? true,
     nextSteps: () => options.switches?.nextSteps ?? true,
-    target: async (_owner, item) =>
-      item.type === "image"
-        ? {
-            label: "Flux 2",
-            guide: { summary: "Subject first.", sampling: {} },
-            edits: options.edits ?? "instruction",
-          }
-        : null,
+    target:
+      options.target ??
+      (async (_owner, item) =>
+        item.type === "image"
+          ? {
+              label: "Flux 2",
+              guide: { summary: "Subject first.", sampling: {} },
+              edits: options.edits ?? "instruction",
+            }
+          : null),
     promptWriter: () => ({ side: "cloud", cloud: options.picked, uncensored: false }),
     fixed: (kind) => options.fixed?.[kind] ?? [],
     now: () => clock,
@@ -696,6 +699,33 @@ test("a requested change picks one of the offered actions and rewrites the promp
   // Upscale keeps the prompt as it was.
   answer = { action: "upscale", label: "Sharper", prompt: "ignored" };
   assert.equal(((await ask(["upscale"])).suggestions[0] as Change).prompt, "A harbour at dawn");
+});
+
+test("Edit writes for the selected profile while describing the original result", async () => {
+  const { calls, suggestions } = fixture({
+    reply: () => JSON.stringify({ action: "edit", label: "Night", prompt: "Make it night" }),
+    target: async (owner, _source, profileId) =>
+      owner === "alice" && profileId === "image:edit"
+        ? { label: "Edit Model", guide: { summary: "Describe the change." }, edits: "instruction" }
+        : null,
+  });
+  const request = {
+    surface: "change",
+    jobId: "job-a",
+    request: "make it night",
+    actions: ["edit"],
+  };
+  const answer = await suggestions.suggest("alice", { ...request, profileId: "image:edit" });
+  assert.equal((answer.suggestions[0] as Change).prompt, "Make it night");
+  const [system, user] = calls[0];
+  assert.match(system.content, /the model Edit Model.*Describe the change/);
+  assert.match(system.content, /short imperative edit instruction/);
+  assert.doesNotMatch(system.content, /rewrite the words it concerns in place/);
+  assert.match(user.content, /Model: Flux 2/);
+  assert.equal(
+    (await suggestions.suggest("alice", { ...request, profileId: "image:unavailable" })).reason,
+    "The selected Edit profile is unavailable.",
+  );
 });
 
 test("a change lands where an edit can make it, else recreates with the seed, written in place", async () => {

@@ -165,7 +165,10 @@ test("A video's prompt field runs its edited prompt again as a video", async ({ 
   expect(state.jobs.at(-1)!.input.kind ?? "video").toBe("video");
 });
 
-test("Edit and Recreate share Custom and review each operation separately", async ({ page }) => {
+test("Edit and Recreate share Custom and review each operation separately", async ({
+  page,
+  isMobile,
+}) => {
   const asked: any[] = [];
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
@@ -191,16 +194,23 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
   await page.keyboard.press("Escape");
   const surface = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
+  const editProfile = async (name: string) => {
+    const profiles = page.getByRole("menuitem", { name: "Profile", exact: true });
+    if (isMobile) await profiles.click();
+    else await profiles.hover();
+    await page.getByRole("menuitemradio", { name, exact: true }).click();
+  };
   // Edit and Recreate open the same dialog and keep its last request.
-  const askForChange = async (mode: "Edit" | "Recreate", request?: string) => {
+  const askForChange = async (mode: "Edit" | "Recreate", request?: string, profile?: string) => {
     await viewerChangeMenu(page, mode);
+    if (profile) await editProfile(profile);
     await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
     const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
     if (request) await custom.getByRole("textbox", { name: "Change", exact: true }).fill(request);
     await custom.getByRole("button", { name: "Ask", exact: true }).click();
     await closeTextEditor(page, "Prompt");
   };
-  await askForChange("Edit", "make it night");
+  await askForChange("Edit", "make it night", "Image Fast");
   // The proposal replaces the prompt in place under the chosen action and what it changed; Undo
   // restores the prompt.
   await expect(field).toHaveValue("An amber bird at night");
@@ -214,6 +224,7 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
       actions: ["edit"],
       prompt: "An amber bird",
       itemId: "hub",
+      profileId: "image:fast",
     },
   ]);
   await surface.getByRole("button", { name: "Undo", exact: true }).click();
@@ -222,10 +233,18 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
   await askForChange("Recreate");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveText("Recreate");
   expect(asked.at(-1)).toMatchObject({ actions: ["recreate"], request: "make it night" });
+  expect(asked.at(-1)).not.toHaveProperty("profileId");
   await surface.getByRole("button", { name: "Undo", exact: true }).click();
   await askForChange("Edit");
   await expect(field).toHaveValue("An amber bird at night");
   expect(state.jobs).toHaveLength(1);
+  // A proposal keeps the Edit profile it was written for even if the next Edit is automatic.
+  await viewerChangeMenu(page, "Edit");
+  await editProfile("Automatic");
+  const review = page.getByRole("menuitem", { name: "Review Prompt", exact: true });
+  await page.keyboard.press("Escape");
+  if (await review.isVisible()) await page.keyboard.press("Escape");
+  await expect(review).toBeHidden();
   await surface.getByRole("button", { name: "Run", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
@@ -233,6 +252,7 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
     parentItemId: "hub",
     input: {
       prompt: "An amber bird at night",
+      profileId: "image:fast",
       count: 1,
       referenceAssets: [{ assetId: "asset-hub", slot: "image" }],
     },

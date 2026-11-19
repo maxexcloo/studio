@@ -85,6 +85,7 @@ export const askChange = (
   actions: ChangeAction[],
   prompt?: string,
   itemId?: string,
+  profileId?: string,
 ) =>
   post<Suggestions<Change>>("/api/suggestions", {
     surface: "change",
@@ -93,6 +94,7 @@ export const askChange = (
     actions,
     prompt,
     itemId,
+    profileId,
   });
 
 /** The same for the composer's draft prompt, which has no result yet. */
