@@ -63,6 +63,21 @@ async function seed(
   return { state, viewer: page.getByRole("dialog", { name: "Generation", exact: true }) };
 }
 
+test("The viewer resolves an older result’s checkpoint to its profile name", async ({ page }) => {
+  const model = "krea2_turbo_int8_convrot";
+  const { viewer } = await seed(page, { settings: { modelName: model } }, async (page) => {
+    await serveProfiles(page, [
+      {
+        ...profiles[0],
+        model: `checkpoints/${model}.safetensors`,
+        label: "Krea 2 Turbo",
+      },
+    ]);
+  });
+  const header = viewer.getByRole("group", { name: "Viewer Header", exact: true });
+  await expect(header.getByText("Krea 2 Turbo", { exact: true })).toBeVisible();
+});
+
 /** Recreate › Run Again: queues the same settings with a new seed, without the composer. */
 async function newSeed(page: Page) {
   await viewerAction(page, "Recreate");
