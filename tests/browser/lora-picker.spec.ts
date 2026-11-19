@@ -123,14 +123,14 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
   const row = controls.getByRole("listitem", { name: "loras Detail Slider", exact: true });
   const action = row.getByRole("button", { name: "Detail Slider Actions", exact: true });
   const menu = controls.getByRole("menu", { name: "Detail Slider Actions", exact: true });
+  const enabled = row.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   if (isMobile) await action.tap();
-  else await row.getByText("Detail Slider", { exact: true }).click({ button: "right" });
+  else await enabled.click({ button: "right" });
   await expect(menu.getByRole("menuitem", { name: "View Source", exact: true })).toHaveAttribute(
     "href",
     "https://example.com/detail",
   );
   await page.keyboard.press("Escape");
-  const enabled = row.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   await enabled.press("Shift+F10");
   await expect(menu.getByRole("menuitemcheckbox", { name: "Enabled", exact: true })).toBeChecked();
   await expect(menu.getByRole("menuitem", { name: "Remove", exact: true })).toBeVisible();
