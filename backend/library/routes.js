@@ -611,7 +611,12 @@ export function registerLibraryRoutes(
   route("POST", "/api/library/imports/:id/substitute", async (_account, { params, body }) =>
     ok({
       import: publicImport(
-        await engine.chooseSubstitute(params.id, Number(body?.index), body?.accept === true),
+        await engine.chooseSubstitute(
+          params.id,
+          Number(body?.index),
+          body?.accept === true,
+          body?.expected,
+        ),
       ),
     }),
   );

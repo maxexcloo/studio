@@ -20,7 +20,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { Link, useLocation } from "react-router";
 
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
@@ -31,7 +30,6 @@ import { LoadingState } from "../../ui/LoadingState";
 import { closingPopup, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
-import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { queueQuery } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaJobStatus } from "./MediaJobStatus";
@@ -46,7 +44,7 @@ import { useMediaRating } from "./useMediaRating";
 import { useVideoSound } from "./useVideoSound";
 import { playVideo } from "./videoPlayback";
 import { VideoPlayButton } from "./VideoPlayButton";
-import { ViewerChrome, viewerBadge } from "./ViewerChrome";
+import { ViewerChrome } from "./ViewerChrome";
 import { ViewerDetails } from "./ViewerDetails";
 
 import classes from "./MediaViewer.module.css";
@@ -492,19 +490,15 @@ export function MediaViewer({
   const [queued, setQueued] = useState<QueuedRun[]>([]);
   const jobs = useQuery(queueQuery).data?.jobs;
   const family = useRunFamily(item, queued, related, jobs);
-  // An MCP call's other results, for the set's place in the top bar and its strip.
   const members = setMembers(related, item);
-  // A comparison's set links to its side-by-side view, unless that is where the viewer is.
-  const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
-  const comparisonPath = comparison && `/compare/${comparison}`;
-  const pathname = useLocation().pathname;
-  const setBadge = {
-    ...viewerBadge,
-    // Phones show only the place; Details names the set.
-    children: phone
-      ? `${members.findIndex((member) => member.id === item.id) + 1} / ${members.length}`
-      : item.resultSet && setPosition(item, members),
-  } as const;
+  const position =
+    canNavigate && itemLabel
+      ? itemLabel(item)
+      : item.resultSet
+        ? setPosition(item, members)
+        : canNavigate
+          ? `${currentIndex + 1} / ${Math.max(total ?? 0, viewable.length)}`
+          : undefined;
   const iteration = useMediaIteration(item);
   // The run belongs to the item it started on, even once the viewer has moved on.
   function iterate(next: Iteration) {
@@ -730,24 +724,11 @@ export function MediaViewer({
             <ViewerChrome
               item={displayed}
               label={
-                canNavigate && itemLabel ? (
-                  <Badge {...viewerBadge}>{itemLabel(item)}</Badge>
-                ) : item.resultSet ? (
-                  comparisonPath && comparisonPath !== pathname ? (
-                    <Badge
-                      component={Link}
-                      to={comparisonPath}
-                      title="Open Comparison"
-                      {...setBadge}
-                    />
-                  ) : (
-                    <Badge {...setBadge} />
-                  )
-                ) : canNavigate ? (
-                  <Badge {...viewerBadge}>
-                    {currentIndex + 1} / {Math.max(total ?? 0, viewable.length)}
-                  </Badge>
-                ) : null
+                position && (
+                  <VisuallyHidden role="status" aria-label="Current Result">
+                    {position}
+                  </VisuallyHidden>
+                )
               }
               details={{ opened: detailsOpen, phone, toggle: toggleDetails }}
               focusClose={bare}
