@@ -13,6 +13,7 @@
  *   POST /api/library/lookup {url|query, type?, baseModel?}  a link's versions and files, or a Civitai search (type lora or checkpoint), without importing
  *   GET  /api/library/placement?key=          where model files live, and where one file sits
  *   PATCH /api/library/catalogue {key, patch} edit one catalogue entry; the reply has the previous values
+ *   POST /api/library/catalogue/install {key} download an exact LoRA from its recorded provider
  *   POST /api/library/catalogue/undo {key}    undo its newest change (recorded as a change of its own)
  *   POST /api/library/catalogue/remove {key}  remove an unused catalogue entry or installed LoRA (undo restores the entry)
  *   POST /api/library/imports/image           {image: data URL, name}: a dropped PNG, WebP or JPEG
@@ -43,10 +44,18 @@ import { forgetLora } from "../lora/stacks.js";
 import { downloadState } from "../model/downloads.js";
 import { fromChat, localRefusal } from "../route-access.js";
 import { loadSharp } from "../sharp-loader.js";
-import { refreshWorkerModels, workerInventory, workerModelFile } from "../worker-models.js";
-import { modelLibraryWorker } from "../workers.js";
+import {
+  modelLibraryUrl,
+  refreshWorkerModels,
+  workerInventory,
+  workerModelFile,
+} from "../worker-models.js";
 import { catalogueKinds, splitCatalogueKey } from "./catalogue.js";
-import { startLibraryDownload } from "./downloads.js";
+import {
+  catalogueInstallSource,
+  resolveCatalogueInstall,
+  startLibraryDownload,
+} from "./downloads.js";
 import { createImportEngine, importStore, publicImport, staleImport } from "./imports.js";
 import { libraryPlacement, lookupLibrary } from "./lookup.js";
 import { detectLink, resolveCivitaiModel, resolveHuggingFace } from "./sources.js";
@@ -173,7 +182,7 @@ export async function matchImageResource(item, { installed = {}, entries = {}, j
 async function removeInstalled(want) {
   if (!want?.file || !Object.hasOwn(catalogueKinds, want.folder))
     throw new Error("That isn't a model file Studio manages.");
-  if (!modelLibraryWorker()) return { removed: false, reachable: false };
+  if (!modelLibraryUrl()) return { removed: false, reachable: false };
   const names = subfolders[want.folder] || [want.folder];
   const reachable = await refreshWorkerModels({ force: true }).then(
     () => true,
@@ -696,15 +705,36 @@ export function registerLibraryRoutes(
       profileDefinitions().catch(() => []),
     ]);
     const state = await updates.settle().catch(() => updates.summary());
+    const transfers = downloads();
+    const byFile = new Map(
+      [
+        [...(transfers.recent || [])].reverse(),
+        transfers.paused || [],
+        transfers.queued || [],
+        [transfers.active],
+      ]
+        .flat()
+        .filter(Boolean)
+        .map((download) => [`${download.folder}/${download.file}`, download]),
+    );
+    const entries = catalogue().entries({ throttleMs: 5000 });
     const items = libraryItems({
       installed: files,
-      entries: catalogue().entries({ throttleMs: 5000 }),
+      entries,
       loraInfo: info,
       profiles: definitions,
     }).map((item) => {
       const update = item.installed ? state.byEntry[item.key] : null;
       const applied = state.applied[item.key];
-      return { ...item, ...(update ? { update } : {}), ...(applied ? { applied } : {}) };
+      const installable = !item.installed && Boolean(catalogueInstallSource(entries[item.key]));
+      const download = installable && byFile.get(item.key);
+      return {
+        ...item,
+        ...(update ? { update } : {}),
+        ...(applied ? { applied } : {}),
+        ...(installable ? { installable } : {}),
+        ...(download ? { install: { state: download.status, note: download.error || "" } } : {}),
+      };
     });
     return ok({
       items,
@@ -730,6 +760,15 @@ export function registerLibraryRoutes(
       placement: libraryPlacement({ key: String(query.key || "") }, { inventory: workerInventory }),
     });
   });
+  route("POST", "/api/library/catalogue/install", async (_account, { body }) => {
+    const entry = catalogue().entry(String(body?.key || ""));
+    if (!entry)
+      return { status: 404, payload: { ok: false, error: "That entry isn't in the catalogue." } };
+    const spec = await resolveCatalogueInstall(entry, { json, request: hfRequest });
+    const { status, id } = await startDownload(spec);
+    return ok({ id, status });
+  });
+
   // One entry's edit, as Studio's catalogue keeps it: the previous values come back, so it can be undone.
   route("PATCH", "/api/library/catalogue", async (account, { body }) => {
     const key = String(body?.key || "");

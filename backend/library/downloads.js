@@ -1,9 +1,41 @@
 import { civitaiJson, isCivitaiHost } from "../civitai/access.js";
-import { civitaiLink, versionResource } from "../civitai/import.js";
+import {
+  civitaiFileSpec,
+  civitaiLink,
+  civitaiModelFiles,
+  versionResource,
+} from "../civitai/import.js";
 import { hfFetch, hfRevision } from "../hf-access.js";
 import { loraCatalogue } from "../lora/info.js";
 import { downloadState, existingCopy, startDownload } from "../model/downloads.js";
 import { refreshWorkerModels, workerInventory, workerModelFile } from "../worker-models.js";
+import { civitaiAvailability } from "./availability.js";
+
+/** Download only the provider file the catalogue names, under its catalogue filename. */
+export function catalogueInstallSource(entry) {
+  if (entry?.folder !== "loras" || !entry.file || entry.file !== entry.file.split("/").at(-1))
+    return "";
+  if (entry.links?.hf) return entry.links.hf;
+  const link = entry.links?.civitaiCom || entry.links?.civitaiRed;
+  if (!link) return "";
+  try {
+    return civitaiLink(link, "models").versionId ? link : "";
+  } catch {
+    return "";
+  }
+}
+
+export async function resolveCatalogueInstall(entry, { json, request } = {}) {
+  const url = catalogueInstallSource(entry);
+  if (!url)
+    throw new Error("This LoRA has no recorded file to install. Import its source link first.");
+  const spec = await resolveModelLink(url, entry.folder, { json, request, exact: entry });
+  if (spec.folder !== entry.folder || (entry.sha256 && entry.sha256 !== spec.sha256))
+    throw new Error(
+      "The source file no longer matches the catalogue. Check its source before installing.",
+    );
+  return { ...spec, file: entry.file };
+}
 
 // Provider download specs live in the catalogue's provider layer (library/catalogue.js).
 export function libraryDownload(id) {
@@ -22,7 +54,7 @@ const directories = new Set([
 export async function resolveModelLink(
   value,
   directory = "loras",
-  { json = civitaiJson, request = hfFetch } = {},
+  { json = civitaiJson, request = hfFetch, exact } = {},
 ) {
   let url;
   try {
@@ -43,6 +75,19 @@ export async function resolveModelLink(
     if (!version) throw new Error("This model has no available versions.");
     if (Number(version.modelId) !== id)
       throw new Error("That version belongs to another model. Check the link.");
+    if (exact) {
+      const files = civitaiModelFiles(version);
+      const file = exact.sha256
+        ? files.find((file) => file.hashes?.SHA256?.toLowerCase() === exact.sha256)
+        : files.find((file) => file.name === exact.file) || (files.length === 1 ? files[0] : null);
+      if (!file) throw new Error("The catalogue file was not found in that Civitai version.");
+      const spec = civitaiFileSpec(version, file);
+      if (!spec)
+        throw new Error(
+          civitaiAvailability(version, file).note || "Civitai publishes no SHA-256 for this file.",
+        );
+      return spec;
+    }
     const resource = versionResource(version);
     if (!resource.spec) throw new Error(resource.note);
     return resource.spec;

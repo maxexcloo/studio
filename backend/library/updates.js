@@ -237,6 +237,7 @@ export function createUpdateChecker({
 } = {}) {
   let state = null;
   let checking = null;
+  let settling = null;
   const load = () => {
     if (state) return state;
     const saved = readRuntimeDocument(dataDir, "library-updates");
@@ -331,6 +332,10 @@ export function createUpdateChecker({
       throw new Error(choice.unavailable?.note || "That update can't be downloaded.");
     const { folder, file: oldFile } = splitCatalogueKey(key);
     const spec = { ...choice.spec, folder: choice.spec.folder || folder };
+    if (spec.folder === folder && spec.file === oldFile) {
+      const { name, ext } = path.parse(spec.file);
+      spec.file = `${name}-${spec.sha256.slice(0, 8)}${ext}`;
+    }
     const download = await startDownload(spec);
     const entry = catalogue.entries()[key] || {};
     current.applied[key] = {
@@ -386,7 +391,13 @@ export function createUpdateChecker({
    * Finishes updates whose download has landed: the catalogue moves to the new file, then the
    * old file is removed when nothing references it (Decision 4), or kept with the reason.
    */
-  async function settle() {
+  function settle() {
+    settling ||= finishDownloads().finally(() => {
+      settling = null;
+    });
+    return settling;
+  }
+  async function finishDownloads() {
     const current = load();
     const queue = downloads();
     const running = new Set(
@@ -397,7 +408,7 @@ export function createUpdateChecker({
     for (const [key, applied] of Object.entries(current.applied)) {
       if (applied.state !== "downloading" || running.has(applied.downloadId)) continue;
       const finished = recent.get(applied.downloadId);
-      if (finished && ["failed", "cancelled"].includes(finished.status)) {
+      if (finished && ["failed", "cancelled", "paused"].includes(finished.status)) {
         Object.assign(applied, {
           state: "failed",
           note: finished.error || "The download stopped. Update again to retry.",
@@ -488,7 +499,8 @@ export function createUpdateChecker({
         });
       else {
         try {
-          await removeFile(applied.from);
+          const removed = await removeFile(applied.from);
+          if (removed?.reachable === false) throw new Error("the Model Library is unavailable");
           Object.assign(applied, {
             state: "removed",
             note: `Updated to ${applied.to.name}.${movedNote} The old file was removed.`,
