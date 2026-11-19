@@ -1775,10 +1775,14 @@ test("Returning after more than a page of incoming results leaves no gap before 
     release();
   }
   await expect.poll(() => cursors.length).toBe(previousReads + 2);
-  await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
+  await expect(viewer.getByText("66 / 75", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/images\/browse-0$/);
   expect(cursors.slice(previousReads)).toEqual(["", "60"]);
   await page.keyboard.press("ArrowLeft");
-  await expect(page).toHaveURL(/\/images\/browse-0$/);
+  await expect(viewer.getByRole("img", { name: "Away 64", exact: true })).toBeVisible();
+  await expect(viewer.getByText("65 / 75", { exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
