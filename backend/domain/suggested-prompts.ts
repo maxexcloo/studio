@@ -25,9 +25,9 @@ interface PromptDescriber {
 
 /**
  * Suggests prompts for finished items without one, such as uploads, as continuous idle work
- * (domain/idle-work.ts), newest first. Uses the stored caption when available, or describes the picture (a video's
- * first frame) if the model can read images. Kept apart from the item's own prompt. Only for owners `allowed` to use the
- * prompt assistant.
+ * (domain/idle-work.ts), newest first. Uses the stored caption when available, or describes
+ * the picture (a video's first frame) if the model can read images. Kept apart from the item's
+ * own prompt. Only for owners `allowed` to use the prompt assistant.
  */
 export function createPromptSuggester(options: {
   /** The Settings › Maintenance switch (STUDIO_SUGGESTED_PROMPTS). */

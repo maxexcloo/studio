@@ -811,11 +811,7 @@ export function MediaActionMenu({
 }: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
   const groups = useMediaActions(item, options).flatMap((group) =>
     group.some(({ id }) => id === "ai" || id === "share")
-      ? group.map((action) =>
-          action.menu
-            ? [{ id: action.id, label: action.label, heading: true }, ...action.menu.flat()]
-            : [action],
-        )
+      ? group.map((action) => action.menu?.flat() ?? [action])
       : [group],
   );
   return (
