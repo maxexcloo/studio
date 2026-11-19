@@ -70,7 +70,7 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
     .toEqual(["Detail Slider", "Soft Style"]);
   // Most Used leads with the LoRA the account ran most.
   await page.getByRole("button", { name: "Sort", exact: true }).click();
-  await expect(page.getByRole("menuitem")).toHaveText([
+  await expect(page.getByRole("menuitemradio")).toHaveText([
     "Most Used",
     "Rating",
     "Name A–Z",
