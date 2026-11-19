@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { type Locator, type Page, expect, test } from "@playwright/test";
 
 import { dreamItem, fixtures, section, serveDream, stamp } from "./fixtures";
@@ -15,6 +17,45 @@ async function fillBox(scope: Locator, name: string, value: string, phone: boole
   const sheet = scope.page().getByRole("dialog", { name, exact: true });
   await sheet.getByRole("textbox", { name, exact: true }).fill(value);
   await sheet.getByRole("button", { name: `Close ${name}`, exact: true }).click();
+}
+
+/** Turns Use LoRAs on or off in a project form's LoRAs chip. */
+async function useLoras(form: Locator, on: boolean) {
+  await form.getByRole("button", { name: "LoRAs", exact: true }).click();
+  const popup = form.page().getByRole("dialog", { name: "LoRAs", exact: true });
+  const toggle = popup.getByRole("switch", { name: "Use LoRAs", exact: true });
+  await toggle.dispatchEvent("click");
+  await expect(toggle).toBeChecked({ checked: on });
+  await popup.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(popup).toBeHidden();
+}
+
+/**
+ * Drags sideways across `target` by `dx`: a finger where Chromium can send touches (the bug this
+ * guards was touch-only), the mouse elsewhere.
+ */
+async function drag(page: Page, target: Locator, dx: number) {
+  const box = (await target.boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  const steps = 8;
+  const chromium = page.context().browser()?.browserType().name() === "chromium";
+  if (test.info().project.use.hasTouch && chromium) {
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type: string, at?: number) =>
+      cdp.send("Input.dispatchTouchEvent", {
+        type: type as "touchStart",
+        touchPoints: at === undefined ? [] : [{ x: at, y }],
+      });
+    await touch("touchStart", x);
+    for (let step = 1; step <= steps; step++) await touch("touchMove", x + (dx * step) / steps);
+    await touch("touchEnd");
+    return;
+  }
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + dx, y + 4, { steps });
+  await page.mouse.up();
 }
 
 const current = (page: Page) => page.getByRole("group", { name: "Current Dream", exact: true });
@@ -148,107 +189,65 @@ test("Undo steps back through Dislike, Like and Accept, taking back each", async
     ]);
 });
 
-test("While You Were Away ranks each project's results, folds its misses and judges them", async ({
+test("Projects show what is new in each since the last visit, and the viewer judges it", async ({
   page,
   isMobile,
 }) => {
   await fixtures(page);
-  const result = (id: string, projectId: string, score: number, miss = "", createdAt = stamp) =>
-    dreamItem(id, {
-      createdAt,
-      dream: { ...dreamItem(id).dream, projectId },
-      review: { score, miss, model: "vision", at: stamp },
-    });
+  const constraints = { profiles: [], loras: true, aspect: "", resolution: "" };
+  const brief = { subjects: "", styles: "", avoid: "" };
+  const result = (id: string, projectId: string, createdAt: string) =>
+    dreamItem(id, { createdAt, dream: { ...dreamItem(id).dream, projectId } });
   const dream = await serveDream(page, {
     since: "2026-10-22T00:00:00.000Z",
     projects: [
-      { id: "beach", name: "Beach", brief: { subjects: "the sea", styles: "", avoid: "" } },
-      { id: "city", name: "City", brief: { subjects: "", styles: "", avoid: "" } },
+      { id: "beach", name: "Beach", brief, constraints },
+      { id: "city", name: "City", brief, constraints },
     ],
     unseen: [
-      result("wave", "beach", 9),
-      result("shore", "beach", 7),
-      result("indoors", "beach", 2, "Indoors; the brief asks for the sea."),
-      result("street", "city", 8, "", "2026-10-20T00:00:00.000Z"),
+      result("shore", "beach", "2026-10-23T00:00:00.000Z"),
+      result("wave", "beach", "2026-10-24T00:00:00.000Z"),
+      result("street", "city", "2026-10-20T00:00:00.000Z"),
       dreamItem("loose"),
     ],
   });
   await page.goto("/dream");
-  await showView(page, "Overview");
-  await expect(page.getByRole("heading", { name: "While You Were Away" })).toBeVisible();
-  await expect(page.getByText(/^4 new since /)).toBeVisible();
-  await expect(page.getByRole("heading", { level: 3, name: /^(Beach|City|Other)$/ })).toHaveText([
-    "Beach",
-    "City",
-    "Other",
-  ]);
-  const beach = page.getByRole("region", { name: "Beach" });
+  // The view menu always shows what waits, both kinds.
+  await expect(
+    page.getByRole("button", { name: "Dream View", exact: true }),
+  ).toHaveAccessibleDescription("4 images and 0 videos waiting");
+  await showView(page, "Projects");
+  await expect(page.getByText(/^2 new since /)).toBeVisible();
+  const beach = page.getByRole("region", { name: "Beach", exact: true });
+  await expect(beach.getByText("2 New", { exact: true })).toBeVisible();
+  // Newest first.
   const views = beach.getByRole("button", { name: /^View / });
-  await expect(views).toHaveCount(2);
   await expect(views.first()).toHaveAccessibleName("View Dream prompt wave");
-  await expect(beach.getByText("9/10")).toBeVisible();
+  const city = page.getByRole("region", { name: "City", exact: true });
+  await expect(city.getByRole("button", { name: "View Dream prompt street" })).toBeVisible();
+  await expect(city.getByText(/ New$/)).toHaveCount(0);
 
-  // Misses stay folded until asked for, with what they miss.
-  const misses = beach.getByRole("button", { name: "Misses (1)" });
-  await expect(misses).toHaveAttribute("aria-expanded", "false");
-  await misses.click();
-  await expect(beach.getByText("Indoors; the brief asks for the sea.")).toBeVisible();
-
-  // Dislike, Like and Accept judge in place.
-  await beach.getByRole("button", { name: "Accept Dream prompt wave", exact: true }).click();
-  await expect(beach.getByRole("button", { name: "View Dream prompt wave" })).toHaveCount(0);
-  await beach.getByRole("button", { name: "Dislike Dream prompt indoors", exact: true }).click();
-  await page
-    .getByRole("region", { name: "City" })
-    .getByRole("button", { name: "Like Dream prompt street", exact: true })
-    .click();
-
-  // Full screen has every choice and moves on to the next result after a verdict.
-  await beach.getByRole("button", { name: "View Dream prompt shore" }).click();
+  // The viewer has every choice and moves on to the next result after a verdict.
+  await views.first().click();
   const viewer = page.getByRole("dialog");
   await expect(viewer.getByRole("button", { name: "Generation Details" })).toBeFocused();
-  // In the item bar's order, every action named, the verdicts together at the end.
   if (!isMobile)
     await expect(
       viewer.getByRole("group", { name: "Dream Actions" }).getByRole("button"),
     ).toHaveText(["Animate", "Edit", "Recreate", "Dislike", "Like", "Accept"]);
-  await dreamAction(page, "More Like This");
-  await expect(viewer.getByRole("img", { name: "Dream prompt loose" })).toBeVisible();
-  await viewer
-    .getByRole("group", { name: "Dream Actions" })
-    .getByRole("button", { name: "Dislike", exact: true })
-    .click();
+  await dreamAction(page, "Accept");
+  await expect(viewer.getByRole("img", { name: "Dream prompt shore" })).toBeVisible();
+  await dreamAction(page, "Dislike");
+  await expect(viewer.getByRole("img", { name: "Dream prompt street" })).toBeVisible();
+  await dreamAction(page, "Like");
   await expect(viewer).toBeHidden();
-  await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nothing new since your last visit", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^View Dream prompt/ })).toHaveCount(0);
   expect(verdicts(dream)).toEqual([
     "POST /api/dream/wave/keep",
-    "POST /api/dream/indoors/discard",
+    "POST /api/dream/shore/discard",
     "POST /api/gallery/favorite",
-    "POST /api/dream/shore/more",
-    "POST /api/dream/loose/discard",
   ]);
-});
-
-test("While You Were Away shows a series as one set, in its order", async ({ page }) => {
-  await fixtures(page);
-  const shot = (id: string, index: number) =>
-    dreamItem(id, {
-      resultSet: { id: "night", title: "Mara · Diner, Midnight", index, source: "dream" },
-    });
-  await serveDream(page, { unseen: [shot("second", 1), dreamItem("loose"), shot("first", 0)] });
-  await page.goto("/dream");
-  await showView(page, "Overview");
-  const set = page.getByRole("group", { name: "Series: Mara · Diner, Midnight" });
-  await expect(set.getByText("· Series of 2")).toBeVisible();
-  const views = set.getByRole("button", { name: /^View / });
-  await expect(views).toHaveCount(2);
-  await expect(views.first()).toHaveAccessibleName("View Dream prompt first");
-  await expect(views.last()).toHaveAccessibleName("View Dream prompt second");
-  await expect(page.getByRole("button", { name: "View Dream prompt loose" })).toBeVisible();
-  await expect(set.getByRole("button", { name: "View Dream prompt loose" })).toHaveCount(0);
-  // Accepting one judges only that result.
-  await set.getByRole("button", { name: "Accept Dream prompt first", exact: true }).click();
-  await expect(views).toHaveCount(1);
 });
 
 test("On a phone held sideways, a deck card's caption stands beside its media", async ({
@@ -456,7 +455,6 @@ test("Dream navigation orders its views and History shows retained activity and 
   await expect(page.getByRole("menuitem")).toHaveText([
     "Images",
     "Videos",
-    "Overview",
     "Projects",
     "Taste",
     "Discards",
@@ -516,7 +514,7 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   // Every fourth card is a pair.
   // Tapping opens the preview; its explicit choice remains undoable.
   await page.getByRole("button", { name: "View B", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "B", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "This Image", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   // Dislike applies its rating in the same calibration request.
   await expect
@@ -572,7 +570,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
   const viewer = page.getByRole("dialog");
   const answers = viewer.getByRole("group", { name: "Comparison Answers" });
-  for (const name of ["Neither", "A", "B", "Both"])
+  for (const name of ["Neither", "This Image", "Both"])
     await expect(answers.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
   await expect(viewer.getByRole("button", { name: "Close Preview" })).toBeFocused();
   await page.keyboard.press("Escape");
@@ -591,10 +589,10 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await expect.poll(() => dream.requests.length).toBe(2);
   const third = page.getByRole("group", { name: "Which Steps?", exact: true });
   await expect(third).toContainText("Guidance 3");
-  // The preview chooses only after pressing A, then Undo puts the comparison back.
+  // The preview chooses only after This Image picks the side shown, then Undo puts it back.
   await third.getByRole("button", { name: "View A · Guidance 3", exact: true }).click();
   expect(dream.requests.length).toBe(2);
-  await viewer.getByRole("button", { name: "A", exact: true }).click();
+  await viewer.getByRole("button", { name: "This Image", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   // Undo stands in the toolbar, beside the view menu.
   const undo = page.getByRole("button", { name: "Undo", exact: true });
@@ -683,15 +681,108 @@ test("The preview swipes between a comparison's sides and answers with the deck'
   await expect(viewer.getByRole("img", { name: "Side 40 Steps" })).toBeInViewport();
   await page.keyboard.press("ArrowLeft");
   await expect(viewer.getByRole("img", { name: "Side 20 Steps" })).toBeInViewport();
-  const answers = viewer.getByRole("group", { name: "Comparison Answers" });
 
-  // An answer returns to the deck.
-  await answers.getByRole("button", { name: "Neither", exact: true }).click();
+  // A sideways swipe over the picture moves to the other side without answering.
+  await drag(page, viewer.getByRole("img", { name: "Side 20 Steps" }), -200);
+  await expect(viewer.getByText("B · 40 Steps", { exact: true })).toBeVisible();
+  await expect(viewer.getByRole("img", { name: "Side 40 Steps" })).toBeInViewport();
+  expect(dream.requests).toEqual([]);
+
+  // This Image picks the side shown; with the deck empty the preview closes.
+  const answers = viewer.getByRole("group", { name: "Comparison Answers" });
+  await expect
+    .poll(() =>
+      answers.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
+    )
+    .toEqual(["Neither", "This Image", "Both"]);
+  await answers.getByRole("button", { name: "This Image", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   await expect.poll(() => dream.requests.length).toBe(1);
   expect(verdicts(dream)).toEqual(["POST /api/dream/pairs/steps/answer"]);
-  expect(dream.requests[0].body).toEqual({ answer: "neither" });
+  expect(dream.requests[0].body).toEqual({ answer: "b" });
+});
+
+test("The preview judges the top card with swipes and its buttons, and Undo steps back", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const dream = await serveDream(page, {
+    unseen: ["one", "two", "three"].map((id) => dreamItem(id)),
+  });
+  await page.goto("/dream");
+  await current(page).getByRole("button", { name: "View", exact: true }).click();
+  const preview = page.getByRole("dialog", { name: "Preview", exact: true });
+  const card = preview.getByRole("group", { name: "Current Dream", exact: true });
+  await expect(card).toContainText("Dream prompt one");
+  // A swipe right accepts and the next card comes forward, the preview staying open.
+  await drag(
+    page,
+    card.getByRole("img", { name: "Dream prompt one" }),
+    page.viewportSize()!.width * 0.45,
+  );
+  await expect(card).toContainText("Dream prompt two");
+  await preview.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(card).toContainText("Dream prompt one");
+  // Tapping the text shows it all.
+  await card.getByRole("button", { name: "Show More", exact: true }).click();
+  await expect(card.getByRole("button", { name: "Show Less", exact: true })).toBeVisible();
+  await preview.getByRole("button", { name: "Dislike", exact: true }).click();
+  await expect(card).toContainText("Dream prompt two");
+  await page.keyboard.press("Escape");
+  await expect(preview).toBeHidden();
+  await expect(current(page)).toContainText("Dream prompt two");
+  await expect(current(page).getByRole("button", { name: "View", exact: true })).toBeFocused();
+  await expect
+    .poll(() => verdicts(dream))
+    .toEqual(["POST /api/dream/one/keep", "POST /api/dream/undo", "POST /api/dream/one/discard"]);
+});
+
+test("A comparison keeps its layout while its pictures load", async ({ page }) => {
+  await fixtures(page);
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/\/slow-side-\w+\.svg$/, async (route) => {
+    await held;
+    await route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="832" height="1216"><rect width="832" height="1216" fill="#335"/></svg>',
+    });
+  });
+  const side = (id: string, index: 0 | 1) =>
+    dreamItem(id, {
+      url: `/slow-side-${id}.svg`,
+      thumbnailUrl: `/slow-side-${id}.svg`,
+      width: 832,
+      height: 1216,
+      dream: {
+        ...dreamItem(id).dream,
+        pair: { id: "steps", side: index, question: "Which Steps?", label: id },
+      },
+    });
+  await serveDream(page, { unseen: [side("sa", 0), side("sb", 1)] });
+  await page.goto("/dream");
+  const pair = page.getByRole("group", { name: "Which Steps?", exact: true });
+  const grid = pair.locator("[data-side]").first().locator("..");
+  await expect(grid).toBeVisible();
+  const before = await grid.getAttribute("data-stacked");
+  // Every change to the layout attribute from here on is recorded.
+  await grid.evaluate((node) => {
+    (window as any).relaid = 0;
+    new MutationObserver(() => (window as any).relaid++).observe(node, {
+      attributeFilter: ["data-stacked"],
+    });
+  });
+  release();
+  await expect
+    .poll(() =>
+      pair
+        .locator("img[alt]:not([alt=''])")
+        .evaluateAll((images) => images.map((image) => (image as HTMLImageElement).naturalWidth)),
+    )
+    .toEqual([832, 832]);
+  expect(await grid.getAttribute("data-stacked")).toBe(before);
+  expect(await page.evaluate(() => (window as any).relaid)).toBe(0);
 });
 
 test("The Dream tab counts the results waiting for a verdict, a comparison as one", async ({
@@ -783,8 +874,8 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   const editor = page.getByRole("dialog", { name: "New Project", exact: true });
   await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Harbour");
   await fillBox(editor, "Avoid", "people", isMobile);
-  await editor.getByRole("checkbox", { name: "Use LoRAs", exact: true }).uncheck();
-  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await useLoras(editor, false);
+  await editor.getByRole("button", { name: "Create", exact: true }).click();
   await expect(editor).toBeHidden();
   const harbour = page.getByRole("region", { name: "Harbour", exact: true });
   await expect(harbour).toContainText("No LoRAs");
@@ -797,7 +888,7 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const edit = page.getByRole("dialog", { name: "Edit Project", exact: true });
-  await edit.getByRole("checkbox", { name: "Use LoRAs", exact: true }).check();
+  await useLoras(edit, true);
   await edit.getByRole("button", { name: "Save", exact: true }).click();
   await expect(edit).toBeHidden();
   await expect(harbour).not.toContainText("No LoRAs");
@@ -928,9 +1019,17 @@ test("The Inbox accepts, edits then accepts, dismisses with a reason and clears 
 
 test("Dream keeps Images and Videos separate through deck, preview, history and discards", async ({
   page,
-}) => {
+}, testInfo) => {
   await fixtures(page);
-  const video = (id: string) => dreamItem(id, { type: "video" });
+  const format = testInfo.project.use.browserName === "webkit" ? "mp4" : "webm";
+  const clip = readFileSync(new URL(`./media/dream-preview.${format}`, import.meta.url), "base64");
+  const video = (id: string) =>
+    dreamItem(id, {
+      type: "video",
+      url: `data:video/${format};base64,${clip}#${id}`,
+      width: 32,
+      height: 18,
+    });
   const dream = await serveDream(page, {
     enabled: false,
     calibration: [dreamItem("image-a"), video("video-a"), dreamItem("image-b"), video("video-b")],
@@ -944,19 +1043,26 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   await expect(page.getByRole("group", { name: "Which Image?", exact: true })).toBeVisible();
   // The view menu picks the deck's media.
   await showView(page, "Videos");
-  await expect(page.getByRole("button", { name: "Dream View", exact: true })).toHaveText("Videos");
+  await expect(page.getByRole("button", { name: "Dream View", exact: true })).toContainText(
+    "Videos",
+  );
   const pair = page.getByRole("group", { name: "Which Video?", exact: true });
   await expect(pair).toBeVisible();
   await pair.getByRole("button", { name: "View A", exact: true }).click();
-  const viewer = page.getByRole("dialog");
+  const viewer = page.getByRole("dialog", { name: "Preview", exact: true });
   await expect(viewer).toBeVisible();
   const player = viewer.locator("video");
   const close = viewer.getByRole("button", { name: "Close Preview", exact: true });
   await expect(player).toHaveCount(1);
-  await player.dispatchEvent("keydown", { key: "ArrowRight" });
   await expect(player).toHaveAttribute("aria-label", "Dream prompt video-a");
+  await expect(player).toHaveAttribute("src", /#video-a$/);
+  await expect(player).toHaveJSProperty("videoWidth", 32);
+  await expect(player).toHaveJSProperty("paused", false);
   await close.press("ArrowRight");
   await expect(player).toHaveAttribute("aria-label", "Dream prompt video-b");
+  await expect(player).toHaveAttribute("src", /#video-b$/);
+  await expect(player).toHaveJSProperty("videoWidth", 32);
+  await expect(player).toHaveJSProperty("paused", false);
   expect(dream.requests).toEqual([]);
   await close.click();
   await expect(pair.getByRole("button", { name: "View B", exact: true })).toBeFocused();

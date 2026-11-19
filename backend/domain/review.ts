@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { DigestGroup, Project, ProjectBrief, Review } from "../../shared/projects.ts";
+import type { Project, ProjectBrief, Review } from "../../shared/projects.ts";
 import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
 import type { PromptWriter } from "./taste.ts";
@@ -74,34 +74,6 @@ export function reviewReply(reply: { score?: unknown; miss?: unknown }) {
           .trim()
           .slice(0, missCharacters) || "Misses the brief.";
   return { score, miss };
-}
-
-/**
- * While You Were Away: the unseen results per project in the projects' order, those without a
- * project last, each ranked with its misses apart.
- */
-export function digest<Item extends ReviewItem>(
-  items: Item[],
-  projects: Pick<Project, "id" | "name">[],
-): DigestGroup<Item>[] {
-  const known = new Set(projects.map((project) => project.id));
-  const rank = (a: Item, b: Item) =>
-    (b.review?.score ?? 0) - (a.review?.score ?? 0) ||
-    String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
-  return [...projects, { id: null, name: "Other" }]
-    .map(({ id, name }) => {
-      const own = items.filter((item) => {
-        const projectId = item.dream?.projectId;
-        return id === null ? !projectId || !known.has(projectId) : projectId === id;
-      });
-      return {
-        projectId: id,
-        name,
-        items: own.filter((item) => !item.review?.miss).sort(rank),
-        misses: own.filter((item) => item.review?.miss).sort(rank),
-      };
-    })
-    .filter((group) => group.items.length + group.misses.length > 0);
 }
 
 /**

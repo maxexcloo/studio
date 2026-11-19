@@ -25,6 +25,32 @@
   min-height: 0;
   max-height: 52rem;
 }
+/* An upright phone gives the deck the whole screen below the toolbar: the page reaches the bottom
+   safe area, through the shell's bottom padding, and the answers float over the card's scrim. */
+:where(:root[data-phone]:not([data-phone="sideways"])) .page {
+  position: relative;
+  height: calc(
+    100dvh - var(--app-shell-header-offset, 68px) - var(--app-shell-padding, 1rem) -
+      env(safe-area-inset-bottom)
+  );
+  margin-bottom: calc(-1 * var(--app-shell-padding, 1rem));
+}
+:where(:root[data-phone]:not([data-phone="sideways"])) .stage {
+  max-height: none;
+}
+:where(:root[data-phone]:not([data-phone="sideways"])) .page > .buttons {
+  position: absolute;
+  inset: auto 0 var(--mantine-spacing-sm);
+  z-index: 1;
+  padding-bottom: 0;
+  pointer-events: none;
+}
+:where(:root[data-phone]:not([data-phone="sideways"])) .stage .overlay {
+  padding-bottom: calc(64px + 2 * var(--mantine-spacing-sm));
+}
+:where(:root[data-phone]:not([data-phone="sideways"])) .stage .pair {
+  padding-bottom: calc(76px + 2 * var(--mantine-spacing-sm));
+}
 .card {
   position: absolute;
   inset: 0;
@@ -69,18 +95,73 @@
   justify-content: center;
   background: rgb(0 0 0 / 0.18);
 }
-/* The card's media fills it, cropped; View opens it whole. */
-.media img,
-.media video {
+/* Media fills its box where little is cropped (mediaFit.ts), and otherwise shows whole over a
+   blurred, dimmed copy of itself. */
+.fit {
+  position: relative;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  overflow: hidden;
+}
+.fit > img,
+.fit > video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   pointer-events: none;
   -webkit-user-drag: none;
+}
+.fit[data-cover] > img,
+.fit[data-cover] > video {
+  object-fit: cover;
+}
+.fit > .backdrop {
+  object-fit: cover;
+  filter: blur(24px) brightness(0.6);
+  transform: scale(1.15);
 }
 .caption {
   flex-shrink: 0;
   padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+}
+/* A card's text over the bottom of its media, white on a dark scrim in either scheme. */
+.overlay {
+  position: absolute;
+  inset: auto 0 0;
+  /* The scrim fades in above the text and stays dark behind all of it, however far it runs. */
+  padding-top: 4rem;
+  background: linear-gradient(
+    to top,
+    rgb(0 0 0 / 0.85),
+    rgb(0 0 0 / 0.65) calc(100% - 4rem),
+    transparent
+  );
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+  color: var(--mantine-color-white);
+  --mantine-color-dimmed: rgb(255 255 255 / 0.78);
+  --mantine-color-text: var(--mantine-color-white);
+  --mantine-color-gray-light-color: var(--mantine-color-white);
+  --mantine-color-gray-light-hover: rgb(255 255 255 / 0.15);
+  pointer-events: none;
+}
+.overlay > * {
+  pointer-events: auto;
+}
+.overlayText {
+  cursor: pointer;
+}
+.overlayText:focus-visible {
+  outline: 2px solid var(--mantine-color-white);
+  outline-offset: -2px;
+}
+/* Expanded, the text scrolls within the scrim's upper half. */
+.overlayText[data-scrolls] {
+  max-height: 45dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 .label {
   position: absolute;
@@ -188,19 +269,15 @@
   gap: var(--mantine-spacing-xs);
   padding: 0 var(--mantine-spacing-xs) var(--mantine-spacing-xs);
 }
-/* Each side's cell sizes its image, as large as fits at the image's shape (`--ratio`). */
+/* Each side fills its cell, its media fitted there as on a single card. */
 .choice {
-  container-type: size;
   min-width: 0;
   min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 .frame {
   position: relative;
-  width: min(100cqw, 100cqh * var(--ratio));
-  aspect-ratio: var(--ratio);
+  width: 100%;
+  height: 100%;
   border-radius: var(--mantine-radius-md);
   outline: 3px solid transparent;
   outline-offset: -3px;
@@ -232,15 +309,6 @@
   outline: 2px solid var(--mantine-primary-color-filled);
   outline-offset: -2px;
 }
-.pick img,
-.pick video {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  pointer-events: none;
-  -webkit-user-drag: none;
-}
 .side {
   position: absolute;
   top: var(--mantine-spacing-xs);
@@ -258,13 +326,13 @@
   top: var(--mantine-spacing-sm);
   right: var(--mantine-spacing-sm);
 }
-/* One side above the other where that shows them larger (PairCard's useSideBySide). */
+/* One side above the other where that wastes less room (mediaFit.ts's besideFits). */
 .pair[data-stacked] {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: repeat(2, minmax(0, 1fr));
 }
-/* A phone held sideways keeps the card's full height for the media: the caption stands beside it,
-   scrolling when it outgrows the card. */
+/* A phone held sideways keeps a comparison's full height for its sides: the question stands beside
+   them, scrolling when it outgrows the card. */
 :where(:root[data-phone="sideways"]) .card {
   flex-direction: row;
 }
@@ -276,8 +344,17 @@
 :where(:root[data-phone="sideways"]) .pair {
   padding: var(--mantine-spacing-xs) 0 var(--mantine-spacing-xs) var(--mantine-spacing-xs);
 }
-/* The preview: each side's media and full text scroll on their own page, swiped across, above the
-   deck's answers. */
+/* So does a single card's text, on its scrim's colour. */
+:where(:root[data-phone="sideways"]) .card:not([data-full]) .overlay {
+  position: static;
+  order: 1;
+  width: min(16rem, 40%);
+  padding-top: 0;
+  overflow-y: auto;
+  background: rgb(0 0 0 / 0.85);
+}
+/* The preview: the top card edge to edge over the next, under the notch too, with its controls and
+   the deck's answers floating over its scrims. */
 .previewHeader {
   min-height: 0;
   padding: 0;
@@ -286,44 +363,99 @@
   display: flex;
   flex-direction: column;
 }
-.preview {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+/* Edge to edge under the notch, as the viewer; the repeated class outranks the full-screen dialogs'
+   safe-area padding, and the controls offset themselves. */
+.previewContent.previewContent[data-full-screen] {
   padding: 0;
 }
-.previewTrack {
+.preview {
+  position: relative;
   flex: 1;
   min-height: 0;
-  display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
+  padding: 0;
+  overflow: hidden;
 }
-.previewPage {
-  flex: 0 0 100%;
-  min-width: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  scroll-snap-align: start;
+.previewStage {
+  position: absolute;
+  inset: 0;
 }
-.previewPage > * {
+.card[data-full] {
+  max-width: none;
+  flex-direction: column;
+}
+.card[data-full] .hint:not([data-hint="up"]) {
+  top: calc(env(safe-area-inset-top) + 4.5rem);
+}
+/* The card's text clears the floating answers. */
+.card[data-full] .overlay {
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: calc(64px + 2 * var(--mantine-spacing-md) + env(safe-area-inset-bottom));
+  padding-left: env(safe-area-inset-left);
+}
+.card[data-full] .overlay > * {
   max-width: 760px;
   margin-inline: auto;
 }
-.previewMedia {
-  display: flex;
-  justify-content: center;
-  padding-inline: var(--mantine-spacing-sm);
+.card[data-full] [data-zoom-controls] {
+  top: calc(env(safe-area-inset-top) + 3.5rem);
+  bottom: auto;
 }
-.previewMedia img,
-.previewMedia video {
-  display: block;
-  max-width: 100%;
-  max-height: calc(100dvh - 14rem);
-  object-fit: contain;
-  border-radius: var(--mantine-radius-md);
+.previewSides {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  transition: transform var(--studio-motion-duration) var(--studio-ease-enter);
+}
+.previewSide {
+  position: relative;
+  flex: 0 0 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.previewTop {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  padding: calc(env(safe-area-inset-top) + var(--mantine-spacing-sm))
+    calc(env(safe-area-inset-right) + var(--mantine-spacing-sm)) var(--mantine-spacing-xl)
+    calc(env(safe-area-inset-left) + var(--mantine-spacing-sm));
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.5), transparent);
+  pointer-events: none;
+}
+.previewTop > * {
+  pointer-events: auto;
+}
+.previewClose {
+  background: var(--studio-glass-raised);
+  -webkit-backdrop-filter: var(--studio-glass-filter);
+  backdrop-filter: var(--studio-glass-filter);
+}
+.previewButtons {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
+  padding-bottom: var(--mantine-spacing-md);
+  pointer-events: none;
+}
+/* Over the dark scrim the answers take a glass fill, so their tints read in either scheme. */
+.previewButtons .answer,
+:where(:root[data-phone]:not([data-phone="sideways"])) .page > .buttons .answer {
+  pointer-events: auto;
+  background: var(--studio-glass-raised);
+  -webkit-backdrop-filter: var(--studio-glass-filter);
+  backdrop-filter: var(--studio-glass-filter);
+}
+/* Held sideways, the preview's text keeps low, beside the answers rather than above them. */
+:where(:root[data-phone="sideways"]) .card[data-full] .overlay {
+  padding-top: 2.5rem;
+  padding-right: calc(env(safe-area-inset-right) + 15rem);
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--mantine-spacing-xs));
+}
+:where(:root[data-phone="sideways"]) .card[data-full] .overlay > * {
+  margin-inline: calc(env(safe-area-inset-left) + var(--mantine-spacing-xs)) 0;
+}
+:where(:root[data-phone="sideways"]) .previewButtons > * {
+  justify-content: flex-end;
+  padding-right: calc(env(safe-area-inset-right) + var(--mantine-spacing-md));
 }

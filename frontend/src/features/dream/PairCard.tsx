@@ -1,34 +1,15 @@
 import { Text, UnstyledButton } from "@mantine/core";
-import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 
 import { useSideways } from "../../ui/usePhone";
 import type { PairDeckCard } from "./deck";
 import { DeckMedia } from "./DeckMedia";
+import { besideFits, useBoxShape } from "./mediaFit";
 
 import classes from "./DreamPage.module.css";
 
 export const sideNames = ["A", "B"] as const;
 export const sideLabel = (card: PairDeckCard, index: number) =>
   `${sideNames[index]}${card.labels ? ` · ${card.labels[index]}` : ""}`;
-
-/**
- * Whether the sides show larger next to each other than one above the other: when the space is
- * wider, for its height, than one side's shape.
- */
-function useSideBySide(ratio: number) {
-  const pair = useRef<HTMLDivElement>(null);
-  const [beside, setBeside] = useState(true);
-  useLayoutEffect(() => {
-    const element = pair.current!;
-    const measure = () =>
-      setBeside(element.clientWidth / Math.max(1, element.clientHeight) >= ratio);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [ratio]);
-  return { pair, beside };
-}
 
 /** Comparison media opens the shared preview; the bottom bar owns the choices. */
 export function PairContent({
@@ -46,7 +27,8 @@ export function PairContent({
 }) {
   const [first] = card.items;
   const sideways = useSideways();
-  const { pair, beside } = useSideBySide((first.width || 1) / (first.height || 1));
+  const { ref: pair, box } = useBoxShape<HTMLDivElement>();
+  const beside = besideFits((first.width || 1) / (first.height || 1), box);
   return (
     <>
       <div className={classes.caption}>
@@ -68,10 +50,7 @@ export function PairContent({
               data-side={side}
               data-picked={picked === undefined ? undefined : picked === side}
             >
-              <div
-                className={classes.frame}
-                style={{ "--ratio": (item.width || 1) / (item.height || 1) } as CSSProperties}
-              >
+              <div className={classes.frame}>
                 {/* SwipeCard owns pointer taps and swipes; keys open the same preview. */}
                 <div
                   role="button"
