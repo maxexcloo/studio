@@ -1,7 +1,7 @@
 import { promptWords } from "../../../../shared/titles";
 import type { MediaItem, Profile } from "../../types";
 import { dateFormat } from "../../ui/dates";
-import { isProfile, shownProfileName } from "../generation/payload";
+import { isProfile, profileName, shownProfileName } from "../generation/payload";
 
 /**
  * An item's title, for every place one shows (tiles, runs, the viewer, accessible names): the title
@@ -28,6 +28,38 @@ const dayAndTime = dateFormat({
 export const mediaNumber = (item: Pick<MediaItem, "number">) =>
   item.number ? `#${item.number}` : "";
 
+const modelFile = (value: unknown) =>
+  String(value || "")
+    .split(/[\\/]/)
+    .at(-1)!
+    .replace(/\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i, "");
+
+/** The saved profile name or an unambiguous catalogue match for older generations. */
+export function mediaProfileName(item: MediaItem, profiles: Profile[]) {
+  const { profileName: saved, profileId, modelName, model } = item.settings ?? {};
+  if (saved) return shownProfileName(String(saved));
+  const exact = profiles.find((profile) => isProfile(profile, profileId || item.model));
+  if (exact) return profileName(exact);
+  const files = new Set([modelName, model, item.model].map(modelFile).filter(Boolean));
+  if (!files.size) return "";
+  const names = new Set(
+    profiles
+      .filter(
+        (profile) =>
+          profile.kind === item.type &&
+          [
+            profile,
+            ...(profile.backendOptions?.flatMap(({ profile }) => (profile ? [profile] : [])) ?? []),
+          ].some(
+            ({ model, baseModel }) =>
+              files.has(modelFile(model)) || files.has(modelFile(baseModel)),
+          ),
+      )
+      .map(profileName),
+  );
+  return names.size === 1 ? [...names][0] : "";
+}
+
 /** Its number · when it was made (unless `withTime` is false) · the profile's name, plus a video's length. */
 export function mediaDetail(item: MediaItem, profiles: Profile[], withTime: boolean) {
   const settings = item.settings || {};
@@ -36,10 +68,7 @@ export function mediaDetail(item: MediaItem, profiles: Profile[], withTime: bool
     withTime && created && !Number.isNaN(created.getTime())
       ? (sameDay(created, new Date()) ? timeOnly : dayAndTime).format(created)
       : "";
-  const profile = profiles.find((entry) => isProfile(entry, settings.profileId));
-  const name = shownProfileName(
-    String(settings.profileName || profile?.displayName || profile?.label || ""),
-  );
+  const name = mediaProfileName(item, profiles);
   const seconds =
     Number(settings.duration) || Number(settings.frames) / Number(settings.fps) || undefined;
   const duration = item.type === "video" && seconds ? `${Math.round(seconds * 10) / 10} s` : "";
