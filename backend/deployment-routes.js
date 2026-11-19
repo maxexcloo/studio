@@ -1,5 +1,6 @@
 import { dreamOverrideKeys, dreamSettingError } from "../shared/dream.ts";
-import { assistantIntegration } from "./assistant-routes.js";
+import { defaultTextProfileKey } from "./account-preferences.js";
+import { assistantIntegration, textModels } from "./assistant-routes.js";
 import { civitaiTokenStatus } from "./civitai/access.js";
 import {
   catalogueFlags,
@@ -18,7 +19,10 @@ import { requireAdmin } from "./route-access.js";
  * Settings › Deployment. `mediaModels` and `unavailableModels` are model/catalogue.js's;
  * `assistantEngine` is the prompt assistant, or undefined without one.
  */
-export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels }) {
+export function registerDeploymentRoutes(
+  app,
+  { assistantEngine, mediaModels, unavailableModels, workloadModels = () => [] },
+) {
   /**
    * What the deployment decides, for Settings: each value with its source
    * (the deployment, saved from Settings, or the default) and whether it is locked.
@@ -41,11 +45,14 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
       effective: effective || "",
       ...settingSource(key),
     });
+    const assistant = await assistantIntegration({ engine: assistantEngine });
     res.json({
       ok: true,
       defaults: {
         image: defaultFor("STUDIO_DEFAULT_IMAGE_PROFILE", models.defaults?.imageModel),
         video: defaultFor("STUDIO_DEFAULT_VIDEO_PROFILE", models.defaults?.videoModel),
+        text: defaultFor(defaultTextProfileKey, assistant.model),
+        textModels: assistantEngine ? await textModels(assistantEngine, workloadModels()) : [],
         profiles,
       },
       catalogue: catalogueFlags.map(describeFlag),
@@ -53,7 +60,7 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
       integrations: {
         civitai: { token: civitaiTokenStatus() },
         huggingFace: { token: { set: Boolean(hfTokenValue()) } },
-        assistant: await assistantIntegration({ engine: assistantEngine }),
+        assistant,
       },
     });
   });
@@ -79,6 +86,12 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
     if (defaultProfileKeys.includes(key)) {
       const id = String(value || "").trim();
       if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid profile.");
+      if (
+        key === defaultTextProfileKey &&
+        id &&
+        !/^(cloud|local)\/[A-Za-z0-9][A-Za-z0-9._:/@+-]*$/.test(id)
+      )
+        return res.status(400).json({ ok: false, error: "Choose a valid text profile." });
       res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key } });
       return;
     }

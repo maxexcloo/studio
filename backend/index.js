@@ -705,7 +705,7 @@ registerLinkImportRoute(app, {
   uploaded: (item) => void imageSearch.completed([item]),
 });
 
-registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels });
+registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels, workloadModels });
 
 const generationRoutes = createGenerationSubmission({
   store,

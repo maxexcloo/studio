@@ -938,6 +938,8 @@ test("Settings › Maintenance switches follow at once and settle back after a f
         defaults: {
           image: setting("STUDIO_DEFAULT_IMAGE_PROFILE"),
           video: setting("STUDIO_DEFAULT_VIDEO_PROFILE"),
+          text: setting("STUDIO_DEFAULT_TEXT_PROFILE"),
+          textModels: [],
           profiles: [],
         },
         dream: dreamOverridesFixture(),
@@ -995,4 +997,26 @@ test("Settings › Generation forces a Dream setting on every account and hands 
   await spicy.getByText("Per Account", { exact: true }).click();
   await page.reload();
   await expect(choice(spicy, "Per Account")).toBeChecked();
+});
+
+test("Settings › Generation saves and clears the default Text Profile", async ({ page }) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  await page.goto("/settings#generation");
+  const text = page.getByRole("combobox", { name: "Text Profile", exact: true });
+  await expect(text).toHaveText("Gateway Default");
+  await text.click();
+  const saved = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/settings/deployment") &&
+      response.request().method() === "POST" &&
+      response.ok(),
+  );
+  await page.getByRole("option", { name: "Auto · Local", exact: true }).click();
+  await saved;
+  await page.reload();
+  await expect(text).toHaveText("Auto · Local");
+  await text.click();
+  await page.getByRole("option", { name: "Gateway Default", exact: true }).click();
+  await expect(text).toHaveText("Gateway Default");
 });
