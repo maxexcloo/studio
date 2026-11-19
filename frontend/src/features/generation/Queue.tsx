@@ -33,6 +33,7 @@ import { loraName } from "../../../../shared/profiles";
 import {
   type QueueCancelAllResponse,
   type QueuePause,
+  type QueueResponse,
   activeStatuses,
   pausedReason,
   pendingStatuses,
@@ -62,7 +63,7 @@ import { referenceLabel } from "./references";
 import type { QueueRowDrag } from "./SortableQueue";
 
 import classes from "./Queue.module.css";
-type QueueListing = { jobs: QueueJob[]; paused: QueuePause };
+type QueueListing = Omit<QueueResponse, "jobs"> & { jobs: QueueJob[] };
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
   // A poll fetches only the jobs changed since the newest it holds and keeps the rest; an
@@ -80,7 +81,7 @@ export const queueQuery = queryOptions({
       );
       const known = new Map([...held, ...changes.jobs].map((job) => [job.id, job]));
       const jobs = changes.ids.map((id) => known.get(id));
-      if (jobs.every((job) => job !== undefined)) return { jobs, paused: changes.paused };
+      if (jobs.every((job) => job !== undefined)) return { ...changes, jobs };
     }
     return api<QueueListing>("/api/queue");
   },
@@ -103,7 +104,7 @@ export function useQueue() {
 export const queueActionKey = ["queue-action"];
 /**
  * An empty `id` acts on the whole queue (`cancel-all`, `clear-failed`, `pause` and the like), or
- * with `set` on that set's waiting work (`move`).
+ * with `set` on that set's work (`move` or `clear-failed`).
  */
 type QueueAction = {
   id: string;
@@ -146,11 +147,14 @@ export function useQueueAction(jobId?: string) {
       if (unconfirmed) throw new Error(unconfirmed.error);
       return result;
     },
-    onSettled: () =>
-      Promise.all([
+    onSettled: (_result, _error, { set, action }) => {
+      if (set && action === "clear-failed")
+        return client.invalidateQueries({ queryKey: queueQuery.queryKey, exact: true });
+      return Promise.all([
         client.invalidateQueries({ queryKey: queueQuery.queryKey }),
         client.invalidateQueries({ queryKey: galleryKey }),
-      ]),
+      ]);
+    },
   });
   const matching = useCallback(
     (value: QueueAction) =>
@@ -236,12 +240,14 @@ export function QueueJobAction({
 }
 /** A queue row's or set's action as a subtle icon; `name` is a fuller accessible name. */
 function RowButton({
+  disabled,
   label,
   name,
   icon: Icon,
   pending,
   onClick,
 }: {
+  disabled?: boolean;
   label: string;
   name?: string;
   icon: LucideIcon;
@@ -255,7 +261,7 @@ function RowButton({
         color="gray"
         aria-label={name ?? label}
         loading={pending}
-        disabled={pending}
+        disabled={pending || disabled}
         onClick={onClick}
       >
         <Icon size={16} />
@@ -588,12 +594,14 @@ function promptEntries({ jobs, set }: QueueEntry) {
  * below once opened. A `prompt` row is one prompt's separate runs within a set.
  */
 function QueueSetRow({
+  clearable = false,
   entry,
   sortable,
   drag,
   row,
   prompt = false,
 }: {
+  clearable?: boolean;
   entry: QueueEntry;
   sortable: boolean;
   drag?: QueueRowDrag;
@@ -604,7 +612,8 @@ function QueueSetRow({
   const jobsId = useId();
   const action = useQueueAction();
   const [busy, setBusy] = useState<"stop" | "retry">();
-  const { title, members } = entry.set!;
+  const clearing = action.isPending;
+  const { id: setId, title, members } = entry.set!;
   const done = members.filter((job) => job.status === "completed").length;
   const total = members.filter((job) => job.status !== "cancelled").length;
   const failed = members.filter((job) => job.status === "failed").map((job) => job.id);
@@ -629,6 +638,7 @@ function QueueSetRow({
   };
   const retryButton = (
     <RowButton
+      disabled={clearing}
       label="Retry Failed"
       icon={icons.retry}
       pending={busy === "retry"}
@@ -676,9 +686,21 @@ function QueueSetRow({
             pending={busy === "stop"}
             onClick={() => void stop()}
           />
-        ) : (
-          failed.length > 0 && retryButton
-        )}
+        ) : failed.length > 0 ? (
+          <>
+            {retryButton}
+            {clearable && !opened && (
+              <RowButton
+                disabled={Boolean(busy)}
+                label="Clear Failed"
+                name="Clear Failed Set"
+                icon={icons.clearFailed}
+                pending={clearing}
+                onClick={() => action.mutate({ id: "", set: setId, action: "clear-failed" })}
+              />
+            )}
+          </>
+        ) : null}
       </Group>
       <Collapse id={jobsId} expanded={opened} keepMounted={false}>
         <div className={classes.set}>
@@ -963,6 +985,7 @@ export function Queue({ downloads }: { downloads: ModelDownload[] }) {
     entry.set ? (
       <QueueSetRow
         key={entry.id}
+        clearable={queue.data.clearableFailedSets?.includes(entry.set.id)}
         entry={entry}
         sortable={sortable && movable.includes(entry)}
         drag={drag}
