@@ -138,10 +138,7 @@ interface Deleting {
   name: string;
 }
 
-/**
- * A profile's or guide's row menu: Edit, then the rest A–Z (Copy ID, Download, Duplicate… and any
- * `more`), then Delete.
- */
+/** A profile's or guide's row menu, ending with Edit and Delete. */
 function rowMenu({
   kind,
   id,
@@ -158,10 +155,6 @@ function rowMenu({
 }) {
   return (
     <>
-      <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => edit({ kind, id })}>
-        Edit
-      </Menu.Item>
-      <Menu.Divider />
       {more}
       <Menu.Item
         leftSection={<icons.copy size={16} />}
@@ -183,6 +176,9 @@ function rowMenu({
         </Menu.Item>
       )}
       <Menu.Divider />
+      <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => edit({ kind, id })}>
+        Edit
+      </Menu.Item>
       <Menu.Item
         color="red"
         leftSection={<icons.delete size={16} />}
@@ -314,17 +310,22 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           }
           filterCount={Number(!!family)}
           onClearFilters={() => setFamily(null)}
-          more={[
-            // Every profile and guide, in one archive.
-            { label: "Download All", icon: icons.download, href: "/api/profiles/export" },
-          ]}
           actions={
-            <ToolbarAction
-              label="Import Workflow"
-              icon={icons.upload}
-              loading={importing.isPending}
-              onClick={workflowFile.open}
-            />
+            <>
+              <ToolbarAction
+                label="Download All"
+                icon={icons.download}
+                href="/api/profiles/export"
+                variant="subtle"
+                color="gray"
+              />
+              <ToolbarAction
+                label="Import Workflow"
+                icon={icons.upload}
+                loading={importing.isPending}
+                onClick={workflowFile.open}
+              />
+            </>
           }
         />
       </SectionHeader>

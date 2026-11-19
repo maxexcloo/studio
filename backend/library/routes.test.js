@@ -94,7 +94,10 @@ test("an import from chat goes through the same pipeline, records chat as its or
     installed: async () => ({}),
     latestInstalled: async () => {
       if (inventoryUnknown) throw new Error("No installed-file inventory");
-      return { files: { loras: ["parked-kept.safetensors"] }, current: false };
+      return {
+        files: { loras: ["parked-kept.safetensors", "uncatalogued.safetensors"] },
+        current: false,
+      };
     },
     loraInfo: async () => ({}),
     catalogue: () => catalogue,
@@ -272,6 +275,20 @@ test("an import from chat goes through the same pipeline, records chat as its or
   assert.equal(unchecked.ok, true);
   assert.match(unchecked.note, /could not be checked/);
   assert.equal(forgotten.includes("parked-unchecked.safetensors"), false);
+
+  inventoryUnknown = false;
+  const uncataloguedKey = "loras/uncatalogued.safetensors";
+  const uncatalogued = await call("POST", "/api/library/catalogue/remove", {
+    key: uncataloguedKey,
+  });
+  assert.deepEqual(uncatalogued, { ok: true, key: uncataloguedKey, fileRemoved: true });
+  assert.equal(catalogue.entry(uncataloguedKey), null);
+  assert.ok(forgotten.includes("uncatalogued.safetensors"));
+  const absent = await call("POST", "/api/library/catalogue/remove", {
+    key: "loras/absent.safetensors",
+  });
+  assert.equal(absent.ok, false);
+  assert.equal(forgotten.includes("absent.safetensors"), false);
 });
 
 test("dropped images arrive as data URLs, PNG, WebP or JPEG only", () => {
