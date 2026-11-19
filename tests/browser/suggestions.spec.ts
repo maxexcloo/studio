@@ -302,17 +302,24 @@ test("Animate offers motions written for the image, then its templates and Custo
   await viewerAction(page, "Animate");
   const menu = page.getByRole("menu");
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
-  await expect(menu.getByRole("menuitem")).toHaveText([
-    "Review Prompt",
-    ...motion.map((idea) => idea.label).sort((a, b) => a.localeCompare(b)),
-    "Refresh",
-    "Action",
-    "Cinematic Camera",
-    "Dialogue",
-    "Living Photo",
-    "Custom…",
-    "Animate in Composer",
-  ]);
+  await expect
+    .poll(() =>
+      menu
+        .getByRole("menuitem")
+        .evaluateAll((items) => items.map((item) => item.ariaLabel || item.textContent)),
+    )
+    .toEqual([
+      "Profile",
+      "Review Prompt",
+      ...motion.map((idea) => idea.label).sort((a, b) => a.localeCompare(b)),
+      "Refresh",
+      "Action",
+      "Cinematic Camera",
+      "Dialogue",
+      "Living Photo",
+      "Custom…",
+      "Animate in Composer",
+    ]);
   await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.writing).toMatchObject({

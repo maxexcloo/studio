@@ -30,6 +30,7 @@ export function AnimateDialog({
   iterate,
   theme,
   instruction: chosen,
+  profileId,
   onClose,
 }: AnimateRequest & {
   item: MediaItem;
@@ -58,7 +59,12 @@ export function AnimateDialog({
     writing.current?.abort();
     writing.current = new AbortController();
     writer.mutate(
-      { theme, instruction: instruction.trim() || undefined, signal: writing.current.signal },
+      {
+        theme,
+        instruction: instruction.trim() || undefined,
+        profileId,
+        signal: writing.current.signal,
+      },
       { onSuccess: (written) => setPrompt(written.prompt) },
     );
   };
@@ -70,7 +76,7 @@ export function AnimateDialog({
   const animate = () => {
     if (!instruction.trim()) return;
     if (review) return write();
-    run({ kind: "animate", theme, instruction: instruction.trim() });
+    run({ kind: "animate", theme, instruction: instruction.trim(), profileId });
     onClose();
   };
   const submitPrompt = () => {

@@ -25,6 +25,7 @@ export interface Profile {
   loraNote?: string;
   provider?: string;
   ready?: boolean;
+  availability?: "offline" | "parked";
   uncensored?: boolean;
   /** Drafted by the assistant and not yet approved; only administrators see it. */
   aiDrafted?: boolean;
