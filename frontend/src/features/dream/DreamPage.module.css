@@ -217,7 +217,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--mantine-spacing-md);
+  gap: min(var(--mantine-spacing-md), 2%);
   padding-bottom: calc(var(--mantine-spacing-xs) + env(safe-area-inset-bottom));
 }
 .answer {
@@ -386,9 +386,6 @@
   padding: var(--mantine-spacing-sm) var(--mantine-spacing-sm) 0;
   background: var(--studio-glass-chrome);
   border-top: 1px solid var(--studio-glass-border);
-}
-.previewButtons .buttons {
-  gap: min(var(--mantine-spacing-md), 2%);
 }
 /* Only the controls, and their popups, take touches over the deck's media. */
 :where(:root[data-phone]:not([data-phone="sideways"])) .page > .buttons > * {
