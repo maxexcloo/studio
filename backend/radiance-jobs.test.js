@@ -8,7 +8,16 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-radiance-jobs-"));
 process.env.STUDIO_DATA_DIR = scratch;
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const { jobs, setTerminalJob } = await import("./jobs.js");
-const { runRadianceJob, orderedRadianceReferences } = await import("./radiance-jobs.js");
+const { runRadianceJob, recoverRadianceJob, orderedRadianceReferences } =
+  await import("./radiance-jobs.js");
+const { createGenerationQueueAdapter } = await import("./domain/generation-adapter.ts");
+const { GenerationQueue } = await import("./domain/queue.ts");
+const { Store } = await import("./domain/store.ts");
+const { workloadQueue } = await import("./domain/workload-queue.ts");
+const { fakeKubernetes } = await import("./fixtures/fake-kubernetes.ts");
+const { openDatabase } = await import("./persistence/runtime.ts");
+const { RuntimeController, memoryStore } = await import("./runtime/controller.ts");
+const { KubernetesEngine } = await import("./runtime/kubernetes.ts");
 const { saveImportedWorkflow } = await import("./custom-workflows.js");
 const { makePendingItems } = await import("./gallery/records.js");
 const { putGalleryItems, galleryItems } = await import("./gallery/store.js");
@@ -316,6 +325,128 @@ test("a missing remote video fails explicitly without a replacement generation",
   });
   assert.equal(jobs.get(id).status, "failed");
   assert.match(jobs.get(id).error, /no video/);
+});
+
+test("a recorded Radiance pinning failure survives process loss and retries once after the old pod leaves", async (t) => {
+  const filename = path.join(scratch, "memory-recovery.sqlite");
+  const db = new Store(openDatabase(filename));
+  const owner = "";
+  const session = db.createSession(owner).id;
+  const id = "pending-memory-recovery";
+  const body = bodyFor(id);
+  const resource = "worker:radiance";
+  const original = db.enqueue(owner, session, body, "image", undefined, resource, id);
+  db.save({ ...original, status: "starting" });
+  const historical = db.enqueue(owner, session, body, "image", undefined, resource);
+  const refusal = "Radiance: Tables placed in host memory cannot be pinned.";
+  db.save({ ...historical, status: "failed", reason: refusal });
+  pending(id, body);
+  const pinFailure = {
+    models: async () => [],
+    images: async () => {
+      throw new Error(refusal);
+    },
+  };
+  await runRadianceJob(id, body, worker, { store: db, client: pinFailure });
+  assert.equal(db.job(owner, id).status, "starting");
+  db.close();
+  jobs.delete(id);
+
+  const restored = new Store(openDatabase(filename));
+  t.after(() => restored.close());
+  const submitted = [];
+  const queue = new GenerationQueue(
+    restored,
+    createGenerationQueueAdapter({
+      jobs,
+      items: (job) => galleryItems({ jobId: job.id }),
+      recover: async (job) => recoverRadianceJob(job, restored),
+      submitGeneration: async (job) => {
+        submitted.push(job.id);
+        return { status: 200, payload: {} };
+      },
+    }),
+  );
+  await queue.tick();
+  assert.equal(restored.job(owner, id).reason, refusal);
+  assert.deepEqual(
+    restored.pendingMemoryRecoveries().map((job) => job.id),
+    [id],
+  );
+  assert.deepEqual(submitted, []);
+
+  const workload = {
+    id: "radiance",
+    label: "Radiance",
+    backend: "radiance",
+    kind: "image",
+    namespace: "radiance",
+    deployment: "radiance",
+    pool: "gpu",
+    gpus: 2,
+    url: worker.url,
+  };
+  const kube = fakeKubernetes([{ namespace: "radiance", name: "radiance", replicas: 1 }]);
+  const engine = new KubernetesEngine(kube.request);
+  const placement = memoryStore();
+  const controller = (sleep = async () => kube.tick()) => {
+    const runtime = new RuntimeController({
+      engine,
+      store: placement,
+      workloads: [workload],
+      pools: { gpu: 2 },
+      radianceIdle: async () => true,
+      sleep,
+    });
+    runtime.useQueue(
+      workloadQueue({
+        queue,
+        leases: new Map(),
+        admitting: new Set(),
+        workloads: (job) => [job.backend],
+      }),
+    );
+    return runtime;
+  };
+  // Lose the process after it scales down, with its old pod still terminating.
+  const waitingForPod = Promise.withResolvers();
+  const prior = controller(() => {
+    waitingForPod.resolve();
+    return new Promise(() => {});
+  });
+  await prior.restartWhenIdle();
+  await waitingForPod.promise;
+  const runtime = controller();
+  assert.equal(placement.read().operations[0].status, "interrupted");
+  await runtime.restartWhenIdle();
+  assert.equal(restored.job(owner, id).replacementJobId, undefined);
+  kube.tick();
+  await runtime.reconcile();
+  await runtime.settled;
+  assert.deepEqual(kube.log, [
+    "scale radiance/radiance 0",
+    "gone radiance/radiance",
+    "scale radiance/radiance 1",
+  ]);
+  const replacement = restored.job(owner, id).replacementJobId;
+  assert.ok(replacement);
+  assert.equal(restored.job(owner, replacement).retried, true);
+  assert.equal(restored.job(owner, historical.id).replacementJobId, undefined);
+  assert.deepEqual(restored.pendingMemoryRecoveries(), []);
+  await controller().restartWhenIdle();
+  assert.equal(kube.log.length, 3);
+
+  await queue.tick();
+  assert.deepEqual(submitted, [replacement]);
+  const replacementBody = bodyFor(replacement);
+  pending(replacement, replacementBody);
+  await runRadianceJob(replacement, replacementBody, worker, {
+    store: restored,
+    client: pinFailure,
+  });
+  await queue.tick();
+  assert.equal(restored.job(owner, replacement).status, "failed");
+  assert.deepEqual(restored.pendingMemoryRecoveries(), []);
 });
 
 test("reference slot identity determines conditioning order after draft reorder", () => {

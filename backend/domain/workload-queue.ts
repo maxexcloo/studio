@@ -1,5 +1,6 @@
 import { activeStatuses, terminalStatuses } from "../../shared/queue.ts";
 import type { RuntimeJob, RuntimeQueueCancel } from "../../shared/runtime.ts";
+import { logEvent, logWarning } from "../crash-log.js";
 import type { WorkloadQueue } from "../runtime/controller.ts";
 import type { GenerationQueue } from "./queue.ts";
 import { type OwnedJob, everyone, queuePriority } from "./store.ts";
@@ -34,6 +35,8 @@ export function workloadQueue({
   const { store } = queue;
   const on = (workload: string) =>
     store.openJobs().filter((job) => workloads(job).includes(workload));
+  const memoryFailures = (workload: string) =>
+    store.pendingMemoryRecoveries().filter((job) => workloads(job).includes(workload));
   const waitingLimit = 20;
   const row = (job: OwnedJob, queuePosition?: number): RuntimeJob => ({
     id: job.id,
@@ -84,6 +87,26 @@ export function workloadQueue({
           .filter((job) => !acceptedWork(job) && !pauses.has(job.ownerId))
           .map((job) => job.priority ?? queuePriority.manual),
       );
+    },
+    memoryFailure(workload) {
+      return memoryFailures(workload)[0]?.memoryRecovery;
+    },
+    retryMemoryFailures(workload) {
+      for (const job of memoryFailures(workload)) {
+        try {
+          const retry = queue.again(job);
+          if (!retry) continue;
+          logEvent("Retry after freeing Radiance host memory", {
+            job: job.id,
+            replacement: retry.id,
+          });
+        } catch (error) {
+          logWarning("Could not queue a job again after freeing host memory", {
+            job: job.id,
+            reason: (error as Error).message,
+          });
+        }
+      }
     },
     async cancel(workload) {
       const counts: RuntimeQueueCancel = { cancelled: 0, cancelling: 0 };

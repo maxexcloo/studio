@@ -44,6 +44,8 @@ export type OwnedJob = Omit<QueueJob, "dream"> &
     cancelRequested?: boolean;
     cleared?: boolean;
     replacementJobId?: string;
+    /** Radiance refused to load this job until its pod frees host memory. */
+    memoryRecovery?: string;
     /** Queued again automatically after its first run failed (queue.ts `again`); it isn't again. */
     retried?: true;
     /** When the scheduler admitted the job and when Studio first began saving its results. */
@@ -78,6 +80,9 @@ export const everyone = "*";
 const openStatuses = [...pendingStatuses, ...activeStatuses];
 const jobPriority = "json_extract(record, '$.priority')";
 const dreamPriority = `${jobPriority} = ${queuePriority.dream}`;
+const pendingMemoryRecovery = `status = 'failed'
+  AND json_extract(record, '$.memoryRecovery') IS NOT NULL
+  AND json_extract(record, '$.cleared') IS NULL`;
 /** How many of an account's finished jobs its queue lists, newest first; older ones are read one at a time (`job`). */
 export const listedFinishedJobs = 200;
 const placeholders = (values: Iterable<unknown>) => [...values].map(() => "?").join(", ");
@@ -108,6 +113,8 @@ export class Store {
       );
       CREATE INDEX IF NOT EXISTS studio_queue_owner ON studio_queue(owner_id, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_status ON studio_queue(status, created_at);
+      CREATE INDEX IF NOT EXISTS studio_queue_memory_recovery ON studio_queue(id)
+        WHERE ${pendingMemoryRecovery};
       CREATE INDEX IF NOT EXISTS studio_queue_session ON studio_queue(session_id, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_set ON studio_queue(json_extract(record, '$.queueSet'));
       CREATE INDEX IF NOT EXISTS studio_queue_priority ON studio_queue(status, ${jobPriority});
@@ -268,6 +275,7 @@ export class Store {
           if (original)
             this.save({
               ...original,
+              memoryRecovery: undefined,
               replacementJobId: id,
               ...(replaces?.clear ? { cleared: true } : {}),
             });
@@ -352,6 +360,23 @@ export class Store {
         `SELECT record FROM studio_queue INDEXED BY studio_queue_status WHERE status IN (${placeholders(openStatuses)})${ownerId === undefined ? "" : " AND owner_id = ?"} ORDER BY created_at, rowid`,
       )
       .all(...openStatuses, ...(ownerId === undefined ? [] : [ownerId]))
+      .map((row) => JSON.parse(row.record as string));
+  }
+
+  /** Journal the confirmed provider failure before it is published to the in-memory adapter. */
+  rememberMemoryFailure(ownerId: string, id: string, reason: string) {
+    const job = this.job(ownerId, id);
+    if (job && !terminalStatuses.has(job.status) && !job.cancelRequested && !job.retried)
+      this.save({ ...job, memoryRecovery: reason });
+  }
+
+  pendingMemoryRecoveries(): OwnedJob[] {
+    return this.db
+      .prepare(
+        `SELECT record FROM studio_queue INDEXED BY studio_queue_memory_recovery
+         WHERE ${pendingMemoryRecovery}`,
+      )
+      .all()
       .map((row) => JSON.parse(row.record as string));
   }
 
@@ -797,6 +822,7 @@ export function publicJob({
   cancelRequested: _cancelRequested,
   cleared: _cleared,
   replacementJobId: _replacementJobId,
+  memoryRecovery: _memoryRecovery,
   admittedAt: _admittedAt,
   savingAt: _savingAt,
   priority,
