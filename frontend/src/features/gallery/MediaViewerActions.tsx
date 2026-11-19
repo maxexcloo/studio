@@ -89,6 +89,7 @@ export function MediaViewerActions({
     onRetried,
     ...handlers,
     onVersionChange,
+    retryInStage: !item.url,
   });
   current.current = groups;
   if (shortcuts) shortcuts.current = groups;
