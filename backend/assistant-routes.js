@@ -2,7 +2,7 @@ import { cardKinds } from "../shared/characters.ts";
 import { maxProjectBrief, projectBriefTextFields } from "../shared/projects.ts";
 import { ownerIdForRequest } from "./account-ownership.js";
 import { mayUseFeature, promptWriter } from "./account-policy.js";
-import { accountPreferences } from "./account-preferences.js";
+import { accountPreferences, defaultTextSide } from "./account-preferences.js";
 /**
  * The prompt assistant's routes. Every route is account-scoped: it needs the Prompt Assistant
  * access-profile feature, works only with profiles the account may use, and an uncensored style (Spicy) needs Uncensored Models.
@@ -122,7 +122,7 @@ export function assistantRecord(value, loras = []) {
 
 /**
  * Settings › Integrations › Prompt Assistant: whether the gateway is set, and the model Studio's
- * own calls use now (the running local text model, otherwise the cloud model).
+ * own calls use now.
  */
 export async function assistantIntegration({ environment = process.env, engine }) {
   let problem = "";
@@ -142,7 +142,7 @@ export async function assistantIntegration({ environment = process.env, engine }
  * The text models to choose from: the gateway's curated aliases (`cloud/…`, `local/…`, not every
  * model it can reach) and those of Studio's workloads serving text.
  */
-async function textModels(engine, workloadModels) {
+export async function textModels(engine, workloadModels) {
   return [...new Set([...(await engine.listModels()), ...workloadModels])].filter((model) =>
     /^(cloud|local)\//.test(model),
   );
@@ -264,6 +264,7 @@ export function registerAssistantRoutes(
         available: true,
         vision: await engine.supportsVision(writer),
         writingModel: await engine.model("rewrite", false, writer),
+        defaultTextSide: defaultTextSide(environment),
         models,
         defaultPreset: promptStyleStore().defaultId(),
         // Library › Prompt Styles' menus: Improve Prompt's styles, Animate's themes and fixed AI edits.

@@ -158,8 +158,8 @@ recur across features.
   and stamp its answer while the next card waits behind; on an upright phone
   the card reaches the bottom safe area with the buttons floating over it.
   Undo beside the view menu steps back through the session's judgements.
-  The Images and Videos views each continue into Rate Your Library for the
-  same media kind when their unseen Dream cards run out. The fullscreen
+  Dream shows unseen results and their comparisons. Library rates existing
+  results. Both use the same Images and Videos selector. The fullscreen
   preview fills the stage above the verdicts and shares the viewer's
   top chrome, media controls and Details panel or phone sheet for the item
   shown. On comparisons, This Image picks the shown side. Like and an upward

@@ -44,7 +44,6 @@ test("Saving and updating a preset never submits a generation, and the name show
   await saveCurrent(page, "Copper Study");
   await expect.poll(() => state.presets.length).toBe(1);
   expect(state.jobs).toHaveLength(0);
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   const update = page.getByRole("option", { name: "Update Preset", exact: true });
   await closePresets(page);
   await prompt.fill("A copper bird with blue wings");

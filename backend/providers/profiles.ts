@@ -1,9 +1,14 @@
 import sharp from "sharp";
 
 import type { GenerationInput } from "../../shared/queue.ts";
+import {
+  grokPinnedResolutions,
+  grokVideoAspects,
+  grokVideoDefaultResolution,
+} from "../../shared/resolution.ts";
 import { modelOf } from "../domain/queue.ts";
 import type { OwnedJob } from "../domain/store.ts";
-import { CliProxyMedia, type CloudRequest, nativeAspects } from "./cliproxy.ts";
+import { CliProxyMedia, type CloudRequest } from "./cliproxy.ts";
 
 type Value = Record<string, any>;
 // Discovery publishes no resolution schemas; an unlisted model takes the provider's default.
@@ -11,9 +16,9 @@ const resolutions: Record<string, string[]> = {
   "grok-imagine-image": [],
   "grok-imagine-image-2.0": ["1k", "2k"],
   "grok-imagine-image-quality": [],
-  "grok-imagine-video": ["480p", "720p"],
-  "grok-imagine-video-1.5": ["480p", "720p", "1080p"],
-  "grok-imagine-video-1.5-lite": ["480p", "720p", "1080p"],
+  "grok-imagine-video": grokPinnedResolutions,
+  "grok-imagine-video-1.5": [...grokPinnedResolutions, "1080p"],
+  "grok-imagine-video-1.5-lite": [...grokPinnedResolutions, "1080p"],
 };
 // Grok Imagine Image 2.0's quality; Auto is low for generation and medium for edits.
 const qualities: Record<string, string[]> = { "grok-imagine-image-2.0": ["auto", "low", "medium"] };
@@ -38,7 +43,10 @@ const nativeSizes: Record<string, Record<string, Record<string, [number, number]
  * per resolution, where known; else about a megapixel.
  */
 export function aspectPresets(model: string) {
-  return nativeAspects.map((label) => {
+  const aspects = model.startsWith("grok-imagine-video")
+    ? grokVideoAspects
+    : Object.keys(nativeSizes[model] || {});
+  return aspects.map((label) => {
     const known = nativeSizes[model]?.[label];
     const [x, y] = label.split(":").map(Number);
     const scale = Math.round(Math.sqrt((1024 * 1024) / (x * y)));
@@ -96,6 +104,7 @@ export function studioCloudProfiles(options: ProfileOptions) {
           height: 1024,
           count: 1,
           duration: 6,
+          ...(kind === "video" ? { resolution: grokVideoDefaultResolution } : {}),
           ...inputs,
           ...configuredDefaults,
           model,
@@ -110,6 +119,7 @@ export function studioCloudProfiles(options: ProfileOptions) {
               baseModel: model,
               workflow: workflow.profileId,
               defaults,
+              aspectPolicy: kind === "video" ? "reference" : workflow.aspectPolicy,
               aspects: resolutions[model]?.length ? aspectPresets(model) : [],
               capabilities: {
                 ...workflow.capabilities,
@@ -147,7 +157,8 @@ export function studioCloudProfiles(options: ProfileOptions) {
     const lastFrameId = references.find((item: Value) => item.slot === "end")?.assetId;
     const referenceId = references.find((item: Value) => item.slot !== "end")?.assetId;
     const workflow = workflowFor(profile.id)!;
-    const selectedMode = workflow.imageModes?.[referenceId ? "reference" : "generate"] || workflow;
+    const selectedMode =
+      workflow.imageModes?.[references.length ? "reference" : "generate"] || workflow;
     const defaults = {
       ...profile.defaults,
       ...Object.fromEntries(
@@ -196,11 +207,21 @@ export function studioCloudProfiles(options: ProfileOptions) {
       // A first frame gives the video its shape.
       if (profile.kind === "video") ({ width, height } = info);
     }
-    let resolution = String(input.resolution ?? defaults.resolution ?? "");
-    const allowed = resolutions[model];
+    const allowed = lastFrame ? grokPinnedResolutions : resolutions[model];
+    const configuredResolution = String(defaults.resolution ?? "");
+    let resolution = String(
+      input.resolution ??
+        (lastFrame && !allowed.includes(configuredResolution)
+          ? grokVideoDefaultResolution
+          : configuredResolution),
+    );
     if (allowed?.length) {
       resolution ||=
-        profile.kind === "video" ? "720p" : Math.max(width, height) > 1280 ? "2k" : "1k";
+        profile.kind === "video"
+          ? grokVideoDefaultResolution
+          : Math.max(width, height) > 1280
+            ? "2k"
+            : "1k";
       if (!allowed.includes(resolution))
         throw new Error(`${model} supports ${allowed.join(", ")} resolution, not ${resolution}.`);
     } else if (allowed && resolution) throw new Error(`${model} has no resolution setting.`);

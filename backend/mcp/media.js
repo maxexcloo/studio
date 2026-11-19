@@ -6,6 +6,7 @@ import sharp from "sharp";
 
 import {
   isCloudProfile,
+  isCloudVideoProfile,
   loraName,
   loraRejection,
   profileBackendLabels,
@@ -148,7 +149,6 @@ const cloudPauseMilliseconds = 10 * 60 * 1000;
 const cloudQuotaMessage = "Cloud video unavailable (quota).";
 const cloudRefusal =
   /\b(?:401|402|403|429)\b|quota|unauthori[sz]ed|forbidden|insufficient|credit|billing|rate.?limit|exhausted/i;
-const isCloudVideo = (profile) => profile?.kind === "video" && isCloudProfile(profile);
 const aborted = () => {
   const error = new Error(
     "The wait ended because the request was cancelled. The generation continues; collect it later with result.",
@@ -600,7 +600,7 @@ export class McpMedia {
       references: Boolean(request.reference_asset_ids?.length),
       loras: Boolean(request.loras?.length),
     });
-    const cloud = isCloudVideo(profile);
+    const cloud = isCloudVideoProfile(profile);
     if (cloud) await this.checkCloudJobs();
     if (cloud && this.cloudPause())
       throw new Error(

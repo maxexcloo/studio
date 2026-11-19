@@ -521,7 +521,7 @@ test("animating an image sends it as the first frame, shaped by the image, withi
   const remote = fixture();
   const node = {
     class_type: "GrokMedia",
-    inputs: { model: "grok-imagine-video-1.5", width: 1280, height: 720, resolution: "720p" },
+    inputs: { model: "grok-imagine-video-1.5", width: 1280, height: 720 },
   };
   const cloud = studioCloudProfiles({
     provider: remote.provider,
@@ -560,11 +560,14 @@ test("animating an image sends it as the first frame, shaped by the image, withi
     return store.job("", job.id)!;
   };
   try {
+    const [profile] = await cloud.profiles();
+    assert.equal(profile.defaults.resolution, "720p");
+    assert.equal(profile.aspectPolicy, "reference");
     const accepted = await run(animate);
     assert.equal(accepted.providerJobId, "provider-video-7");
     const body = remote.calls.find((call) => call.path === "/v1/videos/generations")!.body!;
     assert.equal(body.model, "grok-imagine-video-1.5");
-    assert.equal(body.aspect_ratio, "9:16");
+    assert.equal(body.aspect_ratio, undefined);
     assert.equal(body.duration, 8);
     assert.equal(body.resolution, "720p");
     const frame = String((body.image as { url: string }).url);
@@ -575,6 +578,11 @@ test("animating an image sends it as the first frame, shaped by the image, withi
     // Limits are refused before anything reaches the provider.
     const submissions = () =>
       remote.calls.filter((call) => call.path === "/v1/videos/generations").length;
+    const override = await cloud.resolve({
+      input: { ...animate, resolution: "1080p" },
+      ownerId: "",
+    });
+    assert.equal(override.resolution, "1080p");
     assert.match((await run({ ...animate, duration: 20 })).reason, /between 1 and 15 seconds/);
     assert.match(
       (await run({ ...animate, resolution: "4k" })).reason,
@@ -594,6 +602,19 @@ test("animating an image sends it as the first frame, shaped by the image, withi
     assert.deepEqual(
       store.failedJobs("provider:cliproxyapi:", new Date(Date.now() + 1000).toISOString()),
       [],
+    );
+
+    remote.rejectVideos(false);
+    const ending = { ...animate, referenceAssets: [{ assetId: "photo", slot: "end" }] };
+    const pinned = await cloud.resolve({ input: ending, ownerId: "" });
+    assert.equal(pinned.resolution, "720p");
+    await remote.provider.video(pinned, new AbortController().signal);
+    const pinnedBody = remote.calls.at(-1)!.body!;
+    assert.equal(pinnedBody.aspect_ratio, "9:16");
+    assert.match((pinnedBody.last_frame as { url: string }).url, /^data:image\/jpeg;base64,/);
+    await assert.rejects(
+      cloud.resolve({ input: { ...ending, resolution: "1080p" }, ownerId: "" }),
+      /supports 480p, 720p resolution/,
     );
   } finally {
     store.close();

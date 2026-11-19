@@ -6,6 +6,7 @@ import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { ProfileSelect } from "../generation/ProfilePicker";
+import { TextModelSelect, textModelName } from "../generation/TextModelSelect";
 import { DeleteFailedItems } from "./DeleteFailedItems";
 import { type Setting, deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
 import { DreamAdministration } from "./DreamAdministration";
@@ -20,7 +21,7 @@ export function GenerationSettings() {
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
   const { defaults } = deployment.data;
   const profileSelect = (kind: "image" | "video", setting: Setting) => {
-    const label = kind === "image" ? "Default Image Profile" : "Default Video Profile";
+    const label = kind === "image" ? "Image Profile" : "Video Profile";
     const offered = defaults.profiles.filter((profile) => profile.kind === kind);
     const effective = offered.find((profile) => profile.id === setting.effective);
     return (
@@ -46,6 +47,26 @@ export function GenerationSettings() {
       <SettingGroup title="Defaults">
         {profileSelect("image", defaults.image)}
         {profileSelect("video", defaults.video)}
+        <SettingRow
+          wide
+          label="Text Profile"
+          description={
+            (defaults.text.effective
+              ? `Default for prompt writing and other text work. Uses ${textModelName(defaults.text.effective)} when available.`
+              : "Default for prompt writing and other text work.") + lockedNote(defaults.text)
+          }
+        >
+          <TextModelSelect
+            name="Text Profile"
+            models={defaults.textModels}
+            unset="Gateway Default"
+            value={defaults.text.configured || null}
+            onChange={(model) => save.mutate({ key: defaults.text.key, value: model ?? "" })}
+            disabled={
+              defaults.text.locked || (!defaults.textModels.length && !defaults.text.configured)
+            }
+          />
+        </SettingRow>
       </SettingGroup>
       <DreamAdministration />
       {multiUser && (

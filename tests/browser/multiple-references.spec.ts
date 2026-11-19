@@ -114,6 +114,7 @@ test("Multiple owned references preserve order, role identity and capacity throu
 
 test("Removing a picked reference keeps its upload, one upload fills several slots, and the picker deletes nothing", async ({
   page,
+  isMobile,
 }) => {
   const state = await fixtures(page);
   const profile: Profile = {
@@ -177,11 +178,15 @@ test("Removing a picked reference keeps its upload, one upload fills several slo
     await showReferenceStack(page);
   }
   await expect(slots.getByRole("button", { name: "Reference 3 · End", exact: true })).toBeVisible();
-  await slots.getByRole("button", { name: "Reference 2 · Inputs", exact: true }).click();
-  await page
-    .getByRole("menu", { name: "Reference 2 · Inputs", exact: true })
-    .getByRole("menuitem", { name: "Remove", exact: true })
-    .click();
+  const placed = slots.getByRole("button", { name: "Reference 2 · Inputs", exact: true });
+  const menu = page.getByRole("menu", { name: "Reference 2 · Inputs", exact: true });
+  if (!isMobile) {
+    await placed.press("ContextMenu");
+    await expect(menu.getByRole("menuitem", { name: "Replace", exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await placed.click({ button: "right" });
+  } else await placed.tap();
+  await menu.getByRole("menuitem", { name: "Remove", exact: true }).click();
   await expect(slots.getByRole("button", { name: "Slot 2 · Inputs", exact: true })).toBeVisible();
   expect(state.gallery.filter((item) => item.uploaded)).toHaveLength(2);
   await closeReferences(page);

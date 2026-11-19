@@ -1,6 +1,6 @@
 import type { Express, RequestHandler } from "express";
 
-import type { BenchmarkRun } from "../../shared/runtime.ts";
+import type { BenchmarkModel, BenchmarkRun } from "../../shared/runtime.ts";
 import { logEvent } from "../crash-log.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { RadianceClient } from "../providers/radiance.ts";
@@ -24,10 +24,12 @@ export async function loadRuntime(
     dataDir,
     fetchImpl = fetch,
     request,
+    textModels,
   }: {
     dataDir: string;
     fetchImpl?: typeof fetch;
     request?: KubernetesRequest;
+    textModels?: () => Promise<BenchmarkModel[]>;
   },
 ) {
   if (!environment.STUDIO_KUBERNETES_NAMESPACES) return undefined;
@@ -56,6 +58,7 @@ export async function loadRuntime(
     workloads,
     environment,
     fetchImpl,
+    textModels,
     ...document<BenchmarkRun[]>("runtime-benchmarks"),
   });
   const shutdown = new AbortController();

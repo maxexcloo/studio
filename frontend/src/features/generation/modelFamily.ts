@@ -20,6 +20,7 @@ export function setFamilyLabels(labels: Record<string, string> = {}) {
 export function modelFamilyLabel(family = "", familyName?: string): string {
   const label = (familyName || family).trim();
   if (!label) return "Unclassified";
+  if (/^ltx[ _-]?2$/i.test(family.trim() || label)) return "LTX 2";
   // A family the catalogue knows has one name everywhere, whatever a profile spells it as.
   const known = catalogue[loraFamilyId(family)];
   if (known) return known;

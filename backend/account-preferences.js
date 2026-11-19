@@ -64,12 +64,15 @@ export function accountPreferences(ownerId = "") {
   return preferences;
 }
 
-/**
- * Where a kind (`images`, `videos` or `text`) runs by default: the saved side, else Local, except
- * Text, which runs on Cloud unless Cloud Models is off.
- */
+export const defaultTextProfileKey = "STUDIO_DEFAULT_TEXT_PROFILE";
+export const defaultTextSide = (environment = process.env) =>
+  environment[defaultTextProfileKey]?.startsWith("local/") ? "local" : "cloud";
+
+/** Where a kind runs if an account has not chosen a side. */
 export function sideOf(preferences, kind) {
-  return preferences[kind] || (kind === "text" && preferences.cloudModels ? "cloud" : "local");
+  return (
+    preferences[kind] || (kind === "text" && preferences.cloudModels ? defaultTextSide() : "local")
+  );
 }
 
 /** A kind's chosen side and the default model saved for each side, if any. */

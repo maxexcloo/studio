@@ -33,6 +33,7 @@ interface AssistantStatus {
   /** The text models it may pick and the one its writing asks for. */
   models?: string[];
   writingModel?: string;
+  defaultTextSide?: "cloud" | "local";
 }
 interface Suggestion {
   name: string;

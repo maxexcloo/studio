@@ -1,3 +1,5 @@
+import { grokVideoAspect } from "../../shared/resolution.ts";
+
 export interface CloudRequest {
   kind: "image" | "video";
   model: string;
@@ -30,20 +32,8 @@ interface ProviderVideo {
 }
 
 const prefixes = { image: "grok-imagine-image", video: "grok-imagine-video" };
-// The aspect ratios the provider takes with its own resolution: Grok Imagine Image 2.0 and video.
-export const nativeAspects = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"];
 function gcd(a: number, b: number): number {
   return b ? gcd(b, a % b) : a;
-}
-/** The accepted video aspect ratio closest to a width and height, such as a first frame's. */
-export function videoAspect(width: number, height: number): string {
-  const distance = (aspect: string) => {
-    const [w, h] = aspect.split(":").map(Number);
-    return Math.abs(Math.log(width / height) - Math.log(w / h));
-  };
-  return nativeAspects.reduce((best, aspect) =>
-    distance(aspect) < distance(best) ? aspect : best,
-  );
 }
 
 /** CLIProxyAPI's Grok image and video wire contracts. */
@@ -178,7 +168,9 @@ export class CliProxyMedia {
       {
         model: input.model,
         prompt: input.prompt,
-        aspect_ratio: videoAspect(input.width, input.height),
+        ...(input.reference && !input.lastFrame
+          ? {}
+          : { aspect_ratio: grokVideoAspect(input.width, input.height) }),
         duration: input.duration,
         ...(input.resolution ? { resolution: input.resolution } : {}),
         ...(input.reference ? { image: { url: dataUrl(input.reference) } } : {}),

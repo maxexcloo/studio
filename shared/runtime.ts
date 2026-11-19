@@ -132,6 +132,11 @@ export interface BenchmarkRun {
   summary?: BenchmarkSummary;
 }
 
+export interface BenchmarkModel {
+  id: string;
+  label: string;
+}
+
 /** `configured` is false without a benchmark image; runs are newest first. */
 export interface BenchmarkStatus {
   configured: boolean;

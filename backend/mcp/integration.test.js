@@ -4908,8 +4908,8 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
     texts(moved),
     /Local video isn't running, so this runs on Cloud Video · Fast · Cloud\. Tell the user\./,
   );
-  // Grok takes only standard aspects: the 64×48 image becomes 4:3 at the profile's pixel count.
-  assert.deepEqual([f.submitted.at(-1).width, f.submitted.at(-1).height], [1108, 831]);
+  // Preview dimensions follow the 64×48 reference at the profile's pixel count, rounded to pixels.
+  assert.deepEqual([f.submitted.at(-1).width, f.submitted.at(-1).height], [1109, 831]);
   const animation = await call(client, "reuse", {
     job_id: "#1",
     mode: "animate",
