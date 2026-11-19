@@ -97,7 +97,16 @@ function Empty({ dream }: { dream: Dream }) {
   );
 }
 
-const views = ["deck", "library", "projects", "taste", "discarded", "history"] as const;
+const views = ["deck", "projects", "taste", "discarded", "history"] as const;
+
+function useLibraryReview(seed: string, media: DreamMedia, decided: Set<string>) {
+  const query = useInfiniteQuery(libraryReviewQuery(seed, media));
+  const items =
+    query.data?.pages.flatMap((page) => page.items).filter((item) => !decided.has(item.id)) ?? [];
+  const lastPage = query.data?.pages.at(-1);
+  const remaining = (lastPage ? lastPage.remaining - lastPage.items.length : 0) + items.length;
+  return { query, items, remaining };
+}
 
 /**
  * Dream shows unseen results, comparisons and calibration in the deck, with counts of images
@@ -110,12 +119,10 @@ export function DreamPage() {
   const [seed] = useState(() => crypto.randomUUID());
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
   const [returned, setReturned] = useState<DreamItem[]>([]);
-  const library = useInfiniteQuery(libraryReviewQuery(seed));
-  const libraryItems =
-    library.data?.pages.flatMap((page) => page.items).filter((item) => !decided.has(item.id)) ?? [];
-  const lastPage = library.data?.pages.at(-1);
-  const remaining =
-    (lastPage ? lastPage.remaining - lastPage.items.length : 0) + libraryItems.length;
+  const imageReview = useLibraryReview(seed, "image", decided);
+  const videoReview = useLibraryReview(seed, "video", decided);
+  const reviews = { image: imageReview, video: videoReview };
+  const { query: library, items: libraryItems } = reviews[media];
   const [undoTarget, setUndoTarget] = useState<HTMLDivElement | null>(null);
   const [actionTarget, setActionTarget] = useState<HTMLDivElement | null>(null);
   const client = useQueryClient();
@@ -137,7 +144,6 @@ export function DreamPage() {
   const mediaLabels = { image: "Images", video: "Videos" };
   const viewLabels = {
     deck: mediaLabels[media],
-    library: "Rate Your Library",
     projects: "Projects",
     taste: "Taste",
     discarded: "Discards",
@@ -151,13 +157,13 @@ export function DreamPage() {
       ].filter((item) => !decided.has(item.id))
     : [];
   const count = data && dreamCardCounts(deckUnseen, data.settings);
+  const unseen = { image: count?.images, video: count?.videos };
   const reviewing =
-    view === "library" ||
-    (view === "deck" &&
-      !deckUnseen.length &&
-      (Boolean(library.data?.pages.some((page) => page.items.length)) ||
-        library.isPending ||
-        library.isError));
+    view === "deck" &&
+    !unseen[media] &&
+    (Boolean(library.data?.pages.some((page) => page.items.length)) ||
+      library.isPending ||
+      library.isError);
   useEffect(() => {
     if (
       reviewing &&
@@ -176,7 +182,6 @@ export function DreamPage() {
     library.fetchNextPage,
   ]);
   // Unseen cards of each kind, so new work on the other kind is never hidden.
-  const unseen = { image: count?.images, video: count?.videos };
   const counted = (kind: DreamMedia) =>
     unseen[kind] ? `${mediaLabels[kind]} (${unseen[kind]})` : mediaLabels[kind];
   const waitingId = useId();
@@ -197,9 +202,20 @@ export function DreamPage() {
       ]}
     />
   );
-  const item = (label: string, checked: boolean, open: () => void) => (
-    <Menu.Item key={label} rightSection={checked ? <Check size={14} /> : undefined} onClick={open}>
+  const item = (label: string, checked: boolean, open: () => void, description?: string) => (
+    <Menu.Item
+      key={label}
+      aria-label={label}
+      aria-description={description}
+      rightSection={checked ? <Check size={14} /> : undefined}
+      onClick={open}
+    >
       {label}
+      {description && (
+        <Text component="span" size="xs" c="dimmed" display="block">
+          {description}
+        </Text>
+      )}
     </Menu.Item>
   );
   return (
@@ -216,9 +232,7 @@ export function DreamPage() {
                 aria-describedby={waiting ? waitingId : undefined}
                 rightSection={<ChevronDown size={14} />}
               >
-                {reviewing && (remaining > 0 || view === "library")
-                  ? viewLabels.library
-                  : viewLabels[view]}
+                {viewLabels[view]}
                 {/* Always in sight, so new work on either kind shows from every view. */}
                 {count && waiting && (
                   <Group component="span" gap={4} wrap="nowrap" c="dimmed" ml={8} aria-hidden>
@@ -243,14 +257,19 @@ export function DreamPage() {
             </VisuallyHidden>
           )}
           <Menu.Dropdown>
-            {(["image", "video"] as const).map((kind) =>
-              item(counted(kind), view === "deck" && !reviewing && media === kind, () => {
-                setMedia(kind);
-                setView("deck");
-              }),
-            )}
-            {item(`Rate Your Library (${remaining})`, reviewing, () => setView("library"))}
-            {views.slice(2).map((value) => (
+            {(["image", "video"] as const).map((kind) => {
+              const { remaining } = reviews[kind];
+              return item(
+                counted(kind),
+                view === "deck" && media === kind,
+                () => {
+                  setMedia(kind);
+                  setView("deck");
+                },
+                remaining ? `Rate Your Library (${remaining})` : undefined,
+              );
+            })}
+            {views.slice(1).map((value) => (
               <Fragment key={value}>
                 {value === "discarded" && <Menu.Divider />}
                 {item(viewLabels[value], view === value, () => setView(value))}
