@@ -131,6 +131,10 @@ function where(query = {}) {
   if (query.ownerId !== undefined) add("owner_id = ?", String(query.ownerId));
   if (query.uploaded !== undefined) add("uploaded = ?", query.uploaded ? 1 : 0);
   if (query.unlisted !== undefined) add("unlisted = ?", query.unlisted ? 1 : 0);
+  if (query.includeDisliked && query.unlisted !== false) {
+    const disliked = `rating = 'disliked' AND (json_type(value, '$.dream') IS NOT 'object' OR ${dreamState} = 'kept')`;
+    add(query.unlisted ? disliked : `(unlisted = 0 OR (${disliked}))`);
+  }
   if (query.type) add("type = ?", query.type);
   if (query.jobId !== undefined) add("job_id = ?", String(query.jobId));
   if (query.jobIds) add("job_id IN (SELECT value FROM json_each(?))", list(query.jobIds));
@@ -258,6 +262,12 @@ const rowKey = (row) => ({
  * of the whole gallery never holds all of it.
  */
 function* galleryRows(query = {}, after = null) {
+  // Disliked First ranks both partitions after reading them. Each batch can use the order index.
+  if (query.includeDisliked && query.unlisted === undefined) {
+    yield* galleryRows({ ...query, unlisted: false }, after);
+    yield* galleryRows({ ...query, unlisted: true }, after);
+    return;
+  }
   const base = where(query);
   const select = (conditions, params, limit) =>
     statement(
@@ -829,7 +839,8 @@ function keptList(query, filter, filterKey, rank, sort) {
   if (kept && kept.version === listVersion && Date.now() - kept.at <= listLifeMs) return kept;
   let entries = [];
   for (const unit of galleryUnits(query, filter)) {
-    if (sort === "liked") unit.key.liked = unit.items.some((item) => item.rating === "liked");
+    if (sort === "liked" || sort === "disliked")
+      unit.key[sort] = unit.items.some((item) => item.rating === sort);
     for (const item of unit.items)
       entries.push({
         key: galleryKey(item),
@@ -943,8 +954,9 @@ export function pageGallery({
   const sql = {
     ...query,
     uploaded: uploads,
-    // Disliked items show only in their own view, Dream's pool never.
-    unlisted: query.rating === "disliked",
+    ...(sort === "disliked" && !rank && !query.rating
+      ? { includeDisliked: true }
+      : { unlisted: query.rating === "disliked" }),
     ...(type && { type }),
     notStatus: [query.notStatus ?? [], "cancelled", ...(includeFailed ? [] : ["failed"])].flat(),
   };

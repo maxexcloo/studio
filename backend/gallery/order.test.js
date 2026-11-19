@@ -69,30 +69,39 @@ test("a removed cursor continues through the bucket boundary and descending id t
   assert.deepEqual(ids(pageGallery({ cursor, limit: 2 }).items), ["a", "import"]);
 });
 
-test("oldest and liked-first order all pages before slicing, keeping result sets together", () => {
+test("age and rating sorts order all pages before slicing, keeping result sets together", () => {
   const resultSet = { id: "set" };
   setGallery([
     item("old", "2026-01-01", { status: "failed" }),
     item("liked", "2026-01-02", { rating: "liked", resultSet }),
     item("set-peer", "2026-01-03", { status: "failed", resultSet }),
     item("new", "2026-01-04"),
-    item("hidden", "2026-01-05", { rating: "disliked" }),
+    item("disliked", "2025-12-31", { rating: "disliked" }),
+    item("dream", "2026-01-06", { rating: "disliked", dream: { state: "pending" } }),
   ]);
   for (const [sort, expected] of [
     ["oldest", ["old", "set-peer", "liked", "new"]],
     ["liked", ["set-peer", "liked", "new", "old"]],
+    ["disliked", ["disliked", "new", "set-peer", "liked", "old"]],
   ]) {
-    const first = pageGallery({ sort, limit: 2 });
-    const second = pageGallery({ sort, limit: 2, cursor: first.nextCursor });
-    assert.equal(first.totalApprox, 4);
-    assert.deepEqual(ids([...first.items, ...second.items]), expected);
-    assert.equal(second.hasMore, false);
+    const collected = [];
+    let cursor = "";
+    do {
+      const page = pageGallery({ sort, limit: 2, cursor });
+      assert.equal(page.totalApprox, expected.length);
+      collected.push(...page.items);
+      cursor = page.nextCursor;
+    } while (cursor);
+    assert.deepEqual(ids(collected), expected);
     assert.deepEqual(ids(pageGallery({ sort, selection: "all", limit: 2 }).items), expected);
     assert.deepEqual(
       ids(pageGallery({ sort, selection: "failed", limit: 2 }).items),
       expected.filter((id) => id === "old" || id === "set-peer"),
     );
   }
+  assert.deepEqual(ids(pageGallery({ sort: "disliked", query: { rating: "liked" } }).items), [
+    "liked",
+  ]);
 });
 
 test("A retry keeps its gallery position but date filters use when it was created", () => {

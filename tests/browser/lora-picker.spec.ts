@@ -72,7 +72,9 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
   await page.getByRole("button", { name: "Sort", exact: true }).click();
   await expect(page.getByRole("menuitemradio")).toHaveText([
     "Most Used",
-    "Rating",
+    "Least Used",
+    "Liked First",
+    "Disliked First",
     "Name A–Z",
     "Name Z–A",
   ]);
@@ -84,6 +86,13 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
     )
     .toEqual(["Soft Style", "Detail Slider"]);
+  for (const sort of ["Least Used", "Disliked First"]) {
+    await page.getByRole("button", { name: "Sort", exact: true }).click();
+    await page.getByRole("menuitemradio", { name: sort, exact: true }).click();
+    await expect(
+      choices.getByRole("button", { name: /^(Soft Style|Detail Slider)$/ }).first(),
+    ).toHaveAccessibleName("Detail Slider");
+  }
   await page.getByRole("textbox", { name: "Search LoRAs", exact: true }).fill("inkbird");
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toHaveCount(0);
   const detail = choices.getByRole("button", { name: "Detail Slider", exact: true });

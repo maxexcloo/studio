@@ -130,18 +130,21 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   test.skip(!!testInfo.project.use.isMobile, "Phones without captions hide More (tested below)");
   await galleryFixture(page);
   await tileMenu(page);
-  // Select, followed by the viewer bar's actions and submenus in their shared order.
+  // AI and Share show their actions directly in the menu.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Select",
     "Animate",
     "Edit",
     "Recreate",
     "Upscale",
-    "AI",
+    "More Like This",
+    "Similar",
+    "Copy Details",
+    "Copy Prompt",
+    "Download",
     "Like",
     "Dislike",
     "Report",
-    "Share",
     "Delete",
   ]);
   await page.keyboard.press("Escape");
@@ -440,7 +443,6 @@ test("Similar ranks the gallery by an image from its tile menu or the viewer, as
   state.gallery.push({ ...state.gallery[0], id: "tile-moth", jobId: "", prompt: "A paper moth" });
   await page.reload();
   await tileMenu(page);
-  await page.getByRole("menuitem", { name: "AI", exact: true }).click();
   await page.getByRole("menuitem", { name: "Similar", exact: true }).click();
   const chip = (label: string) =>
     page.getByRole("button", { name: `Remove ${label} Filter`, exact: true });

@@ -367,13 +367,8 @@ export function GallerySelectionBar({
   const quick = [
     ...(
       [
-        { id: "select-all", label: "Select All", short: "All", match: "all" },
-        {
-          id: "select-failed",
-          label: "Select Failed",
-          short: "Failed",
-          match: "failed",
-        },
+        { label: "All", match: "all" },
+        { label: "Failed", match: "failed" },
       ] as const
     ).map(({ match, ...action }) => ({
       ...action,
@@ -386,9 +381,7 @@ export function GallerySelectionBar({
       onClick: () => void selection.selectMatching(match),
     })),
     {
-      id: "select-none",
-      label: "Select None",
-      short: "None",
+      label: "None",
       disabled: pending || !selected.length,
       loading: false,
       onClick: selection.clear,
@@ -404,16 +397,15 @@ export function GallerySelectionBar({
         <div role="group" aria-label="Quick Select" className={classes.quick}>
           {quick.map((action) => (
             <Button
-              key={action.id}
+              key={action.label}
               size="compact-sm"
               variant="subtle"
               color="gray"
-              aria-label={action.label}
               disabled={action.disabled}
               loading={action.loading}
               onClick={action.onClick}
             >
-              {phone ? action.short : action.label}
+              {action.label}
             </Button>
           ))}
         </div>
