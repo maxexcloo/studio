@@ -336,10 +336,13 @@ export function createGenerationQueue({
         if (job.status === "failed" && hostMemoryShort(String(job.reason || "")))
           for (const workload of managedWorkloads(job))
             runtime?.controller.restartForMemory(workload, job.reason, () => {
-              if (job.retried) return;
               try {
                 const retry = generationQueue.again(job);
-                logEvent(`Queued job ${job.id} again as ${retry.id} after freeing host memory`);
+                if (!retry) return;
+                logEvent("Retry after freeing Radiance host memory", {
+                  job: job.id,
+                  replacement: retry.id,
+                });
                 void generationQueue.tick();
               } catch (error) {
                 logWarning("Could not queue a job again after freeing host memory", {
