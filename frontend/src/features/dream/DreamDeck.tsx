@@ -380,11 +380,12 @@ export function DreamDeck({
             ? full
               ? {}
               : { left: "A", right: "B", up: "Like", down: "Neither" }
-            : { left: "Dislike", right: "Accept", up: "Like" }
+            : { left: "Dislike", right: "Accept", up: "Like", ...(full && { down: "Close" }) }
         }
         onTap={full ? undefined : (target) => openPressed(card, target)}
         onHold={full ? undefined : (target) => openPressed(card, target)}
         onSwipe={(direction, target) => {
+          if (full && direction === "down") return closePreview();
           if (card.kind === "pair" && direction === "up") {
             const side = target.closest<HTMLElement>("[data-side]")?.dataset.side ?? String(shown);
             return commit({ card, verdict: side === "1" ? "b" : "a", like: true });
@@ -401,6 +402,7 @@ export function DreamDeck({
               side={side}
               playing={playing}
               setSide={(side) => open(card, side)}
+              onClose={closePreview}
               onLike={isTop ? () => void act("like") : undefined}
             />
           ) : (
