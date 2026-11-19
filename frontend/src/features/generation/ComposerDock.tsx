@@ -305,6 +305,7 @@ export const ComposerDock = memo(function ComposerDock({
           opened={opened}
           onClose={collapse}
           title="Generate"
+          fieldTitles={{ prompt: "Prompt", negative: "Negative Prompt" }}
           hidden={handingOver}
           onPaste={pasteReferences}
           onDragOver={dragReferences}
