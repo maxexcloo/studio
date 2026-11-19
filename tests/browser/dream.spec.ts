@@ -1069,10 +1069,27 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
 
   await page.getByRole("button", { name: "New Project", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "New Project", exact: true });
-  await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Harbour");
-  await fillBox(editor, "Avoid", "people", isMobile);
+  const name = editor.getByRole("textbox", { name: "Name", exact: true });
+  const avoid = editor.getByRole("textbox", { name: "Avoid", exact: true });
+  const done = editor.getByRole("button", { name: "Done", exact: true });
+  const create = editor.getByRole("button", { name: "Create", exact: true });
+  if (isMobile) await name.click();
+  await name.fill("Harbour");
+  if (isMobile) {
+    await done.click();
+    await expect(create).toBeInViewport();
+    await avoid.tap();
+  }
+  await avoid.fill("people");
+  if (isMobile) {
+    await expect(avoid).toBeFocused();
+    await expect(create).toBeHidden();
+    await done.tap();
+    await expect(create).toBeInViewport();
+  }
+  await expect(avoid).toHaveValue("people");
   await useLoras(editor, false);
-  await editor.getByRole("button", { name: "Create", exact: true }).click();
+  await create.click();
   await expect(editor).toBeHidden();
   const harbour = page.getByRole("region", { name: "Harbour", exact: true });
   await expect(harbour).toContainText("No LoRAs");
@@ -1085,6 +1102,7 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const edit = page.getByRole("dialog", { name: "Edit Project", exact: true });
+  await expect(edit.getByRole("textbox", { name: "Avoid", exact: true })).toHaveValue("people");
   await useLoras(edit, true);
   await edit.getByRole("button", { name: "Save", exact: true }).click();
   await expect(edit).toBeHidden();

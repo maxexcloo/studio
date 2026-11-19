@@ -1,0 +1,27 @@
+/* Focusing text cannot scroll the drawer and move its action bar. */
+.sheet {
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+.panel {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.sheet:has([data-typing]) .header {
+  display: none;
+}

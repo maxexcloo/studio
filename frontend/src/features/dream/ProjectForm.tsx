@@ -1,7 +1,7 @@
-import { Alert, Button, Group, MultiSelect, Switch, TextInput } from "@mantine/core";
+import { Alert, Button, Group, MultiSelect, Stack, Switch, TextInput } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, type LucideIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
 import { loraName } from "../../../../shared/profiles";
 import {
@@ -19,7 +19,8 @@ import { api } from "../../api";
 import { ClearButton } from "../../ui/ClearButton";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
-import { TextBox } from "../../ui/TextBox";
+import { TextBox, TextToolsBar } from "../../ui/TextBox";
+import type { SheetTyping } from "../../ui/TextEntrySheet";
 import { CardForm } from "../characters/CardImages";
 import { chipProps } from "../generation/chip";
 import { ChipSelect } from "../generation/ChipSelect";
@@ -30,7 +31,8 @@ import { ChipPopup } from "../generation/Picker";
 import { profileOptions } from "../generation/ProfilePicker";
 import { projectPath, projectsQuery } from "./queries";
 
-import classes from "../generation/GenerationInputControls.module.css";
+import controls from "../generation/GenerationInputControls.module.css";
+import classes from "./ProjectForm.module.css";
 
 // "Any" as a choice's value, as the stored "" names no choice.
 const any = "any";
@@ -73,7 +75,7 @@ function FieldChip({
           rightSection={<ChevronDown size={14} />}
           onClick={() => setOpened(!opened)}
         >
-          <span className={classes.label}>{value}</span>
+          <span className={controls.label}>{value}</span>
         </Button>
       }
     >
@@ -122,6 +124,7 @@ export function ProjectForm({
   initial,
   action,
   pending,
+  typing,
   error,
   onSubmit,
   onClose,
@@ -129,6 +132,7 @@ export function ProjectForm({
   initial: ProjectContent;
   action: string;
   pending: boolean;
+  typing?: SheetTyping;
   error?: string;
   onSubmit: (content: ProjectContent) => void;
   onClose: () => void;
@@ -136,133 +140,201 @@ export function ProjectForm({
   const models = useQuery(modelsQuery);
   const loras = useQuery(loraInfoQuery);
   const [draft, setDraft] = useState<ProjectContent>(() => structuredClone(initial));
+  const [toolsBar, setToolsBar] = useState<HTMLDivElement | null>(null);
+  const fieldsRef = useRef<HTMLDivElement>(null);
+  const scrollTop = useRef(0);
+  const field = typing?.field;
+  useLayoutEffect(() => {
+    if (!field && fieldsRef.current) fieldsRef.current.scrollTop = scrollTop.current;
+  }, [field]);
   const brief = (key: BriefText, value: string) =>
-    setDraft({ ...draft, brief: { ...draft.brief, [key]: value } });
+    setDraft((previous) => ({ ...previous, brief: { ...previous.brief, [key]: value } }));
   const constraint = (patch: Partial<ProjectContent["constraints"]>) =>
     setDraft({ ...draft, constraints: { ...draft.constraints, ...patch } });
   const profileLabel = (id: string) => {
     const profile = models.data?.profiles.find((profile) => profile.id === id);
     return profile ? profileName(profile) : id;
   };
-  return (
-    <CardForm onSubmit={() => onSubmit({ ...draft, name: draft.name.trim() })}>
-      <TextInput
-        label="Name"
-        required
-        maxLength={maxProjectName}
-        data-autofocus
-        value={draft.name}
-        onChange={(event) => setDraft({ ...draft, name: event.currentTarget.value })}
+  const name = (
+    <TextInput
+      label="Name"
+      required
+      maxLength={maxProjectName}
+      data-autofocus
+      value={draft.name}
+      onChange={(event) => setDraft({ ...draft, name: event.currentTarget.value })}
+    />
+  );
+  const fields = briefFields.map(([key, label, description]) => {
+    const box = (
+      <TextBox
+        key={key}
+        label={label}
+        description={field ? undefined : description}
+        autosize={field !== key}
+        minRows={2}
+        maxLength={maxProjectBrief}
+        inline={Boolean(typing)}
+        value={draft.brief[key] || ""}
+        onChange={(value) => brief(key, value)}
       />
-      {briefFields.map(([key, label, description]) => (
-        <TextBox
-          key={key}
-          label={label}
-          description={description}
-          autosize
-          minRows={2}
-          maxLength={maxProjectBrief}
-          value={draft.brief[key] || ""}
-          onChange={(value) => brief(key, value)}
+    );
+    return typing ? (
+      <div key={key} data-text-box={key} hidden={Boolean(field && field !== key)}>
+        {box}
+      </div>
+    ) : (
+      box
+    );
+  });
+  const chips = (
+    <Group gap="xs">
+      <FieldChip
+        title="Profiles"
+        value={
+          draft.constraints.profiles.length
+            ? draft.constraints.profiles.map(profileLabel).join(", ")
+            : "Any Profile"
+        }
+        onClear={() => constraint({ profiles: [] })}
+        clearDisabled={!draft.constraints.profiles.length}
+      >
+        <MultiSelect
+          label="Profiles"
+          description="Chats use only these; none for any."
+          placeholder={draft.constraints.profiles.length ? undefined : "Any"}
+          searchable
+          nothingFoundMessage="No Matches"
+          maxValues={maxProjectProfiles}
+          comboboxProps={{ withinPortal: false }}
+          data={profileOptions(models.data?.profiles || [])}
+          value={draft.constraints.profiles}
+          onChange={(profiles) => constraint({ profiles })}
         />
-      ))}
-      {/* The composer's chips, each opening its choices. */}
-      <Group gap="xs">
-        <FieldChip
-          title="Profiles"
-          value={
-            draft.constraints.profiles.length
-              ? draft.constraints.profiles.map(profileLabel).join(", ")
-              : "Any Profile"
-          }
-          onClear={() => constraint({ profiles: [] })}
-          clearDisabled={!draft.constraints.profiles.length}
-        >
-          <MultiSelect
-            label="Profiles"
-            description="Chats use only these; none for any."
-            placeholder={draft.constraints.profiles.length ? undefined : "Any"}
-            searchable
-            nothingFoundMessage="No Matches"
-            maxValues={maxProjectProfiles}
-            comboboxProps={{ withinPortal: false }}
-            data={profileOptions(models.data?.profiles || [])}
-            value={draft.constraints.profiles}
-            onChange={(profiles) => constraint({ profiles })}
-          />
-        </FieldChip>
-        <FieldChip
-          title="LoRAs"
-          icon={icons.loras}
-          value={
-            !draft.constraints.loras
-              ? "No LoRAs"
-              : draft.brief.loras?.length
-                ? draft.brief.loras
-                    .map((name) => loraName(name, loras.data?.loras?.[name]))
-                    .join(", ")
-                : "LoRAs"
-          }
-          onClear={() => setDraft({ ...draft, brief: { ...draft.brief, loras: [] } })}
-          clearDisabled={!draft.brief.loras?.length}
-        >
-          <Switch
-            label="Use LoRAs"
-            checked={draft.constraints.loras}
-            onChange={(event) => constraint({ loras: event.currentTarget.checked })}
-          />
-          <MultiSelect
-            label="Favourite LoRAs"
-            searchable
-            disabled={!draft.constraints.loras}
-            maxValues={maxProjectLoras}
-            comboboxProps={{ withinPortal: false }}
-            data={[
-              ...new Set([...Object.keys(loras.data?.loras || {}), ...(draft.brief.loras || [])]),
-            ].map((name) => ({
-              value: name,
-              label: loraName(name, loras.data?.loras?.[name]),
-            }))}
-            value={draft.brief.loras || []}
-            onChange={(loras) => setDraft({ ...draft, brief: { ...draft.brief, loras } })}
-          />
-        </FieldChip>
-        <ChipSelect
-          name="Aspect"
-          withinPortal={false}
-          label={draft.constraints.aspect ? aspectLabel(draft.constraints.aspect) : "Any Aspect"}
+      </FieldChip>
+      <FieldChip
+        title="LoRAs"
+        icon={icons.loras}
+        value={
+          !draft.constraints.loras
+            ? "No LoRAs"
+            : draft.brief.loras?.length
+              ? draft.brief.loras
+                  .map((name) => loraName(name, loras.data?.loras?.[name]))
+                  .join(", ")
+              : "LoRAs"
+        }
+        onClear={() => setDraft({ ...draft, brief: { ...draft.brief, loras: [] } })}
+        clearDisabled={!draft.brief.loras?.length}
+      >
+        <Switch
+          label="Use LoRAs"
+          checked={draft.constraints.loras}
+          onChange={(event) => constraint({ loras: event.currentTarget.checked })}
+        />
+        <MultiSelect
+          label="Favourite LoRAs"
+          searchable
+          disabled={!draft.constraints.loras}
+          maxValues={maxProjectLoras}
+          comboboxProps={{ withinPortal: false }}
           data={[
-            { value: any, label: "Any" },
-            ...projectAspects.map((aspect) => ({ value: aspect, label: aspectLabel(aspect) })),
-          ]}
-          value={draft.constraints.aspect || any}
-          onChange={(aspect) => constraint({ aspect: aspect === any ? "" : (aspect ?? "") })}
+            ...new Set([...Object.keys(loras.data?.loras || {}), ...(draft.brief.loras || [])]),
+          ].map((name) => ({
+            value: name,
+            label: loraName(name, loras.data?.loras?.[name]),
+          }))}
+          value={draft.brief.loras || []}
+          onChange={(loras) => setDraft({ ...draft, brief: { ...draft.brief, loras } })}
         />
-        <ChipSelect
-          name="Resolution"
-          withinPortal={false}
-          label={draft.constraints.resolution || "Any Resolution"}
-          data={[{ value: any, label: "Any" }, ...resolutions]}
-          value={draft.constraints.resolution || any}
-          onChange={(resolution) =>
-            constraint({
-              resolution: (resolution === any
-                ? ""
-                : resolution) as ProjectContent["constraints"]["resolution"],
-            })
-          }
-        />
-      </Group>
-      {error && <Alert color="red">{error}</Alert>}
-      <DialogFooter pending={pending} onCancel={onClose}>
-        <ClearButton
-          disabled={pending}
-          onClear={() => setDraft({ ...structuredClone(blankProject), name: draft.name })}
-        />
-        <Button type="submit" loading={pending} disabled={!draft.name.trim()}>
-          {action}
-        </Button>
-      </DialogFooter>
+      </FieldChip>
+      <ChipSelect
+        name="Aspect"
+        withinPortal={false}
+        label={draft.constraints.aspect ? aspectLabel(draft.constraints.aspect) : "Any Aspect"}
+        data={[
+          { value: any, label: "Any" },
+          ...projectAspects.map((aspect) => ({ value: aspect, label: aspectLabel(aspect) })),
+        ]}
+        value={draft.constraints.aspect || any}
+        onChange={(aspect) => constraint({ aspect: aspect === any ? "" : (aspect ?? "") })}
+      />
+      <ChipSelect
+        name="Resolution"
+        withinPortal={false}
+        label={draft.constraints.resolution || "Any Resolution"}
+        data={[{ value: any, label: "Any" }, ...resolutions]}
+        value={draft.constraints.resolution || any}
+        onChange={(resolution) =>
+          constraint({
+            resolution: (resolution === any
+              ? ""
+              : resolution) as ProjectContent["constraints"]["resolution"],
+          })
+        }
+      />
+    </Group>
+  );
+  const footer = (
+    <DialogFooter pending={pending} onCancel={onClose}>
+      <ClearButton
+        disabled={pending}
+        onClear={() => setDraft({ ...structuredClone(blankProject), name: draft.name })}
+      />
+      <Button type="submit" loading={pending} disabled={!draft.name.trim()}>
+        {action}
+      </Button>
+    </DialogFooter>
+  );
+  const alert = error && <Alert color="red">{error}</Alert>;
+  return (
+    <CardForm
+      onSubmit={() => {
+        if (field) typing?.done();
+        else onSubmit({ ...draft, name: draft.name.trim() });
+      }}
+    >
+      {typing ? (
+        <>
+          <Stack
+            ref={fieldsRef}
+            className={classes.fields}
+            data-typing-field={field}
+            onScroll={(event) => {
+              if (!field) scrollTop.current = event.currentTarget.scrollTop;
+            }}
+          >
+            <div data-text-box="name" hidden={Boolean(field && field !== "name")}>
+              {name}
+            </div>
+            <TextToolsBar.Provider value={toolsBar}>{fields}</TextToolsBar.Provider>
+            {!field && alert}
+          </Stack>
+          <div className={classes.footer}>
+            {field ? (
+              <DialogFooter>
+                <div className={classes.tools} ref={setToolsBar} />
+                <Button onMouseDown={(event) => event.preventDefault()} onClick={typing.done}>
+                  Done
+                </Button>
+              </DialogFooter>
+            ) : (
+              <>
+                {chips}
+                {footer}
+              </>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          {name}
+          {fields}
+          {chips}
+          {alert}
+          {footer}
+        </>
+      )}
     </CardForm>
   );
 }
