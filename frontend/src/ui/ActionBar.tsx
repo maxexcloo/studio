@@ -277,12 +277,11 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                 <Check size={14} />
               ) : undefined
             }
-            role={
-              selected !== undefined
-                ? "menuitemradio"
-                : checked !== undefined
-                  ? "menuitemcheckbox"
-                  : undefined
+            role={checked === undefined ? undefined : "menuitemcheckbox"}
+            renderRoot={
+              selected === undefined
+                ? undefined
+                : (props) => <button {...props} role="menuitemradio" />
             }
             aria-checked={selected ?? checked}
             {...described(action, describedBy)}

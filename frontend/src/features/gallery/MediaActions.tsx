@@ -381,7 +381,14 @@ export function useMediaActions(
   const { menu: animateProfiles, profileId: animationProfileId } = useActionProfile("video");
   const { menu: editProfiles, profileId: selectedEdit, profiles } = useActionProfile("image");
   const automaticEdit = image && automaticEditProfile(profiles || [], item);
-  const editProfileId = selectedEdit || (automaticEdit ? automaticEdit.id : undefined);
+  const editProfileId =
+    selectedEdit ||
+    (automaticEdit &&
+    (item.settings?.profileId
+      ? automaticEdit.id !== item.settings.profileId
+      : automaticEdit.model !== item.model)
+      ? automaticEdit.id
+      : undefined);
   const length = useAnimateLengthSetting(item, animationProfileId);
   const animation = useQuery({
     ...animateProfileQuery(item, animationProfileId),
