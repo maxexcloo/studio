@@ -36,35 +36,3 @@
   line-height: 1.5rem;
   padding: calc(var(--mantine-spacing-xs) - 1px);
 }
-
-/*
- * The phone Generate sheet is exactly the screen and never scrolls as a whole: clipped, unlike
- * hidden, focusing its text cannot scroll it and jump the bar.
- */
-.sheet {
-  display: flex;
-  flex-direction: column;
-  overflow: clip;
-}
-
-.sheetBody {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: 0;
-}
-
-.panel {
-  width: 100%;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-/* Typing gives the text the top of the screen; the bar's Done (or Escape) returns to the sheet. */
-.sheet:has([data-typing]) .sheetHeader {
-  display: none;
-}

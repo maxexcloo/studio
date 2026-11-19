@@ -1,12 +1,13 @@
-import { Drawer, FocusTrap, Paper, Transition } from "@mantine/core";
+import { Paper, Transition } from "@mantine/core";
 import { useClickOutside, useDisclosure, useMergedRef } from "@mantine/hooks";
 import { type CSSProperties, memo, useEffect, useId, useRef, useState } from "react";
 
 import { api, failure } from "../../api";
 import type { MediaKind, ReferenceAsset } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
-import { closeWhenTop, closingPopup, layerAbove, popupLayer } from "../../ui/popupClicks";
-import { useKeyboard, useKeyboardDrop, useTypingIn } from "../../ui/useKeyboard";
+import { closingPopup, layerAbove, popupLayer } from "../../ui/popupClicks";
+import { TextEntrySheet } from "../../ui/TextEntrySheet";
+import { useKeyboard, useTypingIn } from "../../ui/useKeyboard";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { GenerationForm } from "./GenerationForm";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
@@ -91,31 +92,6 @@ export const ComposerDock = memo(function ComposerDock({
     }
   }
   const controlsId = useId();
-  const sheet = useRef<HTMLElement | null>(null);
-  const sheetFocus = useRef<HTMLSpanElement>(null);
-  // Tapping a text box flips the sheet's typing layout at once, rather than once iOS reports the
-  // keyboard after its animation, and holds it while the keyboard animates and iOS scrolls to the
-  // text; it ends as the text loses focus or the keyboard drops (Android's Back keeps focus, so the
-  // drop lets the text go). The bar's lift still follows the viewport. It names the box being typed
-  // in (`data-text-box`), which keeps the screen while the box's tools or their menu have focus.
-  const [typing, setTyping] = useState<string>();
-  const focusedField = useTypingIn(phone && opened, (field) => field);
-  const keyboard = useKeyboard(
-    phone &&
-      opened &&
-      (focusedField ? Boolean(sheet.current?.contains(focusedField)) : typing !== undefined),
-    sheet,
-  );
-  const tapping = useRef(false);
-  const sheetField = (panel: HTMLElement, target: unknown): target is HTMLTextAreaElement =>
-    target instanceof HTMLTextAreaElement && panel.contains(target);
-  useKeyboardDrop(typing !== undefined, () => {
-    const field = document.activeElement;
-    if (sheet.current && sheetField(sheet.current, field)) field.blur();
-    setTyping(undefined);
-  });
-  const textBox = (target: EventTarget) =>
-    (target as Element).closest<HTMLElement>("[data-text-box]")?.dataset.textBox;
   // Phones type in the Generate sheet instead, so the dock stays put there. On other touch screens
   // (a phone held sideways, a tablet) only typing in the dock lifts it above the keyboard, and the
   // open panel fits the room left above it (`--dock-room`); a desktop keeps its own scroll.
@@ -152,8 +128,6 @@ export const ComposerDock = memo(function ComposerDock({
   }, [shared]);
   function collapse(restoreFocus = true) {
     returningFocus.current = restoreFocus;
-    // The sheet unmounts without a blur.
-    setTyping(undefined);
     close();
     setExpanded(false);
     if (compose) onDropState("compose");
@@ -326,80 +300,31 @@ export const ComposerDock = memo(function ComposerDock({
         )}
       </div>
       {phone && (
-        <Drawer
+        <TextEntrySheet
+          id="generate"
+          opened={opened}
+          onClose={collapse}
+          title="Generate"
+          hidden={handingOver}
           onPaste={pasteReferences}
           onDragOver={dragReferences}
           onDrop={dropReferences}
-          classNames={{
-            content: classes.sheet,
-            header: classes.sheetHeader,
-            body: classes.sheetBody,
-          }}
-          styles={{
-            // It follows the visible viewport, so the keyboard lifts its bottom bar.
-            content: {
-              translate: keyboard.top ? `0 ${keyboard.top}px` : undefined,
-              "--keyboard-inset": `${keyboard.inset}px`,
-            } as CSSProperties,
-          }}
-          id="generate"
-          opened={opened}
-          onClose={closeWhenTop("generate", collapse)}
-          title="Generate"
-          closeButtonProps={{ "aria-label": "Close Generate" }}
-          position="bottom"
-          transitionProps={{ duration: motionDuration }}
-          size="100%"
           returnFocus={false}
           onEnterTransitionEnd={() => setExpanded(true)}
           onExitTransitionEnd={focusCompact}
         >
-          {/* Initial focus lands here rather than on Close or the prompt, so the keyboard waits for a tap. */}
-          <FocusTrap.InitialFocus ref={sheetFocus} />
-          <div
-            ref={(panel) => {
-              sheet.current = panel?.closest<HTMLElement>(".mantine-Drawer-content") ?? null;
-            }}
-            className={classes.panel}
-            data-typing={typing}
-            onPointerDown={(event) => {
-              tapping.current = sheetField(event.currentTarget, event.target);
-              // A tap on text that already has focus (returned from a menu) raises the keyboard too.
-              if (tapping.current && event.target === document.activeElement)
-                setTyping(textBox(event.target));
-            }}
-            onFocus={(event) => {
-              if (
-                (tapping.current || typing !== undefined) &&
-                sheetField(event.currentTarget, event.target)
-              )
-                setTyping(textBox(event.target));
-              tapping.current = false;
-            }}
-            onBlur={(event) => {
-              const next = event.relatedTarget;
-              if (
-                !sheetField(event.currentTarget, next) &&
-                !(next instanceof Element && next.closest(`${popupLayer}, [data-text-tools]`))
-              )
-                setTyping(undefined);
-            }}
-            aria-hidden={handingOver || !opened || undefined}
-            inert={!opened}
-          >
+          {({ field, done }) => (
             <GenerationForm
               fill
               onNegativeWritten={() => {
-                if (typing !== "prompt" || layerAbove(sheet.current)) return;
-                sheetFocus.current?.focus({ preventScroll: true });
-                setTyping(undefined);
+                if (field === "prompt") done();
               }}
               onSubmitted={submitted}
               onKindChange={onKindChange}
               onCompared={onCompared}
             />
-          </div>
-        </Drawer>
+          )}
+        </TextEntrySheet>
       )}
     </>
   );

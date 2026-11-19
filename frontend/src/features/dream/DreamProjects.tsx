@@ -21,6 +21,8 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup } from "../../ui/SettingRows";
+import { type SheetTyping, TextEntrySheet } from "../../ui/TextEntrySheet";
+import { usePhone } from "../../ui/usePhone";
 import { CardDialog } from "../characters/CardImages";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { modelsQuery } from "../generation/GenerationProvider";
@@ -41,12 +43,21 @@ const sinceFormat = dateFormat({
 });
 
 /** New Project or Edit for one project, saved by the person. */
-function ProjectEditor({ project, onClose }: { project?: Project; onClose: () => void }) {
+function ProjectEditor({
+  project,
+  onClose,
+  typing,
+}: {
+  project?: Project;
+  onClose: () => void;
+  typing?: SheetTyping;
+}) {
   const save = useSaveProject(project?.id);
   return (
     <ProjectForm
       initial={project ?? blankProject}
       action={project ? "Save" : "Create"}
+      typing={typing}
       pending={save.isPending}
       error={save.error?.message}
       onSubmit={({ name, brief, constraints }) =>
@@ -65,6 +76,7 @@ function ProjectEditor({ project, onClose }: { project?: Project; onClose: () =>
  */
 export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement | null }) {
   const client = useQueryClient();
+  const phone = usePhone();
   const navigate = useNavigate();
   const location = useLocation();
   const { projectId } = useParams();
@@ -72,6 +84,17 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
   const inbox = useQuery(inboxQuery);
   const models = useQuery(modelsQuery);
   const [editing, setEditing] = useState<{ project?: Project }>();
+  const closeEditor = () => setEditing(undefined);
+  const editorTitle = editing?.project ? "Edit Project" : "New Project";
+  const editor = (typing?: SheetTyping) =>
+    editing && (
+      <ProjectEditor
+        key={editing.project?.id || "new"}
+        project={editing.project}
+        onClose={closeEditor}
+        typing={typing}
+      />
+    );
   const [deleting, setDeleting] = useState<Project | null>(null);
   const dream = useQuery(dreamQuery);
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
@@ -212,19 +235,15 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
             : navigate("/dream/projects", { replace: true })
         }
       />
-      <CardDialog
-        opened={editing !== undefined}
-        onClose={() => setEditing(undefined)}
-        title={editing?.project ? "Edit Project" : "New Project"}
-      >
-        {editing && (
-          <ProjectEditor
-            key={editing.project?.id || "new"}
-            project={editing.project}
-            onClose={() => setEditing(undefined)}
-          />
-        )}
-      </CardDialog>
+      {phone ? (
+        <TextEntrySheet opened={editing !== undefined} onClose={closeEditor} title={editorTitle}>
+          {editor}
+        </TextEntrySheet>
+      ) : (
+        <CardDialog opened={editing !== undefined} onClose={closeEditor} title={editorTitle}>
+          {editor()}
+        </CardDialog>
+      )}
       <ConfirmDialog
         opened={deleting !== null}
         title="Delete Project"
