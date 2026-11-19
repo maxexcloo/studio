@@ -1,5 +1,5 @@
 import { ActionIcon, Badge, Button, Text, Tooltip } from "@mantine/core";
-import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   type Dispatch,
   type ReactNode,
@@ -33,7 +33,6 @@ import {
   type DreamItem,
   type DreamMedia,
   type PairAnswer,
-  calibrationQuery,
   dreamItemPath,
   dreamQuery,
   libraryReviewPath,
@@ -73,29 +72,6 @@ function usePrefetch(card?: DeckCard) {
   }, [card]);
 }
 
-/**
- * Gallery images for calibration, drawn a round at a time; a new round is drawn once fewer than
- * `least` images so far are unjudged, until a round brings nothing new.
- */
-function useCalibration(least: number, decided: Set<string>, media: DreamMedia, enabled: boolean) {
-  const [round, setRound] = useState(0);
-  const query = useQuery({ ...calibrationQuery(round, media), enabled });
-  const known = useRef(new Set<string>());
-  const [pool, setPool] = useState<{ items: MediaItem[]; added: number }>({ items: [], added: 0 });
-  useEffect(() => {
-    if (!query.data) return;
-    const fresh = query.data.items.filter((item) => !known.current.has(item.id));
-    for (const item of fresh) known.current.add(item.id);
-    setPool((previous) => ({ items: [...previous.items, ...fresh], added: fresh.length }));
-  }, [query.data]);
-  const remaining = pool.items.filter((item) => !decided.has(item.id));
-  const drained = enabled && pool.added > 0 && remaining.length < least;
-  useEffect(() => {
-    if (drained) setRound((previous) => previous + 1);
-  }, [drained]);
-  return { items: remaining, loading: enabled && query.isPending };
-}
-
 export type Judgement =
   | { card: SingleCard; verdict: Verdict }
   | { card: PairDeckCard; verdict: PairAnswer; like?: true };
@@ -112,23 +88,10 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
   return useMutation({
     mutationFn: async (judgement: Judgement) => {
       if (judgement.card.kind === "pair") {
-        const { pairId, items } = judgement.card;
-        const answer = judgement.verdict as PairAnswer;
-        if (pairId)
-          return post(pairAnswerPath(pairId), {
-            answer,
-            ...("like" in judgement && judgement.like && { like: true }),
-          });
-        const [a, b] = items.map((item) => item.id);
-        return post(
-          "/api/dream/calibration",
-          {
-            a: { liked: [a], passed: [b] },
-            b: { liked: [b], passed: [a] },
-            both: { liked: [a, b] },
-            neither: { passed: [a, b] },
-          }[answer],
-        );
+        return post(pairAnswerPath(judgement.card.pairId), {
+          answer: judgement.verdict,
+          ...("like" in judgement && judgement.like && { like: true }),
+        });
       }
       const { item } = judgement.card;
       const verdict = judgement.verdict as Verdict;
@@ -139,13 +102,6 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
               ids: [item.id],
               rating: verdict === "like" ? "liked" : "disliked",
             });
-      if (judgement.card.kind === "calibration")
-        return post(
-          "/api/dream/calibration",
-          verdict === "discard"
-            ? { passed: [item.id], rating: "disliked" }
-            : { liked: [item.id], ...(verdict === "like" && { rating: "liked" }) },
-        );
       if (verdict === "discard") return post(dreamItemPath(item, "discard"));
       if (verdict === "more") return post(dreamItemPath(item, "more"));
       if (verdict === "variations") {
@@ -197,14 +153,9 @@ function useUndo(onFailed: (judgement: Judgement) => void, onGone: (card: DeckCa
               ids: [card.item.id],
               rating: card.item.rating ?? null,
             });
-      const rated =
-        card.kind !== "pair" &&
-        (verdict === "like" || (card.kind === "calibration" && verdict === "discard"));
-      const calibration = card.kind === "calibration" || (card.kind === "pair" && !card.pairId);
       await post("/api/dream/undo", {
         ids: cardIds(card),
-        ...(calibration && { calibration }),
-        ...(rated && { rating: card.item.rating ?? null }),
+        ...(card.kind !== "pair" && verdict === "like" && { rating: card.item.rating ?? null }),
       });
     },
     scope: { id: "dream-judgements" },
@@ -228,24 +179,24 @@ const cardLabel = (card: DeckCard, top: boolean) =>
 /** The unseen deck and its preview; tapping media opens it, buttons, keys and swipes judge it. */
 export function DreamDeck({
   items,
-  decided,
   setDecided,
+  history,
+  setHistory,
   returnItems,
   libraryItems,
   libraryWaiting,
   media,
-  pairsOnly,
   empty,
   undoTarget,
 }: {
   items: DreamItem[];
-  decided: Set<string>;
   setDecided: Dispatch<SetStateAction<Set<string>>>;
+  history: Judgement[];
+  setHistory: Dispatch<SetStateAction<Judgement[]>>;
   returnItems: (items: DreamItem[]) => void;
   libraryItems?: MediaItem[];
   libraryWaiting: boolean;
   media: DreamMedia;
-  pairsOnly: boolean;
   empty: ReactNode;
   undoTarget: HTMLDivElement | null;
 }) {
@@ -254,14 +205,11 @@ export function DreamDeck({
   // A phone held sideways gives the text its own scrolling column, so it shows in full.
   const sideways = useSideways();
   const [current, setCurrent] = useState<DeckCard>();
-  const [judged, setJudged] = useState(0);
   // The top card open in the preview, and a comparison's side shown there.
   const [viewing, setViewing] = useState<{ key: string; side: number } | null>(null);
   // The side a tap chose, outlined while its card leaves.
   const [selected, setSelected] = useState<{ key: string; side: 0 | 1 }>();
   const [picked, setPicked] = useState<{ key: string; side: 0 | 1 } | null>(null);
-  // This session's judgements that Undo can take back, newest last.
-  const [history, setHistory] = useState<Judgement[]>([]);
   /** Puts a card back on the deck, after a failed verdict or an Undo. */
   const restore = (card: DeckCard) => {
     setCurrent(card);
@@ -282,7 +230,6 @@ export function DreamDeck({
     },
     (card) => decide(card),
   );
-  const gallery = useCalibration(pairsOnly ? 2 : 1, decided, media, !libraryItems);
   const libraryCards: DeckCard[] = (libraryItems || [])
     .slice(0, 3)
     .map((item) => ({ kind: "library", key: item.id, item }));
@@ -290,7 +237,7 @@ export function DreamDeck({
     ? current?.kind === "library" && libraryItems.some((item) => item.id === current.key)
       ? [current, ...libraryCards.filter((card) => card.key !== current.key)].slice(0, 3)
       : libraryCards
-    : deckCards(items, gallery.items, judged, { pairsOnly, media, current });
+    : deckCards(items, { media, current });
   const [top] = cards;
   if (top !== current) setCurrent(top);
   const shown =
@@ -312,7 +259,6 @@ export function DreamDeck({
       for (const id of cardIds(card)) next.add(id);
       return next;
     });
-    setJudged((previous) => previous + 1);
   }
   /** Takes the card off the deck and sends its judgement, which Undo can take back. */
   function commit(judgement: Judgement) {
@@ -328,9 +274,8 @@ export function DreamDeck({
     setPicked(null);
     const { card } = last;
     if (card.kind === "dream") returnItems([card.item]);
-    else if (card.kind === "pair" && card.pairId) returnItems(card.items as DreamItem[]);
+    else if (card.kind === "pair") returnItems(card.items);
     restore(card);
-    setJudged((previous) => previous - 1);
     takeBack.mutate(last);
   }
   /** Flies the top card out its way, on the deck or in the preview, then commits the verdict. */
@@ -340,7 +285,7 @@ export function DreamDeck({
     const out = (viewing ? previewFly : fly).current;
     try {
       if (top.kind === "pair") {
-        const like = top.pairId && choice === "like";
+        const like = choice === "like";
         const answer = like ? (shown ? "b" : "a") : (choice as PairAnswer);
         if (!(answer in answerDirections)) return;
         if (answer === "a" || answer === "b")
@@ -358,7 +303,7 @@ export function DreamDeck({
   /** What a swipe or arrow key in a direction means for the top card. */
   const intent = (direction: Direction): Verdict | PairAnswer | null =>
     top?.kind === "pair"
-      ? direction === "up" && top.pairId
+      ? direction === "up"
         ? "like"
         : answers[direction]
       : ({ left: "discard", right: "keep", up: "like", down: null } as const)[direction];
@@ -434,13 +379,13 @@ export function DreamDeck({
           card.kind === "pair"
             ? full
               ? {}
-              : { left: "A", right: "B", up: card.pairId ? "Like" : "Both", down: "Neither" }
+              : { left: "A", right: "B", up: "Like", down: "Neither" }
             : { left: "Dislike", right: "Accept", up: "Like" }
         }
         onTap={full ? undefined : (target) => openPressed(card, target)}
         onHold={full ? undefined : (target) => openPressed(card, target)}
         onSwipe={(direction, target) => {
-          if (card.kind === "pair" && card.pairId && direction === "up") {
+          if (card.kind === "pair" && direction === "up") {
             const side = target.closest<HTMLElement>("[data-side]")?.dataset.side ?? String(shown);
             return commit({ card, verdict: side === "1" ? "b" : "a", like: true });
           }
@@ -456,7 +401,7 @@ export function DreamDeck({
               side={side}
               playing={playing}
               setSide={(side) => open(card, side)}
-              onLike={isTop && card.pairId ? () => void act("like") : undefined}
+              onLike={isTop ? () => void act("like") : undefined}
             />
           ) : (
             <PairContent
@@ -464,7 +409,7 @@ export function DreamDeck({
               top={isTop}
               playing={playing}
               picked={picked?.key === card.key ? picked.side : undefined}
-              shown={isTop && card.pairId ? shown : undefined}
+              shown={isTop ? shown : undefined}
               select={(side) => setSelected({ key: card.key, side })}
               view={(side) => open(card, side)}
             />
@@ -475,9 +420,9 @@ export function DreamDeck({
           <>
             <div className={classes.media}>
               <DeckMedia item={card.item} playing={playing} />
-              {(card.kind === "calibration" || card.kind === "library") && (
+              {card.kind === "library" && (
                 <Badge className={classes.label} variant="default">
-                  {card.kind === "library" ? "Rate Your Library" : "From Your Gallery"}
+                  Rate Your Library
                 </Badge>
               )}
               {isTop && (
@@ -494,13 +439,6 @@ export function DreamDeck({
                 </Tooltip>
               )}
             </div>
-            {isTop &&
-              card.kind === "library" &&
-              card.item.jobId &&
-              card.item.prompt?.trim() &&
-              card.item.settings?.profileId && (
-                <LibrarySuggest key={card.item.id} item={card.item} />
-              )}
             <CardText item={card.item} dreamt={card.kind === "dream"} full={sideways} />
           </>
         )}
@@ -524,14 +462,19 @@ export function DreamDeck({
       undoTarget,
     );
   if (!top)
-    return libraryWaiting || gallery.loading ? (
-      <LoadingState fill label={libraryItems ? "Loading Library" : "Loading Dream"} />
-    ) : (
+    return (
       <>
-        {empty}
+        {libraryWaiting ? <LoadingState fill label="Loading Library" /> : empty}
         {undoButton}
       </>
     );
+  const suggest =
+    top.kind === "library" &&
+    top.item.jobId &&
+    top.item.prompt?.trim() &&
+    top.item.settings?.profileId ? (
+      <LibrarySuggest key={top.item.id} item={top.item} />
+    ) : undefined;
   const stack = (full: boolean) =>
     cards
       .slice(0, full ? 2 : 3)
@@ -546,12 +489,13 @@ export function DreamDeck({
         card={top}
         act={(choice) => void act(choice)}
         hidden={!!viewing}
-        shown={top.kind === "pair" && top.pairId ? shown : undefined}
+        trailing={viewing ? undefined : suggest}
+        shown={top.kind === "pair" ? shown : undefined}
       />
       {!phone && !touch && (
         <Text size="xs" c="dimmed" ta="center">
           {top.kind === "pair"
-            ? `← A · → B · ↑ ${top.pairId ? "Like" : "Both"} · ↓ Neither · U Undo`
+            ? "← A · → B · ↑ Like · ↓ Neither · U Undo"
             : "← Dislike · → Accept · ↑ Like · U Undo"}
         </Text>
       )}
@@ -564,10 +508,10 @@ export function DreamDeck({
           close={closePreview}
           act={(choice) => void act(choice)}
           undo={undo}
+          suggest={suggest}
           onKeyDown={(event) => {
             // A comparison's sides step with the arrows; its answers are its buttons.
-            if (top.kind !== "pair" || (top.pairId && event.key === "ArrowUp"))
-              return respond(event.nativeEvent);
+            if (top.kind !== "pair" || event.key === "ArrowUp") return respond(event.nativeEvent);
             const step = ({ ArrowLeft: -1, ArrowRight: 1 } as Record<string, number>)[event.key];
             const { altKey, ctrlKey, metaKey, shiftKey } = event;
             if (!step || altKey || ctrlKey || metaKey || shiftKey || event.defaultPrevented) return;

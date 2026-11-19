@@ -1,4 +1,4 @@
-import { Badge, Button, Group, Modal, Text, VisuallyHidden } from "@mantine/core";
+import { ActionIcon, Badge, Group, Modal, Text, Tooltip, VisuallyHidden } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import {
   type KeyboardEvent,
@@ -230,6 +230,7 @@ export function DreamPreview({
   close,
   act,
   undo,
+  suggest,
   onKeyDown,
 }: {
   card: DeckCard;
@@ -239,6 +240,7 @@ export function DreamPreview({
   close: () => void;
   act: (choice: Choice["choice"]) => void;
   undo: () => void;
+  suggest?: ReactNode;
   onKeyDown: (event: KeyboardEvent) => void;
 }) {
   const id = useId();
@@ -287,18 +289,6 @@ export function DreamPreview({
                 </Badge>
               </>
             }
-            end={
-              <Button
-                size="compact-sm"
-                variant="default"
-                radius="xl"
-                leftSection={<icons.undo size={14} />}
-                disabled={!canUndo}
-                onClick={undo}
-              >
-                Undo
-              </Button>
-            }
             details={{ phone, opened: details, toggle: () => setDetails((open) => !open) }}
             close={close}
             closeLabel="Close Preview"
@@ -310,6 +300,20 @@ export function DreamPreview({
               act={act}
               hidden={false}
               shown={card.kind === "pair" ? side : undefined}
+              trailing={suggest}
+              leading={
+                <Tooltip label="Undo">
+                  <ActionIcon
+                    variant="default"
+                    radius="xl"
+                    aria-label="Undo"
+                    disabled={!canUndo}
+                    onClick={undo}
+                  >
+                    <icons.undo size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              }
             />
           </div>
         </div>

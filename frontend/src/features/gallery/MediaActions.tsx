@@ -366,7 +366,7 @@ export function useMediaActions(
                 {
                   id: "more-like-image",
                   label: "More Like This",
-                  icon: icons.assistant,
+                  icon: icons.moreLikeThis,
                   disabled: more.isPending,
                   onClick: () => more.mutate("image"),
                 },
@@ -377,7 +377,7 @@ export function useMediaActions(
                 {
                   id: "more-like-set",
                   label: "More Like This Set",
-                  icon: icons.assistant,
+                  icon: icons.moreLikeThis,
                   disabled: more.isPending,
                   onClick: () => more.mutate("set"),
                 },
@@ -525,21 +525,19 @@ export function useMediaActions(
             onClick: () => pick(mode, change.instruction),
           }))
         : [],
+      custom: assistedChanges
+        ? [
+            {
+              id: "custom",
+              label: "Custom…",
+              icon: icons.custom,
+              disabled: draft?.pending,
+              onClick: () => (draft ? draft.custom(mode) : openViewer(mode, { custom: true })),
+            },
+          ]
+        : [],
       others,
-      last: [
-        ...(assistedChanges
-          ? [
-              {
-                id: "custom",
-                label: "Custom…",
-                icon: icons.custom,
-                disabled: draft?.pending,
-                onClick: () => (draft ? draft.custom(mode) : openViewer(mode, { custom: true })),
-              },
-            ]
-          : []),
-        ...last,
-      ],
+      last,
     });
   // The assistant and the animate offers decide every option, so they show together.
   const optionsLoading = assistant.isPending || animation.isPending;
@@ -667,7 +665,9 @@ export function useMediaActions(
                     onClick: () => run({ kind: "repeat", prompt: changedPrompt }),
                   },
                 ],
-                image
+              ],
+              [
+                ...(image
                   ? [
                       {
                         id: "compare-models",
@@ -678,9 +678,9 @@ export function useMediaActions(
                         onClick: () => variants.mutate(),
                       },
                     ]
-                  : [],
+                  : []),
+                recreateAction,
               ],
-              [recreateAction],
             ),
     }),
     upscale,

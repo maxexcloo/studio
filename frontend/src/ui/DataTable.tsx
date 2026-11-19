@@ -1,4 +1,13 @@
-import { ActionIcon, Group, Menu, Table, UnstyledButton, VisuallyHidden } from "@mantine/core";
+import {
+  ActionIcon,
+  Button,
+  Group,
+  Menu,
+  Stack,
+  Table,
+  UnstyledButton,
+  VisuallyHidden,
+} from "@mantine/core";
 import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 
@@ -213,5 +222,20 @@ export function DataTable<T>({
     <Table.ScrollContainer minWidth={minWidth}>{table}</Table.ScrollContainer>
   ) : (
     table
+  );
+}
+
+/** Keeps recent history compact and expands the same table in place. */
+export function HistoryTable<T>({ rows, ...table }: Parameters<typeof DataTable<T>>[0]) {
+  const [all, setAll] = useState(false);
+  return (
+    <Stack gap={4} align="flex-start">
+      <DataTable {...table} rows={all ? rows : rows.slice(0, 3)} />
+      {rows.length > 3 && (
+        <Button variant="subtle" size="compact-sm" aria-expanded={all} onClick={() => setAll(!all)}>
+          {all ? "Show Less" : "Show All"}
+        </Button>
+      )}
+    </Stack>
   );
 }

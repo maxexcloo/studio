@@ -44,7 +44,7 @@ test("the visible queue puts running work first and follows dispatch order withi
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   const labels = queue.getByText(/^(Active|Warm|Parallel|Cold) Job$/);
   await expect(labels).toHaveText(["Active Job", "Warm Job", "Parallel Job", "Cold Job"]);
   await expect(
@@ -96,7 +96,7 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
     });
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   const order = () => queue.getByText(/^(running-job|first|second|third)$/).allTextContents();
   await expect.poll(order).toEqual(["running-job", "first", "second", "third"]);
   await expect(queue.getByText("Generating – Image Quality", { exact: true })).toBeVisible();
@@ -187,9 +187,9 @@ test("a request's jobs group as one set that moves and stops together", async ({
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   // The set is one row: its title and progress, its jobs under it once opened.
-  await expect(queue.getByText("Generations (2)", { exact: true })).toBeVisible();
+  await expect(queue.getByText("Queue (2)", { exact: true })).toBeVisible();
   const set = queue.getByRole("button", { name: /^Fox Studies/ });
   await expect(set).toContainText("1 of 3 Done");
   await expect(set).toContainText("Queued – Krea 2 Turbo");
@@ -223,7 +223,7 @@ test("a request's jobs group as one set that moves and stops together", async ({
       ["single", "queued"],
     ]);
   await expect(set).toBeHidden();
-  await expect(queue.getByText("Generations (1)", { exact: true })).toBeVisible();
+  await expect(queue.getByText("Queue (1)", { exact: true })).toBeVisible();
   await queue.getByRole("button", { name: "Stop All", exact: true }).click();
   const stopAll = page.getByRole("dialog", { name: "Stop All Generations", exact: true });
   await expect(stopAll).toContainText("Studio stops your 1 unfinished generation.");
@@ -280,8 +280,8 @@ test("a request of several prompts lists each prompt once, its split runs stoppi
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
-  await expect(queue.getByText("Generations (1)", { exact: true })).toBeVisible();
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
+  await expect(queue.getByText("Queue (1)", { exact: true })).toBeVisible();
   await queue.getByRole("button", { name: /^Fox Clips/ }).click();
   const fox = queue.getByRole("button", { name: /^A fox runs/ });
   await expect(fox).toContainText("0 of 2 Done");
@@ -339,7 +339,7 @@ test("Retry and a set's Retry Failed go through the shared retry, replacing the 
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   await expect(queue.getByRole("button", { name: "Clear Failed Set", exact: true })).toHaveCount(0);
   await queue.getByRole("button", { name: "Retry Failed", exact: true }).click();
   // The failed tile goes, as a retry anywhere else, and the original leaves the set.
@@ -383,7 +383,7 @@ test("Clear Failed Set removes the collapsed set from the queue and keeps failed
   state.gallery.push(tile);
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   const set = queue.getByRole("button", { name: /^Fox Studies/ });
   await expect(set).toHaveAttribute("aria-expanded", "false");
   await expect(queue.getByRole("button", { name: "Retry Failed", exact: true })).toBeVisible();
@@ -404,7 +404,7 @@ test("an administrator opens Settings › Workers from the summary under the que
   await signIn(page, { id: "admin", role: "administrator" });
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   // An administrator opens Settings › Workers from the summary under the queue.
   await queue.getByRole("link", { name: "Open Workers", exact: true }).click();
   await expect(page).toHaveURL(/\/settings#workers$/);
@@ -436,7 +436,7 @@ test("while work runs the queue polls only for changes and still shows the work 
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   const generating = queue.getByText("Generating – Image Quality", { exact: true });
   await expect(generating).toBeVisible();
   await polled;

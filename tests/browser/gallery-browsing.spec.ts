@@ -1081,7 +1081,7 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Generating");
   await status.click();
-  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   await expect(queue.getByText("waiting-job", { exact: true })).toBeVisible();
   await expect(queue.getByText("queued-job", { exact: true })).toBeVisible();
   for (const action of ["Stop All", "Clear Failed"]) {
@@ -1308,7 +1308,7 @@ test("The phone Generations drawer fills the screen height and swipes away", asy
   await fixtures(page);
   await page.goto("/images");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const drawer = page.getByRole("dialog", { name: "Generations", exact: true });
+  const drawer = page.getByRole("dialog", { name: "Queue", exact: true });
   await expect(drawer).toBeVisible();
   const viewport = page.viewportSize()!;
   // Once it has slid in, it spans the full height and most of the width.

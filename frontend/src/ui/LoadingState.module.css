@@ -1,0 +1,13 @@
+.indicator {
+  animation: reveal var(--studio-motion-duration) var(--studio-ease-enter) 150ms both;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

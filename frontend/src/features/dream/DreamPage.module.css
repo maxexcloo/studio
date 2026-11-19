@@ -92,13 +92,6 @@
 .card[data-depth]:not([data-depth="0"]) {
   pointer-events: none;
 }
-.page > [data-empty-state="fill"] {
-  background: radial-gradient(
-    ellipse 18rem 10rem at center,
-    var(--mantine-primary-color-light),
-    transparent
-  );
-}
 .media {
   position: relative;
   flex: 1;
@@ -372,10 +365,6 @@
 .card[data-full] .hint:not([data-hint="up"]) {
   top: calc(env(safe-area-inset-top) + 4.5rem);
 }
-.card[data-full] [data-zoom-controls] {
-  top: calc(env(safe-area-inset-top) + 3.5rem);
-  bottom: auto;
-}
 .previewSides {
   flex: 1;
   min-height: 0;
@@ -398,18 +387,19 @@
   background: var(--studio-glass-chrome);
   border-top: 1px solid var(--studio-glass-border);
 }
-:where(:root[data-phone]:not([data-phone="sideways"])) .page > .buttons .answer {
+.previewButtons .buttons {
+  gap: min(var(--mantine-spacing-md), 2%);
+}
+/* Only the controls, and their popups, take touches over the deck's media. */
+:where(:root[data-phone]:not([data-phone="sideways"])) .page > .buttons > * {
   pointer-events: auto;
+}
+:where(:root[data-phone]:not([data-phone="sideways"])) .page > .buttons .answer {
   background: var(--studio-glass-raised);
   -webkit-backdrop-filter: var(--studio-glass-filter);
   backdrop-filter: var(--studio-glass-filter);
 }
 
-.suggest {
-  position: absolute;
-  top: var(--mantine-spacing-sm);
-  right: calc(var(--mantine-spacing-sm) + 3rem);
-}
 .choice[data-selected] .side {
   outline: 1px solid var(--mantine-primary-color-filled);
 }

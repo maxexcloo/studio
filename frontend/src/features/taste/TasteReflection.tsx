@@ -2,7 +2,7 @@ import { Group, Image, Stack, Text } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 
 import { api } from "../../api";
-import { DataTable } from "../../ui/DataTable";
+import { HistoryTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 
@@ -88,9 +88,9 @@ export function TasteReflection() {
           </>
         )}
       </SettingGroup>
-      <SettingGroup title="Results by Day">
-        <DataTable
-          label="Results by Day"
+      <SettingGroup title="History">
+        <HistoryTable
+          label="History"
           compact
           rows={data?.days || []}
           rowKey={(row) => `${row.day} ${row.profileId} ${row.model}`}
