@@ -1691,6 +1691,37 @@ test("Incoming results keep the viewer on its current item and return focus to t
   ).toBeVisible();
 });
 
+test("A result loaded at the front is reachable to the left of an open viewer", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(3));
+  await page.goto("/images/browse-0");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByText("1 / 3", { exact: true })).toBeVisible();
+  const [first] = results(1);
+  state.gallery.unshift({ ...first, id: "viewer-arrival", prompt: "New Arrival" });
+  state.jobs.push({
+    id: "viewer-arrival",
+    sessionId: "s",
+    operation: "image",
+    status: "completed",
+    input: { prompt: "New Arrival", profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+
+  await expect(viewer.getByText("2 / 4", { exact: true })).toBeVisible();
+  await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(viewer.getByRole("img", { name: "New Arrival", exact: true })).toBeVisible();
+  await expect(viewer.getByText("1 / 4", { exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
+});
+
 test("Returning after more than a page of incoming results leaves no gap before held items", async ({
   page,
 }) => {
