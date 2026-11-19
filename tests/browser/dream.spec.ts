@@ -990,13 +990,15 @@ test("Dream fullscreen closes from the letterbox and leaves the image interactiv
   await open.click();
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
   const card = preview.getByRole("group", { name: "Current Dream", exact: true });
-  const picture = card.getByRole("img", { name: "Dream prompt wide", exact: true });
+  const picture = card
+    .getByRole("button", { name: "Change Image Zoom", exact: true })
+    .getByRole("img", { name: "Dream prompt wide", exact: true });
   await expect(picture).toBeVisible();
   const stage = (await card.boundingBox())!;
   const media = (await picture.boundingBox())!;
   const x = stage.x + stage.width / 2;
-  const y = stage.y + stage.height - 18;
-  expect(y).toBeGreaterThan(media.y + media.height);
+  expect(stage.y + stage.height).toBeGreaterThan(media.y + media.height);
+  const y = (stage.y + stage.height + media.y + media.height) / 2;
   if (isMobile) await page.touchscreen.tap(x, y);
   else await page.mouse.click(x, y);
   await expect(preview).toBeHidden();
