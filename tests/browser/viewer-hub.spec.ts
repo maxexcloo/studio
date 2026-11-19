@@ -1190,7 +1190,7 @@ test("Animate can pick a compatible profile over the saved default route", async
   if (isMobile) await profiles.click();
   else await profiles.hover();
   await expect(page.getByRole("menuitemradio", { name: "Automatic", exact: true })).toBeChecked();
-  await page.getByRole("menuitemradio", { name: "Motion Fast", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "Motion Quality", exact: true }).click();
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
