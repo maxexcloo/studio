@@ -112,8 +112,12 @@ const templateIcons: Record<string, LucideIcon> = {
 };
 
 /** A failed item's Retry; the new pending tile replaces it (`onRetried` gets the new job). */
-function useRetryAction(item: MediaItem, onRetried?: (jobId: string) => void): Action | null {
-  const failed = item.status === "failed" && Boolean(item.jobId);
+function useRetryAction(
+  item: MediaItem,
+  retryInStage: boolean,
+  onRetried?: (jobId: string) => void,
+): Action | null {
+  const failed = !retryInStage && item.status === "failed" && Boolean(item.jobId);
   // Only a failed item reads the queue, so others don't re-render on each of its polls.
   const queue = useQuery({ ...queueQuery, subscribed: failed });
   const retry = useQueueAction(item.jobId);
@@ -263,6 +267,7 @@ interface MediaActionOptions {
   onReport: () => void;
   onRetried?: (jobId: string) => void;
   onVersionChange?: (id: string, active: boolean) => void;
+  retryInStage?: boolean;
 }
 
 /**
@@ -284,6 +289,7 @@ export function useMediaActions(
     onReport,
     onRetried,
     onVersionChange,
+    retryInStage = false,
   }: MediaActionOptions,
 ): ActionGroups {
   const action = useMediaAction(item, onApplied);
@@ -298,7 +304,7 @@ export function useMediaActions(
   });
   const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
   const settingsText = useSettingsText(item);
-  const retry = useRetryAction(item, onRetried);
+  const retry = useRetryAction(item, retryInStage, onRetried);
   const reference = useReferenceAction(item, onApplied);
   const cards = useCardActions(item, onApplied);
   const recreate = useRecreateAction(item, onApplied);
@@ -626,7 +632,7 @@ export function useMediaActions(
       }),
     // Recreate runs the item again from here, or opens it in the composer. An
     // upload has only its suggested prompt; unfinished work opens its prompt.
-    itemAction("recreate", {
+    itemAction(ready ? "recreate" : "edit", {
       disabled: !ready && action.isPending,
       loading: running === "regenerate" || running === "repeat" || variants.isPending,
       onClick: ready ? undefined : () => action.mutate("image"),

@@ -1,9 +1,22 @@
-import { Alert, Button, Group, Loader, Progress, Stack, Text } from "@mantine/core";
+import {
+  Alert,
+  Button,
+  Group,
+  Loader,
+  Paper,
+  Progress,
+  Stack,
+  Text,
+  ThemeIcon,
+} from "@mantine/core";
+import { CircleAlert } from "lucide-react";
 
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem } from "../../types";
 import { WritingStream } from "../generation/PromptWriting";
 import { QueueJobAction, progressPercent, statusLabels, useQueue } from "../generation/Queue";
+
+import classes from "./MediaJobStatus.module.css";
 
 /** Only a matching account-owned durable queue record can expose retry or cancellation. */
 export function MediaJobStatus({
@@ -17,12 +30,64 @@ export function MediaJobStatus({
   const queue = useQueue();
   const job = item.jobId ? queue.data?.jobs.find((job) => job.id === item.jobId) : undefined;
   const savedError = "error" in item && typeof item.error === "string" ? item.error : "";
-  const loading = Boolean(item.jobId && !job && (queue.isPending || queue.isFetching));
+  const loading = Boolean(item.jobId && queue.isPending);
   const status = job ? job.status : item.status;
   const failed = status === "failed";
   const cancelled = status === "cancelled";
   const active = job && !terminalStatuses.has(job.status);
   const progress = job?.progress;
+  const reason = job?.reason || savedError;
+  const queueError = item.jobId ? queue.error : null;
+
+  if (!loading && !active && !cancelled) {
+    return (
+      <Paper
+        className={classes.panel}
+        role="status"
+        aria-label="Generation Status"
+        radius="lg"
+        p="md"
+        withBorder
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Group gap="xs" wrap="nowrap">
+          <ThemeIcon color={failed ? "red" : "gray"} variant="light" radius="md">
+            <CircleAlert size={16} aria-hidden />
+          </ThemeIcon>
+          <Text fw={600}>{failed ? "Generation Failed" : "Generation Unavailable"}</Text>
+        </Group>
+        <Stack className={classes.reason} gap="xs" tabIndex={0}>
+          <Text size="sm">
+            {reason ||
+              (failed
+                ? "No error was recorded for this generation."
+                : "This generation has no media.")}
+          </Text>
+          {queueError ? (
+            <Text size="sm" c="dimmed">
+              Couldn't load generation status. {queueError.message}
+            </Text>
+          ) : job?.status !== "failed" ? (
+            <Text size="sm" c="dimmed">
+              Use Edit to review the prompt and settings.
+            </Text>
+          ) : null}
+        </Stack>
+        {queueError ? (
+          <Group justify="flex-end">
+            <Button size="sm" loading={queue.isFetching} onClick={() => void queue.refetch()}>
+              Reload Status
+            </Button>
+          </Group>
+        ) : job?.status === "failed" ? (
+          <Group justify="flex-end">
+            <QueueJobAction job={job} items={[item]} onRetried={onRetried} />
+          </Group>
+        ) : null}
+      </Paper>
+    );
+  }
+
   return (
     <Stack
       role="status"
@@ -42,25 +107,16 @@ export function MediaJobStatus({
           aria-label={loading ? "Loading Generation Status" : statusLabels[job!.status]}
         />
       )}
-      <Text size="lg" fw={600} c={failed ? "red" : undefined} ta="center">
+      <Text size="lg" fw={600} ta="center">
         {loading
           ? "Loading Generation Status"
           : job
             ? statusLabels[job.status]
-            : failed
-              ? statusLabels.failed
-              : cancelled
-                ? statusLabels.cancelled
-                : "Generation Unavailable"}
+            : statusLabels.cancelled}
       </Text>
-      {(job?.reason || savedError) && (
-        <Text
-          size="sm"
-          c={failed ? "red" : "dimmed"}
-          ta="center"
-          style={{ overflowWrap: "anywhere" }}
-        >
-          {job?.reason || savedError}
+      {reason && (
+        <Text size="sm" c="dimmed" ta="center" style={{ overflowWrap: "anywhere" }}>
+          {reason}
         </Text>
       )}
       {progress && active && job?.status !== "writing" && (
@@ -72,10 +128,10 @@ export function MediaJobStatus({
         />
       )}
       {active && job?.status === "writing" && <WritingStream progress={progress} />}
-      {item.jobId && queue.error ? (
+      {queueError && (
         <Alert color="red" title="Couldn't Load Generation Status">
           <Stack gap="sm">
-            <Text size="sm">{queue.error.message}</Text>
+            <Text size="sm">{queueError.message}</Text>
             <Button
               variant="subtle"
               size="compact-sm"
@@ -86,11 +142,7 @@ export function MediaJobStatus({
             </Button>
           </Stack>
         </Alert>
-      ) : !job && !loading ? (
-        <Text size="sm" c="dimmed" ta="center">
-          Nothing to retry. Edit opens this item's prompt and settings again.
-        </Text>
-      ) : null}
+      )}
       {job && (
         <Group justify="center">
           <QueueJobAction job={job} items={[item]} onRetried={onRetried} />

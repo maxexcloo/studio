@@ -220,9 +220,8 @@ export function QueueJobAction({
       onClick={() => void onClick()}
     />
   ) : (
-    // The viewer's status, styled as a tile's Stop and Retry.
     <Button
-      variant="default"
+      variant={retry ? "filled" : "default"}
       size="sm"
       radius="xl"
       leftSection={retry ? <icons.retry size={16} /> : <icons.stop size={16} />}
