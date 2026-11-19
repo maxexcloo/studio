@@ -7,7 +7,6 @@ import { loraName } from "../../../../shared/profiles";
 import {
   type Project,
   type ProjectContent,
-  maxProjectBrief,
   maxProjectLoras,
   maxProjectName,
   maxProjectProfiles,
@@ -19,7 +18,7 @@ import { api } from "../../api";
 import { ClearButton } from "../../ui/ClearButton";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
-import { TextBox, TextToolsBar } from "../../ui/TextBox";
+import { TextToolsBar } from "../../ui/TextBox";
 import type { SheetTyping } from "../../ui/TextEntrySheet";
 import { CardForm } from "../characters/CardImages";
 import { chipProps } from "../generation/chip";
@@ -29,6 +28,7 @@ import { loraInfoQuery } from "../generation/LoraPicker";
 import { profileName } from "../generation/payload";
 import { ChipPopup } from "../generation/Picker";
 import { profileOptions } from "../generation/ProfilePicker";
+import { ProjectBriefField } from "./ProjectBriefField";
 import { projectPath, projectsQuery } from "./queries";
 
 import controls from "../generation/GenerationInputControls.module.css";
@@ -167,15 +167,14 @@ export function ProjectForm({
   );
   const fields = briefFields.map(([key, label, description]) => {
     const box = (
-      <TextBox
+      <ProjectBriefField
         key={key}
+        field={key}
+        draft={draft}
         label={label}
         description={field ? undefined : description}
         autosize={field !== key}
-        minRows={2}
-        maxLength={maxProjectBrief}
         inline={Boolean(typing)}
-        value={draft.brief[key] || ""}
         onChange={(value) => brief(key, value)}
       />
     );

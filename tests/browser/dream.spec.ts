@@ -1130,6 +1130,41 @@ test("Dream's projects show how they fare, open in detail with Undo, and are cre
   });
 });
 
+test("New Project suggests an empty brief field and Undo restores it", async ({
+  page,
+  isMobile,
+}) => {
+  await fixtures(page);
+  await serveDream(page);
+  const requests: unknown[] = [];
+  await page.route("**/api/assistant/project-brief", (route) => {
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({ json: { text: "Soft morning light by the harbour." } });
+  });
+  await page.goto("/dream/projects");
+  await page.getByRole("button", { name: "New Project", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "New Project", exact: true });
+  const name = editor.getByRole("textbox", { name: "Name", exact: true });
+  if (isMobile) await name.click();
+  await name.fill("Harbour Study");
+  if (isMobile) await editor.getByRole("button", { name: "Done", exact: true }).click();
+  await editor.getByRole("button", { name: "AI Styles Actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Suggest", exact: true }).click();
+  await expect(editor.getByRole("status")).toHaveText("Suggested");
+  await expect(editor.getByRole("textbox", { name: "Styles", exact: true })).toHaveValue(
+    "Soft morning light by the harbour.",
+  );
+  expect(requests).toEqual([
+    {
+      name: "Harbour Study",
+      field: "styles",
+      brief: { subjects: "", styles: "", avoid: "" },
+    },
+  ]);
+  await editor.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(editor.getByRole("status")).toHaveCount(0);
+});
+
 test("The Inbox accepts, edits then accepts, dismisses with a reason and clears Dream's proposals", async ({
   page,
   isMobile,
