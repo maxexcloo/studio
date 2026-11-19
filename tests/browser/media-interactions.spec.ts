@@ -157,8 +157,15 @@ test("Retrying a failed entry in the viewer replaces it with the new run", async
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Failed Study", exact: true }).click();
-  const status = page.getByRole("status", { name: "Generation Status", exact: true });
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const status = viewer.getByRole("status", { name: "Generation Status", exact: true });
+  await expect(status).toContainText("Generation Failed");
   await expect(status).toContainText("Worker lost connection");
+  await expect(viewer.getByRole("button", { name: "Retry", exact: true })).toHaveCount(1);
+  await expect(viewer.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
+  await expect(
+    viewer.getByRole("button", { name: "Generation Details", exact: true }),
+  ).toBeVisible();
   await status.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(status).toContainText("Generation resumed");
   expect(retries).toBe(1);
@@ -166,10 +173,25 @@ test("Retrying a failed entry in the viewer replaces it with the new run", async
   expect(state.gallery.map((item) => item.id)).toEqual(["retried-item"]);
 });
 
+test("A cleared failure in the viewer keeps its recorded error and Edit", async ({ page }) => {
+  const { state, job } = await failedGeneration(page);
+  state.jobs[0].cleared = true;
+  state.gallery[0].error = job.reason;
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open image: Failed Study", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const status = viewer.getByRole("status", { name: "Generation Status", exact: true });
+  await expect(status).toContainText(job.reason);
+  await expect(status).toContainText("Use Edit to review the prompt and settings.");
+  await expect(viewer.getByRole("button", { name: "Retry", exact: true })).toHaveCount(0);
+  await expect(viewer.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
+});
+
 test("A delayed Retry finishes on its source after navigating to another image", async ({
   page,
 }, testInfo) => {
   const { state, job, item } = await failedGeneration(page);
+  job.reason = "The worker lost its connection while saving this result. ".repeat(75);
   const neighbour = {
     id: "neighbour",
     type: "image",

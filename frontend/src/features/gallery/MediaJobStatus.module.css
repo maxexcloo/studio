@@ -1,0 +1,30 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+  width: 28rem;
+  min-width: 0;
+  max-height: calc(
+    100% - 2 * (var(--mantine-spacing-xl) + var(--mantine-spacing-md) + env(safe-area-inset-top))
+  );
+  margin-inline: calc(var(--mantine-spacing-md) + env(safe-area-inset-left))
+    calc(var(--mantine-spacing-md) + env(safe-area-inset-right));
+}
+
+.panel > :not(.reason) {
+  flex-shrink: 0;
+}
+
+.reason {
+  max-height: 12rem;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  white-space: pre-wrap;
+}
+
+.reason > * {
+  flex-shrink: 0;
+}
