@@ -2,6 +2,8 @@ import type { Resolution } from "./resolution.ts";
 
 /** A project brief's free-text fields, in the order its one-line summary lists them. */
 const briefTexts = ["subjects", "ethnicity", "age", "body", "styles", "rules"] as const;
+export const projectBriefTextFields = [...briefTexts, "avoid"] as const;
+export type ProjectBriefTextField = (typeof projectBriefTextFields)[number];
 
 /** What a project's work shows, how it looks and what it leaves out. */
 export interface ProjectBrief extends Partial<Record<(typeof briefTexts)[number], string>> {

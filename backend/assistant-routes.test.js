@@ -72,11 +72,13 @@ const fetchImpl = async (url, options = {}) => {
     choices: [
       {
         message: {
-          content: body.messages[0].content.startsWith("You write negative prompts")
-            ? "blurry"
-            : body.messages[0].content.startsWith("You rewrite")
-              ? "A cabin at dusk."
-              : '{"loras": [{"name": "cabin.safetensors", "strength": 0.8, "reason": "Cabins"}]}',
+          content: body.messages[0].content.startsWith("You help edit one field")
+            ? "Quiet waterfront streets in soft morning light."
+            : body.messages[0].content.startsWith("You write negative prompts")
+              ? "blurry"
+              : body.messages[0].content.startsWith("You rewrite")
+                ? "A cabin at dusk."
+                : '{"loras": [{"name": "cabin.safetensors", "strength": 0.8, "reason": "Cabins"}]}',
         },
       },
     ],
@@ -142,6 +144,20 @@ const post = async (route, body, account, headers = {}) => {
 };
 const get = async (route, account) =>
   (await fetch(base + route, { headers: account ? { "x-test-account": account } : {} })).json();
+
+test("A project brief suggestion can fill an empty field and responds only with that text", async () => {
+  const route = "/api/assistant/project-brief";
+  const input = { name: "Harbour Study", brief: { subjects: "Waterfront streets" } };
+  assert.equal((await post(route, { ...input, field: "loras" }, "admin")).status, 400);
+  const result = await post(route, { ...input, field: "styles" }, "admin");
+  assert.equal(result.status, 200, result.text);
+  assert.deepEqual(JSON.parse(result.text), {
+    text: "Quiet waterfront streets in soft morning light.",
+  });
+  const { messages } = calls.at(-1);
+  assert.match(messages[0].content, /When the field is empty, suggest/);
+  assert.deepEqual(JSON.parse(messages[1].content), { field: "styles", ...input });
+});
 
 test("the assistant is for every account, and only for profiles the account may use", async () => {
   const status = await get("/api/assistant", "user");
