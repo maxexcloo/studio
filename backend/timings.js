@@ -15,6 +15,7 @@ function load() {
   const raw = readRuntimeDocument(dataDir, "timings");
   timings = {
     runs: Array.isArray(raw?.runs) ? raw.runs : [],
+    radianceRuns: Array.isArray(raw?.radianceRuns) ? raw.radianceRuns : [],
     upscales: Array.isArray(raw?.upscales) ? raw.upscales : [],
   };
   return timings;
@@ -29,8 +30,9 @@ function save(label) {
 }
 
 /** What a generation of `body` should take here; see estimateRun. `warm` overrides the guess. */
-export function generationEstimate(body, options = {}) {
-  return estimateRun(load().runs, body, options);
+export function generationEstimate(body, { radiance = false, ...options } = {}) {
+  const current = load();
+  return estimateRun(radiance ? current.radianceRuns : current.runs, body, options);
 }
 
 /** Whether a run of `body` starting now likely finds its model loaded. */
@@ -53,11 +55,12 @@ export function renameTimingKeys(keys) {
   return moved;
 }
 
-export function recordGeneration(entry) {
+export function recordGeneration({ radiance = false, ...entry }) {
   const current = load();
-  const runs = addRun(current.runs, entry);
-  if (runs === current.runs) return;
-  timings = { ...current, runs };
+  const key = radiance ? "radianceRuns" : "runs";
+  const runs = addRun(current[key], entry);
+  if (runs === current[key]) return;
+  timings = { ...current, [key]: runs };
   save("generation");
 }
 

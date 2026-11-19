@@ -59,6 +59,17 @@ export const awaitsWriting = (input: GenerationInput) => {
   return Boolean(writing && typeof writing === "object" && typeof writing.prompt !== "string");
 };
 export type QueueMedia = Record<string, unknown> & { id?: string; url?: string };
+export interface QueueProgress extends Record<string, unknown> {
+  phase?: string;
+  value?: number;
+  max?: number;
+  steps?: boolean;
+  endsAt?: number;
+  etaMs?: number;
+  estimated?: boolean;
+  thinking?: string;
+  prompt?: string;
+}
 
 export interface StudioSession {
   id: string;
@@ -85,7 +96,7 @@ export interface QueueJob {
   input: GenerationInput;
   items: QueueMedia[];
   outputs: QueueMedia[];
-  progress?: Record<string, unknown>;
+  progress?: QueueProgress;
   providerJobId?: string;
   backend?: string;
   /** The set of jobs one request queued together (an MCP `generate` call of several, a split run). */
@@ -105,6 +116,10 @@ export interface QueueResponse {
   clearableFailedSets?: string[];
   /** Asked with `since`: every listed job's ID in queue order, `jobs` holding only those changed. */
   ids?: string[];
+  /** Current place among waiting jobs on each resource, including for unchanged jobs in a delta. */
+  queuePositions?: Record<string, number>;
+  /** Waiting IDs in dispatch order within each resource. Parallel resources have no shared rank. */
+  queueOrder?: string[];
   paused: QueuePause;
 }
 

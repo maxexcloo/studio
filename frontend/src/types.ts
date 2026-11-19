@@ -250,19 +250,11 @@ export interface MediaItem {
     jobId?: string;
   };
 }
-export type QueueJob = Omit<SharedQueueJob, "input" | "items" | "outputs" | "progress"> & {
+export type QueueJob = Omit<SharedQueueJob, "input" | "items" | "outputs"> & {
   input: GenerationInput;
   items: MediaItem[];
   outputs: MediaItem[];
-  /** Generation steps, or while the prompt is written its streamed thinking and prompt. */
-  progress?: {
-    value?: number;
-    max?: number;
-    phase?: string;
-    steps?: boolean;
-    thinking?: string;
-    prompt?: string;
-  };
+  queuePosition?: number;
 };
 export interface Account {
   id: string;

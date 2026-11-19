@@ -763,7 +763,14 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
   });
   state.jobs.push(
     job("live-job", "running", {
-      progress: { value: 5, max: 10, phase: "Sampling" },
+      progress: {
+        value: 5,
+        max: 10,
+        phase: "Sampling",
+        steps: true,
+        estimated: true,
+        etaMs: 30000,
+      },
       items: [
         { id: "live", status: "pending" },
         { id: "live-2", status: "pending" },
@@ -802,7 +809,10 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
     return [{ id, replacement: retried.id }];
   });
   await page.goto("/images");
-  await expect(page.getByText("Sampling · 50%", { exact: true })).toHaveCount(2);
+  await expect(page.getByText("Sampling · About Step 5 of 10 · About 30s Left")).toHaveCount(2);
+  const progress = page.getByRole("progressbar", { name: "Generation Progress" });
+  await expect(progress).toHaveCount(2);
+  await expect(progress.first()).toHaveAttribute("aria-valuenow", "50");
   await expect(page.getByText("The worker ran out of memory.", { exact: true })).toBeVisible();
   // One Stop for the two-output run.
   await expect(page.getByRole("button", { name: "Stop Live Study", exact: true })).toHaveCount(1);

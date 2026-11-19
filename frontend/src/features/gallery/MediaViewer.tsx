@@ -39,6 +39,7 @@ import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { useGenerationActions } from "../generation/GenerationProvider";
+import { queueQuery } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaDetails, MediaDetailsMetadata, recordedModel } from "./MediaDetails";
 import { MediaJobStatus } from "./MediaJobStatus";
@@ -490,7 +491,8 @@ export function MediaViewer({
   const shortcutActions = useRef<ActionGroups>([]);
   // Runs this viewer queued outside the item's session still join their source's strip.
   const [queued, setQueued] = useState<QueuedRun[]>([]);
-  const family = useRunFamily(item, queued, related);
+  const jobs = useQuery(queueQuery).data?.jobs;
+  const family = useRunFamily(item, queued, related, jobs);
   // An MCP call's other results, for the set's place in the top bar and its strip.
   const members = setMembers(related, item);
   // A comparison's set links to its side-by-side view, unless that is where the viewer is.
@@ -923,6 +925,7 @@ export function MediaViewer({
               <MediaViewerDock
                 item={displayed}
                 family={family}
+                jobs={jobs}
                 set={members}
                 choose={(next) => {
                   setCompare(false);

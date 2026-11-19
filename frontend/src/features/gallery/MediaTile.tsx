@@ -1,20 +1,14 @@
-import { Button, Checkbox, Loader, Progress, Text, UnstyledButton } from "@mantine/core";
+import { Button, Checkbox, Loader, Paper, Stack, Text, UnstyledButton } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlert } from "lucide-react";
 import { type CSSProperties, type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 
 import { finishedItemStatuses, terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem } from "../../types";
-import { useMotionDuration } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
 import { useTouch } from "../../ui/usePhone";
-import {
-  phaseLabel,
-  progressPercent,
-  queueQuery,
-  statusLabels,
-  useQueueAction,
-} from "../generation/Queue";
+import { JobProgressBar, jobReason, jobStatus, statusLabels } from "../generation/JobProgress";
+import { queueQuery, useQueueAction, withQueuePosition } from "../generation/Queue";
 import { galleryReferenceType } from "../generation/references";
 import { mediaTitle } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
@@ -31,7 +25,10 @@ export const finished = (item: { status?: unknown }) =>
 function useQueueJob(jobId: string | undefined, enabled: boolean) {
   return useQuery({
     ...queueQuery,
-    select: (data) => data.jobs.find((job) => job.id === jobId),
+    select: (data) => {
+      const job = data.jobs.find((job) => job.id === jobId);
+      return job && withQueuePosition(job, data.queuePositions);
+    },
     enabled: Boolean(jobId) && enabled,
   }).data;
 }
@@ -46,21 +43,16 @@ function TileStatus({
 }) {
   const job = useQueueJob(item.jobId, item.status !== "done");
   const action = useQueueAction(job?.id);
-  const motionDuration = useMotionDuration();
   const [retrying, setRetrying] = useState(false);
   const active = !finished(item);
   const failed = item.status === "failed";
-  const progress = job?.progress;
-  const percent = active && progress?.max ? Math.round(progressPercent(progress)) : undefined;
   const label = active
-    ? job?.status === "running" && progress?.phase
-      ? phaseLabel(progress.phase)
-      : statusLabels[job?.status || "queued"]
+    ? jobStatus(job ?? { status: "queued" })
     : statusLabels[failed ? "failed" : "cancelled"];
   const reason = failed
     ? job?.reason || ("error" in item && typeof item.error === "string" ? item.error : "")
     : active
-      ? job?.reason
+      ? jobReason(job ?? { status: "queued" })
       : "";
   // A multi-output run shows one Cancel, on its first unfinished placeholder.
   const owner = job?.items.find((entry) => !finished(entry));
@@ -75,24 +67,16 @@ function TileStatus({
         ) : (
           <CircleAlert size={20} color={failed ? "var(--mantine-color-red-6)" : undefined} />
         )}
-        <Text size="sm" fw={600} c={failed ? "red" : undefined}>
+        <Text size="sm" fw={600} c={failed ? "red" : undefined} lineClamp={3} title={label}>
           {label}
-          {percent !== undefined && ` · ${percent}%`}
         </Text>
-        <Text size="xs" c="dimmed" lineClamp={2}>
+        <Text size="xs" c="dimmed" lineClamp={2} title={reason || undefined}>
           {reason || mediaTitle(item)}
         </Text>
       </div>
-      {percent !== undefined && (
+      {active && job && (
         <div className={classes.progress}>
-          <Progress
-            aria-hidden
-            w="100%"
-            size="xs"
-            radius={0}
-            value={percent}
-            transitionDuration={motionDuration}
-          />
+          <JobProgressBar job={job} />
         </div>
       )}
       {(cancellable || retryable) && (
@@ -139,35 +123,41 @@ function TileStatus({
 function TileUpscale({ item }: { item: MediaItem }) {
   const stop = useStopUpscale(item);
   const job = useQueueJob(item.upscale?.jobId, true);
-  const motionDuration = useMotionDuration();
   if (!stop) return null;
-  const percent = job?.progress?.max ? Math.round(progressPercent(job.progress)) : undefined;
+  const reason = job && jobReason(job);
   return (
     <>
-      {percent !== undefined && (
+      {job && (
         <div className={classes.progress}>
-          <Progress
-            aria-hidden
-            w="100%"
-            size="xs"
-            radius={0}
-            value={percent}
-            transitionDuration={motionDuration}
-          />
+          <JobProgressBar job={job} />
         </div>
       )}
       <div className={classes.statusAction}>
-        <Button
-          size="compact-sm"
-          variant="default"
-          radius="xl"
-          leftSection={<icons.stop size={14} />}
-          aria-label={`Stop Upscale of ${mediaTitle(item)}`}
-          loading={stop.isPending}
-          onClick={stop.stop}
-        >
-          Stop Upscale
-        </Button>
+        <Stack align="center" gap={4} miw={0} px="xs">
+          {job && (
+            <Paper className={classes.upscaleStatus} px="xs" py={4} withBorder>
+              <Text size="xs" lineClamp={2}>
+                {jobStatus(job)}
+              </Text>
+              {reason && (
+                <Text size="xs" c="dimmed" lineClamp={2} title={reason}>
+                  {reason}
+                </Text>
+              )}
+            </Paper>
+          )}
+          <Button
+            size="compact-sm"
+            variant="default"
+            radius="xl"
+            leftSection={<icons.stop size={14} />}
+            aria-label={`Stop Upscale of ${mediaTitle(item)}`}
+            loading={stop.isPending}
+            onClick={stop.stop}
+          >
+            Stop Upscale
+          </Button>
+        </Stack>
       </div>
     </>
   );
