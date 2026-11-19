@@ -18,7 +18,6 @@ export function LibrarySuggest({ item }: { item: MediaItem }) {
   const [opened, setOpened] = useState(false);
   const iteration = useMediaIteration(item);
   const change = useItemChange(item, {
-    groups: () => [],
     iterate: (next) => iteration.mutate(next),
     review: false,
     show: () => {},

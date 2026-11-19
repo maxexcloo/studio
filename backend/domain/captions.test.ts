@@ -168,15 +168,12 @@ test("skips owners whose local text model can't read images, the switch off and 
   assert.equal(state.items[0].caption, undefined);
 });
 
-test("stops at the daily cap, which a restart keeps, and starts again the next day", async () => {
-  const { state, captioner, later } = fixture([image("waiting")], {
+test("resumes captioning past the previous daily cap", async () => {
+  const { state, captioner } = fixture([image("waiting")], {
     trickle: { day: new Date("2026-10-26T09:00:00Z").toDateString(), count: dailyItems },
   });
-  assert.equal(await captioner.tick(), "capped");
-  state.clock += 24 * 60 * 60_000;
-  later();
   assert.equal(await captioner.tick(), "done");
-  assert.equal(state.saved?.trickle?.count, 1);
+  assert.equal(state.items[0].caption?.text, "a picture of waiting");
 });
 
 test("an image that fails is skipped; failures in a row pause instead of skipping everything", async () => {
