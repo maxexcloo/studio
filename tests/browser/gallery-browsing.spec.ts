@@ -66,6 +66,84 @@ test("Gallery continues near the bottom and retains loaded results when the next
   await expect(retry).toBeHidden();
 });
 
+test("Select Failed can retry a cleared offscreen job and retains a refusal", async ({ page }) => {
+  const state = await fixtures(page);
+  const items = results(1_205);
+  const failed = [602, 1_204].map((index) => {
+    const jobId = `failed-${index}`;
+    const item = {
+      ...items[index],
+      jobId,
+      title: `Older failure ${index}`,
+      status: "failed",
+      url: "",
+    };
+    items[index] = item;
+    state.jobs.push({
+      id: jobId,
+      sessionId: "older-session",
+      status: "failed",
+      cleared: index === 1_204,
+      operation: "image",
+      input: { kind: "image", profileId: "image:test", prompt: item.prompt },
+      items: [],
+      outputs: [],
+      createdAt: stamp,
+      updatedAt: stamp,
+    });
+    return item;
+  });
+  items[980] = { ...items[980], status: "failed", url: "" };
+  const cursors: string[] = [];
+  const picks: string[] = [];
+  await page.route("**/api/gallery?**", (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    const match = query.get("select");
+    const cursor = query.get("cursor") || "";
+    const end = Number(cursor) + 60;
+    if (match) picks.push(match);
+    else if (cursor) cursors.push(cursor);
+    return route.fulfill({
+      json: match
+        ? {
+            items: items.filter((item) => item.status === "failed"),
+            nextCursor: "",
+            hasMore: false,
+          }
+        : {
+            items: items.slice(Number(cursor), end),
+            nextCursor: end < items.length ? String(end) : "",
+            hasMore: end < items.length,
+          },
+    });
+  });
+  const attempts: string[][] = [];
+  await serveRetries(page, { jobs: state.jobs, gallery: items }, (ids) => {
+    attempts.push(ids);
+    return ids.map((id) =>
+      attempts.length === 1 && id === failed[1].jobId
+        ? { id, error: "Worker unavailable" }
+        : { id, replacement: `retry-${id}` },
+    );
+  });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  await page.getByRole("button", { name: "Select Failed", exact: true }).click();
+  const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
+  await expect(status).toHaveText("3 Selected");
+  expect(picks).toEqual(["failed"]);
+  expect(cursors).toEqual([]);
+  const retry = selectionAction(page, "Retry");
+  await retry.click();
+  await expect(status).toHaveText("1 Selected");
+  await expect(
+    page.getByText("Older failure 1204. Worker unavailable", { exact: true }),
+  ).toBeVisible();
+  await retry.click();
+  await expect(status).toHaveCount(0);
+  expect(attempts).toEqual([failed.map(({ jobId }) => jobId), [failed[1].jobId]]);
+});
+
 test("The viewer loads the next page as it nears the last loaded result and counts every match", async ({
   page,
 }) => {
@@ -96,7 +174,7 @@ test("Select All takes every match across pages, and the search and Liked stay w
   page,
 }) => {
   await fixtures(page);
-  // Every other result is liked; the gallery pages them 60 at a time unless asked for more.
+  // Every other result is liked; the gallery pages them 60 at a time.
   const items = results(130).map((item, index) => ({
     ...item,
     rating: index % 2 === 0 ? "liked" : undefined,
@@ -111,7 +189,7 @@ test("Select All takes every match across pages, and the search and Liked stay w
         (query.get("rating") !== "liked" || item.rating === "liked"),
     );
     const start = Number(query.get("cursor") || 0);
-    const end = start + Number(query.get("limit"));
+    const end = query.has("select") ? matches.length : start + Number(query.get("limit"));
     await route.fulfill({
       json: {
         items: matches.slice(start, end),
@@ -137,9 +215,11 @@ test("Select All takes every match across pages, and the search and Liked stay w
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
   await expect(status).toHaveText("65 Selected");
-  // The rest loaded in one larger page, within the same search and filter.
-  const rest = requests.find((query) => query.get("limit") === "500");
-  expect([rest?.get("q"), rest?.get("rating")]).toEqual(["Browse", "liked"]);
+  const quick = requests.filter((query) => query.has("select"));
+  expect(quick.map((query) => [query.get("select"), query.get("q"), query.get("rating")])).toEqual([
+    ["all", "Browse", "liked"],
+  ]);
+  expect(requests.filter((query) => query.get("cursor"))).toEqual([]);
   // The quick selects always show, disabled where they would change nothing.
   await expect(page.getByRole("button", { name: "Select All", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Select Failed", exact: true })).toBeDisabled();

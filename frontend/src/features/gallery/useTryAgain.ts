@@ -21,7 +21,7 @@ export function useTryAgain(items: MediaItem[]) {
   });
 
   return useCallback(
-    async (jobIds: string[]) => {
+    async (jobIds: string[], selected: MediaItem[] = items) => {
       const ids = [...new Set(jobIds)];
       const accepted = new Map<string, string>();
       if (!ids.length) return accepted;
@@ -31,7 +31,7 @@ export function useTryAgain(items: MediaItem[]) {
           if ("replacement" in outcome) accepted.set(outcome.id, outcome.replacement);
         const refused = outcomes.find((outcome) => "error" in outcome);
         if (refused) {
-          const item = items.find((item) => item.jobId === refused.id);
+          const item = selected.find((item) => item.jobId === refused.id);
           failure(item ? `${mediaTitle(item)}. ${refused.error}` : refused.error);
         }
       } catch {

@@ -6,13 +6,12 @@ import { useNavigate } from "react-router";
 
 import { failure, post } from "../../api";
 import { menuWidth } from "../../theme";
-import type { MediaItem } from "../../types";
 import { ActionBarGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { assistMenu } from "../generation/AskChange";
-import { useQueue, useQueueAction } from "../generation/Queue";
+import { useQueueAction } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { mediaDownload } from "./download";
 import { itemAction, itemActionGroups, namedItemActions } from "./itemActions";
@@ -49,7 +48,6 @@ export function GallerySelectionBar({
 }) {
   const phone = usePhone();
   const [confirm, setConfirm] = useState(false);
-  const queue = useQueue();
   const cancel = useQueueAction();
   const [busy, setBusy] = useState<"retry" | "stop" | null>(null);
   const latestSelection = useRef(selection);
@@ -58,17 +56,17 @@ export function GallerySelectionBar({
    * A finished action leaves selection mode; the items it failed for stay selected, with its error
    * shown by the action itself.
    */
-  const settle = (failedIds: string[] = []) =>
-    failedIds.length ? latestSelection.current.retain(failedIds) : latestSelection.current.end();
+  const settle = (failedIds: string[] = []) => {
+    if (latestSelection.current.scope !== selection.scope) return;
+    if (failedIds.length) latestSelection.current.retain(failedIds);
+    else latestSelection.current.end();
+  };
   const selected = selection.selectedItems;
   const ready = selected.filter((item) => item.status === "done" && item.url);
   const running = selected.filter((item) => !finished(item));
   const deletable = selected.filter(finished);
-  const failedIds = new Set(
-    selected.filter((item) => item.status === "failed").map((item) => item.jobId),
-  );
-  const failed = (queue.data?.jobs || []).filter(
-    (job) => job.status === "failed" && failedIds.has(job.id),
+  const retryJobs = new Set(
+    selected.flatMap((item) => (item.status === "failed" && item.jobId ? [item.jobId] : [])),
   );
   const runningJobs = [...new Set(running.map((item) => item.jobId).filter(Boolean))] as string[];
   const allRated = (rating: string) =>
@@ -122,7 +120,7 @@ export function GallerySelectionBar({
         itemIds: selected.map((item) => item.id),
       }),
     onSuccess: (comparison) => {
-      selection.end();
+      settle();
       void client.invalidateQueries({ queryKey: ["comparisons"] });
       navigate(`/compare/${comparison.id}`);
     },
@@ -147,10 +145,16 @@ export function GallerySelectionBar({
   async function retrySelected() {
     setBusy("retry");
     try {
-      const accepted = await tryAgain(failed.map((job) => job.id));
+      const accepted = await tryAgain([...retryJobs], selected);
       settle(
         latestSelection.current.selectedItems
-          .filter((item) => item.status === "failed" && !accepted.has(item.jobId || ""))
+          .filter(
+            (item) =>
+              item.status === "failed" &&
+              item.jobId &&
+              retryJobs.has(item.jobId) &&
+              !accepted.has(item.jobId),
+          )
           .map((item) => item.id),
       );
     } finally {
@@ -178,9 +182,9 @@ export function GallerySelectionBar({
   const pending = busy !== null;
   // Only what acts on the selection as a whole; an item's own actions stay on its tile and viewer.
   const selectionActions = [
-    (failed.length > 0 || busy === "retry") &&
+    (retryJobs.size > 0 || busy === "retry") &&
       itemAction("retry", {
-        disabled: pending || !failed.length,
+        disabled: pending || !retryJobs.size,
         loading: busy === "retry",
         onClick: () => void retrySelected(),
       }),
@@ -360,32 +364,26 @@ export function GallerySelectionBar({
     document.addEventListener("keydown", keys);
     return () => document.removeEventListener("keydown", keys);
   }, [confirm, pending, selection.end, deletable.length]);
-  // Select All, Select Failed and Select None always show, disabled where they would change
-  // nothing; phones name them by what they select. Each select takes every match of the search
-  // and filters, loading the pages not shown yet first.
-  const [quickPicked, setQuickPicked] = useState("");
   const quick = [
-    ...[
-      { id: "select-all", label: "Select All", short: "All", match: () => true },
-      {
-        id: "select-failed",
-        label: "Select Failed",
-        short: "Failed",
-        match: (item: MediaItem) => item.status === "failed",
-      },
-    ].map(({ match, ...action }) => ({
+    ...(
+      [
+        { id: "select-all", label: "Select All", short: "All", match: "all" },
+        {
+          id: "select-failed",
+          label: "Select Failed",
+          short: "Failed",
+          match: "failed",
+        },
+      ] as const
+    ).map(({ match, ...action }) => ({
       ...action,
       disabled:
         pending ||
-        selection.loading ||
-        (action.id === "select-all"
-          ? selection.all
-          : selection.complete && !selection.items.some(match)),
-      loading: selection.loading && quickPicked === action.id,
-      onClick: () => {
-        setQuickPicked(action.id);
-        selection.selectMatching(match);
-      },
+        !selection.quickReady ||
+        Boolean(selection.pending) ||
+        (match === "all" ? selection.all : selection.noFailed),
+      loading: selection.pending === match,
+      onClick: () => void selection.selectMatching(match),
     })),
     {
       id: "select-none",
