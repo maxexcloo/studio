@@ -232,11 +232,11 @@ function Gallery() {
         first.items.push(...edge.items);
       }
       if (signal.aborted) return first;
-      // Scrolled into the gallery, new results wait behind New Results rather than pushing down
-      // the tiles in view; back at the top they join.
+      // The gallery holds new arrivals while scrolled down. An open viewer can navigate to them.
       const fresh = first.items.findIndex((item) => known.has(mediaIdentity(item)));
       const top = document.querySelector("[data-gallery-view]")?.getBoundingClientRect().top;
-      if (fresh > 0 && top !== undefined && top < 0) {
+      const viewing = viewerPathId(latest.current.location.pathname);
+      if (!viewing && fresh > 0 && top !== undefined && top < 0) {
         first.items = first.items.slice(fresh);
         setIncoming(fresh);
       } else setIncoming(0);
@@ -325,16 +325,20 @@ function Gallery() {
     seenJobs.current = jobs?.key;
     void refreshFirst();
   }, [jobs?.key, refreshFirst]);
-  // Held new results join once the gallery's top is back in view.
+  // Held new results join when the viewer opens or the gallery's top comes back into view.
   useEffect(() => {
     if (!incoming) return;
+    if (itemId) {
+      refreshFirst();
+      return;
+    }
     const join = () => {
       const top = document.querySelector("[data-gallery-view]")?.getBoundingClientRect().top;
       if (top === undefined || top >= 0) refreshFirst();
     };
     window.addEventListener("scroll", join, { passive: true });
     return () => window.removeEventListener("scroll", join);
-  }, [incoming, refreshFirst]);
+  }, [incoming, itemId, refreshFirst]);
   useEffect(() => setIncoming(0), [listingKey]);
   // A retry keeps its original's place, which may lie past the first page: its progress rereads
   // every loaded page.
@@ -423,7 +427,7 @@ function Gallery() {
       scope: viewerScope,
       items: reset ? candidates : next,
       retained,
-      total: reset ? gallery.data?.pages.at(-1)?.totalApprox : previous.total,
+      total: gallery.data?.pages.at(-1)?.totalApprox ?? (reset ? undefined : previous.total),
     };
   }
   const viewerItems = viewerOrder.current?.items || candidates;

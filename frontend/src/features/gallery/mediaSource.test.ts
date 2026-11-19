@@ -21,13 +21,19 @@ test("a pending output keeps its identity and viewer position when saved with a 
   assert.deepEqual(reconcileViewerItems([pending, older], [saved, older]), [saved, older]);
 });
 
-test("incoming results and reordered result sets do not change an open viewer's neighbours", () => {
+test("new results extend both ends without reordering the viewer's existing neighbours", () => {
   const a = item("a"),
     b = item("b"),
     c = item("c");
   const fresh = item("fresh"),
     older = item("older");
-  assert.deepEqual(reconcileViewerItems([a, b, c], [fresh, c, a, b, older]), [a, b, c, older]);
+  assert.deepEqual(reconcileViewerItems([a, b, c], [fresh, c, a, b, older]), [
+    fresh,
+    a,
+    b,
+    c,
+    older,
+  ]);
 });
 
 test("viewer reconciliation removes excluded results and retains updated metadata", () => {
