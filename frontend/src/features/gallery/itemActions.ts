@@ -19,10 +19,10 @@ type ItemActionId = keyof typeof definitions;
 const menus: ItemActionId[] = ["animate", "edit", "recreate", "upscale"];
 // Retry and Stop lead for unfinished work and running upscales; Like comes before Dislike and
 // Delete last.
-const assist: ItemActionId[] = ["ai"];
+const assist: ItemActionId[] = ["ai", "share"];
 const rating: ItemActionId[] = ["like", "dislike"];
-const others: ItemActionId[] = ["report", "share", "delete"];
-/** Bars and menus: Animate, Edit, Recreate, Upscale | AI | Like, Dislike | Report, Share, Delete. */
+const others: ItemActionId[] = ["report", "delete"];
+/** Bars and menus: Animate, Edit, Recreate, Upscale | AI, Share | Like, Dislike | Report, Delete. */
 const sections: ItemActionId[][] = [["retry", "stop", ...menus], assist, rating, others];
 /** Bars name Retry, Stop and the four menus; the rest are icons. */
 export const namedItemActions: string[] = ["retry", "stop", ...menus];

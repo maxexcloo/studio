@@ -340,6 +340,7 @@ test("Gallery and References sort media through separate remembered choices", as
   await expect(options.first()).toHaveAccessibleName("Use reference: Beta");
   await closeReferences(page);
   state.gallery[0].rating = "disliked";
+  await page.goto("/images");
   await page.getByRole("button", { name: "Sort Gallery", exact: true }).click();
   await page.getByRole("menuitemradio", { name: "Disliked First", exact: true }).click();
   await expect(gallery.first()).toHaveAccessibleName("Open image: Alpha");
