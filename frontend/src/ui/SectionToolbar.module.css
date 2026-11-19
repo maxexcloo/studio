@@ -6,35 +6,19 @@
   align-self: stretch;
   margin: 4px 2px;
 }
-/*
- * A section's heading with its toolbar at the top right of the description's line: the title (on
- * desktop) runs above, and the description wraps beside the toolbar. A phone's open search takes
- * a full row under the description.
- */
+/* A phone's open search takes a full row under the heading. */
 .header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: center;
   column-gap: var(--mantine-spacing-md);
 }
-.header > :first-child {
-  display: contents;
-}
-.header > :first-child > * {
-  grid-column: 1;
-}
-.header > :first-child > :last-child {
-  grid-row: 2;
-  align-self: center;
-}
 .header > :last-child {
-  grid-column: 2;
-  grid-row: 2;
   min-width: 0;
 }
 .header > :last-child:has(.searching) {
   grid-column: 1 / -1;
-  grid-row: 3;
+  grid-row: 2;
 }
 @keyframes enter {
   from {
