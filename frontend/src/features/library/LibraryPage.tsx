@@ -46,7 +46,11 @@ export function LibraryPage() {
     enabled: admin && catalogueActive,
     refetchInterval: (query) =>
       catalogueActive &&
-      query.state.data?.items.some((item) => item.applied?.state === "downloading")
+      query.state.data?.items.some(
+        (item) =>
+          item.applied?.state === "downloading" ||
+          ["queued", "downloading"].includes(item.install?.state || ""),
+      )
         ? 2000
         : false,
   });
@@ -64,6 +68,13 @@ export function LibraryPage() {
           title: "LoRA Deletion Needs Attention",
           message: note,
         });
+    },
+  });
+  const install = useMutation({
+    mutationFn: (item: LibraryItem) => post("/api/library/catalogue/install", { key: item.key }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: catalogueQuery.queryKey });
+      void client.invalidateQueries({ queryKey: downloadsQuery.queryKey });
     },
   });
   const compare = useStageComparison();
@@ -132,6 +143,8 @@ export function LibraryPage() {
         onUpdate={
           admin ? (item, alternative) => update.mutate({ key: item.key, alternative }) : undefined
         }
+        onInstall={admin && section === "loras" ? (item) => install.mutate(item) : undefined}
+        installingKey={install.isPending ? install.variables?.key : undefined}
         onCheckUpdates={admin ? () => update.mutate(undefined) : undefined}
         onTest={section === "loras" ? (item) => testLora.mutate(item) : undefined}
         onUpdateAll={

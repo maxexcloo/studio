@@ -87,6 +87,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
     next();
   });
   const forgotten = [];
+  const started = [];
   let inventoryUnknown = false;
   const store = createImportStore({ dataDir, log: {} });
   registerLibraryRoutes(app, {
@@ -104,7 +105,10 @@ test("an import from chat goes through the same pipeline, records chat as its or
     json,
     inspect: async () => ({ status: "missing" }),
     downloads: () => ({ active: null, queued: [], recent: [] }),
-    startDownload: async () => ({}),
+    startDownload: async (spec) => {
+      started.push(spec);
+      return { id: spec.id, status: "downloading" };
+    },
     store,
     schedule: false,
     pictures: { file: () => "", save: async () => false, copy: async () => false },
@@ -160,6 +164,17 @@ test("an import from chat goes through the same pipeline, records chat as its or
     false,
   );
   assert.equal(ui.import.origin, "ui");
+  const key = "loras/watercolour-v2.safetensors";
+  const listed = await call("GET", "/api/library/items");
+  assert.equal(listed.items.find((item) => item.key === key).installable, true);
+  const install = await call("POST", "/api/library/catalogue/install", { key });
+  assert.equal(install.status, "downloading");
+  assert.equal(started[0].file, "watercolour-v2.safetensors");
+  assert.equal(started[0].sha256, catalogue.entry(key).sha256);
+  assert.equal(
+    (await call("POST", "/api/library/catalogue/install", { key: "loras/unknown.safetensors" })).ok,
+    false,
+  );
   const png = fs.readFileSync(new URL("../fixtures/images/a1111.png", import.meta.url));
   const picture = await call("POST", "/api/library/imports/image", {
     image: `data:image/png;base64,${png.toString("base64")}`,

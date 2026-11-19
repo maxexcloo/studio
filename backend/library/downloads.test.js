@@ -23,8 +23,37 @@ fs.writeFileSync(
     },
   }),
 );
-const { resolveModelLink } = await import("./downloads.js");
+const { resolveCatalogueInstall, resolveModelLink } = await import("./downloads.js");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+test("an install uses the pinned variant's checksum and preserves the catalogue name", async () => {
+  const file = (id, digest, primary) => ({
+    id,
+    type: "Model",
+    name: `source-${id}.safetensors`,
+    primary,
+    hashes: { SHA256: digest.repeat(64) },
+  });
+  const entry = {
+    folder: "loras",
+    file: "catalogued.safetensors",
+    sha256: "b".repeat(64),
+    links: { civitaiCom: "https://civitai.com/models/9?modelVersionId=17" },
+  };
+  const json = async () => ({
+    id: 17,
+    modelId: 9,
+    model: { type: "LORA" },
+    files: [file(3, "a", true), file(4, "b", false)],
+  });
+  const spec = await resolveCatalogueInstall(entry, { json });
+  assert.equal(spec.id, "civitai:17:4");
+  assert.equal(spec.file, entry.file);
+  await assert.rejects(
+    resolveCatalogueInstall({ ...entry, sha256: "c".repeat(64) }, { json }),
+    /not found/,
+  );
+});
 
 test("Hugging Face preview pins a revision and requires the published checksum", async () => {
   const result = await resolveModelLink(

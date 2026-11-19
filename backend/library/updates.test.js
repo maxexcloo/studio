@@ -168,7 +168,7 @@ test("the SeedVR2 weights and the face detector are checked at their Hugging Fac
   );
 });
 
-function harness(t, { references = async () => [], repoint } = {}) {
+function harness(t, { references = async () => [], repoint, sourceModel = model } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-updates-"));
   t.after(() => {
     closeRuntimeDatabase(dir);
@@ -208,7 +208,7 @@ function harness(t, { references = async () => [], repoint } = {}) {
     log: quiet,
     json: async (url) => {
       requests.push(url);
-      return structuredClone(model);
+      return structuredClone(sourceModel);
     },
     startDownload: async (spec) => {
       started.push(spec);
@@ -303,6 +303,20 @@ test("an update that verifies moves the catalogue and removes the old file when 
     "Replaced by nightfall-v3-fp8.safetensors.",
   );
   assert.equal(summary.available, 0);
+});
+
+test("an update with the same provider filename stages the new file beside the old one", async (t) => {
+  const sourceModel = structuredClone(model);
+  sourceModel.modelVersions.find((version) => version.id === 703).files[0].name =
+    "nightfall-v1-fp8.safetensors";
+  const h = harness(t, { sourceModel });
+  await h.checker.check();
+  const applied = await h.checker.apply("checkpoints/nightfall-v1-fp8.safetensors", {
+    alternative: true,
+  });
+  assert.equal(applied.to.file, "nightfall-v1-fp8-33333333.safetensors");
+  assert.equal(h.started[0].file, applied.to.file);
+  assert.equal(h.files.get(applied.from.file), sha("1"));
 });
 
 test("the old file stays while something still references it, and says what", async (t) => {

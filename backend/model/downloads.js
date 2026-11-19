@@ -5,13 +5,13 @@ import { civitaiFetch, civitaiTokenStatus } from "../civitai/access.js";
 import { hfFetch as fetch, hfAccessNote, hfMirrored, hfTokenValue } from "../hf-access.js";
 import { digest } from "../values.js";
 import {
+  modelLibraryUrl,
   refreshWorkerModels,
   uploadWorkerModel,
   workerCopy,
   workerInventory,
   workerModelFile,
 } from "../worker-models.js";
-import { modelLibraryWorker } from "../workers.js";
 
 /**
  * Streams catalogue files and verified provider files into the worker's model
@@ -156,7 +156,7 @@ export function startDownload(spec) {
   const waiting = queue.find(same);
   if (waiting) return snapshot(waiting);
   const entry = {
-    workerUrl: modelLibraryWorker()?.url || "",
+    workerUrl: modelLibraryUrl(),
     id: spec.id,
     file: spec.file,
     folder: spec.folder,
@@ -314,9 +314,7 @@ function sameFile(saved, response) {
 /** Throws away a stopped download's partial file. */
 export function discardDownload(spec) {
   const workerUrl =
-    [active, ...queue].find((entry) => entry?.id === spec.id)?.workerUrl ||
-    modelLibraryWorker()?.url ||
-    "";
+    [active, ...queue].find((entry) => entry?.id === spec.id)?.workerUrl || modelLibraryUrl();
   cancelDownload(spec.id);
   return workerModelFile({ ...spec, workerUrl }, "discard").then(() => {
     for (const entry of recent) {

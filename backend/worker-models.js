@@ -1,24 +1,44 @@
-import { modelLibraryWorker, noWorkerMessage, workerTokenHeader } from "./workers.js";
+import {
+  modelLibraryWorker,
+  noWorkerMessage,
+  normalizeWorkerUrl,
+  workerTokenHeader,
+} from "./workers.js";
 
-// Model downloads go to the worker with Model Library (workers.js), not simply the first worker.
-const libraryUrl = () => modelLibraryWorker()?.url || "";
+export const dedicatedModelLibrary = () => Boolean(process.env.STUDIO_MODEL_LIBRARY_URL);
+export function modelLibraryUrl() {
+  if (!dedicatedModelLibrary()) return modelLibraryWorker()?.url || "";
+  const url = normalizeWorkerUrl(process.env.STUDIO_MODEL_LIBRARY_URL);
+  if (!url) throw new Error("STUDIO_MODEL_LIBRARY_URL needs a plain HTTP(S) address.");
+  return url;
+}
 
 let cached = { files: [], paused: [], space: {}, writable: false };
 let cacheUrl = "";
 let refreshedAt = 0;
 
 export function workerInventory() {
-  return cacheUrl && cacheUrl === libraryUrl()
+  return cacheUrl && cacheUrl === modelLibraryUrl()
     ? cached
     : { files: [], paused: [], space: {}, writable: false };
 }
+export function installedWorkerFiles({ files }) {
+  const result = {};
+  for (const { path, size } of files) {
+    const slash = path.indexOf("/");
+    if (slash < 1 || size <= 0) continue;
+    const folder = path.slice(0, slash);
+    (result[folder] ||= new Set()).add(path.slice(slash + 1));
+  }
+  return Object.fromEntries(Object.entries(result).map(([folder, names]) => [folder, [...names]]));
+}
 export function workerCopy(spec) {
-  return (cacheUrl === (spec.workerUrl || libraryUrl()) ? cached.files : []).find(
+  return (cacheUrl === (spec.workerUrl || modelLibraryUrl()) ? cached.files : []).find(
     (item) => item.path === `${spec.folder}/${spec.file}`,
   );
 }
 
-async function request(endpoint, init = {}, workerUrl = libraryUrl()) {
+async function request(endpoint, init = {}, workerUrl = modelLibraryUrl()) {
   if (!process.env.STUDIO_WORKER_TOKEN)
     throw new Error("STUDIO_WORKER_TOKEN is required for the worker model library.");
   if (!workerUrl) throw new Error(noWorkerMessage("models"));
@@ -41,11 +61,15 @@ async function request(endpoint, init = {}, workerUrl = libraryUrl()) {
   return result;
 }
 
-export async function refreshWorkerModels({ force = false, workerUrl = libraryUrl() } = {}) {
+export async function refreshWorkerModels({
+  force = false,
+  workerUrl = modelLibraryUrl(),
+  signal,
+} = {}) {
   // Without a worker that takes models nothing is installed yet, and there is nothing to ask.
   if (!workerUrl) return workerInventory();
   if (!force && cacheUrl === workerUrl && Date.now() - refreshedAt < 5000) return cached;
-  const result = await request("", {}, workerUrl);
+  const result = await request("", { signal }, workerUrl);
   cached = result;
   cacheUrl = workerUrl;
   refreshedAt = Date.now();
@@ -66,17 +90,21 @@ export async function workerModelFile(spec, action = "stat", extra = {}) {
         action,
       }),
     },
-    spec.workerUrl || libraryUrl(),
+    spec.workerUrl || modelLibraryUrl(),
   );
 }
 
 /** The model library worker's Radiance conversion (studio_worker/convert.py): start, status, cancel or clear. */
 export async function workerRadiance(body) {
-  return request("/radiance", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  return request(
+    "/radiance",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    },
+    modelLibraryWorker()?.url || "",
+  );
 }
 
 export async function uploadWorkerModel(spec, response, { offset, total, note, signal, progress }) {
@@ -119,9 +147,9 @@ export async function uploadWorkerModel(spec, response, { offset, total, note, s
         duplex: "half",
         signal,
       },
-      spec.workerUrl || libraryUrl(),
+      spec.workerUrl || modelLibraryUrl(),
     );
-    await refreshWorkerModels({ force: true, workerUrl: spec.workerUrl || libraryUrl() });
+    await refreshWorkerModels({ force: true, workerUrl: spec.workerUrl || modelLibraryUrl() });
     return result;
   } finally {
     await reader.cancel().catch(() => {});
