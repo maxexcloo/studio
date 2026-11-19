@@ -50,6 +50,14 @@ export function profileForBackend(
     : profile;
 }
 
+/** Whether a profile's reference run accepts an image. */
+export function takesReferences(profile: Profile | undefined, backend?: string) {
+  const run = profileForBackend(profile, backend, true);
+  return Boolean(
+    run && (run.mediaInputs?.length || run.capabilities.img2img || run.capabilities.imageInput),
+  );
+}
+
 export function profileForLoras(
   profile: Profile | undefined,
   backend?: string,

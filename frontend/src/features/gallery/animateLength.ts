@@ -1,6 +1,6 @@
 import type { GenerationInput, MediaItem, Profile } from "../../types";
 import { lengthChoices } from "../generation/length.ts";
-import { isProfile, profileForBackend } from "../generation/payload.ts";
+import { isProfile, profileForBackend, takesReferences } from "../generation/payload.ts";
 import type { SidePreference } from "../settings/accountPreferences";
 
 /** A video continues on its own profile unless Cloud is chosen or its profile cannot run. */
@@ -16,9 +16,8 @@ export function retainedAnimationProfile(
     return (
       profile.kind === "video" &&
       profile.ready !== false &&
-      (profile.mediaInputs?.length ||
-        profile.capabilities.imageInput ||
-        profile.capabilities.img2img) &&
+      !listed.availability &&
+      takesReferences(listed) &&
       (priorId ? isProfile(listed, priorId) : listed.model === item.model)
     );
   });

@@ -23,6 +23,7 @@ export type ViewerChange = "edit" | "recreate";
 export type ViewerAsk = {
   itemId: string;
   action: ViewerChange;
+  profileId?: string;
   change: { request: string } | { custom: true };
 };
 
@@ -31,8 +32,8 @@ export interface ViewerDraftActions {
   changedPrompt?: string;
   suggestionPrompt: string;
   pending: boolean;
-  pick: (action: ViewerChange, request: string) => void;
-  custom: (action: ViewerChange) => void;
+  pick: (action: ViewerChange, request: string, profileId?: string) => void;
+  custom: (action: ViewerChange, profileId?: string) => void;
 }
 
 /**
@@ -53,9 +54,13 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
     show: (proposal) => setPrompt(proposalText(proposal)),
     restore: setPrompt,
   });
-  const pick = (action: ViewerChange, request: string) =>
-    ask.send(request, prompt, item.type === "video" ? "animate" : action);
-  const [customAction, setCustomAction] = useState<ViewerChange | null>(null);
+  const pick = (action: ViewerChange, request: string, profileId?: string) =>
+    ask.send(request, prompt, item.type === "video" ? "animate" : action, profileId);
+  const [customAction, setCustomAction] = useState<Pick<ViewerAsk, "action" | "profileId"> | null>(
+    null,
+  );
+  const openCustom = (action: ViewerChange, profileId?: string) =>
+    setCustomAction({ action, profileId });
   // A tile's menu opened the viewer with its choice, asked once the assistant is ready.
   const location = useLocation();
   const navigate = useNavigate();
@@ -63,8 +68,8 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
   useEffect(() => {
     if (!asked || asked.itemId !== item.id || !ask.available) return;
     navigate(location, { replace: true, state: { ...location.state, ask: undefined } });
-    if ("custom" in asked.change) setCustomAction(asked.action);
-    else pick(asked.action, asked.change.request);
+    if ("custom" in asked.change) openCustom(asked.action, asked.profileId);
+    else pick(asked.action, asked.change.request, asked.profileId);
   }, [asked, ask.available]);
   const custom = (
     <CustomDialog
@@ -72,7 +77,9 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
       onClose={() => setCustomAction(null)}
       title="Custom Change"
       action={review ? "Ask" : "Run"}
-      onSend={(request) => customAction && pick(customAction, request)}
+      onSend={(request) =>
+        customAction && pick(customAction.action, request, customAction.profileId)
+      }
     />
   );
   const draft: ViewerDraftActions = {
@@ -80,7 +87,7 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
     suggestionPrompt: ask.typed ?? prompt,
     pending: ask.pending,
     pick,
-    custom: setCustomAction,
+    custom: openCustom,
   };
   return { item, original, prompt, setPrompt, field, ask, custom, draft };
 }
