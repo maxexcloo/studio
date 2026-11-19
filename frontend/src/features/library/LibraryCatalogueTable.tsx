@@ -20,6 +20,8 @@ export interface LibraryItem {
   name?: string;
   file?: string;
   installed: boolean;
+  installable?: boolean;
+  install?: { state: string; note?: string };
   note?: string;
   description?: string;
   families?: string[];
@@ -108,14 +110,15 @@ function resourceType(item: LibraryItem) {
     modelKinds[item.kind || ""] || modelKinds[modelFolders[item.folder || ""]] || "Unclassified"
   );
 }
-const statusOf = (item: LibraryItem) =>
-  item.applied?.state === "downloading"
-    ? { label: "Updating", color: "blue" }
-    : canUpdate(item)
-      ? { label: "Update Available", color: "yellow" }
-      : item.installed
-        ? { label: "Installed", color: "green" }
-        : { label: "Not Installed", color: "gray" };
+function statusOf(item: LibraryItem) {
+  if (item.applied?.state === "downloading") return { label: "Updating", color: "blue" };
+  if (canUpdate(item)) return { label: "Update Available", color: "yellow" };
+  if (item.installed) return { label: "Installed", color: "green" };
+  if (item.install?.state === "queued") return { label: "Queued", color: "blue" };
+  if (item.install?.state === "downloading") return { label: "Installing", color: "blue" };
+  if (item.install?.state === "failed") return { label: "Install Failed", color: "red" };
+  return { label: "Not Installed", color: "gray" };
+}
 const unique = (values: string[]) => [...new Set(values)].sort(compareNames);
 const views = [
   { value: "installed", label: "Installed" },
@@ -130,6 +133,8 @@ export function LibraryCatalogueTable({
   loading = false,
   label,
   onUpdate,
+  onInstall,
+  installingKey,
   onCheckUpdates,
   onTest,
   onUpdateAll,
@@ -147,6 +152,8 @@ export function LibraryCatalogueTable({
   loading?: boolean;
   label: "Files" | "LoRAs";
   onUpdate?: (item: LibraryItem, alternative?: boolean) => void;
+  onInstall?: (item: LibraryItem) => void;
+  installingKey?: string;
   onCheckUpdates?: () => void;
   /** Test LoRA: a strength sweep in Compare. */
   onTest?: (item: LibraryItem) => void;
@@ -332,6 +339,11 @@ export function LibraryCatalogueTable({
                     {item.applied.note}
                   </Text>
                 )}
+                {item.install?.note && (
+                  <Text size="xs" c="red">
+                    {item.install.note}
+                  </Text>
+                )}
               </>
             ),
           },
@@ -422,6 +434,22 @@ export function LibraryCatalogueTable({
               {onTest && item.installed && item.folder === "loras" && (
                 <Menu.Item leftSection={<icons.compare size={16} />} onClick={() => onTest(item)}>
                   Test LoRA
+                </Menu.Item>
+              )}
+              {onInstall && item.installable && (
+                <Menu.Item
+                  leftSection={<icons.download size={16} />}
+                  disabled={
+                    item.key === installingKey ||
+                    ["queued", "downloading"].includes(item.install?.state || "")
+                  }
+                  onClick={() => onInstall(item)}
+                >
+                  {item.install?.state === "failed"
+                    ? "Retry Install"
+                    : item.install?.state === "paused"
+                      ? "Resume Install"
+                      : "Install"}
                 </Menu.Item>
               )}
               {onUpdate &&

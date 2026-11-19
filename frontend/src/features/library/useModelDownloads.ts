@@ -64,7 +64,7 @@ export function useModelDownloads() {
 
 /**
  * A download's actions: Stop keeps its partial file, Resume or Retry starts it again, and Discard
- * deletes the partial file. Starting or discarding needs ComfyUI running, which a refusal says.
+ * deletes the partial file. Starting or discarding needs the Model Library reachable.
  */
 export function useDownloadAction() {
   const client = useQueryClient();

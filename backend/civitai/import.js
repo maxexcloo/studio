@@ -4,8 +4,7 @@ import { a1111Samplers, a1111Schedules } from "../image-metadata.js";
 import { civitaiAvailability } from "../library/availability.js";
 import { civitaiLinks } from "../library/sources.js";
 import { minorAgeRefusal } from "../minor-age.js";
-import { refreshWorkerModels, workerModelFile } from "../worker-models.js";
-import { modelLibraryWorker } from "../workers.js";
+import { modelLibraryUrl, refreshWorkerModels, workerModelFile } from "../worker-models.js";
 import { civitaiAssetUrl, civitaiGenerationData, civitaiJson, isCivitaiHost } from "./access.js";
 import { sameResourceFilename, workflowModelSources } from "./workflow.js";
 
@@ -472,7 +471,7 @@ export async function matchResources(
   { profiles = [], loras = [], textEncoders = [], vaes = [] } = {},
   { verify = true } = {},
 ) {
-  const workerUrl = modelLibraryWorker()?.url || "";
+  const workerUrl = modelLibraryUrl();
   const remote = await refreshWorkerModels({ workerUrl });
   const resources = [];
   for (const resource of preset.resources) {

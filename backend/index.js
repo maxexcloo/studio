@@ -212,6 +212,11 @@ import { installShutdown } from "./shutdown.js";
 import { registerStatusRoutes } from "./status-routes.js";
 import { registerUpscaleRoutes } from "./upscale-routes.js";
 import {
+  dedicatedModelLibrary,
+  installedWorkerFiles,
+  refreshWorkerModels,
+} from "./worker-models.js";
+import {
   defaultWorker,
   defaultWorkerId,
   isRadianceWorker,
@@ -491,9 +496,18 @@ const libraryRoutes = registerLibraryRoutes(app, {
     }),
   families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
   loraInfo: (names, options) => loraInfos(defaultWorkerId(), names, options),
-  installed: async () => installedFiles((await loadComfyContext(defaultWorkerId())).info),
+  installed: async () =>
+    dedicatedModelLibrary()
+      ? installedWorkerFiles(await refreshWorkerModels())
+      : installedFiles((await loadComfyContext(defaultWorkerId())).info),
   // The Library's list: the model library's last known files at once, refreshed in the background.
   latestInstalled: async () => {
+    if (dedicatedModelLibrary()) {
+      const inventory = await refreshWorkerModels({ signal: AbortSignal.timeout(5000) }).catch(
+        () => null,
+      );
+      if (inventory) return { files: installedWorkerFiles(inventory), current: true };
+    }
     const { info, current } = libraryInventory({ refresh: true });
     if (!info)
       throw new Error(

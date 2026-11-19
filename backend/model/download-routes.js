@@ -2,28 +2,30 @@ import { catalogueDownload } from "../catalogue-downloads.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { libraryDownload } from "../library/downloads.js";
 import { adminRefusal } from "../route-access.js";
-import { refreshWorkerModels } from "../worker-models.js";
+import { dedicatedModelLibrary, modelLibraryUrl, refreshWorkerModels } from "../worker-models.js";
 import { defaultWorkerId } from "../workers.js";
 import { cancelDownload, discardDownload, downloadState, startDownload } from "./downloads.js";
 
 export function registerModelDownloadRoutes(app, { loadComfyContext }) {
-  // Every downloads answer starts from the worker's current files, or its last known ones while
-  // ComfyUI is parked; writing into its model library still needs it running.
+  // Use the current Model Library inventory, or its last known files while it is unavailable.
   const route = (method, path, run) =>
     directRoute(app, method, path, async (account, input) => {
-      const reachable = await refreshWorkerModels()
-        .then(() => true)
-        .catch(() => false);
+      const reachable =
+        Boolean(modelLibraryUrl()) &&
+        (await refreshWorkerModels()
+          .then(() => true)
+          .catch(() => false));
       return run(account, input, reachable);
     });
-  const unreachable = {
+  const unreachable = () => ({
     status: 409,
     payload: {
       ok: false,
-      error:
-        "ComfyUI isn't running, so it can't receive downloads. Start it in Settings › Workers.",
+      error: dedicatedModelLibrary()
+        ? "The Model Library service is unavailable. Try again when it reconnects."
+        : "ComfyUI isn't running, so it can't receive downloads. Start it in Settings › Workers.",
     },
-  };
+  });
 
   route("GET", "/api/models/downloads", () => ({
     status: 200,
@@ -35,7 +37,7 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
   route("POST", "/api/models/downloads", async (account, { body }, reachable) => {
     const refused = adminRefusal(account);
     if (refused) return refused;
-    if (!reachable) return unreachable;
+    if (!reachable) return unreachable();
     const spec = catalogueDownload(body?.id) || libraryDownload(String(body?.id || ""));
     if (!spec) return { status: 400, payload: { ok: false, error: "Unknown file." } };
     try {
@@ -54,7 +56,7 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
     if (refused) return refused;
     const id = String(body?.id || "");
     const spec = body?.discard ? catalogueDownload(id) || libraryDownload(id) : null;
-    if (spec && !reachable) return unreachable;
+    if (spec && !reachable) return unreachable();
     try {
       if (spec) await discardDownload(spec);
       else cancelDownload(id);
