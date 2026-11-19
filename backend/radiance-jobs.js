@@ -418,8 +418,9 @@ export async function runRadianceJob(
       return;
     }
     const failure = describeFailure({ message: error.message });
-    setTerminalJob(id, { status: "failed", error: failure.summary, failure });
-    updateGalleryJob(id, { status: "failed", filename: failure.title, failure });
+    if (/cannot be pinned/i.test(failure.summary))
+      store?.rememberMemoryFailure(ownerId, id, failure.summary);
+    publishFailure(id, failure);
   } finally {
     if (marks?.sent)
       logEvent("Radiance job timing", {
@@ -441,7 +442,12 @@ export async function runRadianceJob(
   }
 }
 
-/** Recover an accepted video or locally saved outputs without submitting the job again. */
+function publishFailure(id, failure) {
+  setTerminalJob(id, { status: "failed", error: failure.summary, failure });
+  updateGalleryJob(id, { status: "failed", filename: failure.title, failure });
+}
+
+/** Recover a recorded result or failure without submitting the job again. */
 export function recoverRadianceJob(job, store) {
   const record = store.providerRecord(job.ownerId, job.id);
   const body = record?.body;
@@ -451,7 +457,9 @@ export function recoverRadianceJob(job, store) {
     status: job.cancelRequested ? "cancelling" : "running",
     promptId: record?.videoId || job.providerJobId,
   });
-  if (body && (record.videoId || record.outputs?.length)) {
+  if (job.memoryRecovery) {
+    publishFailure(job.id, describeFailure({ message: job.memoryRecovery }));
+  } else if (body && (record.videoId || record.outputs?.length)) {
     void runRadianceJob(
       job.id,
       body,

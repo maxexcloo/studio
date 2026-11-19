@@ -76,6 +76,10 @@ export interface WorkloadQueue {
   load(workloads: string[]): RuntimeQueueStatus["workloads"];
   /** The most urgent tier (lowest `priority`) of unpaused work waiting to start on a workload; Infinity if none. */
   waitingTier(workload: string): number;
+  /** The reason a failed job needs Radiance to free its host memory. */
+  memoryFailure?(workload: string): string | undefined;
+  /** Queues the failed jobs again after the old pod is gone. */
+  retryMemoryFailures?(workload: string): void;
   /** Cancels every queued and running job routed to a workload. */
   cancel(workload: string): Promise<RuntimeQueueCancel>;
   /** Releases leases whose work is confirmed absent: jobs ended, gone or not yet accepted. */
@@ -118,11 +122,6 @@ const swapIdleMs = 2 * 60_000;
 const wantedMs = 30_000;
 /** How long Radiance has had no work before Studio restarts it to free host memory. */
 const quietMs = 60_000;
-/**
- * Radiance's refusal to load a model once too little host memory is free to pin its tables, as
- * memory it no longer uses stays held in a long-running pod; a restart frees it.
- */
-export const hostMemoryShort = (reason: string) => /cannot be pinned/i.test(reason);
 const isRadiance = (workload: Workload) => workload.backend === "radiance";
 const isComfy = (workload: Workload) => !isRadiance(workload);
 const sameSet = (a: string[], b: string[]) =>
@@ -153,8 +152,6 @@ export class RuntimeController {
   private comfyUsedAt: number;
   /** When work last started or finished on each workload. */
   private usedAt = new Map<string, number>();
-  /** Radiance workloads due a restart to free host memory: why, and what to run once it stopped. */
-  private memoryRestarts = new Map<string, { reason: string; retries: (() => void)[] }>();
   private stopping = new Set<string>();
   private stopListeners = new Set<(id: string) => void>();
   private current?: RuntimeOperation;
@@ -206,6 +203,11 @@ export class RuntimeController {
           !operation.steps.some((step) => /^(Stopping|Starting) /.test(step.message))
         )
           this.record.desired = operation.before;
+        if (
+          operation.type === "restart" &&
+          operation.steps.some((step) => step.message.startsWith("Stopping "))
+        )
+          this.record.desired ??= operation.target;
         Object.assign(operation, {
           status: "interrupted",
           finishedAt: this.timestamp(),
@@ -555,7 +557,6 @@ export class RuntimeController {
   private async run(operation: RuntimeOperation, plan: Plan) {
     const label = (id: string) => this.workload(id).label;
     let scaled = false;
-    const afterwards: (() => void)[] = [];
     try {
       // New work for a leaving workload waits (acquire refuses it); accepted work finishes and saves first.
       this.draining = true;
@@ -588,9 +589,6 @@ export class RuntimeController {
       for (const id of plan.stop) {
         this.step(operation, `Stopping ${label(id)}.`);
         await this.engine.scale(this.workload(id), 0);
-        // Stopping frees the host memory a due restart was for, whatever the change.
-        afterwards.push(...(this.memoryRestarts.get(id)?.retries ?? []));
-        this.memoryRestarts.delete(id);
         for (const listener of this.stopListeners) listener(id);
         if (this.forced.has(id)) {
           this.step(operation, `Ending the accepted work on ${label(id)}.`);
@@ -606,6 +604,10 @@ export class RuntimeController {
         );
         if (lingering.length)
           return `Waiting for ${lingering.map(label).join(", ")} to release ${lingering.length === 1 ? "its GPU" : "their GPUs"}.`;
+        // Consume each failure and queue its replacement before a new pod starts.
+        for (const id of leaving)
+          if (isRadiance(this.workload(id)) && !holds(states.get(id)!))
+            this.queue?.retryMemoryFailures?.(id);
       });
       for (const id of plan.start) {
         this.step(operation, `Starting ${label(id)}.`);
@@ -650,7 +652,6 @@ export class RuntimeController {
       this.cancelledBy = undefined;
       this.current = undefined;
       this.save();
-      for (const retry of afterwards) retry();
     }
   }
 
@@ -837,49 +838,37 @@ export class RuntimeController {
     return Math.min(...operation.start.map((id) => this.queue!.waitingTier(id)));
   }
 
-  /**
-   * Radiance couldn't load a model for want of free host memory: restart it once idle
-   * (restartWhenIdle), then call `retry`, which queues the failed work again.
-   */
-  restartForMemory(id: string, reason: string, retry: () => void) {
-    if (!isRadiance(this.workload(id))) return;
-    const due = this.memoryRestarts.get(id) ?? { reason, retries: [] };
-    due.retries.push(retry);
-    this.memoryRestarts.set(id, due);
-    logEvent("Radiance short of host memory", { workload: id, reason: reason.slice(0, 300) });
-  }
-
-  /**
-   * Called every 30 seconds: restarts a Radiance workload due a restart to free host memory once it
-   * has no accepted or waiting work, none has started or finished for quietMs and Radiance itself
-   * shows none. One already stopped needs none.
-   */
+  /** Restart a workload with recorded host-memory failures once its queue and model server are idle. */
   async restartWhenIdle(signal?: AbortSignal) {
-    for (const [id, due] of this.memoryRestarts) {
-      if (signal?.aborted || this.current || this.claimed) return;
-      const load = this.queue?.load([id])[id];
-      if (
-        this.active.get(id) ||
-        load?.queued ||
-        load?.jobs.some((job) => job.status === "writing") ||
-        this.now() - (this.usedAt.get(id) ?? 0) < quietMs
-      )
-        continue;
-      const workload = this.workload(id);
+    const busy = () => signal?.aborted || this.current || this.claimed;
+    for (const workload of this.workloads.filter(isRadiance)) {
+      if (busy()) return;
+      const { id } = workload;
+      if (!this.queue?.memoryFailure?.(id)) continue;
       const state = await this.engine.state(workload);
-      if (signal?.aborted) return;
-      if (state.replicas === 0) {
-        this.memoryRestarts.delete(id);
-        for (const retry of due.retries) retry();
+      if (busy()) return;
+      if (!holds(state)) {
+        this.queue.retryMemoryFailures?.(id);
         continue;
       }
+      const queueBusy = () => {
+        const load = this.queue?.load([id])[id];
+        return (
+          this.active.get(id) ||
+          load?.queued ||
+          load?.jobs.some((job) => job.status === "writing") ||
+          this.now() - (this.usedAt.get(id) ?? 0) < quietMs
+        );
+      };
+      if (!state.replicas || queueBusy()) continue;
       const idle = await this.radianceIdle(workload);
-      if (signal?.aborted) return;
-      if (!idle || this.current || this.claimed) continue;
-      await this.restart(
-        id,
-        `automatic: freeing host memory after ${due.reason.replace(/^Radiance: /, "")}`,
-      );
+      if (busy()) return;
+      const reason = this.queue.memoryFailure(id);
+      if (idle && reason && !queueBusy())
+        await this.restart(
+          id,
+          `automatic: freeing host memory after ${reason.replace(/^Radiance: /, "")}`,
+        );
     }
   }
 
