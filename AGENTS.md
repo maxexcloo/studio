@@ -141,7 +141,8 @@ recur across features.
 - Item actions are the same, in the same groups and order, on tiles, context
   menus, the viewer and the selection bar. `MediaActions.tsx` owns their availability and
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
-  Submenus match in bar and menu, and assistant menus share `assistMenu`.
+  The context menu shows the AI and Share options in labelled sections. Other
+  submenus match in bar and menu, and assistant menus share `assistMenu`.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
   phone media item bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and
