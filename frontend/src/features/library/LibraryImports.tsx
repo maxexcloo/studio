@@ -208,7 +208,7 @@ export function LibraryImports({
       if (failed.size)
         notifications.show({
           color: "red",
-          title: "Couldn’t Accept Substitutes",
+          title: "Couldn't Accept Substitutes",
           message: [...new Set(failed.values())].join(" "),
         });
     },
