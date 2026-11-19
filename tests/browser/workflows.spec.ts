@@ -108,7 +108,7 @@ test("Retry pending state holds while unrelated jobs remain cancellable", async 
   try {
     await page.goto("/images");
     await page.getByRole("button", { name: "Open Status", exact: true }).click();
-    const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+    const queue = page.getByRole("dialog", { name: "Queue", exact: true });
     // WebKit can click a row while the phone drawer is still sliding to its final position.
     if (isMobile)
       await expect

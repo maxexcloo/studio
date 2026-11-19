@@ -443,7 +443,7 @@ test("Status summarises each kind's workers and state, quietly", async ({ page }
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Services Partly Available");
   await status.click();
-  const drawer = page.getByRole("dialog", { name: "Generations", exact: true });
+  const drawer = page.getByRole("dialog", { name: "Queue", exact: true });
   const summary = drawer.getByRole("region", { name: "Service Status", exact: true });
   await expect(summary).toHaveText(
     "Images1 worker · IdleVideos1 worker · OfflineText1 worker · Running",
@@ -883,7 +883,7 @@ test("Status counts running workers, reads a parked service as Stopped and offer
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Services Running · Some Stopped");
   await status.click();
-  const drawer = page.getByRole("dialog", { name: "Generations", exact: true });
+  const drawer = page.getByRole("dialog", { name: "Queue", exact: true });
   await expect(drawer.getByLabel("Images: 1 worker · 1 running", { exact: true })).toBeVisible();
   await expect(drawer.getByLabel("Videos: 1 worker · Stopped", { exact: true })).toBeVisible();
   await expect(drawer.getByRole("button", { name: "Start Videos" })).toHaveCount(0);
