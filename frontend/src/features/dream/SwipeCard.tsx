@@ -37,6 +37,7 @@ export function SwipeCard({
   paused = false,
   previewSide,
   video,
+  view,
   still = false,
   full = false,
   fly,
@@ -53,6 +54,7 @@ export function SwipeCard({
   paused?: boolean;
   previewSide?: number;
   video?: boolean;
+  view?: ReactNode;
   still?: boolean;
   /** Edge to edge, filling the preview. */
   full?: boolean;
@@ -261,13 +263,14 @@ export function SwipeCard({
       }}
     >
       {children}
-      {playing && (
+      {(view || playing) && (
         <Group
-          className={classes.videoAudio}
+          className={view ? classes.cardControls : classes.videoAudio}
           gap="xs"
           wrap="nowrap"
           onPointerDown={(event) => event.stopPropagation()}
         >
+          {view}
           {chooseAudio && (
             <SegmentedControl
               aria-label="Comparison Audio"
@@ -280,11 +283,17 @@ export function SwipeCard({
               ]}
             />
           )}
-          <Tooltip label={soundLabel}>
-            <ActionIcon variant="default" aria-label={soundLabel} onClick={() => setMuted(!muted)}>
-              {muted ? <icons.mute size={16} /> : <icons.sound size={16} />}
-            </ActionIcon>
-          </Tooltip>
+          {playing && (
+            <Tooltip label={soundLabel}>
+              <ActionIcon
+                variant="default"
+                aria-label={soundLabel}
+                onClick={() => setMuted(!muted)}
+              >
+                {muted ? <icons.mute size={16} /> : <icons.sound size={16} />}
+              </ActionIcon>
+            </Tooltip>
+          )}
         </Group>
       )}
       {play && <VideoPlayButton play={play} />}

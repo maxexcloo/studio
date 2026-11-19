@@ -485,8 +485,10 @@ test("Dream settings an administrator forces stay locked for the account", async
 
 test("An empty disabled video deck counts no held results, then counts verdicts and Undo", async ({
   page,
+  isMobile,
 }) => {
   await fixtures(page);
+  if (isMobile) await page.setViewportSize({ width: 320, height: 720 });
   await serveDream(page, { enabled: false, unseen: [dreamItem("held-video", { type: "video" })] });
   let releaseKeep!: () => void;
   const keep = new Promise<void>((resolve) => (releaseKeep = resolve));
@@ -502,10 +504,25 @@ test("An empty disabled video deck counts no held results, then counts verdicts 
   await page.getByRole("button", { name: "Turn On", exact: true }).click();
   await expect(current(page)).toBeVisible();
   await expect(view).toHaveAccessibleDescription("0 images and 1 video waiting");
-  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  const card = current(page);
+  const actions = page.getByRole("group", { name: "Dream Actions" });
+  if (isMobile) {
+    const media = (await page.getByLabel("Dream Media", { exact: true }).boundingBox())!;
+    const header = (await view.boundingBox())!;
+    const preview = (await card.getByRole("button", { name: "View", exact: true }).boundingBox())!;
+    const sound = (await card.getByRole("button", { name: "Mute", exact: true }).boundingBox())!;
+    const cardBox = (await card.boundingBox())!;
+    expect(media.y).toBeLessThan(header.y + header.height);
+    expect(media.x).toBeGreaterThanOrEqual(header.x + header.width);
+    expect(sound.x).toBeGreaterThanOrEqual(preview.x + preview.width);
+    expect((await actions.boundingBox())!.y).toBeGreaterThanOrEqual(cardBox.y + cardBox.height);
+  }
+  await actions.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(view).toHaveAccessibleDescription("0 images and 0 videos waiting");
   releaseKeep();
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  const undo = actions.getByRole("button", { name: "Undo", exact: true });
+  await expect(undo).toBeInViewport();
+  await undo.click();
   await expect(view).toHaveAccessibleDescription("0 images and 1 video waiting");
   await expect(current(page)).toBeVisible();
 });
@@ -753,7 +770,9 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   // Undo remains available when the deck is empty.
   const undo = page.getByRole("button", { name: "Undo", exact: true });
-  await expect(undo.locator("xpath=../..")).toHaveClass(/toolbar/);
+  await expect(
+    page.getByRole("group", { name: "Dream Actions" }).getByRole("button", { name: "Undo" }),
+  ).toBeEnabled();
   await undo.click();
   await expect(third).toContainText("Guidance 3");
   await page.getByRole("button", { name: "Both", exact: true }).click();

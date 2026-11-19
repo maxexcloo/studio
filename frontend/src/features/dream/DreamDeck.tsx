@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Box, Text, Tooltip } from "@mantine/core";
 import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   type Dispatch,
@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { createPortal, flushSync } from "react-dom";
+import { flushSync } from "react-dom";
 
 import { failure, post } from "../../api";
 import type { MediaItem } from "../../types";
@@ -193,7 +193,6 @@ export function DreamDeck({
   libraryWaiting,
   media,
   empty,
-  undoTarget,
 }: {
   items: DreamItem[];
   setDecided: Dispatch<SetStateAction<Set<string>>>;
@@ -204,7 +203,6 @@ export function DreamDeck({
   libraryWaiting: boolean;
   media: DreamMedia;
   empty: ReactNode;
-  undoTarget: HTMLDivElement | null;
 }) {
   const phone = usePhone();
   const touch = useTouch();
@@ -381,6 +379,20 @@ export function DreamDeck({
         // A comparison's preview swipes between its sides, and answers with its buttons.
         still={full && card.kind === "pair"}
         full={full}
+        view={
+          !full && isTop && card.kind !== "pair" ? (
+            <Tooltip label="View">
+              <ActionIcon
+                variant="default"
+                aria-label="View"
+                data-preview-id={card.item.id}
+                onClick={() => open(card)}
+              >
+                <icons.preview size={16} />
+              </ActionIcon>
+            </Tooltip>
+          ) : undefined
+        }
         fly={full ? previewFly : fly}
         pair={card.kind === "pair"}
         label={cardLabel(card, isTop)}
@@ -437,19 +449,6 @@ export function DreamDeck({
                   Rate Your Library
                 </Badge>
               )}
-              {isTop && (
-                <Tooltip label="View">
-                  <ActionIcon
-                    className={classes.view}
-                    variant="default"
-                    aria-label="View"
-                    data-preview-id={card.item.id}
-                    onClick={() => open(card)}
-                  >
-                    <icons.preview size={16} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
             </div>
             <CardText item={card.item} dreamt={card.kind === "dream"} full={sideways} />
           </>
@@ -462,7 +461,9 @@ export function DreamDeck({
     return (
       <>
         {libraryWaiting ? <LoadingState fill label="Loading Library" /> : empty}
-        {undoTarget && createPortal(undoButton, undoTarget)}
+        <Box role="group" aria-label="Dream Actions" className={classes.buttons} mt="auto">
+          {undoButton}
+        </Box>
       </>
     );
   const suggest =

@@ -155,8 +155,8 @@ recur across features.
 - The Dream Deck alone has its own look, as dating apps have it: cards filled
   by their media with the text over the bottom on a dark scrim, large round
   Dislike (✕), Like (♥) and Accept (✓) buttons, and swipes that tilt the card
-  and stamp its answer while the next card waits behind; on an upright phone
-  the card reaches the bottom safe area with the buttons floating over it.
+  and stamp its answer while the next card waits behind. Its actions sit below
+  the card.
   Undo steps back through the session's judgements.
   Dream shows unseen results and their comparisons. Library rates existing
   results. Both use the same Images and Videos selector. The fullscreen
