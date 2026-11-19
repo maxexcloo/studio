@@ -296,7 +296,7 @@ test("Where Work Runs saves each group’s processing and default models", async
         available: true,
         presets: [],
         writingModel: "cloud/uncensored",
-        models: ["cloud/auto", "cloud/uncensored", "local/auto"],
+        models: ["cloud/auto", "cloud/deepseek-flash-uncensored", "cloud/uncensored", "local/auto"],
       },
     }),
   );
@@ -312,12 +312,17 @@ test("Where Work Runs saves each group’s processing and default models", async
   await expect(textCloud).toHaveText("Studio's Default");
   await textCloud.click();
   const options = page.getByRole("listbox").getByRole("option");
-  await expect(options).toHaveText(["Studio's Default", "Auto · Cloud", "Uncensored · Cloud"]);
+  await expect(options).toHaveText([
+    "Studio's Default",
+    "Auto · Cloud",
+    "DeepSeek Flash · Cloud - Uncensored",
+    "Cloud - Uncensored",
+  ]);
   // The list scrolls inside the Settings modal and its choice applies at once.
   await options.last().scrollIntoViewIfNeeded();
   await options.last().click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBe("cloud/uncensored");
-  await expect(textCloud).toHaveText("Uncensored · Cloud");
+  await expect(textCloud).toHaveText("Cloud - Uncensored");
   await textCloud.click();
   await options.first().click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBeNull();
