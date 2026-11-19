@@ -1,11 +1,17 @@
 import {
+  isCloudVideoProfile,
   profileBackendLabels,
   profileNameParts,
   runBackend,
   slotCapacity,
   slotGroups,
 } from "../../../../shared/profiles.ts";
-import { selectedResolution, withResolution } from "../../../../shared/resolution.ts";
+import {
+  grokPinnedResolutions,
+  grokVideoDefaultResolution,
+  selectedResolution,
+  withResolution,
+} from "../../../../shared/resolution.ts";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 
 /** Whether `profile` is the one a recorded id names. */
@@ -149,12 +155,22 @@ export function generationInput(
     Boolean(references.length || input.referenceAssets?.length),
   );
   const details = referenceDetails(references, input, profile);
+  const assets = details.length ? details.map(referenceAsset) : input.referenceAssets;
+  const pinned = isCloudVideoProfile(profile) && assets?.some((asset) => asset.slot === "end");
+  const resolution = String(input.resolution ?? profile?.defaults.resolution ?? "");
   // The size tier sets the size here as on the server, so the pending tile has the run's shape.
   const sized = withResolution(
     {
       ...input,
+      ...(pinned
+        ? {
+            resolution: grokPinnedResolutions.includes(resolution)
+              ? resolution
+              : grokVideoDefaultResolution,
+          }
+        : {}),
       resolutionTier: selectedResolution(input, profile),
-      referenceAssets: references.length ? details.map(referenceAsset) : input.referenceAssets,
+      referenceAssets: assets,
     },
     profile,
   );
@@ -190,7 +206,15 @@ export function referencePatch(
   const before = referenceDetails(previous, input, profile);
   // The first reference switches the profile to its reference mode, which takes that mode's
   // settings (a partial denoise, as Edit does); removing the last one restores text-to-image's.
-  const mode = profile?.imageModes?.reference?.defaults ?? {};
+  const defaults = profile?.imageModes?.reference?.defaults ?? {};
+  // A Grok clip inherits its frame without overwriting the draft's aspect or chosen resolution.
+  const mode = isCloudVideoProfile(profile)
+    ? Object.fromEntries(
+        Object.entries(defaults).filter(
+          ([key]) => !["width", "height", "resolution"].includes(key),
+        ),
+      )
+    : defaults;
   const switched =
     !before.length && details.length
       ? mode

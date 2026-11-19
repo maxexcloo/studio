@@ -82,12 +82,12 @@ test("A preferred Cloud runs on Grok, and on the local profile when the account 
   );
 });
 
-test("Animate goes to a granted Grok profile while local video is stopped, at an aspect Grok takes", () => {
-  const choice = choose({ localRunning: false });
+test("Animate goes to a granted Grok profile while local video is stopped and keeps the source aspect", () => {
+  const choice = choose({ localRunning: false, width: 500, height: 1000 });
   assert.equal(choice.profile.id, "grok-video");
   assert.equal(choice.cloud, true);
   assert.equal(choice.note, "Local video isn't running, so this runs on Grok Video · Cloud.");
-  assert.deepEqual(choice.size, { width: 784, height: 1176 }, "2:3 at 1280×720 pixels");
+  assert.deepEqual(choice.size, { width: 679, height: 1358 }, "1:2 at about 1280×720 pixels");
   // Profiles of a worker that did not answer never count as running.
   const offline = profiles.map((p) => (p.family ? p : { ...p, availability: "offline" }));
   assert.equal(choose({ localRunning: true }, offline).profile.id, "grok-video");

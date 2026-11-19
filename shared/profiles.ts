@@ -252,6 +252,10 @@ export const isCloudProfile = (
   profile?.family === "grok" ||
   /^grok/i.test(String(profile?.id || ""));
 
+export const isCloudVideoProfile = (
+  profile?: Parameters<typeof isCloudProfile>[0] & { kind?: string },
+) => profile?.kind === "video" && isCloudProfile(profile);
+
 /**
  * What a reference slot (`studio.mediaInputs[].role`) can guide, by name. A slot with one of these
  * roles steers the result rather than being where it starts (`start`, `end` or a plain `reference`),

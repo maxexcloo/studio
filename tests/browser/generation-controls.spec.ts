@@ -210,6 +210,80 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
   });
 });
 
+test("Grok video uses the source framing, keeps resolution selectable and exposes Length", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const defaults = { width: 1280, height: 720, resolution: "720p", duration: 8 };
+  const profile: Profile = {
+    ...profiles[1],
+    label: "Grok Imagine Video",
+    provider: "cliproxyapi",
+    aspectPolicy: "reference",
+    aspectPresets: [{ label: "16:9", w: 1280, h: 720 }],
+    defaults,
+    imageModes: { reference: { defaults } },
+    capabilities: { duration: true, sound: true },
+    constraints: { duration: { min: 1, max: 15 } },
+    options: { resolutions: ["480p", "720p", "1080p"] },
+    mediaInputs: [{ id: "start", role: "start" }],
+  };
+  await serveProfiles(page, [profile]);
+  state.gallery.push({
+    id: "source-frame",
+    jobId: "source-job",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "Thin portrait",
+    width: 480,
+    height: 960,
+    createdAt: stamp,
+  });
+  await page.route("**/api/reference-assets/from-gallery", (route) =>
+    route.fulfill({
+      json: {
+        asset: {
+          id: "asset-source-frame",
+          name: "Thin Portrait",
+          url: image,
+          thumbnailUrl: image,
+          width: 480,
+          height: 960,
+        },
+      },
+    }),
+  );
+  await page.goto("/videos?compose=1");
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Animate the portrait");
+  const aspect = page.getByRole("button", { name: "Aspect", exact: true });
+  const resolution = page.getByRole("radiogroup", { name: "Resolution", exact: true });
+  await expect(aspect).toHaveText("16:9 · 720P");
+  await aspect.click();
+  await resolution.getByText("1080P", { exact: true }).click();
+  await aspect.click();
+  await openReferenceChoices(page);
+  await page.getByRole("button", { name: "Use reference: Thin portrait", exact: true }).click();
+  await closeReferences(page);
+  await expect(aspect).toHaveText("Reference · 1:2 · 1080P");
+  await aspect.click();
+  await resolution.getByText("480P", { exact: true }).click();
+  await aspect.click();
+  await expect(aspect).toHaveText("Reference · 1:2 · 480P");
+  await expect(page.getByRole("combobox", { name: "Length", exact: true })).toBeVisible();
+  await withSettings(page, async () => {
+    await expect(page.getByRole("switch", { name: "Sound", exact: true })).toBeVisible();
+    await expect(page.getByLabel("Duration (Seconds)")).toHaveCount(0);
+  });
+  await pressGenerate(page, "Generate Video");
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input).toMatchObject({
+    resolution: "480p",
+    referenceAssets: [{ assetId: "asset-source-frame", slot: "start" }],
+  });
+});
+
 test("A saved End-only preset restores its explicit slot without creating a Start reference", async ({
   page,
 }) => {
