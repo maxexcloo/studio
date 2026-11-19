@@ -16,6 +16,7 @@ import { Check, ChevronDown, Image as ImageIcon, Video } from "lucide-react";
 import { Fragment, useEffect, useId, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
+import { dreamCardCounts } from "../../../../shared/dream";
 import { post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
@@ -32,8 +33,8 @@ import { DreamProjects } from "./DreamProjects";
 import { lockedByAdministrator, useDreamSettings } from "./DreamSettings";
 import {
   type Dream,
+  type DreamItem,
   type DreamMedia,
-  dreamCountQuery,
   dreamQuery,
   dreamWhen,
   libraryReviewQuery,
@@ -108,6 +109,7 @@ export function DreamPage() {
   const [media, setMedia] = useRemembered<DreamMedia>("dream-media", "image");
   const [seed] = useState(() => crypto.randomUUID());
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
+  const [returned, setReturned] = useState<DreamItem[]>([]);
   const library = useInfiniteQuery(libraryReviewQuery(seed));
   const libraryItems =
     library.data?.pages.flatMap((page) => page.items).filter((item) => !decided.has(item.id)) ?? [];
@@ -118,7 +120,6 @@ export function DreamPage() {
   const [actionTarget, setActionTarget] = useState<HTMLDivElement | null>(null);
   const client = useQueryClient();
   const dream = useQuery(dreamQuery);
-  const count = useQuery(dreamCountQuery);
   useEffect(() => {
     void post("/api/dream/visit")
       .then(() => client.invalidateQueries({ queryKey: dreamQuery.queryKey, exact: true }))
@@ -144,8 +145,12 @@ export function DreamPage() {
   };
   const data = dream.data;
   const deckUnseen = data?.settings.enabled
-    ? data.unseen.filter((item) => !decided.has(item.id))
+    ? [
+        ...data.unseen,
+        ...returned.filter((item) => !data.unseen.some((listed) => listed.id === item.id)),
+      ].filter((item) => !decided.has(item.id))
     : [];
+  const count = data && dreamCardCounts(deckUnseen, data.settings);
   const reviewing =
     view === "library" ||
     (view === "deck" &&
@@ -171,14 +176,14 @@ export function DreamPage() {
     library.fetchNextPage,
   ]);
   // Unseen cards of each kind, so new work on the other kind is never hidden.
-  const unseen = { image: count.data?.images, video: count.data?.videos };
+  const unseen = { image: count?.images, video: count?.videos };
   const counted = (kind: DreamMedia) =>
     unseen[kind] ? `${mediaLabels[kind]} (${unseen[kind]})` : mediaLabels[kind];
   const waitingId = useId();
   const plural = (number: number, noun: string) => `${number} ${noun}${number === 1 ? "" : "s"}`;
-  const waiting = count.data && {
-    images: plural(count.data.images, "image"),
-    videos: plural(count.data.videos, "video"),
+  const waiting = count && {
+    images: plural(count.images, "image"),
+    videos: plural(count.videos, "video"),
   };
   // The deck takes its media from the view menu; the other views that list media switch here.
   const selector = ["discarded", "history"].includes(view) && (
@@ -215,14 +220,14 @@ export function DreamPage() {
                   ? viewLabels.library
                   : viewLabels[view]}
                 {/* Always in sight, so new work on either kind shows from every view. */}
-                {count.data && waiting && (
+                {count && waiting && (
                   <Group component="span" gap={4} wrap="nowrap" c="dimmed" ml={8} aria-hidden>
                     {phone ? (
                       <>
                         <ImageIcon size={14} />
-                        {count.data.images} ·
+                        {count.images} ·
                         <Video size={14} />
-                        {count.data.videos}
+                        {count.videos}
                       </>
                     ) : (
                       `· ${waiting.images} · ${waiting.videos}`
@@ -315,6 +320,12 @@ export function DreamPage() {
           items={deckUnseen}
           decided={decided}
           setDecided={setDecided}
+          returnItems={(items) =>
+            setReturned((previous) => [
+              ...previous.filter((item) => !items.some((restored) => restored.id === item.id)),
+              ...items,
+            ])
+          }
           libraryItems={reviewing ? libraryItems : undefined}
           libraryWaiting={
             reviewing &&

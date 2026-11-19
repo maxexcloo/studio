@@ -430,6 +430,33 @@ test("Dream settings an administrator forces stay locked for the account", async
   await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeEnabled();
 });
 
+test("An empty disabled video deck counts no held results, then counts verdicts and Undo", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await serveDream(page, { enabled: false, unseen: [dreamItem("held-video", { type: "video" })] });
+  let releaseKeep!: () => void;
+  const keep = new Promise<void>((resolve) => (releaseKeep = resolve));
+  await page.route("**/api/dream/held-video/keep", async (route) => {
+    await keep;
+    await route.fallback();
+  });
+  await page.goto("/dream");
+  await showView(page, "Videos");
+  const view = page.getByRole("button", { name: "Dream View", exact: true });
+  await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
+  await expect(view).toHaveAccessibleDescription("0 images and 0 videos waiting");
+  await page.getByRole("button", { name: "Turn On", exact: true }).click();
+  await expect(current(page)).toBeVisible();
+  await expect(view).toHaveAccessibleDescription("0 images and 1 video waiting");
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect(view).toHaveAccessibleDescription("0 images and 0 videos waiting");
+  releaseKeep();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(view).toHaveAccessibleDescription("0 images and 1 video waiting");
+  await expect(current(page)).toBeVisible();
+});
+
 test("While Dream is off, the deck compares gallery images in pairs", async ({ page }) => {
   await fixtures(page);
   const gallery = ["g1", "g2", "g3", "g4", "g5"].map((id) => ({
