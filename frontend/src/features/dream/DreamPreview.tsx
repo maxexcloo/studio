@@ -142,11 +142,13 @@ export function PreviewFace({ item, active = true }: { item: MediaItem; active?:
 export function PreviewSides({
   card,
   side,
+  playing,
   setSide,
   onLike,
 }: {
   card: PairDeckCard;
   side: number;
+  playing: boolean;
   setSide: (side: number) => void;
   onLike?: () => void;
 }) {
@@ -212,7 +214,7 @@ export function PreviewSides({
           aria-hidden={index !== side}
           inert={index !== side}
         >
-          <PreviewFace item={item} active={index === side} />
+          <PreviewFace item={item} active={playing && index === side} />
         </section>
       ))}
     </div>

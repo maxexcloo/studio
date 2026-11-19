@@ -7,6 +7,7 @@ export function useVideoSound() {
   const [muted, setMuted] = useRemembered("video-muted", false);
   return {
     muted,
+    setMuted,
     onVolumeChange: (event: SyntheticEvent<HTMLVideoElement>) => {
       if (event.currentTarget.muted !== muted) setMuted(event.currentTarget.muted);
     },
