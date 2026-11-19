@@ -214,14 +214,14 @@ recur across features.
   Composer fields edit in place: at rest the phone Generate sheet's prompt,
   and its Negative Prompt when shown, share the room between its heading and
   the chips, which wrap onto as many rows as they need; each box shows only
-  its AI menu in its corner, if it has one. Typing gives the text the top of the
-  screen, without the sheet's header, above one action bar: the box's menu,
+  its AI menu in its corner, if it has one. Typing shows a Prompt or Negative Prompt heading above the field
+  and one action bar: the box's menu,
   Copy and Clear/Reset/Undo as icons, then Done, which returns to the sheet,
   in place of the output, Clear and Generate. There Reset returns
   to the text the box had when typing began. Other phone text boxes open the
   shared full-screen editor, and AI tools stay beside the text before it
-  opens. That editor shows Copy, Clear/Reset/Undo and More above the
-  keyboard, with tools in More and form sends separate. The tools menu stays
+  opens. That editor shares the same tools row and keeps its heading and close
+  button. The viewer offers AI Suggestions there to review in the field. The tools menu stays
   an anchored menu on phones, fitted to the visual viewport. A box without
   tools has no ⋯, Copy or Clear.
 - Respect safe areas and the phone keyboard. The viewport uses

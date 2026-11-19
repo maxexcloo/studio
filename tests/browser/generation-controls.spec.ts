@@ -1164,8 +1164,7 @@ test("Typing in either prompt in the phone Generate sheet gives it the screen ab
   await prompt.click();
   await prompt.fill("A copper fox in a misty forest at dawn, cinematic light, ".repeat(20));
   // Typing puts AI, Copy and Clear in the bar as icons, then Done, in place of the output, Clear
-  // and Generate; Recent Prompts stays in the AI menu. The bar ends where it did, the header gives
-  // the text the top of the screen, and the text, scrolled to its end, ends above the bar.
+  // and Generate. The Prompt heading stays in reach, and the text ends above the bar.
   await expect(bar.getByRole("group", { name: "Prompt Tools", exact: true })).toBeVisible();
   await expect
     .poll(() =>
@@ -1179,7 +1178,7 @@ test("Typing in either prompt in the phone Generate sheet gives it the screen ab
   const done = bar.getByRole("button", { name: "Done", exact: true });
   await expect(done).toBeVisible();
   await expect.poll(async () => Math.abs((await bottom()) - resting)).toBeLessThanOrEqual(2);
-  await expect(sheet.getByRole("button", { name: "Close Generate", exact: true })).toBeHidden();
+  await expect(sheet.getByRole("button", { name: "Close Prompt", exact: true })).toBeVisible();
   await prompt.evaluate((text) => (text.scrollTop = text.scrollHeight));
   const text = (await prompt.boundingBox())!;
   expect(text.y + text.height).toBeLessThanOrEqual((await tools.boundingBox())!.y + 1);
@@ -1209,6 +1208,9 @@ test("Typing in either prompt in the phone Generate sheet gives it the screen ab
   await expect(close).toBeInViewport({ ratio: 1 });
   await negative.click();
   await negative.fill("Blurry feathers");
+  await expect(
+    sheet.getByRole("button", { name: "Close Negative Prompt", exact: true }),
+  ).toBeVisible();
   await expect(prompt).toBeHidden();
   await expect(
     bar.getByRole("group", { name: "Negative Prompt Tools", exact: true }),

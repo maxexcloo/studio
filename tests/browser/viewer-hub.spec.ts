@@ -568,8 +568,7 @@ test("Viewer prompt offers Reset once edited, without a menu, and restores its o
   const surface = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
   const more = surface.getByRole("button", { name: "More Prompt Actions", exact: true });
-  if (phone) await expect(more).toBeDisabled();
-  else await expect(more).toHaveCount(0);
+  await expect(more).toHaveCount(0);
   const edit = (name: string) => surface.getByRole("button", { name, exact: true });
   await expect(edit("Reset")).toHaveCount(0);
   await field.fill("A bird at night");
@@ -580,6 +579,45 @@ test("Viewer prompt offers Reset once edited, without a menu, and restores its o
   if (!phone) await expect(field).toBeFocused();
   await edit("Undo").click();
   await expect(field).toHaveValue("A bird at night");
+});
+
+test("The phone viewer prompt offers suggestions for review above Generate", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "The viewer has a separate prompt editor on phones.");
+  const { state, viewer } = await seed(page, {}, (page) =>
+    page.route("**/api/suggestions", (route) => {
+      const { surface } = route.request().postDataJSON();
+      const suggestion = { label: "At Dusk", request: "Set the scene at dusk." };
+      return route.fulfill({
+        json: {
+          suggestions: [
+            surface === "change"
+              ? { ...suggestion, action: "recreate", prompt: "An amber bird at dusk" }
+              : suggestion,
+          ],
+        },
+      });
+    }),
+  );
+  await viewer.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+  const text = editor.getByRole("textbox", { name: "Prompt", exact: true });
+  await expect(editor.getByRole("button", { name: "Close Prompt", exact: true })).toBeVisible();
+  const suggest = async () => {
+    await editor.getByRole("button", { name: "AI Prompt Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "At Dusk", exact: true }).click();
+    await expect(text).toHaveValue("An amber bird at dusk");
+  };
+  await suggest();
+  expect(state.jobs).toHaveLength(1);
+  await editor.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(text).toHaveValue("An amber bird");
+  await suggest();
+  await editor.getByRole("button", { name: "Generate", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input.prompt).toBe("An amber bird at dusk");
 });
 
 test("Viewer runs queue into the strip and Recreate › Recreate in Composer opens the composer", async ({
