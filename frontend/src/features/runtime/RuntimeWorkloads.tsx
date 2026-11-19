@@ -1,4 +1,15 @@
-import { Alert, Badge, Button, Checkbox, Group, Loader, Menu, Stack, Text } from "@mantine/core";
+import {
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  Group,
+  Loader,
+  Menu,
+  Select,
+  Stack,
+  Text,
+} from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -17,7 +28,7 @@ import { DataTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { SettingGroup } from "../../ui/SettingRows";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { JobProgressBar, jobReason, jobStatus } from "../generation/JobProgress";
 import { useSettingsSection } from "../settings/SettingsNavigation";
@@ -263,6 +274,38 @@ function WorkloadLog({
 const sameSet = (a: string[], b: string[]) =>
   a.length === b.length && a.every((id) => b.includes(id));
 
+/** One feasible placement per GPU count, in configured workload order within each pool. */
+function gpuPresets({ workloads, pools }: RuntimeStatus) {
+  return [
+    { label: "ComfyUI", radiance: false },
+    { label: "Radiance", radiance: true },
+  ].flatMap(({ label, radiance }) => {
+    const empty = pools.map(() => 0);
+    const combinations = new Map([[empty.join(","), { used: empty, target: [] as string[] }]]);
+    for (const workload of workloads.filter((item) => Boolean(item.radiance) === radiance)) {
+      const pool = pools.findIndex(({ id }) => id === workload.pool);
+      for (const { used, target } of [...combinations.values()]) {
+        const next = used.map((gpus, index) => (index === pool ? gpus + workload.gpus : gpus));
+        const key = next.join(",");
+        if (next[pool] <= pools[pool]?.capacity && !combinations.has(key))
+          combinations.set(key, { used: next, target: [...target, workload.id] });
+      }
+    }
+    const counts = new Map<number, string[]>();
+    for (const { used, target } of combinations.values()) {
+      const count = used.reduce((sum, gpus) => sum + gpus, 0);
+      if (count && !counts.has(count)) counts.set(count, target);
+    }
+    return [...counts]
+      .sort(([a], [b]) => a - b)
+      .map(([count, target]) => ({
+        label: `${label} · ${count} ${count === 1 ? "GPU" : "GPUs"}`,
+        value: target.join(","),
+        target,
+      }));
+  });
+}
+
 /** Settings › Workers: which GPU deployments run, a previewed switch and restarts. */
 export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> }) {
   const client = useQueryClient();
@@ -271,6 +314,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   const status = useQuery(runtimeStatusQuery);
   const live = useQuery({ ...runtimeQueueQuery, enabled: active && status.isSuccess });
   const [selection, setSelection] = useState<string[] | null>(null);
+  const [custom, setCustom] = useState(false);
   const [preview, setPreview] = useState<RuntimePreview | null>(null);
   const [restarting, setRestarting] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState("");
@@ -303,6 +347,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
     onSuccess: () => {
       setPreview(null);
       setSelection(null);
+      setCustom(false);
       void refresh();
     },
   });
@@ -349,7 +394,11 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
     );
   const names = workloadNames(workloads);
   const running = workloads.filter((item) => holding(item.phase)).map((item) => item.id);
-  const chosen = selection ?? running;
+  const placed = status.data.placement ?? running;
+  const chosen = selection ?? placed;
+  const options = [...gpuPresets(status.data), { label: "Stopped", value: "stopped", target: [] }];
+  const preset = options.find(({ target }) => sameSet(chosen, target));
+  const individual = custom || !preset;
   const change = changeLine(names);
   // One short line for the running change, or for the latest one if it didn't finish.
   const failed = operation ? undefined : unfinished(history[0]);
@@ -363,6 +412,22 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
         : { doing: "Stopping", verb: "stop", ids: shown.stop });
   return (
     <Stack gap="md">
+      {workloads.length > 0 && (
+        <SettingRow label="Placement" wide>
+          <Select
+            aria-label="GPU Placement"
+            allowDeselect={false}
+            value={individual ? "custom" : preset?.value}
+            data={[...options, { value: "custom", label: "Custom" }]}
+            disabled={Boolean(operation)}
+            onChange={(value) => {
+              setCustom(value === "custom");
+              if (value !== "custom")
+                setSelection(options.find((option) => option.value === value)?.target ?? null);
+            }}
+          />
+        </SettingRow>
+      )}
       <DataTable
         label="GPU Workloads"
         rows={workloads}
@@ -371,27 +436,31 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
         empty="No GPU Workloads"
         compact
         columns={[
-          {
-            key: "run",
-            header: "Run",
-            width: 44,
-            cell: (item) => (
-              <Checkbox
-                aria-label={`Run ${item.label}`}
-                // Phones fold this cell under the workload's name, without the column's header.
-                label={phone ? "Run" : undefined}
-                checked={chosen.includes(item.id)}
-                disabled={Boolean(operation)}
-                onChange={(event) =>
-                  setSelection(
-                    event.currentTarget.checked
-                      ? [...chosen, item.id]
-                      : chosen.filter((id) => id !== item.id),
-                  )
-                }
-              />
-            ),
-          },
+          ...(!individual
+            ? []
+            : [
+                {
+                  key: "run",
+                  header: "Run",
+                  width: 44,
+                  cell: (item: RuntimeStatus["workloads"][number]) => (
+                    <Checkbox
+                      aria-label={`Run ${item.label}`}
+                      // Phones fold this cell under the workload's name, without the column's header.
+                      label={phone ? "Run" : undefined}
+                      checked={chosen.includes(item.id)}
+                      disabled={Boolean(operation)}
+                      onChange={(event) =>
+                        setSelection(
+                          event.currentTarget.checked
+                            ? [...chosen, item.id]
+                            : chosen.filter((id) => id !== item.id),
+                        )
+                      }
+                    />
+                  ),
+                },
+              ]),
           {
             key: "workload",
             header: "Workload",
@@ -554,13 +623,16 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
         <Group gap="xs" ml="auto">
           <Button
             variant="default"
-            disabled={!selection || sameSet(chosen, running)}
-            onClick={() => setSelection(null)}
+            disabled={Boolean(operation) || (!selection && !custom)}
+            onClick={() => {
+              setSelection(null);
+              setCustom(false);
+            }}
           >
             Reset
           </Button>
           <Button
-            disabled={Boolean(operation) || sameSet(chosen, running)}
+            disabled={Boolean(operation) || !selection || sameSet(chosen, placed)}
             loading={previewing.isPending}
             onClick={() => previewing.mutate(chosen)}
           >
