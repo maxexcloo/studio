@@ -25,7 +25,6 @@ import { withPngText } from "./png-text.js";
 import { writingIssue, writingRequest } from "./prompt-stage.js";
 import { providerMediaWriter } from "./providers/media.ts";
 import { recoverRadianceJob } from "./radiance-jobs.js";
-import { hostMemoryShort } from "./runtime/controller.ts";
 import { runUpscaleJob } from "./upscale-jobs.js";
 import { resultSource } from "./version-sources.js";
 import {
@@ -332,25 +331,6 @@ export function createGenerationQueue({
             worker: job.backend,
             reason: String(job.reason || "").slice(0, 200),
           });
-        // Radiance short of host memory restarts once idle, then runs the job once more.
-        if (job.status === "failed" && hostMemoryShort(String(job.reason || "")))
-          for (const workload of managedWorkloads(job))
-            runtime?.controller.restartForMemory(workload, job.reason, () => {
-              try {
-                const retry = generationQueue.again(job);
-                if (!retry) return;
-                logEvent("Retry after freeing Radiance host memory", {
-                  job: job.id,
-                  replacement: retry.id,
-                });
-                void generationQueue.tick();
-              } catch (error) {
-                logWarning("Could not queue a job again after freeing host memory", {
-                  job: job.id,
-                  reason: error.message,
-                });
-              }
-            });
         await generationAdapter.settled(job);
         if (job.status !== "completed") return;
         // Its results keep the result it was made from, once the run has left the queue too, and

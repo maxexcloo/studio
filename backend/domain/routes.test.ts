@@ -126,13 +126,16 @@ test("Clearing takes only the owner's failed jobs out of the queue and keeps the
     store.enqueue("alice", alice.id, {}, "image"),
   );
   const foreign = store.enqueue("bob", bob.id, {}, "image");
-  for (const job of [first, second, foreign]) store.save({ ...job, status: "failed" });
+  for (const job of [first, second, foreign])
+    store.save({ ...job, status: "failed", memoryRecovery: "Host memory cannot be pinned." });
+  const queue = new GenerationQueue(store, {} as never);
+  const pendingRecovery = () => new Set(store.pendingMemoryRecoveries().map(({ id }) => id));
   const app = express();
   app.use((req, _res, next) => {
     Object.assign(req, { studioAccount: { userId: "alice" } });
     next();
   });
-  registerQueueRoutes(app, { store, queue: new GenerationQueue(store, {} as never), ...unused });
+  registerQueueRoutes(app, { store, queue, ...unused });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/queue`;
@@ -142,11 +145,16 @@ test("Clearing takes only the owner's failed jobs out of the queue and keeps the
     assert.equal((await fetch(`${base}/${active.id}/clear`, { method: "POST" })).status, 409);
     assert.equal((await fetch(`${base}/${first.id}/clear`, { method: "POST" })).status, 200);
     assert.deepEqual(await listed(), [second.id, active.id]);
+    assert.deepEqual(pendingRecovery(), new Set([second.id, foreign.id]));
     const response = await fetch(`${base}/clear-failed`, { method: "POST" });
     assert.deepEqual(await response.json(), { cleared: 1 });
     assert.deepEqual(await listed(), [active.id]);
     assert.equal(store.job("alice", first.id)?.status, "failed");
     assert.equal(store.job("bob", foreign.id)?.cleared, undefined);
+    assert.deepEqual(pendingRecovery(), new Set([foreign.id]));
+    const replacement = queue.retry("alice", first.id);
+    assert.ok(replacement);
+    assert.equal(queue.retry("alice", first.id)?.id, replacement.id);
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

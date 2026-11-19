@@ -620,18 +620,23 @@ test("Radiance short of host memory restarts once idle and quiet, then queues th
     withRadiance: true,
   });
   let waiting = 1;
+  let reason: string | undefined =
+    "Radiance: tables placed in host memory cannot be pinned: 39.20 GiB available, the fleet keeps 8.00 GiB free";
   const retried: string[] = [];
   controller.useQueue({
     waitingTier: () => Infinity,
     load: () => ({ radiance: { jobs: [], queued: waiting } }),
+    memoryFailure: () => reason,
+    retryMemoryFailures: () => {
+      assert.deepEqual(kube.log, ["scale radiance/radiance 0", "gone radiance/radiance"]);
+      retried.push("job-1");
+      reason = undefined;
+    },
     cancel: async () => ({ cancelled: 0, cancelling: 0 }),
     releaseStale: () => {},
     end: async () => {},
   });
   const failed = await controller.acquire("radiance");
-  const reason =
-    "Radiance: tables placed in host memory cannot be pinned: 39.20 GiB available, the fleet keeps 8.00 GiB free";
-  controller.restartForMemory("radiance", reason, () => retried.push("job-1"));
   failed.release();
   // Work waits on Radiance, then has only just finished: no restart yet.
   advance(120_000);
