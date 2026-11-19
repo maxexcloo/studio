@@ -16,10 +16,8 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 const { openDatabase } = await import("./persistence/runtime.ts");
 const { Store } = await import("./domain/store.ts");
 const { saveAccountPreferences } = await import("./account-preferences.js");
-const [{ registerGalleryReadRoutes }, galleryStore] = await Promise.all([
-  import("./gallery/routes.js"),
-  import("./gallery/store.js"),
-]);
+const [{ registerGalleryHistoryRoutes, registerGalleryReadRoutes }, galleryStore] =
+  await Promise.all([import("./gallery/routes.js"), import("./gallery/store.js")]);
 const { setGallery, gallery: galleryRows } = await import("./fixtures/gallery.js");
 
 const routes = {};
@@ -65,6 +63,101 @@ const item = (ownerId, jobId) => ({
   createdAt: "2026-10-19T00:00:00.000Z",
   url: `/files/${jobId}.png`,
   filename: `${jobId}.png`,
+});
+
+test("library review pages only the owner's eligible media in a stable seeded order", async () => {
+  const own = (id, fields = {}) => ({ ...item("account-a", id), ...fields });
+  const candidates = [
+    own("recent", { createdAt: "2026-11-01T00:00:00Z" }),
+    own("old", { type: "video", createdAt: "2024-01-01T00:00:00Z" }),
+    own("kept", { dream: { state: "kept" } }),
+    own("expired", { libraryReviewedAt: Date.now() - 31 * 24 * 60 * 60 * 1000 }),
+    own("without-metadata", { prompt: undefined, model: undefined }),
+  ];
+  setGallery([
+    ...candidates,
+    own("accepted", { libraryReviewedAt: Date.now() }),
+    own("unseen", { dream: { state: "unseen" } }),
+    own("discarded", { dream: { state: "discarded" } }),
+    own("liked", { rating: "liked" }),
+    own("disliked", { rating: "disliked" }),
+    own("pending", { status: "pending" }),
+    own("text", { type: "text" }),
+    own("reference", { uploaded: true }),
+    own("missing", { url: "/comfy/view?filename=missing.png&type=media" }),
+    item("account-b", "other"),
+  ]);
+  const read = (query, studioAccount = { userId: "account-a" }) =>
+    call(routes["/api/gallery/library-review"], {
+      studioAccount,
+      query: { seed: "first", ownerId: "account-b", ...query },
+    });
+  const all = await read({});
+  assert.equal(all.remaining, candidates.length);
+  assert.deepEqual(new Set(all.items.map(({ id }) => id)), new Set(candidates.map(({ id }) => id)));
+  assert.deepEqual(await read({}), all);
+  assert.notDeepEqual((await read({ seed: "second" })).items, all.items);
+  assert.equal((await read({}, null)).remaining, 0);
+
+  const first = await read({ limit: 2 });
+  galleryStore.setGalleryRatings([first.items[1].id], "liked", "account-a");
+  const rest = await read({ cursor: first.nextCursor });
+  assert.deepEqual([...first.items, ...rest.items], all.items);
+  assert.equal(rest.remaining, candidates.length - first.items.length);
+  assert.equal(rest.nextCursor, "");
+});
+
+test("library Accept and gallery ratings undo through their own routes", async () => {
+  const media = item("account-a", "review");
+  setGallery([media]);
+  const handlers = {};
+  const ratings = [];
+  registerGalleryHistoryRoutes(
+    {
+      get() {},
+      post: (path, handler) => {
+        handlers[path] = handler;
+      },
+    },
+    { rated: (...args) => ratings.push(args) },
+  );
+  const review = (reviewed, userId = media.ownerId) =>
+    call(handlers["/api/gallery/library-review/:id"], {
+      studioAccount: { userId },
+      params: { id: media.id },
+      body: { reviewed },
+    });
+  const page = () =>
+    call(routes["/api/gallery/library-review"], {
+      studioAccount: { userId: media.ownerId },
+      query: { seed: "review" },
+    });
+  const rate = (rating) =>
+    call(handlers["/api/gallery/favorite"], {
+      studioAccount: { userId: media.ownerId },
+      body: { ids: [media.id], rating },
+    });
+  assert.ok((await review(true, "account-b")).error);
+  assert.equal((await page()).remaining, 1);
+  assert.equal((await review(true)).ok, true);
+  assert.equal((await page()).remaining, 0);
+  assert.equal(galleryStore.galleryItem(media.id).rating, undefined);
+  assert.equal((await review(false)).ok, true);
+  assert.equal((await page()).remaining, 1);
+  assert.equal(ratings.length, 0);
+  assert.equal((await rate("disliked")).ok, true);
+  assert.equal((await page()).remaining, 0);
+  assert.equal(galleryStore.visibleGallery({ ownerId: media.ownerId }).length, 0);
+  assert.equal(galleryStore.galleryItem(media.id).rating, "disliked");
+  assert.equal((await rate(null)).ok, true);
+  assert.equal((await page()).remaining, 1);
+  assert.deepEqual(
+    ratings.map(([, [change]]) => [change.was, change.rating]),
+    [
+      [null, "disliked"],
+      ["disliked", undefined],
+    ],
+  );
 });
 
 test("gallery pages and exact job reads return only the signed-in account's records", async () => {

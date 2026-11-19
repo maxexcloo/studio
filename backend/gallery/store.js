@@ -673,6 +673,50 @@ export function setGalleryRatings(keys, rating, ownerId) {
   }));
 }
 
+const libraryReviewMs = 30 * 24 * 60 * 60 * 1000;
+const reviewable = `status = 'done' AND unlisted = 0 AND uploaded = 0
+  AND type IN ('image', 'video') AND rating IS NULL AND json_extract(value, '$.url') <> ''`;
+
+/** A seeded order across the whole library. The cursor survives ratings removing earlier rows. */
+export function pageLibraryReview(ownerId, seed, cursor, limit) {
+  const entries = statement(
+    `SELECT key, json_extract(value, '$.createdAt') AS createdAt
+      FROM studio_gallery WHERE owner_id = ? AND ${reviewable}
+      AND coalesce(json_extract(value, '$.libraryReviewedAt'), 0) <= ?`,
+  )
+    .all(ownerId, Date.now() - libraryReviewMs)
+    .filter(({ key, createdAt }) => hasGalleryMedia({ url: key, createdAt }))
+    .map(({ key }) => ({
+      key,
+      rank: crypto.createHash("sha256").update(seed).update("\0").update(key).digest("hex"),
+    }))
+    .filter(({ rank }) => rank > cursor);
+  const page = entries
+    .sort((a, b) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : 0))
+    .slice(0, limit);
+  const records = galleryItems({ ownerId, named: page.map(({ key }) => key) });
+  const byKey = new Map(records.map((item) => [galleryKey(item), item]));
+  return {
+    items: page.map(({ key }) => byKey.get(key)),
+    nextCursor: entries.length > limit ? page.at(-1).rank : "",
+    remaining: entries.length,
+  };
+}
+
+/** Accept keeps a library item unrated. Undo clears that review so it is eligible again. */
+export function setLibraryReviewed(ownerId, id, reviewed) {
+  const row = statement(
+    `SELECT value FROM studio_gallery WHERE owner_id = ? AND item_id = ? AND ${reviewable}`,
+  ).get(ownerId, id);
+  if (!row) return false;
+  const { libraryReviewedAt, ...item } = parse(row);
+  if (!hasGalleryMedia(item)) return false;
+  if (reviewed === Boolean(libraryReviewedAt && libraryReviewedAt > Date.now() - libraryReviewMs))
+    return true;
+  putGalleryItems([reviewed ? { ...item, libraryReviewedAt: Date.now() } : item]);
+  return true;
+}
+
 /* ---------------------------------------------------------------- Paging */
 
 /** A cursor: the order key of the row a page ended at; mid-set, the set and its last item shown. */

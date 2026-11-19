@@ -34,7 +34,7 @@ async function useLoras(form: Locator, on: boolean) {
  * Drags sideways across `target` by `dx`: a finger where Chromium can send touches (the bug this
  * guards was touch-only), the mouse elsewhere.
  */
-async function drag(page: Page, target: Locator, dx: number) {
+async function drag(page: Page, target: Locator, dx: number, dy = 0) {
   const box = (await target.boundingBox())!;
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
@@ -42,19 +42,20 @@ async function drag(page: Page, target: Locator, dx: number) {
   const chromium = page.context().browser()?.browserType().name() === "chromium";
   if (test.info().project.use.hasTouch && chromium) {
     const cdp = await page.context().newCDPSession(page);
-    const touch = (type: string, at?: number) =>
+    const touch = (type: string, at?: number, down = y) =>
       cdp.send("Input.dispatchTouchEvent", {
         type: type as "touchStart",
-        touchPoints: at === undefined ? [] : [{ x: at, y }],
+        touchPoints: at === undefined ? [] : [{ x: at, y: down }],
       });
     await touch("touchStart", x);
-    for (let step = 1; step <= steps; step++) await touch("touchMove", x + (dx * step) / steps);
+    for (let step = 1; step <= steps; step++)
+      await touch("touchMove", x + (dx * step) / steps, y + (dy * step) / steps);
     await touch("touchEnd");
     return;
   }
   await page.mouse.move(x, y);
   await page.mouse.down();
-  await page.mouse.move(x + dx, y + 4, { steps });
+  await page.mouse.move(x + dx, y + (dy || 4), { steps });
   await page.mouse.up();
 }
 
@@ -151,6 +152,84 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
     ]);
   expect(dream.requests[1].body).toEqual({ ids: ["one"] });
   expect(dream.requests[6].body).toEqual({ ids: ["three"], rating: "liked" });
+});
+
+test("Dream continues into paged library review and Undo restores each rating", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const library = [
+    dreamItem("library-old", { dream: undefined, settings: undefined }),
+    dreamItem("library-video", { dream: undefined, type: "video" }),
+    dreamItem("library-image", { dream: undefined }),
+  ];
+  const dream = await serveDream(page, { unseen: [dreamItem("last-dream")], library });
+  await page.goto("/dream");
+  await expect(current(page)).toBeVisible();
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  const image = page.getByRole("group", { name: "Current Gallery Image" });
+  const video = page.getByRole("group", { name: "Current Gallery Video" });
+  await expect(image).toContainText("library-old");
+  await expect(image.getByRole("button", { name: "Suggest" })).toHaveCount(0);
+  const view = page.getByRole("button", { name: "Dream View" });
+  await view.click();
+  await expect(
+    page.getByRole("menuitem", { name: "Rate Your Library (3)", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect(video).toContainText("library-video");
+  await expect.poll(() => dream.reviewed.has("library-old")).toBe(true);
+  await page.getByRole("button", { name: "Like", exact: true }).click();
+  await expect(image).toContainText("library-image");
+  await expect.poll(() => dream.library[1].rating).toBe("liked");
+  await page.getByRole("button", { name: "Dislike", exact: true }).click();
+  await expect(page.getByText("Library Review Complete")).toBeVisible();
+  await expect.poll(() => dream.library[2].rating).toBe("disliked");
+
+  const undo = page.getByRole("button", { name: "Undo", exact: true });
+  await undo.click();
+  await expect(image).toContainText("library-image");
+  await expect.poll(() => dream.library[2].rating).toBeUndefined();
+  await undo.click();
+  await expect(video).toContainText("library-video");
+  await expect.poll(() => dream.library[1].rating).toBeUndefined();
+  await undo.click();
+  await expect(image).toContainText("library-old");
+  await expect.poll(() => dream.reviewed.has("library-old")).toBe(false);
+});
+
+test("Suggest can queue a library item variation at its source", async ({ page }) => {
+  await fixtures(page);
+  await serveDream(page, { library: [dreamItem("harbour", { dream: undefined })] });
+  await page.route("**/api/suggestions", (route) => {
+    const body = route.request().postDataJSON();
+    return route.fulfill({
+      json: {
+        suggestions:
+          body.surface === "viewer"
+            ? [
+                { label: "Closer Crop", request: "crop closer", prompt: "A tighter harbour view" },
+                { label: "Earlier Light", request: "move to dawn", prompt: "A dawn harbour view" },
+              ]
+            : [{ action: "recreate", prompt: "A tighter harbour view", request: "crop closer" }],
+      },
+    });
+  });
+  await page.goto("/dream");
+  await page.getByRole("button", { name: "Suggest", exact: true }).click();
+  const submitted = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" &&
+      /\/api\/sessions\/[^/]+\/generations$/.test(new URL(request.url()).pathname),
+  );
+  await page.getByRole("menuitem", { name: "Closer Crop", exact: true }).click();
+  expect((await submitted).postDataJSON()).toMatchObject({
+    parentItemId: "harbour",
+    profileId: "image:test",
+    prompt: "A tighter harbour view",
+  });
 });
 
 test("Undo steps back through Dislike, Like and Accept, taking back each", async ({ page }) => {
@@ -455,6 +534,7 @@ test("Dream navigation orders its views and History shows retained activity and 
   await expect(page.getByRole("menuitem")).toHaveText([
     "Images",
     "Videos",
+    "Rate Your Library (0)",
     "Projects",
     "Taste",
     "Discards",
@@ -564,13 +644,13 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
         .getByRole("button")
         .evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Neither", "A", "B", "Both"]);
+    .toEqual(["Neither", "This Image", "Like", "Both"]);
 
   // A side opens in the preview; closing it returns to the same comparison.
   await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
   const viewer = page.getByRole("dialog");
   const answers = viewer.getByRole("group", { name: "Comparison Answers" });
-  for (const name of ["Neither", "This Image", "Both"])
+  for (const name of ["Neither", "This Image", "Like", "Both"])
     await expect(answers.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
   await expect(viewer.getByRole("button", { name: "Close Preview" })).toBeFocused();
   await page.keyboard.press("Escape");
@@ -610,6 +690,44 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
       '/api/dream/undo {"ids":["p3a","p3b"]}',
       '/api/dream/pairs/three/answer {"answer":"both"}',
     ]);
+});
+
+test("A comparison can Like the shown side in the deck and preview, then Undo", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const side = (id: string, index: 0 | 1) => {
+    const item = dreamItem(id);
+    return {
+      ...item,
+      dream: {
+        ...item.dream,
+        pair: { id: "pair", side: index, question: "Which Image?", label: id },
+      },
+    };
+  };
+  const dream = await serveDream(page, { unseen: [side("Quiet", 0), side("Bright", 1)] });
+  await page.goto("/dream");
+  const comparison = page.getByRole("group", { name: "Which Image?", exact: true });
+  await comparison.getByRole("button", { name: "Select B · Bright", exact: true }).click();
+  await page.getByRole("button", { name: "Like", exact: true }).click();
+  await expect.poll(() => dream.requests[0]?.body).toEqual({ answer: "b", like: true });
+  await expect.poll(() => dream.known.get("Bright")?.rating).toBe("liked");
+  const undo = page.getByRole("button", { name: "Undo", exact: true });
+  await undo.click();
+  await expect(comparison).toBeVisible();
+  await expect.poll(() => dream.known.get("Bright")?.rating).toBeUndefined();
+
+  await comparison.getByRole("button", { name: "View A · Quiet", exact: true }).click();
+  const preview = page.getByRole("dialog", { name: "Preview", exact: true });
+  await preview.getByRole("button", { name: "Like", exact: true }).click();
+  await expect.poll(() => dream.requests[2]?.body).toEqual({ answer: "a", like: true });
+  await expect(preview).toBeHidden();
+  await undo.click();
+  await expect(comparison).toBeVisible();
+  await comparison.getByRole("button", { name: "View A · Quiet", exact: true }).click();
+  await drag(page, preview.getByRole("img", { name: "Dream prompt Quiet", exact: true }), 0, -160);
+  await expect.poll(() => dream.requests[4]?.body).toEqual({ answer: "a", like: true });
 });
 
 test("Discarded Dream results can be viewed and accepted after all, or deleted all at once", async ({
@@ -694,7 +812,7 @@ test("The preview swipes between a comparison's sides and answers with the deck'
     .poll(() =>
       answers.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Neither", "This Image", "Both"]);
+    .toEqual(["Neither", "This Image", "Like", "Both"]);
   await answers.getByRole("button", { name: "This Image", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
@@ -1167,7 +1285,7 @@ test("new Dream generations follow the active comparison, survive Undo and prece
   await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
   await refreshed;
   await expect(original).toBeVisible();
-  await page.getByRole("button", { name: "A", exact: true }).click();
+  await page.getByRole("button", { name: "This Image", exact: true }).click();
   await expect(current(page)).toContainText("Dream prompt latest");
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(original).toBeVisible();

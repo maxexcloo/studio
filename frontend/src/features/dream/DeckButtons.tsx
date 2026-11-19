@@ -56,7 +56,12 @@ export function DeckButtons({
       shown === undefined || (answer.id !== "a" && answer.id !== "b")
         ? [answer]
         : answer.id === "a"
-          ? [{ ...answer, id: "shown", label: "This Image", choice: shown ? "b" : "a" }]
+          ? [
+              { ...answer, id: "shown", label: "This Image", choice: shown ? "b" : "a" },
+              ...(card.kind === "pair" && card.pairId
+                ? [{ choice: "like" as const, id: "like", label: "Like", icon: icons.like }]
+                : []),
+            ]
           : [],
     );
   return (
@@ -78,7 +83,7 @@ export function DeckButtons({
             data-size={
               card.kind !== "pair"
                 ? undefined
-                : id === "a" || id === "b" || id === "shown"
+                : id === "a" || id === "b" || id === "shown" || id === "like"
                   ? "large"
                   : "small"
             }
