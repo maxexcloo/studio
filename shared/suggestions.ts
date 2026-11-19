@@ -1,8 +1,11 @@
-/** A viewer next step: a short label, the change in words and the item's prompt with it applied. */
-export interface NextStep {
+/** A short menu title and the complete prompt applied on selection. */
+export interface PromptIdea {
   label: string;
-  request: string;
   prompt: string;
+}
+/** A viewer next step also names the change in words. */
+export interface NextStep extends PromptIdea {
+  request: string;
 }
 /** The number of distinct ideas requested for a generated suggestion picker. */
 export const maxSuggestions = 6;
@@ -14,6 +17,6 @@ export interface Change extends NextStep {
   action: ChangeAction;
 }
 /** `POST /api/suggestions`: none, with the reason, where the account or the text model can't. */
-export type Suggestions<T = string | NextStep> =
+export type Suggestions<T = PromptIdea> =
   | { suggestions: T[]; reason?: undefined }
   | { suggestions: []; reason: string };

@@ -1,74 +1,86 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { maxSuggestions } from "../../../../shared/suggestions";
-import type { MediaKind } from "../../types";
+import type { GenerationInput, ReferenceAsset } from "../../types";
 import type { Action } from "../../ui/ActionBar";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { useGroupFeature } from "../auth/AccountGate";
-import { askPromptIdeas, promptIdeasQuery } from "../taste/suggestions";
+import { appliedCardIds } from "../characters/cardParts";
+import { promptIdeasQuery } from "../taste/suggestions";
 import { UndoButton, suggested } from "./AskChange";
 import { assistantQuery } from "./PromptAssistant";
 
-/**
- * Taste-led prompt ideas for an empty prompt: a Suggested tool, first in the prompt's AI menu, asked
- * for as that menu opens, with Refresh… for others. Picking one fills the prompt, with Undo beside
- * it until the prompt next changes.
- */
+/** Taste-led ideas for an empty prompt or a draft with cards, applied only on selection. */
 export function usePromptIdeas({
-  kind,
-  value,
+  input: { kind, prompt, cardParts },
+  references,
   onChange,
+  enabled,
 }: {
-  kind: MediaKind;
-  value: string;
+  input: GenerationInput;
+  references: ReferenceAsset[];
   onChange: (value: string) => void;
+  enabled: boolean;
 }) {
   const client = useQueryClient();
-  const [asked, setAsked] = useState(false);
-  const [picked, setPicked] = useState<{ before: string; after: string } | null>(null);
-  // A group without Prompt Assistant, or a Studio without its model, gets no ideas, so they are
-  // never asked for.
+  const [picked, setPicked] = useState<{ before: string; after: string; label: string } | null>(
+    null,
+  );
+  if (picked && prompt !== picked.after) setPicked(null);
+  const current = picked?.after === prompt ? picked : null;
+  const base = current?.before ?? prompt;
+
   const assistant = useQuery(assistantQuery);
-  const offered = useGroupFeature("promptAssistant") && !!assistant.data?.available;
-  const query = promptIdeasQuery(kind);
-  const ideas = useQuery({ ...query, enabled: asked && offered });
-  const refresh = useMutation({
-    mutationFn: () => askPromptIdeas(kind, true),
-    onSuccess: (answer) => client.setQueryData(query.queryKey, answer),
-  });
-  const list = [...(ideas.data?.suggestions ?? [])].slice(0, maxSuggestions).sort(compareNames);
-  const loading = refresh.isPending || ((ideas.isPending || ideas.isFetching) && !list.length);
+  const mayUseAssistant = useGroupFeature("promptAssistant");
+  const mayUseCards = useGroupFeature("characters");
+  const cardIds = mayUseCards ? appliedCardIds(cardParts, base, references) : [];
+  const cards = cardIds.length ? { cardIds, prompt: base } : undefined;
+  const query = promptIdeasQuery(kind, cards);
+  const ideas = useQuery({ ...query, enabled: false });
+  function load(fresh = false) {
+    const options = promptIdeasQuery(kind, cards, fresh);
+    void client.fetchQuery({ ...options, ...(fresh && { staleTime: 0 }) }).catch(() => {});
+  }
+  const list = [...(ideas.data?.suggestions ?? [])]
+    .slice(0, maxSuggestions)
+    .sort((a, b) => compareNames(a.label, b.label));
   const { options, again } = suggested(
-    loading,
+    ideas.isFetching || ideas.isPending,
     list.map((idea) => ({
-      id: `idea:${idea}`,
-      label: idea,
+      id: `idea:${idea.label}`,
+      label: idea.label,
       icon: icons.assistant,
       onClick: () => {
-        setPicked({ before: value, after: idea });
-        onChange(idea);
+        setPicked({ before: base, after: idea.prompt, label: idea.label });
+        onChange(idea.prompt);
       },
     })),
-    { onClick: () => refresh.mutate() },
+    { onClick: () => load(true) },
+    ideas.error?.message || ideas.data?.reason,
   );
+  const offered =
+    enabled &&
+    mayUseAssistant &&
+    assistant.data?.available &&
+    (cards || !prompt.trim()) &&
+    (cards || ideas.isPending || list.length);
   return {
-    // An account Studio has no ideas for yet (no taste to draw on) is offered none.
-    tool:
-      offered && !value.trim() && (loading || list.length > 0)
-        ? ({
-            id: "ideas",
-            label: "Suggested",
-            icon: icons.assistant,
-            menu: [[...options, again]],
-            onOpen: () => setAsked(true),
-          } satisfies Action)
-        : undefined,
-    undo: picked && value === picked.after && (
+    tool: offered
+      ? ({
+          id: "ideas",
+          label: "Suggested",
+          icon: icons.assistant,
+          menu: [[...options, again]],
+          onOpen: () => load(),
+        } satisfies Action)
+      : undefined,
+    label: current?.label,
+    undo: current && (
       <UndoButton
         onClick={() => {
-          onChange(picked.before);
+          onChange(current.before);
           setPicked(null);
         }}
       />

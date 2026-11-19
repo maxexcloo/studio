@@ -1,10 +1,12 @@
 import { randomInt } from "node:crypto";
 
+import { type Card, type CardKind, cardKinds, maxCards } from "../../shared/characters.ts";
 import { maxPromptCharacters } from "../../shared/queue.ts";
 import {
   type Change,
   type ChangeAction,
   type NextStep,
+  type PromptIdea,
   type Suggestions,
   changeActions,
   maxSuggestions,
@@ -186,7 +188,7 @@ const json = (text: string) => {
     return null;
   }
 };
-const empty = <T = string | NextStep>(reason: string): Suggestions<T> => ({
+const empty = <T = PromptIdea>(reason: string): Suggestions<T> => ({
   suggestions: [],
   reason,
 });
@@ -199,8 +201,8 @@ const unlike = (labels: string[]) => {
   const taken = new Set(labels.map(sameLabel));
   return (step: NextStep) => !taken.has(sameLabel(step.label));
 };
-const describeIdea = (idea: string | NextStep) =>
-  typeof idea === "string" ? idea : `${idea.label}: ${idea.request}`;
+const describeIdea = (idea: PromptIdea) =>
+  `${idea.label}: ${"request" in idea ? idea.request : idea.prompt}`;
 
 /** What the item was made with and what it shows, for the model's next steps and changes. */
 function describeItem(item: SuggestionItem) {
@@ -242,6 +244,7 @@ export function createSuggestions({
   save,
   ideas,
   nextSteps,
+  cards = () => null,
   target = async () => null,
   promptWriter = () => undefined,
   fixed = () => [],
@@ -263,6 +266,7 @@ export function createSuggestions({
   ideas: () => boolean;
   /** The switch for next steps, an image's and the composer draft's (STUDIO_NEXT_STEPS). */
   nextSteps: () => boolean;
+  cards?: (ownerId: string) => Record<CardKind, Card[]> | null;
   /** The model a finished result was made with, for the owner, or null where it isn't available. */
   target?: (ownerId: string, item: SuggestionItem) => Promise<WritingTarget | null>;
   /** The owner's text writer (account-policy.js `promptWriter`). */
@@ -274,7 +278,7 @@ export function createSuggestions({
   const cache = new Map<string, { until: number; value: Promise<Suggestions> }>();
   /** The latest ideas per owner and menu (composer kind, Animate's image or the draft), newest first. */
   const shown = new Map<string, string[]>();
-  function rememberShown(menu: string, choices: (string | NextStep)[]) {
+  function rememberShown(menu: string, choices: PromptIdea[]) {
     const latest = shown.get(menu) ?? [];
     shown.delete(menu);
     if (shown.size >= cacheLimit) shown.delete(shown.keys().next().value!);
@@ -303,25 +307,36 @@ export function createSuggestions({
       image,
       spicy = false,
       target,
+      cardDraft,
     }: {
       signal?: AbortSignal;
       image?: ModelImage | null;
       spicy?: boolean;
       target?: WritingTarget | null;
+      cardDraft?: string;
     } = {},
   ): Promise<Suggestions> {
     const offered = surface === "composer" ? [] : fixed(fixedKinds[surface]);
     const system = {
       composer: [
-        `You suggest prompt ideas for a person's next ${kind} in a media studio, drawn from their taste profile and the prompts they liked.`,
-        `Write ${maxSuggestions} useful, distinct, standalone ${kind} prompts of at most ${maxIdea} characters each that they would likely enjoy: not copies of the prompts they liked.`,
-        `Take each from a different angle (${angles(kind === "video" ? motionAngles : imageAngles, maxSuggestions)}), with subjects and settings unlike one another.`,
+        ...(cardDraft === undefined
+          ? [
+              `You suggest prompt ideas for a person's next ${kind} in a media studio, drawn from their taste profile and the prompts they liked.`,
+              `Write ${maxSuggestions} useful, distinct, standalone ${kind} prompts of at most ${maxIdea} characters each that they would likely enjoy: not copies of the prompts they liked.`,
+              `Take each from a different angle (${angles(kind === "video" ? motionAngles : imageAngles, maxSuggestions)}), with subjects and settings unlike one another.`,
+            ]
+          : [
+              `Write ${maxSuggestions} useful, distinct continuations for the draft ${kind} prompt, built around its applied cards.`,
+            ]),
         contentRule(spicy),
         suggestionChoices(kind, spicy),
+        cardDraft !== undefined &&
+          "Keep the same character, any specified outfit or scene and the draft's other details. The draft's wording takes precedence if a saved card differs. Vary compatible actions, framing, light or mood. Write only the new sentences that follow the draft without repeating it. Use taste for inspiration when available.",
         americanEnglish,
         avoidFiller(),
         data,
-        'Reply with JSON only, with an "ideas" array of prompt strings.',
+        'Give each idea a concrete title of at most four words in Title Case, such as "Lantern-Lit Crossing" or "Over the Shoulder".',
+        'Reply with JSON only: {"ideas": [{"label": "<title>", "prompt": "<prompt text>"}]}.',
       ],
       // A draft without a request asks for changes to offer, as the viewer's next steps do.
       draft: [
@@ -398,13 +413,24 @@ export function createSuggestions({
     }
     const reply = json(text);
     if (surface === "composer") {
-      const ideas = [
-        ...new Set(
-          (Array.isArray(reply?.ideas) ? reply.ideas : [])
-            .map((idea: unknown) => clean(idea, maxPromptCharacters))
-            .filter(Boolean),
-        ),
-      ].slice(0, maxSuggestions) as string[];
+      const labels = new Set<string>();
+      const prompts = new Set<string>();
+      const ideas = (Array.isArray(reply?.ideas) ? reply.ideas : [])
+        .map((idea: Record<string, unknown>) => ({
+          label: shortTitle(clean(idea?.label, 40), 4),
+          prompt: clean(idea?.prompt, maxPromptCharacters),
+        }))
+        .filter(({ label, prompt }: PromptIdea) => {
+          const title = sameLabel(label);
+          const words = sameLabel(prompt);
+          if (!title || !words || labels.has(title) || prompts.has(words)) return false;
+          if (cardDraft !== undefined && cardDraft.length + 2 + prompt.length > maxPromptCharacters)
+            return false;
+          labels.add(title);
+          prompts.add(words);
+          return true;
+        })
+        .slice(0, maxSuggestions) as PromptIdea[];
       return ideas.length ? { suggestions: ideas } : empty("The text model's reply was unusable.");
     }
     const labels = new Set<string>();
@@ -611,8 +637,9 @@ export function createSuggestions({
         fresh?: unknown;
         request?: unknown;
         actions?: unknown;
+        cardIds?: unknown;
       },
-    ): Promise<Suggestions<string | NextStep | Change>> {
+    ): Promise<Suggestions<PromptIdea | NextStep | Change>> {
       const surface = body.surface as SuggestionSurface;
       if (!surfaces.has(surface))
         throw failure("Choose composer, viewer, animate, change or draft.", 400);
@@ -707,9 +734,42 @@ export function createSuggestions({
       const kind = drafted ? (body.kind as "image" | "video") : "image";
       const prompt = drafted || edited ? clean(body.prompt, maxPromptCharacters) : "";
       if (surface === "draft" && !prompt) return empty("Write a prompt to change first.");
-      if (surface === "composer" && !known)
+      let cardDraft: string | undefined;
+      let appliedCards: string[] = [];
+      if (surface === "composer" && body.cardIds !== undefined) {
+        const ids = body.cardIds;
+        if (
+          !Array.isArray(ids) ||
+          ids.length > maxCards ||
+          ids.some((id) => typeof id !== "string" || !id || id.length > 80)
+        )
+          throw failure("Choose the cards applied to the draft.", 400);
+        if (ids.length) {
+          const owned = cards(ownerId);
+          if (!owned) throw failure("Characters are off for this account.", 403);
+          const requested = new Set(ids);
+          appliedCards = (Object.keys(cardKinds) as CardKind[]).flatMap((kind) =>
+            owned[kind]
+              .filter((card) => requested.delete(card.id))
+              .map((card) => `${cardKinds[kind].name}: ${card.name} — ${card.description}`),
+          );
+          if (requested.size) throw failure("Card not found.", 404);
+          if (!prompt) throw failure("Apply the cards to the draft first.", 400);
+          cardDraft = body.prompt as string;
+        }
+      }
+      if (surface === "composer" && !known && cardDraft === undefined)
         return empty("Like a few results so Studio learns your taste.");
-      const key = JSON.stringify([ownerId, surface, kind, prompt, body.jobId ?? "", itemId, spicy]);
+      const key = JSON.stringify([
+        ownerId,
+        surface,
+        kind,
+        cardDraft ?? prompt,
+        appliedCards,
+        body.jobId ?? "",
+        itemId,
+        spicy,
+      ]);
       const cached = cache.get(key);
       if (cached && cached.until > now() && !fresh) return cached.value;
       const answer = (async () => {
@@ -727,6 +787,7 @@ export function createSuggestions({
           ? [...lines, "", "The image:", describeItem(source)].join("\n")
           : [
               ...lines,
+              ...(appliedCards.length ? ["", "Applied cards:", ...appliedCards] : []),
               ...(surface === "draft"
                 ? ["", `The draft prompt: ${prompt}`]
                 : prompt
@@ -736,7 +797,11 @@ export function createSuggestions({
         const menu = JSON.stringify([
           ownerId,
           surface,
-          surface === "composer" ? kind : surface === "draft" ? prompt : [body.jobId, itemId],
+          surface === "composer"
+            ? [kind, appliedCards, cardDraft]
+            : surface === "draft"
+              ? prompt
+              : [body.jobId, itemId],
           spicy,
         ]);
         const latest = shown.get(menu) ?? [];
@@ -748,19 +813,24 @@ export function createSuggestions({
           latest.length
             ? `${context}\n\nAlready suggested (offer different ones): ${latest.join("; ")}`
             : context,
-          { image: picture, spicy },
+          { image: picture, spicy, cardDraft },
         );
         if (ideas.reason) return ideas;
-        const label = (idea: string | NextStep) => (typeof idea === "string" ? idea : idea.label);
         const fresh = ideas.suggestions.filter(
           (idea) =>
             !latest.some(
               (previous) =>
-                previous === describeIdea(idea) || previous.startsWith(`${label(idea)}: `),
+                previous === describeIdea(idea) || previous.startsWith(`${idea.label}: `),
             ),
         );
         rememberShown(menu, fresh);
-        return fresh.length ? { suggestions: fresh } : ideas;
+        const choices = fresh.length ? fresh : ideas.suggestions;
+        return {
+          suggestions:
+            cardDraft === undefined
+              ? choices
+              : choices.map((idea) => ({ ...idea, prompt: `${cardDraft}\n\n${idea.prompt}` })),
+        };
       })();
       remember(key, answer);
       return answer;

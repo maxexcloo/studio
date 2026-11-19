@@ -4,6 +4,7 @@ import test from "node:test";
 import { characterLead, outfitPart, scenePart } from "../../../../shared/characters.ts";
 import { addReference } from "../generation/payload.ts";
 import {
+  appliedCardIds,
   forgetCard,
   promptCardApplied,
   rememberCard,
@@ -155,4 +156,29 @@ test("removing an edited character removes its old recorded text and images, pre
     references,
     cardParts: {},
   });
+});
+
+test("card ideas follow the character reference and the outfit and scene still in the draft", () => {
+  const reference = { id: "ranger", name: "Mara", thumbnailUrl: "", width: 64, height: 64 };
+  const character = { id: "chr-ranger", description: "red hair", references: [reference] };
+  const outfit = {
+    id: "out-coat",
+    description: "a yellow raincoat",
+    name: "Raincoat",
+    references: [],
+  };
+  const scene = { id: "scn-harbour", description: "a harbour", name: "Harbour", references: [] };
+  const lead = characterLead(character.description);
+  const outfitPrompt = `${lead} ${outfitPart(outfit.description)}`;
+  const base = `${outfitPrompt} ${scenePart(scene.description, true)}`;
+  const withCharacter = rememberCard(undefined, "characters", character, "", lead);
+  const withOutfit = rememberCard(withCharacter, "outfits", outfit, lead, outfitPrompt);
+  const parts = rememberCard(withOutfit, "scenes", scene, outfitPrompt, base);
+  assert.deepEqual(appliedCardIds(parts, `${base} Extra draft text.`, [reference]), [
+    character.id,
+    outfit.id,
+    scene.id,
+  ]);
+  assert.deepEqual(appliedCardIds(parts, outfitPrompt, []), [outfit.id]);
+  assert.deepEqual(appliedCardIds(undefined, base, [reference]), []);
 });
