@@ -327,6 +327,12 @@ test("Gallery and References sort media through separate remembered choices", as
   await page.getByRole("menuitemradio", { name: "Oldest First", exact: true }).click();
   const gallery = page.getByRole("button", { name: /^Open image: (Alpha|Beta)$/ });
   await expect(gallery.first()).toHaveAccessibleName("Open image: Beta");
+  state.gallery[0].rating = "disliked";
+  await page.getByRole("button", { name: "Sort Gallery", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "Disliked First", exact: true }).click();
+  await expect(gallery.first()).toHaveAccessibleName("Open image: Alpha");
+  await expect(gallery).toHaveCount(2);
+  delete state.gallery[0].rating;
   await create(page);
   const picker = await openReferenceChoices(page);
   const options = picker.getByRole("button", { name: /^Use reference: (Alpha|Beta)$/ });
@@ -338,13 +344,35 @@ test("Gallery and References sort media through separate remembered choices", as
   await closeReferences(page);
   await openReferenceChoices(page);
   await expect(options.first()).toHaveAccessibleName("Use reference: Beta");
-  await closeReferences(page);
-  state.gallery[0].rating = "disliked";
-  await page.goto("/images");
-  await page.getByRole("button", { name: "Sort Gallery", exact: true }).click();
-  await page.getByRole("menuitemradio", { name: "Disliked First", exact: true }).click();
-  await expect(gallery.first()).toHaveAccessibleName("Open image: Alpha");
-  await expect(gallery).toHaveCount(2);
+});
+
+test("Full-screen references show the selected model and open Details", async ({ page }) => {
+  const state = await setup(page);
+  state.gallery[0].settings = { profileName: "Reference Model" };
+  await create(page);
+  const picker = await openReferenceChoices(page);
+  await picker
+    .getByRole("listitem")
+    .filter({
+      has: page.getByRole("button", { name: "Use reference: Alpha", exact: true }),
+    })
+    .getByRole("button", { name: "Preview", exact: true })
+    .click();
+  const preview = page.getByRole("dialog", { name: "Preview", exact: true });
+  const header = preview.getByRole("group", { name: "Viewer Header", exact: true });
+  await expect(header.getByText("Reference Model", { exact: true })).toBeVisible();
+  const details = header.getByRole("button", { name: "Generation Details", exact: true });
+  await details.click();
+  if (test.info().project.use.isMobile) {
+    const closeDetails = page.getByRole("button", { name: "Close Details", exact: true });
+    await expect(closeDetails).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(closeDetails).toBeHidden();
+    await expect(preview).toBeVisible();
+  } else {
+    await expect(preview.getByRole("complementary", { name: "Generation Details" })).toBeVisible();
+    await details.click();
+  }
 });
 
 test("The reference grid pages and virtualises as it scrolls, and a tile previews above it", async ({
@@ -424,18 +452,6 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   const header = preview.getByRole("group", { name: "Viewer Header", exact: true });
   await expect(header.getByText("148 / 150", { exact: true })).toBeVisible();
   await expect(header.getByText("Reference Model", { exact: true })).toBeVisible();
-  const details = header.getByRole("button", { name: "Generation Details", exact: true });
-  await details.click();
-  if (test.info().project.use.isMobile) {
-    const closeDetails = page.getByRole("button", { name: "Close Details", exact: true });
-    await expect(closeDetails).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(closeDetails).toBeHidden();
-    await expect(preview).toBeVisible();
-  } else {
-    await expect(preview.getByRole("complementary", { name: "Generation Details" })).toBeVisible();
-    await details.click();
-  }
   await expect(preview.getByRole("group", { name: "Generation Actions" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();
