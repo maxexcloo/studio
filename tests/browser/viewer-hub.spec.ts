@@ -1567,6 +1567,46 @@ test("Desktop details stay where the viewer left them", async ({ page }, testInf
   await expect(details).toBeHidden();
 });
 
+test("Phone Details stays above usable viewer actions and swipes closed", async ({
+  page,
+  isMobile,
+}, testInfo) => {
+  test.skip(!isMobile, "Phones show Details in a sheet.");
+  const { viewer } = await seed(page);
+  await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: "Amber Bird", exact: true });
+  await expect(sheet.getByText("1234567", { exact: true })).toBeVisible();
+  const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
+  await expect
+    .poll(async () => {
+      const [panel, bar] = await Promise.all([sheet.boundingBox(), actions.boundingBox()]);
+      return panel && bar && panel.y + panel.height <= bar.y + 1;
+    })
+    .toBe(true);
+  await actions.getByRole("button", { name: "Share", exact: true }).click();
+  const copy = page.getByRole("menuitem", { name: "Copy Details", exact: true });
+  await expect(copy).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(copy).toBeHidden();
+  await expect(sheet).toBeVisible();
+
+  if (testInfo.project.use.browserName === "chromium") {
+    const header = (await sheet.getByRole("heading", { name: "Amber Bird" }).boundingBox())!;
+    const x = header.x + header.width / 2;
+    const y = header.y + header.height / 2;
+    const touch = await page.context().newCDPSession(page);
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    for (const offset of [40, 80, 125])
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x, y: y + offset }],
+      });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect(sheet).toBeHidden();
+    await expect(viewer).toBeVisible();
+  }
+});
+
 test("Phone swipes reveal details and close the viewer", async ({ page }, testInfo) => {
   test.skip(
     !testInfo.project.use.isMobile || testInfo.project.use.browserName === "webkit",

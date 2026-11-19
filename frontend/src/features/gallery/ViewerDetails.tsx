@@ -3,6 +3,7 @@ import { type ReactNode, type RefObject, useId, useLayoutEffect, useState } from
 
 import type { MediaItem } from "../../types";
 import { closeWhenTop } from "../../ui/popupClicks";
+import { useSwipeClose } from "../../ui/useSwipeClose";
 import { MediaDetails, MediaDetailsMetadata } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
 
@@ -32,6 +33,8 @@ export function ViewerDetails({
   children?: ReactNode;
 }) {
   const id = useId();
+  const closeSheet = closeWhenTop(id, close);
+  const swipe = useSwipeClose("down", closeSheet);
   const [barOffset, setBarOffset] = useState(0);
   useLayoutEffect(() => {
     const bar = bottomBar?.current;
@@ -46,7 +49,7 @@ export function ViewerDetails({
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [bottomBar, phone, opened]);
+  }, [bottomBar, item.id, phone, opened]);
   const details = (
     <>
       {children}
@@ -55,28 +58,43 @@ export function ViewerDetails({
   );
   if (phone)
     return (
-      <Drawer
+      <Drawer.Root
         id={id}
         opened={opened}
-        onClose={closeWhenTop(id, close)}
+        onClose={closeSheet}
         position="bottom"
         zIndex={zIndex}
         size="80%"
         radius="lg"
-        title={title}
-        closeButtonProps={{ "aria-label": "Close Details" }}
         styles={{
-          header: { position: "static", paddingBottom: 0 },
-          inner: { bottom: barOffset },
-          overlay: { bottom: barOffset },
+          // Clip the sheet's slide above the actions, including while it moves with a swipe.
+          inner: { bottom: barOffset, overflow: "clip" },
+          overlay: { bottom: barOffset, pointerEvents: opened ? undefined : "none" },
+          content: {
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            pointerEvents: opened ? undefined : "none",
+          },
+          header: { position: "static", paddingBottom: 0, touchAction: "none" },
+          body: { overflowY: "auto", overscrollBehavior: "contain" },
         }}
       >
-        <FocusTrap.InitialFocus />
-        <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
-          <MediaDetailsMetadata item={item} />
-          {details}
-        </Stack>
-      </Drawer>
+        <Drawer.Overlay />
+        <Drawer.Content {...swipe}>
+          <FocusTrap.InitialFocus />
+          <Drawer.Header>
+            <Drawer.Title>{title}</Drawer.Title>
+            <Drawer.CloseButton aria-label="Close Details" />
+          </Drawer.Header>
+          <Drawer.Body>
+            <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
+              <MediaDetailsMetadata item={item} />
+              {details}
+            </Stack>
+          </Drawer.Body>
+        </Drawer.Content>
+      </Drawer.Root>
     );
   return (
     <div className={classes.asideTrack} data-open={opened || undefined}>

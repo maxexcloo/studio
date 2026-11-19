@@ -841,6 +841,7 @@ test("Discarded Dream results can be viewed and accepted after all, or deleted a
 
 test("The preview swipes between a comparison's sides and answers with the deck's buttons", async ({
   page,
+  isMobile,
 }) => {
   await fixtures(page);
   const side = (id: string, index: 0 | 1, label: string) =>
@@ -879,6 +880,15 @@ test("The preview swipes between a comparison's sides and answers with the deck'
   await expect(viewer.getByRole("img", { name: "Side 40 Steps" })).toBeInViewport();
   expect(dream.requests).toEqual([]);
 
+  if (isMobile) {
+    await drag(page, viewer.getByRole("img", { name: "Side 40 Steps" }), 0, 160);
+    await expect(viewer).toBeHidden();
+    const reopen = page.getByRole("button", { name: "View B · 40 Steps", exact: true });
+    await expect(reopen).toBeFocused();
+    expect(dream.requests).toEqual([]);
+    await reopen.click();
+  }
+
   // This Image picks the side shown; with the deck empty the preview closes.
   const answers = viewer.getByRole("group", { name: "Comparison Answers" });
   await expect
@@ -907,6 +917,12 @@ test("The preview judges the top card with swipes and its buttons, and Undo step
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
   const card = preview.getByRole("group", { name: "Current Dream", exact: true });
   await expect(card.getByRole("img", { name: "Dream prompt one", exact: true })).toBeVisible();
+  if (isMobile) {
+    await drag(page, card.getByRole("img", { name: "Dream prompt one" }), 0, 160);
+    await expect(preview).toBeHidden();
+    expect(dream.requests).toEqual([]);
+    await current(page).getByRole("button", { name: "View", exact: true }).click();
+  }
   // A swipe right accepts and the next card comes forward, the preview staying open.
   await drag(
     page,
