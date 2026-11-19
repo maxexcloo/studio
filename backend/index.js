@@ -882,10 +882,10 @@ const suggestions = createSuggestions({
   save: (item, nextSteps) => updateGalleryJob(galleryKey(item), { nextSteps }),
   ideas: () => flagEnabled("STUDIO_PROMPT_IDEAS"),
   nextSteps: () => flagEnabled("STUDIO_NEXT_STEPS"),
-  target: (ownerId, item) =>
+  target: (ownerId, item, profileId) =>
     assistant.target(
       ownerId ? accountAccessForId(ownerId) : undefined,
-      item.settings?.profileId || "",
+      profileId ?? (item.settings?.profileId || ""),
     ),
   promptWriter: textWriter,
   fixed: (kind) =>

@@ -48,6 +48,8 @@ export function animateProfile(
   profiles,
   {
     defaultId,
+    profileId,
+    preferRadiance = false,
     localRunning,
     localParked = false,
     tier = "fast",
@@ -69,7 +71,11 @@ export function animateProfile(
   const grok = usable.filter(isCloudProfile);
   const pick = (pool, wanted) => {
     const frames = pool.filter(takesFirstFrame);
-    const candidates = frames.length ? frames : pool;
+    const framed = frames.length ? frames : pool;
+    const radiance = preferRadiance
+      ? framed.filter((profile) => profile.backend === "radiance")
+      : [];
+    const candidates = radiance.length ? radiance : framed;
     return chooseProfile(candidates, {
       kind: "video",
       tier: tierDistance[wanted].find((item) => candidates.some((p) => tierOf(p) === item)),
@@ -82,6 +88,15 @@ export function animateProfile(
   const refuse = (message) => {
     throw Object.assign(new Error(message), { offers });
   };
+  if (profileId) {
+    const profile = usable.find((item) => item.id === profileId);
+    if (!profile) refuse("This video profile is unavailable for animation.");
+    return withSize(
+      { profile, tier: tierOf(profile), cloud: isCloudProfile(profile), offers },
+      width,
+      height,
+    );
+  }
   const choose = (pool) => {
     const own = preferred[isCloudProfile(pool[0]) ? "cloud" : "local"];
     const profile = pool.find((item) => item.id === own) || pick(pool, tier);

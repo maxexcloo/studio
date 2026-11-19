@@ -47,6 +47,20 @@ test("Animate takes the account's Local default, else a local first-frame profil
   assert.equal(choose({ localRunning: true, preferred: { local: "gone" } }).profile.id, "fl-fast");
 });
 
+test("Animate prefers available Radiance unless a profile or Cloud preference takes precedence", () => {
+  const radiance = video("radiance-motion", "Radiance Motion", { backend: "radiance" });
+  const models = [...profiles, radiance];
+  const state = { localRunning: true, preferRadiance: true };
+  assert.equal(choose(state, models).profile.id, radiance.id);
+  assert.equal(choose({ ...state, prefer: "cloud" }, models).profile.id, grok.id);
+  const selected = choose({ ...state, prefer: "cloud", profileId: "fl-fast" }, models);
+  assert.equal(selected.profile.id, "fl-fast");
+  assert.deepEqual(selected.size, { width: 832, height: 1248 });
+  const parked = [...profiles, { ...radiance, availability: "parked" }];
+  assert.equal(choose(state, parked).profile.id, "fl-fast");
+  assert.throws(() => choose({ ...state, profileId: "text-video" }, models), /unavailable/);
+});
+
 test("Picking Cloud or Local GPU takes only that pool, and Local refuses rather than fall back", () => {
   // Cloud goes to Grok without a note, even while local video runs.
   const cloud = choose({ localRunning: true, where: "cloud" });

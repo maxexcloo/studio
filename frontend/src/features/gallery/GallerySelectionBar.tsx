@@ -15,6 +15,7 @@ import { useQueueAction } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { mediaDownload } from "./download";
 import { itemAction, itemActionGroups, namedItemActions } from "./itemActions";
+import { useActionProfile } from "./mediaProfiles";
 import { prepareMediaShare } from "./mediaShare";
 import { finished } from "./MediaTile";
 import { useUpscaleMany } from "./UpscaleControls";
@@ -91,14 +92,15 @@ export function GallerySelectionBar({
   const upscale = useUpscaleMany(finishedImages);
   const iterate = useIterate();
   const templates = useAnimateTemplates();
-  const length = useAnimateLengthSetting(finishedImages[0]);
+  const { menu: profiles, profileId } = useActionProfile("video");
+  const length = useAnimateLengthSetting(finishedImages[0], profileId);
   const client = useQueryClient();
   const animate = useMutation({
-    mutationFn: async (theme: string) => {
+    mutationFn: async ({ theme, profileId }: { theme: string; profileId?: string }) => {
       const failed: string[] = [];
       let error: unknown;
       for (const item of finishedImages)
-        await iterate(item, { kind: "animate", theme }).catch((reason: unknown) => {
+        await iterate(item, { kind: "animate", theme, profileId }).catch((reason: unknown) => {
           failed.push(item.id);
           error ??= reason;
         });
@@ -199,7 +201,7 @@ export function GallerySelectionBar({
       itemAction("animate", {
         loading: animate.isPending,
         menu: assistMenu({
-          settings: [length],
+          settings: [...profiles, length],
           templates: templates
             .filter((template) => template.id !== "custom")
             .map((template) => ({
@@ -207,7 +209,7 @@ export function GallerySelectionBar({
               label: template.label,
               icon: icons.animate,
               disabled: animate.isPending || length.loading,
-              onClick: () => animate.mutate(template.id),
+              onClick: () => animate.mutate({ theme: template.id, profileId }),
             })),
           last: [],
         }),

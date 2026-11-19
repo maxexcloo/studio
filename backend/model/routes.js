@@ -54,6 +54,8 @@ export function registerModelRoutes(app, { catalogue }) {
       const models = modelsForAccount(await catalogue.catalogueModels(), req);
       const { profile, cloud, size, offers, note } = animateProfile(models.profiles || [], {
         defaultId: models.defaults?.videoModel,
+        profileId: typeof req.query.profileId === "string" ? req.query.profileId : undefined,
+        preferRadiance: true,
         localRunning: models.backends?.video?.available !== false,
         localParked: models.backends?.video?.parked === true,
         prefer: videos.side,
