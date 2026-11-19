@@ -1,21 +1,11 @@
 import { Button, SegmentedControl, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Fragment } from "react";
 
-import { isCloudProfile } from "../../../../shared/profiles";
-import { titleCase } from "../../../../shared/titles";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { ChipOption, ChipSelect } from "../generation/ChipSelect";
-import { modelsQuery } from "../generation/GenerationProvider";
-import { ProfileSelect } from "../generation/ProfilePicker";
-import { assistantQuery } from "../generation/PromptAssistant";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import {
   type GalleryWorkPreference,
-  type SidePreference,
-  type WorkKind,
-  defaultModelKeys,
   preferencesQuery,
   useSavePreferences,
   useTileCaptions,
@@ -23,7 +13,7 @@ import {
 import { DeleteFailedItems } from "./DeleteFailedItems";
 import { FinishLikedImages } from "./FinishLikedImages";
 
-type ModelChoice = "cloudModels" | "loras" | "uncensoredModels";
+type ModelChoice = "loras" | "uncensoredModels";
 /** A switch for a model choice the account turns off for itself, shown only where its role or group grants it. */
 function ModelChoiceRow({
   choice,
@@ -64,119 +54,6 @@ function ModelChoices() {
         label="Uncensored"
         description="Offer uncensored models and themes, and allow explicit prompt ideas."
       />
-    </SettingGroup>
-  );
-}
-
-/** The model a side uses until the account picks one. */
-const studioDefault = "Studio's Default";
-const sides: { value: SidePreference; label: string }[] = [
-  { value: "cloud", label: "Cloud" },
-  { value: "local", label: "Local" },
-];
-const kinds: { kind: WorkKind; label: string; description: string }[] = [
-  { kind: "images", label: "Images", description: "Where new images run until you pick a model." },
-  {
-    kind: "videos",
-    label: "Videos",
-    description: "Where new videos and Animate run until you pick a model.",
-  },
-  {
-    kind: "text",
-    label: "Text",
-    description:
-      "Where prompt writing, titles, captions, suggestions and Dream's writing run. Local shares a GPU with images.",
-  },
-];
-
-/**
- * Cloud Models, then for Images, Videos and Text where each runs by default (unsaved, Local, Cloud
- * and Local) and its default model on each side, the deployment's until one is chosen; each row
- * leads with its kind, so they read in order. With Cloud Models off, Cloud is no choice and only
- * the Local defaults remain, as the backend reads it (account-preferences.js).
- */
-function WhereWorkRuns() {
-  const status = useQuery(preferencesQuery).data;
-  const profiles = useQuery(modelsQuery).data?.profiles;
-  const textModels = useQuery(assistantQuery).data?.models;
-  const save = useSavePreferences();
-  if (!status) return null;
-  const { preferences } = status;
-  const cloud = preferences.cloudModels;
-  const defaultRow = (kind: WorkKind, label: string, side: SidePreference) => {
-    const key = defaultModelKeys[kind][side];
-    const sideLabel = side === "cloud" ? "Cloud" : "Local";
-    const name = `${label} Default ${sideLabel} Model`;
-    const value = preferences[key] ?? null;
-    const choose = (choice: string | null) => save.mutate({ [key]: choice || null });
-    const text = (textModels || []).filter(
-      (model) => model.startsWith("local/") === (side === "local"),
-    );
-    return (
-      <SettingRow
-        key={key}
-        wide
-        label={name}
-        description={`The ${label.toLowerCase()} model ${sideLabel} uses until you pick one.`}
-      >
-        {kind === "text" ? (
-          <ChipSelect
-            field
-            name={name}
-            searchable
-            nothingFoundMessage="No Matches"
-            data={[
-              { value: "", label: studioDefault },
-              ...text.map((model) => ({ value: model, label: textModelName(model) })),
-            ]}
-            value={value ?? ""}
-            renderOption={({ option, checked }) => (
-              <ChipOption label={option.label} checked={checked} />
-            )}
-            onChange={choose}
-            label={value ? textModelName(value) : studioDefault}
-          />
-        ) : (
-          <ProfileSelect
-            field
-            name={name}
-            unset={studioDefault}
-            profiles={(profiles || []).filter(
-              (profile) =>
-                profile.kind === (kind === "images" ? "image" : "video") &&
-                isCloudProfile(profile) === (side === "cloud"),
-            )}
-            value={value}
-            onChange={(profile) => choose(profile?.id ?? null)}
-          />
-        )}
-      </SettingRow>
-    );
-  };
-  return (
-    <SettingGroup title="Where Work Runs">
-      <ModelChoiceRow
-        choice="cloudModels"
-        label="Cloud Models"
-        description="Offer the cloud models you have access to. Off keeps all work local, here and over MCP."
-      />
-      {kinds.map(({ kind, label, description }) => (
-        <Fragment key={kind}>
-          {cloud && (
-            <SettingRow wide label={`${label} Default`} description={description}>
-              <SegmentedControl
-                aria-label={`${label} Default`}
-                fullWidth
-                data={sides}
-                value={preferences[kind] || (kind === "text" ? "cloud" : "local")}
-                onChange={(side) => save.mutate({ [kind]: side as SidePreference })}
-              />
-            </SettingRow>
-          )}
-          {cloud && defaultRow(kind, label, "cloud")}
-          {defaultRow(kind, label, "local")}
-        </Fragment>
-      ))}
     </SettingGroup>
   );
 }
@@ -263,18 +140,9 @@ export function Preferences() {
           />
         </SettingRow>
       </SettingGroup>
-      <WhereWorkRuns />
       <SettingGroup title="Danger Zone" danger>
         <DeleteFailedItems />
       </SettingGroup>
     </Stack>
   );
 }
-
-const brands: Record<string, string> = { deepseek: "DeepSeek", glm: "GLM", mimo: "MiMo" };
-const titled = (word: string) => brands[word] ?? titleCase(word);
-/** A gateway alias by its readable name: `cloud/glm-flash` reads GLM Flash · Cloud. */
-const textModelName = (id: string) => {
-  const [side, name = ""] = id.split("/");
-  return `${name.split("-").map(titled).join(" ")} · ${titled(side)}`;
-};

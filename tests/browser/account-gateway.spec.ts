@@ -432,33 +432,16 @@ test("Administrators change roles, reset passwords and delete galleries, account
   expect(state.administration.accessProfiles.map((group) => group.id)).toEqual(["users"]);
 });
 
-test("A member turns the Cloud Models its group grants off for itself, leaving Cloud no choice", async ({
-  page,
-}) => {
+test("Where Work Runs shows local defaults for accounts without cloud access", async ({ page }) => {
   const state = await fixtures(page);
-  await signIn(page, { id: "member", role: "user", features: { cloudModels: true } });
-  state.preferences.grants = { cloudModels: true, loras: false, uncensoredModels: false };
+  await signIn(page, { id: "member", role: "user", features: { cloudModels: false } });
   state.preferences.preferences.images = "cloud";
-  await page.goto("/settings#preferences");
-  const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
-  await expect(where).toBeVisible();
-  // Only what the group grants can be turned off.
-  await expect(page.getByRole("region", { name: "Models", exact: true })).toHaveCount(0);
-  const images = where.getByRole("radiogroup", { name: "Images Default", exact: true });
-  await expect(images.getByRole("radio", { name: "Cloud" })).toBeChecked();
-  const cloud = where.getByRole("switch", { name: "Cloud Models", exact: true });
-  await expect(cloud).toBeChecked();
-  await cloud.click({ force: true });
-  await expect(cloud).not.toBeChecked();
-  await expect.poll(() => state.preferences.preferences.cloudModels).toBe(false);
-  // Nothing then chooses Cloud: only the Local defaults remain.
+  await page.goto("/settings#where-work-runs");
+  const where = page.getByRole("region", { name: "Settings: Where Work Runs", exact: true });
+  const videos = where.getByRole("region", { name: "Videos", exact: true });
+  await expect(videos.getByRole("combobox", { name: "Local Model", exact: true })).toBeVisible();
   await expect(where.getByRole("radiogroup")).toHaveCount(0);
-  await expect(where.getByRole("combobox", { name: /Cloud Model$/ })).toHaveCount(0);
-  await expect(
-    where.getByRole("combobox", { name: "Videos Default Local Model", exact: true }),
-  ).toBeVisible();
-  await page.reload();
-  await expect(cloud).not.toBeChecked();
+  await expect(where.getByRole("combobox", { name: "Cloud Model", exact: true })).toHaveCount(0);
 });
 
 test("Account menu names the account by its email and opens the account workspace", async ({
