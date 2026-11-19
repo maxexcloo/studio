@@ -494,13 +494,6 @@ export function DreamDeck({
                 </Tooltip>
               )}
             </div>
-            {isTop &&
-              card.kind === "library" &&
-              card.item.jobId &&
-              card.item.prompt?.trim() &&
-              card.item.settings?.profileId && (
-                <LibrarySuggest key={card.item.id} item={card.item} />
-              )}
             <CardText item={card.item} dreamt={card.kind === "dream"} full={sideways} />
           </>
         )}
@@ -532,6 +525,13 @@ export function DreamDeck({
         {undoButton}
       </>
     );
+  const suggest =
+    top.kind === "library" &&
+    top.item.jobId &&
+    top.item.prompt?.trim() &&
+    top.item.settings?.profileId ? (
+      <LibrarySuggest key={top.item.id} item={top.item} />
+    ) : undefined;
   const stack = (full: boolean) =>
     cards
       .slice(0, full ? 2 : 3)
@@ -546,6 +546,7 @@ export function DreamDeck({
         card={top}
         act={(choice) => void act(choice)}
         hidden={!!viewing}
+        trailing={viewing ? undefined : suggest}
         shown={top.kind === "pair" && top.pairId ? shown : undefined}
       />
       {!phone && !touch && (
@@ -564,6 +565,7 @@ export function DreamDeck({
           close={closePreview}
           act={(choice) => void act(choice)}
           undo={undo}
+          suggest={suggest}
           onKeyDown={(event) => {
             // A comparison's sides step with the arrows; its answers are its buttons.
             if (top.kind !== "pair" || (top.pairId && event.key === "ArrowUp"))

@@ -529,8 +529,32 @@ test("Taste displays readable preferences and saves explicit edits separately", 
       signals: 40,
     },
   });
+  const sameness = { recent: null, earlier: null, converging: false, examples: [] };
+  await page.route("**/api/taste/reflection?*", (route) =>
+    route.fulfill({
+      json: {
+        sameness: { made: sameness, liked: sameness },
+        days: [19, 18, 17, 16].map((day) => ({
+          day: `2026-11-${day}`,
+          profileId: "image:test",
+          profileName: "Image Quality",
+          model: "test.safetensors",
+          made: 10,
+          liked: 2,
+          disliked: 1,
+        })),
+      },
+    }),
+  );
   await page.goto("/dream");
   await showView(page, "Taste");
+  const history = page.getByRole("region", { name: "History", exact: true });
+  const historyRows = history.getByRole("table", { name: "History", exact: true }).getByRole("row");
+  await expect(historyRows).toHaveCount(4);
+  await history.getByRole("button", { name: "Show All", exact: true }).click();
+  await expect(historyRows).toHaveCount(5);
+  await history.getByRole("button", { name: "Show Less", exact: true }).click();
+  await expect(historyRows).toHaveCount(4);
   const profile = page.getByRole("region", { name: "Taste Profile" });
   await expect(profile.getByText(/foxes in snow/)).toBeVisible();
   await expect(profile.getByText("Image Quality", { exact: true })).toBeVisible();
@@ -919,7 +943,10 @@ test("The preview judges the top card with swipes and its buttons, and Undo step
     page.viewportSize()!.width * 0.45,
   );
   await expect(card.getByRole("img", { name: "Dream prompt two", exact: true })).toBeVisible();
-  await preview.getByRole("button", { name: "Undo", exact: true }).click();
+  await preview
+    .getByRole("group", { name: "Dream Actions", exact: true })
+    .getByRole("button", { name: "Undo", exact: true })
+    .click();
   await expect(card.getByRole("img", { name: "Dream prompt one", exact: true })).toBeVisible();
   const details = await previewDetails(preview, isMobile);
   await expect(details).toContainText("Dream prompt one");
@@ -1142,6 +1169,7 @@ test("New Project suggests an empty brief field and Undo restores it", async ({
     return route.fulfill({ json: { text: "Soft morning light by the harbour." } });
   });
   await page.goto("/dream/projects");
+  await expect(page.getByText("No Projects", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "New Project", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "New Project", exact: true });
   const name = editor.getByRole("textbox", { name: "Name", exact: true });

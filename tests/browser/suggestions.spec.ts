@@ -141,7 +141,8 @@ test("The viewer directly offers Suggested and Templates without styles or item 
   await expect(menu.getByRole("menuitem", { name: "Refresh", exact: true })).toHaveCount(0);
   release[0]();
   await expect(menu.getByRole("menuitem", { name: steps[0].label, exact: true })).toBeVisible();
-  await expect(menu.getByRole("menuitem").nth(-2)).toHaveText("Custom…");
+  await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem").last()).toHaveText("Edit in Composer");
   expect(asked).toEqual([
     { surface: "viewer", jobId: "job-hub", fresh: false, prompt: "An amber bird", itemId: "hub" },
@@ -357,7 +358,9 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
     const body = route.request().postDataJSON();
     asked.push(body);
     return route.fulfill({
-      json: { suggestions: body.surface === "change" ? [{ action: "edit", ...steps[2] }] : steps },
+      json: {
+        suggestions: body.surface === "change" ? [{ action: body.actions[0], ...steps[2] }] : steps,
+      },
     });
   });
   await page.goto("/images");
@@ -416,9 +419,21 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   await expect(review()).toHaveAttribute("aria-checked", "false");
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
-  menu = await viewerChangeMenu(page);
+  menu = await viewerChangeMenu(page, "Recreate");
   await expect(review()).toHaveAttribute("aria-checked", "false");
+  await expect(menu.getByText("Suggested", { exact: true })).toBeVisible();
+  await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem").nth(-2)).toHaveText("Compare in Composer");
+  await expect(menu.getByRole("menuitem").last()).toHaveText("Recreate in Composer");
   await menu.getByRole("menuitem", { name: "Night Version", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
+  expect(asked.filter((body) => body.surface === "change").at(-1)).toMatchObject({
+    actions: ["recreate"],
+    request: steps[2].request,
+  });
+  expect(state.jobs[1]).toMatchObject({
+    operation: "image",
+    input: { prompt: steps[2].prompt, referenceAssets: [], seed: 1234567 },
+  });
   await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });

@@ -31,8 +31,9 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { menuWidth } from "../theme";
+import { easing, menuWidth } from "../theme";
 import { type Action, ActionMenuItems } from "./ActionBar";
+import { useMotionDuration } from "./Appearance";
 import { useCopy } from "./clipboard";
 import { icons } from "./icons";
 import { layerAbove, popupLayer } from "./popupClicks";
@@ -200,6 +201,38 @@ export function TextBox({
     );
   const [focused, setFocused] = useState(false);
   const resting = oneLine && !focused;
+  const centreTools = oneLine && Boolean(send) && !phone;
+  const inlineTools = useRef<HTMLDivElement>(null);
+  const motionDuration = useMotionDuration();
+  useLayoutEffect(() => {
+    const input = field.current;
+    const controls = inlineTools.current;
+    const row = controls?.parentElement;
+    if (!centreTools || !input || !controls || !row || !motionDuration) return;
+
+    const centre = () => row.getBoundingClientRect().top + controls.offsetTop;
+    let previousTop = centre();
+    let animation: Animation | undefined;
+    const resize = new ResizeObserver(() => {
+      const top = centre();
+      const delta = previousTop - top;
+      previousTop = top;
+      if (!delta) return;
+
+      // Continue from the visible position if the prompt changes height again mid-transition.
+      const offset = delta + controls.getBoundingClientRect().top - top;
+      animation?.cancel();
+      animation = controls.animate(
+        [{ transform: `translateY(${offset}px)` }, { transform: "none" }],
+        { duration: motionDuration, easing: easing.enter },
+      );
+    });
+    resize.observe(input);
+    return () => {
+      resize.disconnect();
+      animation?.cancel();
+    };
+  }, [centreTools, hideTools, motionDuration]);
   // The resting line is drawn over the text, since WebKit ends no textarea in an ellipsis; it
   // takes the textarea's font, padding and border so the two line up.
   const ref = useMergedRef(field, props.ref);
@@ -538,10 +571,10 @@ export function TextBox({
           {popups && <div className={classes.anchor}>{popups}</div>}
         </div>
       ) : ((!phone || ai) && tools && !inside) || send ? (
-        <div className={classes.columned}>
+        <div className={classes.columned} data-centre-tools={centreTools || undefined}>
           {textarea}
           {!editing && !hideTools && (
-            <div className={classes.tools}>
+            <div className={classes.tools} ref={inlineTools}>
               {(!phone || ai) && boxTools}
               {send}
             </div>

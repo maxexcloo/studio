@@ -1,7 +1,6 @@
 import {
   ActionIcon,
   Alert,
-  Button,
   ScrollArea,
   Stack,
   Text,
@@ -145,9 +144,6 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
   return (
     <>
       {actionTarget &&
-        !projects.isPending &&
-        (list.length > 0 || !inbox.isPending) &&
-        !empty &&
         createPortal(
           <Tooltip label="New Project">
             <ActionIcon
@@ -170,16 +166,7 @@ export function DreamProjects({ actionTarget }: { actionTarget: HTMLDivElement |
       ) : !list.length && inbox.isPending ? (
         <LoadingState fill label="Loading Inbox" />
       ) : empty ? (
-        <EmptyState
-          fill
-          action={
-            <Button leftSection={<icons.add size={16} />} onClick={() => setEditing({})}>
-              New Project
-            </Button>
-          }
-        >
-          No Projects
-        </EmptyState>
+        <EmptyState fill>No Projects</EmptyState>
       ) : (
         <ScrollArea flex={1} mih={0}>
           <Stack w="100%" maw={760} mx="auto" gap="lg" pb="md">
