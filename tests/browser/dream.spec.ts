@@ -69,6 +69,7 @@ async function useLoras(form: Locator, on: boolean) {
  * guards was touch-only), the mouse elsewhere.
  */
 async function drag(page: Page, target: Locator, dx: number, dy = 0) {
+  await expect(target).toBeVisible();
   const box = (await target.boundingBox())!;
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
