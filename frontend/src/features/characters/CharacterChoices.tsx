@@ -9,6 +9,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
 import { PickerGrid, PickerTile } from "../generation/Picker";
+import { type CardSort, listedCards } from "./cardListing";
 import { type CardParts, removeCharacter } from "./cardParts";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import { type CharacterCard, applyCharacter, characterApplied, charactersQuery } from "./queries";
@@ -53,6 +54,8 @@ export const switchedText = (name: string) =>
  */
 export function CharacterChoices({
   query,
+  sort,
+  disliked,
   references,
   prompt,
   parts,
@@ -62,6 +65,8 @@ export function CharacterChoices({
   onLayer,
 }: {
   query: string;
+  sort: CardSort;
+  disliked: boolean;
   references: ReferenceAsset[];
   prompt: string;
   parts?: CardParts;
@@ -80,10 +85,7 @@ export function CharacterChoices({
   const [switched, setSwitched] = useState("");
   const editor = switchable ? characterEditor(profile, models.data) : undefined;
   const dialogs = useCharacterDialogs(onLayer);
-  const words = query.trim().toLowerCase();
-  const cards = (characters.data || []).filter(
-    (card) => !words || `${card.name} ${card.description}`.toLowerCase().includes(words),
-  );
+  const cards = listedCards(characters.data, query, { sort, disliked });
   if (characters.isPending) return <LoadingState fill label="Loading Characters" />;
   if (characters.error) return <Alert color="red">{characters.error.message}</Alert>;
   return (

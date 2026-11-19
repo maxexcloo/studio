@@ -3,9 +3,11 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { type GallerySort, gallerySortLabels } from "../../../../shared/gallery-sort";
 import type { MediaItem } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
+import { SortMenu } from "../../ui/SortMenu";
 import {
   GalleryFilterPanel,
   type GalleryFilterValues,
@@ -32,9 +34,8 @@ export const galleryTabs: { value: Tab; label: string }[] = [
 
 /**
  * The gallery's images to choose from, as the References sheet and the card editors show them: the
- * picker header (the gallery's tabs and any `more` after them, search, Filter ▾ and `actions`),
- * then any `notice` under it, so the header keeps its place across tabs, then the tiles, each with a Preview, paged and virtualised as they scroll in the room they are
- * given, keeping their place in `browser`; `onLayer` hears while a preview is open.
+ * picker header, any notice under it, and paged, virtualised tiles that keep their scroll place
+ * in `browser`. `onLayer` hears while a preview is open.
  * Render inside a flex column that bounds its height.
  */
 export function GalleryChoices({
@@ -43,7 +44,7 @@ export function GalleryChoices({
   uploadTile,
   browser,
   enabled,
-  actions,
+  sorting,
   notice,
   tile,
   onLayer,
@@ -54,7 +55,7 @@ export function GalleryChoices({
   uploadTile?: ReactNode;
   browser: ReferenceBrowser;
   enabled: boolean;
-  actions?: ReactNode;
+  sorting?: { value: GallerySort; onChange: (value: GallerySort) => void };
   notice?: ReactNode;
   /** Each image's tile: its accessible label, from `name`, whether it is chosen and what a tap does. */
   tile: (
@@ -107,7 +108,7 @@ export function GalleryChoices({
       : []),
   ]);
   const [search] = useDebouncedValue(query, 250);
-  const { listing, items: loaded } = useGalleryImages(search, applied, enabled);
+  const { listing, items: loaded } = useGalleryImages(search, applied, enabled, sorting?.value);
   const queue = useQuery({ ...queueQuery, enabled: grouped }).data?.jobs;
   const items = grouped ? versionGroups(loaded, queue || []).map((group) => group[0]) : loaded;
   const [viewport, setViewport] = useState<HTMLDivElement | null>(null);
@@ -156,7 +157,7 @@ export function GalleryChoices({
   const morePages = (
     <MorePages
       listing={listing}
-      results={JSON.stringify([search, filters, tab])}
+      results={JSON.stringify([search, filters, tab, sorting?.value])}
       root={items.length ? viewport : null}
     />
   );
@@ -172,7 +173,20 @@ export function GalleryChoices({
         onQueryChange={(query) => browse({ query })}
         filterCount={activeFilters.length}
         onClearFilters={() => browse({ filters: emptyGalleryFilters, originalsOnly: false })}
-        actions={actions}
+        actions={
+          sorting && (
+            <SortMenu
+              label={`Sort ${label}`}
+              labels={gallerySortLabels}
+              value={sorting.value}
+              onChange={(value) => {
+                browser.scroll.current = 0;
+                viewport?.scrollTo({ top: 0 });
+                sorting.onChange(value);
+              }}
+            />
+          )
+        }
         filters={
           <GalleryFilterPanel
             {...filterProps}

@@ -667,7 +667,12 @@ export async function fixtures(page: Page) {
       );
       // Similar ranks the image first.
       const similar = url.searchParams.get("similar");
+      const sort = url.searchParams.get("sort");
       if (similar) items.sort((a, b) => Number(b.id === similar) - Number(a.id === similar));
+      else if (sort === "oldest")
+        items.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+      else if (sort === "liked")
+        items.sort((a, b) => Number(b.rating === "liked") - Number(a.rating === "liked"));
       return respond({ items, hasMore: false, nextCursor: "", totalApprox: items.length });
     }
     // Character, outfit and scene cards, their images shown as reference assets.
@@ -684,6 +689,9 @@ export async function fixtures(page: Page) {
         id,
         name: fields.name,
         description: fields.description,
+        createdAt: stamp,
+        updatedAt: stamp,
+        rating: null,
         referenceIds: fields.referenceIds,
         references: fields.referenceIds.map((asset: string) => ({
           id: asset,
@@ -707,7 +715,11 @@ export async function fixtures(page: Page) {
         return respond({ ok: true, [noun]: list.at(-1) }, 201);
       }
       if (method === "PUT") {
-        list[index] = card(body, id);
+        list[index] = { ...card(body, id), rating: list[index].rating };
+        return respond({ ok: true, [noun]: list[index] });
+      }
+      if (method === "PATCH") {
+        list[index] = { ...list[index], rating: body.rating };
         return respond({ ok: true, [noun]: list[index] });
       }
       if (method === "DELETE") {

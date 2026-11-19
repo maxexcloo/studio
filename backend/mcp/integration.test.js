@@ -2054,7 +2054,12 @@ test("models lists the account's characters, and generate applies one by name: i
     name: "Raincoat",
     description: "a yellow raincoat and black boots",
   });
+  f.outfits.push(
+    { id: "out-suit", name: "Suit", description: "a grey suit", rating: "disliked" },
+    { id: "out-cloak", name: "Cloak", description: "a blue cloak", rating: "liked" },
+  );
   assert.deepEqual(data(await call(client, "models")).outfits, [
+    { id: "out-cloak", name: "Cloak", description: "a blue cloak", rating: "liked" },
     { id: "out-1", name: "Raincoat", description: "a yellow raincoat and black boots" },
   ]);
   const shot = { scene: "a rainy street at night", action: "walking", camera: "full-length shot" };

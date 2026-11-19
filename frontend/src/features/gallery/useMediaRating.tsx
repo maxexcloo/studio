@@ -101,6 +101,7 @@ export function useRatings() {
       void cache.invalidateQueries({
         predicate: (query) =>
           Boolean(listRating(query)) ||
+          (query.queryKey[0] === galleryKey[0] && query.queryKey.at(-1) === "liked") ||
           (rating !== "liked" && String(query.queryKey[0]) === "gallery"),
       }),
   });

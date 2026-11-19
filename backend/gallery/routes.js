@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 
+import { gallerySortLabels } from "../../shared/gallery-sort.ts";
 import { terminalStatuses } from "../../shared/queue.ts";
 import {
   ownedQuery,
@@ -192,6 +193,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const limit = Number(query.limit || 0);
     const cursor = String(query.cursor || "");
     const includeFailed = query.includeFailed !== "0";
+    const requestedSort = one(query.sort);
+    const sort = Object.hasOwn(gallerySortLabels, requestedSort) ? requestedSort : "newest";
     const looksLike = await near(one(query.q));
     const search = searchFilter(query, looksLike);
     // A text search reads only rows holding every word: the filter still decides what matches.
@@ -228,6 +231,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const page = owned
       ? pageGallery({
           rank: similarTo,
+          sort,
           type,
           limit: limit || 200,
           cursor,
@@ -300,9 +304,9 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
             );
     // A retry keeps its failed original's place (domain/queue.ts): it joins this page in order,
     // or none until it starts when its place is on a later page.
-    const leading = queued.filter((item) => !retried.has(item.jobId));
+    const leading = queued.filter((item) => sort !== "newest" || !retried.has(item.jobId));
     const items = [...page.items];
-    for (const item of queued.filter((item) => retried.has(item.jobId))) {
+    for (const item of queued.filter((item) => sort === "newest" && retried.has(item.jobId))) {
       const at = items.findIndex((listed) => compareGalleryItems(item, listed) < 0);
       if (at >= 0) items.splice(at, 0, item);
       else if (!page.hasMore) items.push(item);

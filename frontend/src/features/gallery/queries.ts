@@ -1,5 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
+import type { GallerySort } from "../../../../shared/gallery-sort";
 import { api } from "../../api";
 import type { MediaItem, MediaKind } from "../../types";
 import { type GalleryFilterValues, appendGalleryFilters } from "./GalleryFilters";
@@ -20,6 +21,7 @@ export interface GalleryListing {
   search: string;
   kind: MediaKind;
   filters: GalleryFilterValues;
+  sort?: GallerySort;
   similar?: string;
   strictness?: string;
   setId?: string;
@@ -40,6 +42,7 @@ export function galleryPage(
     type: listing.kind,
   });
   appendGalleryFilters(params, listing.filters);
+  if (listing.sort && listing.sort !== "newest") params.set("sort", listing.sort);
   if (listing.similar) {
     params.set("similar", listing.similar);
     params.set("strictness", listing.strictness || "");
@@ -64,6 +67,7 @@ export const galleryQuery = (
       listing.similar ? [listing.similar, listing.strictness] : null,
       listing.setId || null,
       listing.chat ? [listing.chat, listing.turn || null] : null,
+      listing.sort || "newest",
     ],
     initialPageParam: "",
     queryFn: ({ pageParam, signal }) => galleryPage(listing, pageParam, limit(pageParam), signal),

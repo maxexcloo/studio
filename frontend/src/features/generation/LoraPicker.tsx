@@ -33,6 +33,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { OrderedItems } from "../../ui/OrderedItems";
+import { SortMenu } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "./chip";
@@ -48,7 +49,6 @@ import {
   PickerTile,
   PopupHeading,
   SavedName,
-  SortMenu,
   useNaming,
 } from "./Picker";
 import { usePresets } from "./PresetPicker";
