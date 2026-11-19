@@ -1,4 +1,14 @@
-import { Boxes, Info, Plug, Server, Shield, UserRound, UsersRound, Wrench } from "lucide-react";
+import {
+  Boxes,
+  Info,
+  Plug,
+  Route,
+  Server,
+  Shield,
+  UserRound,
+  UsersRound,
+  Wrench,
+} from "lucide-react";
 
 import { icons } from "../../ui/icons";
 import {
@@ -25,30 +35,33 @@ const settingSections = {
   },
   preferences: {
     label: "Preferences",
-    description: "How Studio works for you, saved with your account.",
+    description: "Gallery, model access and prompt history preferences.",
     icon: icons.settings,
+    group: "Personal",
+  },
+  "where-work-runs": {
+    label: "Where Work Runs",
+    description: "Choose default models and where images, videos and text run.",
+    icon: Route,
     group: "Personal",
   },
   generation: {
     label: "Generation",
-    description:
-      "The profiles new drafts start on and the Dream settings forced on everyone, and deleting any account's failed items.",
+    description: "Default profiles and Dream settings for all accounts.",
     icon: Boxes,
     admin: true,
     group: "Administration",
   },
   groups: {
     label: "Groups",
-    description:
-      "Which models, uncensored content, Characters and Dream each group can use; administrators can use everything.",
+    description: "Model and feature access for each group.",
     icon: Shield,
     admin: true,
     group: "Administration",
   },
   maintenance: {
     label: "Maintenance",
-    description:
-      "Background AI, the passes that caption, check and index the gallery, and unfinished items.",
+    description: "Background AI, gallery maintenance and unfinished items.",
     icon: Wrench,
     admin: true,
     group: "Administration",
