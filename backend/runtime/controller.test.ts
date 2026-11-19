@@ -409,6 +409,9 @@ test("waiting ComfyUI work swaps Radiance out after its accepted work, and Radia
     (await controller.observe()).history[0].requestedBy,
     "automatic: switching to Image for waiting ComfyUI work",
   );
+  const swapped = await controller.observe();
+  assert.deepEqual(swapped.placement, ["radiance"]);
+  assert.equal(swapped.workloads.find(({ id }) => id === "image")?.phase, "running");
   (await controller.acquire("image")).release();
   await assert.rejects(controller.acquire("radiance"), {
     message: "Waiting for Radiance — Studio switches the GPUs back once the ComfyUI work finishes.",

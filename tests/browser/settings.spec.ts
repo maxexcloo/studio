@@ -497,6 +497,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
     route.fulfill({
       json: {
         pools: [{ id: "gpu", capacity: 2, used: 2 }],
+        placement: ["image", "text"],
         // Four changes, newest first; only the latest three show until Show All.
         history: ["first", "second", "third", "earlier"].map((id) => ({
           id,
@@ -517,6 +518,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
           workload("image", "Image", "running"),
           workload("text", "Text", "running"),
           workload("video", "Video", "parked"),
+          { ...workload("radiance", "Radiance", "parked", 2), radiance: true },
         ],
       },
     }),
@@ -524,7 +526,18 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   const previews: unknown[] = [];
   const applied: unknown[] = [];
   await page.route("**/api/runtime/preview", (route) => {
-    previews.push(route.request().postDataJSON());
+    const choice = route.request().postDataJSON();
+    previews.push(choice);
+    if (choice.workloads?.includes("radiance"))
+      return route.fulfill({
+        json: {
+          target: ["radiance"],
+          stop: ["image", "text"],
+          start: ["radiance"],
+          keep: [],
+          signature: "radiance",
+        },
+      });
     return route.fulfill({
       json: {
         target: ["text", "video"],
@@ -545,7 +558,19 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   const history = page.getByRole("region", { name: "History", exact: true });
   await expect(history).toBeVisible();
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
-  await expect(table.getByRole("checkbox", { name: "Run Image", exact: true })).toBeChecked();
+  const placement = page.getByRole("combobox", { name: "GPU Placement", exact: true });
+  await expect(placement).toHaveValue("ComfyUI · 2 GPUs");
+  await placement.click();
+  await expect(page.getByRole("option", { name: "ComfyUI · 1 GPU", exact: true })).toBeVisible();
+  await page.getByRole("option", { name: "Radiance · 2 GPUs", exact: true }).click();
+  await expect(table.getByRole("row", { name: "Radiance", exact: true })).toContainText("Stopped");
+  await page.getByRole("button", { name: "Preview Changes", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Apply GPU Placement" });
+  await expect(dialog).toContainText("Start: Radiance");
+  expect(previews).toEqual([{ workloads: ["radiance"] }]);
+  expect(applied).toEqual([]);
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Reset", exact: true }).click();
   const changes = history.getByRole("table", { name: "Runtime Changes" });
   await expect(changes.getByRole("row", { name: "Restart Text" })).toHaveCount(3);
   await page.getByRole("button", { name: "Show All", exact: true }).click();
@@ -592,16 +617,18 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   );
   await page.keyboard.press("Escape");
   await expect(workloadLog).toBeHidden();
+  await placement.click();
+  await page.getByRole("option", { name: "Custom", exact: true }).click();
+  await expect(table.getByRole("checkbox", { name: "Run Image", exact: true })).toBeChecked();
   await table.getByRole("checkbox", { name: "Run Image", exact: true }).click();
   await table.getByRole("checkbox", { name: "Run Video", exact: true }).click();
   await page.getByRole("button", { name: "Preview Changes", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Apply GPU Placement" });
   await expect(dialog).toContainText("Stop: Image");
   await expect(dialog).toContainText("Start: Video");
   expect(applied).toEqual([]);
   await dialog.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(dialog).toBeHidden();
-  expect(previews).toEqual([{ workloads: ["text", "video"] }]);
+  expect(previews.at(-1)).toEqual({ workloads: ["text", "video"] });
   expect(applied).toEqual([{ workloads: ["text", "video"], signature: "fixture" }]);
   // A parked workload's own Start previews starting it beside what runs.
   const video = table.getByRole("row", { name: "Video", exact: true });

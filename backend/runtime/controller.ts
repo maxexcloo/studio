@@ -331,9 +331,11 @@ export class RuntimeController {
       if ("state" in entry && holds(entry.state))
         used[entry.workload.pool] = (used[entry.workload.pool] ?? 0) + entry.workload.gpus;
     const swaps = this.swaps;
+    const placement = this.record.home ?? this.record.desired;
     const loads = this.queueStatus().workloads;
     return {
       ...(swaps ? { swaps } : {}),
+      ...(placement ? { placement: [...placement] } : {}),
       pools: Object.entries(this.pools).map(([id, capacity]) => ({
         id,
         capacity,
