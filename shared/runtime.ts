@@ -94,6 +94,8 @@ export interface RuntimePodLog {
 }
 
 export interface RuntimeStatus {
+  /** The administrator’s placement, including while an automatic swap runs other workloads. */
+  placement?: string[];
   /** Whether waiting ComfyUI work swaps in for Radiance, or a placement by hand paused that. */
   swaps?: "automatic" | "paused";
   pools: { id: string; capacity: number; used: number }[];
