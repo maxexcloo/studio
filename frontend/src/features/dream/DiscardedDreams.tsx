@@ -107,7 +107,7 @@ export function DiscardedDreams({ media }: { media: DreamMedia }) {
       </ConfirmDialog>
       <SimpleGrid cols={{ base: 2, sm: 3, md: 5, lg: 6 }} spacing="sm" pb="md">
         {items.map((item) => (
-          <Card key={item.id} withBorder padding={0} radius="md">
+          <Card key={item.id} withBorder padding={0} radius="lg">
             <UnstyledButton
               aria-label={`View ${item.prompt || "Result"}`}
               onClick={() => setViewing(item.id)}
@@ -116,13 +116,13 @@ export function DiscardedDreams({ media }: { media: DreamMedia }) {
                 <Thumbnail item={item} />
               </AspectRatio>
             </UnstyledButton>
-            <Text size="xs" c="dimmed" lineClamp={2} px="xs" pt={6} mih={36}>
+            <Text size="xs" c="dimmed" lineClamp={2} px="sm" pt="xs" mih={42}>
               {item.prompt || item.dream?.prompt}
             </Text>
             <Button
               m="xs"
-              size="xs"
-              variant="light"
+              size="compact-sm"
+              variant="subtle"
               leftSection={<icons.keep size={14} />}
               loading={keep.isPending && keep.variables?.id === item.id}
               onClick={() => keep.mutate(item)}

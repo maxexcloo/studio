@@ -325,10 +325,14 @@ function ProposalCard({
       alt: `${proposal.title} ${index + 1}`,
     }));
   return (
-    <Paper withBorder p="sm" radius="md" component="article" aria-label={proposal.title}>
+    <Paper withBorder p="md" radius="lg" component="article" aria-label={proposal.title}>
       <Stack gap="xs">
         <Group gap="xs" wrap="nowrap" align="flex-start">
-          <Icon size={18} aria-hidden style={{ flexShrink: 0, marginTop: 2 }} />
+          <Icon
+            size={18}
+            aria-hidden
+            style={{ flexShrink: 0, marginTop: 2, color: "var(--mantine-color-dimmed)" }}
+          />
           <Stack gap={2} flex={1} miw={0}>
             <Text size="sm" fw={600}>
               {proposal.title}
