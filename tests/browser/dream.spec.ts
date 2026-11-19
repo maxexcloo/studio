@@ -171,7 +171,7 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
         .getByRole("button")
         .evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Dislike", "Like", "Accept"]);
+    .toEqual(["Undo", "Dislike", "Like", "Accept"]);
   await preview.getByRole("button", { name: "Accept", exact: true }).click();
   await expect(preview).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
@@ -885,7 +885,7 @@ test("The preview swipes between a comparison's sides and answers with the deck'
     .poll(() =>
       answers.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Neither", "This Image", "Like", "Both"]);
+    .toEqual(["Undo", "Neither", "This Image", "Like", "Both"]);
   await answers.getByRole("button", { name: "This Image", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
