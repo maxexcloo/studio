@@ -60,7 +60,7 @@ const time = (value?: string) => {
   return date && !Number.isNaN(date.getTime()) ? formatDateTime(date) : "";
 };
 /** The recorded profile's readable name, then the current profile's, then the model file's. */
-const recordedModel = (item: MediaItem, profiles: Profile[]) => {
+export const recordedModel = (item: MediaItem, profiles: Profile[]) => {
   const settings = item.settings || {};
   const recorded = profiles.find((profile) => isProfile(profile, settings.profileId));
   if (!settings.profileName && recorded) return profileName(recorded);
