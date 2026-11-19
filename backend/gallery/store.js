@@ -678,13 +678,14 @@ const reviewable = `status = 'done' AND unlisted = 0 AND uploaded = 0
   AND type IN ('image', 'video') AND rating IS NULL AND json_extract(value, '$.url') <> ''`;
 
 /** A seeded order across the whole library. The cursor survives ratings removing earlier rows. */
-export function pageLibraryReview(ownerId, seed, cursor, limit) {
+export function pageLibraryReview(ownerId, seed, cursor, limit, media) {
   const entries = statement(
     `SELECT key, json_extract(value, '$.createdAt') AS createdAt
       FROM studio_gallery WHERE owner_id = ? AND ${reviewable}
+      ${media ? "AND type = ?" : ""}
       AND coalesce(json_extract(value, '$.libraryReviewedAt'), 0) <= ?`,
   )
-    .all(ownerId, Date.now() - libraryReviewMs)
+    .all(ownerId, ...(media ? [media] : []), Date.now() - libraryReviewMs)
     .filter(({ key, createdAt }) => hasGalleryMedia({ url: key, createdAt }))
     .map(({ key }) => ({
       key,
