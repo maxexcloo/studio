@@ -26,9 +26,12 @@ export function useItemChange<T extends string>(
 ) {
   const video = item.type === "video";
   const assistant = useQuery(assistantQuery);
-  const [change, setChange] = useState<{ proposal: Change; typed: T; profileId?: string; preview: boolean } | null>(
-    null,
-  );
+  const [change, setChange] = useState<{
+    proposal: Change;
+    typed: T;
+    profileId?: string;
+    preview: boolean;
+  } | null>(null);
   const ask = useItemMutation(item.id, "ask-change", {
     mutationFn: async ({
       request,
