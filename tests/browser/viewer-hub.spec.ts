@@ -195,9 +195,9 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
   const surface = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
   const editProfile = async (name: string) => {
-    const profiles = page.getByRole("menuitem", { name: "Profile", exact: true });
-    if (isMobile) await profiles.click();
-    else await profiles.hover();
+    const profileMenu = page.getByRole("menuitem", { name: "Profile", exact: true });
+    if (isMobile) await profileMenu.click();
+    else await profileMenu.hover();
     await page.getByRole("menuitemradio", { name, exact: true }).click();
   };
   // Edit and Recreate open the same dialog and keep its last request.
@@ -1186,9 +1186,9 @@ test("Animate can pick a compatible profile over the saved default route", async
     });
   });
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  const profiles = page.getByRole("menuitem", { name: "Profile", exact: true });
-  if (isMobile) await profiles.click();
-  else await profiles.hover();
+  const profileMenu = page.getByRole("menuitem", { name: "Profile", exact: true });
+  if (isMobile) await profileMenu.click();
+  else await profileMenu.hover();
   await expect(page.getByRole("menuitemradio", { name: "Automatic", exact: true })).toBeChecked();
   await page.getByRole("menuitemradio", { name: "Motion Quality", exact: true }).click();
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
