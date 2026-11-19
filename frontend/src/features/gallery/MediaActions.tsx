@@ -40,7 +40,7 @@ import { useStageComparison } from "../compare/variants";
 import { assistMenu, useChangeSuggestions } from "../generation/AskChange";
 import { defaultProfile, useGeneration } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
-import { profileForBackend } from "../generation/payload";
+import { takesReferences } from "../generation/payload";
 import { type AssistantOption, assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
@@ -53,6 +53,7 @@ import {
 import { AnimateDialog } from "./AnimateDialog";
 import { videoGif } from "./download";
 import { itemAction, itemActionGroups } from "./itemActions";
+import { automaticEditProfile, useActionProfile } from "./mediaProfiles";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
 import { galleryKey } from "./queries";
@@ -171,14 +172,6 @@ function useSaveFrame(item: MediaItem): Action {
     keepOpen: true,
     onClick: () => save.mutate(),
   };
-}
-
-/** Whether a run with references on `profile` takes them: any of a combined profile's backends may. */
-function takesReferences(profile: Profile | undefined, backend?: string) {
-  const run = profileForBackend(profile, backend, true);
-  return Boolean(
-    run && (run.mediaInputs?.length || run.capabilities.img2img || run.capabilities.imageInput),
-  );
 }
 
 /**
@@ -385,9 +378,12 @@ export function useMediaActions(
       : [];
   // Animate says why no model can run before anything queues.
   const [review, setReview] = useAnimateReview();
-  const length = useAnimateLengthSetting(item);
+  const { menu: animateProfiles, profileId: animationProfileId } = useActionProfile("video");
+  const { menu: editProfiles, profileId: selectedEdit, profiles } = useActionProfile("image");
+  const editProfileId = selectedEdit || automaticEditProfile(profiles || [], item)?.id;
+  const length = useAnimateLengthSetting(item, animationProfileId);
   const animation = useQuery({
-    ...animateProfileQuery(item),
+    ...animateProfileQuery(item, animationProfileId),
     enabled: image || video,
     placeholderData: keepPreviousData,
   });
@@ -395,7 +391,7 @@ export function useMediaActions(
   const refusal = animation.error?.message;
   // A video's templates continue the clip from its last frame at once; it keeps the clip's own
   // model unless videos run on Cloud.
-  const animateDisabled = action.isPending || length.loading || (!video && !animation.data);
+  const animateDisabled = action.isPending || length.loading || ((!video || animationProfileId) && !animation.data);
   const templates = useAnimateTemplates();
   const templateItem = (template: AssistantOption): Action => ({
     id: `animate-${template.id}`,
@@ -404,8 +400,8 @@ export function useMediaActions(
     disabled: animateDisabled,
     onClick:
       template.id === "custom" || review
-        ? () => onAnimate({ theme: template.id })
-        : () => run({ kind: "animate", theme: template.id }),
+        ? () => onAnimate({ theme: template.id, profileId: animationProfileId })
+        : () => run({ kind: "animate", theme: template.id, profileId: animationProfileId }),
   });
   // Motions written for this image, asked for only once its Animate menu opens.
   const [motionsFor, setMotionsFor] = useState<string>();
@@ -416,8 +412,8 @@ export function useMediaActions(
     disabled: animateDisabled,
     onPick: (instruction) =>
       review
-        ? onAnimate({ theme: "custom", instruction })
-        : run({ kind: "animate", theme: "custom", instruction }),
+        ? onAnimate({ theme: "custom", instruction, profileId: animationProfileId })
+        : run({ kind: "animate", theme: "custom", instruction, profileId: animationProfileId }),
   });
   const motionsOffered = image && Boolean(item.jobId && assisted);
   // Templates write the prompt into an editable review before anything queues.
@@ -434,7 +430,7 @@ export function useMediaActions(
       ]
     : [];
   // A tile starts the same prompt change by opening the item's viewer.
-  const openViewer = (mode: ViewerChange, change: ViewerAsk["change"]) => {
+  const openViewer = (mode: ViewerChange, change: ViewerAsk["change"], profileId?: string) => {
     onApplied();
     const { chat, set, show, similar, turn } = (location.state as GalleryState | null) || {};
     navigate(viewerPath(item), {
@@ -445,12 +441,18 @@ export function useMediaActions(
         similar,
         turn,
         viewer: true,
-        ask: { itemId: item.id, action: mode, change } satisfies ViewerAsk,
+        ask: { itemId: item.id, action: mode, change, profileId } satisfies ViewerAsk,
       },
     });
   };
-  const pick = (mode: ViewerChange, request: string) =>
-    draft ? draft.pick(mode, request) : openViewer(mode, { request });
+  const pick = (mode: ViewerChange, request: string) => {
+    const profileId = mode === "edit" ? editProfileId : undefined;
+    return draft ? draft.pick(mode, request, profileId) : openViewer(mode, { request }, profileId);
+  };
+  const custom = (mode: ViewerChange) => {
+    const profileId = mode === "edit" ? editProfileId : undefined;
+    return draft ? draft.custom(mode, profileId) : openViewer(mode, { custom: true }, profileId);
+  };
   const [reviewChanges, setReviewChanges] = useMediaReview();
   const canChange = ready && !item.uploaded && Boolean(item.jobId);
   const assistedChanges = canChange && assisted;
@@ -474,18 +476,17 @@ export function useMediaActions(
     setSuggestions({ id: item.id, mode, prompt: draft?.suggestionPrompt });
   const changeMenu = (mode: ViewerChange, others: ActionGroups, last: Action[]) =>
     assistMenu({
-      settings: assistedChanges
-        ? [
-            {
-              id: "review",
-              label: "Review Prompt",
-              icon: icons.review,
-              checked: reviewChanges,
-              keepOpen: true,
-              onClick: () => setReviewChanges(!reviewChanges),
-            },
-          ]
-        : [],
+      settings: [
+        ...(mode === "edit" ? editProfiles : []),
+        ...(assistedChanges ? [{
+          id: "review",
+          label: "Review Prompt",
+          icon: icons.review,
+          checked: reviewChanges,
+          keepOpen: true,
+          onClick: () => setReviewChanges(!reviewChanges),
+        }] : []),
+      ],
       suggestions: assistedChanges && image ? steps.group : [],
       templates: assistedChanges
         ? (assistant.data?.changes ?? []).map((change) => ({
@@ -503,7 +504,7 @@ export function useMediaActions(
               label: "Custom…",
               icon: icons.custom,
               disabled: draft?.pending,
-              onClick: () => (draft ? draft.custom(mode) : openViewer(mode, { custom: true })),
+              onClick: () => custom(mode),
             },
           ]
         : [],
@@ -553,7 +554,7 @@ export function useMediaActions(
         onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
         menu: assistMenu({
           loading: optionsLoading,
-          settings: [length, ...reviewItems],
+          settings: [...animateProfiles, length, ...reviewItems],
           suggestions: motionsOffered ? motions.group : [],
           templates: templates.filter((template) => template.id !== "custom").map(templateItem),
           custom: templates.filter((template) => template.id === "custom").map(templateItem),
@@ -564,14 +565,14 @@ export function useMediaActions(
                   label: "Extend in Composer",
                   icon: FastForward,
                   disabled: animateDisabled,
-                  onClick: () => action.mutate({ operation: "extend" }),
+                  onClick: () => action.mutate({ operation: "extend", profileId: animationProfileId }),
                 }
               : {
                   id: "animate-composer",
                   label: "Animate in Composer",
                   icon: icons.prompt,
                   disabled: animateDisabled,
-                  onClick: () => action.mutate({ operation: "animate" }),
+                  onClick: () => action.mutate({ operation: "animate", profileId: animationProfileId }),
                 },
           ],
         }),
@@ -591,7 +592,7 @@ export function useMediaActions(
                   label: "Edit in Composer",
                   icon: icons.edit,
                   disabled: action.isPending,
-                  onClick: () => action.mutate({ operation: "refine", prompt: changedPrompt }),
+                  onClick: () => action.mutate({ operation: "refine", prompt: changedPrompt, profileId: editProfileId }),
                 },
               ],
             )

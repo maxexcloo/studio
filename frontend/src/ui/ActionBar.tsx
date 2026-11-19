@@ -50,6 +50,8 @@ export interface Action {
   pressed?: boolean;
   /** An on/off option: a checked menu item (Show Upscale), or with `keepOpen` a switch row. */
   checked?: boolean;
+  /** The choice in a single-selection submenu. */
+  selected?: boolean;
   color?: "red";
   disabled?: boolean;
   loading?: boolean;
@@ -97,7 +99,11 @@ export function findAction(groups: ActionGroups, id: string): Action | undefined
  * menu open (Review Prompt, Face Detail).
  */
 const isSetting = (action: Action) =>
-  Boolean(action.choice || (action.keepOpen && action.checked !== undefined));
+  Boolean(
+    action.choice ||
+    (action.keepOpen && action.checked !== undefined) ||
+    action.menu?.some((group) => group.some((option) => option.selected !== undefined)),
+  );
 
 /** What clicking the action does: its own click, or with options the first that isn't a setting. */
 export const usualAction = (action: Action): Action | undefined =>
@@ -152,7 +158,7 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
     <Fragment key={group[0].id}>
       {index > 0 && <Menu.Divider />}
       {group.map((action) => {
-        const { id, label, icon: Icon, pressed, checked, color, disabled, link, onClick } = action;
+        const { id, label, icon: Icon, pressed, checked, selected, color, disabled, link, onClick } = action;
         const describedBy = `${uid}-${id}`;
         if (action.heading) return <Menu.Label key={id}>{label}</Menu.Label>;
         if (action.choice)
@@ -256,12 +262,12 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                   aria-hidden
                   className={classes.switch}
                 />
-              ) : checked ? (
+              ) : checked || selected ? (
                 <Check size={14} />
               ) : undefined
             }
-            role={checked === undefined ? undefined : "menuitemcheckbox"}
-            aria-checked={checked}
+            role={selected !== undefined ? "menuitemradio" : checked !== undefined ? "menuitemcheckbox" : undefined}
+            aria-checked={selected ?? checked}
             {...described(action, describedBy)}
             disabled={disabled}
             closeMenuOnClick={!action.keepOpen}
