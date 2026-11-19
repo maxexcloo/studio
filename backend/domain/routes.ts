@@ -44,6 +44,33 @@ const newPollProfile = () => ({
   slowest: { totalMs: 0, listMs: 0, hydrateMs: 0, jsonSendMs: 0 },
 });
 
+/** Ranked jobs fill their resource's slots in dispatch order. Resources can run in parallel. */
+function dispatchOrder(
+  jobs: Pick<OwnedJob, "id" | "status" | "resource">[],
+  queue: GenerationQueue,
+) {
+  const queuePositions: Record<string, number> = Object.create(null);
+  const waitingResources: string[] = [];
+  const byResource = new Map<string, string[]>();
+  for (const job of jobs) {
+    if (!pendingStatuses.has(job.status)) continue;
+    const position = queue.queuePosition(job.id);
+    if (position === undefined) continue;
+    queuePositions[job.id] = position;
+    const resource = job.status === "writing" ? "writing" : job.resource;
+    const ids = byResource.get(resource) ?? [];
+    ids.push(job.id);
+    byResource.set(resource, ids);
+    waitingResources.push(resource);
+  }
+  // Each resource keeps its slots in the saved list. Their jobs run in parallel without a shared rank.
+  for (const ids of byResource.values()) ids.sort((a, b) => queuePositions[b] - queuePositions[a]);
+  return {
+    queuePositions,
+    queueOrder: waitingResources.map((resource) => byResource.get(resource)!.pop()!),
+  };
+}
+
 export function registerQueueRoutes(
   app: object,
   {
@@ -205,28 +232,11 @@ export function registerQueueRoutes(
     );
     const listedAt = performance.now();
     const since = typeof query.since === "string" ? query.since : undefined;
-    const queuePositions: Record<string, number> = Object.create(null);
-    const waitingResources: string[] = [];
-    const byResource = new Map<string, string[]>();
-    for (const job of jobs) {
-      if (!pendingStatuses.has(job.status)) continue;
-      const position = queue.queuePosition(job.id);
-      if (position === undefined) continue;
-      queuePositions[job.id] = position;
-      const resource = job.status === "writing" ? "writing" : job.resource;
-      const ids = byResource.get(resource) ?? [];
-      ids.push(job.id);
-      byResource.set(resource, ids);
-      waitingResources.push(resource);
-    }
-    // Each resource keeps its slots in the saved list. Their jobs run in parallel without a shared rank.
-    for (const ids of byResource.values())
-      ids.sort((a, b) => queuePositions[b] - queuePositions[a]);
+    const order = dispatchOrder(jobs, queue);
     const payload = {
       jobs: queued(ownerId, since ? jobs.filter((job) => job.updatedAt >= since) : jobs),
       ...(since ? { ids: jobs.map((job) => job.id) } : {}),
-      queuePositions,
-      queueOrder: waitingResources.map((resource) => byResource.get(resource)!.pop()!),
+      ...order,
       paused: { mine: pauses.has(ownerId), all: pauses.has(everyone) },
       clearableFailedSets,
     } satisfies QueueResponse;
@@ -430,17 +440,26 @@ export function registerMaintenanceRoutes(
   directRoute(app, "GET", "/api/maintenance/unfinished", (account) => {
     const refusal = adminRefusal(account);
     if (refusal) return refusal;
-    const working: UnfinishedJob[] = [];
-    const queued: UnfinishedJob[] = [];
-    const remaining: UnfinishedJob[] = [];
+    const working: OwnedJob[] = [];
+    const queued: OwnedJob[] = [];
+    const remaining: OwnedJob[] = [];
     for (const job of store.openJobs()) {
       if (job.cleared) continue;
-      const row = { ...publicJob(job), ownerId: job.ownerId };
-      if (acceptedWork(job) || queue.isWriting(job.id)) working.push(row);
-      else if (job.status === "queued" || job.status === "waiting") queued.push(row);
-      else remaining.push(row);
+      if (acceptedWork(job) || queue.isWriting(job.id)) working.push(job);
+      else if (job.status === "queued" || job.status === "waiting") queued.push(job);
+      else remaining.push(job);
     }
-    return { status: 200, payload: { jobs: [...working, ...queued, ...remaining] } };
+    const { queuePositions, queueOrder } = dispatchOrder(queued, queue);
+    const byId = new Map(queued.map((job) => [job.id, job]));
+    let next = 0;
+    const waiting = queued.map((job) =>
+      queuePositions[job.id] === undefined ? job : byId.get(queueOrder[next++])!,
+    );
+    const jobs: UnfinishedJob[] = [...working, ...waiting, ...remaining].map((job) => ({
+      ...publicJob(job),
+      ownerId: job.ownerId,
+    }));
+    return { status: 200, payload: { jobs } };
   });
   directRoute(app, "POST", "/api/maintenance/unfinished/retry", async (account, { body }) => {
     const refusal = adminRefusal(account);
