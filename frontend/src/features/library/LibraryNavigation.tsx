@@ -11,7 +11,6 @@ export const librarySections = {
     description:
       "Your saved presets: a prompt, model, settings or LoRAs to start from, or any mix of them.",
     icon: icons.preset,
-    group: "AI",
   },
   characters: {
     label: "Characters",

@@ -28,7 +28,7 @@ test("Settings follow the settled section order and run maintenance and worker r
     if (new URL(request.url()).pathname === "/api/services/status") statusReads++;
   });
   await page.goto("/settings");
-  // Personal, then Administration, each alphabetical, with Integrations and About apart.
+  // Personal, then Administration, each alphabetical, with About last.
   const order = [
     "Account",
     "Dream",
@@ -39,7 +39,6 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Maintenance",
     "Users",
     "Workers",
-    "Integrations",
     "About",
   ];
   if ((page.viewportSize()?.width || 1440) < 768) {
@@ -53,7 +52,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   if ((page.viewportSize()?.width || 1440) >= 768)
     await expect(
       page.getByRole("group", { name: "Administration", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(4, -2));
+    ).toHaveText(order.slice(4, -1));
   await section(page, "Settings", "Generation");
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
@@ -297,7 +296,7 @@ test("Where Work Runs saves each group’s processing and default models", async
         available: true,
         presets: [],
         writingModel: "cloud/uncensored",
-        models: ["cloud/auto", "cloud/uncensored", "local/auto"],
+        models: ["cloud/auto", "cloud/deepseek-flash-uncensored", "cloud/uncensored", "local/auto"],
       },
     }),
   );
@@ -313,12 +312,17 @@ test("Where Work Runs saves each group’s processing and default models", async
   await expect(textCloud).toHaveText("Studio's Default");
   await textCloud.click();
   const options = page.getByRole("listbox").getByRole("option");
-  await expect(options).toHaveText(["Studio's Default", "Auto · Cloud", "Uncensored · Cloud"]);
+  await expect(options).toHaveText([
+    "Studio's Default",
+    "Auto · Cloud",
+    "DeepSeek Flash · Cloud - Uncensored",
+    "Cloud - Uncensored",
+  ]);
   // The list scrolls inside the Settings modal and its choice applies at once.
   await options.last().scrollIntoViewIfNeeded();
   await options.last().click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBe("cloud/uncensored");
-  await expect(textCloud).toHaveText("Uncensored · Cloud");
+  await expect(textCloud).toHaveText("Cloud - Uncensored");
   await textCloud.click();
   await options.first().click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBeNull();
@@ -953,11 +957,6 @@ test("Settings › Maintenance switches follow at once and settle back after a f
             locked: false,
           },
         ],
-        integrations: {
-          civitai: { token: { set: false } },
-          huggingFace: { token: { set: false } },
-          assistant: { available: false },
-        },
       },
     });
   });

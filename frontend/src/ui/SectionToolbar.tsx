@@ -45,14 +45,17 @@ export function SectionHeader({ heading, children }: { heading: ReactNode; child
 export function ToolbarAction({
   label,
   icon: Icon,
+  href,
   rightSection,
   variant,
   ...props
-}: { label: string; icon: LucideIcon } & Omit<
+}: { label: string; icon: LucideIcon; href?: string } & Omit<
   ComponentPropsWithRef<typeof Button<"button">>,
   "children"
 >) {
   const phone = usePhone();
+  const renderLink =
+    href && ((props: ComponentPropsWithRef<"a">) => <a {...props} href={href} download />);
   if (phone)
     return (
       <Tooltip label={label}>
@@ -62,6 +65,7 @@ export function ToolbarAction({
           aria-label={label}
           w={rightSection ? "auto" : undefined}
           px={rightSection ? 4 : undefined}
+          renderRoot={renderLink || undefined}
           {...(props as ComponentPropsWithRef<typeof ActionIcon<"button">>)}
         >
           <Icon size={18} />
@@ -75,6 +79,7 @@ export function ToolbarAction({
       leftSection={<Icon size={16} />}
       rightSection={rightSection}
       variant={variant}
+      renderRoot={renderLink || undefined}
       {...props}
     >
       {label}

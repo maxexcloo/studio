@@ -22,13 +22,8 @@ export interface Deployment {
   catalogue: Flag[];
   /** Settings › Generation › Dream: each override, `null` where each account chooses. */
   dream: { [K in DreamOverride]: Source & { key: string; value: DreamSettings[K] | null } };
-  integrations: {
-    civitai: { token: { set: boolean } };
-    huggingFace: { token: { set: boolean } };
-    assistant: { available: boolean; note?: string; model?: string };
-  };
 }
-/** Settings › Gallery, Generation and Integrations: values an administrator saves for everyone. */
+/** Values an administrator saves for everyone from Settings. */
 export const deploymentQuery = queryOptions({
   queryKey: ["settings-deployment"],
   queryFn: () => api<Deployment>("/api/settings/deployment"),

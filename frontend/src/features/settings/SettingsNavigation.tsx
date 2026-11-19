@@ -1,14 +1,4 @@
-import {
-  Boxes,
-  Info,
-  Plug,
-  Route,
-  Server,
-  Shield,
-  UserRound,
-  UsersRound,
-  Wrench,
-} from "lucide-react";
+import { Boxes, Info, Route, Server, Shield, UserRound, UsersRound, Wrench } from "lucide-react";
 
 import { icons } from "../../ui/icons";
 import {
@@ -18,8 +8,7 @@ import {
 } from "../../ui/WorkspaceSections";
 import { useAccount, useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 
-// Personal sections, then administration, each alphabetical, with Integrations and About apart at
-// the end.
+// Personal sections, then administration, each alphabetical, with About last.
 const settingSections = {
   account: {
     label: "Account",
@@ -79,13 +68,6 @@ const settingSections = {
     icon: Server,
     admin: true,
     group: "Administration",
-  },
-  integrations: {
-    label: "Integrations",
-    description: "Civitai, Hugging Face and the prompt assistant.",
-    icon: Plug,
-    admin: true,
-    apart: true,
   },
   about: {
     label: "About",

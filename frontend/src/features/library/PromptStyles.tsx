@@ -16,7 +16,7 @@ import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable } from "../../ui/DataTable";
+import { DataTable, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import {
   FilterChoices,
@@ -184,7 +184,7 @@ function StyleEditor({
 }
 
 /**
- * Library › Prompt Styles: the assistant's fixed options, alphabetically with a type filter.
+ * Library › Prompt Styles: the assistant's fixed options, grouped by type and name.
  */
 export function PromptStyles({ heading }: { heading: ReactNode }) {
   const client = useQueryClient();
@@ -256,14 +256,16 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
       ) : (
         <DataTable
           label="Prompt Styles"
-          rows={styles.filter((style) => !kind || style.kind === kind)}
+          rows={styles
+            .filter((style) => !kind || style.kind === kind)
+            .sort((a, b) => compareNames(a.label, b.label))}
           rowKey={(style) => `${style.kind}:${style.id}`}
           rowName={(style) => style.label}
           loading={list.isPending && "Loading Prompt Styles"}
           query={query}
           searchText={(style) => [style.label, style.description, style.instruction]}
           empty="No Prompt Styles"
-          initialSort={{ key: "name", descending: false }}
+          initialSort={{ key: "kind", descending: false }}
           columns={[
             {
               key: "name",
@@ -289,6 +291,7 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
             {
               key: "kind",
               header: "Type",
+              sortValue: (style) => kinds.find((kind) => kind.value === style.kind)?.label,
               // The main column takes the free width, so the type keeps its line instead.
               cell: (style) => (
                 <Text span inherit style={{ whiteSpace: "nowrap" }}>

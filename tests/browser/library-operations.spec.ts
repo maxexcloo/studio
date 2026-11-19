@@ -20,17 +20,16 @@ async function updates(page: Page, action: "Check" | "Update All") {
   await page.getByRole("menuitem", { name: action, exact: true }).click();
 }
 
-test("The Library groups AI, Cards and Generation, sets Files and Imports apart and opens on Presets", async ({
+test("The Library opens on Presets, groups Cards and Generation, and sets Files and Imports apart", async ({
   page,
 }) => {
   await fixtures(page);
   await page.goto("/library");
   const groups = {
-    AI: ["Presets"],
     Cards: ["Characters", "Outfits", "Scenes"],
     Generation: ["Guides", "LoRAs", "Profiles", "Prompt Styles"],
   };
-  const order = [...Object.values(groups).flat(), "Files", "Imports"];
+  const order = ["Presets", ...Object.values(groups).flat(), "Files", "Imports"];
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
     await expect(select).toHaveValue("Presets");
@@ -551,6 +550,45 @@ test("Imports group by what they need: Download All Missing, substitutes to acce
     .getByRole("button", { name: "Delete", exact: true })
     .click();
   await expect(page.getByText("Kept Model", { exact: true })).toBeHidden();
+});
+
+test("LoRA row actions end with Edit and Delete, and deletion requires confirmation", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const key = "loras/texture.safetensors";
+  const item = {
+    key,
+    title: "Soft Texture",
+    file: "texture.safetensors",
+    folder: "loras",
+    kind: "lora",
+    installed: true,
+  };
+  const removals: string[] = [];
+  await page.route("**/api/library/items", (route) =>
+    route.fulfill({ json: { items: removals.length ? [] : [item] } }),
+  );
+  await page.route("**/api/library/catalogue/remove", (route) => {
+    removals.push(route.request().postDataJSON().key);
+    return route.fulfill({ json: { ok: true, key, fileRemoved: true } });
+  });
+  await page.goto("/library#loras");
+  const actions = page.getByRole("button", { name: "Actions for Soft Texture", exact: true });
+  await actions.click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Copy File Name",
+    "Test LoRA",
+    "Edit",
+    "Delete",
+  ]);
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete LoRA", exact: true });
+  await expect(dialog).toBeVisible();
+  expect(removals).toEqual([]);
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(actions).toBeHidden();
+  expect(removals).toEqual([key]);
 });
 
 test("Catalogue views, sorting, search and filters order and narrow the list", async ({ page }) => {
