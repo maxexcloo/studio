@@ -27,7 +27,7 @@ import { useLocation, useNavigate } from "react-router";
 
 import type { CardKind } from "../../../../shared/characters";
 import { post } from "../../api";
-import type { MediaItem, Profile } from "../../types";
+import type { MediaItem } from "../../types";
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { copyText } from "../../ui/clipboard";
 import { compareNames } from "../../ui/DataTable";
@@ -53,8 +53,8 @@ import {
 import { AnimateDialog } from "./AnimateDialog";
 import { videoGif } from "./download";
 import { itemAction, itemActionGroups } from "./itemActions";
-import { automaticEditProfile, useActionProfile } from "./mediaProfiles";
 import { useSettingsText } from "./MediaDetails";
+import { automaticEditProfile, useActionProfile } from "./mediaProfiles";
 import type { MediaTransferActions } from "./mediaShare";
 import { galleryKey } from "./queries";
 import { ReportIssueDialog, issues, useReportIssue } from "./ReportIssueDialog";
@@ -380,7 +380,8 @@ export function useMediaActions(
   const [review, setReview] = useAnimateReview();
   const { menu: animateProfiles, profileId: animationProfileId } = useActionProfile("video");
   const { menu: editProfiles, profileId: selectedEdit, profiles } = useActionProfile("image");
-  const editProfileId = selectedEdit || automaticEditProfile(profiles || [], item)?.id;
+  const automaticEdit = image && automaticEditProfile(profiles || [], item);
+  const editProfileId = selectedEdit || (automaticEdit ? automaticEdit.id : undefined);
   const length = useAnimateLengthSetting(item, animationProfileId);
   const animation = useQuery({
     ...animateProfileQuery(item, animationProfileId),
@@ -391,7 +392,10 @@ export function useMediaActions(
   const refusal = animation.error?.message;
   // A video's templates continue the clip from its last frame at once; it keeps the clip's own
   // model unless videos run on Cloud.
-  const animateDisabled = action.isPending || length.loading || ((!video || animationProfileId) && !animation.data);
+  const animateDisabled =
+    action.isPending ||
+    length.loading ||
+    ((!video || Boolean(animationProfileId)) && !animation.data);
   const templates = useAnimateTemplates();
   const templateItem = (template: AssistantOption): Action => ({
     id: `animate-${template.id}`,
@@ -478,14 +482,18 @@ export function useMediaActions(
     assistMenu({
       settings: [
         ...(mode === "edit" ? editProfiles : []),
-        ...(assistedChanges ? [{
-          id: "review",
-          label: "Review Prompt",
-          icon: icons.review,
-          checked: reviewChanges,
-          keepOpen: true,
-          onClick: () => setReviewChanges(!reviewChanges),
-        }] : []),
+        ...(assistedChanges
+          ? [
+              {
+                id: "review",
+                label: "Review Prompt",
+                icon: icons.review,
+                checked: reviewChanges,
+                keepOpen: true,
+                onClick: () => setReviewChanges(!reviewChanges),
+              },
+            ]
+          : []),
       ],
       suggestions: assistedChanges && image ? steps.group : [],
       templates: assistedChanges
@@ -565,14 +573,16 @@ export function useMediaActions(
                   label: "Extend in Composer",
                   icon: FastForward,
                   disabled: animateDisabled,
-                  onClick: () => action.mutate({ operation: "extend", profileId: animationProfileId }),
+                  onClick: () =>
+                    action.mutate({ operation: "extend", profileId: animationProfileId }),
                 }
               : {
                   id: "animate-composer",
                   label: "Animate in Composer",
                   icon: icons.prompt,
                   disabled: animateDisabled,
-                  onClick: () => action.mutate({ operation: "animate", profileId: animationProfileId }),
+                  onClick: () =>
+                    action.mutate({ operation: "animate", profileId: animationProfileId }),
                 },
           ],
         }),
@@ -592,7 +602,12 @@ export function useMediaActions(
                   label: "Edit in Composer",
                   icon: icons.edit,
                   disabled: action.isPending,
-                  onClick: () => action.mutate({ operation: "refine", prompt: changedPrompt, profileId: editProfileId }),
+                  onClick: () =>
+                    action.mutate({
+                      operation: "refine",
+                      prompt: changedPrompt,
+                      profileId: editProfileId,
+                    }),
                 },
               ],
             )

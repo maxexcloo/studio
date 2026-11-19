@@ -14,11 +14,7 @@ import { api, post } from "../../api";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
 import type { Action } from "../../ui/ActionBar";
 import { useRemembered } from "../auth/useRemembered";
-import {
-  initialInput,
-  modelsQuery,
-  useGenerationActions,
-} from "../generation/GenerationProvider";
+import { initialInput, modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { lengthChoices } from "../generation/length";
 import { useOpenComposer } from "../generation/openComposer";
 import {
@@ -387,9 +383,7 @@ export function useIterate() {
     const repeat = iteration.kind === "repeat";
     const sameSeed = repeat || Boolean(given?.sameSeed);
     // Recreate keeps the recorded Count. A reference edit or animation runs once.
-    const count = draft.input.kind === "video" || (given && given.operation !== "image")
-      ? 1
-      : draft.input.count;
+    const count = animate || (given && given.operation !== "image") ? 1 : draft.input.count;
     const payload = {
       ...generationInput(
         { ...draft.input, prompt, seed: sameSeed ? (seed ?? "") : "", count },

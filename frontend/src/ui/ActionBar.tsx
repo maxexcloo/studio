@@ -158,7 +158,18 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
     <Fragment key={group[0].id}>
       {index > 0 && <Menu.Divider />}
       {group.map((action) => {
-        const { id, label, icon: Icon, pressed, checked, selected, color, disabled, link, onClick } = action;
+        const {
+          id,
+          label,
+          icon: Icon,
+          pressed,
+          checked,
+          selected,
+          color,
+          disabled,
+          link,
+          onClick,
+        } = action;
         const describedBy = `${uid}-${id}`;
         if (action.heading) return <Menu.Label key={id}>{label}</Menu.Label>;
         if (action.choice)
@@ -266,7 +277,13 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                 <Check size={14} />
               ) : undefined
             }
-            role={selected !== undefined ? "menuitemradio" : checked !== undefined ? "menuitemcheckbox" : undefined}
+            role={
+              selected !== undefined
+                ? "menuitemradio"
+                : checked !== undefined
+                  ? "menuitemcheckbox"
+                  : undefined
+            }
             aria-checked={selected ?? checked}
             {...described(action, describedBy)}
             disabled={disabled}

@@ -591,7 +591,7 @@ test("Viewer runs queue into the strip and Recreate › Recreate in Composer ope
     sessionId: "session-hub",
     parentJobId: "job-hub",
     parentItemId: "hub",
-    input: { count: 1, seed: 1234567 },
+    input: { count: 2, seed: 1234567 },
   });
   const strip = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
@@ -1163,12 +1163,18 @@ async function offline(page: Page) {
   );
 }
 
-test("Animate uses the saved Cloud preference when both routes are available", async ({ page }) => {
+test("Animate can pick a compatible profile over the saved default route", async ({
+  page,
+  isMobile,
+}) => {
   const { state, viewer } = await seed(page, {}, async (page, fixture) => {
     fixture.preferences.preferences.videos = "cloud";
     await serveProfiles(page, [...profiles, grok]);
     await page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) => {
-      const cloud = fixture.preferences.preferences.videos === "cloud";
+      const chosen = new URL(route.request().url()).searchParams.get("profileId");
+      const cloud = chosen
+        ? chosen === grok.id
+        : fixture.preferences.preferences.videos === "cloud";
       return route.fulfill({
         json: {
           profileId: cloud ? grok.id : "video:test",
@@ -1180,11 +1186,16 @@ test("Animate uses the saved Cloud preference when both routes are available", a
     });
   });
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  const profiles = page.getByRole("menuitem", { name: "Profile", exact: true });
+  if (isMobile) await profiles.click();
+  else await profiles.hover();
+  await expect(page.getByRole("menuitemradio", { name: "Automatic", exact: true })).toBeChecked();
+  await page.getByRole("menuitemradio", { name: "Motion Fast", exact: true }).click();
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
     operation: "animate",
-    input: { kind: "video", profileId: grok.id },
+    input: { kind: "video", profileId: "video:test" },
   });
 });
 
