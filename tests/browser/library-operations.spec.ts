@@ -591,6 +591,110 @@ test("LoRA row actions end with Edit and Delete, and deletion requires confirmat
   expect(removals).toEqual([key]);
 });
 
+test("Bulk accepting visible substitutes keeps the failed choice selected for retry", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const file = (name: string) => ({
+    name,
+    want: { file: `${name}.safetensors`, folder: "loras" },
+    status: "substitute",
+    substitute: { file: `${name}-new.safetensors`, reason: "New version" },
+    accepted: false,
+  });
+  const records = [
+    {
+      id: "imp-close",
+      name: "Close Recipe",
+      state: "ready",
+      audit: "substitute",
+      resources: [file("first"), file("second")],
+    },
+    {
+      id: "imp-other",
+      name: "Other Recipe",
+      state: "ready",
+      audit: "substitute",
+      resources: [file("third")],
+    },
+  ];
+  const requests: { index: number; accept: boolean; expected?: unknown }[] = [];
+  let releaseFirst!: () => void;
+  const finishingFirst = new Promise<void>((resolve) => (releaseFirst = resolve));
+  let rejectSecond = true;
+  await page.route("**/api/library/imports**", async (route) => {
+    const { pathname } = new URL(route.request().url());
+    if (!pathname.endsWith("/substitute")) return route.fulfill({ json: { imports: records } });
+    const record = records.find((item) => pathname.endsWith(`/${item.id}/substitute`))!;
+    const body = route.request().postDataJSON();
+    requests.push(body);
+    const resource = record.resources.find(
+      (item) => body.expected?.file === `loras/${item.want.file}`,
+    )!;
+    if (resource.name === "first") await finishingFirst;
+    if (resource.name === "second" && rejectSecond) {
+      rejectSecond = false;
+      return route.fulfill({
+        status: 503,
+        json: { error: "The catalogue is temporarily unavailable." },
+      });
+    }
+    resource.accepted = true;
+    // A refresh can move a file; the failed selection still belongs to the file it named.
+    if (resource.name === "first") record.resources.reverse();
+    if (record.resources.every((resource) => resource.accepted)) record.audit = "ready";
+    return route.fulfill({ json: { import: record } });
+  });
+  await page.goto("/library#imports");
+  const search = await toolbarSearch(page, "Imports");
+  await search.fill("Close Recipe");
+  const table = page.getByRole("table", { name: "Substitutes", exact: true });
+  const first = table.getByRole("checkbox", {
+    name: "Select Close Recipe: first.safetensors",
+    exact: true,
+  });
+  const second = table.getByRole("checkbox", {
+    name: "Select Close Recipe: second.safetensors",
+    exact: true,
+  });
+  const third = table.getByRole("checkbox", {
+    name: "Select Other Recipe: third.safetensors",
+    exact: true,
+  });
+  const accept = page.getByRole("button", { name: "Accept Selected", exact: true });
+  await table.getByRole("checkbox", { name: "Select All Substitutes", exact: true }).check();
+  await expect(first).toBeChecked();
+  await expect(second).toBeChecked();
+  await expect(third).toBeHidden();
+  await accept.click();
+  try {
+    await expect.poll(() => requests.map(({ index }) => index)).toEqual([0]);
+    await expect(accept).toBeDisabled();
+  } finally {
+    releaseFirst();
+  }
+  await expect(
+    page.getByText("The catalogue is temporarily unavailable.", { exact: true }),
+  ).toBeVisible();
+  await expect(first).toBeHidden();
+  await expect(second).toBeChecked();
+  await accept.click();
+  await expect(second).toBeHidden();
+  await expect(accept).toBeDisabled();
+  expect(requests.map(({ index, accept }) => [index, accept])).toEqual([
+    [0, true],
+    [1, true],
+    [0, true],
+  ]);
+  expect(requests[0].expected).toEqual({
+    file: "loras/first.safetensors",
+    substitute: "first-new.safetensors",
+  });
+  await search.fill("");
+  await expect(third).toBeVisible();
+  await expect(third).not.toBeChecked();
+});
+
 test("Catalogue views, sorting, search and filters order and narrow the list", async ({ page }) => {
   await fixtures(page);
   const model = (key: string, title: string, families: string[], installed = true) => ({

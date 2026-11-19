@@ -937,10 +937,24 @@ export function createImportEngine({
    * Accept keeps a stand-in for good; Reject drops it for the exact file, which counts as missing
    * until Download Missing installs it (or at once, when it already is).
    */
-  async function chooseSubstitute(id, index, accept) {
+  async function chooseSubstitute(id, index, accept, expected) {
     const record = store.get(id);
-    const resource = record?.resources?.[index];
-    if (!resource?.substitute) throw new Error("That file isn't using a substitute.");
+    // A bulk review records its choices before any of them refreshes and rebuilds the files.
+    const resource =
+      expected === undefined
+        ? record?.resources?.[index]
+        : record?.resources?.find(
+            (file) =>
+              file.substitute &&
+              choiceKey(file) === expected?.file &&
+              file.substitute.file === expected?.substitute,
+          );
+    if (!resource?.substitute)
+      throw new Error(
+        expected === undefined
+          ? "That file isn't using a substitute."
+          : "The substitute changed. Review it and try again.",
+      );
     record.substituteChoices = {
       ...record.substituteChoices,
       [choiceKey(resource)]: accept ? "accepted" : "rejected",
