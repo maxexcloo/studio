@@ -164,7 +164,7 @@ test("The queue lists model downloads to stop, resume, retry or discard one at a
   // A finished download refreshes the models without the queue being open.
   await expect.poll(() => freshModelReads).toBeGreaterThan(0);
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   const download = (file: string) =>
     queue.getByRole("group", { name: `Download ${file}`, exact: true });
   await expect(queue.getByText("Keep generating", { exact: true })).toBeVisible();

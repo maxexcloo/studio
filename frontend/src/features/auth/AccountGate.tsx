@@ -4,7 +4,6 @@ import {
   Center,
   Container,
   Divider,
-  Loader,
   Paper,
   PasswordInput,
   Stack,
@@ -18,6 +17,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { api, post } from "../../api";
 import type { Account } from "../../types";
 import { icons } from "../../ui/icons";
+import { LoadingState } from "../../ui/LoadingState";
 import { StudioLogo } from "../../ui/StudioLogo";
 import type { McpTokenStatus } from "../settings/PersonalMcpToken";
 
@@ -114,7 +114,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
   if (status.isPending || toOidc)
     return (
       <Center h="100dvh">
-        <Loader aria-label="Loading Studio" />
+        <LoadingState fill label="Loading Studio" />
       </Center>
     );
   if (status.error)

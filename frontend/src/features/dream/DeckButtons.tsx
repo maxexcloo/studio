@@ -44,11 +44,15 @@ export function DeckButtons({
   act,
   hidden,
   shown,
+  leading,
+  trailing,
 }: {
   card: DeckCard;
   act: (choice: Choice["choice"]) => void;
   hidden: boolean;
   shown?: number;
+  leading?: ReactNode;
+  trailing?: ReactNode;
 }) {
   const answers = dreamChoices(card)
     .at(-1)!
@@ -72,6 +76,7 @@ export function DeckButtons({
       aria-hidden={hidden}
       inert={hidden}
     >
+      {leading}
       {answers.map(({ choice, id, label }) => (
         <Tooltip key={id} label={label}>
           <ActionIcon
@@ -94,6 +99,7 @@ export function DeckButtons({
           </ActionIcon>
         </Tooltip>
       ))}
+      {trailing}
     </div>
   );
 }

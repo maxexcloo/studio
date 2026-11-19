@@ -2,7 +2,7 @@ import type { Action, ActionGroups } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 
 const definitions = {
-  ai: { label: "AI", icon: icons.assistant },
+  ai: { label: "AI", icon: icons.similar },
   animate: { label: "Animate", icon: icons.animate },
   delete: { label: "Delete", icon: icons.delete, color: "red" as const },
   dislike: { label: "Dislike", icon: icons.dislike },

@@ -12,8 +12,8 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronDown, Image as ImageIcon, Video } from "lucide-react";
-import { Fragment, useEffect, useId, useState } from "react";
+import { Check, ChevronDown } from "lucide-react";
+import { Fragment, type SetStateAction, useEffect, useId, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { dreamCardCounts } from "../../../../shared/dream";
@@ -27,7 +27,7 @@ import { useRemembered } from "../auth/useRemembered";
 import { TasteProfile } from "../taste/TasteProfile";
 import { TasteReflection } from "../taste/TasteReflection";
 import { DiscardedDreams } from "./DiscardedDreams";
-import { DreamDeck } from "./DreamDeck";
+import { DreamDeck, type Judgement } from "./DreamDeck";
 import { DreamHistory } from "./DreamHistory";
 import { DreamProjects } from "./DreamProjects";
 import { lockedByAdministrator, useDreamSettings } from "./DreamSettings";
@@ -42,7 +42,7 @@ import {
 
 import classes from "./DreamPage.module.css";
 
-/** The deck once every card is judged, or while Dream is off with no pair to compare. */
+/** The Dream deck once every card is judged or while Dream is off. */
 function Empty({ dream }: { dream: Dream }) {
   const save = useDreamSettings();
   if (!dream.settings.enabled)
@@ -97,10 +97,18 @@ function Empty({ dream }: { dream: Dream }) {
   );
 }
 
-const views = ["deck", "projects", "taste", "discarded", "history"] as const;
+const views = [
+  ["dream", "Dream"],
+  ["library", "Library"],
+  ["projects", "Projects"],
+  ["taste", "Taste"],
+  ["history", "History"],
+  ["discarded", "Discards"],
+] as const;
+const mediaLabels = { image: "Images", video: "Videos" };
 
-function useLibraryReview(seed: string, media: DreamMedia, decided: Set<string>) {
-  const query = useInfiniteQuery(libraryReviewQuery(seed, media));
+function useLibraryReview(seed: string, media: DreamMedia, decided: Set<string>, enabled: boolean) {
+  const query = useInfiniteQuery({ ...libraryReviewQuery(seed, media), enabled });
   const items =
     query.data?.pages.flatMap((page) => page.items).filter((item) => !decided.has(item.id)) ?? [];
   const lastPage = query.data?.pages.at(-1);
@@ -108,62 +116,50 @@ function useLibraryReview(seed: string, media: DreamMedia, decided: Set<string>)
   return { query, items, remaining };
 }
 
-/**
- * Dream shows unseen results, comparisons and calibration in the deck, with counts of images
- * and videos awaiting a verdict. Projects shows what is new in each project. Opening Dream counts
- * as a visit.
- */
+/** Dream's unseen results and comparisons, Library review, and their related views. */
 export function DreamPage() {
   const phone = usePhone();
   const [media, setMedia] = useRemembered<DreamMedia>("dream-media", "image");
   const [seed] = useState(() => crypto.randomUUID());
-  const [decided, setDecided] = useState<Set<string>>(() => new Set());
+  const [dreamDecided, setDreamDecided] = useState<Set<string>>(() => new Set());
+  const [libraryDecided, setLibraryDecided] = useState<Set<string>>(() => new Set());
   const [returned, setReturned] = useState<DreamItem[]>([]);
-  const imageReview = useLibraryReview(seed, "image", decided);
-  const videoReview = useLibraryReview(seed, "video", decided);
-  const reviews = { image: imageReview, video: videoReview };
-  const { query: library, items: libraryItems } = reviews[media];
+  const [histories, setHistories] = useState<Partial<Record<string, Judgement[]>>>({});
   const [undoTarget, setUndoTarget] = useState<HTMLDivElement | null>(null);
   const [actionTarget, setActionTarget] = useState<HTMLDivElement | null>(null);
   const client = useQueryClient();
   const dream = useQuery(dreamQuery);
+  const save = useDreamSettings();
+  const params = useParams();
+  const param = params.projectId ? "projects" : params.view;
+  const [view, label] = views.find(([name]) => name === param) ?? views[0];
+  const navigate = useNavigate();
+  const reviewing = view === "library";
+  const imageReview = useLibraryReview(seed, "image", libraryDecided, reviewing);
+  const videoReview = useLibraryReview(seed, "video", libraryDecided, reviewing);
+  const reviews = { image: imageReview, video: videoReview };
+  const { query: library, items: libraryItems } = reviews[media];
+  const visited = useRef(false);
   useEffect(() => {
+    if (reviewing || visited.current) return;
+    visited.current = true;
     void post("/api/dream/visit")
       .then(() => client.invalidateQueries({ queryKey: dreamQuery.queryKey, exact: true }))
       .catch(() => undefined);
-  }, [client]);
-  const save = useDreamSettings();
-  // Dream opens on the deck at /dream; each other view has its own path, so reload and Back keep
-  // it. A project's detail view (/dream/projects/:projectId) opens over Projects.
-  const params = useParams();
-  const param = params.projectId ? "projects" : params.view;
-  const view = views.find((name) => name === param) ?? "deck";
-  const navigate = useNavigate();
-  const setView = (next: (typeof views)[number]) =>
-    navigate(next === "deck" ? "/dream" : `/dream/${next}`);
-  const mediaLabels = { image: "Images", video: "Videos" };
-  const viewLabels = {
-    deck: mediaLabels[media],
-    projects: "Projects",
-    taste: "Taste",
-    discarded: "Discards",
-    history: "History",
-  };
+  }, [client, reviewing]);
   const data = dream.data;
   const deckUnseen = data?.settings.enabled
     ? [
         ...data.unseen,
         ...returned.filter((item) => !data.unseen.some((listed) => listed.id === item.id)),
-      ].filter((item) => !decided.has(item.id))
+      ].filter((item) => !dreamDecided.has(item.id))
     : [];
   const count = data && dreamCardCounts(deckUnseen, data.settings);
-  const unseen = { image: count?.images, video: count?.videos };
-  const reviewing =
-    view === "deck" &&
-    !unseen[media] &&
-    (Boolean(library.data?.pages.some((page) => page.items.length)) ||
-      library.isPending ||
-      library.isError);
+  const pending = {
+    image: reviewing ? imageReview.remaining : view === "dream" ? count?.images : undefined,
+    video: reviewing ? videoReview.remaining : view === "dream" ? count?.videos : undefined,
+  };
+
   useEffect(() => {
     if (
       reviewing &&
@@ -181,42 +177,27 @@ export function DreamPage() {
     library.isFetchNextPageError,
     library.fetchNextPage,
   ]);
-  // Unseen cards of each kind, so new work on the other kind is never hidden.
-  const counted = (kind: DreamMedia) =>
-    unseen[kind] ? `${mediaLabels[kind]} (${unseen[kind]})` : mediaLabels[kind];
+  const deckKey = `${view}:${media}`;
+  const history = histories[deckKey] ?? [];
+  const setHistory = (update: SetStateAction<Judgement[]>) =>
+    setHistories((previous) => ({
+      ...previous,
+      [deckKey]: typeof update === "function" ? update(previous[deckKey] ?? []) : update,
+    }));
   const waitingId = useId();
   const plural = (number: number, noun: string) => `${number} ${noun}${number === 1 ? "" : "s"}`;
-  const waiting = count && {
-    images: plural(count.images, "image"),
-    videos: plural(count.videos, "video"),
-  };
-  // The deck takes its media from the view menu; the other views that list media switch here.
-  const selector = ["discarded", "history"].includes(view) && (
+  const waiting =
+    count && `${plural(count.images, "image")} and ${plural(count.videos, "video")} waiting`;
+  const selector = view !== "projects" && view !== "taste" && (
     <SegmentedControl
       aria-label="Dream Media"
       value={media}
       onChange={(value) => setMedia(value as DreamMedia)}
-      data={[
-        { value: "image", label: counted("image") },
-        { value: "video", label: counted("video") },
-      ]}
+      data={(["image", "video"] as const).map((kind) => ({
+        value: kind,
+        label: pending[kind] ? `${mediaLabels[kind]} (${pending[kind]})` : mediaLabels[kind],
+      }))}
     />
-  );
-  const item = (label: string, checked: boolean, open: () => void, description?: string) => (
-    <Menu.Item
-      key={label}
-      aria-label={label}
-      aria-description={description}
-      rightSection={checked ? <Check size={14} /> : undefined}
-      onClick={open}
-    >
-      {label}
-      {description && (
-        <Text component="span" size="xs" c="dimmed" display="block">
-          {description}
-        </Text>
-      )}
-    </Menu.Item>
   );
   return (
     <div className={classes.page}>
@@ -232,47 +213,21 @@ export function DreamPage() {
                 aria-describedby={waiting ? waitingId : undefined}
                 rightSection={<ChevronDown size={14} />}
               >
-                {viewLabels[view]}
-                {/* Always in sight, so new work on either kind shows from every view. */}
-                {count && waiting && (
-                  <Group component="span" gap={4} wrap="nowrap" c="dimmed" ml={8} aria-hidden>
-                    {phone ? (
-                      <>
-                        <ImageIcon size={14} />
-                        {count.images} ·
-                        <Video size={14} />
-                        {count.videos}
-                      </>
-                    ) : (
-                      `· ${waiting.images} · ${waiting.videos}`
-                    )}
-                  </Group>
-                )}
+                {label}
               </Button>
             </Menu.Target>
           </PopupTooltip>
-          {waiting && (
-            <VisuallyHidden id={waitingId}>
-              {`${waiting.images} and ${waiting.videos} waiting`}
-            </VisuallyHidden>
-          )}
+          {waiting && <VisuallyHidden id={waitingId}>{waiting}</VisuallyHidden>}
           <Menu.Dropdown>
-            {(["image", "video"] as const).map((kind) => {
-              const { remaining } = reviews[kind];
-              return item(
-                counted(kind),
-                view === "deck" && media === kind,
-                () => {
-                  setMedia(kind);
-                  setView("deck");
-                },
-                remaining ? `Rate Your Library (${remaining})` : undefined,
-              );
-            })}
-            {views.slice(1).map((value) => (
-              <Fragment key={value}>
-                {value === "discarded" && <Menu.Divider />}
-                {item(viewLabels[value], view === value, () => setView(value))}
+            {views.map(([name, title]) => (
+              <Fragment key={name}>
+                {name === "history" && <Menu.Divider />}
+                <Menu.Item
+                  rightSection={view === name ? <Check size={14} /> : undefined}
+                  onClick={() => navigate(name === "dream" ? "/dream" : `/dream/${name}`)}
+                >
+                  {title}
+                </Menu.Item>
               </Fragment>
             ))}
           </Menu.Dropdown>
@@ -326,19 +281,20 @@ export function DreamPage() {
             </Stack>
           </ScrollArea>
         )
-      ) : dream.isPending ? (
+      ) : !reviewing && dream.isPending ? (
         <LoadingState fill label="Loading Dream" />
-      ) : dream.isError ? (
+      ) : !reviewing && dream.isError ? (
         <Alert color="red" title="Couldn't Load Dream">
           {dream.error.message}
         </Alert>
       ) : (
         <DreamDeck
-          key={media}
+          key={deckKey}
           media={media}
           items={deckUnseen}
-          decided={decided}
-          setDecided={setDecided}
+          setDecided={reviewing ? setLibraryDecided : setDreamDecided}
+          history={history}
+          setHistory={setHistory}
           returnItems={(items) =>
             setReturned((previous) => [
               ...previous.filter((item) => !items.some((restored) => restored.id === item.id)),
@@ -352,7 +308,6 @@ export function DreamPage() {
               library.isFetchingNextPage ||
               (library.hasNextPage && !library.isFetchNextPageError))
           }
-          pairsOnly={!data!.settings.enabled}
           undoTarget={undoTarget}
           empty={
             reviewing ? (

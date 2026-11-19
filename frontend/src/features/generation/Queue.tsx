@@ -949,7 +949,7 @@ export function Queue({ downloads }: { downloads: ModelDownload[] }) {
   // Loads dragging ahead of a second waiting item, so the rows aren't replaced when it arrives.
   useEffect(() => void loadSortable(), []);
   if (queue.error) return <Alert color="red">{queue.error.message}</Alert>;
-  if (queue.isPending) return <LoadingState label="Loading Generations" fill />;
+  if (queue.isPending) return <LoadingState label="Loading Queue" fill />;
   const { paused, jobs: saved, queueOrder } = queue.data;
   const jobs = shownJobs(saved);
   if (!jobs.length && !downloads.length) {
