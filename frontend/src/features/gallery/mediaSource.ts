@@ -60,7 +60,7 @@ export function currentMedia(items: MediaItem[], item: MediaItem) {
 export const mediaIdentity = (item: MediaItem) =>
   item.jobId && item.index !== undefined ? `${item.jobId}:${item.index}` : item.id;
 
-/** Keep an open viewer's order, updating records and appending only newly paged older items. */
+/** Keep the order of existing neighbours and extend either end as more results arrive. */
 export function reconcileViewerItems(
   previous: MediaItem[],
   incoming: MediaItem[],
@@ -68,12 +68,16 @@ export function reconcileViewerItems(
 ) {
   const known = new Set(previous.map(mediaIdentity));
   const current = new Map([...retained, ...incoming].map((item) => [mediaIdentity(item), item]));
-  let boundary = -1;
+  let first = -1;
+  let last = -1;
   incoming.forEach((item, index) => {
-    if (known.has(mediaIdentity(item))) boundary = index;
+    if (!known.has(mediaIdentity(item))) return;
+    if (first < 0) first = index;
+    last = index;
   });
   return [
+    ...incoming.slice(0, Math.max(0, first)),
     ...previous.flatMap((item) => current.get(mediaIdentity(item)) || []),
-    ...incoming.slice(boundary + 1).filter((item) => !known.has(mediaIdentity(item))),
+    ...incoming.slice(last + 1),
   ];
 }
