@@ -788,10 +788,27 @@ test("Workers benchmark a running local text model and list each run's figures",
   let runs: Record<string, unknown>[] = [earlier];
   const started: unknown[] = [];
   const stopped: string[] = [];
+  await page.route("**/api/runtime/workloads/gemma/benchmark-models", (route) =>
+    route.fulfill({
+      json: {
+        models: [
+          { id: "gemma-4-31b", label: "Gemma 4 31B" },
+          { id: "qwen3.8-27b", label: "Qwen 3.8 27B" },
+        ],
+      },
+    }),
+  );
   await page.route("**/api/runtime/benchmarks", (route) => {
     if (route.request().method() === "POST") {
-      started.push(route.request().postDataJSON());
-      const run = { ...earlier, id: "next", status: "running", summary: undefined };
+      const choice = route.request().postDataJSON();
+      started.push(choice);
+      const run = {
+        ...earlier,
+        model: choice.model,
+        id: "next",
+        status: "running",
+        summary: undefined,
+      };
       runs = [run, ...runs];
       return route.fulfill({ status: 202, json: run });
     }
@@ -830,10 +847,15 @@ test("Workers benchmark a running local text model and list each run's figures",
   await closeMenu();
   await (await menu("Gemma")).click();
   const dialog = page.getByRole("dialog", { name: "Benchmark Gemma", exact: true });
-  await dialog.getByRole("button", { name: "Benchmark", exact: true }).click();
+  const benchmark = dialog.getByRole("button", { name: "Benchmark", exact: true });
+  await expect(benchmark).toBeDisabled();
+  await dialog.getByRole("combobox", { name: "Text Model", exact: true }).click();
+  await dialog.getByRole("option", { name: "Qwen 3.8 27B", exact: true }).click();
+  await benchmark.click();
   await expect(dialog).toBeHidden();
-  expect(started).toEqual([{ workload: "gemma" }]);
+  expect(started).toEqual([{ workload: "gemma", model: "qwen3.8-27b" }]);
   await expect(results.getByRole("row", { name: "Gemma" }).first()).toContainText("Running");
+  await expect(results.getByRole("row", { name: "Gemma" }).first()).toContainText("qwen3.8-27b");
   // One benchmark at a time.
   await expect(await menu("Gemma")).toBeDisabled();
   await closeMenu();

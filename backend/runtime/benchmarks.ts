@@ -1,11 +1,13 @@
 import { randomBytes } from "node:crypto";
 
 import type {
+  BenchmarkModel,
   BenchmarkRun,
   BenchmarkStatus,
   BenchmarkSummary,
   RuntimePodLog,
 } from "../../shared/runtime.ts";
+import { RadianceClient } from "../providers/radiance.ts";
 import {
   RuntimeConflict,
   RuntimeRequestError,
@@ -161,6 +163,7 @@ export class Benchmarks {
     environment: Environment;
     store?: BenchmarkStore;
     fetchImpl?: typeof fetch;
+    textModels?: () => Promise<BenchmarkModel[]>;
     now?: () => number;
     pollMs?: number;
   };
@@ -207,41 +210,69 @@ export class Benchmarks {
     }
   }
 
-  /**
-   * The model to benchmark: the workload's gateway model without its provider, such as `auto` for
-   * `local/auto`, which the workload serves under that name. It answers only while the workload runs.
-   */
-  private async servedModel(workload: Workload) {
+  private workload(id: string) {
+    if (!this.configured) throw new RuntimeRequestError("Benchmarks need STUDIO_BENCHMARK_IMAGE.");
+    const workload = this.options.workloads.find((item) => item.id === id && servesText(item));
+    if (!workload) throw new RuntimeRequestError("workload must be a workload serving local text.");
+    return workload;
+  }
+
+  async models(id: string) {
+    return this.servedModels(this.workload(id));
+  }
+
+  private async servedModels(workload: Workload): Promise<BenchmarkModel[]> {
     const fetchImpl = this.options.fetchImpl ?? fetch;
     const key = this.options.environment.STUDIO_RADIANCE_KEY;
+    const signal = AbortSignal.timeout(5000);
+    const stopped = () => new RuntimeConflict(`${workload.label} isn't answering: start it first.`);
+    if (workload.backend === "radiance") {
+      const [served, text] = await Promise.all([
+        new RadianceClient(workload.url, fetchImpl, key || "").models(signal).catch(() => {
+          throw stopped();
+        }),
+        this.options.textModels?.() ?? [],
+      ]);
+      // Cold models do not report capabilities. The gateway's local catalogue classifies text.
+      const available = new Set(
+        served.filter(({ state }) => state !== "failed").map(({ id }) => id),
+      );
+      return text
+        .filter(({ id }) => id.startsWith("local/") && available.has(id.slice(6)))
+        .map(({ id, label }) => ({ id: id.slice(6), label: label === id ? id.slice(6) : label }));
+    }
     try {
       const response = await fetchImpl(`${workload.url}/health`, {
         headers: key ? { Authorization: `Bearer ${key}` } : {},
         redirect: "error",
-        signal: AbortSignal.timeout(5000),
+        signal,
       });
       await response.body?.cancel();
-      if (response.ok) return workload.model!.replace(/^[^/]+\//, "");
+      if (response.ok) {
+        const model = workload.model!.replace(/^[^/]+\//, "");
+        return [{ id: model, label: model }];
+      }
     } catch {}
-    throw new RuntimeConflict(`${workload.label} isn't answering: start it first.`);
+    throw stopped();
   }
 
-  async start(id: string, requestedBy: string) {
-    if (!this.configured) throw new RuntimeRequestError("Benchmarks need STUDIO_BENCHMARK_IMAGE.");
-    const workload = this.options.workloads.find((item) => item.id === id && servesText(item));
-    if (!workload) throw new RuntimeRequestError("workload must be a workload serving local text.");
+  async start(id: string, requestedBy: string, model?: string) {
+    const workload = this.workload(id);
     if (this.starting || this.runs.some((run) => run.status === "running"))
       throw new RuntimeConflict("A benchmark is already running.");
     this.starting = true;
     try {
-      return await this.create(workload, requestedBy);
+      const available = await this.servedModels(workload);
+      const chosen = model ?? (available.length === 1 ? available[0].id : undefined);
+      if (!chosen || !available.some((entry) => entry.id === chosen))
+        throw new RuntimeRequestError("Choose an available text model.");
+      return await this.create(workload, requestedBy, chosen);
     } finally {
       this.starting = false;
     }
   }
 
-  private async create(workload: Workload, requestedBy: string) {
-    const model = await this.servedModel(workload);
+  private async create(workload: Workload, requestedBy: string, model: string) {
     const run: BenchmarkRun = {
       // Short and lower-case: it names the Job.
       id: randomBytes(4).toString("hex"),

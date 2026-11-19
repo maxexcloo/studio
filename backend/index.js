@@ -256,7 +256,10 @@ for (const [name, migrate] of [
   }
 }
 // GPU deployments Studio scales (runtime/bootstrap.ts); the control MCP tools and Settings › Workers drive it.
-const runtime = await loadRuntime(process.env, { dataDir });
+const runtime = await loadRuntime(process.env, {
+  dataDir,
+  textModels: async () => assistantEngine?.listModelDetails() ?? [],
+});
 if (runtime) {
   useWorkloadWorkers(runtime.controller.workloads);
   setParkedCheck(async (id) => (await parkedWorkers(runtime.controller, listWorkers())).has(id));

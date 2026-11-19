@@ -19,13 +19,32 @@ const radiance: Workload = {
   backend: "radiance",
   model: "local/auto",
 };
+const qwen = "qwen3.8-27b-iq4r";
+const gemma = "gemma-4-31b-heretic";
+const textModels = async () => [
+  { id: "local/auto", label: "Auto" },
+  { id: `local/${qwen}`, label: "Qwen 3.8 27B" },
+  { id: `local/${gemma}`, label: "Gemma 4 31B" },
+  { id: "local/stale", label: "Stale" },
+  { id: "local/failed", label: "Failed" },
+  { id: `cloud/${qwen}`, label: "Cloud Qwen" },
+];
+const modelResponse = () =>
+  Response.json({
+    data: [
+      { id: qwen, state: "resident" },
+      { id: gemma, state: "cold" },
+      { id: "qwen-image", state: "resident" },
+      { id: "failed", state: "failed" },
+    ],
+  });
 const summaryLine = `STUDIO-BENCHMARK {"version": "0.9.0", "decode": 61.2, "ttftMs": 140.5, "aggregate": {"level": 8, "tps": 290.1}, "prefill": {"depth": 64000, "tps": 4100.0}}`;
 
 test("the Job benchmarks the workload's own endpoint with the key from its namespace's secret", () => {
   const job = benchmarkJob({
     name: "studio-benchmark-1a2b3c4d",
     workload: radiance,
-    model: "auto",
+    model: qwen,
     image: "ghcr.io/maxexcloo/betterbench:v0.6.1-1",
     secret: "radiance",
   });
@@ -41,7 +60,7 @@ test("the Job benchmarks the workload's own endpoint with the key from its names
   assert.equal(container.image, "ghcr.io/maxexcloo/betterbench:v0.6.1-1");
   assert.deepEqual(container.command.slice(-2), [
     "http://radiance.radiance.svc.cluster.local:8000/v1",
-    "auto",
+    qwen,
   ]);
   assert.deepEqual(container.env, [
     {
@@ -72,9 +91,13 @@ test("the summary is the log's last marked line; a log without one has none", ()
 test("a run creates its Job, reads the summary once it succeeds and refuses a second meanwhile", async () => {
   const calls: string[] = [];
   let job: Record<string, any> = {};
+  const posted: unknown[] = [];
   const request: KubernetesRequest = async (method, path, body) => {
     calls.push(`${method} ${path.split("?")[0]}`);
-    if (method === "POST") return { status: 201, body };
+    if (method === "POST") {
+      posted.push(body);
+      return { status: 201, body };
+    }
     if (path.includes("/jobs/")) return { status: 200, body: job };
     if (path.endsWith("/log?tailLines=20")) return { status: 200, body: `done\n${summaryLine}\n` };
     if (path.includes("tailLines=50"))
@@ -93,9 +116,9 @@ test("a run creates its Job, reads the summary once it succeeds and refuses a se
     };
   };
   const fetchImpl = (async (url: string, init: RequestInit) => {
-    assert.equal(url, "http://radiance.radiance.svc.cluster.local:8000/health");
-    assert.deepEqual(init.headers, { Authorization: "Bearer fixture-key" });
-    return Response.json({ status: "ok" });
+    assert.equal(url, "http://radiance.radiance.svc.cluster.local:8000/v1/models");
+    assert.deepEqual(init.headers, { authorization: "Bearer fixture-key" });
+    return modelResponse();
   }) as typeof fetch;
   const benchmarks = new Benchmarks({
     request,
@@ -106,16 +129,29 @@ test("a run creates its Job, reads the summary once it succeeds and refuses a se
       STUDIO_RADIANCE_KEY: "fixture-key",
     },
     fetchImpl,
+    textModels,
     pollMs: 60_000,
   });
+  assert.deepEqual(await benchmarks.models("radiance"), [
+    { id: qwen, label: "Qwen 3.8 27B" },
+    { id: gemma, label: "Gemma 4 31B" },
+  ]);
+  await assert.rejects(benchmarks.start("radiance", "account:admin"), /Choose an available/);
+  await assert.rejects(
+    benchmarks.start("radiance", "account:admin", "qwen-image"),
+    /Choose an available/,
+  );
+  assert.deepEqual(posted, []);
   // A second start while the first checks its model is refused.
   const [first, second] = await Promise.allSettled([
-    benchmarks.start("radiance", "account:admin"),
-    benchmarks.start("radiance", "account:admin"),
+    benchmarks.start("radiance", "account:admin", gemma),
+    benchmarks.start("radiance", "account:admin", qwen),
   ]);
   assert.match(String((second as PromiseRejectedResult).reason), /already running/);
   const run = (first as PromiseFulfilledResult<BenchmarkRun>).value;
-  assert.equal(run.model, "auto");
+  assert.equal(run.model, gemma);
+  const [submitted] = posted as ReturnType<typeof benchmarkJob>[];
+  assert.equal(submitted.spec.template.spec.containers[0].command.at(-1), gemma);
   assert.equal(run.requestedBy, "account:admin");
   assert.equal(run.status, "running");
   assert.deepEqual(calls, ["POST /apis/batch/v1/namespaces/radiance/jobs"]);
@@ -162,7 +198,9 @@ test("a failed Job reports why, and Stop deletes a Job still running", async () 
     request,
     workloads: [radiance],
     environment: { STUDIO_BENCHMARK_IMAGE: "image", STUDIO_BENCHMARK_SECRET: "radiance" },
-    fetchImpl: (async () => Response.json({ status: "ok" })) as typeof fetch,
+    fetchImpl: (async () =>
+      Response.json({ data: [{ id: qwen, state: "resident" }] })) as typeof fetch,
+    textModels,
     pollMs: 60_000,
   });
   await benchmarks.start("radiance", "local");

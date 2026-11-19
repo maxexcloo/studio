@@ -2,13 +2,14 @@ import { Badge, Loader, Menu, Stack, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import type { BenchmarkRun, BenchmarkStatus } from "../../../../shared/runtime";
+import type { BenchmarkModel, BenchmarkRun, BenchmarkStatus } from "../../../../shared/runtime";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SettingGroup } from "../../ui/SettingRows";
+import { ChipOption, ChipSelect } from "../generation/ChipSelect";
 import { LogDialog, PodLog, useRequester } from "./RuntimeLogs";
 
 export const benchmarksQuery = queryOptions({
@@ -17,6 +18,16 @@ export const benchmarksQuery = queryOptions({
   refetchInterval: (query) =>
     query.state.data?.runs.some((run) => run.status === "running") ? 10000 : false,
 });
+
+const benchmarkModelsQuery = (workload: string) =>
+  queryOptions({
+    queryKey: ["runtime-benchmark-models", workload],
+    queryFn: () =>
+      api<{ models: BenchmarkModel[] }>(
+        `/api/runtime/workloads/${encodeURIComponent(workload)}/benchmark-models`,
+      ),
+    enabled: Boolean(workload),
+  });
 
 const shortDateTime = dateFormat({ dateStyle: "short", timeStyle: "short" });
 const statusColour = (status: BenchmarkRun["status"]) =>
@@ -36,11 +47,18 @@ export function BenchmarkDialog({
   onClose: () => void;
 }) {
   const client = useQueryClient();
+  const inventory = useQuery(benchmarkModelsQuery(workload?.id ?? ""));
+  const [selected, setSelected] = useState<string | null>(null);
+  const models = inventory.data?.models ?? [];
+  const model =
+    models.find(({ id }) => id === selected) ?? (models.length === 1 ? models[0] : undefined);
   const start = useMutation({
-    mutationFn: (id: string) => post<BenchmarkRun>("/api/runtime/benchmarks", { workload: id }),
+    mutationFn: (choice: { workload: string; model: string }) =>
+      post<BenchmarkRun>("/api/runtime/benchmarks", choice),
     meta: { inlineError: true },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: benchmarksQuery.queryKey });
+      setSelected(null);
       onClose();
     },
   });
@@ -50,15 +68,37 @@ export function BenchmarkDialog({
       title={`Benchmark ${workload?.label ?? ""}`}
       action="Benchmark"
       pending={start.isPending}
-      error={start.error?.message}
-      onConfirm={() => start.mutate(workload!.id)}
+      disabled={inventory.isFetching || !model}
+      error={start.error?.message || inventory.error?.message}
+      onConfirm={() => {
+        if (workload && model) start.mutate({ workload: workload.id, model: model.id });
+      }}
       onClose={() => {
         start.reset();
+        setSelected(null);
         onClose();
       }}
     >
-      BetterBench's quick pass measures decode, prompt processing and concurrent throughput over
-      several minutes. Studio keeps using the model meanwhile, which shows in the figures.
+      <Stack gap="sm">
+        <Text size="sm">
+          BetterBench measures decode, prompt processing and concurrent throughput. Loading the
+          selected model may delay other work, and activity on the worker affects the results.
+        </Text>
+        <ChipSelect
+          field
+          name="Text Model"
+          label={model?.label ?? (inventory.isFetching ? "Loading Models" : "Choose Model")}
+          data={models.map(({ id, label }) => ({ value: id, label }))}
+          value={model?.id ?? ""}
+          onChange={setSelected}
+          renderOption={({ option, checked }) => (
+            <ChipOption label={option.label} checked={checked} />
+          )}
+          disabled={!models.length || inventory.isFetching || start.isPending}
+          withinPortal={false}
+        />
+        {inventory.isSuccess && !models.length && <Text size="sm">No text models available.</Text>}
+      </Stack>
     </ConfirmDialog>
   );
 }
@@ -120,14 +160,14 @@ export function BenchmarkResults() {
             key: "model",
             header: "Model",
             main: true,
-            sortValue: (run) => run.label,
+            sortValue: (run) => run.model,
             cell: (run) => (
               <Stack gap={0}>
                 <Text size="sm" fw={500}>
-                  {run.label}
+                  {run.model}
                 </Text>
                 <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
-                  {run.model} · Requested by {who(run.requestedBy)}
+                  {run.label} · Requested by {who(run.requestedBy)}
                 </Text>
                 {run.error && (
                   <Text size="xs" c="red">
