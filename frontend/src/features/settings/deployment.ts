@@ -3,6 +3,7 @@ import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query
 import type { DreamOverride, DreamSettings } from "../../../../shared/dream";
 import { api, post } from "../../api";
 import { modelsQuery } from "../generation/GenerationProvider";
+import { assistantQuery } from "../generation/PromptAssistant";
 
 interface Source {
   source: "default" | "studio" | "deployment";
@@ -14,6 +15,8 @@ export interface Deployment {
   defaults: {
     image: Setting;
     video: Setting;
+    text: Setting;
+    textModels: string[];
     profiles: { id: string; label: string; kind: string; ready: boolean }[];
   };
   catalogue: Flag[];
@@ -43,6 +46,7 @@ const applied = (data: Deployment, { key, value }: Change): Deployment => {
       ...data.defaults,
       image: setting(data.defaults.image),
       video: setting(data.defaults.video),
+      text: setting(data.defaults.text),
     },
     dream: Object.fromEntries(
       Object.entries(data.dream).map(([name, entry]) => [
@@ -71,6 +75,7 @@ export function useDeploymentSetting() {
     onSettled: () => {
       void client.invalidateQueries({ queryKey: deploymentQuery.queryKey });
       void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
+      void client.invalidateQueries({ queryKey: assistantQuery.queryKey });
       void client.invalidateQueries({ queryKey: ["dream"] });
     },
   });

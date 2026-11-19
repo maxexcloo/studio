@@ -13,6 +13,7 @@ delete process.env.STUDIO_GALLERY_CAPTIONS;
 delete process.env.STUDIO_IMAGE_SEARCH;
 delete process.env.STUDIO_GALLERY_WHILE_BUSY;
 delete process.env.STUDIO_RETIRED_SETTING;
+delete process.env.STUDIO_DEFAULT_TEXT_PROFILE;
 writeRuntimeDocument(temporary, "settings", {
   STUDIO_GALLERY_CAPTIONS: "0",
   STUDIO_DEFAULT_IMAGE_PROFILE: "saved-profile",
@@ -94,8 +95,16 @@ test("Dream overrides force only what is set, off included, and deployment locks
   }
 });
 
-test("Dream administration requires admin authority, validates inputs and reads saved overrides back", async () => {
+test("Generation administration validates and applies Dream overrides and the default text profile", async () => {
+  const { promptWriter } = await import("./account-policy.js");
+  const { createAssistant } = await import("./assistant.js");
   const { registerDeploymentRoutes } = await import("./deployment-routes.js");
+  let local;
+  const assistantEngine = createAssistant(process.env, {
+    resolveSettings: () => ({ root: "http://gateway.invalid", cloud: "cloud/auto" }),
+    fetchImpl: async () => Response.json({ data: [{ id: "cloud/auto" }, { id: "local/auto" }] }),
+    localText: async () => local,
+  });
   const handlers = {};
   registerDeploymentRoutes(
     {
@@ -106,7 +115,12 @@ test("Dream administration requires admin authority, validates inputs and reads 
         handlers[`POST ${path}`] = handler;
       },
     },
-    { mediaModels: async () => ({ models: { profiles: [] } }), unavailableModels: () => ({}) },
+    {
+      assistantEngine,
+      mediaModels: async () => ({ models: { profiles: [] } }),
+      unavailableModels: () => ({}),
+      workloadModels: () => ["local/text-default"],
+    },
   );
   const previous = process.env.STUDIO_MULTI_USER;
   process.env.STUDIO_MULTI_USER = "1";
@@ -162,7 +176,38 @@ test("Dream administration requires admin authority, validates inputs and reads 
       value: null,
     });
     assert.equal(cleared.body.dream.videoBackend.value, null);
+
+    const key = "STUDIO_DEFAULT_TEXT_PROFILE";
+    assert.deepEqual((await request("GET")).body.defaults.textModels, [
+      "cloud/auto",
+      "local/auto",
+      "local/text-default",
+    ]);
+    assert.equal((await request("POST", { key, value: "image-model" })).statusCode, 400);
+    assert.equal((await request("POST", { key, value: "local/text-default" })).statusCode, 200);
+    assert.equal((await request("GET")).body.defaults.text.configured, "local/text-default");
+    assert.equal(readRuntimeDocument(temporary, "settings")[key], "local/text-default");
+
+    const model = (preferences = {}) =>
+      assistantEngine.model(
+        "rewrite",
+        false,
+        promptWriter(undefined, { cloudModels: true, ...preferences }),
+      );
+    assert.equal(await model({ textCloud: "cloud/personal" }), "cloud/personal");
+    local = { model: "local/auto" };
+    assert.equal(await model(), "local/text-default");
+    assert.equal(await model({ textLocal: "local/personal" }), "local/personal");
+    assert.equal(await model({ text: "cloud" }), "cloud/uncensored");
+    await request("POST", { key, value: "cloud/text-default" });
+    assert.equal(await model(), "cloud/text-default");
+    assert.equal(await model({ text: "local" }), "local/auto");
+    await request("POST", { key, value: "" });
+    assert.equal((await request("GET")).body.defaults.text.configured, "");
+    assert.equal(await model({ textCloud: "cloud/personal" }), "cloud/personal");
   } finally {
+    if (process.env.STUDIO_DEFAULT_TEXT_PROFILE)
+      settings.saveDeploymentSetting("STUDIO_DEFAULT_TEXT_PROFILE", "");
     if (previous === undefined) delete process.env.STUDIO_MULTI_USER;
     else process.env.STUDIO_MULTI_USER = previous;
   }

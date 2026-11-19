@@ -4,6 +4,7 @@ import {
   Button,
   Chip,
   Group,
+  Menu,
   type PopoverProps,
   ScrollArea,
   Scroller,
@@ -11,7 +12,6 @@ import {
   Stack,
   Switch,
   Text,
-  Tooltip,
 } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
@@ -28,11 +28,13 @@ import {
 } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, Profile, Rating } from "../../types";
+import { contextMenuHandlers } from "../../ui/contextMenu";
 import { compareNames } from "../../ui/DataTable";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { OrderedItems } from "../../ui/OrderedItems";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { SortMenu } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
@@ -516,8 +518,7 @@ function useStackDraft({ value, onChange, picker }: LoraPickerProps) {
 
 /**
  * The stack's preset, in its heading or the phone sheet's header: its name, the presets with LoRAs
- * for this family, and their edits. Save updates the current preset's LoRAs, or names a new preset
- * of only LoRAs.
+ * for this family, and their edits.
  */
 function StackPreset(props: LoraPickerProps) {
   const { picker } = props;
@@ -636,6 +637,7 @@ function StackEntry({
   onChange: (patch: Partial<Lora>) => void;
   onRemove: () => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const range = info?.strengthRange;
   const { min, max, step } = loraStrengthRange(info);
   const enabled = lora.enabled !== false;
@@ -649,7 +651,12 @@ function StackEntry({
         ? triggers.filter((word) => (lora.triggers as string[]).includes(word))
         : triggers;
   return (
-    <Stack gap={4} className={classes.entry} data-disabled={!enabled || undefined}>
+    <Stack
+      gap={4}
+      className={classes.entry}
+      data-disabled={!enabled || undefined}
+      {...contextMenuHandlers(() => setMenuOpen(true))}
+    >
       <Group gap="xs" wrap="nowrap">
         <Switch
           classNames={{ root: classes.enable, body: classes.enable, labelWrapper: classes.enable }}
@@ -662,24 +669,34 @@ function StackEntry({
           checked={enabled}
           onChange={(event) => onChange({ enabled: event.currentTarget.checked })}
         />
-        {info?.sourceUrl && (
-          <Tooltip label="View Source">
-            <ActionIcon
-              component="a"
-              href={info.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              variant="subtle"
-              color="gray"
-              aria-label="View Source"
-            >
-              <icons.external size={16} />
-            </ActionIcon>
-          </Tooltip>
-        )}
-        <ActionIcon variant="subtle" color="gray" aria-label={`Remove ${title}`} onClick={onRemove}>
-          <icons.clear size={16} />
-        </ActionIcon>
+        <Menu position="bottom-end" withinPortal={false} opened={menuOpen} onChange={setMenuOpen}>
+          <PopupTooltip label={`${title} Actions`}>
+            <Menu.Target>
+              <ActionIcon variant="subtle" color="gray" aria-label={`${title} Actions`}>
+                <icons.more size={16} />
+              </ActionIcon>
+            </Menu.Target>
+          </PopupTooltip>
+          <Menu.Dropdown aria-label={`${title} Actions`}>
+            <Menu.CheckboxItem checked={enabled} onChange={(enabled) => onChange({ enabled })}>
+              Enabled
+            </Menu.CheckboxItem>
+            {info?.sourceUrl && (
+              <Menu.Item
+                component="a"
+                href={info.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                leftSection={<icons.external size={16} />}
+              >
+                View Source
+              </Menu.Item>
+            )}
+            <Menu.Item leftSection={<icons.clear size={16} />} onClick={onRemove}>
+              Remove
+            </Menu.Item>
+          </Menu.Dropdown>
+        </Menu>
       </Group>
       <Stack gap={4} className={classes.details}>
         <StrengthControl

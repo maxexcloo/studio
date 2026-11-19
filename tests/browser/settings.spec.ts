@@ -788,10 +788,27 @@ test("Workers benchmark a running local text model and list each run's figures",
   let runs: Record<string, unknown>[] = [earlier];
   const started: unknown[] = [];
   const stopped: string[] = [];
+  await page.route("**/api/runtime/workloads/gemma/benchmark-models", (route) =>
+    route.fulfill({
+      json: {
+        models: [
+          { id: "gemma-4-31b", label: "Gemma 4 31B" },
+          { id: "qwen3.8-27b", label: "Qwen 3.8 27B" },
+        ],
+      },
+    }),
+  );
   await page.route("**/api/runtime/benchmarks", (route) => {
     if (route.request().method() === "POST") {
-      started.push(route.request().postDataJSON());
-      const run = { ...earlier, id: "next", status: "running", summary: undefined };
+      const choice = route.request().postDataJSON();
+      started.push(choice);
+      const run = {
+        ...earlier,
+        model: choice.model,
+        id: "next",
+        status: "running",
+        summary: undefined,
+      };
       runs = [run, ...runs];
       return route.fulfill({ status: 202, json: run });
     }
@@ -830,10 +847,15 @@ test("Workers benchmark a running local text model and list each run's figures",
   await closeMenu();
   await (await menu("Gemma")).click();
   const dialog = page.getByRole("dialog", { name: "Benchmark Gemma", exact: true });
-  await dialog.getByRole("button", { name: "Benchmark", exact: true }).click();
+  const benchmark = dialog.getByRole("button", { name: "Benchmark", exact: true });
+  await expect(benchmark).toBeDisabled();
+  await dialog.getByRole("combobox", { name: "Text Model", exact: true }).click();
+  await dialog.getByRole("option", { name: "Qwen 3.8 27B", exact: true }).click();
+  await benchmark.click();
   await expect(dialog).toBeHidden();
-  expect(started).toEqual([{ workload: "gemma" }]);
+  expect(started).toEqual([{ workload: "gemma", model: "qwen3.8-27b" }]);
   await expect(results.getByRole("row", { name: "Gemma" }).first()).toContainText("Running");
+  await expect(results.getByRole("row", { name: "Gemma" }).first()).toContainText("qwen3.8-27b");
   // One benchmark at a time.
   await expect(await menu("Gemma")).toBeDisabled();
   await closeMenu();
@@ -916,6 +938,8 @@ test("Settings › Maintenance switches follow at once and settle back after a f
         defaults: {
           image: setting("STUDIO_DEFAULT_IMAGE_PROFILE"),
           video: setting("STUDIO_DEFAULT_VIDEO_PROFILE"),
+          text: setting("STUDIO_DEFAULT_TEXT_PROFILE"),
+          textModels: [],
           profiles: [],
         },
         dream: dreamOverridesFixture(),
@@ -973,4 +997,26 @@ test("Settings › Generation forces a Dream setting on every account and hands 
   await spicy.getByText("Per Account", { exact: true }).click();
   await page.reload();
   await expect(choice(spicy, "Per Account")).toBeChecked();
+});
+
+test("Settings › Generation saves and clears the default Text Profile", async ({ page }) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  await page.goto("/settings#generation");
+  const text = page.getByRole("combobox", { name: "Text Profile", exact: true });
+  await expect(text).toHaveText("Gateway Default");
+  await text.click();
+  const saved = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/settings/deployment") &&
+      response.request().method() === "POST" &&
+      response.ok(),
+  );
+  await page.getByRole("option", { name: "Auto · Local", exact: true }).click();
+  await saved;
+  await page.reload();
+  await expect(text).toHaveText("Auto · Local");
+  await text.click();
+  await page.getByRole("option", { name: "Gateway Default", exact: true }).click();
+  await expect(text).toHaveText("Gateway Default");
 });

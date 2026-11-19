@@ -2,6 +2,7 @@ import { Button, ComboboxPopover, SegmentedControl, Tooltip } from "@mantine/cor
 import { Brush, ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { isCloudVideoProfile } from "../../../../shared/profiles";
 import type { GenerationInput, Profile } from "../../types";
 import { icons } from "../../ui/icons";
 import { chipProps, iconChipProps } from "./chip";
@@ -162,7 +163,7 @@ export function GenerationInputControls({
         />
       )}
       {references}
-      {references && hasReferences && (
+      {references && hasReferences && !isCloudVideoProfile(profile) && (
         <ReferenceRole input={input} onChange={onChange} mask={mask} />
       )}
       {(input.loras.length > 0 ||

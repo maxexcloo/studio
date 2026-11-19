@@ -15,6 +15,7 @@ import {
 
 test("LoRA ratings persist and order the list, search narrows the choices, and Trigger Words reach the generation", async ({
   page,
+  isMobile,
 }) => {
   const state = await fixtures(page);
   await page.route("**/api/loras/info", (route) =>
@@ -119,10 +120,21 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
   await expect(lastTrigger).toBeChecked();
   await triggers.getByText("a long exact trigger, with punctuation", { exact: true }).click();
   await expect(lastTrigger).not.toBeChecked();
-  await expect(controls.getByRole("link", { name: "View Source", exact: true })).toHaveAttribute(
+  const row = controls.getByRole("listitem", { name: "loras Detail Slider", exact: true });
+  const action = row.getByRole("button", { name: "Detail Slider Actions", exact: true });
+  const menu = controls.getByRole("menu", { name: "Detail Slider Actions", exact: true });
+  const enabled = row.getByRole("switch", { name: "Enable Detail Slider", exact: true });
+  if (isMobile) await action.tap();
+  else await enabled.click({ button: "right" });
+  await expect(menu.getByRole("menuitem", { name: "View Source", exact: true })).toHaveAttribute(
     "href",
     "https://example.com/detail",
   );
+  await page.keyboard.press("Escape");
+  await enabled.press("Shift+F10");
+  await expect(menu.getByRole("menuitemcheckbox", { name: "Enabled", exact: true })).toBeChecked();
+  await expect(menu.getByRole("menuitem", { name: "Remove", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   await closeLoras(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A quiet bird");
   await pressGenerate(page);
@@ -372,13 +384,11 @@ test("The stack's preset field saves, loads and renames LoRA presets, marks edit
   const name = page.getByRole("combobox", { name: "Preset Name", exact: true });
   await expect(name).toHaveValue("");
   await expect(name).toHaveAttribute("placeholder", "Unsaved Preset");
-  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toHaveText("Save");
   // Names stay unique: a name in use offers that preset rather than saving another.
-  await page.getByRole("button", { name: "Save Preset", exact: true }).click();
-  await expect(name).toBeFocused();
+  await name.click();
   await name.fill("portrait");
   await expect(page.getByRole("option", { name: /^Save as New Preset/ })).toHaveCount(0);
-  await expect(page.getByText("Name in Use", { exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Portrait", exact: true })).toBeVisible();
   await name.press("Escape");
   await saveCurrent(page, "Soft Look");
   await expect.poll(() => state.presets.length).toBe(4);
@@ -388,8 +398,6 @@ test("The stack's preset field saves, loads and renames LoRA presets, marks edit
     family: "test",
     input: { loras: [{ name: "soft-style.safetensors", enabled: true }] },
   });
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeDisabled();
   await renamePreset(page, "Soft Look Two");
   await expect.poll(() => state.presets[3].title).toBe("Soft Look Two");
   // Older duplicates show when each was saved.
@@ -403,15 +411,17 @@ test("The stack's preset field saves, loads and renames LoRA presets, marks edit
   await expect(detail).toBeChecked();
   await expect(page.getByRole("switch", { name: "Enable Soft Style", exact: true })).toHaveCount(0);
   await detail.uncheck();
-  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeEnabled();
   await name.click();
+  const update = page.getByRole("option", { name: "Update Preset", exact: true });
+  await expect(update).toBeVisible();
   await page.getByRole("option", { name: "Soft Look Two", exact: true }).click();
   await expect(
     page.getByText("Replace the current LoRAs with “Soft Look Two”?", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Replace", exact: true }).click();
   await expect(name).toHaveValue("Soft Look Two");
-  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeDisabled();
+  await name.click();
+  await expect(update).toHaveCount(0);
   expect(state.presets[0].input.loras).toEqual(portrait);
   expect(state.jobs).toHaveLength(0);
 });

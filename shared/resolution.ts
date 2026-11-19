@@ -95,6 +95,20 @@ export function resolutionSize(
 }
 
 const aspectOrder = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"];
+export const grokVideoAspects = [...aspectOrder, "21:9", "5:2"];
+export const grokVideoDefaultResolution = "720p";
+export const grokPinnedResolutions = ["480p", grokVideoDefaultResolution];
+
+export function grokVideoAspect(width: number, height: number) {
+  const distance = (aspect: string) => {
+    const [w, h] = aspect.split(":").map(Number);
+    return Math.abs(Math.log(width / height) - Math.log(w / h));
+  };
+  return grokVideoAspects.reduce((best, aspect) =>
+    distance(aspect) < distance(best) ? aspect : best,
+  );
+}
+
 /** Aspect presets as every size control lists them: the standard ratios in order, then the rest. */
 export function orderedAspects<T extends { label: string }>(presets: T[]) {
   const rank = (preset: T) => {
