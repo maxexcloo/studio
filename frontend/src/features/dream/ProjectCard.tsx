@@ -113,16 +113,20 @@ export function ProjectCard({
   const badges = constraintBadges(project, profileLabel);
   const results = (stats?.results || []).slice(0, resultsShown);
   return (
-    <Paper withBorder p="sm" radius="md" component="section" aria-label={project.name}>
+    <Paper withBorder p="md" radius="lg" component="section" aria-label={project.name}>
       <Stack gap="xs">
         <Group justify="space-between" wrap="nowrap" gap="xs">
           <Group gap="xs" wrap="nowrap" miw={0}>
             <UnstyledButton onClick={open} miw={0} aria-label={`Open ${project.name}`}>
-              <Text fw={600} truncate>
+              <Text size="sm" fw={600} truncate>
                 {project.name}
               </Text>
             </UnstyledButton>
-            {fresh > 0 && <Badge style={{ flexShrink: 0 }}>{fresh} New</Badge>}
+            {fresh > 0 && (
+              <Badge variant="light" style={{ flexShrink: 0 }}>
+                {fresh} New
+              </Badge>
+            )}
           </Group>
           <Menu position="bottom-end" width={menuWidth}>
             <Menu.Target>

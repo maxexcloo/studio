@@ -156,11 +156,11 @@ recur across features.
   Dislike (✕), Like (♥) and Accept (✓) buttons, and swipes that tilt the card
   and stamp its answer while the next card waits behind; on an upright phone
   the card reaches the bottom safe area with the buttons floating over it.
-  Undo beside the view menu steps back through the session's judgements. Its preview is the same
-  card full screen, zooming as the viewer does, with Undo, Close and the
-  buttons floating over it. On a comparison, This Image picks the shown side.
-  Like and the upward swipe pick and rate that side. Sideways swipes in the
-  preview switch sides.
+  Undo beside the view menu steps back through the session's judgements. Its
+  fullscreen preview fills the stage above the verdicts and shares the viewer's
+  top chrome, media controls and Details panel or phone sheet for the item
+  shown. On comparisons, This Image picks the shown side. Like and an upward
+  swipe pick and rate it. Sideways swipes in the preview switch sides.
 - A finished selection action ends the selection, keeping selected only the
   items it failed for; opening a menu does not. Quick selects take every
   match, not only loaded pages, and deletion confirms.
