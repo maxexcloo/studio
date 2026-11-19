@@ -568,13 +568,13 @@ export function createGenerationSubmission({
               error: "Choose reference images belonging to this account.",
             },
           };
-        if (routed.profile.capabilities?.startImageRequired && !references.length)
+        if (profile.capabilities?.startImageRequired && !references.length)
           return {
             status: 400,
             payload: { ok: false, error: "A reference image is required for this workflow." },
           };
         try {
-          validateReferenceSlots(references, routed.profile);
+          validateReferenceSlots(references, profile);
           const requested = (Array.isArray(input.loras) ? input.loras : []).filter(
             (lora) => lora?.enabled !== false && lora?.name,
           );

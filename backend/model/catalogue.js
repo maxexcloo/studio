@@ -3,7 +3,9 @@ import { mayUseFeature, visibleGenerationProfiles } from "../account-policy.js";
 import { kindDefaults } from "../account-preferences.js";
 import {
   allowedProfile,
+  forgetWorkerProfiles,
   isDefaultBackend,
+  matchesWorkerBackend,
   mergeWorkerModels,
   noteWorkerProfiles,
   workerAvailability,
@@ -28,7 +30,7 @@ import {
   workerById,
 } from "../workers.js";
 import { primeModelMetadata } from "./families.js";
-import { inferModels, offlineModelResult } from "./models.js";
+import { inferModels, offlineModelResult, profileWithBackendOptions } from "./models.js";
 
 // A worker context's catalogue, kept per node list (each fetch or stored observation is its own
 // object) until the profile folder or a setting inferModels reads changes (Settings saves the
@@ -46,7 +48,10 @@ function inferred(info = none, stats = none, { configuredOnly = false } = {}) {
   inferredModels.set(info, entries);
   const kept = entries.get(configuredOnly);
   if (kept?.revision === revision && kept.stats === stats) return kept.models;
-  const models = inferModels(info, stats, { configuredOnly });
+  const models = inferModels(info, stats, {
+    configuredOnly,
+    includeUnavailableBackends: !configuredOnly && info !== none,
+  });
   entries.set(configuredOnly, { revision, stats, models });
   return models;
 }
@@ -200,8 +205,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
   /**
    * The catalogue across every worker (comfy/backends.js), with whether each
    * capability's workers answered (`backends`), so MCP can refuse local video
-   * while no video worker is up. One worker that runs everything keeps
-   * upstream's catalogue exactly. Without `wait`, a worker not read since Studio started counts as
+   * while no video worker is up. Without `wait`, a worker not read since Studio started counts as
    * not answering (its stored observation stands in) and is read in the background.
    */
   async function mediaModels(force = false, { wait = true } = {}) {
@@ -234,6 +238,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
       .map((worker) => {
         const online = answered.find((entry) => entry.worker.id === worker.id);
         if (online) return online;
+        forgetWorkerProfiles(worker.id);
         const observed = store.workerModels(worker.id, worker.url);
         // Persist worker observations; project current runtime catalogue metadata on each read.
         const cached = observed?.info && inferred(observed.info, observed.stats);
@@ -264,18 +269,13 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     const primary = answered.find(({ worker }) => isDefaultBackend(worker.id))?.result ||
       answered[0]?.result ||
       catalogues[0]?.result || { models: offlineModelResult() };
-    const complete =
-      workers.length === 1 &&
-      ["image", "video"].every((capability) => workers[0].capabilities.includes(capability));
-    const models = complete
-      ? { ...primary.models, backends }
-      : {
-          ...mergeWorkerModels(
-            catalogues.map(({ worker, result }) => ({ worker, models: result.models })),
-            inferred(),
-          ),
-          backends,
-        };
+    const models = {
+      ...mergeWorkerModels(
+        catalogues.map(({ worker, result }) => ({ worker, models: result.models })),
+        inferred(),
+      ),
+      backends,
+    };
     models.profiles = (models.profiles || []).map((profile) => {
       // Every worker shares the catalogue, so only one whose capabilities run the profile lists it.
       const listing = catalogues.filter(
@@ -283,15 +283,19 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
           allowedProfile(worker, profile) &&
           result.models.profiles?.some((candidate) => candidate.id === profile.id),
       );
-      // Where a combined profile's backend is ready on some workers only, those are its workers.
-      const ready = listing.filter(({ result }) =>
+      const current = profile.backendOptions?.length
+        ? listing.filter(({ worker }) => matchesWorkerBackend(worker, profile, profile.backend))
+        : listing;
+      const ready = current.filter(({ result }) =>
         result.models.profiles.some(
           (candidate) => candidate.id === profile.id && candidate.ready !== false,
         ),
       );
       return {
-        ...profile,
-        workerIds: (profile.backendOptions && ready.length ? ready : listing).map(
+        ...(profile.backendOptions?.length
+          ? profileWithBackendOptions(profile, profile.backendOptions)
+          : profile),
+        workerIds: (profile.backendOptions && ready.length ? ready : current).map(
           ({ worker }) => worker.id,
         ),
       };
