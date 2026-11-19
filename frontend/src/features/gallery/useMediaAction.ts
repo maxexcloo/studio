@@ -37,15 +37,11 @@ import { galleryKey } from "./queries";
 import { useItemMutation } from "./useItemMutation";
 
 type Operation = "image" | "refine" | "animate" | "extend";
-/** What Animate's Cloud, Fast and Quality offer the account (backend/animate-profile.js). */
-export type AnimateOffers = Record<SidePreference, boolean>;
-
 interface AnimateChoice {
   profileId: string;
   label: string;
   cloud: boolean;
   size?: { width: number; height: number };
-  offers: AnimateOffers;
   /** Why it runs somewhere other than the account prefers. */
   note?: string;
 }
