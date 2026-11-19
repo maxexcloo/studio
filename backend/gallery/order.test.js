@@ -69,6 +69,27 @@ test("a removed cursor continues through the bucket boundary and descending id t
   assert.deepEqual(ids(pageGallery({ cursor, limit: 2 }).items), ["a", "import"]);
 });
 
+test("oldest and liked-first order all pages before slicing, keeping result sets together", () => {
+  const resultSet = { id: "set" };
+  setGallery([
+    item("old", "2026-01-01"),
+    item("liked", "2026-01-02", { rating: "liked", resultSet }),
+    item("set-peer", "2026-01-03", { resultSet }),
+    item("new", "2026-01-04"),
+    item("hidden", "2026-01-05", { rating: "disliked" }),
+  ]);
+  for (const [sort, expected] of [
+    ["oldest", ["old", "set-peer", "liked", "new"]],
+    ["liked", ["set-peer", "liked", "new", "old"]],
+  ]) {
+    const first = pageGallery({ sort, limit: 2 });
+    const second = pageGallery({ sort, limit: 2, cursor: first.nextCursor });
+    assert.equal(first.totalApprox, 4);
+    assert.deepEqual(ids([...first.items, ...second.items]), expected);
+    assert.equal(second.hasMore, false);
+  }
+});
+
 test("A retry keeps its gallery position but date filters use when it was created", () => {
   const items = [
     item("newer", "2026-01-03"),

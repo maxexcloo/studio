@@ -20,7 +20,7 @@ import {
   getDefaultZIndex,
   useCombobox,
 } from "@mantine/core";
-import { ArrowDownUp, Check, type LucideIcon } from "lucide-react";
+import { Check, type LucideIcon } from "lucide-react";
 import {
   type CSSProperties,
   type DragEvent,
@@ -679,45 +679,6 @@ export function savedItems<T extends SavedItem>(items: T[], query: string, sort:
             : a.at - b.at,
     )
     .map(({ item }) => item);
-}
-
-/** The header action that sorts a picker's list: presets and LoRAs. */
-export function SortMenu<Sort extends string>({
-  label = "Sort",
-  labels,
-  value,
-  onChange,
-}: {
-  label?: string;
-  /** Each order's name, in menu order, such as `savedSortLabels`. */
-  labels: Record<Sort, string>;
-  value: Sort;
-  onChange: (sort: Sort) => void;
-}) {
-  return (
-    <Menu position="bottom-end" withinPortal={false}>
-      <PopupTooltip label={`Sort: ${labels[value]}`}>
-        <Menu.Target>
-          <ActionIcon aria-label={label} variant="subtle" color="gray">
-            <ArrowDownUp size={18} />
-          </ActionIcon>
-        </Menu.Target>
-      </PopupTooltip>
-      <Menu.Dropdown>
-        {(Object.keys(labels) as Sort[]).map((sort) => (
-          <Menu.Item
-            key={sort}
-            role="menuitemradio"
-            aria-checked={sort === value}
-            rightSection={sort === value ? <Check size={14} /> : undefined}
-            onClick={() => onChange(sort)}
-          >
-            {labels[sort]}
-          </Menu.Item>
-        ))}
-      </Menu.Dropdown>
-    </Menu>
-  );
 }
 
 /**

@@ -5,8 +5,10 @@ import { menuWidth } from "../../theme";
 import { ActionMenuItems } from "../../ui/ActionBar";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
+import { itemAction, itemActionGroups } from "../gallery/itemActions";
 import { CharacterEditor, type CharacterStart } from "./CharacterEditor";
 import { type CharacterCard, useDeleteCharacter, useMakeSheet } from "./queries";
+import { useCardRating } from "./useCardRating";
 
 /**
  * New, Edit and Delete Character and Make Sheet for a list of cards: `edit`
@@ -80,6 +82,7 @@ export function CharacterMenu({
   /** Off inside a popover, so choosing an item is not a press outside it. */
   withinPortal?: boolean;
 }) {
+  const ratings = useCardRating("characters", card);
   return (
     <Menu position="bottom-end" width={menuWidth} withinPortal={withinPortal}>
       <Menu.Target>
@@ -111,15 +114,10 @@ export function CharacterMenu({
                   ]
                 : []),
             ],
-            [
-              {
-                id: "delete",
-                label: "Delete Character",
-                icon: icons.delete,
-                color: "red",
-                onClick: onDelete,
-              },
-            ],
+            ...itemActionGroups([
+              ...ratings,
+              itemAction("delete", { label: "Delete Character", onClick: onDelete }),
+            ]),
           ]}
         />
       </Menu.Dropdown>

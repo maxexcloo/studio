@@ -6,7 +6,9 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import { SortMenu } from "../../ui/SortMenu";
 import { LibraryCard } from "./CardImages";
+import { CardRatingFilter, cardSortLabels, listedCards, useCardListing } from "./cardListing";
 import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCardDialogs";
 import { type PromptCardKind, promptCardsQuery } from "./queries";
 import { useCardFrom } from "./useCardFrom";
@@ -30,10 +32,8 @@ export function LibraryPromptCards({
   const start = useCardFrom((asset, named) => dialogs.edit(undefined, [asset], named));
   const use = useCardInComposer();
   const [query, setQuery] = useState("");
-  const words = query.trim().toLowerCase();
-  const cards = (listing.data || []).filter(
-    (card) => !words || `${card.name} ${card.description}`.toLowerCase().includes(words),
-  );
+  const order = useCardListing("library", kind);
+  const cards = listedCards(listing.data, query, order);
   return (
     <>
       <SectionHeader heading={heading}>
@@ -41,8 +41,24 @@ export function LibraryPromptCards({
           label={label}
           query={query}
           onQueryChange={listing.data?.length ? setQuery : undefined}
+          filters={<CardRatingFilter {...order} />}
+          filterCount={Number(order.disliked)}
+          onClearFilters={() => order.setDisliked(false)}
           actions={
-            <ToolbarAction label={`New ${noun}`} icon={icons.add} onClick={() => dialogs.edit()} />
+            <>
+              <SortMenu
+                label={`Sort ${label}`}
+                labels={cardSortLabels}
+                value={order.sort}
+                onChange={order.setSort}
+                withinPortal
+              />
+              <ToolbarAction
+                label={`New ${noun}`}
+                icon={icons.add}
+                onClick={() => dialogs.edit()}
+              />
+            </>
           }
         />
       </SectionHeader>
@@ -52,7 +68,9 @@ export function LibraryPromptCards({
       ) : listing.error ? (
         <Alert color="red">{listing.error.message}</Alert>
       ) : !cards.length ? (
-        <EmptyState>{words ? "No Matches" : `No ${label}`}</EmptyState>
+        <EmptyState>
+          {query.trim() ? "No Matches" : order.disliked ? `No Disliked ${label}` : `No ${label}`}
+        </EmptyState>
       ) : (
         <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} role="list" aria-label={label}>
           {cards.map((card) => (

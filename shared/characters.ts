@@ -19,6 +19,7 @@ export const cardKinds = {
   scenes: { name: "scene", prefix: "scn", images: { min: 0, max: 1 } },
 } as const;
 export type CardKind = keyof typeof cardKinds;
+export type CardRating = "liked" | "disliked";
 /**
  * How many of a card's images a draft places: its first. The run adds the others after it where the
  * profile's reference stack has room (backend/character-sheets.js sheetReferences).
@@ -33,7 +34,14 @@ export interface Card {
   referenceIds: string[];
   createdAt: string;
   updatedAt: string;
+  rating?: CardRating | null;
 }
+
+export const compareCardLikes = (a: Pick<Card, "rating">, b: Pick<Card, "rating">) =>
+  Number(b.rating === "liked") - Number(a.rating === "liked");
+
+export const suggestedCards = <T extends Pick<Card, "rating">>(cards: readonly T[]) =>
+  cards.filter((card) => card.rating !== "disliked").sort(compareCardLikes);
 /**
  * A character's own story beside its looks: shown on its card and never sent to a model, which
  * draws only the description. Ages start at 18.

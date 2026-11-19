@@ -42,6 +42,17 @@ export function compareGalleryKeys(a, b) {
   );
 }
 
+export function compareGalleryUnits(a, b, sort) {
+  if (sort === "oldest")
+    return (
+      a.bucket - b.bucket ||
+      (a.time === null || b.time === null ? descending(a.time, b.time) : a.time - b.time) ||
+      compareGalleryKeys(a, b)
+    );
+  if (sort === "liked") return Number(b.liked) - Number(a.liked) || compareGalleryKeys(a, b);
+  return compareGalleryKeys(a, b);
+}
+
 export function compareGalleryItems(a, b) {
   return compareGalleryKeys(galleryOrderKey(a), galleryOrderKey(b));
 }
