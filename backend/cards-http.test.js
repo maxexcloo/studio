@@ -192,6 +192,35 @@ test(
       body: { name: "Harbour", description: "a foggy harbour at dawn", referenceIds: [front.id] },
     });
     assert.equal(scene.status, 201, scene.body.error);
+    for (const [kind, noun, saved] of [
+      ["characters", "character", updated.body.character],
+      ["outfits", "outfit", outfit.body.outfit],
+      ["scenes", "scene", scene.body.scene],
+    ]) {
+      const route = `/api/${kind}/${saved.id}`;
+      const rate = (rating, cookie = cookies.artist) =>
+        call(route, { method: "PATCH", cookie, body: { rating } });
+      assert.equal(saved.rating, null);
+      assert.equal((await rate("liked", cookies.other)).status, 404);
+      assert.equal((await rate("liked", cookies.limited)).status, 403);
+      assert.equal((await rate(1)).status, 400);
+      for (const rating of ["liked", "disliked", "liked", null]) {
+        const result = await rate(rating);
+        assert.equal(result.status, 200, result.body.error);
+        const [listed] = (await call(`/api/${kind}`, { cookie: cookies.artist })).body[kind];
+        for (const item of [result.body[noun], listed]) {
+          assert.equal(item.rating, rating);
+          assert.deepEqual(
+            [item.id, item.name, item.description, item.referenceIds, item.createdAt],
+            [saved.id, saved.name, saved.description, saved.referenceIds, saved.createdAt],
+          );
+        }
+        if (rating === "liked") {
+          const edited = await call(route, { method: "PUT", cookie: cookies.artist, body: saved });
+          assert.equal(edited.body[noun].rating, "liked");
+        }
+      }
+    }
     assert.deepEqual(
       (await call("/api/scenes", { cookie: cookies.artist })).body.scenes.map((item) => [
         item.name,

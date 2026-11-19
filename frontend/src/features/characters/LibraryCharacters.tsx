@@ -6,7 +6,9 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import { SortMenu } from "../../ui/SortMenu";
 import { CardThumbnails, LibraryCard } from "./CardImages";
+import { CardRatingFilter, cardSortLabels, listedCards, useCardListing } from "./cardListing";
 import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import { sheetViews } from "./CharacterEditor";
@@ -23,13 +25,11 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
   const dialogs = useCharacterDialogs();
   const use = useCardInComposer();
   const [query, setQuery] = useState("");
+  const order = useCardListing("library", "characters");
   const start = useCardFrom((asset, named) =>
     dialogs.edit(undefined, { references: [asset], ...named }),
   );
-  const words = query.trim().toLowerCase();
-  const cards = (characters.data || []).filter(
-    (card) => !words || `${card.name} ${card.description}`.toLowerCase().includes(words),
-  );
+  const cards = listedCards(characters.data, query, order);
   return (
     <>
       <SectionHeader heading={heading}>
@@ -37,8 +37,24 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
           label="Characters"
           query={query}
           onQueryChange={characters.data?.length ? setQuery : undefined}
+          filters={<CardRatingFilter {...order} />}
+          filterCount={Number(order.disliked)}
+          onClearFilters={() => order.setDisliked(false)}
           actions={
-            <ToolbarAction label="New Character" icon={icons.add} onClick={() => dialogs.edit()} />
+            <>
+              <SortMenu
+                label="Sort Characters"
+                labels={cardSortLabels}
+                value={order.sort}
+                onChange={order.setSort}
+                withinPortal
+              />
+              <ToolbarAction
+                label="New Character"
+                icon={icons.add}
+                onClick={() => dialogs.edit()}
+              />
+            </>
           }
         />
       </SectionHeader>
@@ -48,7 +64,13 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
       ) : characters.error ? (
         <Alert color="red">{characters.error.message}</Alert>
       ) : !cards.length ? (
-        <EmptyState>{words ? "No Matches" : "No Characters"}</EmptyState>
+        <EmptyState>
+          {query.trim()
+            ? "No Matches"
+            : order.disliked
+              ? "No Disliked Characters"
+              : "No Characters"}
+        </EmptyState>
       ) : (
         <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} role="list" aria-label="Characters">
           {cards.map((card) => (

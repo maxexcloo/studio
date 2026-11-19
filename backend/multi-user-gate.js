@@ -56,6 +56,7 @@ const ordinaryRoutes = [
   ["POST", /^\/api\/(characters|outfits|scenes)$/],
   ["POST", /^\/api\/characters\/[\w-]+\/sheet$/],
   ["PUT", /^\/api\/(characters|outfits|scenes)\/[\w-]+$/],
+  ["PATCH", /^\/api\/(characters|outfits|scenes)\/[\w-]+$/],
   ["DELETE", /^\/api\/(characters|outfits|scenes)\/[\w-]+$/],
   // The prompt assistant works only with the requester's profiles, LoRAs and references.
   ["GET", /^\/api\/assistant$/],

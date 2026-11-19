@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useRef } from "react";
 
+import type { GallerySort } from "../../../../shared/gallery-sort";
 import { guidingRoles, slotCapacity } from "../../../../shared/profiles";
 import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
@@ -287,9 +288,14 @@ export function useGalleryReference(itemId?: string) {
  * already loaded show at once; searching and filtering keep the current tiles until the new ones
  * arrive.
  */
-export function useGalleryImages(search: string, filters: GalleryFilterValues, enabled: boolean) {
+export function useGalleryImages(
+  search: string,
+  filters: GalleryFilterValues,
+  enabled: boolean,
+  sort?: GallerySort,
+) {
   const listing = useInfiniteQuery({
-    ...galleryQuery({ search, kind: "image", filters }),
+    ...galleryQuery({ search, kind: "image", filters, sort }),
     enabled,
     placeholderData: keepPreviousData,
   });

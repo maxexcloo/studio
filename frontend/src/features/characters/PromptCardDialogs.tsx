@@ -7,6 +7,7 @@ import type { ReferenceAsset } from "../../types";
 import { ActionMenuItems } from "../../ui/ActionBar";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
+import { itemAction, itemActionGroups } from "../gallery/itemActions";
 import { CardDialog, CardFields, CardForm } from "./CardImages";
 import {
   type PromptCard,
@@ -15,6 +16,7 @@ import {
   useSavePromptCard,
 } from "./queries";
 import type { CardNamed } from "./useCardFrom";
+import { useCardRating } from "./useCardRating";
 
 /** Each kind's words: its name in titles, and what its description should hold. */
 export const promptCardText = {
@@ -176,6 +178,7 @@ export function PromptCardMenu({
   withinPortal?: boolean;
 }) {
   const { noun } = promptCardText[kind];
+  const ratings = useCardRating(kind, card);
   return (
     <Menu position="bottom-end" width={menuWidth} withinPortal={withinPortal}>
       <Menu.Target>
@@ -192,15 +195,10 @@ export function PromptCardMenu({
                 ? [{ id: "use", label: "Use in Composer", icon: icons.prompt, onClick: onUse }]
                 : []),
             ],
-            [
-              {
-                id: "delete",
-                label: `Delete ${noun}`,
-                icon: icons.delete,
-                color: "red",
-                onClick: onDelete,
-              },
-            ],
+            ...itemActionGroups([
+              ...ratings,
+              itemAction("delete", { label: `Delete ${noun}`, onClick: onDelete }),
+            ]),
           ]}
         />
       </Menu.Dropdown>
