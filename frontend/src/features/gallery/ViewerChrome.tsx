@@ -6,7 +6,7 @@ import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { recordedModel } from "./MediaDetails";
+import { mediaProfileName } from "./mediaLabels";
 
 import classes from "./MediaViewer.module.css";
 
@@ -37,7 +37,7 @@ export function ViewerChrome({
   focusClose?: boolean;
 }) {
   const { profiles } = useGenerationActions();
-  const model = item && recordedModel(item, profiles);
+  const model = item && mediaProfileName(item, profiles);
   return (
     <Group
       className={classes.topBar}
