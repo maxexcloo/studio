@@ -196,6 +196,69 @@ test("The viewer fits a large image but never enlarges a small one beyond its ac
   await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBeLessThan(1);
 });
 
+test("The viewer centres wide and tall images above the actions and updates both badges", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  for (const [shape, width, height, model] of [
+    ["wide", 2048, 768, "Wide Rendering Profile"],
+    ["tall", 800, 3072, "Tall Rendering Profile"],
+  ] as const) {
+    const url = `/test-media/${shape}-badge.png`;
+    const png = await sharp({ create: { width, height, channels: 3, background: "#254866" } })
+      .png()
+      .toBuffer();
+    state.gallery.push({
+      id: shape,
+      type: "image",
+      status: "done",
+      prompt: `A ${shape} scene`,
+      url,
+      width,
+      height,
+      createdAt: stamp,
+      settings: { profileName: model },
+    });
+    await page.route(`**${url}`, (route) => route.fulfill({ contentType: "image/png", body: png }));
+  }
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open image: Wide Scene", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const header = viewer.getByRole("group", { name: "Viewer Header", exact: true });
+  const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
+  const close = header.getByRole("button", { name: "Close Generation", exact: true });
+  for (const [index, shape, model] of [
+    [1, "wide", "Wide Rendering Profile"],
+    [2, "tall", "Tall Rendering Profile"],
+  ] as const) {
+    if (index === 2) await page.keyboard.press("ArrowRight");
+    const picture = viewer.getByRole("img", { name: `A ${shape} scene`, exact: true });
+    const position = header.getByText(`${index} / 2`, { exact: true });
+    const badge = header.getByText(model, { exact: true });
+    await expect(picture).toBeVisible();
+    await expect(position).toBeVisible();
+    await expect(badge).toBeVisible();
+    await expect
+      .poll(async () => {
+        const bounds = (await picture.boundingBox())!;
+        const bar = (await actions.boundingBox())!;
+        const stage = (await viewer.locator("[data-zoom-mode]").boundingBox())!;
+        const place = (await position.boundingBox())!;
+        const label = (await badge.boundingBox())!;
+        const dismiss = (await close.boundingBox())!;
+        return {
+          centred: Math.abs(bounds.y * 2 + bounds.height - bar.y) <= 2,
+          fitted:
+            shape === "wide"
+              ? Math.abs(bounds.width - stage.width) <= 2
+              : Math.abs(bounds.height - bar.y) <= 2,
+          badgesFit: place.x + place.width < label.x && label.x + label.width < dismiss.x,
+        };
+      })
+      .toEqual({ centred: true, fitted: true, badgesFit: true });
+  }
+});
+
 test("The viewer shows a server picture's display copy, and its original once zoom passes the copy", async ({
   page,
 }) => {
