@@ -223,6 +223,29 @@ for (const operation of ["Edit", "Animate"] as const) {
   });
 }
 
+test("Edit and Recreate open while the assistant status is still loading", async ({ page }) => {
+  const state = await galleryFixture(page);
+  await page.route("**/api/assistant", () => {});
+  await page.reload();
+
+  await tileMenu(page);
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  const editInComposer = page.getByRole("menuitem", { name: "Edit in Composer", exact: true });
+  await expect(editInComposer).toBeEnabled();
+
+  await page.reload();
+  await page.getByRole("button", { name: "Open image: Copper Bird", exact: true }).click();
+  await viewerAction(page, "Recreate");
+  await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeEnabled();
+  await expect(
+    page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }),
+  ).toBeEnabled();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await viewerAction(page, "Edit", "Edit in Composer");
+  await expect.poll(() => state.referenceRequests).toEqual([{ galleryItemId: "tile-bird" }]);
+});
+
 test("Edit submits the image with the profile's reference-mode settings", async ({ page }) => {
   const state = await galleryFixture(page);
   // Text-to-image samples from scratch; only the reference mode's partial denoise keeps the image.
