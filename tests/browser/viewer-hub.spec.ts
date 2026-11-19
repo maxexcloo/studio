@@ -1143,15 +1143,12 @@ async function offline(page: Page) {
   );
 }
 
-test("Animate offers Cloud and Local when the account has both, and runs on the pick", async ({
-  page,
-}) => {
-  const asked: string[] = [];
+test("Animate uses the saved Cloud preference when both routes are available", async ({ page }) => {
   const { state, viewer } = await seed(page, {}, async (page, fixture) => {
+    fixture.preferences.preferences.videos = "cloud";
     await serveProfiles(page, [...profiles, grok]);
     await page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) => {
       const cloud = fixture.preferences.preferences.videos === "cloud";
-      asked.push(cloud ? "cloud" : "local");
       return route.fulfill({
         json: {
           profileId: cloud ? grok.id : "video:test",
@@ -1163,15 +1160,8 @@ test("Animate offers Cloud and Local when the account has both, and runs on the 
     });
   });
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  const choice = page.getByRole("radiogroup", { name: "Cloud or Local", exact: true });
-  // Local where the account has local video, until another is chosen.
-  await expect(choice.getByRole("radio", { name: "Local", exact: true })).toBeChecked();
-  expect(asked[0]).toBe("local");
-  await choice.getByText("Cloud", { exact: true }).click();
-  await expect(choice.getByRole("radio", { name: "Cloud", exact: true })).toBeChecked();
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
-  expect(asked.at(-1)).toBe("cloud");
   expect(state.jobs[1]).toMatchObject({
     operation: "animate",
     input: { kind: "video", profileId: grok.id },

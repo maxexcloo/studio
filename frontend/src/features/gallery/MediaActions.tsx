@@ -44,7 +44,6 @@ import { profileForBackend } from "../generation/payload";
 import { type AssistantOption, assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
-import { type SidePreference, useVideosPreference } from "../settings/accountPreferences";
 import {
   askMotionIdeas,
   askNextSteps,
@@ -61,7 +60,6 @@ import { ReportIssueDialog, issues, useReportIssue } from "./ReportIssueDialog";
 import { useUpscaleAction } from "./UpscaleControls";
 import { useItemMutation } from "./useItemMutation";
 import {
-  type AnimateOffers,
   type AnimateRequest,
   type Iteration,
   animateProfileQuery,
@@ -386,40 +384,13 @@ export function useMediaActions(
         ]
       : [];
   // Animate says why no model can run before anything queues.
-  const [videos, setVideos] = useVideosPreference();
   const [review, setReview] = useAnimateReview();
   const length = useAnimateLengthSetting(item);
-  // The menu keeps its choice while a switch loads.
   const animation = useQuery({
     ...animateProfileQuery(item),
     enabled: image || video,
     placeholderData: keepPreviousData,
   });
-  // A refusal still says what is offered.
-  const offers =
-    animation.data?.offers ??
-    (animation.error?.cause as { offers?: AnimateOffers } | undefined)?.offers;
-  // Where the account prefers videos to run (also in Settings), where it has both. Unsaved or no
-  // longer offered, it shows Local where the account has local video, else Cloud.
-  const local = offers?.local ? "local" : "cloud";
-  const modelChoice =
-    offers?.cloud && offers.local
-      ? [
-          {
-            id: "animate-model",
-            label: "Cloud or Local",
-            icon: icons.animate,
-            choice: {
-              value: videos && offers[videos] ? videos : local,
-              options: [
-                { value: "cloud", label: "Cloud" },
-                { value: "local", label: "Local" },
-              ],
-              onChange: (value: string) => setVideos(value as SidePreference),
-            },
-          },
-        ]
-      : [];
   // Nothing can animate: say why.
   const refusal = animation.error?.message;
   // A video's templates continue the clip from its last frame at once; it keeps the clip's own
@@ -582,7 +553,7 @@ export function useMediaActions(
         onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
         menu: assistMenu({
           loading: optionsLoading,
-          settings: [...modelChoice, length, ...reviewItems],
+          settings: [length, ...reviewItems],
           suggestions: motionsOffered ? motions.group : [],
           templates: templates.filter((template) => template.id !== "custom").map(templateItem),
           custom: templates.filter((template) => template.id === "custom").map(templateItem),
