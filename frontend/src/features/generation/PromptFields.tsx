@@ -100,7 +100,7 @@ export function PromptFields({
   autoFocus?: boolean;
   /** Fills the phone Generate sheet: the prompt takes the room left above the settings, typed in place. */
   fill?: boolean;
-  /** Offers taste-led prompt ideas in the AI menu while the prompt is empty (`usePromptIdeas`). */
+  /** Offers ideas in the AI menu for an empty prompt or a draft with applied cards. */
   ideas?: boolean;
   /** Sends the assistant's Custom… as a change to the draft (`useDraftChange`). */
   ask?: DraftChange;
@@ -138,11 +138,11 @@ export function PromptFields({
     onPick: (prompt) => onChange({ prompt }),
   });
   const ideas = usePromptIdeas({
-    kind: input.kind,
-    value: input.prompt,
+    input,
+    references,
+    enabled: offerIdeas && !proposal && !ask?.pending,
     onChange: (prompt) => onChange({ prompt }),
   });
-  const idea = offerIdeas ? ideas.tool : undefined;
   return (
     <>
       <div
@@ -153,7 +153,7 @@ export function PromptFields({
       >
         <TextBox
           ref={textareaRef}
-          tools={[idea, assistant.action, history.action].filter((tool) => !!tool)}
+          tools={[ideas.tool, assistant.action, history.action].filter((tool) => !!tool)}
           send={proposal ? <UndoButton onClick={ask.undo} /> : offerIdeas && ideas.undo}
           busy={assistant.working}
           popups={history.popup}
@@ -162,7 +162,11 @@ export function PromptFields({
           className={proposal ? proposedClass : undefined}
           // The proposal's action names it over the prompt; Generate runs it.
           description={
-            proposal && <ProposalLabel proposal={proposal} before={base} labels={draftLabels} />
+            proposal ? (
+              <ProposalLabel proposal={proposal} before={base} labels={draftLabels} />
+            ) : (
+              ideas.label
+            )
           }
           variant="unstyled"
           aria-label="Prompt"

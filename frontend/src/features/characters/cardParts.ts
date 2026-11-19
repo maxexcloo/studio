@@ -11,6 +11,19 @@ import type { PromptCard, PromptCardKind } from "./queries";
 
 export type CardParts = GenerationInput["cardParts"];
 
+/** The cards still represented by the draft's text and, for characters, its attached images. */
+export function appliedCardIds(parts: CardParts, prompt: string, references: ReferenceAsset[]) {
+  return Object.entries(parts || {})
+    .filter(
+      ([, part]) =>
+        part.text &&
+        prompt.includes(part.text) &&
+        (part.kind !== "characters" ||
+          references.some((asset) => part.cardReferenceIds?.includes(asset.id))),
+    )
+    .map(([id]) => id);
+}
+
 function cardTexts(kind: CardKind, description: string) {
   return kind === "characters"
     ? [characterLead(description)]

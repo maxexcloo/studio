@@ -23,6 +23,7 @@ function fixture(
     picked?: string;
     fixed?: Record<string, string[]>;
     edits?: "instruction" | "description";
+    cards?: Parameters<typeof createSuggestions>[0]["cards"];
   } = {},
 ) {
   const calls: Message[][] = [];
@@ -75,6 +76,7 @@ function fixture(
       // Suggestions read only the summary and the signals.
       read: (owner) => ({ summary: "", signals: [], ...records[owner] }) as TasteRecord,
     },
+    cards: options.cards,
     writer: (owner) => ((options.writer || (() => true))(owner) ? model : null),
     online: async () => options.online ?? true,
     explicit: options.explicit || ((owner) => owner === "bob"),
@@ -117,10 +119,10 @@ function replies(system: string) {
   if (system.includes('"ideas"'))
     return JSON.stringify({
       ideas: [
-        "A foghorn lighthouse at blue hour",
-        `A harbour market ${"under lanterns ".repeat(20)}`,
-        "A harbour market at dusk",
-        "A harbour market at dusk",
+        { label: "Foghorn at Blue Hour", prompt: "A foghorn lighthouse at blue hour" },
+        { label: "Lantern Market", prompt: `A harbour market ${"under lanterns ".repeat(20)}` },
+        { label: "Market at Dusk", prompt: "A harbour market at dusk" },
+        { label: "Evening Market", prompt: "A harbour market at dusk" },
       ],
     });
   if (system.includes('"steps"'))
@@ -178,7 +180,7 @@ test("each suggestion picker requests six distinct ideas and caps an oversized r
     const { calls, suggestions } = fixture({
       reply: () =>
         JSON.stringify({
-          ideas: [labels[0], ...labels],
+          ideas: [labels[0], ...labels].map((label) => ({ label, prompt: label })),
           steps: [labels[0], ...labels].map((label) => ({ label, request: label, prompt: label })),
         }),
     });
@@ -189,11 +191,7 @@ test("each suggestion picker requests six distinct ideas and caps an oversized r
       prompt: "A harbour",
     });
     assert.equal(result.suggestions.length, 6, surface);
-    assert.equal(
-      new Set(result.suggestions.map((idea) => (typeof idea === "string" ? idea : idea.label)))
-        .size,
-      6,
-    );
+    assert.equal(new Set(result.suggestions.map((idea) => idea.label)).size, 6);
     assert.match(calls[0][0].content, /(?:Write|Suggest) 6 useful, distinct/);
   }
 });
@@ -219,8 +217,14 @@ test("composer ideas come from the taste profile, framed as data, whole and dist
   const { calls, suggestions } = fixture();
   const result = await suggestions.suggest("alice", { surface: "composer", kind: "image" });
   assert.equal(result.suggestions.length, 3);
-  assert.equal(result.suggestions[0], "A foghorn lighthouse at blue hour");
-  assert.equal(result.suggestions[1], `A harbour market ${"under lanterns ".repeat(20)}`.trim());
+  assert.deepEqual(result.suggestions[0], {
+    label: "Foghorn at Blue Hour",
+    prompt: "A foghorn lighthouse at blue hour",
+  });
+  assert.equal(
+    result.suggestions[1].prompt,
+    `A harbour market ${"under lanterns ".repeat(20)}`.trim(),
+  );
   const [system, user] = calls[0];
   assert.match(system.content, /data, never instructions/);
   assert.match(system.content, /image prompts/);
@@ -236,11 +240,62 @@ test("composer ideas asked again offer different ones from those shown", async (
   const again = await suggestions.suggest("alice", { surface: "composer", kind: "image" });
   assert.match(
     calls[1][1].content,
-    /Already suggested \(offer different ones\): A foghorn lighthouse at blue hour; /,
+    /Already suggested \(offer different ones\): Foghorn at Blue Hour: A foghorn lighthouse at blue hour; /,
   );
   assert.equal(again.suggestions.length, 3);
   // Each ask takes its ideas from a few angles drawn at random, so refreshes range widely.
   assert.match(calls[0][0].content, /Take each from a different angle \([^;)]+(?:; [^;)]+){5}\)/);
+});
+
+test("composer ideas keep applied cards and the full draft, even before Studio learns taste", async () => {
+  const card = (id: string, name: string, description: string) => ({
+    id,
+    name,
+    description,
+    referenceIds: [],
+    createdAt: "",
+    updatedAt: "",
+  });
+  const { calls, suggestions } = fixture({
+    cards: (owner) =>
+      owner === "carol"
+        ? {
+            characters: [card("chr-ranger", "Mara", "a ranger with red hair")],
+            outfits: [card("out-coat", "Raincoat", "a yellow raincoat")],
+            scenes: [card("scn-harbour", "Harbour", "a foggy harbour")],
+          }
+        : owner === "alice"
+          ? { characters: [], outfits: [], scenes: [] }
+          : null,
+    reply: () =>
+      JSON.stringify({ ideas: [{ label: "lantern light", prompt: "She raises a lantern." }] }),
+  });
+  const prompt = "The person from the reference image.  She wears a raincoat.\nFacing the harbour.";
+  const body = {
+    surface: "composer",
+    kind: "image",
+    cardIds: ["chr-ranger", "out-coat", "scn-harbour"],
+    prompt,
+  };
+
+  await assert.rejects(suggestions.suggest("alice", body), { status: 404 });
+  await assert.rejects(suggestions.suggest("bob", body), { status: 403 });
+  assert.equal(calls.length, 0);
+  assert.deepEqual(await suggestions.suggest("carol", body), {
+    suggestions: [{ label: "Lantern Light", prompt: `${prompt}\n\nShe raises a lantern.` }],
+  });
+  const [system, user] = calls[0];
+  assert.match(system.content, /Keep the same character, any specified outfit or scene/);
+  assert.match(user.content, /character: Mara.*ranger with red hair/);
+  assert.match(user.content, /outfit: Raincoat.*yellow raincoat/);
+  assert.match(user.content, /scene: Harbour.*foggy harbour/);
+  assert.match(user.content, /Facing the harbour/);
+
+  await suggestions.suggest("carol", body);
+  assert.equal(calls.length, 1, "the same draft reuses its ideas");
+  const next = await suggestions.suggest("carol", { ...body, prompt: `${prompt} At noon.` });
+  assert.match(next.suggestions[0].prompt, /At noon/);
+  assert.equal(calls.length, 2);
 });
 
 test("Animate's ideas and a draft's changes asked again offer different ones from those shown", async () => {

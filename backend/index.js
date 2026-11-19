@@ -858,12 +858,18 @@ registerReflectionRoutes(app, {
 /** Whether what the owner is offered may be worded explicitly: Uncensored Models, always in single-user mode. */
 const explicitFor = (ownerId) =>
   !ownerId || mayUseFeature(accountAccessForId(ownerId), "uncensoredModels");
+/** The account's cards of each kind, or null where it may not use Characters. */
+const accountCards = (ownerId) => {
+  if (cardRefusal(ownerId ? accountAccessForId(ownerId) : undefined)) return null;
+  return Object.fromEntries(Object.keys(cardKinds).map((kind) => [kind, listCards(kind, ownerId)]));
+};
 // Suggestions (domain/suggestions.ts): composer ideas and viewer next steps from taste.
 const suggestions = createSuggestions({
   taste,
   writer: tasteWriter,
   online: textOnline,
   explicit: explicitFor,
+  cards: accountCards,
   item: (ownerId, jobId, itemId) =>
     filterVisibleGallery(galleryJobItems(jobId, ownerId)).find(
       (item) => !itemId || item.id === itemId,
@@ -895,11 +901,6 @@ registerSuggestionRoutes(app, {
 // Dream (domain/dream.ts): idle-time results from each account's taste and resolved settings.
 // It only queues work; it never places GPU workloads.
 const projects = createProjects({ dataDir });
-/** The account's cards of each kind, or null where it may not use Characters. */
-const accountCards = (ownerId) => {
-  if (cardRefusal(ownerId ? accountAccessForId(ownerId) : undefined)) return null;
-  return Object.fromEntries(Object.keys(cardKinds).map((kind) => [kind, listCards(kind, ownerId)]));
-};
 const dream = createDream({
   dataDir,
   overrides: dreamOverrides,
