@@ -14,12 +14,12 @@ import {
 } from "./fixtures";
 
 const ideas = [
-  "A lighthouse in rolling fog at blue hour",
-  "A harbour market under paper lanterns",
-  "Fishing boats asleep on a glassy bay",
-  "Clouds above a quiet coast",
-  "Dawn on a rocky beach",
-  "Boats under stars",
+  { label: "Blue-Hour Lighthouse", prompt: "A lighthouse in rolling fog at blue hour" },
+  { label: "Lantern Market", prompt: "A harbour market under paper lanterns" },
+  { label: "Sleeping Fishing Boats", prompt: "Fishing boats asleep on a glassy bay" },
+  { label: "Quiet Coast", prompt: "Clouds above a quiet coast" },
+  { label: "Rocky Beach Sunrise", prompt: "Dawn on a rocky beach" },
+  { label: "Boats Under Stars", prompt: "Boats under stars" },
 ];
 const steps = [
   { label: "Warmer Light", request: "make the light warmer", prompt: "An amber bird, warm light" },
@@ -90,15 +90,15 @@ test("The empty composer prompt's AI menu offers Suggested ideas that fill it wi
   expect(asked).toHaveLength(0);
   let menu = await promptMenu(page, "Prompt");
   await expect(menu.getByText("Suggested", { exact: true })).toBeVisible();
-  const sorted = [...ideas].sort((a, b) => a.localeCompare(b));
+  const sorted = ideas.map((idea) => idea.label).sort((a, b) => a.localeCompare(b));
   await expect(menu.getByRole("menuitem").first()).toHaveText(sorted[0]);
   for (const idea of sorted)
     await expect(menu.getByRole("menuitem", { name: idea, exact: true })).toBeVisible();
   expect(asked).toEqual([{ surface: "composer", kind: "image", fresh: false }]);
   await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
   await expect.poll(() => asked.at(-1)?.fresh).toBe(true);
-  await menu.getByRole("menuitem", { name: ideas[1], exact: true }).click();
-  await expect(prompt).toHaveValue(ideas[1]);
+  await menu.getByRole("menuitem", { name: ideas[1].label, exact: true }).click();
+  await expect(prompt).toHaveValue(ideas[1].prompt);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("");
   await prompt.fill("A fox");
