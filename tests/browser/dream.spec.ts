@@ -9,6 +9,24 @@ async function showView(page: Page, name: string | RegExp) {
   await page.getByRole("button", { name: "Dream View", exact: true }).click();
   await page.getByRole("menuitem", { name, exact: true }).click();
 }
+/** Uses the shared Details panel on desktop and its sheet on phones. */
+async function previewDetails(preview: Locator, phone: boolean) {
+  const toggle = preview.getByRole("button", { name: "Generation Details", exact: true });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  return phone
+    ? preview
+        .page()
+        .getByRole("dialog")
+        .filter({
+          has: preview.page().getByRole("button", { name: "Close Details", exact: true }),
+        })
+    : preview.getByRole("complementary", { name: "Generation Details", exact: true });
+}
+async function closeDetails(preview: Locator, panel: Locator, phone: boolean) {
+  if (phone) await panel.getByRole("button", { name: "Close Details", exact: true }).click();
+  else await preview.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await expect(panel).toBeHidden();
+}
 /** Fills a text box in a dialog, through its full-screen editor on phones. */
 async function fillBox(scope: Locator, name: string, value: string, phone: boolean) {
   const box = scope.getByRole("textbox", { name, exact: true });
@@ -71,7 +89,10 @@ async function dreamAction(page: Page, name: string) {
 const verdicts = (state: Awaited<ReturnType<typeof serveDream>>) =>
   state.requests.map((request) => `${request.method} ${request.path}`);
 
-test("The Dream deck judges results with keys, a drag and its buttons", async ({ page }) => {
+test("The Dream deck judges results with keys, a drag and its buttons", async ({
+  page,
+  isMobile,
+}) => {
   await fixtures(page);
   const dream = await serveDream(page, {
     unseen: ["one", "two", "three", "four", "five"].map((id) => dreamItem(id)),
@@ -120,11 +141,13 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await page.mouse.up();
   await expect(current(page)).toContainText("Dream prompt five");
 
-  // The preview shows the card's full text and judges with the deck's own buttons.
+  // The preview shows the card's full text in Details and judges with the deck's buttons.
   await current(page).getByRole("button", { name: "View", exact: true }).click();
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
-  await expect(preview).toContainText("Because you like five.");
-  await expect(preview).toContainText("Dream prompt five");
+  const details = await previewDetails(preview, isMobile);
+  await expect(details).toContainText("Because you like five.");
+  await expect(details.getByText("Dream prompt five", { exact: true }).last()).toBeVisible();
+  await closeDetails(preview, details, isMobile);
   await expect
     .poll(() =>
       preview
@@ -823,6 +846,7 @@ test("The preview swipes between a comparison's sides and answers with the deck'
 
 test("The preview judges the top card with swipes and its buttons, and Undo steps back", async ({
   page,
+  isMobile,
 }) => {
   await fixtures(page);
   const dream = await serveDream(page, {
@@ -832,21 +856,21 @@ test("The preview judges the top card with swipes and its buttons, and Undo step
   await current(page).getByRole("button", { name: "View", exact: true }).click();
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
   const card = preview.getByRole("group", { name: "Current Dream", exact: true });
-  await expect(card).toContainText("Dream prompt one");
+  await expect(card.getByRole("img", { name: "Dream prompt one", exact: true })).toBeVisible();
   // A swipe right accepts and the next card comes forward, the preview staying open.
   await drag(
     page,
     card.getByRole("img", { name: "Dream prompt one" }),
     page.viewportSize()!.width * 0.45,
   );
-  await expect(card).toContainText("Dream prompt two");
+  await expect(card.getByRole("img", { name: "Dream prompt two", exact: true })).toBeVisible();
   await preview.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(card).toContainText("Dream prompt one");
-  // Tapping the text shows it all.
-  await card.getByRole("button", { name: "Show More", exact: true }).click();
-  await expect(card.getByRole("button", { name: "Show Less", exact: true })).toBeVisible();
+  await expect(card.getByRole("img", { name: "Dream prompt one", exact: true })).toBeVisible();
+  const details = await previewDetails(preview, isMobile);
+  await expect(details).toContainText("Dream prompt one");
+  await closeDetails(preview, details, isMobile);
   await preview.getByRole("button", { name: "Dislike", exact: true }).click();
-  await expect(card).toContainText("Dream prompt two");
+  await expect(card.getByRole("img", { name: "Dream prompt two", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();
   await expect(current(page)).toContainText("Dream prompt two");
@@ -1179,6 +1203,7 @@ test("Projects shows and accepts new card proposals while the Inbox stays open",
 
 test("Dream keeps Images and Videos separate through deck, preview, history and discards", async ({
   page,
+  isMobile,
 }, testInfo) => {
   await fixtures(page);
   const format = testInfo.project.use.browserName === "webkit" ? "mp4" : "webm";
@@ -1189,6 +1214,11 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
       url: `data:video/${format};base64,${clip}#${id}`,
       width: 32,
       height: 18,
+      title: id === "video-a" ? "River at Dawn" : "River at Dusk",
+      settings: {
+        profileName: id === "video-a" ? "Video Profile A" : "Video Profile B",
+        duration: 3,
+      },
     });
   const dream = await serveDream(page, {
     enabled: false,
@@ -1207,7 +1237,7 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
     "Videos",
   );
   const pair = page.getByRole("group", { name: "Which Video?", exact: true });
-  await expect(pair).toBeVisible();
+  await expect(pair).toContainText("Which Video? · From Your Gallery");
   await pair.getByRole("button", { name: "View A", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Preview", exact: true });
   await expect(viewer).toBeVisible();
@@ -1218,11 +1248,24 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   await expect(player).toHaveAttribute("src", /#video-a$/);
   await expect(player).toHaveJSProperty("videoWidth", 32);
   await expect(player).toHaveJSProperty("paused", false);
+  const details = await previewDetails(viewer, isMobile);
+  await expect(details).toContainText("Dream prompt video-a");
+  await expect(details).toContainText("Video Profile A");
+  if (isMobile) {
+    await page.keyboard.press("Escape");
+    await expect(details).toBeHidden();
+    await expect(viewer).toBeVisible();
+  }
   await close.press("ArrowRight");
   await expect(player).toHaveAttribute("aria-label", "Dream prompt video-b");
   await expect(player).toHaveAttribute("src", /#video-b$/);
   await expect(player).toHaveJSProperty("videoWidth", 32);
   await expect(player).toHaveJSProperty("paused", false);
+  const nextDetails = await previewDetails(viewer, isMobile);
+  await expect(nextDetails).toContainText("Dream prompt video-b");
+  await expect(nextDetails).toContainText("Video Profile B");
+  await expect(nextDetails).not.toContainText("Dream prompt video-a");
+  await closeDetails(viewer, nextDetails, isMobile);
   expect(dream.requests).toEqual([]);
   await close.click();
   await expect(pair.getByRole("button", { name: "View B", exact: true })).toBeFocused();

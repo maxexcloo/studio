@@ -295,7 +295,7 @@ export function DreamDeck({
       ? [current, ...libraryCards.filter((card) => card.key !== current.key)].slice(0, 3)
       : libraryCards
     : deckCards(unseen, gallery.items, judged, { pairsOnly, media, current });
-  const [top, next] = cards;
+  const [top] = cards;
   if (top !== current) setCurrent(top);
   const shown =
     viewing?.key === top?.key
@@ -425,7 +425,7 @@ export function DreamDeck({
     return (
       <SwipeCard
         key={card.key}
-        depth={isTop ? 0 : 1}
+        depth={cards.indexOf(card)}
         paused={!playing}
         previewSide={full && card.kind === "pair" ? side : undefined}
         // A comparison's preview swipes between its sides, and answers with its buttons.
@@ -473,7 +473,7 @@ export function DreamDeck({
             />
           )
         ) : full ? (
-          <PreviewFace item={card.item} dreamt={card.kind === "dream"} />
+          <PreviewFace item={card.item} />
         ) : (
           <>
             <div className={classes.media}>
@@ -535,7 +535,11 @@ export function DreamDeck({
         {undoButton}
       </>
     );
-  const stack = (full: boolean) => [next, top].map((card) => card && swipeCard(card, full));
+  const stack = (full: boolean) =>
+    cards
+      .slice(0, full ? 2 : 3)
+      .reverse()
+      .map((card) => swipeCard(card, full));
   return (
     <>
       <div className={classes.stage} aria-hidden={!!viewing} inert={!!viewing}>

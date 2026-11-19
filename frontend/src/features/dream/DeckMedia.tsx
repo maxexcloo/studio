@@ -2,9 +2,14 @@ import { type RefObject, useEffect, useState } from "react";
 
 import type { MediaItem } from "../../types";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
+import { videoLifecycle } from "../gallery/videoPlayback";
 import { covers, useBoxShape } from "./mediaFit";
 
 import classes from "./DreamPage.module.css";
+
+const attachVideo = (media: HTMLVideoElement | null) => {
+  if (media) return videoLifecycle(media);
+};
 
 /** A blurred, dimmed copy of media shown whole, so no flat bars frame it. */
 export function MediaBackdrop({ src }: { src?: string }) {
@@ -31,6 +36,7 @@ export function DeckMedia({ item, playing = false }: { item: MediaItem; playing?
       {!cover && <MediaBackdrop src={still} />}
       {video && playing && failedVideo !== video ? (
         <video
+          ref={attachVideo}
           src={video}
           poster={source.thumbnailUrl}
           aria-label={item.prompt || "Dream video"}
