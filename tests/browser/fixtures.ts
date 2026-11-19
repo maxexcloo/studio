@@ -849,7 +849,8 @@ export async function fixtures(page: Page) {
       });
     // Dream off, as a new account sees it; serveDream replaces this for Dream's own specs.
     if (path === "/api/dream/history") return respond({ items: [] });
-    if (path === "/api/dream/count") return respond({ unseen: 0, active: false });
+    if (path === "/api/dream/count")
+      return respond({ unseen: 0, images: 0, videos: 0, active: false });
     if (path === "/api/dream")
       return respond({
         settings: {
@@ -1360,29 +1361,9 @@ export async function serveDream(
     proposals: options.proposals ?? [],
     requests: [] as { method: string; path: string; body: any }[],
   };
-  // As the backend, without ranking: single results by project in the order given, misses apart.
-  const digest = () =>
-    [...state.projects, { id: null, name: "Other" }]
-      .map(({ id, name }) => {
-        const own = state.unseen.filter(
-          (item) =>
-            !item.dream?.pair &&
-            (id === null
-              ? !state.projects.some((project) => project.id === item.dream?.projectId)
-              : item.dream?.projectId === id),
-        );
-        return {
-          projectId: id,
-          name,
-          items: own.filter((item) => !item.review?.miss),
-          misses: own.filter((item) => item.review?.miss),
-        };
-      })
-      .filter((group) => group.items.length + group.misses.length);
   const show = () => ({
     settings: state.settings,
     unseen: state.unseen,
-    digest: digest(),
     since: options.since ?? null,
     today: { images: 12, videos: 1 },
     spicyAvailable: state.spicyAvailable,
@@ -1482,10 +1463,19 @@ export async function serveDream(
           ),
         },
       });
+    // As the backend: a pair counts once, like a single card.
+    const cards = (type?: string) =>
+      new Set(
+        state.unseen
+          .filter((item) => !type || item.type === type)
+          .map((item) => item.dream?.pair?.id ?? item.id),
+      ).size;
     if (path === "/api/dream/count")
       return route.fulfill({
         json: {
-          unseen: new Set(state.unseen.map((item) => item.dream?.pair?.id ?? item.id)).size,
+          unseen: cards(),
+          images: cards("image"),
+          videos: cards("video"),
           active: state.settings.enabled && !state.settings.paused,
         },
       });

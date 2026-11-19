@@ -151,11 +151,15 @@ recur across features.
 - Like and Dislike rate an item and teach taste. A Dislike never deletes: it
   hides the item with Undo, and the gallery's Disliked filter shows it again.
   Dream's Accept keeps a result unrated; its Like accepts and rates it.
-- The Dream Deck alone has its own look: large round Dislike (✕), Like (♥) and
-  Accept (✓) buttons and swipes, as dating apps have them, with Undo beside the
-  view menu stepping back through the session's judgements. Its preview offers
-  only those buttons, under the card's media and full text, and swipes between
-  a comparison's sides.
+- The Dream Deck alone has its own look, as dating apps have it: cards filled
+  by their media with the text over the bottom on a dark scrim, large round
+  Dislike (✕), Like (♥) and Accept (✓) buttons, and swipes that tilt the card
+  and stamp its answer while the next card waits behind; on an upright phone
+  the card reaches the bottom safe area with the buttons floating over it.
+  Undo beside the view menu steps back through the session's judgements. Its preview is the same
+  card full screen, zooming as the viewer does, with Undo, Close and the
+  buttons floating over it; its swipes judge too, except on a comparison,
+  where they move between the sides and This Image answers for the side shown.
 - A finished selection action ends the selection, keeping selected only the
   items it failed for; opening a menu does not. Quick selects take every
   match, not only loaded pages, and deletion confirms.

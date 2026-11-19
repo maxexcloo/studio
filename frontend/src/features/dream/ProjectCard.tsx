@@ -15,6 +15,7 @@ import { useNavigate } from "react-router";
 import type { Project, ProjectStats } from "../../../../shared/projects";
 import { menuWidth } from "../../theme";
 import { icons } from "../../ui/icons";
+import { Thumbnail } from "./DiscardedDreams";
 import { aspectLabel, briefFields, useSaveProject } from "./ProjectForm";
 import type { DreamItem } from "./queries";
 
@@ -76,18 +77,26 @@ export function constraintBadges(project: Project, profileLabel: (id: string) =>
 
 /**
  * A project in Dream › Projects: its brief in a line, a strip of its newest results, how they fare
- * and its share of turns, with Edit, Pause and Delete in its ⋯ menu. Its name and strip open it.
+ * and its share of turns, with Edit, Pause and Delete in its ⋯ menu. Its name opens it; while it
+ * has results waiting for a verdict (`unseen`, newest first), the strip shows those, each opening
+ * the viewer (`onView`), and otherwise opens it too. `fresh` counts those new since the last visit.
  */
 export function ProjectCard({
   project,
   stats,
+  unseen,
+  fresh,
   profileLabel,
+  onView,
   onEdit,
   onDelete,
 }: {
   project: Project;
   stats?: ProjectStats<DreamItem>;
+  unseen: DreamItem[];
+  fresh: number;
   profileLabel: (id: string) => string;
+  onView: (item: DreamItem) => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -107,11 +116,14 @@ export function ProjectCard({
     <Paper withBorder p="sm" radius="md" component="section" aria-label={project.name}>
       <Stack gap="xs">
         <Group justify="space-between" wrap="nowrap" gap="xs">
-          <UnstyledButton onClick={open} miw={0} aria-label={`Open ${project.name}`}>
-            <Text fw={600} truncate>
-              {project.name}
-            </Text>
-          </UnstyledButton>
+          <Group gap="xs" wrap="nowrap" miw={0}>
+            <UnstyledButton onClick={open} miw={0} aria-label={`Open ${project.name}`}>
+              <Text fw={600} truncate>
+                {project.name}
+              </Text>
+            </UnstyledButton>
+            {fresh > 0 && <Badge style={{ flexShrink: 0 }}>{fresh} New</Badge>}
+          </Group>
           <Menu position="bottom-end" width={menuWidth}>
             <Menu.Target>
               <ActionIcon variant="subtle" color="gray" aria-label={`Actions for ${project.name}`}>
@@ -142,23 +154,44 @@ export function ProjectCard({
             {summary}
           </Text>
         )}
-        {results.length > 0 && (
-          <UnstyledButton onClick={open} tabIndex={-1} aria-hidden>
-            <Group gap={6} wrap="nowrap" style={{ overflow: "hidden" }}>
-              {results.map((item) => (
-                <Image
-                  key={item.id}
-                  src={item.thumbnailUrl || item.url}
-                  alt=""
-                  h={56}
-                  w={56}
-                  radius="md"
-                  loading="lazy"
-                  style={{ flexShrink: 0 }}
-                />
-              ))}
-            </Group>
-          </UnstyledButton>
+        {unseen.length > 0 ? (
+          <Group gap={6} wrap="nowrap" style={{ overflow: "hidden" }}>
+            {unseen.slice(0, resultsShown).map((item) => (
+              <UnstyledButton
+                key={item.id}
+                aria-label={`View ${item.title || item.prompt || "Dream Result"}`}
+                w={56}
+                h={56}
+                style={{
+                  flexShrink: 0,
+                  borderRadius: "var(--mantine-radius-md)",
+                  overflow: "hidden",
+                }}
+                onClick={() => onView(item)}
+              >
+                <Thumbnail item={item} />
+              </UnstyledButton>
+            ))}
+          </Group>
+        ) : (
+          results.length > 0 && (
+            <UnstyledButton onClick={open} tabIndex={-1} aria-hidden>
+              <Group gap={6} wrap="nowrap" style={{ overflow: "hidden" }}>
+                {results.map((item) => (
+                  <Image
+                    key={item.id}
+                    src={item.thumbnailUrl || item.url}
+                    alt=""
+                    h={56}
+                    w={56}
+                    radius="md"
+                    loading="lazy"
+                    style={{ flexShrink: 0 }}
+                  />
+                ))}
+              </Group>
+            </UnstyledButton>
+          )
         )}
         {badges.length > 0 && (
           <Group gap={6}>

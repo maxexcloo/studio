@@ -19,6 +19,7 @@ export function ZoomImage({
   placeholder,
   swipe,
   onTap,
+  fill = false,
 }: {
   mediaId?: string;
   src: string;
@@ -33,6 +34,8 @@ export function ZoomImage({
   swipe?: SwipeGesture;
   /** A lone touch tap on the picture, once it is plainly not the first of a double tap. */
   onTap?: () => void;
+  /** Rests filling the viewport, cropped, rather than whole; it doesn't pan there. */
+  fill?: boolean;
 }) {
   const instructions = useId();
   const [size, setSize] = useState({ width: width || 1, height: height || 1 });
@@ -46,7 +49,12 @@ export function ZoomImage({
   // The original zoom has needed: it stays once loaded, and a version change starts from its copy.
   const [sharpened, setSharpened] = useState<string>();
   const wanted = original && sharpened === original ? original : src;
-  const zoom = useMediaZoom({ ...size, disabled: loading || failed, resetKey: displayed.mediaId });
+  const zoom = useMediaZoom({
+    ...size,
+    disabled: loading || failed,
+    resetKey: displayed.mediaId,
+    rest: fill ? "Fill" : "Fit",
+  });
   const image = useRef<HTMLImageElement>(null);
   const suppressClick = useRef(false);
   const touched = useRef(false);
@@ -230,6 +238,7 @@ export function ZoomImage({
       ref={zoom.viewport}
       className={classes.zoom}
       data-zoom-mode={zoom.mode}
+      data-zoomed={!zoom.resting(zoom.mode) || undefined}
       onPointerDownCapture={down}
       onPointerMoveCapture={move}
       onPointerUpCapture={up}
@@ -262,7 +271,7 @@ export function ZoomImage({
         disablePadding
         disabled={zoom.disabled}
         doubleClick={{ disabled: true }}
-        panning={{ velocityDisabled: true }}
+        panning={{ velocityDisabled: true, disabled: zoom.resting(zoom.mode) && fill }}
         zoomAnimation={{ disabled: zoom.duration === 0, animationTime: zoom.duration }}
         autoAlignment={{ animationTime: zoom.duration, velocityAlignmentTime: zoom.duration }}
         onWheelStart={zoom.manualZoom}
@@ -272,6 +281,7 @@ export function ZoomImage({
           zoom.manualZoom();
         }}
         onPinch={zoom.revealControls}
+        onPinchStop={zoom.settle}
         onTransform={(ref, state) => {
           zoom.onTransform(ref, state);
           const shown = image.current?.naturalWidth;

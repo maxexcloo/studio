@@ -2,6 +2,7 @@ import { ActionIcon, type MantineColor, Text, Tooltip } from "@mantine/core";
 import { Check, Heart, X } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { icons } from "../../ui/icons";
 import { type Choice, dreamChoices } from "./choices";
 import type { DeckCard } from "./deck";
 
@@ -30,22 +31,34 @@ const looks: Record<string, { glyph: ReactNode; color: MantineColor }> = {
     color: "blue",
   },
   both: { glyph: <Check size={30} strokeWidth={2.5} />, color: "green" },
+  shown: { glyph: <icons.winner size={30} strokeWidth={2.5} />, color: "blue" },
 };
 
 /**
  * The deck's answers as large round buttons under the card, as dating apps have them: a single
- * card's Dislike, Like and Accept, or a comparison's Neither, A, B and Both.
+ * card's Dislike, Like and Accept, or a comparison's Neither, A, B and Both. Where one side is
+ * `shown` alone, This Image answers for it in place of A and B.
  */
 export function DeckButtons({
   card,
   act,
   hidden,
+  shown,
 }: {
   card: DeckCard;
   act: (choice: Choice["choice"]) => void;
   hidden: boolean;
+  shown?: number;
 }) {
-  const answers = dreamChoices(card).at(-1)!;
+  const answers = dreamChoices(card)
+    .at(-1)!
+    .flatMap((answer): Choice[] =>
+      shown === undefined || (answer.id !== "a" && answer.id !== "b")
+        ? [answer]
+        : answer.id === "a"
+          ? [{ ...answer, id: "shown", label: "This Image", choice: shown ? "b" : "a" }]
+          : [],
+    );
   return (
     <div
       role="group"
@@ -60,10 +73,14 @@ export function DeckButtons({
             className={classes.answer}
             variant="light"
             color={looks[id].color}
-            radius="xl"
+            radius="50%"
             // A comparison's sides stand out from Neither and Both.
             data-size={
-              card.kind !== "pair" ? undefined : id === "a" || id === "b" ? "large" : "small"
+              card.kind !== "pair"
+                ? undefined
+                : id === "a" || id === "b" || id === "shown"
+                  ? "large"
+                  : "small"
             }
             aria-label={label}
             onClick={() => act(choice)}
