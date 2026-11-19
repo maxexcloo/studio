@@ -261,10 +261,10 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
     ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
     "Refresh",
     "Softer Shadows",
+    "Custom…",
     "Run Again",
     "Run Again, Same Seed",
     "Compare in Composer",
-    "Custom…",
     "Recreate in Composer",
   ]);
   await menu.getByRole("menuitem", { name: "Softer Shadows", exact: true }).click();
