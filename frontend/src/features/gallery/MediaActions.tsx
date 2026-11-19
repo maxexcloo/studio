@@ -595,17 +595,6 @@ export function useMediaActions(
                 onClick: () => editAsk.pick(change.instruction),
               }))
             : [],
-          custom: editAssisted
-            ? [
-                {
-                  id: "custom",
-                  label: "Custom…",
-                  icon: icons.custom,
-                  disabled: editAsk.pending,
-                  onClick: editAsk.custom,
-                },
-              ]
-            : [],
           others: image
             ? [[...cards.slice(0, 2), ...(reference ? [reference] : []), ...cards.slice(2)]]
             : [
@@ -617,17 +606,30 @@ export function useMediaActions(
                   editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
                 ],
               ],
-          last: image
-            ? [
-                {
-                  id: "edit-image",
-                  label: "Edit in Composer",
-                  icon: icons.edit,
-                  disabled: action.isPending,
-                  onClick: () => action.mutate("refine"),
-                },
-              ]
-            : [],
+          last: [
+            ...(assist?.custom ??
+              (editAssisted
+                ? [
+                    {
+                      id: "custom",
+                      label: "Custom…",
+                      icon: icons.custom,
+                      onClick: editAsk.custom,
+                    },
+                  ]
+                : [])),
+            ...(image
+              ? [
+                  {
+                    id: "edit-image",
+                    label: "Edit in Composer",
+                    icon: icons.edit,
+                    disabled: action.isPending,
+                    onClick: () => action.mutate("refine"),
+                  },
+                ]
+              : []),
+          ],
         }),
       }),
     // Recreate runs the item again from here, or opens it in the composer. An

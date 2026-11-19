@@ -45,6 +45,7 @@ test("a model that reads images suggests prompts for promptless items, kept apar
   const { state, suggester } = fixture(
     [
       item("upload"),
+      item("captioned", { caption: { text: "a fishing boat" } }),
       item("clip", { type: "video", uploaded: true }),
       item("made", { prompt: "a red barn" }),
       item("done", { suggestedPrompt: "Kept" }),
@@ -58,6 +59,7 @@ test("a model that reads images suggests prompts for promptless items, kept apar
     state.items.map((entry) => [entry.prompt, entry.suggestedPrompt]),
     [
       ["", "A prompt from the picture"],
+      ["", "A prompt from a fishing boat"],
       ["", "A prompt from the picture"],
       ["a red barn", undefined],
       ["", "Kept"],

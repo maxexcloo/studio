@@ -193,9 +193,10 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
   await page.keyboard.press("Escape");
   const surface = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
-  // The prompt's Custom… asks in a box of its own, which keeps the last request.
+  // Edit and AI open the same dialog and keep its last request.
   const askForChange = async (request?: string) => {
-    await viewerPromptMenu(page);
+    if (request) await viewerAction(page, "Edit");
+    else await viewerPromptMenu(page);
     await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
     const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
     if (request) await custom.getByRole("textbox", { name: "Change", exact: true }).fill(request);

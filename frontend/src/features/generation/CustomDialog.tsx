@@ -17,7 +17,7 @@ export function CustomDialog({
   onClose,
   title,
   action,
-  label = "Change",
+  label,
   placeholder = "What should change, like “make it night”",
   onSend,
   suggestions,
@@ -55,6 +55,7 @@ export function CustomDialog({
       <Stack>
         <TextBox
           label={label}
+          aria-label={label || "Change"}
           placeholder={placeholder}
           autosize
           minRows={3}
