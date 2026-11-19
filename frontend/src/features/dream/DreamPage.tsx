@@ -11,7 +11,7 @@ import {
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, Image as ImageIcon, Video } from "lucide-react";
 import { Fragment, useEffect, useId, useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -30,7 +30,14 @@ import { DreamDeck } from "./DreamDeck";
 import { DreamHistory } from "./DreamHistory";
 import { DreamProjects } from "./DreamProjects";
 import { lockedByAdministrator, useDreamSettings } from "./DreamSettings";
-import { type Dream, type DreamMedia, dreamCountQuery, dreamQuery, dreamWhen } from "./queries";
+import {
+  type Dream,
+  type DreamMedia,
+  dreamCountQuery,
+  dreamQuery,
+  dreamWhen,
+  libraryReviewQuery,
+} from "./queries";
 
 import classes from "./DreamPage.module.css";
 
@@ -89,7 +96,7 @@ function Empty({ dream }: { dream: Dream }) {
   );
 }
 
-const views = ["deck", "projects", "taste", "discarded", "history"] as const;
+const views = ["deck", "library", "projects", "taste", "discarded", "history"] as const;
 
 /**
  * Dream shows unseen results, comparisons and calibration in the deck, with counts of images
@@ -99,6 +106,14 @@ const views = ["deck", "projects", "taste", "discarded", "history"] as const;
 export function DreamPage() {
   const phone = usePhone();
   const [media, setMedia] = useRemembered<DreamMedia>("dream-media", "image");
+  const [seed] = useState(() => crypto.randomUUID());
+  const [decided, setDecided] = useState<Set<string>>(() => new Set());
+  const library = useInfiniteQuery(libraryReviewQuery(seed));
+  const libraryItems =
+    library.data?.pages.flatMap((page) => page.items).filter((item) => !decided.has(item.id)) ?? [];
+  const lastPage = library.data?.pages.at(-1);
+  const remaining =
+    (lastPage ? lastPage.remaining - lastPage.items.length : 0) + libraryItems.length;
   const [undoTarget, setUndoTarget] = useState<HTMLDivElement | null>(null);
   const [actionTarget, setActionTarget] = useState<HTMLDivElement | null>(null);
   const client = useQueryClient();
@@ -121,12 +136,40 @@ export function DreamPage() {
   const mediaLabels = { image: "Images", video: "Videos" };
   const viewLabels = {
     deck: mediaLabels[media],
+    library: "Rate Your Library",
     projects: "Projects",
     taste: "Taste",
     discarded: "Discards",
     history: "History",
   };
   const data = dream.data;
+  const deckUnseen = data?.settings.enabled
+    ? data.unseen.filter((item) => !decided.has(item.id))
+    : [];
+  const reviewing =
+    view === "library" ||
+    (view === "deck" &&
+      !deckUnseen.length &&
+      (Boolean(library.data?.pages.some((page) => page.items.length)) ||
+        library.isPending ||
+        library.isError));
+  useEffect(() => {
+    if (
+      reviewing &&
+      libraryItems.length < 3 &&
+      library.hasNextPage &&
+      !library.isFetchingNextPage &&
+      !library.isFetchNextPageError
+    )
+      void library.fetchNextPage();
+  }, [
+    reviewing,
+    libraryItems.length,
+    library.hasNextPage,
+    library.isFetchingNextPage,
+    library.isFetchNextPageError,
+    library.fetchNextPage,
+  ]);
   // Unseen cards of each kind, so new work on the other kind is never hidden.
   const unseen = { image: count.data?.images, video: count.data?.videos };
   const counted = (kind: DreamMedia) =>
@@ -168,7 +211,9 @@ export function DreamPage() {
                 aria-describedby={waiting ? waitingId : undefined}
                 rightSection={<ChevronDown size={14} />}
               >
-                {viewLabels[view]}
+                {reviewing && (remaining > 0 || view === "library")
+                  ? viewLabels.library
+                  : viewLabels[view]}
                 {/* Always in sight, so new work on either kind shows from every view. */}
                 {count.data && waiting && (
                   <Group component="span" gap={4} wrap="nowrap" c="dimmed" ml={8} aria-hidden>
@@ -194,12 +239,13 @@ export function DreamPage() {
           )}
           <Menu.Dropdown>
             {(["image", "video"] as const).map((kind) =>
-              item(counted(kind), view === "deck" && media === kind, () => {
+              item(counted(kind), view === "deck" && !reviewing && media === kind, () => {
                 setMedia(kind);
                 setView("deck");
               }),
             )}
-            {views.slice(1).map((value) => (
+            {item(`Rate Your Library (${remaining})`, reviewing, () => setView("library"))}
+            {views.slice(2).map((value) => (
               <Fragment key={value}>
                 {value === "discarded" && <Menu.Divider />}
                 {item(viewLabels[value], view === value, () => setView(value))}
@@ -266,10 +312,38 @@ export function DreamPage() {
         <DreamDeck
           key={media}
           media={media}
-          items={data!.settings.enabled ? data!.unseen.filter((item) => item.type === media) : []}
+          items={deckUnseen}
+          decided={decided}
+          setDecided={setDecided}
+          libraryItems={reviewing ? libraryItems : undefined}
+          libraryWaiting={
+            reviewing &&
+            (library.isPending ||
+              library.isFetchingNextPage ||
+              (library.hasNextPage && !library.isFetchNextPageError))
+          }
           pairsOnly={!data!.settings.enabled}
           undoTarget={undoTarget}
-          empty={<Empty dream={data!} />}
+          empty={
+            reviewing ? (
+              library.isError ? (
+                <Alert color="red" title="Couldn't Load the Library">
+                  <Button
+                    variant="subtle"
+                    onClick={() =>
+                      void (library.hasNextPage ? library.fetchNextPage() : library.refetch())
+                    }
+                  >
+                    Retry
+                  </Button>
+                </Alert>
+              ) : (
+                <EmptyState fill>Library Review Complete</EmptyState>
+              )
+            ) : (
+              <Empty dream={data!} />
+            )
+          }
         />
       )}
     </div>

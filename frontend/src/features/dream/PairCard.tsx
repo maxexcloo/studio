@@ -17,12 +17,16 @@ export function PairContent({
   top,
   playing,
   picked,
+  shown,
+  select,
   view,
 }: {
   card: PairDeckCard;
   top: boolean;
   playing: boolean;
   picked?: 0 | 1;
+  shown?: number;
+  select: (side: 0 | 1) => void;
   view: (index: 0 | 1) => void;
 }) {
   const [first] = card.items;
@@ -49,6 +53,7 @@ export function PairContent({
               className={classes.choice}
               data-side={side}
               data-picked={picked === undefined ? undefined : picked === side}
+              data-selected={shown === side || undefined}
             >
               <div className={classes.frame}>
                 {/* SwipeCard owns pointer taps and swipes; keys open the same preview. */}
@@ -68,9 +73,10 @@ export function PairContent({
                 </div>
                 <UnstyledButton
                   className={classes.side}
-                  aria-label={`Preview ${label}`}
+                  aria-label={`${shown === undefined ? "Preview" : "Select"} ${label}`}
+                  aria-pressed={shown === undefined ? undefined : shown === side}
                   tabIndex={top ? 0 : -1}
-                  onClick={() => view(side)}
+                  onClick={() => (shown === undefined ? view(side) : select(side))}
                 >
                   <Text span size="sm" fw={600} truncate>
                     {label}

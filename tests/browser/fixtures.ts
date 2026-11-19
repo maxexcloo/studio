@@ -875,6 +875,8 @@ export async function fixtures(page: Page) {
       });
     // Dream off, as a new account sees it; serveDream replaces this for Dream's own specs.
     if (path === "/api/dream/history") return respond({ items: [] });
+    if (path === "/api/gallery/library-review")
+      return respond({ items: [], remaining: 0, nextCursor: "" });
     if (path === "/api/dream/count")
       return respond({ unseen: 0, images: 0, videos: 0, active: false });
     if (path === "/api/dream")
@@ -1357,6 +1359,7 @@ export async function serveDream(
     locked?: (keyof typeof dreamDefaults)[];
     /** Older gallery images offered for calibration until judged. */
     calibration?: any[];
+    library?: any[];
     /** Why Dream can't run, which makes it unavailable. */
     reason?: string;
     /** The taste profile `/api/taste` serves; edits keep learnt words separate. */
@@ -1380,6 +1383,8 @@ export async function serveDream(
     discarded: options.discarded ?? [],
     spicyAvailable: options.spicyAvailable ?? false,
     calibration: options.calibration ?? [],
+    library: options.library ?? [],
+    reviewed: new Set<string>(),
     judged: new Set<string>(),
     /** Every Dream result served, so Undo can bring one back. */
     known: new Map<string, any>(),
@@ -1445,6 +1450,31 @@ export async function serveDream(
       }
     }
     return route.fulfill({ json: taste });
+  });
+  await page.route(/\/api\/gallery\/library-review(?:\/[^/?]+)?(?:\?.*)?$/, (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === "POST") {
+      const body = request.postDataJSON();
+      const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
+      state.requests.push({ method: "POST", path: url.pathname, body });
+      if (body.reviewed) state.reviewed.add(id);
+      else state.reviewed.delete(id);
+      return route.fulfill({ json: { ok: true } });
+    }
+    const offset = Number(url.searchParams.get("cursor") || 0);
+    const entries = state.library
+      .slice(offset)
+      .filter((item) => !item.rating && !state.reviewed.has(item.id));
+    const items = entries.slice(0, 2);
+    const next = items.length ? state.library.indexOf(items.at(-1)) + 1 : 0;
+    return route.fulfill({
+      json: {
+        items,
+        remaining: entries.length,
+        nextCursor: entries.length > 2 ? String(next) : "",
+      },
+    });
   });
   await page.route(/\/api\/dream(?:\/.*)?$/, (route) => {
     const request = route.request();
@@ -1610,6 +1640,14 @@ export async function serveDream(
     const answered = /^\/api\/dream\/pairs\/([^/]+)\/answer$/.exec(path);
     if (answered) {
       const pairId = decodeURIComponent(answered[1]);
+      if (body.like) {
+        const winner = state.unseen.find(
+          (item) =>
+            item.dream?.pair?.id === pairId &&
+            item.dream.pair.side === (body.answer === "b" ? 1 : 0),
+        );
+        if (winner) winner.rating = "liked";
+      }
       state.unseen = state.unseen.filter((item) => item.dream?.pair?.id !== pairId);
       return route.fulfill({ json: { items: [] } });
     }
@@ -1633,6 +1671,8 @@ export async function serveDream(
     const body = route.request().postDataJSON();
     state.requests.push({ method: "POST", path: "/api/gallery/favorite", body });
     for (const item of state.unseen) state.known.set(item.id, item);
+    for (const item of state.library)
+      if (body.ids.includes(item.id)) item.rating = body.rating ?? undefined;
     if (body.rating) state.unseen = state.unseen.filter((item) => !body.ids.includes(item.id));
     return route.fulfill({ json: { ok: true, items: [] } });
   });
