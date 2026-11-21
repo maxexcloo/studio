@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-FROM docker.io/stilldeadcode/radiance:2.1.0 AS radiance
-FROM docker.io/yanwk/comfyui-boot:rocm-20261111 AS comfyui-boot
+FROM docker.io/stilldeadcode/radiance:2.2.0 AS radiance
+FROM docker.io/yanwk/comfyui-boot:rocm-20261119 AS comfyui-boot
 
 FROM comfyui-boot AS sources
 COPY worker/install_nodes.py worker/source.json worker/sources.json /opt/studio/
@@ -14,7 +14,7 @@ RUN python3 -m pip install --no-cache-dir \
     # renovate: datasource=pypi depName=fsspec
     fsspec==2026.9.0 \
     # renovate: datasource=pypi depName=peft
-    peft==0.21.3 \
+    peft==0.22.0 \
     # renovate: datasource=pypi depName=rotary_embedding_torch
     rotary_embedding_torch==0.9.2 \
     && rm -rf /root/ComfyUI
@@ -36,7 +36,7 @@ RUN sed -i 's|http://download.opensuse.org/|https://download.opensuse.org/|g' /e
         libpcre2-8-0 libpcre2-16-0 libpcre2-32-0 python313 python313-dbm \
     && zypper clean --all \
     # renovate: datasource=pypi depName=uv
-    && python3 -m pip install --no-cache-dir uv==0.13.8
+    && python3 -m pip install --no-cache-dir uv==0.13.9
 # Radiance's rad-convert converts fine-tunes (studio_worker/convert.py). It comes last, so a
 # Radiance update changes only these layers.
 COPY --from=radiance /opt/radiance /opt/radiance
