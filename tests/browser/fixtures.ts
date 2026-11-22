@@ -1079,6 +1079,7 @@ export function viewerChangeButton(page: Page, action: "Edit" | "Recreate" = "Ed
 
 /** Opens the viewer's prompt-change options. */
 export async function viewerChangeMenu(page: Page, action?: "Edit" | "Recreate") {
+  await showViewerControls(page.getByRole("dialog", { name: "Generation", exact: true }));
   await viewerChangeButton(page, action).click();
   return page.getByRole("menu");
 }
@@ -1104,12 +1105,20 @@ export async function editorMenu(scope: Page | Locator, box: string, tool: strin
   return menu;
 }
 
+/** Opens Gallery's controls when a test needs an action or thumbnail. */
+export async function showViewerControls(viewer: Locator) {
+  await expect(viewer).toBeVisible();
+  const reveal = viewer.getByRole("button", { name: "Show Controls", exact: true });
+  if (await reveal.count()) await reveal.click();
+}
+
 /**
  * Clicks a viewer action on its bar, then any `options` in turn (Edit, Upscale); a control with
  * options left to pick opens its menu for the test.
  */
 export async function viewerAction(page: Page, label: string, ...options: string[]) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await showViewerControls(viewer);
   await viewer
     .getByRole("button", { name: label, exact: true })
     .or(viewer.getByRole("link", { name: label, exact: true }))
@@ -1703,6 +1712,7 @@ export async function serveDream(
     state.unseen = state.unseen.filter((entry) => entry !== item);
     state.discarded = state.discarded.filter((entry) => entry !== item);
     item.dream = { ...item.dream, state: verdict === "discard" ? "discarded" : "kept" };
+    if (verdict === "super-like") item.rating = "liked";
     if (verdict === "discard") state.discarded.unshift(item);
     return route.fulfill({
       status: verdict === "variations" ? 202 : 200,

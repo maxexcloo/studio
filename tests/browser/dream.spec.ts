@@ -194,12 +194,12 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
       "POST /api/dream/undo",
       "POST /api/dream/one/keep",
       "POST /api/dream/pass",
-      "POST /api/gallery/favorite",
+      "POST /api/dream/three/super-like",
       "POST /api/dream/pass",
       "POST /api/dream/five/keep",
     ]);
   expect(dream.requests[1].body).toEqual({ ids: ["one"] });
-  expect(dream.requests[6].body).toEqual({ ids: ["three"], rating: "liked" });
+  expect(dream.requests[6].body).toEqual({});
 });
 
 test("Dream and Library keep separate Images and Videos, with paged review and Undo", async ({
@@ -342,7 +342,7 @@ test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => 
     .poll(sent)
     .toEqual([
       `/api/dream/pass {"ids":["one"],"reason":"glitch"}`,
-      `/api/gallery/favorite {"ids":["two"],"rating":"liked"}`,
+      "/api/dream/two/super-like {}",
       "/api/dream/three/keep {}",
       `/api/dream/undo {"ids":["three"]}`,
       `/api/dream/undo {"ids":["two"],"rating":null}`,
@@ -1010,17 +1010,17 @@ test("The preview swipes between a comparison's sides and answers with the deck'
   const viewer = page.getByRole("dialog");
   await expect(viewer.getByRole("button", { name: "Close Preview" })).toBeFocused();
   // The top names the shown side, and arrow keys switch sides as swipes do.
-  await expect(viewer.getByText("A · 20 Steps", { exact: true })).toBeVisible();
+  await expect(viewer.getByRole("region", { name: "A · 20 Steps", exact: true })).toBeVisible();
   await expect(viewer.getByRole("img", { name: "Side 20 Steps" })).toBeInViewport();
   await page.keyboard.press("ArrowRight");
-  await expect(viewer.getByText("B · 40 Steps", { exact: true })).toBeVisible();
+  await expect(viewer.getByRole("region", { name: "B · 40 Steps", exact: true })).toBeVisible();
   await expect(viewer.getByRole("img", { name: "Side 40 Steps" })).toBeInViewport();
   await page.keyboard.press("ArrowLeft");
   await expect(viewer.getByRole("img", { name: "Side 20 Steps" })).toBeInViewport();
 
   if (isMobile && browserName === "chromium") {
     await drag(page, viewer.getByRole("img", { name: "Side 20 Steps" }), -160);
-    await expect(viewer.getByText("B · 40 Steps", { exact: true })).toBeVisible();
+    await expect(viewer.getByRole("region", { name: "B · 40 Steps", exact: true })).toBeVisible();
     await expect(viewer.getByRole("img", { name: "Side 40 Steps" })).toBeInViewport();
     await drag(page, viewer.getByRole("img", { name: "Side 40 Steps" }), 0, 160);
     await expect(viewer).toBeHidden();

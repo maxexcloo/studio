@@ -51,7 +51,12 @@ import classes from "./DreamPage.module.css";
 
 type SingleCard = Exclude<DeckCard, PairDeckCard>;
 /** The deck's verdicts, the ways their cards fly. */
-const directions: Record<string, Direction> = { discard: "left", keep: "right", like: "up" };
+const directions: Record<string, Direction> = {
+  discard: "left",
+  keep: "right",
+  like: "up",
+  more: "up",
+};
 const comparisonSwipes: Record<Direction, PairAnswer> = {
   left: "a",
   right: "b",
@@ -91,7 +96,7 @@ function usePrefetch(card?: DeckCard) {
 export type Judgement = (
   | { card: SingleCard; verdict: Verdict; likedId?: string; overrides?: SetOverrides }
   | { card: PairDeckCard; verdict: PairAnswer }
-) & { passReason?: DreamPassReason };
+) & { passReason?: DreamPassReason; superLike?: true };
 
 /**
  * Sends a verdict: Dream results move to the gallery or, disliked, out of sight; gallery images
@@ -137,6 +142,7 @@ export function useJudge(onFailed: (card: DeckCard, judgement: Judgement) => voi
         await post(dreamItemPath(item, "variations"));
         return client.invalidateQueries({ queryKey: queueQuery.queryKey });
       }
+      if (judgement.superLike) return post(dreamItemPath(item, "super-like"));
       // Liking an unseen result keeps it (backend/domain/dream.ts).
       if (verdict === "like")
         return post("/api/gallery/favorite", { ids: [item.id], rating: "liked" });
@@ -355,7 +361,13 @@ export function DreamDeck({
       const likedId =
         top.kind === "set" && viewing && choice === "like" ? top.items[shown].id : undefined;
       await out?.(directions[choice]);
-      commit({ card: top, verdict: choice as Verdict, likedId, passReason: reason });
+      commit({
+        card: top,
+        verdict: choice as Verdict,
+        likedId,
+        passReason: reason,
+        ...(top.kind === "dream" && choice === "like" && { superLike: true }),
+      });
     } finally {
       busy.current = false;
     }
@@ -536,7 +548,11 @@ export function DreamDeck({
         act={(choice) => void act(choice)}
         hidden={!!viewing}
         leading={undoButton}
-        trailing={viewing ? undefined : <DreamSuggestions card={top} side={shown} />}
+        trailing={
+          viewing ? undefined : (
+            <DreamSuggestions card={top} side={shown} onMore={() => void act("more")} />
+          )
+        }
       />
       {!phone && !touch && (
         <Text size="xs" c="dimmed" ta="center">

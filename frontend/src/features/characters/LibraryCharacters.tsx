@@ -15,6 +15,7 @@ import { sheetViews } from "./CharacterEditor";
 import { type CharacterCard, charactersQuery } from "./queries";
 import { useCardFrom } from "./useCardFrom";
 import { useCardInComposer } from "./useCardInComposer";
+import { useCardSelection } from "./useCardSelection";
 
 /**
  * Library › Characters: every card the account keeps, to search, edit and delete. Use as Character
@@ -30,6 +31,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
     dialogs.edit(undefined, { references: [asset], ...named }),
   );
   const cards = listedCards(characters.data, query, order.sort);
+  const selection = useCardSelection("characters", characters.data, cards);
   return (
     <>
       <SectionHeader heading={heading}>
@@ -46,6 +48,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                 onChange={order.setSort}
                 withinPortal
               />
+              {selection.toggle}
               <ToolbarAction
                 label="New Character"
                 icon={icons.add}
@@ -55,6 +58,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
           }
         />
       </SectionHeader>
+      {selection.bar}
       {start.error && <Alert color="red">{start.error.message}</Alert>}
       {characters.isPending ? (
         <LoadingState fill label="Loading Characters" />
@@ -69,14 +73,17 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
               key={card.id}
               name={card.name}
               images={card.references}
+              selection={selection.control(card)}
               menu={
-                <CharacterMenu
-                  card={card}
-                  onEdit={() => dialogs.edit(card)}
-                  onSheet={() => dialogs.sheet(card)}
-                  onDelete={() => dialogs.remove(card)}
-                  onUse={() => use.character(card)}
-                />
+                !selection.active && (
+                  <CharacterMenu
+                    card={card}
+                    onEdit={() => dialogs.edit(card)}
+                    onSheet={() => dialogs.sheet(card)}
+                    onDelete={() => dialogs.remove(card)}
+                    onUse={() => use.character(card)}
+                  />
+                )
               }
             >
               {card.description && (

@@ -9,7 +9,17 @@ import {
   getDefaultZIndex,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { flushSync } from "react-dom";
 
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
@@ -83,7 +93,7 @@ const viewerShortcuts: Record<string, string> = {
 
 /**
  * The opened video, its controls hidden until a pointer moves over or taps it, then fading again.
- * A touch tap while they are hidden also taps the viewer's chrome in or out; taps while they show
+ * A touch tap while they are hidden also toggles the gallery's bottom controls; taps while they show
  * work them.
  */
 function ViewerVideo({
@@ -103,7 +113,7 @@ function ViewerVideo({
   width?: number;
   height?: number;
   swipe: ReturnType<typeof useTouchSwipe>;
-  onTap: () => void;
+  onTap?: () => void;
 }) {
   const { muted, onVolumeChange } = useVideoSound();
   const player = useRef<HTMLVideoElement>(null);
@@ -150,7 +160,7 @@ function ViewerVideo({
         onPointerDown={swipe.onPointerDown}
         onPointerUp={(event) => {
           if (!swipe.onPointerUp(event)) return;
-          if (!controls && !refused && !closingPopup()) onTap();
+          if (!controls && !refused && !closingPopup()) onTap?.();
           reveal();
         }}
         onFocus={reveal}
@@ -214,6 +224,7 @@ export function MediaViewer({
   itemLabel,
   sideBySide = false,
   bare = false,
+  quiet = false,
 }: {
   item: MediaItem;
   close: () => void;
@@ -234,6 +245,8 @@ export function MediaViewer({
   sideBySide?: boolean;
   /** Only the media and its navigation, over any dialog: no details, actions or item keys. */
   bare?: boolean;
+  /** The gallery opens without bottom controls. */
+  quiet?: boolean;
 }) {
   const phone = usePhone();
   const noun = bare ? "Image" : "Generation";
@@ -252,16 +265,17 @@ export function MediaViewer({
   useNeighbourPrefetch(viewable, currentIndex);
   const gestureClick = useRef(false);
   const [compare, setCompare] = useState(false);
-  const [details, setDetails] = useRemembered("viewer-details", true);
-  const [previewDetails, setPreviewDetails] = useState(false);
+  const [localDetails, setLocalDetails] = useState(false);
+  const [rememberedDetails, setRememberedDetails] = useRemembered("viewer-details", true);
+  const [details, setDetails] =
+    quiet || bare ? [localDetails, setLocalDetails] : [rememberedDetails, setRememberedDetails];
   const [sheet, setSheet] = useState(false);
-  const detailsOpen = phone ? sheet : bare ? previewDetails : details;
-  const hideActions = phone && sheet;
-  // A touch tap on the media hides the chrome around it, as Photos does, until the viewer closes.
-  const [chromeHidden, setChromeHidden] = useState(false);
-  const toggleChrome = () => {
-    if (!bare) setChromeHidden((hidden) => !hidden);
-  };
+  const detailsOpen = phone ? sheet : details;
+  const showDetails = () => (phone ? setSheet(true) : setDetails(true));
+  const controlsId = useId();
+  const [controlsOpen, setControlsOpen] = useState(!quiet);
+  const toggleControls = () => setControlsOpen((opened) => !opened);
+  const reveal = () => (!quiet || controlsOpen ? showDetails() : setControlsOpen(true));
   // Navigation replaces the media, and focus on it would fall out of the viewer beyond its keys.
   const stage = useRef<HTMLDivElement>(null);
   const containStage = useCallback((view: HTMLDivElement | null) => {
@@ -269,27 +283,6 @@ export function MediaViewer({
     // Keys reach the viewer from the start, before the dialog's own focus lands on its control.
     view?.focus({ preventScroll: true });
   }, []);
-  // Hidden chrome leaves the whole screen to the media: the stage moves its centre to the screen's,
-  // measured again as the stage resizes, the screen turning included.
-  useLayoutEffect(() => {
-    const view = stage.current;
-    if (!chromeHidden || !view) return;
-    const centre = () => {
-      // The box includes the stage's own translate as it stands, possibly mid-transition.
-      const [shiftX = 0, shiftY = 0] = getComputedStyle(view)
-        .translate.split(" ")
-        .map((value) => parseFloat(value) || 0);
-      const box = view.getBoundingClientRect();
-      const x = window.innerWidth / 2 - (box.left - shiftX + box.width / 2);
-      const y = window.innerHeight / 2 - (box.top - shiftY + box.height / 2);
-      view.style.setProperty("--studio-viewer-centre", `${x}px ${y}px`);
-    };
-    centre();
-    // The layout settles after the window's resize (a phone turned sideways moves the controls).
-    const observer = new ResizeObserver(centre);
-    observer.observe(view);
-    return () => observer.disconnect();
-  }, [chromeHidden]);
   // An action that turns busy disables its button, so focus falls to the page (a menu's return to
   // it too); the stage takes focus back and the key that landed on the page.
   useEffect(() => {
@@ -400,13 +393,9 @@ export function MediaViewer({
     />
   );
   const toggleDetails = () => {
-    if (phone) return setSheet(true);
-    setChromeHidden(false);
-    if (bare) setPreviewDetails((open) => !open);
+    if (phone) setSheet(true);
     else setDetails((open) => !open);
   };
-  // Escape brings hidden chrome back before it closes the viewer.
-  const escape = () => (chromeHidden ? setChromeHidden(false) : close());
   function swipe(direction: SwipeDirection) {
     if (deleting || layerAbove(stage.current)) return false;
     // A swipe replaces the media before its compatibility click arrives.
@@ -416,7 +405,7 @@ export function MediaViewer({
     });
     if (direction === "down") close();
     else if (direction === "up") {
-      if (phone) setSheet(true);
+      reveal();
     } else return Boolean(move(direction === "left" ? 1 : -1));
     return false;
   }
@@ -471,7 +460,7 @@ export function MediaViewer({
             )
           ) {
             event.preventDefault();
-            escape();
+            close();
           }
         }}
         onKeyDown={(event) => {
@@ -485,7 +474,7 @@ export function MediaViewer({
             return;
           if (event.key === "Escape" && !event.nativeEvent.isComposing) {
             event.preventDefault();
-            escape();
+            close();
             return;
           }
           if (
@@ -517,8 +506,10 @@ export function MediaViewer({
               !action.disabled &&
               !action.loading &&
               !event.repeat
-            )
+            ) {
+              if (!controlsOpen) flushSync(() => setControlsOpen(true));
               action.onClick();
+            }
           } else if (
             !actions &&
             !bare &&
@@ -531,12 +522,13 @@ export function MediaViewer({
           } else if (!actions && !bare && event.key === "Delete") {
             event.preventDefault();
             setDeleting(true);
+          } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            reveal();
           } else if (canNavigate && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
             event.preventDefault();
             move(event.key === "ArrowLeft" ? -1 : 1);
           }
-          // A key that ran a viewer action brings hidden chrome back.
-          if (event.defaultPrevented) setChromeHidden(false);
         }}
       >
         <div
@@ -548,18 +540,10 @@ export function MediaViewer({
             gestureClick.current = false;
           }}
           onClick={(event) => {
-            // With the chrome hidden, a tap beside the media brings it back rather than closing.
-            if (nearControl(event)) return;
-            if (chromeHidden) setChromeHidden(false);
-            else close();
+            if (!nearControl(event)) close();
           }}
-          onFocusCapture={(event) => {
-            // Keyboard and screen reader focus reaching hidden chrome reveals it.
-            if ((event.target as Element).closest("[data-chrome]")) setChromeHidden(false);
-          }}
-          data-chrome-hidden={chromeHidden || undefined}
         >
-          <div className={classes.main}>
+          <div className={classes.main} data-docked={!quiet && !bare ? true : undefined}>
             <ViewerChrome
               item={displayed}
               label={
@@ -569,12 +553,19 @@ export function MediaViewer({
                   </VisuallyHidden>
                 )
               }
+              controls={
+                quiet ? { id: controlsId, opened: controlsOpen, toggle: toggleControls } : undefined
+              }
               details={{ opened: detailsOpen, phone, toggle: toggleDetails }}
               focusClose={bare}
               closeLabel={bare ? "Close Preview" : "Close Generation"}
               close={close}
             />
-            <div ref={containStage} className={classes.stage} tabIndex={-1}>
+            <div
+              ref={containStage}
+              className={`${classes.stage} ${classes.viewerStage}`}
+              tabIndex={-1}
+            >
               {showTogether ? (
                 // Each side opens alone; the current one, whose details show, is outlined.
                 <div className={classes.together}>
@@ -670,7 +661,7 @@ export function MediaViewer({
                         width={source.width}
                         height={source.height}
                         swipe={touchSwipe}
-                        onTap={toggleChrome}
+                        onTap={quiet ? toggleControls : undefined}
                       />
                     ) : compare && item.upscale?.url ? (
                       <div className={classes.comparison}>
@@ -694,7 +685,7 @@ export function MediaViewer({
                           width={source.width}
                           height={source.height}
                           swipe={strip.gesture}
-                          onTap={toggleChrome}
+                          onTap={quiet ? toggleControls : undefined}
                         />
                       </Suspense>
                     )}
@@ -704,69 +695,75 @@ export function MediaViewer({
               )}
             </div>
             {!bare && (
-              <MediaViewerDock
-                item={displayed}
-                family={family}
-                jobs={jobs}
-                set={members}
-                choose={(next) => {
-                  setCompare(false);
-                  navigate?.(next);
-                }}
-                actions={
-                  actions ? (
-                    <ActionBarSurface
-                      aria-label={actions.label}
-                      radius="lg"
-                      className={classes.actions}
-                      data-actions-hidden={hideActions || undefined}
-                      inert={hideActions}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <ViewerActionGroups
-                        groups={
-                          sideBySide && canNavigate && !phone
-                            ? [
-                                [
-                                  {
-                                    id: "side-by-side",
-                                    label: "Side by Side",
-                                    icon: icons.compareSideBySide,
-                                    pressed: together,
-                                    onClick: () => setTogether((value) => !value),
-                                  },
-                                ],
-                                ...actions.groups,
-                              ]
-                            : actions.groups
-                        }
-                        labelled={[...actions.labelled, "side-by-side"]}
-                        equal={actions.equal}
+              <div
+                id={controlsId}
+                className={quiet ? classes.controls : classes.dockedControls}
+                data-open={(quiet && controlsOpen && !sheet) || undefined}
+                data-actions-hidden={(!quiet && sheet) || undefined}
+                inert={!controlsOpen || sheet}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <MediaViewerDock
+                  item={displayed}
+                  family={family}
+                  jobs={jobs}
+                  set={members}
+                  choose={(next) => {
+                    setCompare(false);
+                    navigate?.(next);
+                  }}
+                  actions={
+                    actions ? (
+                      <ActionBarSurface
+                        aria-label={actions.label}
+                        radius="lg"
+                        className={classes.actions}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <ViewerActionGroups
+                          groups={
+                            sideBySide && canNavigate && !phone
+                              ? [
+                                  [
+                                    {
+                                      id: "side-by-side",
+                                      label: "Side by Side",
+                                      icon: icons.compareSideBySide,
+                                      pressed: together,
+                                      onClick: () => setTogether((value) => !value),
+                                    },
+                                  ],
+                                  ...actions.groups,
+                                ]
+                              : actions.groups
+                          }
+                          labelled={[...actions.labelled, "side-by-side"]}
+                          equal={actions.equal}
+                        />
+                      </ActionBarSurface>
+                    ) : (
+                      <MediaViewerActions
+                        key={displayed.id}
+                        item={displayed}
+                        compare={compare}
+                        iterate={iterate}
+                        pending={pending}
+                        onCompare={() => setCompare((value) => !value)}
+                        onDelete={() => setDeleting(true)}
+                        onRetried={onRetried}
+                        onVersionChange={(id, active) => {
+                          if (shownId.current === id) setVersion({ id, active });
+                        }}
+                        shortcuts={shortcutActions}
+                        onApplied={() => {
+                          restoreFocus.current = false;
+                          close();
+                        }}
                       />
-                    </ActionBarSurface>
-                  ) : (
-                    <MediaViewerActions
-                      key={displayed.id}
-                      item={displayed}
-                      compare={compare}
-                      iterate={iterate}
-                      pending={pending}
-                      onCompare={() => setCompare((value) => !value)}
-                      onDelete={() => setDeleting(true)}
-                      onRetried={onRetried}
-                      onVersionChange={(id, active) => {
-                        if (shownId.current === id) setVersion({ id, active });
-                      }}
-                      shortcuts={shortcutActions}
-                      hidden={hideActions}
-                      onApplied={() => {
-                        restoreFocus.current = false;
-                        close();
-                      }}
-                    />
-                  )
-                }
-              />
+                    )
+                  }
+                />
+              </div>
             )}
           </div>
           {!phone && detailsSurface}

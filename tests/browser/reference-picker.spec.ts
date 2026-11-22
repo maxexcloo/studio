@@ -226,7 +226,7 @@ test("Reference slots preserve optional End-only inputs and reuse one asset in t
   });
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("End-only study");
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await openReferenceChoices(page);
   await showReferenceStack(page);
   await page.getByRole("button", { name: "Slot 2 · End", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Slot Source", exact: true }).click();

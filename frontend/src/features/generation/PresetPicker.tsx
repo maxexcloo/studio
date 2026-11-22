@@ -32,7 +32,81 @@ export const presetsQuery = queryOptions({
   queryFn: () => api<{ presets: Preset[] }>("/api/user-presets"),
 });
 const json = (method: string, value: unknown) => ({ method, body: JSON.stringify(value) });
+const writePreset = (method: string, id?: string, value?: Partial<Preset>) =>
+  api<{ preset?: Preset }>(
+    id ? `/api/user-presets/${encodeURIComponent(id)}` : "/api/user-presets",
+    json(method, value ?? {}),
+  );
 const defaultParts: PresetPart[] = ["prompt", "negative", "settings", "size", "loras"];
+
+function showPresetUndo(count: number, restore: () => void) {
+  const notification = notifications.show({
+    message: (
+      <Group justify="space-between">
+        <Text size="sm">{count === 1 ? "Preset deleted" : `${count} presets deleted`}</Text>
+        <Button
+          variant="subtle"
+          onClick={() => {
+            notifications.hide(notification);
+            restore();
+          }}
+        >
+          Undo
+        </Button>
+      </Group>
+    ),
+  });
+}
+
+function presetToRestore({ id: _id, savedAt: _savedAt, ...value }: Preset) {
+  return value;
+}
+
+export function useDeletePresets() {
+  const client = useQueryClient();
+  const restore = useMutation({
+    mutationFn: async (presets: Preset[]) => {
+      let failures = 0;
+      for (const preset of presets) {
+        try {
+          await writePreset("POST", undefined, presetToRestore(preset));
+        } catch {
+          failures++;
+        }
+      }
+      if (failures)
+        throw new Error(`Couldn't restore ${failures} ${failures === 1 ? "preset" : "presets"}.`);
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: presetsQuery.queryKey }),
+  });
+  return useMutation({
+    mutationFn: async (presets: Preset[]) => {
+      const deleted: Preset[] = [];
+      const failed: Preset[] = [];
+      for (const preset of presets) {
+        try {
+          await writePreset("DELETE", preset.id);
+          deleted.push(preset);
+        } catch {
+          failed.push(preset);
+        }
+      }
+      return { deleted, failed };
+    },
+    onSuccess: async ({ deleted }) => {
+      const ids = new Set(deleted.map(({ id }) => id));
+      client.setQueryData(
+        presetsQuery.queryKey,
+        (data) =>
+          data && {
+            presets: data.presets.filter(({ id }) => !ids.has(id)),
+          },
+      );
+      if (deleted.length) showPresetUndo(deleted.length, () => restore.mutate(deleted));
+      await client.invalidateQueries({ queryKey: presetsQuery.queryKey });
+    },
+  });
+}
 
 /** The account's presets, named for the shared pickers, and their edits. Deleting offers Undo. */
 export function usePresets(enabled = true) {
@@ -48,30 +122,11 @@ export function usePresets(enabled = true) {
       method: "POST" | "PATCH" | "DELETE";
       value?: Partial<Preset>;
       deleted?: Preset;
-    }) =>
-      api<{ preset?: Preset }>(
-        id ? `/api/user-presets/${encodeURIComponent(id)}` : "/api/user-presets",
-        json(method, value ?? {}),
-      ),
+    }) => writePreset(method, id, value),
     onSuccess: (_, { deleted }) => {
       void client.invalidateQueries({ queryKey: presetsQuery.queryKey });
       if (deleted)
-        notifications.show({
-          message: (
-            <Group justify="space-between">
-              <Text size="sm">Preset deleted</Text>
-              <Button
-                variant="subtle"
-                onClick={() => {
-                  const { id: _, savedAt: __, ...value } = deleted;
-                  change.mutate({ method: "POST", value });
-                }}
-              >
-                Undo
-              </Button>
-            </Group>
-          ),
-        });
+        showPresetUndo(1, () => change.mutate({ method: "POST", value: presetToRestore(deleted) }));
     },
   });
   return {

@@ -4,7 +4,7 @@ import type { ProjectBrief, ProjectContent } from "./projects.ts";
 /**
  * What Dream proposes in Dream › Projects' Inbox: a new project, an edit to a project's brief, a
  * rule, a project's pacing (pause it, give it more turns, or vary results that look alike) or a
- * card. Nothing changes until the person accepts one.
+ * card. Recurring named card context can be saved automatically, with Undo.
  */
 export const proposalKinds = ["project", "brief", "rule", "pacing", "card"] as const;
 export type ProposalKind = (typeof proposalKinds)[number];
@@ -41,7 +41,9 @@ export interface Proposal<Item> {
 /** `GET /api/dream/inbox`. */
 export interface Inbox<Item> {
   proposals: Proposal<Item>[];
+  savedCards?: SavedCard[];
 }
+export type SavedCard = { id: string; title: string; kind: CardKind };
 /** `POST /api/dream/inbox/:id/accept`: the Inbox after, and what Undo can take back. */
 export interface Accepted<Item> extends Inbox<Item> {
   accepted: { id: string; title: string };

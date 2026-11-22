@@ -47,11 +47,7 @@ import {
   workerHas,
 } from "./workers.js";
 import { markWorkflowUsed } from "./workflow-catalogue.js";
-import { resolveImageMode } from "./workflow-modes.js";
-
-/** A listed profile as it runs on `backend`, with that backend's own reference slots. */
-const runProfile = (profile, backend) =>
-  profile?.backendOptions?.find((option) => option.id === backend)?.profile || profile;
+import { resolveImageMode, runProfile } from "./workflow-modes.js";
 
 export function createGenerationSubmission({
   loadComfyContext,

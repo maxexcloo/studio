@@ -5,13 +5,11 @@ import {
   FocusTrap,
   Group,
   Popover,
-  RingProgress,
   Text,
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
@@ -65,6 +63,7 @@ export function StatusAction() {
   // Work a paused queue holds is waiting, not generating.
   const unfinished = jobs.filter((job) => !terminalStatuses.has(job.status));
   const progress = queueProgress(jobs, unfinished);
+  const percent = progress ? Math.floor((100 * progress.finished) / progress.total) : 0;
   const progressLabel =
     progress &&
     [
@@ -124,24 +123,19 @@ export function StatusAction() {
       color={generating || held ? "gray" : summary.colour}
       onClick={() => setOpened(!opened)}
     >
-      {progress && (
-        <RingProgress
+      {progress ? (
+        <span
           aria-hidden
           className={classes.progress}
-          pos="absolute"
-          size={30}
-          thickness={2}
-          roundCaps
-          rootColor="var(--mantine-color-default-border)"
-          sections={[
-            {
-              value: (100 * progress.finished) / progress.total,
-              color: "var(--mantine-primary-color-filled)",
-            },
-          ]}
-        />
+          style={{
+            backgroundImage: `linear-gradient(90deg, var(--mantine-primary-color-filled) ${percent}%, transparent ${percent}%)`,
+          }}
+        >
+          {progress.total > 99 ? `${percent}%` : `${progress.finished}/${progress.total}`}
+        </span>
+      ) : (
+        <icons.queue size={19} />
       )}
-      {held ? <icons.pause size={16} /> : <Activity size={19} />}
     </ActionIcon>
   );
   // Administrators open Settings › Workers from the summary; it stays read-only for others.

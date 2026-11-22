@@ -7,6 +7,7 @@ import {
   fixtures,
   image,
   promptMenu,
+  showViewerControls,
   stamp,
   viewerAction,
   viewerChangeButton,
@@ -301,8 +302,10 @@ test("Animate offers motions written for the image, then its templates and Custo
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await showViewerControls(viewer);
   // Motions are asked for only once the menu opens.
-  await expect(page.getByRole("button", { name: "Animate", exact: true })).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Animate", exact: true })).toBeVisible();
   expect(asked).toEqual([]);
   await viewerAction(page, "Animate");
   const menu = page.getByRole("menu");
@@ -380,6 +383,7 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const phone = testInfo.project.use.isMobile;
   const editPrompt = async (value: string) => {
+    await showViewerControls(viewer);
     const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
     if (phone) await field.click();
     const surface = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
