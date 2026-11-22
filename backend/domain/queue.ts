@@ -2,7 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { isDeepStrictEqual } from "node:util";
 
 import type { ResultContext } from "../../shared/characters.ts";
-import { dreamImageSwitchSetting } from "../../shared/dream.ts";
+import { dreamTimingSettings } from "../../shared/dream.ts";
 import {
   type GenerationInput,
   type PromptWriting,
@@ -288,7 +288,8 @@ export class GenerationQueue {
       return;
     const minutes = video
       ? dreamVideoModelIdleMinutes
-      : (this.adapter.dreamImageSwitchMinutes?.() ?? dreamImageSwitchSetting.defaultValue);
+      : (this.adapter.dreamImageSwitchMinutes?.() ??
+        dreamTimingSettings.imageSwitchMinutes.defaultValue);
     if (!minutes) return;
     this.updateModelIdle(this.store.openJobs());
     if (this.modelIdleSince === undefined || this.now() - this.modelIdleSince < minutes * 60_000)

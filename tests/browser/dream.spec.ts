@@ -469,8 +469,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
   expect(dream.settings.paused).toBe(true);
 
-  await page.goto("/settings");
-  await section(page, "Settings", "Dream");
+  await page.goto("/settings#dream");
   const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
   const imageSettings = settings.getByRole("region", { name: "Images", exact: true });
   const videoSettings = settings.getByRole("region", { name: "Videos", exact: true });
@@ -484,22 +483,12 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await images.fill("200");
   await images.press("Enter");
   await expect.poll(() => dream.settings.dailyImages).toBe(200);
-  const idle = imageSettings.getByRole("textbox", { name: "Idle Delay", exact: true });
-  await idle.fill("8");
-  await idle.press("Enter");
   await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeVisible();
   await expect
     .poll(() => dream.requests.map((request) => request.body))
-    .toEqual([
-      { enabled: true },
-      { paused: true },
-      { videos: true },
-      { dailyImages: 200 },
-      { imageIdleMinutes: 8 },
-    ]);
+    .toEqual([{ enabled: true }, { paused: true }, { videos: true }, { dailyImages: 200 }]);
   await imageSettings.getByRole("switch", { name: "Enable", exact: true }).click({ force: true });
   await expect(images).toBeDisabled();
-  await expect(idle).toBeDisabled();
   await expect.poll(() => dream.settings.images).toBe(false);
 });
 
@@ -521,13 +510,13 @@ test("Dream settings an administrator forces stay locked for the account", async
       .getByRole("region", { name: "Dream", exact: true })
       .getByRole("switch", { name: "Enable", exact: true }),
   ).toBeDisabled();
+  await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeEnabled();
+  await section(page, "Settings", "Where Work Runs");
   await expect(
-    settings
-      .getByRole("region", { name: "Images", exact: true })
-      .getByRole("radiogroup", { name: "Processing", exact: true })
+    page
+      .getByRole("radiogroup", { name: "Dream Images", exact: true })
       .getByRole("radio", { name: "Cloud", exact: true }),
   ).toBeDisabled();
-  await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeEnabled();
 });
 
 test("An empty disabled video deck counts no held results, then counts verdicts and Undo", async ({

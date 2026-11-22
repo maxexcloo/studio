@@ -140,7 +140,8 @@
 }
 
 /* Fitted as the picture is: never beyond its recorded size. */
-.neighbour img {
+.neighbour img,
+.viewerPlaceholder {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
@@ -259,10 +260,6 @@
 .promptRow {
   align-self: stretch;
   padding-inline: var(--mantine-spacing-xs) 4px;
-}
-
-:where(:root:not([data-phone])) .promptRow {
-  border-bottom: 1px solid var(--studio-glass-border);
 }
 
 /* The padding sits outside the text, so a phone summary clips at a whole line. */

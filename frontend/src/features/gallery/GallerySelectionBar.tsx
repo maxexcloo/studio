@@ -1,12 +1,16 @@
 import { Button, Divider, Menu, Text } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Shuffle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { failure, post } from "../../api";
 import { menuWidth } from "../../theme";
-import { ActionBarGroups, ActionMenuItems, useActionMenuBounds } from "../../ui/ActionBar";
+import {
+  ActionBarGroups,
+  ActionMenuItems,
+  submenuParentProps,
+  useActionMenuBounds,
+} from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
@@ -41,11 +45,13 @@ export function GallerySelectionBar({
   tryAgain,
   menu,
   onMenuClose,
+  submenus,
 }: {
   selection: GallerySelection;
   tryAgain: ReturnType<typeof useTryAgain>;
   menu: { x: number; y: number } | null;
   onMenuClose: () => void;
+  submenus: boolean;
 }) {
   const phone = usePhone();
   const menuBounds = useActionMenuBounds(menu !== null);
@@ -259,7 +265,7 @@ export function GallerySelectionBar({
                   {
                     id: "run-suggested",
                     label: "Run Suggested Prompts",
-                    icon: Shuffle,
+                    icon: icons.shuffle,
                     disabled: recreate.isPending,
                     onClick: () =>
                       recreate.mutate(uploads, {
@@ -421,7 +427,7 @@ export function GallerySelectionBar({
         </div>
       </div>
       <Menu
-        {...menuBounds}
+        {...(submenus ? submenuParentProps : menuBounds)}
         opened={menu !== null}
         onChange={(opened) => !opened && onMenuClose()}
         width={menuWidth}
@@ -434,7 +440,7 @@ export function GallerySelectionBar({
         </Menu.Target>
         <Menu.Dropdown aria-label="Selection Actions">
           <Menu.Label>{selected.length} Selected</Menu.Label>
-          <ActionMenuItems groups={actions} />
+          <ActionMenuItems groups={actions} submenus={submenus} />
         </Menu.Dropdown>
       </Menu>
       <DeleteMediaDialog

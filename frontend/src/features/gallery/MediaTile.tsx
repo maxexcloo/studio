@@ -183,6 +183,7 @@ export function MediaTile({
   onSelectionMenu,
   onTryAgain,
   onKeyDown,
+  eager,
 }: {
   item: MediaItem;
   label?: string;
@@ -199,6 +200,7 @@ export function MediaTile({
   onSelectionMenu?: (x: number, y: number) => void;
   onTryAgain?: (item: MediaItem) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  eager?: boolean;
 }) {
   const selecting = Boolean(selection?.selecting);
   // Touch holds use Studio's menu or selection instead of a native drag lift.
@@ -305,7 +307,7 @@ export function MediaTile({
             alt=""
             width={media.width || 1024}
             height={media.height || 1024}
-            loading="lazy"
+            loading={eager ? "eager" : "lazy"}
             decoding="async"
             draggable={false}
             onLoad={(event) => {

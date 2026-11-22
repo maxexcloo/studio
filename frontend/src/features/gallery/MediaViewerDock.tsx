@@ -97,12 +97,13 @@ export function useRunFamily(
   }, [jobs, item, runs, related]);
 }
 
-/** Result set and version strips under the viewer image. */
+/** Result set, version and nearby gallery strips under the viewer image. */
 export function MediaViewerDock({
   item,
   family,
   jobs,
   set,
+  nearby,
   showThumbnails,
   choose,
   actions,
@@ -112,6 +113,7 @@ export function MediaViewerDock({
   jobs?: QueueJob[];
   /** The MCP result set's loaded results, in order (`setMembers`). */
   set: MediaItem[];
+  nearby?: MediaItem[];
   showThumbnails: boolean;
   choose?: (item: MediaItem) => void;
   actions: React.ReactNode;
@@ -145,6 +147,19 @@ export function MediaViewerDock({
   }));
   return (
     <div className={classes.dock} data-chrome>
+      {nearby && (
+        <ResultStrip
+          label="Gallery Results"
+          entries={nearby.map((result) => ({
+            key: result.id,
+            item: result,
+            label: `Show ${mediaTitle(result)}`,
+          }))}
+          jobs={jobs}
+          current={item}
+          choose={choose}
+        />
+      )}
       {showThumbnails && setEntries.length > 1 && (
         <ResultStrip
           label={`Set: ${item.resultSet?.title}`}

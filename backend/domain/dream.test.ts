@@ -9,7 +9,7 @@ import test, { type TestContext } from "node:test";
 import express from "express";
 
 import type { CardKind, Character, ResultContext } from "../../shared/characters.ts";
-import { type DreamSettings, dreamDefaults } from "../../shared/dream.ts";
+import { type DreamSettings, dreamDefaults, dreamTimingSettings } from "../../shared/dream.ts";
 import { dreamVideoProfile } from "../animate-profile.js";
 import {
   closeRuntimeDatabase,
@@ -71,6 +71,10 @@ function fixture(t: TestContext, catalogue = profiles) {
   const state = {
     owners: ["alice", "bob"],
     overrides: {} as Partial<DreamSettings>,
+    idleMinutes: {
+      image: dreamTimingSettings.imageIdleMinutes.defaultValue,
+      video: dreamTimingSettings.videoIdleMinutes.defaultValue,
+    },
     clock: Date.now(),
     items: [] as DreamItem[],
     reads: [] as Record<string, unknown>[],
@@ -206,6 +210,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     );
   const dream = createDream({
     dataDir,
+    idleMinutes: (kind) => state.idleMinutes[kind],
     overrides: () => state.overrides,
     store,
     taste,
@@ -418,8 +423,6 @@ test("Dream is off until turned on, queues one hidden job per account only while
     paused: false,
     dailyImages: 40,
     dailyVideos: 4,
-    imageIdleMinutes: 0,
-    videoIdleMinutes: 5,
     images: true,
     videos: false,
     spicy: false,
@@ -588,14 +591,15 @@ test("Dream fills every free worker in one tick: images beside running work, vid
   );
 });
 
-test("Dream waits separately after the owner's manual and MCP generation requests", async (t) => {
+test("Dream applies shared delays to the owner's manual and MCP generation requests", async (t) => {
   const { dream, store, state, generated, live, finish } = fixture(t, profiles);
   t.mock.timers.enable({ apis: ["Date"], now: state.clock });
   const advance = (ms: number) => {
     state.clock += ms;
     t.mock.timers.setTime(state.clock);
   };
-  await dream.save("alice", { enabled: true, videos: true, dailyImages: 1, imageIdleMinutes: 1 });
+  state.idleMinutes.image = 1;
+  await dream.save("alice", { enabled: true, videos: true, dailyImages: 1 });
   generated({
     id: "liked-still",
     ownerId: "alice",
@@ -1320,7 +1324,10 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   );
 
   assert.equal((await request("/settings", { dailyImages: -1 }, "PUT")).status, 400);
-  assert.equal((await request("/settings", { videoIdleMinutes: 121 }, "PUT")).status, 400);
+  assert.equal(
+    (await request("/settings", { videoIdleMinutes: 1 }, "PUT")).body.settings.videoIdleMinutes,
+    undefined,
+  );
   assert.equal((await request("/settings", { videos: "yes" }, "PUT")).status, 400);
   assert.equal((await request("/settings", { spicy: true }, "PUT")).status, 403);
   const saved = await request("/settings", { paused: true, dailyVideos: 2 }, "PUT");
@@ -3140,12 +3147,12 @@ test("Dream videos animate liked stills for most videos and Dream's keeps for th
   const { dream, state, generated, dreamOnce, walks } = fixture(t, profiles);
   const frameOf = (job: Awaited<ReturnType<typeof dreamOnce>>) =>
     (job!.input.referenceAssets as { assetId: string; slot: string }[])[0];
+  state.idleMinutes.video = 0;
   await dream.save("alice", {
     enabled: true,
     dailyImages: 0,
     videos: true,
     dailyVideos: 10,
-    videoIdleMinutes: 0,
   });
   generated({
     id: "liked",
@@ -3244,12 +3251,12 @@ test("Dream reports today's finished images alongside the video refusal", async 
 
 test("A Dream video skips a source that left the gallery and animates the next", async (t) => {
   const { dream, state, dreamOnce, finish, live, generated } = fixture(t, profiles);
+  state.idleMinutes.video = 0;
   await dream.save("alice", {
     enabled: true,
     dailyImages: 0,
     videos: true,
     dailyVideos: 10,
-    videoIdleMinutes: 0,
   });
   for (const [id, score] of [
     ["gone", 9],
@@ -3285,13 +3292,13 @@ test("A Dream video skips a source that left the gallery and animates the next",
 });
 
 test("A failed Dream video sets its profile aside rather than sending the next one", async (t) => {
-  const { dream, store, live, generated } = fixture(t, profiles);
+  const { dream, state, store, live, generated } = fixture(t, profiles);
+  state.idleMinutes.video = 0;
   await dream.save("alice", {
     enabled: true,
     dailyImages: 0,
     videos: true,
     dailyVideos: 10,
-    videoIdleMinutes: 0,
   });
   for (const id of ["first", "second"])
     generated({
@@ -3436,12 +3443,12 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
     mediaInputs: alternate.mediaInputs.map((input) => ({ ...input, required: true })),
   };
   const fx = fixture(t, [...profiles, cloud, needsTwo, alternate]);
+  fx.state.idleMinutes.video = 0;
   await fx.dream.save("alice", {
     enabled: true,
     images: false,
     videos: true,
     videoBackend: "cloud",
-    videoIdleMinutes: 0,
   });
   fx.state.video = cloud.id;
   fx.state.online.video = "parked";
