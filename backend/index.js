@@ -195,6 +195,7 @@ import { createFaces } from "./providers/faces.ts";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { createSiglip, siglipVersion } from "./providers/siglip.ts";
 import { workerLoads } from "./queue-eta.js";
+import { drainRadianceImages } from "./radiance-jobs.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
 import {
   animatedPhoto,
@@ -1450,7 +1451,12 @@ drainServer = async () => {
   server.closeIdleConnections();
   // Bound the wait for slow responses and clients still uploading a request body.
   const disconnect = setTimeout(() => server.closeAllConnections(), 2000);
-  await closed.finally(() => clearTimeout(disconnect));
+  const deadline = Date.now() + 20_000;
+  await Promise.all([
+    closed.finally(() => clearTimeout(disconnect)),
+    generationQueue.waitForSubmissions(deadline),
+  ]);
+  await drainRadianceImages(deadline);
   flushWorkflowPreferences();
   // The runtime database's one connection; nothing may write after this.
   store.close();

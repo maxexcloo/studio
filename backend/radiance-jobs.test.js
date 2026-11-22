@@ -329,6 +329,48 @@ test("a missing remote video fails explicitly without a replacement generation",
   assert.match(jobs.get(id).error, /no video/);
 });
 
+test("a restarted Studio resumes an interrupted Radiance image under the same ID after idle", async (t) => {
+  const store = new Store(openDatabase(":memory:"));
+  t.after(() => store.close());
+  const session = store.createSession("").id;
+  const interrupted = (id, cancelRequested) => {
+    const body = bodyFor(id);
+    const job = store.enqueue("", session, body, "image", undefined, "worker:radiance", id);
+    store.save({ ...job, status: "running", providerJobId: `radiance-${id}`, cancelRequested });
+    store.saveProviderRecord("", id, { body, video: false, values: { seed: 0 }, outputs: [] });
+    return job;
+  };
+  const image = interrupted("interrupted-image");
+  const cancelled = interrupted("interrupted-cancellation", true);
+  let idle = false;
+  const submitted = [];
+  const adapter = createGenerationQueueAdapter({
+    jobs,
+    items: () => [],
+    recover: (job) => recoverRadianceJob(job, store, { idle: async () => idle }),
+    submitGeneration: async (job) => {
+      submitted.push(job.id);
+      return { status: 200, payload: {} };
+    },
+  });
+  const queue = new GenerationQueue(store, adapter);
+  await queue.tick();
+  assert.deepEqual(submitted, []);
+  assert.equal(store.job("", image.id).status, "starting");
+  assert.equal(store.job("", cancelled.id).cancelRequested, true);
+  idle = true;
+  await queue.tick();
+  assert.deepEqual(submitted, [image.id]);
+  assert.equal(store.job("", image.id).retried, true);
+  assert.equal(store.job("", image.id).input.seed, "0");
+  assert.equal(store.job("", cancelled.id).status, "cancelled");
+
+  await new GenerationQueue(store, adapter).tick();
+  assert.deepEqual(submitted, [image.id]);
+  assert.equal(store.job("", image.id).status, "failed");
+  assert.equal(store.jobs("").length, 2);
+});
+
 test("a recorded Radiance pinning failure survives process loss and retries once after the old pod leaves", async (t) => {
   const filename = path.join(scratch, "memory-recovery.sqlite");
   const db = new Store(openDatabase(filename));

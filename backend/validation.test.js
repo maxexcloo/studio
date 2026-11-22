@@ -97,16 +97,20 @@ test("reference capacity comes from exact roles or the retained single start-ima
   assert.throws(() => validateReferenceSlots(references.slice(0, 2), img2img), /at most 1 image/);
 });
 
-test("required reference slots are enforced for image-edit workflows", () => {
+test("image-edit validation enforces required reference slots and preserves explicit seeds", () => {
   assert.throws(() => sanitizeGenerateBody(request, exact, {}), /Reference image is required/);
-  const body = sanitizeGenerateBody(
-    { ...request, count: 4, referenceAssets: [{ slot: "reference", assetId: "upload-id" }] },
-    exact,
-    {},
-  );
+  const input = {
+    ...request,
+    count: 4,
+    referenceAssets: [{ slot: "reference", assetId: "upload-id" }],
+  };
+  const body = sanitizeGenerateBody(input, exact, {});
   assert.equal(body.referenceAssets[0].assetId, "upload-id");
   assert.equal(body.count, 1);
+  assert.equal(body.seed, "");
   assert.deepEqual(body.promptPolicy, { policy: "preserve-source-v1", version: 1 });
+  for (const seed of [0, "0"])
+    assert.equal(sanitizeGenerateBody({ ...input, seed }, exact, {}).seed, "0");
 });
 
 test("omitted settings take the profile's defaults, not ComfyUI's node defaults", () => {
