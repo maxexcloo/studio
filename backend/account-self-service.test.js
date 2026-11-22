@@ -138,6 +138,7 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
     ["POST", "/api/dream/calibration"],
     ["POST", "/api/dream/visit"],
     ["GET", "/api/gallery/items/%2Fcomfy%2Fview%3Ffilename%3Da.png"],
+    ["GET", "/api/gallery/timeline"],
     ["GET", "/api/results/12"],
     ["POST", "/api/gallery/export"],
     ["POST", "/api/assistant/cards/describe"],

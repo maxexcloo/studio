@@ -11,6 +11,7 @@ export const galleryKey = ["gallery"] as const;
 export interface GalleryResultsPage {
   items: MediaItem[];
   nextCursor: string;
+  previousCursor?: string;
   hasMore: boolean;
   /** How many items match, across every page. */
   totalApprox: number;
@@ -30,15 +31,19 @@ export interface GalleryListing {
 }
 export type GalleryQuickSelect = "all" | "failed";
 
-export function galleryPage(
-  listing: GalleryListing,
-  cursor: string,
-  signal?: AbortSignal,
-  selection?: GalleryQuickSelect,
-) {
+export interface GalleryDate {
+  day: string;
+  count: number;
+  cursor: string;
+}
+
+export interface GalleryPageParam {
+  cursor: string;
+  previous?: boolean;
+}
+
+function galleryParams(listing: GalleryListing) {
   const params = new URLSearchParams({
-    limit: "60",
-    cursor,
     q: listing.search,
     type: listing.kind,
   });
@@ -51,25 +56,72 @@ export function galleryPage(
   if (listing.setId) params.set("set", listing.setId);
   if (listing.chat) params.set("chat", listing.chat);
   if (listing.chat && listing.turn) params.set("turn", listing.turn);
+  return params;
+}
+
+export function galleryPage(
+  listing: GalleryListing,
+  cursor: string,
+  signal?: AbortSignal,
+  {
+    selection,
+    windowed,
+    previous,
+  }: {
+    selection?: GalleryQuickSelect;
+    windowed?: boolean;
+    previous?: boolean;
+  } = {},
+) {
+  const params = galleryParams(listing);
+  params.set("limit", "60");
+  params.set(previous ? "beforeCursor" : "cursor", cursor);
   if (selection) params.set("select", selection);
+  if (windowed) params.set("window", "1");
   return api<GalleryResultsPage>(`/api/gallery?${params}`, { signal });
 }
-export const galleryQuery = (listing: GalleryListing) =>
-  infiniteQueryOptions({
+
+export const galleryListingKey = (listing: GalleryListing) =>
+  [
+    ...galleryKey,
+    listing.search,
     // The kind stays third: GalleryPage keeps results only while it matches.
-    queryKey: [
-      ...galleryKey,
-      listing.search,
-      listing.kind,
-      listing.filters,
-      listing.similar ? [listing.similar, listing.strictness] : null,
-      listing.setId || null,
-      listing.chat ? [listing.chat, listing.turn || null] : null,
-      listing.sort || "newest",
-    ],
-    initialPageParam: "",
-    queryFn: ({ pageParam, signal }) => galleryPage(listing, pageParam, signal),
-    getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
+    listing.kind,
+    listing.filters,
+    listing.similar ? [listing.similar, listing.strictness] : null,
+    listing.setId || null,
+    listing.chat ? [listing.chat, listing.turn || null] : null,
+    listing.sort || "newest",
+  ] as const;
+
+export const galleryTimelineQuery = (listing: GalleryListing) => {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return queryOptions({
+    queryKey: [...galleryListingKey(listing), "timeline", timeZone],
+    queryFn: ({ signal }) => {
+      const params = galleryParams(listing);
+      params.set("timeZone", timeZone);
+      return api<{ days: GalleryDate[] }>(`/api/gallery/timeline?${params}`, { signal });
+    },
+    staleTime: 60_000,
+  });
+};
+
+export const galleryQuery = (listing: GalleryListing, windowCursor?: string) =>
+  infiniteQueryOptions({
+    queryKey:
+      windowCursor === undefined
+        ? galleryListingKey(listing)
+        : [...galleryListingKey(listing), "window", windowCursor],
+    initialPageParam: { cursor: windowCursor ?? "" } as GalleryPageParam,
+    queryFn: ({ pageParam, signal }) =>
+      galleryPage(listing, pageParam.cursor, signal, {
+        windowed: windowCursor !== undefined,
+        previous: pageParam.previous,
+      }),
+    getNextPageParam: (last) => (last.hasMore ? { cursor: last.nextCursor } : undefined),
+    getPreviousPageParam: (first) =>
+      first.previousCursor ? { cursor: first.previousCursor, previous: true } : undefined,
   });
 
 /** One gallery item in full: gallery pages leave out its prompt's thinking, which Details reads here. */

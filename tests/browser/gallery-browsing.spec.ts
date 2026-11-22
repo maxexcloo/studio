@@ -1,6 +1,6 @@
 import { type Locator, type Route, expect, test } from "@playwright/test";
 
-import { mediaTitle } from "../../frontend/src/features/gallery/mediaLabels";
+import { dayHeading, mediaTitle } from "../../frontend/src/features/gallery/mediaLabels";
 import {
   closeReferences,
   expandComposer,
@@ -1324,6 +1324,108 @@ test("The grid heads each day, and the date scrubber names the day while it scro
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
   // Virtualisation still renders only the tiles near the screen.
   expect(await page.getByRole("button", { name: /^Open image:/ }).count()).toBeLessThan(90);
+});
+
+test("Gallery Dates jumps past unloaded pages and scrolls either way from the chosen date", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const days = ["2025-04-04", "2025-04-03", "2025-04-02", "2025-04-01"];
+  const created = await page.evaluate(
+    (days) =>
+      days.map((day) => {
+        const [year, month, date] = day.split("-").map(Number);
+        return new Date(year, month - 1, date, 12).toISOString();
+      }),
+    days,
+  );
+  const items = results(240).map((item, index) => ({
+    ...item,
+    createdAt: created[Math.floor(index / 60)],
+  }));
+  const requests: string[] = [];
+  let searchedDates = false;
+  await page.route("**/api/gallery/timeline?**", (route) => {
+    const { searchParams } = new URL(route.request().url());
+    const filtered = searchParams.get("q") === "Browse Result 0";
+    searchedDates ||= filtered;
+    return route.fulfill({
+      json: {
+        days: filtered
+          ? [{ day: days[0], count: 1, cursor: "" }]
+          : days.map((day, index) => ({
+              day,
+              count: 60,
+              cursor: index ? `seek-${index}` : "",
+            })),
+      },
+    });
+  });
+  await page.route("**/api/gallery?**", (route) => {
+    const { searchParams } = new URL(route.request().url());
+    const cursor = searchParams.get("cursor") || "";
+    const before = searchParams.get("beforeCursor") || "";
+    const windowed = searchParams.get("window") === "1";
+    const search = searchParams.get("q");
+    requests.push(before || cursor || (search ? "filtered" : "head"));
+    if (windowed && before)
+      return route.fulfill({
+        json: {
+          items: before === "before-1" ? items.slice(0, 60) : items.slice(60, 120),
+          previousCursor: before === "before-1" ? "" : "before-1",
+          nextCursor: before === "before-1" ? "seek-1" : "seek-2",
+          hasMore: true,
+          totalApprox: 240,
+        },
+      });
+    if (windowed && cursor)
+      return route.fulfill({
+        json: {
+          items: cursor === "seek-3" ? items.slice(180) : items.slice(120, 180),
+          previousCursor: cursor === "seek-3" ? "before-3" : "before-2",
+          nextCursor: cursor === "seek-3" ? "" : "seek-3",
+          hasMore: cursor !== "seek-3",
+          totalApprox: 240,
+        },
+      });
+    return route.fulfill({
+      json: {
+        items: items.slice(0, search ? 1 : 60),
+        previousCursor: "",
+        nextCursor: search ? "" : "walk-to-1",
+        hasMore: !search,
+        totalApprox: search ? 1 : 240,
+      },
+    });
+  });
+  await page.goto("/images");
+  const scrubber = page.getByRole("scrollbar", { name: "Gallery Dates" });
+  await expect(scrubber).toHaveAttribute("data-indexed", "true");
+  const track = (await scrubber.boundingBox())!;
+  const x = track.x + track.width / 2;
+  await page.mouse.move(x, track.y + track.height / 8);
+  await page.mouse.down();
+  await page.mouse.move(x, track.y + (track.height * 5) / 8);
+  await expect(scrubber).toHaveAttribute("aria-valuetext", dayHeading(days[2]));
+  expect(requests).not.toContain("seek-2");
+  await page.mouse.up();
+  await expect.poll(() => requests.includes("seek-2")).toBe(true);
+  expect(requests).not.toContain("walk-to-1");
+  await expect(page.getByRole("heading", { name: dayHeading(days[2]) })).toBeInViewport();
+  await expect(scrubber).toHaveAttribute("aria-valuetext", dayHeading(days[2]));
+  await expect.poll(() => requests.includes("before-2")).toBe(true);
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 120" }),
+  ).toBeInViewport();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(() => requests.includes("seek-3")).toBe(true);
+  await scrubber.press("End");
+  await expect(scrubber).toHaveAttribute("aria-valuetext", dayHeading(days[3]));
+
+  await (await toolbarSearch(page)).fill("Browse Result 0");
+  await expect.poll(() => searchedDates).toBe(true);
+  await expect(page.getByRole("button", { name: "Open image: Browse Result 0" })).toBeVisible();
+  await expect(scrubber).toBeHidden();
 });
 
 test("The Tags facet lists the most used caption tags with counts and filters by them", async ({
