@@ -398,6 +398,7 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
   );
   await viewerChangeMenu(page);
   await page.getByRole("menuitem", { name: "Review Prompt", exact: true }).click();
+  await expandAssistantMenu(page, "Suggestions");
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   await closeTextEditor(page, "Prompt");
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
@@ -456,6 +457,7 @@ test("A delayed automatic change runs on its source without closing the next ima
   });
   try {
     await viewerChangeMenu(page, "Recreate");
+    await expandAssistantMenu(page, "Suggestions");
     const requested = page.waitForRequest(
       (request) =>
         request.url().endsWith("/api/suggestions") && request.postDataJSON()?.surface === "change",

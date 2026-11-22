@@ -14,11 +14,11 @@
     "defaults": {
       "count": 1,
       "height": 1024,
-      "model": "qwen-image-2.1-iq8r",
       "steps": 28,
       "width": 1024
     },
     "controls": {
+      "cfg": { "node": "1", "input": "cfg" },
       "count": { "node": "1", "input": "count" },
       "height": { "node": "1", "input": "height" },
       "model": { "node": "1", "input": "model" },
@@ -32,6 +32,7 @@
     "1": {
       "class_type": "RadianceImageGenerate",
       "inputs": {
+        "cfg": 3.5,
         "count": 1,
         "height": 1024,
         "model": "qwen-image-2.1-iq8r",

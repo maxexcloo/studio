@@ -1113,9 +1113,10 @@ export async function showViewerThumbnails(viewer: Locator) {
   const chrome = viewer.locator("[data-viewer-chrome]");
   if (!(await chrome.count())) return;
   const stage = viewer.locator("[data-viewer-stage]");
-  if ((await chrome.getAttribute("data-viewer-chrome")) === "image") await stage.press("c");
-  if ((await chrome.getAttribute("data-viewer-chrome")) !== "full") await stage.press("c");
-  await expect(chrome).toHaveAttribute("data-viewer-chrome", "full");
+  await expect(async () => {
+    if ((await chrome.getAttribute("data-viewer-chrome")) !== "full") await stage.press("c");
+    await expect(chrome).toHaveAttribute("data-viewer-chrome", "full", { timeout: 500 });
+  }).toPass({ timeout: 5000 });
 }
 
 /**

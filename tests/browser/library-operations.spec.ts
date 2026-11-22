@@ -1068,9 +1068,8 @@ for (const surface of ["Library", "Composer"])
       if (surface === "Library") {
         await page.goto("/library#presets");
         await page
-          .getByRole("button", { name: "Actions for Full Replacement", exact: true })
+          .getByRole("button", { name: "Edit Full Replacement in Composer", exact: true })
           .click();
-        await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
         const confirmation = page.getByRole("dialog", { name: "Load Preset", exact: true });
         await expect(confirmation).toBeVisible();
         await confirmation.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -1103,8 +1102,9 @@ for (const surface of ["Library", "Composer"])
         references: references.map((asset) => asset.id),
       });
       if (surface === "Library") {
-        await page.getByRole("button", { name: "Actions for Prompt Only", exact: true }).click();
-        await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
+        await page
+          .getByRole("button", { name: "Edit Prompt Only in Composer", exact: true })
+          .click();
       } else {
         await page.getByRole("combobox", { name: "Preset Name", exact: true }).click();
         await page.getByRole("option", { name: "Prompt Only", exact: true }).click();

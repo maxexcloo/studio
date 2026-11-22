@@ -4,6 +4,8 @@ Run one Studio replica. Two schedulers must not control the same workers or SQLi
 
 Studio reads process environment variables first, then its settings file on startup. The Docker image reads `/data/.env` and a source checkout reads `.env` in the project folder. Docker's `--env-file` can also supply process environment variables. Values an administrator saves in **Settings** apply at once. A value from the environment appears locked there.
 
+For the Docker quick start, keep your deployment settings in a local `studio.env` file. Pass `--env-file studio.env` before the image name and recreate the container with the same data volume when the file changes. Use `NAME=value` on each line. In Docker's env file, write JSON values directly without surrounding shell quotes.
+
 ```bash
 HOST=127.0.0.1
 PORT=8787
@@ -42,7 +44,7 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
    STUDIO_WORKERS='[{"id":"radiance","name":"Radiance","backend":"radiance","url":"http://127.0.0.1:8000","capabilities":["image"]}]'
    ```
 
-3. In **Library › Profiles**, import the [Radiance image sample](backend/samples/radiance-qwen-image.json) if it is missing. Set its model ID to the name Radiance returns from `/v1/models` and select the profile in Images. Add the `video` capability only when the worker serves a video model and you have a matching Studio video profile.
+3. In **Library › Profiles**, open **Qwen Image 2.1** or use **Import Workflow** to open the [Radiance image sample](backend/samples/radiance-qwen-image.json) if the profile is missing. In **Advanced JSON**, set `graph["1"].inputs.model` to the model ID Radiance returns from `/v1/models`. Choose **Create** or **Save**, then select the profile in Generate. Add the `video` capability only when the worker serves a video model and you have a matching Studio video profile.
 
 This path uses Radiance's own media API. Install the [ComfyUI worker](worker/README.md) separately if you need ComfyUI workflows, model downloads or conversions.
 

@@ -137,6 +137,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
     "Edit",
     "Recreate",
     "Upscale",
+    "Keep & Vary",
     "More Like This",
     "Similar",
     "Copy Details",
@@ -196,9 +197,6 @@ for (const operation of ["Edit", "Animate"] as const) {
     const state = await galleryFixture(page);
     await tileMenu(page);
     await page.getByRole("menuitem", { name: operation, exact: true }).click();
-    // Animate's suggestions answer, so the list stops growing under the press.
-    if (operation === "Animate")
-      await expect(page.getByRole("menuitem", { name: "Refresh", exact: true })).toBeVisible();
     // Phones slide the options open in place, clipping them until the slide ends.
     const compose = page.getByRole("menuitem", { name: `${operation} in Composer`, exact: true });
     await expect(compose).toBeInViewport({ ratio: 1 });

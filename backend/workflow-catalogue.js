@@ -3,9 +3,11 @@ import path from "node:path";
 import { catalogueDownloadsForFile } from "./catalogue-downloads.js";
 import {
   allCustomWorkflowRecords,
+  backendIdsOf,
   detectWorkflowFormat,
   detectWorkflowMetadata,
   graphFromJson,
+  profileOnBackend,
   usesGrokMedia,
   validateGraph,
   workflowMissingFiles,
@@ -13,6 +15,7 @@ import {
 } from "./custom-workflows.js";
 import { dataDir } from "./data-dir.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
+import { validateProfileText } from "./profile/editor.js";
 import { workflowRisks } from "./workflow-risk.js";
 
 let preferencesCache = null;
@@ -297,9 +300,14 @@ export function previewWorkflowImport(raw, filename = "", info = {}) {
   const format = detectWorkflowFormat(raw);
   if (format === "unsupported")
     throw new Error(
-      "This isn't a ComfyUI workflow. Use one saved from ComfyUI, in the regular or API format.",
+      "Use a Studio profile or a workflow saved from ComfyUI in regular or API format.",
     );
-  const source = format === "comfyui-api-wrapper" ? raw.prompt : raw;
+  const native = format === "studio-profile";
+  const source = native
+    ? profileOnBackend(raw).raw
+    : format === "comfyui-api-wrapper"
+      ? raw.prompt
+      : raw;
   const graph = graphFromJson(format === "comfyui-visual" ? { ...raw } : source, info);
   // A wrapper ({ prompt: graph }) or a visual file can carry the studio block beside the graph.
   const declared = raw?.studio || null;
@@ -308,6 +316,27 @@ export function previewWorkflowImport(raw, filename = "", info = {}) {
     path.basename(filename || "", path.extname(filename || "")),
     info,
   );
+  if (native) {
+    const validation = validateProfileText(detected.id, JSON.stringify(raw), { info });
+    const backends = backendIdsOf(raw);
+    const graphs = (backends.length ? backends : [""]).flatMap((backend) => {
+      const view = profileOnBackend(raw, backend).raw;
+      return [
+        graphFromJson(view),
+        ...Object.values(view.studio?.imageModes || {}).map((mode) => mode?.graph),
+      ];
+    });
+    return {
+      filename,
+      graph,
+      declared,
+      detected,
+      format,
+      hasStudioBlock: true,
+      validation: { ok: validation.ok, issues: validation.errors, warnings: validation.warnings },
+      risks: graphs.flatMap(workflowRisks),
+    };
+  }
   const validation = validateWorkflow(
     {
       id: detected.id,

@@ -184,6 +184,7 @@ test("The viewer directly offers Suggested and Templates without styles or item 
   expect(asked.filter((body) => body.surface === "change")).toEqual([]);
   await viewerAction(page, "AI");
   await expect(page.getByRole("menu").getByRole("menuitem")).toHaveText([
+    "Keep & Vary",
     "More Like This",
     "Similar",
   ]);
@@ -358,6 +359,7 @@ test("Suggestions show why Studio has none, and no ideas show", async ({ page })
   await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const menu = await viewerChangeMenu(page);
+  await expandAssistantMenu(menu, "Suggestions");
   await expect(
     menu.getByRole("menuitem", {
       name: "Like a few results so Studio learns your taste.",
