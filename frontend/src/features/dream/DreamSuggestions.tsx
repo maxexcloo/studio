@@ -79,7 +79,7 @@ export function DreamSuggestions({
       <PopupTooltip label="Suggestions">
         <Menu.Target>{trigger}</Menu.Target>
       </PopupTooltip>
-      <Menu.Dropdown>
+      <Menu.Dropdown style={{ overscrollBehavior: "none" }}>
         {available && (
           <>
             {card.kind === "pair" && <Menu.Label>{sideLabel(card, side)}</Menu.Label>}

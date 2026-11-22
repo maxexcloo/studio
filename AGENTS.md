@@ -165,8 +165,10 @@ recur across features.
   gestures, top chrome, media controls and Details surface. Verdicts in
   fullscreen use the buttons. Passing moves on without a rating. Holding Pass
   opens the reason picker.
-  Not My Taste records a dislike. Comparisons offer Pass, the lettered choices
-  and Accept. A three-way comparison picks its winner through A, B or C.
+  Not My Taste records a dislike. Comparisons in the deck and fullscreen video
+  offer Pass, the lettered choices and Accept. Fullscreen image comparisons
+  offer the single-image verdicts. Accept keeps the image shown and Super Like
+  also rates it.
   On a set, Deny All dislikes every member. Super Like keeps the set and rates
   the image shown, or the cover when the set is closed. An explicit Like
   or Deny on a member overrides the set verdict for that member.
@@ -267,9 +269,10 @@ recur across features.
   the current tile.
 - The gallery viewer fits media between its header and a separate bottom
   dock. A touch tap cycles through actions, actions with thumbnails and
-  media alone. Hiding the dock gives its space back to the media. Swipe up
-  first reveals thumbnails, then opens Details. Dream fullscreen keeps its
-  verdicts and opens Details on the first swipe up.
+  media alone. Hiding the chrome gives its space back to the media. Swipe
+  up opens Details. Dream fullscreen keeps its verdicts and opens Details
+  on swipe up. In both viewers, media at 9:16 or narrower can extend
+  behind the header. The dock always has its own space.
 - The gallery defaults to newest first, with a tile per result. Sets and
   versions have separate thumbnail strips in the viewer. Version grouping
   has one owner in `gallery/versions.ts`. Viewing and upscale

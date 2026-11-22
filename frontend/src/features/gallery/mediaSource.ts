@@ -32,6 +32,10 @@ export function mediaSource(item: MediaItem): {
   };
 }
 
+export function isTallMedia({ width, height }: { width?: number; height?: number }) {
+  return Boolean(width && height && width * 16 <= height * 9);
+}
+
 /**
  * Where a video plays: Studio's copy that iOS Safari plays (backend getComfyVideoPlayback), the
  * original itself when it already does. Downloads and shares keep the original's address.
