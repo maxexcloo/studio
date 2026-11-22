@@ -106,9 +106,10 @@ async function dreamAction(page: Page, name: string) {
 const verdicts = (state: Awaited<ReturnType<typeof serveDream>>) =>
   state.requests.map((request) => `${request.method} ${request.path}`);
 
-async function confirmPass(page: Page, reason = "Skip Feedback") {
+async function confirmPass(page: Page, reason?: string) {
   const dialog = page.getByRole("dialog", { name: "Why Pass?", exact: true });
-  await dialog.getByRole("radio", { name: reason, exact: true }).check();
+  await expect(dialog.getByRole("radio", { name: "Not My Taste", exact: true })).toBeChecked();
+  if (reason) await dialog.getByRole("radio", { name: reason, exact: true }).check();
   await dialog.getByRole("button", { name: "Pass", exact: true }).click();
 }
 
@@ -146,12 +147,11 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await page.keyboard.press("ArrowRight");
   await expect(current(page)).toContainText("Dream prompt two");
   await page.keyboard.press("ArrowLeft");
-  await confirmPass(page);
   await expect(current(page)).toContainText("Dream prompt three");
   await page.keyboard.press("ArrowUp");
   await expect(current(page)).toContainText("Dream prompt four");
 
-  // A full drag asks why the card was passed; a short one springs back.
+  // A full drag passes the card; a short one springs back.
   const box = (await current(page).boundingBox())!;
   const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   await page.mouse.move(centre.x, centre.y);
@@ -163,7 +163,6 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await page.mouse.down();
   await page.mouse.move(centre.x - box.width / 2, centre.y + 10, { steps: 8 });
   await page.mouse.up();
-  await confirmPass(page, "Too Similar");
   await expect(current(page)).toContainText("Dream prompt five");
 
   // The preview shows the card's full text in Details and judges with the deck's buttons.
@@ -250,8 +249,8 @@ test("Dream and Library keep separate Images and Videos, with paged review and U
   await page.getByRole("button", { name: "Super Like", exact: true }).click();
   await expect(image).toContainText("library-third");
   await expect.poll(() => dream.library[2].rating).toBe("liked");
-  await page.getByRole("button", { name: "Pass", exact: true }).click();
-  await confirmPass(page, "Not My Taste");
+  await page.getByRole("button", { name: "Pass", exact: true }).press("Shift+F10");
+  await confirmPass(page);
   await expect(page.getByText("Library Review Complete")).toBeVisible();
   await expect.poll(() => dream.library[3].rating).toBe("disliked");
 
@@ -313,6 +312,33 @@ test("Suggest can queue a library item variation at its source", async ({ page }
   });
 });
 
+test("Dream video Suggestions can stage an extension from the current clip", async ({ page }) => {
+  const state = await fixtures(page);
+  const dream = await serveDream(page, {
+    unseen: [
+      dreamItem("dream-clip", {
+        type: "video",
+        url: "/test-media/clip.mp4",
+        settings: {
+          profileId: "video:test",
+          referenceAssets: [{ assetId: "missing-start", slot: "reference" }],
+        },
+      }),
+    ],
+  });
+  await page.goto("/dream");
+  await showMedia(page, "Videos");
+  await page.getByRole("button", { name: "Suggestions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Extend in Composer", exact: true }).click();
+  await expect(page).toHaveURL(/\/videos$/);
+  await expect
+    .poll(() => state.referenceRequests.at(-1))
+    .toEqual({ galleryItemId: "dream-clip", frame: "last" });
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+  expect(state.jobs).toHaveLength(0);
+  expect(dream.requests).toHaveLength(0);
+});
+
 test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => {
   await fixtures(page);
   const dream = await serveDream(page, {
@@ -327,7 +353,6 @@ test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => 
     ["Accept", "four"],
   ]) {
     await bar.getByRole("button", { name, exact: true }).click();
-    if (name === "Pass") await confirmPass(page, "Glitch");
     await expect(current(page)).toContainText(`Dream prompt ${next}`);
   }
   // Each Undo brings back the card before, newest first, until nothing is left to undo.
@@ -341,7 +366,7 @@ test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => 
   await expect
     .poll(sent)
     .toEqual([
-      `/api/dream/pass {"ids":["one"],"reason":"glitch"}`,
+      `/api/dream/pass {"ids":["one"],"reason":"skip"}`,
       "/api/dream/two/super-like {}",
       "/api/dream/three/keep {}",
       `/api/dream/undo {"ids":["three"]}`,
@@ -733,6 +758,19 @@ test("Liking an expanded Dream Set rates the shown member and keeps the set", as
   await expect(set).toContainText("Dream prompt cover");
   await set.getByRole("button", { name: "View Set (3)", exact: true }).click();
   const preview = page.getByRole("dialog");
+  await expect(
+    preview.getByRole("button", { name: "Change Image Zoom", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Digit0");
+  await expect
+    .poll(async () => {
+      const controls = await preview
+        .getByRole("group", { name: "Image Zoom", exact: true })
+        .boundingBox();
+      const picker = await preview.locator('[aria-label="Set Results"]').boundingBox();
+      return !!controls && !!picker && controls.y + controls.height <= picker.y;
+    })
+    .toBe(true);
   const third = preview.getByRole("radio", { name: "3", exact: true });
   await third.press("Space");
   await preview.getByRole("button", { name: "Deny This Image", exact: true }).click();
@@ -829,7 +867,6 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await page.mouse.up();
   await expect.poll(() => dream.requests.length).toBe(1);
   await page.keyboard.press("ArrowDown");
-  await confirmPass(page);
   await expect.poll(() => dream.requests.length).toBe(2);
   const third = page.getByRole("group", { name: "Which Steps?", exact: true });
   await expect(third).toContainText("Guidance 3");
@@ -1085,8 +1122,15 @@ test("Preview uses viewer gestures and its buttons judge and undo", async ({
   const details = await previewDetails(preview, isMobile);
   await expect(details).toContainText("Dream prompt one");
   await closeDetails(preview, details, isMobile);
-  await preview.getByRole("button", { name: "Pass", exact: true }).click();
-  await confirmPass(page);
+  const pass = (await preview.getByRole("button", { name: "Pass", exact: true }).boundingBox())!;
+  await page.mouse.move(pass.x + pass.width / 2, pass.y + pass.height / 2);
+  await page.mouse.down();
+  try {
+    await expect(page.getByRole("dialog", { name: "Why Pass?", exact: true })).toBeVisible();
+  } finally {
+    await page.mouse.up();
+  }
+  await confirmPass(page, "Glitch");
   await expect(card.getByRole("img", { name: "Dream prompt two", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();
@@ -1095,6 +1139,7 @@ test("Preview uses viewer gestures and its buttons judge and undo", async ({
   await expect
     .poll(() => verdicts(dream))
     .toEqual(["POST /api/dream/one/keep", "POST /api/dream/undo", "POST /api/dream/pass"]);
+  expect(dream.requests[2].body).toEqual({ ids: ["one"], reason: "glitch" });
 });
 
 test("Dream fullscreen closes from the letterbox and leaves the image interactive", async ({

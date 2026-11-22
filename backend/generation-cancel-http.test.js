@@ -195,6 +195,7 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   const active = (await api("/api/queue")).body.jobs.find((job) => job.id === accepted.body.jobId);
   assert.equal(recordedJob(active.id).cancelRequested, true);
   assert.equal(active.status, "running");
+  assert.equal(active.cancelling, true);
   // An administrator switches the GPU to text; the change waits for the cancelled job.
   const preview = await api("/api/runtime/preview", { workloads: ["text"] });
   assert.equal(preview.status, 200);

@@ -67,7 +67,9 @@ test("mcpOwnership moves MCP's records into rows, and its links, numbers and res
   assert.deepEqual(waiting.claims("Aaaaaaaaa1"), { owner: "owner-1", jobId: "job-a", index: 0 });
   assert.equal(media.shortId("owner-1", "job-a", 0), "Aaaaaaaaa1");
   assert.equal(media.shortId("owner-1", "job-a"), "Aaaaaaaaa2");
-  assert.equal(media.allUrl("owner-1", "scope1"), `${audience}/mcp/results/Aaaaaaaaa3`);
+  const previousChatLink = media.claims("Aaaaaaaaa3");
+  assert.deepEqual(previousChatLink, { owner: "owner-1", scope: "scope1", all: true });
+  assert.equal(await media.studioUrl(previousChatLink), `${audience}/images`);
   assert.deepEqual(await media.resolve("owner-1", "scope1", "#14"), { jobId: "job-b", index: 1 });
   assert.equal((await media.resolve("owner-1", "scope1", "B")).jobId, "job-b");
   assert.equal(media.reference("owner-1", "scope1", "job-c"), 3);

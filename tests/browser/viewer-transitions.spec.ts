@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
 
-import { fixtures, showViewerControls, stamp, viewerAction } from "./fixtures";
+import { fixtures, showViewerThumbnails, stamp, viewerAction } from "./fixtures";
 
 const original = await sharp({
   create: { width: 800, height: 1200, channels: 3, background: "#46a3ff" },
@@ -196,7 +196,9 @@ test("The viewer fits a large image but never enlarges a small one beyond its ac
   await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBeLessThan(1);
 });
 
-test("Fit leaves room for the header and keeps its bounds when controls open", async ({ page }) => {
+test("Fit leaves room for the header and keeps its bounds when thumbnails open", async ({
+  page,
+}) => {
   const state = await fixtures(page);
   for (const [shape, width, height, model] of [
     ["wide", 2048, 768, "Wide Rendering Profile"],
@@ -216,6 +218,7 @@ test("Fit leaves room for the header and keeps its bounds when controls open", a
       height,
       createdAt: stamp,
       settings: { profileName: model },
+      resultSet: { id: "fitted", title: "Fitted", index: shape === "wide" ? 0 : 1 },
     });
     await page.route(`**${url}`, (route) => route.fulfill({ contentType: "image/png", body: png }));
   }
@@ -234,7 +237,7 @@ test("Fit leaves room for the header and keeps its bounds when controls open", a
     const position = header.getByRole("status", { name: "Current Result", exact: true });
     const badge = header.getByText(model, { exact: true });
     await expect(picture).toBeVisible();
-    await expect(position).toHaveText(`${index} / 2`);
+    await expect(position).toHaveText(new RegExp(`${index} / 2$`));
     await expect(badge).toBeVisible();
     await expect
       .poll(async () => {
@@ -256,9 +259,28 @@ test("Fit leaves room for the header and keeps its bounds when controls open", a
       .toEqual({ centred: true, fitted: true, headerClear: true, titleFits: true });
     if (index === 1) {
       const bounds = await picture.boundingBox();
-      await expect(actions).toBeHidden();
-      await showViewerControls(viewer);
+      const thumbnails = viewer.getByRole("list", { name: "Set: Fitted", exact: true });
+      const zoom = viewer.getByRole("group", { name: "Image Zoom", exact: true });
       await expect(actions).toBeVisible();
+      await expect(thumbnails).toBeHidden();
+      await page.keyboard.press("Digit0");
+      await expect
+        .poll(async () => {
+          const controls = await zoom.boundingBox();
+          const dock = await actions.boundingBox();
+          return !!controls && !!dock && controls.y + controls.height <= dock.y;
+        })
+        .toBe(true);
+      await showViewerThumbnails(viewer);
+      await expect(thumbnails).toBeVisible();
+      await page.keyboard.press("Digit0");
+      await expect
+        .poll(async () => {
+          const controls = await zoom.boundingBox();
+          const dock = await thumbnails.boundingBox();
+          return !!controls && !!dock && controls.y + controls.height <= dock.y;
+        })
+        .toBe(true);
       await expect.poll(() => picture.boundingBox()).toEqual(bounds);
     }
   }

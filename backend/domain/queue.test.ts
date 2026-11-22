@@ -669,6 +669,39 @@ test("direct and finishing work admitted after a waiting Dream job run first; Dr
   }
 });
 
+test("Dream rechecks the owner's idle delay before dispatching a prepared job", async () => {
+  const { store, queue, adapter, submitted } = fixture();
+  try {
+    const session = store.createSession("alice");
+    const job = store.enqueue(
+      "alice",
+      session.id,
+      { kind: "video" },
+      "animate",
+      undefined,
+      undefined,
+      undefined,
+      { priority: queuePriority.dream },
+    );
+    let cutoff = "";
+    adapter.dreamIdleWait = ({ ownerId }) =>
+      store.hasRecentGenerationRequest(ownerId, cutoff) ? "Waiting for idle time." : undefined;
+    adapter.eligible = async () => {
+      const request = store.enqueue("alice", session.id, { kind: "image" }, "image");
+      store.save({ ...request, status: "completed" });
+    };
+    await queue.tick();
+    assert.deepEqual(submitted, []);
+    assert.equal(store.job("alice", job.id)?.reason, "Waiting for idle time.");
+    cutoff = new Date(Date.now() + 1).toISOString();
+    adapter.eligible = undefined;
+    await queue.tick();
+    assert.deepEqual(submitted, [job.id]);
+  } finally {
+    store.close();
+  }
+});
+
 test("an idle worker takes waiting work, manual work first", async () => {
   const queue = fixture();
   const { store, observations } = queue;

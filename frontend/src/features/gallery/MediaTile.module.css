@@ -166,17 +166,6 @@
   pointer-events: none;
 }
 
-/* Badges sit between the tile's corner actions. */
-.badges {
-  position: absolute;
-  top: calc(var(--mantine-spacing-xs) + 2px);
-  left: 50%;
-  translate: -50% 0;
-  display: flex;
-  gap: 4px;
-  pointer-events: none;
-}
-
 .check {
   position: absolute;
   top: var(--mantine-spacing-xs);
@@ -186,6 +175,9 @@
 
 /* Face Check's mark on a result that shows someone else or the character twice. */
 .drift {
+  position: absolute;
+  top: calc(var(--mantine-spacing-xs) + 2px);
+  inset-inline-start: var(--mantine-spacing-xs);
   display: flex;
   align-items: center;
   gap: 4px;

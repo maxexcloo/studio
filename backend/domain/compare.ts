@@ -2,6 +2,7 @@ import { randomInt, randomUUID } from "node:crypto";
 
 import { compareVariants } from "../../shared/compare.ts";
 import type { GenerationInput, QueueMedia } from "../../shared/queue.ts";
+import { storedChatRecord } from "../gallery/records.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import { type RouteAccount, directRoute } from "./direct-route.ts";
 import type { QueueOrigin, Store } from "./store.ts";
@@ -419,6 +420,7 @@ export function registerCompareRoutes(
     });
     if (!items) return galleryOff;
     const { itemId, axis, projectId, variants } = body || {};
+    const chat = storedChatRecord(body?.chat);
     const ownerId = account?.userId || "";
     const source = items.find((item) => item.id === itemId && item.status === "done");
     const job = source?.jobId ? store.job(ownerId, source.jobId) : undefined;
@@ -433,6 +435,7 @@ export function registerCompareRoutes(
       clientJobId: _id,
       writing: _writing,
       assistant: _assistant,
+      chat: _chat,
       resultSet: _set,
       ...input
     } = job.input;
@@ -440,7 +443,7 @@ export function registerCompareRoutes(
     return run(account, items, {
       variants: variants.map((variant, index) => ({
         label: [letter(index), String(variant.label || "").trim()].filter(Boolean).join(" · "),
-        input: { ...input, prompt: variant.prompt.trim(), seed },
+        input: { ...input, ...(chat ? { chat } : {}), prompt: variant.prompt.trim(), seed },
       })),
       sessionId: job.sessionId,
       parentJobId: job.id,

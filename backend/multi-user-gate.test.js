@@ -67,6 +67,8 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["HEAD", "/comfy/thumb"],
     ["POST", "/api/accounts/mcp-token/revoke"],
     ["POST", "/api/suggestions"],
+    ["POST", "/api/suggestions/inspect"],
+    ["POST", "/api/dream/reset-limit"],
     ["POST", "/api/queue/pause"],
     ["POST", "/api/queue/abc-1/move"],
     ["POST", "/api/queue/abc-1/clear"],

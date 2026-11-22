@@ -227,6 +227,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       state.reads.push(query);
       return matching(ownerId, query);
     },
+    unseenReadiness: (ownerId) => matching(ownerId, { dreamState: "unseen" }),
     items: (ownerId, ids) =>
       state.items.filter((item) => item.ownerId === ownerId && ids.includes(String(item.id))),
     visible,
@@ -408,6 +409,8 @@ test("Dream is off until turned on, queues one hidden job per account only while
     paused: false,
     dailyImages: 40,
     dailyVideos: 4,
+    imageIdleMinutes: 0,
+    videoIdleMinutes: 5,
     images: true,
     videos: false,
     spicy: false,
@@ -575,6 +578,58 @@ test("Dream fills every free worker in one tick: images beside running work, vid
       .sort(),
     ["image", "video"],
   );
+});
+
+test("Dream waits separately after the owner's manual and MCP generation requests", async (t) => {
+  const { dream, store, state, generated, live, finish } = fixture(t, profiles);
+  t.mock.timers.enable({ apis: ["Date"], now: state.clock });
+  const advance = (ms: number) => {
+    state.clock += ms;
+    t.mock.timers.setTime(state.clock);
+  };
+  await dream.save("alice", { enabled: true, videos: true, dailyImages: 1, imageIdleMinutes: 1 });
+  generated({
+    id: "liked-still",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    prompt: "A fox",
+    rating: "liked",
+  });
+  await dream.tick();
+  assert.equal(live("alice").length, 0);
+  assert.equal(dream.status("alice").status, "waiting");
+
+  advance(60_000);
+  await dream.tick();
+  assert.equal(live("alice")[0]?.input.kind, "image");
+  finish("alice", live("alice")[0].id);
+
+  const done = (owner: string, priority: number, operation: "image" | "upscale" = "image") => {
+    const job = store.enqueue(
+      owner,
+      store.createSession(owner).id,
+      { kind: "image" },
+      operation,
+      undefined,
+      undefined,
+      undefined,
+      { priority },
+    );
+    store.save({ ...job, status: "completed" });
+  };
+  done("alice", queuePriority.mcp);
+  advance(5 * 60_000 - 1);
+  done("bob", queuePriority.manual);
+  done("alice", queuePriority.manual, "upscale");
+  done("alice", queuePriority.finishing);
+  done("alice", queuePriority.dream);
+  await dream.tick();
+  assert.equal(live("alice").length, 0);
+  assert.match(dream.status("alice").reason || "", /Dream videos wait 5 minutes/);
+  advance(1);
+  await dream.tick();
+  assert.equal(live("alice")[0]?.input.kind, "video");
 });
 
 test("A finished Dream job starts the next at once, without waiting for the next tick", async (t) => {
@@ -943,6 +998,46 @@ async function serve(
   };
 }
 
+test("Reset Limit grants a fresh quota only to the capped Dream kind and owner", async (t) => {
+  const fx = fixture(t);
+  const { dream, dreamOnce, store, state } = fx;
+  t.mock.timers.enable({ apis: ["Date"], now: state.clock });
+  const request = await serve(t, fx);
+  await dream.save("alice", { enabled: true, dailyImages: 1, videos: true, dailyVideos: 1 });
+  assert.equal((await request("/reset-limit", { kind: "image" })).status, 409);
+  const oldImage = (await dreamOnce())!;
+  assert.equal(oldImage.input.kind, "image");
+  dream.keep("alice", String(dream.unseen("alice")[0].id));
+  assert.equal((await dreamOnce())?.input.kind, "video");
+  assert.equal((await request("")).body.status, "capped");
+  assert.equal((await request("/reset-limit", { kind: "image" }, "POST", "bob")).status, 409);
+  const saved = store.jobs("alice");
+  const reset = await request("/reset-limit", { kind: "image" });
+  assert.equal(reset.status, 200);
+  assert.deepEqual(reset.body.today, { images: 1, videos: 1 });
+  assert.deepEqual(reset.body.usage, { images: 0, videos: 1 });
+  assert.deepEqual(store.jobs("alice"), saved);
+  assert.equal(reset.body.unseen.length, 1);
+  assert.equal(reset.body.settings.dailyImages, 1);
+  assert.equal((await request("/reset-limit", { kind: "image" })).status, 409);
+
+  const newImage = (await dreamOnce())!;
+  assert.equal(newImage.input.kind, "image");
+  assert.equal(newImage.createdAt, oldImage.createdAt);
+  assert.equal(await dreamOnce(), undefined);
+  const capped = await request("");
+  assert.equal(capped.body.status, "capped");
+  assert.deepEqual(capped.body.today, { images: 2, videos: 1 });
+  assert.deepEqual(capped.body.usage, { images: 1, videos: 1 });
+  store.save({ ...store.job("alice", oldImage.id)!, status: "cancelled" });
+  assert.equal(await dreamOnce(), undefined);
+  assert.equal((await request("/reset-limit", { kind: "image" })).status, 200);
+  state.clock += 86_400_000;
+  const tomorrow = await request("");
+  assert.deepEqual(tomorrow.body.today, { images: 0, videos: 0 });
+  assert.equal((await request("/reset-limit", { kind: "image" })).status, 409);
+});
+
 test("Dream history exposes only the owner's retained Dream activity and available result links", async (t) => {
   const fx = fixture(t);
   fx.taste.record("alice", [
@@ -993,6 +1088,7 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   );
 
   assert.equal((await request("/settings", { dailyImages: -1 }, "PUT")).status, 400);
+  assert.equal((await request("/settings", { videoIdleMinutes: 121 }, "PUT")).status, 400);
   assert.equal((await request("/settings", { videos: "yes" }, "PUT")).status, 400);
   assert.equal((await request("/settings", { spicy: true }, "PUT")).status, 403);
   const saved = await request("/settings", { paused: true, dailyVideos: 2 }, "PUT");
@@ -2726,7 +2822,13 @@ test("Dream videos animate liked stills for most videos and Dream's keeps for th
   const { dream, state, generated, dreamOnce, walks } = fixture(t, profiles);
   const frameOf = (job: Awaited<ReturnType<typeof dreamOnce>>) =>
     (job!.input.referenceAssets as { assetId: string; slot: string }[])[0];
-  await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
+  await dream.save("alice", {
+    enabled: true,
+    dailyImages: 0,
+    videos: true,
+    dailyVideos: 10,
+    videoIdleMinutes: 0,
+  });
   generated({
     id: "liked",
     ownerId: "alice",
@@ -2824,7 +2926,13 @@ test("Dream reports today's finished images alongside the video refusal", async 
 
 test("A Dream video skips a source that left the gallery and animates the next", async (t) => {
   const { dream, state, dreamOnce, finish, live, generated } = fixture(t, profiles);
-  await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
+  await dream.save("alice", {
+    enabled: true,
+    dailyImages: 0,
+    videos: true,
+    dailyVideos: 10,
+    videoIdleMinutes: 0,
+  });
   for (const [id, score] of [
     ["gone", 9],
     ["next", 7],
@@ -2860,7 +2968,13 @@ test("A Dream video skips a source that left the gallery and animates the next",
 
 test("A failed Dream video sets its profile aside rather than sending the next one", async (t) => {
   const { dream, store, live, generated } = fixture(t, profiles);
-  await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
+  await dream.save("alice", {
+    enabled: true,
+    dailyImages: 0,
+    videos: true,
+    dailyVideos: 10,
+    videoIdleMinutes: 0,
+  });
   for (const id of ["first", "second"])
     generated({
       id,
@@ -3009,6 +3123,7 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
     images: false,
     videos: true,
     videoBackend: "cloud",
+    videoIdleMinutes: 0,
   });
   fx.state.video = cloud.id;
   fx.state.online.video = "parked";

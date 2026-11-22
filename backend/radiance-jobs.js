@@ -93,14 +93,18 @@ async function storeOutput(id, index, bytes, type, ownerId) {
 
 function showProgress(id, phase, progress = {}) {
   if (ended(id)) return;
+  const finishing = stopping(id) && phase !== "Saving";
   jobs.set(id, {
     ...jobs.get(id),
+    ...(finishing && {
+      error: "Radiance is finishing accepted work. Studio will save any result.",
+    }),
     progress: {
       value: 0,
       max: 0,
       steps: false,
       node: "",
-      phase: stopping(id) && phase !== "Saving" ? "Finishing accepted work" : phase,
+      phase: finishing ? "Finishing accepted work" : phase,
       ...progress,
     },
   });

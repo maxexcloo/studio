@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { mediaTitle } from "../../frontend/src/features/gallery/mediaLabels";
-import { fixtures, image, showViewerControls, stamp, viewerAction } from "./fixtures";
+import { fixtures, image, stamp, viewerAction } from "./fixtures";
 
 for (const kind of ["image", "video"] as const) {
   test(`${kind} version selection persists and downloads the displayed format`, async ({
@@ -65,7 +65,6 @@ for (const kind of ["image", "video"] as const) {
         : viewer.locator("video");
     // Share › Download, or a video's Download Video beside Download GIF.
     const expectDownload = async (href: string, extension?: string) => {
-      await showViewerControls(viewer);
       const share = viewer.getByRole("button", { name: "Share", exact: true });
       await share.click();
       const download = page.getByRole("menuitem", { name: /^Download( Video)?$/ });

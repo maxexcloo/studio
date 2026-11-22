@@ -2337,7 +2337,9 @@ test("Result reads current per-output user feedback for single, all and set requ
     const reply = await call(alice, "result", { job_id });
     const body = data(reply);
     assert.deepEqual(
-      body.outputs || body.results.find((item) => item.job_id === id).outputs,
+      (body.outputs || body.results.find((item) => item.job_id === id).outputs).map(
+        ({ link, ...output }) => output,
+      ),
       feedback,
     );
     assert.deepEqual(JSON.parse(/Recorded user feedback: (.+)/.exec(texts(reply))[1]), feedback);
@@ -2356,6 +2358,13 @@ test("Result reads current per-output user feedback for single, all and set requ
   assert.equal((await read("#2", [expected[1]])).ref, "#2");
   const { outputs } = data(await call(alice, "status", { job_id: id }));
   await read(outputs[2].url, [expected[2]]);
+  const viewer = await fetch(localLink(f, outputs[2].link), { redirect: "manual" });
+  assert.equal(
+    viewer.headers.get("location"),
+    `https://studio.example.test/images/${job.numbers[2]}`,
+  );
+  const fromViewerLink = await read(outputs[2].link, [expected[2]]);
+  assert.equal(fromViewerLink.link, outputs[2].link);
   const { asset } = data(await call(alice, "reuse", { job_id: outputs[2].url, mode: "reference" }));
   assert.equal(asset.galleryItemId, `${id}-2`);
   const refsBefore = f.requests.filter(
@@ -2369,21 +2378,22 @@ test("Result reads current per-output user feedback for single, all and set requ
   );
   await read("all", expected);
   await read(generated.set, expected);
-  const pending = jobId(await generate(alice, { prompts: ["Still running"] }));
-  const failed = jobId(await generate(alice, { prompts: ["Failed work"] }));
-  f.jobs.get(failed).status = "failed";
+  const pending = (await generate(alice, { prompts: ["Still running"] })).jobs[0];
+  const failed = (await generate(alice, { prompts: ["Failed work"] })).jobs[0];
+  f.jobs.get(failed.job_id).status = "failed";
   const all = await read("all", expected);
   assert.equal(all.status, "running");
-  for (const [job_id, status] of [
+  for (const [{ job_id, ref, link }, status] of [
     [pending, "running"],
     [failed, "failed"],
   ])
     assert.deepEqual(
       all.results.find((item) => item.job_id === job_id),
       {
-        ref: `#${f.jobs.get(job_id).numbers[0]}`,
+        ref,
         job_id,
         status,
+        link,
       },
     );
   await failure(bob, "result", { job_id: id });
@@ -3606,7 +3616,7 @@ test("a client without a conversation header gets its MCP session's own results;
   // Each chat's All Results link opens only that chat's results; a chat without a conversation
   // header opens the account's gallery.
   const allLink = async (reply) => {
-    const [, link] = /\[All Results\]\((https?:\/\/[^)]+)\)/.exec(texts(reply));
+    const [, link] = /\[(?:Gallery Images|Chat Images)\]\((https?:\/\/[^)]+)\)/.exec(texts(reply));
     return (await fetch(localLink(f, link), { redirect: "manual" })).headers.get("location");
   };
   assert.equal(await allLink(other), "https://studio.example.test/images");
@@ -3628,7 +3638,7 @@ test("a client without a conversation header gets its MCP session's own results;
         count: 1,
       }),
     ),
-    "https://studio.example.test/images?chat=conversation-x&show=chat",
+    "https://studio.example.test/images?chat=conversation-x",
   );
 });
 test("the Result wait ends promptly when the client cancels or disconnects, without cancelling the generation", async (t) => {
@@ -4225,13 +4235,19 @@ test("tier-based Generate chooses only profiles the account may use", async (t) 
 test("Result returns recorded feedback and markdown, never a settings record", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
-  const id = jobId(await generate(client));
+  const queued = data(await generate(client)).jobs[0];
+  const id = queued.job_id;
   const pending = await call(client, "result", {
     job_id: id,
     wait_seconds: 0,
   });
   assert.equal(pending.content.length, 1);
-  assert.deepEqual(pending.structuredContent, { job_id: id, ref: "#1", status: "running" });
+  assert.deepEqual(pending.structuredContent, {
+    job_id: id,
+    ref: "#1",
+    link: queued.link,
+    status: "running",
+  });
   Object.assign(f.jobs.get(id), {
     status: "done",
     outputs: [{ url: "/comfy/view?filename=lean.png" }],
@@ -4243,14 +4259,14 @@ test("Result returns recorded feedback and markdown, never a settings record", a
   assert.equal(lean.content.length, 1);
   assert.match(
     lean.content[0].text,
-    /^Recorded user feedback: .+\n\n#1 is ready\. .+\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
+    /^Recorded user feedback: .+\n\n#1 is ready\. .+\n\n\[Open in Studio\]\([^)]+\) .*\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
   );
-  assert.deepEqual(lean.structuredContent, {
-    job_id: id,
-    ref: "#1",
-    status: "done",
-    outputs: [{ ref: "#1", job_id: id, output_index: 0, rating: "unrated" }],
-  });
+  const { links, outputs, ...details } = lean.structuredContent;
+  assert.deepEqual(details, { job_id: id, ref: "#1", link: queued.link, status: "done" });
+  assert.match(links.gallery, /\/mcp\/results\/[A-Za-z0-9]{10}$/);
+  const [{ link, ...feedback }] = outputs;
+  assert.match(link, /\/mcp\/results\/[A-Za-z0-9]{10}$/);
+  assert.deepEqual(feedback, { ref: "#1", job_id: id, output_index: 0, rating: "unrated" });
 });
 
 test("a finished video notification names its result and profile beside View Video", async (t) => {
@@ -5603,8 +5619,11 @@ test("result numbers are the account's in every chat, and a job id from another 
 
 test("variants offers lettered options of a result, records the pick and takes letters and numbers", async (t) => {
   const f = await fixture(t);
-  const client = await chat(t, f, "alice", "fox-chat");
-  data(await call(client, "generate", { kind: "image", prompts: ["A fox at noon"], count: 1 }));
+  const client = await chat(t, f, "alice", "fox-chat", "fox-turn");
+  const earlier = await chat(t, f, "alice", "earlier-chat", "earlier-turn");
+  const original = data(
+    await call(earlier, "generate", { kind: "image", prompts: ["A fox at noon"], count: 1 }),
+  );
   finish(f);
   const runs = [];
   const votes = [];
@@ -5650,6 +5669,7 @@ test("variants offers lettered options of a result, records the pick and takes l
       itemId: `${[...f.jobs.keys()][0]}-0`,
       axis: "lighting",
       projectId: "foxes",
+      chat: { conversationId: "fox-chat", turnId: "fox-turn" },
       variants: [
         { label: "Blue Hour", prompt: "A fox at blue hour" },
         { label: "Golden Dusk", prompt: "A fox at golden dusk" },
@@ -5663,6 +5683,11 @@ test("variants offers lettered options of a result, records the pick and takes l
     /\[Compare Side by Side\]\(https:\/\/studio\.example\.test\/compare\/fox-options\)/,
   );
   assert.match(text, /\[A · Blue Hour\]\([^)]+\) #2\n\[B · Golden Dusk\]\([^)]+\) #3/);
+  assert.deepEqual(
+    data(await call(client, "result", { job_id: "all" })).results.map((result) => result.job_id),
+    ["variant-0", "variant-1"],
+    `adopting ${jobId(original)} as a source keeps it in its original conversation`,
+  );
   // A letter names the chat's latest options. Reuse and reference leave the vote to variants pick.
   finish(f);
   data(await call(client, "reuse", { job_id: "B", prompt: "A fox at golden dusk, closer" }));
@@ -5827,7 +5852,7 @@ test("a vague generate runs two images on its family's fastest profile at the de
   assert.equal((await run({ count: 1 })).count, 1);
 });
 
-test('replies label links Result N with one All Results link, and Result "all" shows the conversation', async (t) => {
+test("chat links open the exact result, set, turn or cumulative media view", async (t) => {
   const f = await fixture(t);
   const client = await chat(t, f, "alice", "plush-chat", "turn-1");
   const queued = await call(client, "generate", {
@@ -5838,21 +5863,26 @@ test('replies label links Result N with one All Results link, and Result "all" s
   });
   const text = texts(queued);
   assert.equal(/Watch/i.test(text), false, "no Watch wording");
-  const [, allLink] = /\[All Results\]\((https:[^)]+)\)/.exec(text);
+  const links = data(queued).links;
+  assert.match(text, /This Set.*This Turn's Images.*Chat Images/);
   assert.deepEqual(
     [...text.matchAll(/\[(#\d)\]/g)].map((match) => match[1]),
     ["#1", "#2", "#3"],
   );
-  assert.equal(text.match(/All Results/g).length, 1);
   // Its runs record the chat and turn, which the links open in Studio's gallery: the whole chat
   // from All Results, a result in its turn's.
   assert.deepEqual(f.submitted.at(-1).chat, { conversationId: "plush-chat", turnId: "turn-1" });
-  const page = localLink(f, allLink);
+  const page = localLink(f, links.chat);
   const opened = (link) =>
     fetch(link, { redirect: "manual" }).then((reply) => reply.headers.get("location"));
+  assert.equal(await opened(page), "https://studio.example.test/images?chat=plush-chat");
   assert.equal(
-    await opened(page),
-    "https://studio.example.test/images?chat=plush-chat&turn=turn-1&show=chat",
+    await opened(localLink(f, links.turn)),
+    "https://studio.example.test/images?chat=plush-chat&turn=turn-1",
+  );
+  assert.equal(
+    await opened(localLink(f, links.set)),
+    `https://studio.example.test/images?chat=plush-chat&set=${f.submitted[0].resultSet.id}`,
   );
   const [first, second] = queued.structuredContent.jobs;
   assert.equal(
@@ -5877,13 +5907,33 @@ test('replies label links Result N with one All Results link, and Result "all" s
   );
   // Results queued together share one contact sheet.
   assert.match(body, /\*\*#1–#2\*\*[^\n]*\n\[!\[#1–#2\]/);
-  assert.match(body, /\[#3\]\(https:[^)]+\) · \[All Results\]\(https:[^)]+\)$/);
+  assert.match(body, /\[#3\]\(https:[^)]+\).*\[Chat Images\]\(https:[^)]+\)$/);
   assert.equal(/Watch/i.test(body), false);
   assert.equal(previews(shown).length, 1);
   // A result asked for by number still shows its own preview.
   assert.match(
     texts(await call(client, "result", { job_id: "#2" })),
     /\*\*#2\*\*[^\n]*\n\[!\[#2\]\([^)]+\.jpg\)\]/,
+  );
+  const exact = data(await call(client, "result", { job_id: "#2" }));
+  assert.equal(
+    await opened(localLink(f, exact.link)),
+    "https://studio.example.test/images/2?chat=plush-chat&turn=turn-1",
+  );
+  assert.equal(data(await call(client, "status", { job_id: exact.link })).job_id, second.job_id);
+  const secondTurn = await chat(t, f, "alice", "plush-chat", "turn-2");
+  const video = data(
+    await call(secondTurn, "generate", { kind: "video", prompts: ["An owl flies"] }),
+  );
+  assert.equal(
+    await opened(localLink(f, video.links.turn)),
+    "https://studio.example.test/videos?chat=plush-chat&turn=turn-2",
+  );
+  const cumulative = data(await call(secondTurn, "result", { job_id: "all" }));
+  assert.equal(cumulative.links.image.chat, links.chat);
+  assert.equal(
+    await opened(localLink(f, cumulative.links.video.chat)),
+    "https://studio.example.test/videos?chat=plush-chat",
   );
   // Another conversation and another account see only their own results, and with none here
   // are pointed at search for earlier or liked work.
@@ -7144,7 +7194,7 @@ test("one Generate call fans out over several models with the same prompts and r
   );
   assert.match(
     texts(reply),
-    /^Queued 2 sets, one per model\.[^\n]+\n\n\[Compare Side by Side\]\([^)]+\/compare\/fixture-comparison-[^)]+\)\nFixture Image: \[#1\]\([^)]+\)\nOther Image: \[#2\]\([^)]+\)\n\[All Results\]/,
+    /^Queued 2 sets, one per model\.[^\n]+\n\n\[Compare Side by Side\]\([^)]+\/compare\/fixture-comparison-[^)]+\)\nFixture Image: \[#1\]\([^)]+\)\nOther Image: \[#2\]\([^)]+\)\n\[This Set\].*\[Gallery Images\]/,
   );
   // One shared seed, and one labelled comparison of the two jobs.
   assert.equal(new Set(f.submitted.map((body) => String(body.seed))).size, 1);

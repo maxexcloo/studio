@@ -37,7 +37,6 @@ import {
   Maximize2,
   MessageCircle,
   Moon,
-  PanelBottom,
   Pause,
   PenLine,
   Pencil,
@@ -184,7 +183,6 @@ export const icons = {
   undo: Undo2,
   unfinished: ListRestart,
   upload: Upload,
-  viewerControls: PanelBottom,
   /** The uploaded images: the gallery's Uploads toggle, apart from the Upload action. */
   uploads: ImageUp,
   upscale: ImageUpscale,

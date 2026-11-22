@@ -10,11 +10,14 @@ import {
   suggestedCards,
 } from "../../shared/characters.ts";
 import {
+  type DreamCounts,
   type DreamPassReason,
   type DreamResultSet,
   type DreamSettings,
   type PairAnswer,
+  dreamCardCounts,
   dreamDefaults,
+  dreamLimitReached,
   dreamSeriesLength,
   dreamSet,
 } from "../../shared/dream.ts";
@@ -177,6 +180,7 @@ export type DreamItem = QueueMedia & {
   /** How it fits its project's brief (domain/review.ts). */
   review?: Review;
 };
+type DreamReadiness = Pick<DreamItem, "id" | "type" | "status" | "dream" | "resultSet">;
 /** A ready generation profile the account may use. */
 export interface DreamProfile {
   id: string;
@@ -312,8 +316,11 @@ const unreachable = (what: string, reach: Reach) =>
     : `${what} is offline.`;
 export type DreamStatus = "off" | "paused" | "waiting" | "generating" | "capped" | "unavailable";
 type DreamAttempt = { status: DreamStatus; reason?: string; imagesDone?: boolean };
+type LimitReset = { day: string; createdAt: string; ids: string[] };
 interface DreamRecord {
   settings: DreamSettings;
+  /** The last already-admitted job boundary per kind at a reset of the daily limit. */
+  limitReset?: Partial<Record<Kind, LimitReset>>;
   /** Dream's hidden session for its jobs. */
   session?: string;
   /** The latest Dream prompts, newest first and shortened, so new ones don't repeat them. */
@@ -763,6 +770,8 @@ export function createDream(options: {
   negative(profile: DreamProfile, input: GenerationInput): string;
   /** The owner's gallery records the query matches, Dream's pool included, newest first. */
   gallery(ownerId: string, query: DreamQuery): DreamItem[];
+  /** Only the fields needed to decide which of the owner's unseen results are ready. */
+  unseenReadiness(ownerId: string): DreamReadiness[];
   /** How many of the owner's gallery records the query matches. */
   count(ownerId: string, query: DreamQuery): number;
   /** The owner's gallery records with these ids, Dream's pool included. */
@@ -882,23 +891,41 @@ export function createDream(options: {
   const pressed = () => store.hasOpenOwnWork(true);
   /** The account's Dream jobs not yet finished. */
   const held = (ownerId: string) => store.openDreamJobs(ownerId).length;
-  function today(ownerId: string) {
-    const counts = { images: 0, videos: 0 };
-    const current = day(now());
+  function todaysJobs(ownerId: string, time: number) {
+    const current = day(time);
     // A Dream job's mark is stamped just before it queues, so today's were created since the
     // day's start; a day's slack covers a clock running ahead of the store's.
-    const start = new Date(now());
+    const start = new Date(time);
     start.setHours(0, 0, 0, 0);
     start.setDate(start.getDate() - 1);
-    for (const job of store.dreamJobsSince(ownerId, start.toISOString()))
+    return store
+      .dreamJobsSince(ownerId, start.toISOString())
+      .filter((job) => day(Date.parse(job.dreamAt || job.createdAt)) === current);
+  }
+  function daily(
+    ownerId: string,
+    record = read(ownerId),
+    time = now(),
+    jobs = todaysJobs(ownerId, time),
+  ) {
+    const today: DreamCounts = { images: 0, videos: 0 };
+    const usage: DreamCounts = { images: 0, videos: 0 };
+    const current = day(time);
+    for (const job of jobs) {
       // An idea the text model never finished writing made nothing.
+      if (job.status === "cancelled" || (job.status === "failed" && job.awaitsWriting)) continue;
+      const kind = kindOf(job);
+      const key = kind === "video" ? "videos" : "images";
+      today[key]++;
+      const reset = record.limitReset?.[kind];
       if (
-        job.status !== "cancelled" &&
-        !(job.status === "failed" && job.awaitsWriting) &&
-        day(Date.parse(job.dreamAt || job.createdAt)) === current
+        reset?.day !== current ||
+        job.createdAt > reset.createdAt ||
+        (job.createdAt === reset.createdAt && !reset.ids.includes(job.id))
       )
-        counts[kindOf(job) === "video" ? "videos" : "images"]++;
-    return counts;
+        usage[key]++;
+    }
+    return { today, usage };
   }
   /**
    * The owner's Studio generations: visible gallery records of a job this Studio queued for the
@@ -917,9 +944,9 @@ export function createDream(options: {
   const pool = (ownerId: string, state: DreamState) =>
     options.gallery(ownerId, { dreamState: state });
   const admittingComparisons = new Set<string>();
-  const orderedSides = (items: DreamItem[]) =>
+  const orderedSides = <T extends DreamReadiness>(items: T[]) =>
     items.sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side);
-  function completeComparison(items: DreamItem[]) {
+  function completeComparison(items: DreamReadiness[]) {
     const pair = items[0]?.dream?.pair;
     return (
       pair &&
@@ -930,12 +957,10 @@ export function createDream(options: {
     );
   }
   /** Comparisons and sets are ready when the rest of their work has finished. */
-  function unseen(ownerId: string) {
-    const all = pool(ownerId, "unseen");
-    const openSeries = all.some(dreamSet) ? read(ownerId).series?.id : undefined;
+  function readyUnseen<T extends DreamReadiness>(ownerId: string, all: T[], openSeries?: string) {
     const pendingPairs = new Set<string>();
     const pendingSets = new Set(openSeries ? [openSeries] : []);
-    const triples = new Map<string, DreamItem[]>();
+    const triples = new Map<string, T[]>();
     for (const item of all) {
       const pair = item.dream?.pair;
       if (pair?.size === 3 && item.status === "done") {
@@ -956,23 +981,26 @@ export function createDream(options: {
     const runningTriples = new Set(
       incomplete.size ? store.openDreamJobs(ownerId).map((job) => job.pairId) : [],
     );
-    return all
-      .flatMap((item) => {
-        if (item.status !== "done") return [];
-        const pair = item.dream?.pair;
-        if (pair) {
-          if (admittingComparisons.has(pair.id)) return [];
-          // A failed or interrupted triple leaves its finished results for individual review.
-          if (incomplete.has(pair.id))
-            return runningTriples.has(pair.id)
-              ? []
-              : [{ ...item, dream: { ...item.dream!, pair: undefined } }];
-          return pair.size === 3 || !pendingPairs.has(pair.id) ? [item] : [];
-        }
-        const set = dreamSet(item);
-        return !set || !pendingSets.has(set.id) ? [item] : [];
-      })
-      .reverse();
+    return all.flatMap((item) => {
+      if (item.status !== "done") return [];
+      const pair = item.dream?.pair;
+      if (pair) {
+        if (admittingComparisons.has(pair.id)) return [];
+        // A failed or interrupted triple leaves its finished results for individual review.
+        if (incomplete.has(pair.id))
+          return runningTriples.has(pair.id)
+            ? []
+            : [{ ...item, dream: { ...item.dream!, pair: undefined } }];
+        return pair.size === 3 || !pendingPairs.has(pair.id) ? [item] : [];
+      }
+      const set = dreamSet(item);
+      return !set || !pendingSets.has(set.id) ? [item] : [];
+    });
+  }
+  function unseen(ownerId: string) {
+    const all = pool(ownerId, "unseen");
+    const openSeries = all.some(dreamSet) ? read(ownerId).series?.id : undefined;
+    return readyUnseen(ownerId, all, openSeries).reverse();
   }
   let considering: { ownerId: string; latest?: DreamItem[] } | undefined;
   /** Dream's latest image results, leaving out comparisons and series, which are alike by design. */
@@ -1036,14 +1064,13 @@ export function createDream(options: {
     );
   }
   /** The kinds still due today, the one it is behind on first, and whether images reached their cap. */
-  function kinds(settings: DreamSettings, counts: { images: number; videos: number }) {
-    const image = settings.images && counts.images < settings.dailyImages;
-    const video = settings.videos && counts.videos < settings.dailyVideos;
+  function kinds(settings: DreamSettings, { today, usage }: ReturnType<typeof daily>) {
+    const image = settings.images && usage.images < settings.dailyImages;
+    const video = settings.videos && usage.videos < settings.dailyVideos;
     // Videos keep pace with their share of the day's images.
     const videoDue =
       video &&
-      (!image ||
-        (counts.videos + 1) * settings.dailyImages <= counts.images * settings.dailyVideos);
+      (!image || (today.videos + 1) * settings.dailyImages <= today.images * settings.dailyVideos);
     return {
       due: [
         ...(videoDue ? (["video"] as Kind[]) : []),
@@ -1053,6 +1080,15 @@ export function createDream(options: {
       imagesDone: settings.dailyImages > 0 && settings.images && !image,
     };
   }
+  /** A recently admitted request still holds off this kind of background work. */
+  function idleWait(ownerId: string, kind: Kind, settings = read(ownerId).settings) {
+    const minutes = kind === "image" ? settings.imageIdleMinutes : settings.videoIdleMinutes;
+    if (!minutes) return;
+    const cutoff = new Date(now() - minutes * 60_000).toISOString();
+    if (store.hasRecentGenerationRequest(ownerId, cutoff))
+      return `Dream ${kind}s wait ${minutes} ${minutes === 1 ? "minute" : "minutes"} after your most recent generation request.`;
+  }
+
   /** What stands in the way before counting today's work. */
   function blockedBySettings(ownerId: string, { settings }: DreamRecord) {
     if (!settings.enabled) return { status: "off" as const };
@@ -2059,7 +2095,7 @@ export function createDream(options: {
     const record = read(ownerId);
     const blocked = blockedBySettings(ownerId, record);
     if (blocked) return blocked;
-    const counts = today(ownerId);
+    const counts = daily(ownerId, record);
     const { due, imagesDone } = kinds(record.settings, counts);
     if (!due.length) return capped;
     if (now() < (failures.get(ownerId)?.until ?? 0))
@@ -2078,6 +2114,11 @@ export function createDream(options: {
     let reason = "";
     let idle = "";
     for (const kind of due) {
+      const delay = idleWait(ownerId, kind, record.settings);
+      if (delay) {
+        idle = delay;
+        continue;
+      }
       const backend = record.settings[kind === "image" ? "imageBackend" : "videoBackend"];
       const online = await options.online(kind, backend);
       if (online.text !== "online")
@@ -2137,8 +2178,8 @@ export function createDream(options: {
       if (
         kind === "image" &&
         !steer &&
-        counts.images % every === every - 1 &&
-        counts.images + 2 <= record.settings.dailyImages &&
+        counts.today.images % every === every - 1 &&
+        counts.usage.images + 2 <= record.settings.dailyImages &&
         random(pairDraw) === 0
       ) {
         const pair = await comparison(
@@ -2146,7 +2187,7 @@ export function createDream(options: {
           record,
           access,
           catalogue.profiles,
-          counts.images + 3 <= record.settings.dailyImages,
+          counts.usage.images + 3 <= record.settings.dailyImages,
         );
         if (pair) return pair;
       }
@@ -3012,12 +3053,16 @@ export function createDream(options: {
     },
     /** A Dream job finished: its worker is free now, so the next starts without waiting a tick. */
     finished: wake,
+    idleWaitForJob: (job: OwnedJob) => idleWait(job.ownerId, kindOf(job.input)),
     access: (ownerId: string) => options.access(ownerId),
-    status(ownerId: string): { status: DreamStatus; reason?: string } {
+    status(
+      ownerId: string,
+      counts?: ReturnType<typeof daily>,
+    ): { status: DreamStatus; reason?: string } {
       const record = read(ownerId);
       const blocked = blockedBySettings(ownerId, record);
       if (blocked) return blocked;
-      const { due, imagesDone } = kinds(record.settings, today(ownerId));
+      const { due, imagesDone } = kinds(record.settings, counts ?? daily(ownerId, record));
       if (!due.length) return capped;
       const last = states.get(ownerId);
       if (last && ["unavailable", "waiting"].includes(last.status))
@@ -3029,7 +3074,32 @@ export function createDream(options: {
         ? { status: "waiting", reason: "Waiting for other work to finish." }
         : { status: "waiting" };
     },
-    today,
+    daily,
+    today: (ownerId: string) => daily(ownerId).today,
+    resetLimit(ownerId: string, kind: Kind) {
+      runtimeTransaction(options.dataDir, () => {
+        const record = read(ownerId);
+        const time = now();
+        const jobs = todaysJobs(ownerId, time);
+        const { usage } = daily(ownerId, record, time, jobs);
+        if (!dreamLimitReached(record.settings, usage, kind))
+          throw failure("The daily limit has not been reached.", 409);
+        const admitted = jobs.filter((job) => kindOf(job) === kind);
+        const createdAt = admitted.at(-1)!.createdAt;
+        write(ownerId, {
+          ...record,
+          limitReset: {
+            ...record.limitReset,
+            [kind]: {
+              day: day(time),
+              createdAt,
+              ids: admitted.filter((job) => job.createdAt === createdAt).map((job) => job.id),
+            },
+          },
+        });
+      });
+      wake();
+    },
     /**
      * Notes a view of the Dream page and answers when the visit before this one ended: views within
      * `visitGapMs` of the last are the same visit.
@@ -3046,6 +3116,13 @@ export function createDream(options: {
       return record.visit.since || null;
     },
     unseen,
+    unseenCount(ownerId: string) {
+      const { settings, series } = read(ownerId);
+      const items = settings.enabled
+        ? readyUnseen(ownerId, options.unseenReadiness(ownerId), series?.id)
+        : [];
+      return dreamCardCounts(items, settings);
+    },
     /** An explicit Dream Super Like qualifies the result for automatic continuation. */
     superLike(ownerId: string, itemId: string) {
       return runtimeTransaction(options.dataDir, () => {

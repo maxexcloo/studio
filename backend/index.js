@@ -132,6 +132,7 @@ import {
   resultNumbers,
   setGalleryRatings,
   unseenDreamItem,
+  unseenDreamReadiness,
   updateGalleryJob,
   visibleGallery,
   visibleGenerationItems,
@@ -199,6 +200,7 @@ import {
   animatedPhoto,
   bytesForReferenceAccount,
   galleryStill,
+  publicGalleryBuffer,
   referenceAssetForAccount,
 } from "./references.js";
 import { hostAllowed, requestGuard } from "./request-guard.js";
@@ -759,9 +761,11 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
     void imageSearch.completed(items);
     void faceCheck.completed(items);
     void characterSheets.completed(items);
+    nextSteps.prioritiseRecent();
     if (items.some((item) => item.dream)) dream.finished();
   },
   directCloud,
+  dreamIdleWait: (job) => dream.idleWaitForJob(job),
   generationRoutes,
   promptStage,
   recoverRunningJobs,
@@ -896,9 +900,11 @@ const suggestions = createSuggestions({
     filterVisibleGallery(galleryJobItems(jobId, ownerId)).find(
       (item) => !itemId || item.id === itemId,
     ),
-  image: async (item) =>
-    (await assistantEngine?.supportsVision(textWriter(item.ownerId))) ? smallImage(item) : null,
-  save: (item, nextSteps) => updateGalleryJob(galleryKey(item), { nextSteps }),
+  image: async (item, upscaled) =>
+    (await assistantEngine?.supportsVision(textWriter(item.ownerId)))
+      ? smallImage(item, upscaled)
+      : null,
+  save: (item, field, steps) => updateGalleryJob(galleryKey(item), { [field]: steps }),
   ideas: () => flagEnabled("STUDIO_PROMPT_IDEAS"),
   nextSteps: () => flagEnabled("STUDIO_NEXT_STEPS"),
   target: (ownerId, item, profileId) =>
@@ -983,6 +989,7 @@ const dream = createDream({
       ),
     }),
   gallery: (ownerId, query) => galleryItems({ ownerId, ...query }),
+  unseenReadiness: unseenDreamReadiness,
   count: (ownerId, query) => countGalleryItems({ ownerId, ...query }),
   items: (ownerId, ids) => resultNumbers.numbered(galleryItems({ ownerId, ids })),
   visible: filterVisibleGallery,
@@ -1133,10 +1140,21 @@ function promptWriterOwner(ownerId) {
   return Boolean(ownerId && mayUseFeature(accountAccessForId(ownerId), "promptAssistant"));
 }
 /** A small (≤512 px) JPEG of a gallery image (a video's first frame) for the text model, or null without sharp. */
-async function smallImage(item) {
+async function smallImage(item, upscaled = false) {
   const sharp = await loadSharp();
   if (!sharp) return null;
-  const data = await sharp(await galleryStill(item))
+  const version = upscaled ? item.upscale : undefined;
+  if (upscaled && (version?.status !== "done" || !version.url)) return null;
+  const buffer = version
+    ? (
+        await publicGalleryBuffer({
+          id: version.url,
+          url: version.url,
+          outputName: version.outputName,
+        })
+      ).buffer
+    : await galleryStill(item);
+  const data = await sharp(buffer)
     .rotate()
     .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 80 })
@@ -1263,18 +1281,18 @@ const suggester = createPromptSuggester({
   save: (item, suggestedPrompt) => updateGalleryJob(galleryKey(item), { suggestedPrompt }),
   explicit: explicitFor,
 });
-// Viewer next steps (domain/suggestions.ts), written while idle so the viewer shows them at once.
+// Completion kicks this bounded worker; it retries recent results without walking the old gallery.
 const nextSteps = createNextStepWork({
-  enabled: () => flagEnabled("STUDIO_NEXT_STEPS"),
+  enabled: () => Boolean(assistantEngine) && flagEnabled("STUDIO_NEXT_STEPS"),
   suggestions,
-  writer: assistantEngine,
-  text: textWriter,
   idle: galleryIdle,
   allowed: promptWriterOwner,
-  items: idleItems,
+  items: (since, after) => idleItems(Math.max(since ?? 0, Date.now() - 24 * 60 * 60_000), after),
   changes: galleryChangeCount,
-  visible: (item) => filterVisibleGallery([item]).length > 0,
-  image: smallImage,
+  visible: (item) =>
+    item.dream?.state === "unseen"
+      ? Boolean(item.url && hasGalleryMedia(item))
+      : filterVisibleGallery([item]).length > 0,
 });
 
 const backgroundWork = [

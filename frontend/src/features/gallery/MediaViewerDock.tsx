@@ -103,6 +103,7 @@ export function MediaViewerDock({
   family,
   jobs,
   set,
+  showThumbnails,
   choose,
   actions,
 }: {
@@ -111,6 +112,7 @@ export function MediaViewerDock({
   jobs?: QueueJob[];
   /** The MCP result set's loaded results, in order (`setMembers`). */
   set: MediaItem[];
+  showThumbnails: boolean;
   choose?: (item: MediaItem) => void;
   actions: React.ReactNode;
 }) {
@@ -143,7 +145,7 @@ export function MediaViewerDock({
   }));
   return (
     <div className={classes.dock} data-chrome>
-      {setEntries.length > 1 && (
+      {showThumbnails && setEntries.length > 1 && (
         <ResultStrip
           label={`Set: ${item.resultSet?.title}`}
           entries={setEntries}
@@ -152,7 +154,7 @@ export function MediaViewerDock({
           choose={choose}
         />
       )}
-      {versions.length > 1 && (
+      {showThumbnails && versions.length > 1 && (
         <ResultStrip
           label="Versions"
           entries={versions}

@@ -129,7 +129,7 @@ function storedContext(value) {
  * prompt's thinking (up to 20,000 characters) in Details (`/api/gallery/items/:id`), not carried
  * in every list.
  */
-export function listedRecord({ nextSteps: _steps, ...item }) {
+export function listedRecord({ motionIdeas: _motions, nextSteps: _steps, ...item }) {
   if (!item.writing?.thinking) return item;
   const { thinking: _thinking, ...writing } = item.writing;
   return { ...item, writing };
@@ -230,7 +230,7 @@ export function generationSettings(body) {
           scheduler: body.scheduler || "",
         }
       : {}),
-    seed: body.seed || "Random",
+    seed: body.seed === 0 ? 0 : body.seed || "Random",
     ...(body.seedRandom ? { seedRandom: true } : {}),
     // An imported workflow's model is the workflow; this is the file it loaded.
     ...(body.modelName && String(body.model || "").startsWith("custom:")
@@ -275,7 +275,7 @@ export function generationSettings(body) {
           ...keptTriggers(item.triggers),
         }))
     : [];
-  if (loras.length) settings.loras = loras;
+  settings.loras = loras;
   if (body.kind === "image") {
     settings.count = Number(body.count || 1);
     if (hasReferenceImage(body) && !isRadianceWorker(workerById(body.comfyBackend)))

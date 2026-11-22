@@ -57,7 +57,11 @@ function TileStatus({
   // A multi-output run shows one Cancel, on its first unfinished placeholder.
   const owner = job?.items.find((entry) => !finished(entry));
   const cancellable =
-    active && job && !terminalStatuses.has(job.status) && (!owner || owner.id === item.id);
+    active &&
+    job &&
+    !job.cancelling &&
+    !terminalStatuses.has(job.status) &&
+    (!owner || owner.id === item.id);
   const retryable = failed && job?.status === "failed" && onTryAgain;
   return (
     <>
@@ -341,15 +345,10 @@ export function MediaTile({
           <RatingIcon size={14} fill="currentColor" />
         </div>
       )}
-      {!selecting && (
-        <div className={classes.badges}>
-          {item.identity?.drifted && (
-            // Face Check found someone else, or the character twice; Details says which.
-            <div className={classes.drift} role="img" aria-label="Face Check: Face Differs">
-              <icons.character size={12} />
-              Face
-            </div>
-          )}
+      {!selecting && item.identity?.drifted && (
+        <div className={classes.drift} role="img" aria-label="Face Check: Face Differs">
+          <icons.character size={12} />
+          Face
         </div>
       )}
       {!selecting && actions}

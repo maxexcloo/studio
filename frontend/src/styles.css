@@ -72,6 +72,10 @@ select {
   top: calc(var(--studio-header-height) + var(--mantine-spacing-xs));
   right: calc(var(--mantine-spacing-xs) + env(safe-area-inset-right));
   width: fit-content;
+  max-width: calc(
+    100% - var(--mantine-spacing-xs) * 2 - env(safe-area-inset-left) - env(safe-area-inset-right)
+  );
+  overflow-wrap: anywhere;
 }
 .mantine-Notifications-notification {
   transition-timing-function: var(--studio-ease-enter) !important;
