@@ -151,7 +151,7 @@ export function WhereWorkRuns() {
           {defaultRow(kind, "local")}
         </SettingGroup>
       ))}
-      {dream && <DreamProcessing />}
+      {dream && cloud && <DreamProcessing />}
     </Stack>
   );
 }
