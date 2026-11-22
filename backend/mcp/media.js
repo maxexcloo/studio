@@ -2203,8 +2203,7 @@ export class McpMedia {
           [
             comparisonContext(comparisons),
             feedbackContext(feedback),
-            `${label} is ready. ${replyRule}\n\n${markdown}`,
-            gallery,
+            `${label} is ready. ${replyRule}\n\n${gallery}\n\n${markdown}`,
           ]
             .filter(Boolean)
             .join("\n\n"),

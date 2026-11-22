@@ -305,7 +305,7 @@ export function registerGenerateTools({
     ].join(" · ");
     const message =
       submission.status === "queued"
-        ? `Queued on ${label}${readyIn(left, ahead)}. ${ignoredNote(submission)}${note}${await waiting(profile)}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. When the user later asks to see results, call result. Never poll or resubmit. ${followUp}`
+        ? `Queued on ${label}${readyIn(left, ahead)}. ${ignoredNote(submission)}${note}${await waiting(profile)}Share the links and end the turn. Call result only if asked. Never poll or resubmit. ${followUp}`
         : `${submission.error} ${ignoredNote(submission)}${note}Share the links; never resubmit.`;
     return {
       content: [{ type: "text", text: `${message}\n\n${pending}` }, ...extra],

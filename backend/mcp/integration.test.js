@@ -4235,13 +4235,19 @@ test("tier-based Generate chooses only profiles the account may use", async (t) 
 test("Result returns recorded feedback and markdown, never a settings record", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
-  const id = jobId(await generate(client));
+  const queued = data(await generate(client)).jobs[0];
+  const id = queued.job_id;
   const pending = await call(client, "result", {
     job_id: id,
     wait_seconds: 0,
   });
   assert.equal(pending.content.length, 1);
-  assert.deepEqual(pending.structuredContent, { job_id: id, ref: "#1", status: "running" });
+  assert.deepEqual(pending.structuredContent, {
+    job_id: id,
+    ref: "#1",
+    link: queued.link,
+    status: "running",
+  });
   Object.assign(f.jobs.get(id), {
     status: "done",
     outputs: [{ url: "/comfy/view?filename=lean.png" }],
@@ -4253,14 +4259,14 @@ test("Result returns recorded feedback and markdown, never a settings record", a
   assert.equal(lean.content.length, 1);
   assert.match(
     lean.content[0].text,
-    /^Recorded user feedback: .+\n\n#1 is ready\. .+\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
+    /^Recorded user feedback: .+\n\n#1 is ready\. .+\n\n\[Open in Studio\]\([^)]+\) .*\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
   );
-  assert.deepEqual(lean.structuredContent, {
-    job_id: id,
-    ref: "#1",
-    status: "done",
-    outputs: [{ ref: "#1", job_id: id, output_index: 0, rating: "unrated" }],
-  });
+  const { links, outputs, ...details } = lean.structuredContent;
+  assert.deepEqual(details, { job_id: id, ref: "#1", link: queued.link, status: "done" });
+  assert.match(links.gallery, /\/mcp\/results\/[A-Za-z0-9]{10}$/);
+  const [{ link, ...feedback }] = outputs;
+  assert.match(link, /\/mcp\/results\/[A-Za-z0-9]{10}$/);
+  assert.deepEqual(feedback, { ref: "#1", job_id: id, output_index: 0, rating: "unrated" });
 });
 
 test("a finished video notification names its result and profile beside View Video", async (t) => {
