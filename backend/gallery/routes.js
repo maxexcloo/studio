@@ -123,7 +123,9 @@ function ownedSummary(req, name, query, build) {
 }
 
 export function galleryJobResponse(store, account, id, settings = false) {
-  cleanupGalleryState(store);
+  const owned = ownedQuery(account);
+  if (!owned) return { status: 200, payload: { items: [] } };
+  cleanupGalleryState(store, { ...owned, jobId: id });
   const items = resultNumbers.numbered(
     filterVisibleGallery(
       galleryJobItems(id).filter(
@@ -255,15 +257,22 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     res.json(found);
   });
 
-  directRoute(app, "GET", "/api/gallery", async (account, { query }) => {
-    cleanupGalleryState(store);
+  async function readGallery(account, { query }, dates = null) {
+    const owned = ownedQuery(account);
+    if (owned) cleanupGalleryState(store, owned);
     const type = String(query.type || "");
     const limit = Number(query.limit || 0);
     const selection = ["all", "failed"].includes(query.select) ? query.select : undefined;
     const cursor = selection ? "" : String(query.cursor || "");
+    const window = !selection && query.window === "1";
     const includeFailed = query.includeFailed !== "0";
     const requestedSort = one(query.sort);
     const sort = Object.hasOwn(gallerySortLabels, requestedSort) ? requestedSort : "newest";
+    if ((dates || window) && (query.similar || !["newest", "oldest"].includes(sort)))
+      return {
+        status: 400,
+        payload: { error: "Sort the gallery by date to browse its timeline." },
+      };
     const looksLike = await near(one(query.q));
     const search = searchFilter(query, looksLike);
     // A text search reads only rows holding every word: the filter still decides what matches.
@@ -302,7 +311,6 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       chat || query.set
         ? "queued"
         : accountPreferences(account?.userId || "").galleryWork || "none";
-    const owned = ownedQuery(account);
     const page = owned
       ? pageGallery({
           rank: similarTo,
@@ -310,6 +318,9 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
           type,
           limit: limit || 200,
           cursor,
+          dates,
+          window,
+          ...(window && { beforeCursor: String(query.beforeCursor || "") }),
           selection,
           includeFailed,
           uploads: query.uploads === "1",
@@ -329,7 +340,14 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
           filterKey: JSON.stringify([
             account?.userId ?? "",
             work,
-            Object.entries(query).filter(([key]) => !["cursor", "limit", "select"].includes(key)),
+            Object.entries(query)
+              .filter(
+                ([key]) =>
+                  !["beforeCursor", "cursor", "limit", "select", "timeZone", "window"].includes(
+                    key,
+                  ),
+              )
+              .sort(([left], [right]) => left.localeCompare(right)),
           ]),
           filter:
             inComparison || search
@@ -343,11 +361,17 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
           revision: galleryRevisionValue(),
           totalApprox: 0,
         };
+    if (dates) return { status: 200, payload: owned ? page : { days: [] } };
     // Work the queue holds has no tiles until it starts; with queued work shown, the first page
     // leads with them. Dream's stays in its own pool; an upscale has no tile.
     const retried = new Set();
     const queued =
-      selection === "failed" || work !== "queued" || cursor || similarTo || query.uploads === "1"
+      selection === "failed" ||
+      work !== "queued" ||
+      window ||
+      cursor ||
+      similarTo ||
+      query.uploads === "1"
         ? []
         : store
             .openJobs(account?.userId || "")
@@ -400,6 +424,21 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
           : resultNumbers.numbered([...leading, ...items]).map(listedRecord),
       },
     };
+  }
+  directRoute(app, "GET", "/api/gallery", readGallery);
+  directRoute(app, "GET", "/api/gallery/timeline", (account, request) => {
+    let dates;
+    try {
+      dates = new Intl.DateTimeFormat("sv-SE", {
+        timeZone: one(request.query.timeZone) || "UTC",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+    } catch {
+      return { status: 400, payload: { error: "Supply a valid time zone." } };
+    }
+    return readGallery(account, request, dates);
   });
 
   // One item in full, as Details shows it: the gallery's pages leave out its prompt's thinking.

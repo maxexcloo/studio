@@ -69,6 +69,36 @@ const item = (ownerId, jobId) => ({
   filename: `${jobId}.png`,
 });
 
+test("Gallery reads repair only the requested account's pending work", async (t) => {
+  const ownerId = "account-a";
+  const working = queue.enqueue(
+    ownerId,
+    queue.createSession(ownerId).id,
+    { kind: "image", prompt: "a lantern" },
+    "image",
+  );
+  t.after(() => queue.save({ ...working, status: "cancelled" }));
+  const pending = (owner, jobId) => ({ ...item(owner, jobId), status: "pending" });
+  setGallery([
+    pending(ownerId, "target"),
+    pending(ownerId, "other-job"),
+    pending(ownerId, working.id),
+    pending("account-b", "other-account"),
+  ]);
+  const status = (jobId) => galleryStore.galleryItem(`${jobId}-0`).status;
+  const req = { studioAccount: { userId: ownerId, authenticated: true }, query: {} };
+  await call(routes["/api/gallery/jobs/:id"], { ...req, params: { id: "target" } });
+  assert.equal(status("target"), "failed");
+  assert.equal(status("other-job"), "pending");
+  assert.equal(status("other-account"), "pending");
+  await call(routes["/api/gallery"], req);
+  assert.equal(status("other-job"), "failed");
+  assert.equal(status(working.id), "pending");
+  assert.equal(status("other-account"), "pending");
+  galleryStore.cleanupGalleryState(queue);
+  assert.equal(status("other-account"), "failed");
+});
+
 test("Gallery Comparisons includes saved comparisons and kept Dream pairs, without sets or batches", async () => {
   const own = (id, fields) => ({ ...item("account-a", id), ...fields });
   const pair = { state: "kept", pair: { id: "dream-comparison" } };
@@ -89,6 +119,54 @@ test("Gallery Comparisons includes saved comparisons and kept Dream pairs, witho
   assert.deepEqual(await read({ type: "image" }), ["compared-0", "paired-0"]);
   assert.deepEqual(await read({ type: "video" }), ["paired-video-0"]);
   assert.deepEqual(await read({ type: "image", origin: "chat" }), ["compared-0"]);
+});
+
+test("the owned timeline indexes local days and seeks a filtered window in both directions", async () => {
+  const own = (jobId, timestamp, fields) => ({
+    ...item("account-a", jobId),
+    createdAt: timestamp,
+    ...fields,
+  });
+  setGallery([
+    own("latest", "2026-10-20T08:00:00Z"),
+    own("evening", "2026-10-20T02:00:00Z"),
+    own("morning", "2026-10-19T14:00:00Z"),
+    own("earliest", "2026-10-15T14:00:00Z", { galleryAt: "2026-10-18T14:00:00Z" }),
+    own("other-model", "2026-10-21T14:00:00Z", { model: "another-model" }),
+    own("other-owner", "2026-10-17T14:00:00Z", { ownerId: "account-b" }),
+    own("dream", "2026-10-16T14:00:00Z", { dream: { state: "unseen" } }),
+    own("upload", "2026-10-14T14:00:00Z", { uploaded: true }),
+  ]);
+  const request = (query) => ({
+    studioAccount: { userId: "account-a", authenticated: true },
+    query: { type: "image", model: "test-model", ...query },
+  });
+  const timeline = (sort) =>
+    call(routes["/api/gallery/timeline"], request({ sort, timeZone: "America/Los_Angeles" }));
+  const page = (query) =>
+    call(routes["/api/gallery"], request({ window: "1", limit: "1", ...query }));
+  const { days } = await timeline("newest");
+  assert.deepEqual(
+    days.map(({ day, count }) => [day, count]),
+    [
+      ["2026-10-20", 1],
+      ["2026-10-19", 2],
+      ["2026-10-18", 1],
+    ],
+  );
+  const newer = await page({ cursor: days[1].cursor });
+  assert.equal(newer.items[0].jobId, "evening");
+  const older = await page({ cursor: newer.nextCursor });
+  assert.equal(older.items[0].jobId, "morning");
+  const preceding = await page({ beforeCursor: newer.previousCursor });
+  assert.equal(preceding.items[0].jobId, "latest");
+  assert.equal(preceding.previousCursor, "");
+  const ascending = await timeline("oldest");
+  assert.equal(ascending.days[0].day, "2026-10-18");
+  assert.equal(
+    (await page({ sort: "oldest", cursor: ascending.days[1].cursor })).items[0].jobId,
+    "morning",
+  );
 });
 
 test("library review pages only the owner's eligible media in a stable seeded order", async () => {

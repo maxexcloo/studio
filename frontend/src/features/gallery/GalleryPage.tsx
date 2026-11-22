@@ -29,16 +29,20 @@ import { GalleryImport, droppedFiles, useGalleryUpload } from "./GalleryImport";
 import { GallerySelectionBar } from "./GallerySelectionBar";
 import { GalleryToolbar } from "./GalleryToolbar";
 import { MediaGrid } from "./MediaGrid";
-import { mediaDetail, mediaTitle } from "./mediaLabels";
+import { mediaDay, mediaDetail, mediaTitle } from "./mediaLabels";
 import { currentMedia, mediaIdentity, reconcileViewerItems } from "./mediaSource";
 import { MediaTileActions } from "./MediaTileActions";
 import { MediaViewer } from "./MediaViewer";
 import { MorePages } from "./MorePages";
 import {
+  type GalleryDate,
+  type GalleryPageParam,
   type GalleryResultsPage,
   galleryKey,
+  galleryListingKey,
   galleryPage,
   galleryQuery,
+  galleryTimelineQuery,
   viewerItemQuery,
 } from "./queries";
 import {
@@ -192,7 +196,21 @@ function Gallery() {
     () => ({ search, kind, filters, similar, strictness, setId, chat, turn, sort }) as const,
     [search, kind, filters, similar, strictness, setId, chat, turn, sort],
   );
-  const listingQuery = useMemo(() => galleryQuery(listing), [listing]);
+  const scope = useMemo(() => JSON.stringify(galleryListingKey(listing)), [listing]);
+  const byDay = !similar && sort !== "liked" && sort !== "disliked";
+  const [jump, setJump] = useState<{ scope: string; date: GalleryDate }>();
+  if (jump && jump.scope !== scope) setJump(undefined);
+  const jumpDate = jump?.scope === scope && byDay ? jump.date : undefined;
+  const date = jumpDate?.cursor ? jumpDate : undefined;
+  const timeline = useQuery({ ...galleryTimelineQuery(listing), enabled: byDay });
+  const jumpToDate = useCallback(
+    (date: GalleryDate) => {
+      setFocusItem(null);
+      setJump({ scope, date });
+    },
+    [scope],
+  );
+  const listingQuery = useMemo(() => galleryQuery(listing, date?.cursor), [listing, date?.cursor]);
   const listingKey = listingQuery.queryKey;
   const gallery = useInfiniteQuery({
     ...listingQuery,
@@ -202,6 +220,9 @@ function Gallery() {
     // Returning to the tab reads only the first page (below), not every loaded page.
     refetchOnWindowFocus: false,
   });
+  const historical = Boolean(
+    date && (gallery.isPlaceholderData || gallery.data?.pages[0]?.previousCursor !== ""),
+  );
   // Query ownership deduplicates overlapping signals and cancels reads on account changes or
   // optimistic media mutations. Refreshes keep loaded pages and their continuation cursors.
   const refreshKey = useMemo(
@@ -214,7 +235,8 @@ function Gallery() {
     enabled: false,
     retry: false,
     queryFn: async ({ signal }) => {
-      const held = client.getQueryData<InfiniteData<GalleryResultsPage, string>>(listingKey);
+      const held =
+        client.getQueryData<InfiniteData<GalleryResultsPage, GalleryPageParam>>(listingKey);
       const known = new Set(held?.pages.flatMap((page) => page.items.map(mediaIdentity)));
       const first = await galleryPage(listing, "", signal);
       // If more than a page arrived while away, bridge to the held results sequentially so no
@@ -245,34 +267,41 @@ function Gallery() {
         first.items = first.items.slice(fresh);
         setIncoming(fresh);
       } else setIncoming(0);
-      client.setQueryData<InfiniteData<GalleryResultsPage, string>>(listingKey, (data) => {
-        if (!data) return data;
-        const slots = new Set(first.items.map(mediaIdentity));
-        const completed = new Set(
-          first.items.flatMap((item) => (item.status === "done" && item.jobId ? [item.jobId] : [])),
-        );
-        const keep = (item: MediaItem) =>
-          !slots.has(mediaIdentity(item)) &&
-          !wasCancelled(item) &&
-          !(item.status === "pending" && item.jobId && completed.has(item.jobId));
-        return {
-          ...data,
-          pages: data.pages.map((page, index) => ({
-            ...page,
-            ...(!index && !page.items.length && data.pages.length === 1
-              ? { hasMore: first.hasMore, nextCursor: first.nextCursor }
-              : {}),
-            totalApprox: first.totalApprox,
-            items: index ? page.items.filter(keep) : [...first.items, ...page.items.filter(keep)],
-          })),
-        };
-      });
+      client.setQueryData<InfiniteData<GalleryResultsPage, GalleryPageParam>>(
+        listingKey,
+        (data) => {
+          if (!data) return data;
+          const slots = new Set(first.items.map(mediaIdentity));
+          const completed = new Set(
+            first.items.flatMap((item) =>
+              item.status === "done" && item.jobId ? [item.jobId] : [],
+            ),
+          );
+          const keep = (item: MediaItem) =>
+            !slots.has(mediaIdentity(item)) &&
+            !wasCancelled(item) &&
+            !(item.status === "pending" && item.jobId && completed.has(item.jobId));
+          return {
+            ...data,
+            pages: data.pages.map((page, index) => ({
+              ...page,
+              ...(!index && !page.items.length && data.pages.length === 1
+                ? { hasMore: first.hasMore, nextCursor: first.nextCursor }
+                : {}),
+              totalApprox: first.totalApprox,
+              items: index ? page.items.filter(keep) : [...first.items, ...page.items.filter(keep)],
+            })),
+          };
+        },
+      );
       return first;
     },
   });
   const { refetch: readFirst } = refresh;
   const pendingFirst = useRef<typeof listingKey | null>(null);
   const refreshFirst = useCallback(() => {
+    // A date jump can skip thousands of items. Never bridge from the newest page to that window.
+    if (historical) return;
     if (
       client.isFetching({ queryKey: listingKey, exact: true }) ||
       client.isFetching({ queryKey: refreshKey, exact: true })
@@ -285,7 +314,7 @@ function Gallery() {
       if (sort === "newest") void readFirst({ cancelRefetch: false });
       else void client.invalidateQueries({ queryKey: listingKey, exact: true });
     }
-  }, [client, listingKey, readFirst, refreshKey, sort]);
+  }, [client, historical, listingKey, readFirst, refreshKey, sort]);
   useEffect(
     () => () => {
       pendingFirst.current = null;
@@ -355,6 +384,34 @@ function Gallery() {
     () => gallery.data?.pages.flatMap((page) => page.items) || [],
     [gallery.data],
   );
+  // A day may disappear after the index was read. Return to the listing if its seek has no items.
+  const { refetch: refreshTimeline } = timeline;
+  useEffect(() => {
+    if (!date || gallery.isPlaceholderData || !gallery.isSuccess || loaded.length) return;
+    setJump(undefined);
+    void refreshTimeline();
+  }, [date, gallery.isPlaceholderData, gallery.isSuccess, loaded.length, refreshTimeline]);
+  // A tab left open can begin receiving results on a new local date without ever refocusing.
+  const head = gallery.data?.pages[0]?.items.find((item) => item.status === "done");
+  const headDay = head && mediaDay(head);
+  const observedDay = useRef("");
+  useEffect(() => {
+    if (!headDay || !byDay || historical || sort !== "newest" || gallery.isPlaceholderData) return;
+    const key = JSON.stringify([scope, headDay]);
+    const days = timeline.data?.days;
+    if (!days || observedDay.current === key) return;
+    observedDay.current = key;
+    if (!days.some(({ day }) => day === headDay)) void refreshTimeline();
+  }, [
+    byDay,
+    gallery.isPlaceholderData,
+    headDay,
+    historical,
+    refreshTimeline,
+    scope,
+    sort,
+    timeline.data,
+  ]);
   // A linked item not on a loaded page is read on its own; one that leaves the gallery while
   // shown stays until the viewer moves on.
   const listed = itemId
@@ -421,10 +478,11 @@ function Gallery() {
   const [resultsKey, setResultsKey] = useState(() => JSON.stringify(listingKey));
   if (!gallery.isPlaceholderData && resultsKey !== JSON.stringify(listingKey))
     setResultsKey(JSON.stringify(listingKey));
-  const selection = useGallerySelection(loaded, JSON.stringify([listingKey, query]), {
-    complete: !gallery.hasNextPage,
+  const selection = useGallerySelection(loaded, JSON.stringify([scope, query]), {
+    complete: !gallery.hasNextPage && !gallery.hasPreviousPage,
     ready: Boolean(gallery.data) && !gallery.isPlaceholderData && query === search,
-    load: async (match, signal) => (await galleryPage(listing, "", signal, match)).items,
+    load: async (match, signal) =>
+      (await galleryPage(listing, "", signal, { selection: match })).items,
   });
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || Boolean(similar);
@@ -523,9 +581,15 @@ function Gallery() {
   const shownIndex = shown ? loaded.findIndex((item) => item.id === shown.id) : -1;
   const nearEnd = shownIndex >= 0 && loaded.length - shownIndex <= 3;
   const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } = gallery;
+  const nearStart = Boolean(date) && shownIndex >= 0 && shownIndex < 3;
+  const { hasPreviousPage, isFetchPreviousPageError, fetchPreviousPage } = gallery;
   useEffect(() => {
     if (nearEnd && hasNextPage && !isFetching && !isFetchNextPageError) void fetchNextPage();
   }, [nearEnd, hasNextPage, isFetching, isFetchNextPageError, fetchNextPage]);
+  useEffect(() => {
+    if (nearStart && hasPreviousPage && !isFetching && !isFetchPreviousPageError)
+      void fetchPreviousPage();
+  }, [nearStart, hasPreviousPage, isFetching, isFetchPreviousPageError, fetchPreviousPage]);
   const selectionBar = selection.selecting && (
     <GallerySelectionBar
       selection={{ ...selection, end: doneSelecting }}
@@ -703,7 +767,7 @@ function Gallery() {
         </Alert>
       ) : loaded.length ? (
         <div className={classes.results} data-stale={gallery.isPlaceholderData || undefined}>
-          {incoming > 0 && (
+          {!historical && incoming > 0 && (
             <div className={classes.incoming}>
               <Button
                 variant="default"
@@ -719,10 +783,23 @@ function Gallery() {
               </Button>
             </div>
           )}
+          {date && (
+            <MorePages
+              direction="previous"
+              listing={gallery}
+              results={resultsKey}
+              paused={!!itemId || gallery.isPlaceholderData}
+            />
+          )}
           <MediaGrid
             items={loaded}
             results={resultsKey}
-            byDay={!similar && sort !== "liked" && sort !== "disliked"}
+            byDay={byDay}
+            timeline={timeline.data?.days}
+            onDate={jumpToDate}
+            jumpDay={jumpDate?.day}
+            seekPending={gallery.isPlaceholderData}
+            leadingPage={gallery.data?.pages[0]?.previousCursor}
             focusItem={focusItem}
             open={openItem}
             selection={selection}

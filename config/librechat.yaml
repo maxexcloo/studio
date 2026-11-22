@@ -1,0 +1,12 @@
+mcpServers:
+  studio:
+    type: streamable-http
+    url: https://studio.example.com/mcp
+    requiresOAuth: false
+    startup: false
+    apiKey:
+      source: user
+      authorization_type: bearer
+    requestHeaders:
+      X-Studio-Conversation-Id: "{{LIBRECHAT_BODY_CONVERSATIONID}}"
+      X-Studio-Turn-Id: "{{LIBRECHAT_BODY_PARENTMESSAGEID}}"

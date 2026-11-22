@@ -28,6 +28,50 @@
   opacity: 1;
 }
 
+.scrubber[data-indexed] {
+  cursor: pointer;
+  opacity: 0.6;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.scrubber[data-indexed][data-active] {
+  opacity: 1;
+}
+
+.scrubber[data-indexed]::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 50%;
+  border-left: 1px solid var(--mantine-color-default-border);
+}
+
+.endpoint {
+  position: absolute;
+  right: 100%;
+  padding: 2px var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-sm);
+  color: var(--mantine-color-text);
+  background: var(--mantine-color-default);
+  font-size: var(--mantine-font-size-xs);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.endpoint:first-of-type {
+  top: 0;
+}
+
+.endpoint:last-of-type {
+  bottom: 0;
+}
+
+.scrubber[data-active] .endpoint,
+.scrubber:hover .endpoint {
+  opacity: 1;
+}
+
 .thumb {
   position: absolute;
   right: 0;
@@ -59,4 +103,11 @@
   font-size: var(--mantine-font-size-sm);
   font-weight: 600;
   white-space: nowrap;
+}
+/* Date jumps clear the sticky header and any pinned gallery controls. */
+.grid {
+  scroll-margin-top: calc(
+    var(--app-shell-header-offset, var(--app-shell-header-height)) +
+      var(--gallery-pinned-height, 0px)
+  );
 }

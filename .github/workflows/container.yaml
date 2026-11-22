@@ -8,7 +8,7 @@ on:
     paths-ignore:
       - AGENTS.md
       - SECURITY.md
-      - backend/samples/README.md
+      - config/profiles/README.md
       - worker/**/*.md
   workflow_dispatch:
     inputs:
