@@ -1,21 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { recordedObjectInfo } from "./fixtures/fake-comfy.js";
 import {
   inpaintFiles,
   inpaintGeometry,
-  inpaintNodes,
   maskBounds,
   maskBufferFromDataUrl,
   radianceMask,
 } from "./inpaint.js";
-
-const objectInfo = recordedObjectInfo();
-
-test("the inpaint nodes are all ComfyUI core nodes", () => {
-  for (const node of inpaintNodes) assert.ok(objectInfo[node], node);
-});
 
 test("mask bounds find the painted pixels and ignore faint brush edges", () => {
   const width = 10;

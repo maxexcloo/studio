@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 import type { QueueJob } from "../../shared/queue.ts";
-import { recordedObjectInfo } from "../fixtures/fake-comfy.js";
+import { fixtureObjectInfo } from "../fixtures/fake-comfy.js";
 import { clusterDns, fakeKubernetes, serviceUrl } from "../fixtures/fake-kubernetes.ts";
 const { startFakeComfy } = await import(new URL("../fixtures/fake-comfy.js", import.meta.url).href);
 
@@ -88,7 +88,7 @@ test(
     );
     const profileFile = path.join(dataDir, "workflows", "cold.json");
     writeFileSync(profileFile, JSON.stringify(raw));
-    const info = recordedObjectInfo();
+    const info = fixtureObjectInfo();
     info.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
     const png = await sharp({ create: { width: 64, height: 64, channels: 3, background: "white" } })
       .png()
