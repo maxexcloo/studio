@@ -8,13 +8,13 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
-import { recordedObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
+import { fixtureObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
 import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 
 // The real server, started the way the launcher starts it, against a stand-in
-// ComfyUI that answers with a recorded /object_info (fixtures/) plus one model.
+// ComfyUI that answers with a synthetic /object_info (fixtures/) plus one model.
 const here = path.dirname(fileURLToPath(import.meta.url));
-const objectInfo = recordedObjectInfo();
+const objectInfo = fixtureObjectInfo();
 objectInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
 
 // The run's output, which Studio moves into its media before the job completes.

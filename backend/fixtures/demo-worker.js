@@ -1,17 +1,17 @@
 /**
- * A worker without a GPU: fake ComfyUI with the recorded node list and the test workflows, which
+ * A worker without a GPU: fake ComfyUI with the test node list and the test workflows, which
  * finishes every run shortly after it is queued with a plain picture, or holds it with `hold`. For
  * tests that need finished runs and for `mise run dev:demo`.
  */
 
 import sharp from "sharp";
 
-import { recordedObjectInfo, startFakeComfy } from "./fake-comfy.js";
+import { fixtureObjectInfo, startFakeComfy } from "./fake-comfy.js";
 import { testImageProfile, testVideoProfile, writeTestWorkflows } from "./test-workflows.js";
 
 export async function startDemoWorker(dataDir, { hold = false } = {}) {
   writeTestWorkflows(dataDir);
-  const objectInfo = recordedObjectInfo();
+  const objectInfo = fixtureObjectInfo();
   objectInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = [
     testImageProfile.studio.defaults.model,
     testVideoProfile.studio.defaults.model,
