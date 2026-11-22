@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 
+import type { ResultContext } from "../../shared/characters.ts";
 import {
   type GenerationInput,
   type PromptWriting,
@@ -82,6 +83,7 @@ export interface WrittenPrompt {
   model: string;
   why?: string;
   title?: string;
+  cardContext?: ResultContext;
 }
 /**
  * Writes a job's prompt (`input.writing`), passing the text model's thinking and reply pieces on
@@ -96,8 +98,6 @@ export type PromptWriter = (
   },
 ) => Promise<WrittenPrompt>;
 
-const accepted = (job: OwnedJob) =>
-  !terminalStatuses.has(job.status) && !pendingStatuses.has(job.status);
 const started = (job: OwnedJob) => !pendingStatuses.has(job.status) && job.status !== "cancelled";
 const progressMs = 250;
 const maxWrites = 2;
@@ -127,6 +127,7 @@ export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
             ...job.dream,
             prompt: written.prompt,
             ...(written.why ? { why: written.why } : {}),
+            ...(written.cardContext ? { cardContext: written.cardContext } : {}),
           },
         }
       : {}),
@@ -208,14 +209,10 @@ export class GenerationQueue {
     this.store = store;
     this.adapter = adapter;
     this.writer = writer;
-    // One job runs per resource at a time, so after a restart the latest updated started job is what is loaded.
-    const latest = new Map<string, OwnedJob>();
-    for (const job of store.jobs()) {
-      if (accepted(job) || job.providerJobId) this.acceptedIds.add(job.id);
-      if (started(job) && !(job.updatedAt < (latest.get(job.resource)?.updatedAt ?? "")))
-        latest.set(job.resource, job);
+    for (const job of store.openJobs()) {
+      if (started(job) || job.providerJobId) this.acceptedIds.add(job.id);
     }
-    this.loaded = latest;
+    this.loaded = new Map(store.loadedJobs().map((job) => [job.resource, job]));
   }
 
   /** Each resource's load, for routing new work (comfy/backends.js routeJob). */
@@ -460,7 +457,8 @@ export class GenerationQueue {
     const free = (resource: string) => this.slots(resource) - (running.get(resource)?.length ?? 0);
     // Resources whose every slot runs a job; the rest take work.
     const occupied = new Set([...running.keys()].filter((resource) => free(resource) <= 0));
-    const isStarted = (job: OwnedJob) => this.acceptedIds.has(job.id) || started(job);
+    const isStarted = (job: OwnedJob) =>
+      this.acceptedIds.has(job.id) || Boolean(job.providerJobId) || started(job);
     // A started MCP set finishes before other work of its tier and below, so its jobs stay
     // contiguous; manual work still goes first.
     const startedSets = new Set(

@@ -1,3 +1,7 @@
+/** A listed profile as it runs on `backend`, with that backend's own reference slots. */
+export const runProfile = (profile, backend) =>
+  profile?.backendOptions?.find((option) => option.id === backend)?.profile || profile;
+
 // Keep validation and graph construction on the same image mode.
 export function hasReferenceImage(body) {
   return Boolean((body.referenceAssets || []).some((item) => item?.assetId || item?.comfyName));

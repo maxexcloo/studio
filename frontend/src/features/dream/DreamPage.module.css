@@ -351,7 +351,6 @@
 }
 .previewStage {
   position: relative;
-  flex: 1;
   min-height: 0;
   overflow: hidden;
 }
@@ -366,10 +365,10 @@
   height: 100%;
 }
 .previewContent .previewMain {
-  flex-direction: column;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 .previewButtons {
-  flex-shrink: 0;
+  grid-area: 3 / 1;
   padding: var(--mantine-spacing-sm) var(--mantine-spacing-sm) 0;
   background: var(--studio-glass-chrome);
   border-top: 1px solid var(--studio-glass-border);

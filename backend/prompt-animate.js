@@ -70,10 +70,11 @@ function pacing(seconds, fps = 0) {
   ].join(" ");
 }
 
-/** Whether the profile makes sound with the picture: an audio family (H3) or Grok. */
-const makesSound = (profile) =>
-  families[String(profile.family || "").replaceAll("-", "_")]?.audio === true ||
-  isCloudProfile(profile);
+/** Whether the profile makes sound with the picture. */
+function makesSound(profile) {
+  const family = String(profile.family || "").replaceAll("-", "_");
+  return family === "ltx2" || families[family]?.audio === true || isCloudProfile(profile);
+}
 
 /** How the writer knows the frame: it sees it, reads its description, or has only the prompt. */
 const frameKnowledge = {

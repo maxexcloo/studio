@@ -346,6 +346,9 @@ export function registerDreamRoutes(
       return refuse(error);
     }
   });
+  route("POST", "/api/dream/:itemId/super-like", (account, { params }) =>
+    answer(() => ({ item: dream.superLike(owner(account), params.itemId) })),
+  );
   for (const verdict of ["keep", "discard", "more"] as const)
     route("POST", `/api/dream/:itemId/${verdict}`, (account, { params }) => {
       try {

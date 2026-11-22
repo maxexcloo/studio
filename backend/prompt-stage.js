@@ -20,6 +20,7 @@ import { storyContext } from "./domain/writing-standard.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { writeSetPrompt } from "./prompt-set.js";
 import { sheetRequest, writeSheetPrompt } from "./prompt-sheet.js";
+import { resolveImageMode, runProfile } from "./workflow-modes.js";
 
 /** The admitted writing request: only its kind's request fields, never a written result; or null. */
 export function writingRequest(value) {
@@ -71,8 +72,9 @@ export function createPromptStage({
     if (access === null) throw new Error("This account no longer has access.");
     const issue = writingIssue(writingRequest(writing), { engine, account: access });
     if (issue) throw new Error(issue.error);
-    const profile = (await profiles(access)).find((item) => item.id === job.input.profileId);
-    if (!profile) throw new Error("The model is no longer available to this account.");
+    const listed = (await profiles(access)).find((item) => item.id === job.input.profileId);
+    if (!listed) throw new Error("The model is no longer available to this account.");
+    const profile = runProfile(listed, job.input.profileBackend);
     const writer = promptWriter(access, accountPreferences(job.ownerId || ""));
     // The story an MCP chat gave its result set, which its variations and clips keep to.
     const story = storyContext(job.input.resultSet?.context);
@@ -92,25 +94,31 @@ export function createPromptStage({
         onThinking,
         onDelta,
       });
-    // The job's first reference is the frame it animates from, or the character a sheet redraws.
-    const start = job.input.referenceAssets?.[0]?.assetId;
-    if (writing.kind === "sheet")
+    const references = job.input.referenceAssets || [];
+    if (writing.kind === "sheet") {
+      const source = references[0]?.assetId;
       return writeSheetPrompt({
         engine,
         writing,
         writer,
-        frame: () => frame(access, start),
-        caption: () => caption(access, start),
+        frame: () => frame(access, source),
+        caption: () => caption(access, source),
         signal,
         onThinking,
         onDelta,
       });
+    }
+    const video = { ...profile, ...resolveImageMode(profile, job.input) };
+    const startSlot = video.mediaInputs?.find((slot) => slot.role === "start");
+    const start = (
+      startSlot ? references.find((item) => item.slot === startSlot.id) : references[0]
+    )?.assetId;
     return writeAnimatePrompt({
       engine,
-      profile,
-      guide: guide(profile),
+      profile: video,
+      guide: guide(video),
       writing,
-      clip: animateClip(job.input, profile),
+      clip: animateClip(job.input, video),
       explicit: !access || mayUseFeature(access, "uncensoredModels"),
       story,
       writer,

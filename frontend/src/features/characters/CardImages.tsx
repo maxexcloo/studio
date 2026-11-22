@@ -9,6 +9,7 @@ import {
   Image,
   Input,
   Modal,
+  Paper,
   Stack,
   Text,
   TextInput,
@@ -253,11 +254,13 @@ export function LibraryCard({
   name,
   images,
   menu,
+  selection,
   children,
 }: {
   name: string;
   images: ReferenceAsset[];
   menu: ReactNode;
+  selection?: ReactNode;
   children: ReactNode;
 }) {
   const preview = useMediaPreview();
@@ -292,7 +295,13 @@ export function LibraryCard({
             </UnstyledButton>
           </AspectRatio>
           <Box pos="absolute" top={8} right={8}>
-            {menu}
+            {selection ? (
+              <Paper p={4} radius="sm" withBorder>
+                {selection}
+              </Paper>
+            ) : (
+              menu
+            )}
           </Box>
         </Card.Section>
       ) : null}
@@ -301,7 +310,7 @@ export function LibraryCard({
           <Text size="sm" fw={500}>
             {name}
           </Text>
-          {!cover && menu}
+          {!cover && (selection || menu)}
         </Group>
         {children}
       </Stack>

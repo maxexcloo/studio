@@ -2,9 +2,12 @@ import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query
 
 import {
   type Card,
+  type CardKind,
+  type CardRating,
   type Character,
   type CharacterTrait,
   type SheetRole,
+  cardKinds,
   characterLead,
   identitySlot,
   withCharacter,
@@ -49,6 +52,18 @@ export const charactersQuery = queryOptions({
       : false,
 });
 
+export function deleteCard(kind: CardKind, id: string) {
+  return api(`/api/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function saveCardRating(kind: CardKind, id: string, rating: CardRating | null) {
+  const result = await api<Record<string, Card>>(`/api/${kind}/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ rating }),
+  });
+  return result[cardKinds[kind].name];
+}
+
 /** Saves a new card, or `id`'s changes, and refreshes the list. */
 export function useSaveCharacter(id?: string) {
   const client = useQueryClient();
@@ -84,8 +99,7 @@ export function useDeleteCharacter() {
   const client = useQueryClient();
   return useMutation({
     meta: { inlineError: true },
-    mutationFn: (id: string) =>
-      api(`/api/characters/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    mutationFn: (id: string) => deleteCard("characters", id),
     onSuccess: () => client.invalidateQueries({ queryKey: charactersQuery.queryKey }),
   });
 }
@@ -174,7 +188,7 @@ export function useDeletePromptCard(kind: PromptCardKind) {
   const client = useQueryClient();
   return useMutation({
     meta: { inlineError: true },
-    mutationFn: (id: string) => api(`/api/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    mutationFn: (id: string) => deleteCard(kind, id),
     onSuccess: () => client.invalidateQueries({ queryKey: [kind] }),
   });
 }

@@ -13,6 +13,7 @@ import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCa
 import { type PromptCardKind, promptCardsQuery } from "./queries";
 import { useCardFrom } from "./useCardFrom";
 import { useCardInComposer } from "./useCardInComposer";
+import { useCardSelection } from "./useCardSelection";
 
 /**
  * Library › Outfits and Library › Scenes: every card of the kind, to search, edit and delete. Use as
@@ -34,6 +35,7 @@ export function LibraryPromptCards({
   const [query, setQuery] = useState("");
   const order = useCardListing("library", kind);
   const cards = listedCards(listing.data, query, order.sort);
+  const selection = useCardSelection(kind, listing.data, cards);
   return (
     <>
       <SectionHeader heading={heading}>
@@ -50,6 +52,7 @@ export function LibraryPromptCards({
                 onChange={order.setSort}
                 withinPortal
               />
+              {selection.toggle}
               <ToolbarAction
                 label={`New ${noun}`}
                 icon={icons.add}
@@ -59,6 +62,7 @@ export function LibraryPromptCards({
           }
         />
       </SectionHeader>
+      {selection.bar}
       {start.error && <Alert color="red">{start.error.message}</Alert>}
       {listing.isPending ? (
         <LoadingState fill label={`Loading ${label}`} />
@@ -73,14 +77,17 @@ export function LibraryPromptCards({
               key={card.id}
               name={card.name}
               images={card.references}
+              selection={selection.control(card)}
               menu={
-                <PromptCardMenu
-                  kind={kind}
-                  card={card}
-                  onEdit={() => dialogs.edit(card)}
-                  onDelete={() => dialogs.remove(card)}
-                  onUse={() => use.promptCard(kind, card)}
-                />
+                !selection.active && (
+                  <PromptCardMenu
+                    kind={kind}
+                    card={card}
+                    onEdit={() => dialogs.edit(card)}
+                    onDelete={() => dialogs.remove(card)}
+                    onUse={() => use.promptCard(kind, card)}
+                  />
+                )
               }
             >
               <Text size="sm" c="dimmed" lineClamp={3}>

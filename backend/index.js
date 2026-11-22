@@ -687,10 +687,10 @@ const itemsRated = (ownerId, items, issue = "", strict = false) => {
     strict,
   );
 };
-// Every admitted job teaches the taste profile (iterations, chat reruns included) and makes a waiting finishing upscale step aside.
+// A manual or chat iteration teaches taste. Foreground work makes a waiting finishing upscale step aside.
 // Animating one of the account's photos, from the app or MCP but not Dream, likes that photo.
 const jobAdmitted = (job) => {
-  if (job.parentJobId || job.parentItemId)
+  if (job.priority !== queuePriority.dream && (job.parentJobId || job.parentItemId))
     taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
   const photo = job.priority === queuePriority.dream ? null : animatedPhoto(job);
   if (photo) itemsRated(job.ownerId, setGalleryRatings([photo.id], "liked"));
@@ -1065,7 +1065,7 @@ const dream = createDream({
   },
   cards: accountCards,
   inbox: {
-    propose: (ownerId) => inbox.propose(ownerId),
+    propose: (ownerId, account) => inbox.propose(ownerId, account),
     drafts: (ownerId) => inbox.drafts(ownerId),
   },
   minorAge,

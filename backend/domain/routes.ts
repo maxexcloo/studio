@@ -217,6 +217,17 @@ export function registerQueueRoutes(
   directRoute(app, "GET", "/api/queue", (account, { query }) => {
     const started = performance.now();
     const ownerId = ownerOf(account);
+    if (query.outputCounts === "1")
+      return {
+        status: 200,
+        payload: {
+          jobs: store
+            .openJobs(ownerId)
+            .flatMap(({ id, status, cleared, input: { kind, count } }) =>
+              !cleared && kind === "image" ? [{ id, status, input: { kind, count } }] : [],
+            ),
+        },
+      };
     const pauses = store.pauses();
     const jobs = listed(store, ownerId, { results: false });
     const failedSets = new Set<string>();

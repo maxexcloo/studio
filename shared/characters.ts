@@ -20,6 +20,14 @@ export const cardKinds = {
 } as const;
 export type CardKind = keyof typeof cardKinds;
 export type CardRating = "liked" | "disliked";
+/** The named subjects an MCP chat says its results show. */
+export type ResultContext = Partial<
+  Record<(typeof cardKinds)[CardKind]["name"], { name: string; description?: string }>
+> & {
+  series?: string;
+  /** Backstory or scene notes for Studio's prompt writers. */
+  notes?: string;
+};
 /**
  * How many of a card's images a draft places: its first. The run adds the others after it where the
  * profile's reference stack has room (backend/character-sheets.js sheetReferences).

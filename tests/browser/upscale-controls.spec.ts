@@ -272,7 +272,6 @@ test("A running upscale stops from its tile and the viewer, keeping the original
   await expect(page.getByRole("menuitem", { name: "Upscale", exact: true })).toBeEnabled();
   await upscale.click();
   await expect(page.getByRole("menu")).toHaveCount(0);
-  if ((page.viewportSize()?.width || 1440) < 768)
-    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
   await expect(page.getByText("Cancelled", { exact: true })).toBeVisible();
 });

@@ -1,15 +1,9 @@
 import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import {
-  type Card,
-  type CardKind,
-  type CardRating,
-  cardKinds,
-} from "../../../../shared/characters";
-import { api } from "../../api";
+import type { Card, CardKind, CardRating } from "../../../../shared/characters";
 import { itemAction } from "../gallery/itemActions";
 import { showDisliked } from "../gallery/useMediaRating";
-import { charactersQuery, promptCardsQuery } from "./queries";
+import { charactersQuery, promptCardsQuery, saveCardRating } from "./queries";
 
 export function useCardRating(kind: CardKind, card: Pick<Card, "id" | "rating">) {
   const client = useQueryClient();
@@ -18,16 +12,8 @@ export function useCardRating(kind: CardKind, card: Pick<Card, "id" | "rating">)
   const busy = useIsMutating({ mutationKey });
   const { mutate } = useMutation({
     mutationKey,
-    mutationFn: async ({ rating }: { rating: CardRating | null; undo?: CardRating | null }) => {
-      const result = await api<Record<string, Card>>(
-        `/api/${kind}/${encodeURIComponent(card.id)}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({ rating }),
-        },
-      );
-      return result[cardKinds[kind].name];
-    },
+    mutationFn: ({ rating }: { rating: CardRating | null; undo?: CardRating | null }) =>
+      saveCardRating(kind, card.id, rating),
     onSuccess: (saved, { undo }) => {
       client.setQueryData<Card[]>(queryKey, (cards) =>
         cards?.map((entry) => (entry.id === saved.id ? { ...entry, rating: saved.rating } : entry)),

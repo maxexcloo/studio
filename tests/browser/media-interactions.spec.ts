@@ -7,6 +7,7 @@ import {
   image,
   pressGenerate,
   serveRetries,
+  showViewerControls,
   stamp,
   viewerAction,
 } from "./fixtures";
@@ -162,6 +163,7 @@ test("Retrying a failed entry in the viewer replaces it with the new run", async
   await expect(status).toContainText("Generation Failed");
   await expect(status).toContainText("Worker lost connection");
   await expect(viewer.getByRole("button", { name: "Retry", exact: true })).toHaveCount(1);
+  await showViewerControls(viewer);
   await expect(viewer.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
   await expect(
     viewer.getByRole("button", { name: "Generation Details", exact: true }),
@@ -184,6 +186,7 @@ test("A cleared failure in the viewer keeps its recorded error and Edit", async 
   await expect(status).toContainText(job.reason);
   await expect(status).toContainText("Use Edit to review the prompt and settings.");
   await expect(viewer.getByRole("button", { name: "Retry", exact: true })).toHaveCount(0);
+  await showViewerControls(viewer);
   await expect(viewer.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
 });
 
@@ -268,7 +271,7 @@ test("A delayed Retry finishes on its source after navigating to another image",
     const picture = viewer.getByRole("img", { name: neighbour.prompt, exact: true });
     await expect(picture).toBeVisible();
     await expect(retry).toHaveCount(0);
-    await viewer.getByRole("button", { name: "Like", exact: true }).click();
+    await viewerAction(page, "Like");
     const unlike = viewer.getByRole("button", { name: "Unlike", exact: true });
     await expect(unlike).toHaveAttribute("aria-pressed", "true");
     await expect(unlike).toBeEnabled();

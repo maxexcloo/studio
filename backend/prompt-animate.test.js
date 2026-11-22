@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { loadMcpPrompting } from "./mcp/prompting.js";
 import { animateClip, animateInstructions, writeAnimatePrompt } from "./prompt-animate.js";
 import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.js";
 
@@ -23,9 +24,15 @@ const shapes = {
     profile: { id: "custom:video-grok-imagine-cloud", family: "grok" },
     guide: { mode: { id: "video", rules: ["Write one detailed paragraph."] } },
   },
+  ltx: {
+    profile: { id: "custom:video-ltx-2.5-distilled-fast", family: "ltx2" },
+    guide: loadMcpPrompting()({
+      prompting: { mode: { id: "first-frame", rules: ["Describe action with ambient sound."] } },
+    }),
+  },
 };
 
-test("each profile shape gets its guide's format, with sound for H3 and Grok", () => {
+test("each profile shape gets its guide's format, with sound where supported", () => {
   const writing = { theme: "action", source: "A skater" };
   for (const { profile, guide } of Object.values(shapes)) {
     const system = animateInstructions({ profile, guide, writing, clip: { seconds: 8 } });
@@ -286,4 +293,66 @@ test("the writer sees the first frame when the model reads images, and reads its
   assert.equal(typeof calls[0].messages[1].content, "string");
   assert.match(calls[0].messages[0].content, /keep to what the prompt below states/);
   assert.doesNotMatch(calls[0].messages[1].content, /What the frame shows/);
+});
+
+test("a queued video uses the recorded backend's reference mode guide, timing and start frame", async () => {
+  const stage = createPromptStage({
+    engine: { ...engine, supportsVision: async () => true },
+    account: () => undefined,
+    profiles: async () => [
+      {
+        ...video,
+        prompting: { mode: { id: "default", rules: ["Use the default format."] } },
+        backendOptions: [
+          {
+            id: "comfyui",
+            profile: {
+              ...video,
+              prompting: { mode: { id: "generate", rules: ["Use the Generate format."] } },
+              mediaInputs: [{ id: "style" }, { id: "start", role: "start" }],
+              imageModes: {
+                reference: {
+                  prompting: { mode: { id: "first-frame", rules: ["Write a shot heading."] } },
+                  defaults: { frames: 96, fps: 24 },
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
+    guide: loadMcpPrompting(),
+    frame: async (_account, assetId) => {
+      assert.equal(assetId, "last-frame");
+      return { mime: "image/jpeg", data: "AAAA" };
+    },
+  });
+  calls.length = 0;
+  await stage(
+    {
+      input: {
+        profileId: video.id,
+        profileBackend: "comfyui",
+        referenceAssets: [
+          { assetId: "style-reference", slot: "style" },
+          { assetId: "last-frame", slot: "start" },
+        ],
+        writing: {
+          kind: "animate",
+          theme: "custom",
+          instruction: "Follow its flight.",
+          source: "A bird takes flight",
+          extend: true,
+        },
+      },
+    },
+    { signal: new AbortController().signal },
+  );
+  assert.equal(calls.length, 1);
+  const [system, request] = calls[0].messages;
+  assert.match(system.content, /first-frame.*Write a shot heading\./);
+  assert.doesNotMatch(system.content, /Use the (default|Generate) format\./);
+  assert.match(system.content, /only 4 seconds long at 24 fps/);
+  assert.match(request.content[0].text, /The clip so far was made from: A bird takes flight/);
+  assert.equal(request.content[1].image_url.url, "data:image/jpeg;base64,AAAA");
 });

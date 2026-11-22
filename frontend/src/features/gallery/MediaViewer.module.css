@@ -47,25 +47,34 @@
   min-height: 0;
 }
 
-/* Keep the media's fitted bounds while the phone sheet covers its actions. */
+/* Keep Dream's fitted bounds while the phone Details sheet covers its verdicts. */
 .layout [data-actions-hidden] {
   visibility: hidden;
 }
 
 .main {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template: auto minmax(0, 1fr) / minmax(0, 1fr);
   flex: 1;
   min-width: 0;
   min-height: 0;
 }
 
+.main[data-docked] {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.dockedControls {
+  grid-area: 3 / 1;
+}
+
 .topBar {
-  position: absolute;
-  top: calc(var(--mantine-spacing-sm) + env(safe-area-inset-top));
-  right: calc(var(--mantine-spacing-sm) + env(safe-area-inset-right));
-  left: calc(var(--mantine-spacing-sm) + env(safe-area-inset-left));
+  grid-area: 1 / 1;
+  padding-block: calc(var(--mantine-spacing-sm) + env(safe-area-inset-top))
+    var(--mantine-spacing-sm);
+  padding-inline: calc(var(--mantine-spacing-sm) + env(safe-area-inset-left))
+    calc(var(--mantine-spacing-sm) + env(safe-area-inset-right));
   z-index: 3;
   pointer-events: none;
 }
@@ -74,12 +83,47 @@
   pointer-events: auto;
 }
 
+.viewerStage {
+  grid-area: 1 / 1 / 3;
+}
+
+/* Fit and manual zoom share the same viewport. Fill and comparison still extend under the header. */
+.viewerStage:has(.mediaStrip [data-zoom-mode]:not([data-zoom-mode="Fill"])):not(:has(.comparison)) {
+  grid-row: 2;
+}
+
+.controls {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(var(--mantine-spacing-xs));
+  visibility: hidden;
+  transition:
+    opacity var(--studio-motion-exit) var(--studio-ease-exit),
+    transform var(--studio-motion-exit) var(--studio-ease-exit),
+    visibility 0s var(--studio-motion-exit);
+}
+
+.controls[data-open] {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition:
+    opacity var(--studio-motion-duration) var(--studio-ease-enter),
+    transform var(--studio-motion-duration) var(--studio-ease-enter);
+}
+
+.controls[data-open] .dock > * {
+  pointer-events: auto;
+}
+
 .stage {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
   min-height: 0;
   overflow: hidden;
   overscroll-behavior-x: contain;
@@ -358,7 +402,7 @@
   }
 }
 
-/* Phones show the media edge to edge, filling the space above the strip and controls. */
+/* Phone controls reach the safe edges over the media. */
 :where(:root[data-phone]) .dock {
   padding: 0;
 }
@@ -371,43 +415,6 @@
   padding-bottom: calc(4px + env(safe-area-inset-bottom));
 }
 
-/* A phone held sideways keeps the full height for the media: the strip, prompt and actions stand
-   beside it, at a portrait phone's width, below the top bar's buttons. */
-:where(:root[data-phone="sideways"]) .main {
-  flex-direction: row;
-}
-:where(:root[data-phone="sideways"]) .dock {
-  justify-content: flex-end;
-  width: min(24rem, 45%);
-}
-
-:where(:root[data-phone="sideways"]) .dock > .actions {
-  padding-inline-start: 4px;
-}
-
 .topActions {
   flex-shrink: 0;
-}
-
-/* A touch tap on the media fades the chrome out and back. Hidden chrome stays in the accessibility
-   tree, and focus reaching it brings it back; loading actions stay in sight, the strip does not. With
-   nothing left in sight the media glides to the middle of the screen (MediaViewer.tsx measures the
-   distance), keeping its fitted size. */
-.topBar,
-.navigation,
-.dock > * {
-  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
-}
-.stage {
-  transition: translate var(--studio-motion-duration) var(--studio-ease-enter);
-}
-.layout[data-chrome-hidden] :is(.topBar, .navigation, .aside, .dock > :not(:has([data-loading]))) {
-  opacity: 0;
-}
-.layout[data-chrome-hidden]
-  :is(.topBar > *, .navigation button, .aside, .dock > :not(:has([data-loading]))) {
-  pointer-events: none;
-}
-.layout[data-chrome-hidden]:not(:has(.dock [data-loading])) .stage {
-  translate: var(--studio-viewer-centre, none);
 }
