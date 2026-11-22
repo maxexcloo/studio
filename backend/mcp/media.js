@@ -229,7 +229,7 @@ function runCaption(labels, numbers) {
  * A gallery item's output number. Records from before 0.4x carry it only in their id
  * (`<jobId>-<n>`), and single-output ones may carry neither, which means the first output.
  */
-function outputIndex(item) {
+export function outputIndex(item) {
   if (Number.isInteger(item.index)) return item.index;
   const suffix = /-(\d+)$/.exec(String(item.id || "").slice(String(item.jobId || "").length));
   return suffix ? Number(suffix[1]) : 0;
@@ -966,7 +966,11 @@ export class McpMedia {
         index < 1000 &&
         mcpOutputPath(item.url)
       ) {
-        outputs.set(index, { url: item.url, rating: item.rating || "unrated" });
+        outputs.set(index, {
+          url: item.url,
+          rating: item.rating || "unrated",
+          galleryItemId: item.id,
+        });
         kind = item.type;
         profileId ||= item.settings?.profileId;
         prompt ||= item.prompt;
@@ -1213,7 +1217,7 @@ export class McpMedia {
       if (!inSet.letter) return { jobId: item.jobs[0].id };
       let at = inSet.letter.toLowerCase().charCodeAt(0) - 97;
       for (const job of item.jobs) {
-        if (at < job.images) return { jobId: job.id, index: at, output: true };
+        if (at < job.images) return { jobId: job.id, index: at };
         at -= job.images;
       }
       throw new Error(`set ${inSet.number} item ${inSet.item} has no image ${inSet.letter}.`);
@@ -1224,7 +1228,7 @@ export class McpMedia {
       const { jobId } = await this.resolve(owner, scope, `${chat ? "result " : "#"}${number}`, {
         signal,
       });
-      return { jobId, index: letter.toLowerCase().charCodeAt(0) - 97, output: true };
+      return { jobId, index: letter.toLowerCase().charCodeAt(0) - 97 };
     }
     const short = /^(?:https?:\/\/\S+\/mcp\/results\/)?([A-Za-z0-9]{10})(?:\.jpg)?$/.exec(
       String(value || "").trim(),
@@ -1249,7 +1253,7 @@ export class McpMedia {
         throw new Error(
           `There is no option ${letter.toUpperCase()} in this conversation; variants offers lettered options.`,
         );
-      return { jobId, index: 0, letter: letter.toUpperCase(), offer };
+      return { jobId, index: 0 };
     }
     const number = Number(numberPattern.exec(String(value || ""))?.[1]);
     if (!number) return { jobId: value };
@@ -1302,7 +1306,7 @@ export class McpMedia {
     if (!found || found.item) return null;
     return found.set.plans.flatMap(({ jobs }) =>
       jobs.flatMap(({ id, images }) =>
-        Array.from({ length: images }, (_, index) => ({ jobId: id, index, output: true })),
+        Array.from({ length: images }, (_, index) => ({ jobId: id, index })),
       ),
     );
   }
@@ -1312,16 +1316,21 @@ export class McpMedia {
       (pattern) => pattern.test(String(value)),
     );
   }
-  /** A result's image as a new reference asset, for generate. */
-  async resultReference(owner, jobId, index) {
-    const result = await this.download(owner, jobId, index);
-    if (!imageMimes.includes(result.mime))
-      throw new Error("Only images can be reused as references.");
-    return this.upload(
+  /** The gallery reference for this exact result's image. */
+  async resultReference(owner, jobId, index, signal) {
+    const job = await this.job(owner, jobId, 0, { signal });
+    const { galleryItemId } = this.available(job, index);
+    if (job.kind !== "image") throw new Error("Only images can be reused as references.");
+    const result = await this.request(
+      "POST",
+      "/api/reference-assets/from-gallery",
+      { galleryItemId },
       owner,
-      result.content.toString("base64"),
-      `reference.${result.mime.split("/")[1]}`,
+      { signal },
     );
+    if (!result.asset?.id) throw new Error("Studio could not take this image as a reference.");
+    this.adopt(owner, "", { assets: [result.asset.id] });
+    return result;
   }
   /** Remembers a conversation's latest lettered options, which "A", "B"… then name. */
   offer(owner, scope, comparison, jobs) {
@@ -1339,24 +1348,21 @@ export class McpMedia {
       ? offer.comparison
       : (await this.comparisons(owner, [found.jobId], { scope, signal }))[0]?.id;
     if (!comparison) throw new Error("That result is not among any options; nothing to pick.");
-    const voted = await this.request(
+    return this.request(
       "PUT",
       `/api/comparisons/${safeId(comparison)}/vote`,
       { jobId: found.jobId, by: "chat" },
       owner,
       { signal },
     );
-    if (offer?.comparison === comparison)
-      this.rows.setOffer(key, { ...offer, picked: found.jobId });
-    return voted;
   }
   /** Whether a job is among this conversation's results. */
   inScope(owner, scope, jobId) {
     return this.rows.refNumber(scope || this.referenceScope(owner), jobId) !== undefined;
   }
-  /** A job's reference, its first output's number ("#12"), once Studio gave it. */
-  refOf(jobId) {
-    const number = this.numberOf(jobId);
+  /** The selected output's number ("#12"), defaulting to the job's first output. */
+  refOf(jobId, index) {
+    const number = this.numberOf(jobId, index);
     return number ? `#${number}` : undefined;
   }
   outputFeedback(jobId, index, rating) {
@@ -2103,10 +2109,10 @@ export class McpMedia {
       ],
     };
   }
-  /** A job's outputs as markdown to reply with once it finished, otherwise its link and state. */
-  async result(owner, jobId, seconds = 0, { scope = "", signal } = {}) {
+  /** A finished job or selected output as markdown, otherwise the job's link and state. */
+  async result(owner, jobId, seconds = 0, { index, scope = "", signal } = {}) {
     const job = await this.job(owner, jobId, seconds, { signal });
-    const ref = this.refOf(jobId);
+    const ref = this.refOf(jobId, index);
     const label = ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : "Studio result";
     const named = { job_id: jobId, ...(ref ? { ref } : {}) };
     if (!finished.has(job.status)) {
@@ -2124,9 +2130,12 @@ export class McpMedia {
       };
     }
     const comparisons = await this.comparisons(owner, [jobId], { scope, signal });
-    const { outputs, markdown } = await this.markdown(owner, [{ jobId, job, label }], scope);
+    if (index !== undefined) this.available(job, index);
+    const { outputs, markdown } = await this.markdown(owner, [{ jobId, job, label, index }], scope);
     if (!outputs.length) throw new Error("This completed job has no available output.");
-    const feedback = this.feedback(jobId, job);
+    const feedback = this.feedback(jobId, job).filter(
+      (output) => index === undefined || output.output_index === index,
+    );
     return {
       content: [
         text(
@@ -2154,9 +2163,9 @@ export class McpMedia {
    * renderers add no gap; videos are blank-line separated.
    */
   async markdown(owner, entries, scope = "") {
-    const outputs = entries.flatMap(({ jobId, job, label }) =>
+    const outputs = entries.flatMap(({ jobId, job, label, index: selected }) =>
       (job.outputs || []).flatMap((item, index) =>
-        mcpOutputPath(item?.url)
+        (selected === undefined || selected === index) && mcpOutputPath(item?.url)
           ? [{ jobId, label, output_index: index, url: this.url(owner, jobId, index) }]
           : [],
       ),

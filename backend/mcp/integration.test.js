@@ -382,12 +382,19 @@ async function fixture(
     });
     res.json({ asset });
   });
-  // Extend's last frame of a gallery video, or an upload's own reference.
+  // A generation, upload or video frame as a gallery reference.
   app.post("/api/reference-assets/from-gallery", express.json(), (req, res) => {
     const upload = uploads.find((item) => item.id === req.body.galleryItemId);
     const asset = upload
       ? assets.get(upload.assetId)
-      : { id: `fixture-frame-${req.body.galleryItemId}-${req.body.frame}`, source: "gallery" };
+      : {
+          id:
+            req.body.frame === undefined
+              ? `fixture-reference-${req.body.galleryItemId}`
+              : `fixture-frame-${req.body.galleryItemId}-${req.body.frame}`,
+          source: "generation",
+          galleryItemId: req.body.galleryItemId,
+        };
     assets.set(asset.id, asset);
     res.json({ ok: true, asset });
   });
@@ -2336,7 +2343,20 @@ test("Result reads current per-output user feedback for single, all and set requ
   delete job.outputs[1].rating;
   expected[0].rating = "disliked";
   expected[1].rating = "unrated";
-  await read("#1", expected);
+  assert.equal((await read("#2", [expected[1]])).ref, "#2");
+  const { outputs } = data(await call(alice, "status", { job_id: id }));
+  await read(outputs[2].url, [expected[2]]);
+  const { asset } = data(await call(alice, "reuse", { job_id: outputs[2].url, mode: "reference" }));
+  assert.equal(asset.galleryItemId, `${id}-2`);
+  const refsBefore = f.requests.filter(
+    ({ path }) => path === "/reference-assets/from-gallery",
+  ).length;
+  await failure(bob, "reuse", { job_id: outputs[2].url, mode: "reference" });
+  await failure(bob, "generate", { prompts: ["A landscape"], reference_asset_ids: [asset.id] });
+  assert.equal(
+    f.requests.filter(({ path }) => path === "/reference-assets/from-gallery").length,
+    refsBefore,
+  );
   await read("all", expected);
   await read(generated.set, expected);
   const pending = jobId(await generate(alice, { prompts: ["Still running"] }));
@@ -2504,7 +2524,8 @@ test("owned completed results remain available after the transient job expires",
   );
   assert.equal(links(result).length, 1);
   const reused = data(await call(client, "reuse", { job_id: id, mode: "reference" }));
-  assert.ok(reused.asset?.id || reused.id || reused.asset_id);
+  assert.equal(reused.asset.galleryItemId, "retained-gallery-output");
+  assert.equal(f.downloads.length, 0);
 });
 
 test("invalid generation controls, references and excessive batches fail before submission", async (t) => {
@@ -4381,10 +4402,11 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
   const extras = data(
     await call(client, "reuse", { job_id: "#1", mode: "reference", request: "bluer" }),
   );
-  assert.match(extras.asset.id, /^fixture-asset-/);
+  assert.equal(extras.asset.galleryItemId, `${first.jobs[0].job_id}-0`);
   assert.match(extras.note, /^Ignored request: mode reference takes only job_id and output_index/);
   const { asset, note } = data(await call(client, "reuse", { job_id: "#1", mode: "reference" }));
-  assert.match(asset.id, /^fixture-asset-/);
+  assert.equal(asset.id, extras.asset.id);
+  assert.equal(asset.galleryItemId, extras.asset.galleryItemId);
   assert.equal(note, undefined);
   const edit = data(
     await call(client, "generate", {
@@ -5631,19 +5653,19 @@ test("variants offers lettered options of a result, records the pick and takes l
     /\[Compare Side by Side\]\(https:\/\/studio\.example\.test\/compare\/fox-options\)/,
   );
   assert.match(text, /\[A · Blue Hour\]\([^)]+\) #2\n\[B · Golden Dusk\]\([^)]+\) #3/);
-  // A letter names the chat's latest options: reuse with it follows the pick up and records it once.
+  // A letter names the chat's latest options. Reuse and reference leave the vote to variants pick.
   finish(f);
   data(await call(client, "reuse", { job_id: "B", prompt: "A fox at golden dusk, closer" }));
   assert.equal(f.submitted.at(-1).prompt, "A fox at golden dusk, closer");
-  assert.deepEqual(votes, [["fox-options", { jobId: "variant-1", by: "chat" }]]);
-  data(await call(client, "reuse", { job_id: "B" }));
-  assert.equal(votes.length, 1);
+  data(await call(client, "reuse", { job_id: "B", mode: "reference" }));
+  assert.deepEqual(votes, []);
   // pick records a choice by number too, and says Dream proposes it for the project's brief.
   const picked = data(await call(client, "variants", { pick: "#3" }));
   assert.equal(picked.picked, "B · Golden Dusk");
   assert.match(picked.note, /proposes this lighting for Foxes's brief/);
+  assert.deepEqual(votes, [["fox-options", { jobId: "variant-1", by: "chat" }]]);
   await failure(client, "variants", { pick: "D" });
-  // generate takes a result's number or letter as a reference image.
+  // Generate uses an option's existing gallery reference, with no repeat upload.
   const uploads = f.requests.filter(
     (request) => request.path === "/reference-assets/upload",
   ).length;
@@ -5656,9 +5678,9 @@ test("variants offers lettered options of a result, records the pick and takes l
   );
   assert.equal(
     f.requests.filter((request) => request.path === "/reference-assets/upload").length,
-    uploads + 1,
+    uploads,
   );
-  assert.match(f.submitted.at(-1).referenceAssets[0].assetId, /^fixture-asset-/);
+  assert.equal(f.submitted.at(-1).referenceAssets[0].assetId, "fixture-reference-variant-0-0");
 });
 
 test("aspect picks the profile's own preset and resolution its long edge", async (t) => {
@@ -7278,16 +7300,23 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
 
   // Gallery: like one output, dislike it, delete both, clear failed items; each with the caller's own credential.
   assert.deepEqual(
-    data(await call(mine, "gallery", { action: "like", results: ["#1"], output_index: 1 })),
+    data(await call(mine, "gallery", { action: "like", results: [id], output_index: 1 })),
     { liked: 1, results: ["#1"] },
   );
   assert.deepEqual(seen.at(-1).body, { ids: ["/comfy/view?filename=b.png"], rating: "liked" });
-  assert.deepEqual(
-    data(await call(mine, "gallery", { action: "dislike", results: ["#1"], output_index: 1 })),
-    { disliked: 1, results: ["#1"] },
+  const { outputs } = data(await call(mine, "status", { job_id: id }));
+  assert.equal(
+    data(await call(mine, "gallery", { action: "dislike", results: [outputs[1].url] })).disliked,
+    1,
   );
   assert.deepEqual(seen.at(-1).body, { ids: ["/comfy/view?filename=b.png"], rating: "disliked" });
   assert.equal(seen.at(-1).authorization, `Bearer ${userToken}`);
+  assert.equal(
+    data(await call(mine, "gallery", { action: "delete", results: ["#1"], output_index: 1 }))
+      .deleted,
+    1,
+  );
+  assert.deepEqual(seen.at(-1).body, { ids: ["/comfy/view?filename=a.png"] });
   // A pick such as "1b" names one output by its letter, beside another ref's.
   assert.deepEqual(
     data(await call(mine, "gallery", { action: "like", results: ["#1b", "result 1 a"] })),

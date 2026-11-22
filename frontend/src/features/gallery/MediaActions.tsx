@@ -29,7 +29,7 @@ import type { CardKind } from "../../../../shared/characters";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
-import { copyText } from "../../ui/clipboard";
+import { copyText, useCopy } from "../../ui/clipboard";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
@@ -60,6 +60,7 @@ import { AnimateDialog } from "./AnimateDialog";
 import { videoGif } from "./download";
 import { itemAction, itemActionGroups } from "./itemActions";
 import { useSettingsText } from "./MediaDetails";
+import { mediaNumber } from "./mediaLabels";
 import { automaticEditProfile, useActionProfile } from "./mediaProfiles";
 import type { MediaTransferActions } from "./mediaShare";
 import { galleryKey } from "./queries";
@@ -297,6 +298,8 @@ export function useMediaActions(
   });
   const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
   const settingsText = useSettingsText(item);
+  const resultNumber = mediaNumber(item);
+  const copyReference = useCopy();
   const retry = useRetryAction(item, retryInStage, onRetried);
   const reference = useReferenceAction(item, onApplied);
   const cards = useCardActions(item, onApplied);
@@ -762,6 +765,17 @@ export function useMediaActions(
             icon: TextQuote,
             onClick: () => void copyText(item.prompt || "", "Prompt"),
           },
+          ...(resultNumber
+            ? [
+                {
+                  id: "copy-reference",
+                  label: copyReference.copied ? "Copied" : "Copy Reference",
+                  icon: copyReference.copied ? Check : icons.copy,
+                  keepOpen: true,
+                  onClick: () => copyReference.copy(resultNumber),
+                },
+              ]
+            : []),
           // A video also downloads as a GIF, beside it rather than in a submenu.
           ...(gif ? [{ id: "download-gif", label: "Download GIF", icon: Film, link: gif }] : []),
           ...(ready

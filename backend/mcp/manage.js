@@ -16,7 +16,7 @@ import {
 } from "../../shared/characters.ts";
 import { terminalStatuses } from "../../shared/queue.ts";
 import { shapeName } from "../../shared/taste.ts";
-import { mcpJson } from "./media.js";
+import { mcpJson, outputIndex } from "./media.js";
 
 const maxResults = 50;
 const maxListed = 25;
@@ -72,7 +72,7 @@ export function registerManageTools({
     server,
     "gallery",
     "manage gallery",
-    'Change the user\'s gallery when asked: like, dislike (hides) or clear_rating results the user picks, delete them with their files (only on request), or clear_failed. results: refs from generate or search, a letter picking one output ("#12b", "set 3 B"), else output_index, else all.',
+    "Change the user's gallery when asked: like, dislike (hides), clear_rating, delete with files, or clear_failed. A result number, output link or letter picks one output. For a job, output_index picks one, otherwise all.",
     {
       action: z.enum(["like", "dislike", "clear_rating", "delete", "clear_failed"]),
       results: z.array(result).min(1).max(maxResults).optional(),
@@ -85,8 +85,6 @@ export function registerManageTools({
         return mcpJson({ cleared });
       }
       if (!results) throw new Error(`Pass results: the refs or job_ids to ${action}.`);
-      // A ref with an output letter ("#12b") names that output alone, else output_index, else all.
-      // A whole set's ref ("set 3") names each of its images; "set 3 2c" one of them.
       const picks = (
         await Promise.all(
           results.map(async (value) => {
@@ -94,9 +92,9 @@ export function registerManageTools({
               await resolveOutput(value, signal),
             ];
             for (const { jobId } of found) media.own(owner, jobId);
-            return found.map(({ jobId, index, output }) => ({
+            return found.map(({ jobId, index }) => ({
               jobId,
-              index: output ? index : output_index,
+              index: index ?? output_index,
             }));
           }),
         )
@@ -114,7 +112,7 @@ export function registerManageTools({
         for (const item of items)
           if (
             item.url &&
-            (wanted.includes(undefined) || wanted.includes(item.index ?? 0)) &&
+            (wanted.includes(undefined) || wanted.includes(outputIndex(item))) &&
             !urls.includes(item.url)
           )
             urls.push(item.url);

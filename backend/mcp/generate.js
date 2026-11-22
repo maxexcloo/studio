@@ -1912,10 +1912,7 @@ export function registerGenerateTools({
         throw new Error('only, add and swap are for a set ref ("set 3"). Call reuse again.');
       const found = await resolveOutput(job_id, signal);
       const id = found.jobId;
-      const output_index = chosenIndex || found.index || 0;
-      // Following up on a lettered option is the user's pick.
-      if (found.letter && found.offer.picked !== found.jobId)
-        await media.pick(owner, refs, found, signal);
+      const output_index = found.index ?? chosenIndex ?? 0;
       // A reference is the result's image as it is, so other arguments change nothing; they are
       // named back rather than refused, and the chat carries on to generate.
       if (mode === "reference") {
@@ -1934,14 +1931,14 @@ export function registerGenerateTools({
         })
           .filter(([, value]) => value)
           .map(([name]) => name);
-        const uploaded = await media.resultReference(owner, id, output_index);
+        const reference = await media.resultReference(owner, id, output_index, signal);
         return mcpJson(
           ignored.length
             ? {
-                ...uploaded,
+                ...reference,
                 note: `Ignored ${ignored.join(", ")}: mode reference takes only job_id and output_index. Pass the asset's id to generate as reference_asset_ids, with your prompts there.`,
               }
-            : uploaded,
+            : reference,
         );
       }
       const animating = mode === "animate" || mode === "extend";

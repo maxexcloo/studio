@@ -332,7 +332,7 @@ export function registerMcpRoutes(
     const referenceAsset = async (value, signal) => {
       if (!media.namesResult(value)) return media.referenceId(value);
       const found = await resolveOutput(value, signal);
-      return (await media.resultReference(owner, found.jobId, found.index || 0)).asset.id;
+      return (await media.resultReference(owner, found.jobId, found.index ?? 0, signal)).asset.id;
     };
     const server = new McpServer(
       // The commit the image was built from, so a client sees when Studio (and its tools) changed.

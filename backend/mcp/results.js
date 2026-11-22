@@ -101,7 +101,9 @@ export function registerResultTools({
           signal,
           jobIds: [...new Set(set.map(({ jobId }) => jobId))],
         });
-      return media.result(owner, await resolve(job_id, signal), wait_seconds, {
+      const { jobId, index } = await resolveOutput(job_id, signal);
+      return media.result(owner, jobId, wait_seconds, {
+        index,
         scope: refs,
         signal,
       });
