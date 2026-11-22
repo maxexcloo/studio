@@ -1401,6 +1401,9 @@ test("Gallery Dates jumps past unloaded pages and scrolls either way from the ch
   await page.goto("/images");
   const scrubber = page.getByRole("scrollbar", { name: "Gallery Dates" });
   await expect(scrubber).toHaveAttribute("data-indexed", "true");
+  // Scrolling reveals the date control on touch screens too.
+  await page.evaluate(() => window.scrollBy(0, 1));
+  await expect(scrubber).toHaveAttribute("data-active", "true");
   const track = (await scrubber.boundingBox())!;
   const x = track.x + track.width / 2;
   await page.mouse.move(x, track.y + track.height / 8);

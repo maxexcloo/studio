@@ -28,8 +28,13 @@ function dateDensity(days: GalleryDate[]) {
   });
   const peak = Math.max(...density.map(({ level }) => level), 1);
   const stops = density.map(({ start, end, level }) => {
-    const alpha = Math.round(16 + (76 * level) / peak);
-    return `color-mix(in srgb, var(--mantine-primary-color-filled) ${alpha}%, transparent) ${(100 * start) / days.length}% ${(100 * end) / days.length}%`;
+    const alpha = Math.round(14 + (52 * level) / peak);
+    const middle = (50 * (start + end)) / days.length;
+    const half = `min(1px, ${(12 * (end - start)) / days.length}%)`;
+    const first = `calc(${middle}% - ${half})`;
+    const last = `calc(${middle}% + ${half})`;
+    const colour = `color-mix(in srgb, var(--mantine-primary-color-filled) ${alpha}%, transparent)`;
+    return `transparent ${first}, ${colour} ${first} ${last}, transparent ${last}`;
   });
   return `linear-gradient(${stops.join(", ")})`;
 }
@@ -198,7 +203,7 @@ export const DateScrubber = memo(function DateScrubber({
     <div
       ref={track}
       className={classes.scrubber}
-      data-active={active || drag !== null || focus || undefined}
+      data-active={active || drag !== null || focus || pendingIndex !== undefined || undefined}
       data-indexed={indexed || undefined}
       style={indexed ? { backgroundImage: density } : undefined}
       role="scrollbar"
@@ -269,16 +274,6 @@ export const DateScrubber = memo(function DateScrubber({
       }}
       onLostPointerCapture={endDrag}
     >
-      {indexed && drag === null && (
-        <>
-          <span className={classes.endpoint} aria-hidden>
-            {dateLabel(timeline[0].day)}
-          </span>
-          <span className={classes.endpoint} aria-hidden>
-            {dateLabel(timeline.at(-1)!.day)}
-          </span>
-        </>
-      )}
       <div
         className={classes.thumb}
         style={{ top: `calc(${fraction} * (100% - var(--scrubber-thumb)))` }}
