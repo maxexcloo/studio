@@ -216,24 +216,17 @@ export function useChangeSuggestions<K extends QueryKey>({
     disabled,
     menu: [options, [again]],
   };
-  // The same under a heading, as one group of an assistant menu (assistMenu).
-  const group: Action[] = [
-    { id: "suggestions-heading", label: "Suggested", heading: true },
-    ...options.map((option) => ({ ...option, icon: icons.assistant })),
-    again,
-  ];
-  return { action, group, loading };
+  return { action, loading };
 }
 
 /**
  * An assistant menu (Animate, Edit, AI): its settings, the suggestions written for this
- * item with Refresh, Library's templates under their heading with Custom… last, then any other
+ * item with Refresh, Library's templates with Custom… last, then any other
  * actions, then its own run. While what decides its options is `loading`, one row stands in for
  * them all.
  */
 export const assistMenu = ({
   loading,
-  expandable,
   settings = [],
   suggestions,
   templates,
@@ -242,9 +235,8 @@ export const assistMenu = ({
   last,
 }: {
   loading?: boolean;
-  expandable?: boolean;
   settings?: Action[];
-  suggestions?: { action?: Action; group: Action[] };
+  suggestions?: { action: Action };
   templates: Action[];
   custom?: Action[];
   others?: ActionGroups;
@@ -252,20 +244,11 @@ export const assistMenu = ({
 }): ActionGroups => {
   if (loading) return [[{ id: "loading", label: "Loading…", disabled: true }]];
   const choices = [...templates].sort((a, b) => compareNames(a.label, b.label)).concat(custom);
-  const sections: ActionGroups = expandable
-    ? [
-        [
-          ...(suggestions?.action ? [suggestions.action] : []),
-          ...(choices.length ? [{ id: "templates", label: "Templates", menu: [choices] }] : []),
-        ],
-      ]
-    : [
-        suggestions?.group ?? [],
-        choices.length
-          ? [{ id: "templates-heading", label: "Templates", heading: true }, ...choices]
-          : [],
-      ];
-  return [settings, ...sections, ...others, last];
+  const sections: Action[] = [
+    ...(suggestions ? [suggestions.action] : []),
+    ...(choices.length ? [{ id: "templates", label: "Templates", menu: [choices] }] : []),
+  ];
+  return [settings, sections, ...others, last];
 };
 
 export function changeTemplates(

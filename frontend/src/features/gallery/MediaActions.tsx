@@ -34,7 +34,6 @@ import { copyText } from "../../ui/clipboard";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
-import { usePhone } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
 import { useStartCard } from "../characters/useCardFrom";
@@ -297,7 +296,6 @@ export function useMediaActions(
     retryInStage = false,
   }: MediaActionOptions,
 ): ActionGroups {
-  const phone = usePhone();
   const action = useMediaAction(item, onApplied);
   const iteration = useMediaIteration(item);
   const client = useQueryClient();
@@ -521,7 +519,6 @@ export function useMediaActions(
     setSuggestions({ id: item.id, mode, prompt: draft?.suggestionPrompt });
   const changeMenu = (mode: ViewerChange, others: ActionGroups, last: Action[]) =>
     assistMenu({
-      expandable: phone,
       settings: [
         ...(mode === "edit" ? editProfiles : []),
         ...(mode === "recreate" && countLimit > 1
@@ -633,7 +630,6 @@ export function useMediaActions(
         onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
         menu: assistMenu({
           loading: optionsLoading,
-          expandable: phone,
           settings: [length, ...animateProfiles, ...reviewItems],
           suggestions: motionsOffered ? motions : undefined,
           templates: templates.filter((template) => template.id !== "custom").map(templateItem),

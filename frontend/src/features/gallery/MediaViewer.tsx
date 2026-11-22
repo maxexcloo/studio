@@ -128,6 +128,11 @@ function ViewerVideo({
     clearTimeout(hide.current);
     hide.current = window.setTimeout(() => setControls(false), 2500);
   };
+  const tap = (video: HTMLVideoElement, y: number) => {
+    const nearPlaybackControls = video.controls && video.getBoundingClientRect().bottom - y < 44;
+    if (!nearPlaybackControls && !refused && !closingPopup()) onTap?.();
+    reveal();
+  };
   return (
     <>
       <video
@@ -152,13 +157,11 @@ function ViewerVideo({
         onPointerCancel={swipe.onPointerCancel}
         onPointerDown={swipe.onPointerDown}
         onPointerUp={(event) => {
-          if (!swipe.onPointerUp(event)) return;
-          const nearPlaybackControls =
-            controls &&
-            !hideControls &&
-            event.currentTarget.getBoundingClientRect().bottom - event.clientY < 44;
-          if (!nearPlaybackControls && !refused && !closingPopup()) onTap?.();
-          reveal();
+          if (
+            swipe.onPointerUp(event) ||
+            (onTap && event.pointerType === "mouse" && event.button === 0)
+          )
+            tap(event.currentTarget, event.clientY);
         }}
         onFocus={reveal}
         onClick={(event) => event.stopPropagation()}
@@ -591,6 +594,16 @@ export function MediaViewer({
               data-viewer-stage
               data-tall={isTallMedia(source) || undefined}
               tabIndex={-1}
+              onPointerDown={(event) => {
+                // The zoom library cancels mouse down to pan, so the prompt won't blur on its own.
+                if (
+                  !phone &&
+                  event.button === 0 &&
+                  document.activeElement?.closest(`.${classes.promptRow}`) &&
+                  !layerAbove(event.currentTarget)
+                )
+                  event.currentTarget.focus({ preventScroll: true });
+              }}
             >
               {showTogether ? (
                 // Each side opens alone; the current one, whose details show, is outlined.
