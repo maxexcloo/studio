@@ -9,7 +9,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
-import { recordedObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
+import { fixtureObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
 import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 import { readGalleryRows } from "./persistence/gallery-rows.ts";
 
@@ -90,7 +90,7 @@ test(
     const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-http-shutdown-"));
     t.after(() => fs.rmSync(data, { recursive: true, force: true }));
     writeTestWorkflows(data);
-    const objectInfo = recordedObjectInfo();
+    const objectInfo = fixtureObjectInfo();
     objectInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
     const worker = await startFakeComfy({ objectInfo });
     t.after(() => worker.close());

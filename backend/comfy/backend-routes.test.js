@@ -8,11 +8,11 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { recordedObjectInfo, startFakeComfy } from "../fixtures/fake-comfy.js";
+import { fixtureObjectInfo, startFakeComfy } from "../fixtures/fake-comfy.js";
 import { testImageProfile, writeTestWorkflows } from "../fixtures/test-workflows.js";
 
 const here = path.dirname(fileURLToPath(new URL("../index.js", import.meta.url)));
-const source = recordedObjectInfo();
+const source = fixtureObjectInfo();
 const imageInfo = structuredClone(source);
 imageInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
 imageInfo.UNETLoader.input.required.unet_name[0] = ["krea2-test.safetensors"];
