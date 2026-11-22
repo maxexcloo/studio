@@ -978,9 +978,7 @@ export function registerGenerateTools({
         .array(z.string().min(1))
         .max(16)
         .optional()
-        .describe(
-          `Ids from uploads or reuse mode reference, or a result's number or letter; models gives references.max.`,
-        ),
+        .describe("Ids from search uploads or reuse reference, or a result number or letter."),
       reference_role: z.enum(["edit", "reference"]).optional(),
       // In reference_asset_ids order, where models lists the profile's reference_strengths.
       reference_strengths: z.array(z.number().finite().nullable()).max(16).optional(),
@@ -1335,8 +1333,18 @@ export function registerGenerateTools({
       let keptModel = null;
       if (args.profile_id === undefined && !fits && keptId && !input.tier && !card)
         try {
-          keptModel = namedInTier(await media.profiles(kind || "all", owner), keptId);
-          remembered.kept.push(keptModel.profile.label || keptId);
+          const candidate = namedInTier(await media.profiles(kind || "all", owner), keptId);
+          const profile = media.runProfile(candidate.profile, {
+            references: references > 0,
+            loras: Boolean(args.loras?.length),
+          });
+          const { max, required } = referenceCount(
+            references ? { ...profile, ...profile.imageModes?.reference } : profile,
+          );
+          if (references >= required && references <= max) {
+            keptModel = candidate;
+            remembered.kept.push(candidate.profile.label || keptId);
+          }
         } catch {
           // Gone or no longer granted: Studio picks as usual.
         }
@@ -1904,10 +1912,7 @@ export function registerGenerateTools({
         throw new Error('only, add and swap are for a set ref ("set 3"). Call reuse again.');
       const found = await resolveOutput(job_id, signal);
       const id = found.jobId;
-      const output_index = chosenIndex || found.index || 0;
-      // Following up on a lettered option is the user's pick.
-      if (found.letter && found.offer.picked !== found.jobId)
-        await media.pick(owner, refs, found, signal);
+      const output_index = found.index ?? chosenIndex ?? 0;
       // A reference is the result's image as it is, so other arguments change nothing; they are
       // named back rather than refused, and the chat carries on to generate.
       if (mode === "reference") {
@@ -1926,14 +1931,14 @@ export function registerGenerateTools({
         })
           .filter(([, value]) => value)
           .map(([name]) => name);
-        const uploaded = await media.resultReference(owner, id, output_index);
+        const reference = await media.resultReference(owner, id, output_index, signal);
         return mcpJson(
           ignored.length
             ? {
-                ...uploaded,
+                ...reference,
                 note: `Ignored ${ignored.join(", ")}: mode reference takes only job_id and output_index. Pass the asset's id to generate as reference_asset_ids, with your prompts there.`,
               }
-            : uploaded,
+            : reference,
         );
       }
       const animating = mode === "animate" || mode === "extend";

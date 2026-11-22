@@ -88,8 +88,15 @@ export function SwipeCard({
   const { muted, setMuted } = useVideoSound();
   const playing = Boolean(video && !depth && !paused);
   const chooseAudio = playing && pair && !full;
-  const play = useInSync(card, playing, previewSide, chooseAudio ? audioSide : undefined, muted);
-  const soundLabel = muted ? "Unmute" : "Mute";
+  const { play, autoplayMuted, restoreSound } = useInSync(
+    card,
+    playing,
+    previewSide,
+    chooseAudio ? audioSide : undefined,
+    muted,
+  );
+  const silent = muted || autoplayMuted;
+  const soundLabel = silent ? "Unmute" : "Mute";
   /** Ends the press as a hold: the card settles and the release opens nothing. */
   function hold() {
     clearTimeout(holding.current);
@@ -288,9 +295,12 @@ export function SwipeCard({
               <ActionIcon
                 variant="default"
                 aria-label={soundLabel}
-                onClick={() => setMuted(!muted)}
+                onClick={() => {
+                  if (autoplayMuted) restoreSound();
+                  setMuted(!silent);
+                }}
               >
-                {muted ? <icons.mute size={16} /> : <icons.sound size={16} />}
+                {silent ? <icons.mute size={16} /> : <icons.sound size={16} />}
               </ActionIcon>
             </Tooltip>
           )}

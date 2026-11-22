@@ -21,11 +21,14 @@ test("an upload becomes its owner's uploaded gallery image, listed only under Up
   })
     .png()
     .toBuffer();
-  const { item, asset } = await referenceAssets.saveUpload({
-    buffer,
-    name: "sample.png",
-    mime: "image/png",
-  });
+  const input = { buffer, name: "sample.png", mime: "image/png" };
+  const copies = await Promise.all([
+    referenceAssets.saveUpload(input),
+    referenceAssets.saveUpload(input),
+  ]);
+  assert.equal(copies.filter(({ added }) => added).length, 1);
+  assert.equal(copies[0].asset.id, copies[1].asset.id);
+  const { item, asset } = copies[0];
   assert.equal(item.uploaded, true);
   assert.equal(item.status, "done");
   assert.equal(asset.source, "upload");

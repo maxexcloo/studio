@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useLayoutEffect, useState } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { MediaItem } from "../../types";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
@@ -71,6 +71,8 @@ export function useInSync(
   audioSide: string | undefined,
   muted: boolean,
 ) {
+  const audibleVideo = useRef<HTMLVideoElement | undefined>(undefined);
+  const [autoplayMuted, setAutoplayMuted] = useState(false);
   const [retry, setRetry] = useState<{ side: number | undefined; play: () => void }>();
   useLayoutEffect(() => {
     if (!playing) return;
@@ -82,8 +84,9 @@ export function useInSync(
             (video) => video.closest<HTMLElement>("[data-side]")?.dataset.side === audioSide,
           );
     for (const video of videos) if (video !== audible) video.muted = true;
-    if (audible) audible.muted = muted;
-  }, [root, playing, previewSide, audioSide, muted]);
+    audibleVideo.current = audible;
+    if (audible) audible.muted = muted || autoplayMuted;
+  }, [root, playing, previewSide, audioSide, muted, autoplayMuted]);
   useEffect(() => {
     const videos = [...(root.current?.querySelectorAll("video") ?? [])];
     setRetry(undefined);
@@ -116,10 +119,17 @@ export function useInSync(
           blocked = false;
           setRetry(undefined);
         },
-        () => {
+        (error) => {
           if (current !== attempt) return;
           starting = false;
-          if (!document.hidden) showPlay();
+          if (document.hidden) return;
+          if (error?.name === "NotAllowedError" && active.some((video) => !video.muted)) {
+            for (const video of active) video.muted = true;
+            setAutoplayMuted(true);
+            start(active, restart);
+            return;
+          }
+          showPlay();
         },
       );
     }
@@ -187,5 +197,12 @@ export function useInSync(
       }
     };
   }, [root, playing, previewSide]);
-  return playing && retry?.side === previewSide ? retry?.play : undefined;
+  return {
+    play: playing && retry?.side === previewSide ? retry?.play : undefined,
+    autoplayMuted,
+    restoreSound() {
+      if (audibleVideo.current) audibleVideo.current.muted = false;
+      setAutoplayMuted(false);
+    },
+  };
 }

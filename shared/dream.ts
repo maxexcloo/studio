@@ -11,15 +11,33 @@ export const dreamDefaults = {
   videoBackend: "local" as "local" | "cloud",
 };
 export type DreamSettings = typeof dreamDefaults;
-/** Cards the Dream queue can show. A comparison is one card in its media kind. */
+export const dreamSeriesLength = 4;
+
+export type DreamResultSet = { id: string; source?: string; title: string; index: number };
+
+type DreamResult = {
+  id?: string;
+  type?: string;
+  dream?: { pair?: { id: string } };
+  resultSet?: DreamResultSet;
+};
+
+export const dreamSet = (item: DreamResult) =>
+  item.dream && !item.dream.pair && item.resultSet?.source === "dream" ? item.resultSet : undefined;
+
+/** Each comparison and set counts once in its media kind. */
 export function dreamCardCounts(
-  items: readonly { id?: string; type?: string; dream?: { pair?: { id: string } } }[],
+  items: readonly DreamResult[],
   { enabled, paused }: Pick<DreamSettings, "enabled" | "paused">,
 ) {
   const count = (type: "image" | "video") =>
     enabled
       ? new Set(
-          items.filter((item) => item.type === type).map((item) => item.dream?.pair?.id ?? item.id),
+          items.flatMap((item) => {
+            if (item.type !== type) return [];
+            const set = dreamSet(item);
+            return [set ? `set:${set.id}` : (item.dream?.pair?.id ?? item.id)];
+          }),
         ).size
       : 0;
   const images = count("image");

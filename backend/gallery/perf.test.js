@@ -158,13 +158,13 @@ test("failed selection reuses search and rank membership and reads beyond the fi
   assert.equal(tested, items.length, "quick selection reuses the listing's membership");
 });
 
-test("sparse failed selection keeps a set's position in the gallery", () => {
+test("sparse failed selection follows the gallery's chronological order", () => {
   const items = bigGallery(500);
   items[0].resultSet = { id: "set-a" };
   items[496].resultSet = { id: "set-a" };
   setGallery(items);
   const listing = pageGallery({ selection: "all" });
-  assert.equal(listing.items[1].id, items[0].id);
+  assert.equal(listing.items.at(-4).id, items[0].id);
   assert.deepEqual(
     pageGallery({ selection: "failed" }).items.map(({ id }) => id),
     listing.items.filter(({ status }) => status === "failed").map(({ id }) => id),

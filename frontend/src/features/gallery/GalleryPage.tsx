@@ -1,12 +1,4 @@
-import {
-  Alert,
-  Button,
-  Center,
-  SegmentedControl,
-  Stack,
-  Tooltip,
-  VisuallyHidden,
-} from "@mantine/core";
+import { Alert, Button, Stack, Tooltip, VisuallyHidden } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import {
   type InfiniteData,
@@ -15,7 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { ArrowUp, LayoutGrid, Rows3, SquareCheck } from "lucide-react";
+import { ArrowUp, SquareCheck } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type Location, Navigate, useLocation, useNavigate } from "react-router";
 
@@ -49,8 +41,6 @@ import {
   galleryQuery,
   viewerItemQuery,
 } from "./queries";
-import { inRunOrder, runKey } from "./resultSets";
-import { RunsView } from "./RunsView";
 import {
   type SimilarStrictness,
   similarChipLabels,
@@ -59,7 +49,6 @@ import {
 } from "./similarStrictness";
 import { useGallerySelection } from "./useGallerySelection";
 import { useTryAgain } from "./useTryAgain";
-import { versionGroups } from "./versions";
 import {
   type GalleryState,
   galleryKind,
@@ -71,8 +60,7 @@ import {
 
 import classes from "./GalleryPage.module.css";
 
-type PageState = GalleryState &
-  OpenComposerState & { compose?: boolean; run?: string; viewer?: boolean };
+type PageState = GalleryState & OpenComposerState & { compose?: boolean; viewer?: boolean };
 
 /**
  * Links already shared (in chats too) carried the viewer's item and the gallery's state as query
@@ -120,13 +108,9 @@ function Gallery() {
   }, [kind, changeKind]);
   const phone = usePhone();
   const [captions] = useTileCaptions();
-  const [view, setView] = useRemembered<"grid" | "runs">("gallery-view", "grid");
-  const [originalsOnly, setOriginalsOnly] = useRemembered("gallery-originals-only", false);
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const [sort, setSort] = useRemembered<GallerySort>("gallery-sort", "newest");
   const [focusItem, setFocusItem] = useState<string | null>(null);
-  // History restores the run's neighbours when returning from a linked result.
-  const run = state?.run;
   // A caption tag in Details links here with `q`: it becomes the search and closes the viewer.
   const linkedQuery = state?.q;
   // The viewer's item (`/images/<id>`): opening one adds a history entry, so Back closes it, and
@@ -242,16 +226,13 @@ function Gallery() {
       } else setIncoming(0);
       client.setQueryData<InfiniteData<GalleryResultsPage, string>>(listingKey, (data) => {
         if (!data) return data;
-        const ids = new Set(first.items.map((item) => item.id));
-        const replaced = new Set(
-          first.items.flatMap((item) =>
-            item.jobId && item.index !== undefined ? [`${item.jobId}-${item.index}`] : [],
-          ),
+        const slots = new Set(first.items.map(mediaIdentity));
+        const completed = new Set(
+          first.items.flatMap((item) => (item.status === "done" && item.jobId ? [item.jobId] : [])),
         );
-        // The fresh head holds every surviving tile of its jobs; the rest were dropped.
-        const jobs = new Set(first.items.flatMap((item) => (item.jobId ? [item.jobId] : [])));
         const keep = (item: MediaItem) =>
-          !ids.has(item.id) && !replaced.has(item.id) && !(item.jobId && jobs.has(item.jobId));
+          !slots.has(mediaIdentity(item)) &&
+          !(item.status === "pending" && item.jobId && completed.has(item.jobId));
         return {
           ...data,
           pages: data.pages.map((page, index) => ({
@@ -377,97 +358,67 @@ function Gallery() {
     if (!shownPath || shownPath === location.pathname) return;
     void routerNavigate(shownPath, { replace: true, state: location.state });
   }, [shownPath, location.pathname, location.state, routerNavigate]);
-  // Every generation shows by default; Originals Only collapses each version chain into one Grid
-  // tile showing its original. Runs always shows all.
-  const queue = useQuery(queueQuery).data?.jobs;
-  const groups = useMemo(() => versionGroups(loaded, queue || []), [loaded, queue]);
-  const grouped = view === "grid" && originalsOnly;
-  const versions = useMemo(
-    () => (grouped ? new Map(groups.map((group) => [group[0].id, group])) : undefined),
-    [grouped, groups],
-  );
-  const items = useMemo(
-    () => (versions ? [...versions.values()].map((group) => group[0]) : loaded),
-    [versions, loaded],
-  );
-  const candidates = useMemo(
-    () =>
-      run
-        ? inRunOrder(loaded.filter((candidate) => runKey(candidate) === run))
-        : versions
-          ? [...versions.values()].map(
-              (group) => group.find((version) => version.id === shown?.id) || group[0],
-            )
-          : items,
-    [run, loaded, versions, shown?.id, items],
-  );
   const viewerOrder = useRef<{
     scope: string;
     items: MediaItem[];
     retained: Map<string, MediaItem>;
     total?: number;
   } | null>(null);
-  const viewerScope = JSON.stringify([listingKey, run, grouped]);
+  const viewerScope = JSON.stringify(listingKey);
   if (!itemId) viewerOrder.current = null;
   else {
     const previous = viewerOrder.current;
     const retained = new Map(previous?.scope === viewerScope ? previous.retained : []);
     // Dislike hides the current tile, but it remains a neighbour until this viewer closes.
     if (shown) retained.set(mediaIdentity(shown), shown);
-    for (const candidate of candidates) retained.delete(mediaIdentity(candidate));
+    for (const candidate of loaded) retained.delete(mediaIdentity(candidate));
     const next =
       previous?.scope === viewerScope
-        ? reconcileViewerItems(previous.items, candidates, [...retained.values()])
-        : candidates;
+        ? reconcileViewerItems(previous.items, loaded, [...retained.values()])
+        : loaded;
     const reset =
       previous?.scope !== viewerScope ||
       !previous.items.length ||
       (shown && !next.some((item) => mediaIdentity(item) === mediaIdentity(shown)));
     viewerOrder.current = {
       scope: viewerScope,
-      items: reset ? candidates : next,
+      items: reset ? loaded : next,
       retained,
       total: gallery.data?.pages.at(-1)?.totalApprox ?? (reset ? undefined : previous.total),
     };
   }
-  const viewerItems = viewerOrder.current?.items || candidates;
+  const viewerItems = viewerOrder.current?.items || loaded;
   // The query the shown results answer: placeholder results still answer the previous one.
   const [resultsKey, setResultsKey] = useState(() => JSON.stringify(listingKey));
   if (!gallery.isPlaceholderData && resultsKey !== JSON.stringify(listingKey))
     setResultsKey(JSON.stringify(listingKey));
-  const selection = useGallerySelection(items, JSON.stringify([listingKey, query, grouped]), {
+  const selection = useGallerySelection(loaded, JSON.stringify([listingKey, query]), {
     complete: !gallery.hasNextPage,
     ready: Boolean(gallery.data) && !gallery.isPlaceholderData && query === search,
-    load: async (match, signal) => {
-      // A failed version only counts if it represents its tree. Its source may be on any page.
-      const { items: records } = await galleryPage(listing, "", signal, grouped ? "all" : match);
-      return grouped ? versionGroups(records, queue || []).map((group) => group[0]) : records;
-    },
+    load: async (match, signal) => (await galleryPage(listing, "", signal, match)).items,
   });
   const hasFilters =
-    JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped || Boolean(similar);
+    JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || Boolean(similar);
   // Liked or Uploads alone: its pressed toggle in the toolbar already undoes it.
   const toggledOnly =
     !search &&
-    !grouped &&
     !similar &&
     (filters.uploads || filters.rating === "liked") &&
     JSON.stringify({ ...filters, uploads: false, rating: "" }) ===
       JSON.stringify(emptyGalleryFilters);
   const clearFilters = () => {
     setFilters(emptyGalleryFilters);
-    setOriginalsOnly(false);
     removeSimilar();
   };
   // The image ranks first, being most like itself, unless the filters leave it out.
   const similarSource = loaded.find((item) => item.id === similar);
   const tryAgain = useTryAgain(loaded);
   const openItem = useCallback(
-    (item: MediaItem, run?: string) => {
+    (item: MediaItem) => {
       setFocusItem(null);
       const { chat, set, show, similar, turn } = latest.current.state || {};
       void routerNavigate(viewerPath(item), {
-        state: { chat, run, set, show, similar, turn, viewer: true } satisfies PageState,
+        state: { chat, set, show, similar, turn, viewer: true } satisfies PageState,
       });
     },
     [routerNavigate],
@@ -488,13 +439,12 @@ function Gallery() {
   );
   const showItem = useCallback(
     (item: MediaItem) => {
-      // Moving to another set's results flips through that set.
       void routerNavigate(viewerPath(item), {
         replace: true,
-        state: run ? { ...state, run: runKey(item) } : state,
+        state,
       });
     },
-    [run, routerNavigate, state],
+    [routerNavigate, state],
   );
   const closeViewer = useCallback(() => {
     if (state?.viewer) {
@@ -541,14 +491,12 @@ function Gallery() {
   // New uploads show at once under the Uploads filter.
   const upload = useGalleryUpload(() => setFilters((current) => ({ ...current, uploads: true })));
   // The viewer nearing the last loaded item loads the next page, so navigation carries on.
-  const shownIndex = shown && !run ? items.findIndex((item) => item.id === shown.id) : -1;
-  const nearEnd = shownIndex >= 0 && items.length - shownIndex <= 3;
+  const shownIndex = shown ? loaded.findIndex((item) => item.id === shown.id) : -1;
+  const nearEnd = shownIndex >= 0 && loaded.length - shownIndex <= 3;
   const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } = gallery;
   useEffect(() => {
     if (nearEnd && hasNextPage && !isFetching && !isFetchNextPageError) void fetchNextPage();
   }, [nearEnd, hasNextPage, isFetching, isFetchNextPageError, fetchNextPage]);
-  // A ranking has no runs to group: it shows as a grid.
-  const View = view === "runs" && !similar ? RunsView : MediaGrid;
   const selectionBar = selection.selecting && (
     <GallerySelectionBar
       selection={{ ...selection, end: doneSelecting }}
@@ -679,42 +627,8 @@ function Gallery() {
                   },
                 ]
               : []),
-            ...(grouped
-              ? [
-                  {
-                    key: "versions",
-                    label: "Originals Only",
-                    remove: () => setOriginalsOnly(false),
-                  },
-                ]
-              : []),
           ]}
-          view={
-            <SegmentedControl
-              aria-label="Gallery View"
-              fullWidth
-              size="xs"
-              mt={4}
-              value={view}
-              onChange={(value) => setView(value as "grid" | "runs")}
-              data={[
-                {
-                  value: "grid",
-                  label: <ViewLabel icon={<LayoutGrid size={14} />} text="Grid" />,
-                },
-                { value: "runs", label: <ViewLabel icon={<Rows3 size={14} />} text="Runs" /> },
-              ]}
-            />
-          }
-          toggles={
-            <ShowToggles
-              kind={kind}
-              value={filters}
-              onChange={setFilters}
-              originalsOnly={originalsOnly}
-              onOriginalsOnly={view === "grid" ? setOriginalsOnly : undefined}
-            />
-          }
+          toggles={<ShowToggles kind={kind} value={filters} onChange={setFilters} />}
           actions={
             <>
               <GalleryImport upload={upload} />
@@ -726,7 +640,7 @@ function Gallery() {
                   aria-label="Select Items"
                   aria-pressed={selection.selecting}
                   leftSection={phone ? undefined : <SquareCheck size={15} />}
-                  disabled={!items.length && !selection.selecting}
+                  disabled={!loaded.length && !selection.selecting}
                   onClick={selection.selecting ? doneSelecting : selection.start}
                 >
                   {phone ? <SquareCheck size={16} /> : "Select"}
@@ -758,7 +672,7 @@ function Gallery() {
             </Button>
           </Stack>
         </Alert>
-      ) : items.length ? (
+      ) : loaded.length ? (
         <div className={classes.results} data-stale={gallery.isPlaceholderData || undefined}>
           {incoming > 0 && (
             <div className={classes.incoming}>
@@ -776,10 +690,9 @@ function Gallery() {
               </Button>
             </div>
           )}
-          <View
-            items={items}
+          <MediaGrid
+            items={loaded}
             results={resultsKey}
-            versions={versions}
             byDay={!similar && sort !== "liked" && sort !== "disliked"}
             focusItem={focusItem}
             open={openItem}
@@ -842,7 +755,7 @@ function Gallery() {
           item={shown || selected}
           items={viewerItems}
           related={loaded}
-          total={run || versions ? undefined : viewerOrder.current?.total}
+          total={viewerOrder.current?.total}
           navigate={showItem}
           follow={openItem}
           onReturnFocus={(item) => {
@@ -863,14 +776,5 @@ function Gallery() {
         />
       )}
     </Stack>
-  );
-}
-
-function ViewLabel({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <Center className={classes.viewLabel}>
-      {icon}
-      <span>{text}</span>
-    </Center>
   );
 }

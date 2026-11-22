@@ -52,7 +52,7 @@ export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: ()
 
 /**
  * The deck's answers as large round buttons under the card, as dating apps have them: a single
- * card's Dislike, Like and Accept, or a comparison's Neither, A, B and Both. Where one side is
+ * card's Dislike, Like and Accept, or a comparison's Neither, A, B, Like and Both. Where one side is
  * `shown` alone, This Image answers for it in place of A and B.
  */
 export function DeckButtons({
@@ -72,23 +72,23 @@ export function DeckButtons({
 }) {
   const answers = dreamChoices(card)
     .at(-1)!
-    .flatMap((answer): Choice[] =>
-      shown === undefined || (answer.id !== "a" && answer.id !== "b")
-        ? [answer]
-        : answer.id === "a"
-          ? [
-              { ...answer, id: "shown", label: "This Image", choice: shown ? "b" : "a" },
-              ...(card.kind === "pair" && card.pairId
-                ? [{ choice: "like" as const, id: "like", label: "Like", icon: icons.like }]
-                : []),
-            ]
-          : [],
-    );
+    .flatMap((answer): Choice[] => {
+      if (answer.id === "a" && shown !== undefined)
+        return [{ ...answer, id: "shown", label: "This Image", choice: shown ? "b" : "a" }];
+      if (answer.id !== "b") return [answer];
+      return [
+        ...(shown === undefined ? [answer] : []),
+        ...(card.kind === "pair" && card.pairId
+          ? [{ choice: "like" as const, id: "like", label: "Like", icon: icons.like }]
+          : []),
+      ];
+    });
   return (
     <div
       role="group"
       aria-label={card.kind === "pair" ? "Comparison Answers" : "Dream Actions"}
       className={classes.buttons}
+      data-pair-deck={(card.kind === "pair" && shown === undefined) || undefined}
       aria-hidden={hidden}
       inert={hidden}
     >

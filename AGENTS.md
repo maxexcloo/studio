@@ -158,8 +158,9 @@ recur across features.
   and stamp its answer while the next card waits behind. Its actions sit below
   the card.
   Undo steps back through the session's judgements.
-  Dream shows unseen results and their comparisons. Library rates existing
-  results. Both use the same Images and Videos selector. The fullscreen
+  Dream shows one card per unseen idea, set or comparison. Expand a set to
+  inspect its members. A verdict applies to the whole set. Library rates
+  existing results. Both use the same Images and Videos selector. The fullscreen
   preview fills the stage above the verdicts and shares the viewer's
   top chrome, media controls and Details panel or phone sheet for the item
   shown. On comparisons, This Image picks the shown side. Like and an upward
@@ -259,14 +260,17 @@ recur across features.
   fill the viewport, keep the current image visible until the next loads,
   stop navigation at the first and last item, and on closing reveal and focus
   the current tile.
-- Version grouping has one owner in `gallery/versions.ts`. Viewing and upscale
+- The gallery defaults to newest first, with a tile per result. Sets and
+  versions have separate thumbnail strips in the viewer. Version grouping
+  has one owner in `gallery/versions.ts`. Viewing and upscale
   comparison share `MediaZoom`. Display, thumbnails, sharing and downloads
   respect the saved original/upscale choice through `mediaSource`.
 - Reserve media dimensions, virtualise large galleries, lazy-load images and
   avoid autoplaying tile videos. Only the Dream Deck's top card plays its
   videos, in step, with sound on by default and the viewer's explicit mute
   choice remembered. A comparison plays audio from only the selected side.
-  Offer Play if autoplay is blocked. Release closed players and pause playback
+  Dream retries silently if sound blocks autoplay. Offer Play if playback still
+  needs a tap. Release closed players and pause playback
   when the tab hides. Heavy tools load only when opened. Paging keeps loaded
   results and offers retry on failure.
 

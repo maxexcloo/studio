@@ -1,5 +1,5 @@
 import { Box } from "@mantine/core";
-import { type Ref, type RefObject } from "react";
+import { type RefObject } from "react";
 
 import type { MediaItem } from "../../types";
 import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "../../ui/ActionBar";
@@ -52,8 +52,7 @@ export function MediaViewerActions({
   onRetried,
   onVersionChange,
   shortcuts,
-  ref,
-  promptHidden,
+  hidden,
 }: {
   item: MediaItem;
   compare: boolean;
@@ -67,10 +66,8 @@ export function MediaViewerActions({
   onVersionChange: (id: string, active: boolean) => void;
   /** Holds the current actions for the viewer's keyboard shortcuts. */
   shortcuts?: RefObject<ActionGroups>;
-  /** The bar, which the phone details sheet stays above. */
-  ref?: Ref<HTMLDivElement>;
-  /** Hides the prompt field, keeping what was typed (the phone details sheet). */
-  promptHidden?: boolean;
+  /** Hides the bar without discarding the prompt draft while the phone details sheet is open. */
+  hidden?: boolean;
 }) {
   const transfer = useMediaTransfer(item, true);
   const { handlers, dialogs } = useMediaDialogs(item, iterate);
@@ -91,14 +88,14 @@ export function MediaViewerActions({
   if (shortcuts) shortcuts.current = groups;
   return (
     <ActionBarSurface
-      ref={ref}
       aria-label="Generation Actions"
       radius="lg"
       className={classes.actions}
+      display={hidden ? "none" : undefined}
       onClick={(event) => event.stopPropagation()}
     >
       {item.jobId && (
-        <Box className={classes.promptRow} miw={0} display={promptHidden ? "none" : undefined}>
+        <Box className={classes.promptRow} miw={0}>
           <ViewerPrompt state={prompt} iterate={iterate} pending={pending} />
         </Box>
       )}

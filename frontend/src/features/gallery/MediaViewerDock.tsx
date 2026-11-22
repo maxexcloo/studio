@@ -19,7 +19,7 @@ interface Entry {
   depth?: number;
 }
 
-type StripEntry = Entry & { label: string; version?: boolean };
+type StripEntry = Entry & { label: string };
 
 /** A run the viewer queued, and the item it was started on. */
 export interface QueuedRun {
@@ -97,10 +97,7 @@ export function useRunFamily(
   }, [jobs, item, runs, related]);
 }
 
-/**
- * The strip and the actions under the viewer image. In a set the strip holds the set's results, the
- * shown result's versions standing in its place; outside one it holds the versions.
- */
+/** Result set and version strips under the viewer image. */
 export function MediaViewerDock({
   item,
   family,
@@ -139,33 +136,30 @@ export function MediaViewerDock({
           };
         })
       : [];
-  const versionKeys = new Set(versions.map(({ key }) => key));
-  const entries: StripEntry[] =
-    set.length > 1
-      ? set.flatMap<StripEntry>((result, index) =>
-          result.id === item.id && versions.length
-            ? versions.map((entry) => ({ ...entry, version: true }))
-            : versionKeys.has(result.id)
-              ? []
-              : [
-                  {
-                    key: result.id,
-                    item: result,
-                    label: `Show ${mediaTitle(result)} (${index + 1} of ${set.length})`,
-                  },
-                ],
-        )
-      : versions;
+  const setEntries = set.map((result, index) => ({
+    key: result.id,
+    item: result,
+    label: `Show ${mediaTitle(result)} (${index + 1} of ${set.length})`,
+  }));
   return (
     <div className={classes.dock} data-chrome>
-      {entries.length > 1 && (
+      {setEntries.length > 1 && (
         <ResultStrip
-          label={set.length > 1 ? `Set: ${item.resultSet?.title}` : "Versions"}
-          entries={entries}
+          label={`Set: ${item.resultSet?.title}`}
+          entries={setEntries}
+          jobs={jobs}
+          current={item}
+          choose={choose}
+        />
+      )}
+      {versions.length > 1 && (
+        <ResultStrip
+          label="Versions"
+          entries={versions}
           jobs={jobs}
           current={item}
           depths={branched}
-          entering={(key) => versionKeys.has(key) && shown.root === root && !shown.keys.has(key)}
+          entering={(key) => shown.root === root && !shown.keys.has(key)}
           choose={choose}
         />
       )}
@@ -232,7 +226,7 @@ function ResultStrip({
         px={2}
         py={2}
       >
-        {entries.map(({ key, item: result, jobId, depth, label, version }) => {
+        {entries.map(({ key, item: result, jobId, depth, label }) => {
           const shown = result?.id === current.id;
           return (
             <Thumbnail
@@ -241,7 +235,6 @@ function ResultStrip({
               job={active.get(jobId ?? result?.jobId ?? "")}
               shown={shown}
               entering={entering?.(key)}
-              version={version}
               depth={depths ? depth : undefined}
               label={label}
               onClick={() => result && !shown && choose?.(result)}
@@ -258,7 +251,6 @@ function Thumbnail({
   job,
   shown,
   entering,
-  version,
   depth,
   label,
   onClick,
@@ -267,8 +259,6 @@ function Thumbnail({
   job?: QueueJob;
   shown?: boolean;
   entering?: boolean;
-  /** A version standing in a set result's place. */
-  version?: boolean;
   depth?: number;
   label: string;
   onClick: () => void;
@@ -281,7 +271,6 @@ function Thumbnail({
       className={classes.variation}
       data-current={shown || undefined}
       data-entering={entering || undefined}
-      data-version={version || undefined}
       aria-current={shown || undefined}
       aria-label={label}
       aria-description={status}

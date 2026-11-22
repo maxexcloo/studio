@@ -108,7 +108,7 @@ test("The empty composer prompt's AI menu offers Suggested ideas that fill it wi
 
 test("The viewer directly offers Suggested and Templates without styles or item descriptions", async ({
   page,
-}) => {
+}, testInfo) => {
   await openViewer(page);
   const asked: any[] = [];
   const others = [{ label: "Snowfall", request: "add snow", prompt: "An amber bird in snow" }];
@@ -167,7 +167,12 @@ test("The viewer directly offers Suggested and Templates without styles or item 
   await expect(send).toBeDisabled();
   await change.fill("make it night");
   await expect(send).toBeEnabled();
-  await custom.getByRole("button", { name: "Cancel", exact: true }).click();
+  await custom
+    .getByRole("button", {
+      name: testInfo.project.use.isMobile ? "Close Custom Change" : "Cancel",
+      exact: true,
+    })
+    .click();
   await expect(custom).toHaveCount(0);
   await closeTextEditor(page, "Prompt");
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(

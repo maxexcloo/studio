@@ -48,6 +48,9 @@ test("the visible queue puts running work first and follows dispatch order withi
   const labels = queue.getByText(/^(Active|Warm|Parallel|Cold) Job$/);
   await expect(labels).toHaveText(["Active Job", "Warm Job", "Parallel Job", "Cold Job"]);
   await expect(
+    queue.getByRole("progressbar", { name: "Generation Progress", exact: true }),
+  ).toHaveAttribute("aria-valuenow", "25");
+  await expect(
     queue.getByText("Generating – Krea 2 Turbo · Step 2 of 8 · About 20s Left", { exact: true }),
   ).toBeVisible();
   await expect(
@@ -186,10 +189,13 @@ test("a request's jobs group as one set that moves and stops together", async ({
     job("set-second", "queued", "set"),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const status = page.getByRole("button", { name: "Open Status", exact: true });
+  await expect(status).toHaveAccessibleDescription("Generating · 1 of 4 Finished");
+  await status.click();
   const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   // The set is one row: its title and progress, its jobs under it once opened.
   await expect(queue.getByText("Queue (2)", { exact: true })).toBeVisible();
+  await expect(queue.getByText("1 of 4 Finished", { exact: true })).toBeVisible();
   const set = queue.getByRole("button", { name: /^Fox Studies/ });
   await expect(set).toContainText("1 of 3 Done");
   await expect(set).toContainText("Queued – Krea 2 Turbo");

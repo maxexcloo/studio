@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
+import { useActionMenuBounds } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { ratingLabel } from "./itemActions";
@@ -29,6 +30,7 @@ export function MediaTileActions({
   hideMore?: boolean;
 }) {
   const [deleting, setDeleting] = useState(false);
+  const menuBounds = useActionMenuBounds(opened);
   const { handlers, dialogs } = useMediaDialogs(item);
   const rating = useMediaRating(item);
   const liked = item.rating === "liked";
@@ -73,7 +75,13 @@ export function MediaTileActions({
             </ActionIcon>
           </Tooltip>
         )}
-        <Menu opened={opened} onChange={onOpenedChange} position="bottom-end" width={menuWidth}>
+        <Menu
+          {...menuBounds}
+          opened={opened}
+          onChange={onOpenedChange}
+          position="bottom-end"
+          width={menuWidth}
+        >
           <Menu.Target>
             <ActionIcon
               className={`${classes.control} ${classes.more}`}
