@@ -336,6 +336,15 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByText(/^[12] \/ 2$/)).toBeVisible();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  const modes = page.getByRole("navigation", { name: "Creative Modes", exact: true });
+  await modes.getByRole("link", { name: "Videos", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Remove This Chat Filter" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open video: Chat Video", exact: true }),
+  ).toBeVisible();
+  await modes.getByRole("link", { name: "Images", exact: true }).click();
+  await expect(tile(1)).toBeVisible();
+  await expect(tile(2)).toHaveCount(0);
   const output = page.getByRole("radiogroup", { name: "Generation Output", exact: true });
   await expandComposer(page);
   await output.locator("label").filter({ hasText: "Video" }).click();

@@ -394,6 +394,7 @@ export function registerMcpRoutes(
         owner,
         refs,
         chat: actor.conversation,
+        turn: actor.turn,
         resolveOutput,
       });
       if (actor.admin)
@@ -629,7 +630,7 @@ export function registerMcpRoutes(
         throw new Error("Invalid host.");
       const claims = media.claims(req.params.token);
       // A job's or conversation's link opens its results in Studio's own gallery and viewer.
-      if (claims.page || claims.all)
+      if (claims.page || claims.all || claims.gallery)
         return res
           .set({ "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" })
           .redirect(302, await media.studioUrl(claims));

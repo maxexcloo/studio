@@ -2,12 +2,21 @@
 import { z } from "zod";
 
 import { compareVariants } from "../../shared/compare.ts";
-import { mcpJson } from "./media.js";
+import { mcpJson, scopeMarkdown } from "./media.js";
 
 const letter = (index) => String.fromCharCode(65 + index);
 
 /** Registers variants: offer lettered options of a result, or record which one the user picked. */
-export function registerVariantsTool({ tool, server, media, owner, refs, chat, resolveOutput }) {
+export function registerVariantsTool({
+  tool,
+  server,
+  media,
+  owner,
+  refs,
+  chat,
+  turn,
+  resolveOutput,
+}) {
   tool(
     server,
     "variants",
@@ -51,13 +60,29 @@ export function registerVariantsTool({ tool, server, media, owner, refs, chat, r
       const made = await media.request(
         "POST",
         "/api/comparisons/variants",
-        { itemId: item.id, axis, ...(project ? { projectId: project.id } : {}), variants: options },
+        {
+          itemId: item.id,
+          axis,
+          ...(project ? { projectId: project.id } : {}),
+          ...(chat ? { chat: { conversationId: chat, ...(turn ? { turnId: turn } : {}) } } : {}),
+          variants: options,
+        },
         owner,
         { signal },
       );
       const jobs = made.variants.map(({ jobId }) => jobId);
       media.adopt(owner, refs, { jobs });
       media.noteNumbers(made.variants.map((variant) => variant.item).filter(Boolean));
+      for (const jobId of jobs)
+        media.recordPrompt(jobId, {
+          kind: "image",
+          set: made.id,
+          resultSet: { id: made.id },
+          ...(chat ? { chat } : {}),
+          ...(turn ? { turn } : {}),
+        });
+      const compare = `${media.publicUrl}/compare/${encodeURIComponent(made.id)}`;
+      const links = media.scopeLinks(owner, "image", jobs, chat);
       media.offer(owner, refs, made.id, jobs);
       const source = media.refOf(found.jobId) || "the result";
       const lines = made.variants.map(
@@ -68,9 +93,10 @@ export function registerVariantsTool({ tool, server, media, owner, refs, chat, r
         content: [
           {
             type: "text",
-            text: `Queued options ${letter(0)}–${letter(jobs.length - 1)} of ${source}, varying ${axis}, with its seed. Share the comparison link and options, ask the user to pick a letter, and end your turn.\n\n[Compare Side by Side](${media.publicUrl}/compare/${encodeURIComponent(made.id)})\n${lines.join("\n")}`,
+            text: `Queued options ${letter(0)}–${letter(jobs.length - 1)} of ${source}, varying ${axis}, with its seed. Share the comparison link and options, ask the user to pick a letter, and end your turn.\n\n[Compare Side by Side](${compare})\n${lines.join("\n")}\n${scopeMarkdown(links, "image")}`,
           },
         ],
+        structuredContent: { compare, links },
       };
     },
   );

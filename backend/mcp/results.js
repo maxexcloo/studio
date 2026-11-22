@@ -44,7 +44,7 @@ export function registerResultTools({
   resolveOutput,
   reviewWaitSeconds,
 }) {
-  const { owner, refs } = actor;
+  const { owner, refs, conversation } = actor;
   const resolve = async (value, signal) => (await resolveOutput(value, signal)).jobId;
   /** A value's job output: the output its number names, else `index`. */
   const target = async (value, index, signal) => {
@@ -58,15 +58,15 @@ export function registerResultTools({
     "Status, full prompt, outputs and comparison winner, for reuse.",
     { ...job, wait_seconds: wait },
     async ({ job_id, wait_seconds }, signal) => {
-      const id = await resolve(job_id, signal);
+      const { jobId: id, index } = await resolveOutput(job_id, signal);
       const status = await media.job(owner, id, wait_seconds, { signal });
-      const ref = media.refOf(id);
+      const ref = media.refOf(id, index);
       const comparisons = await media.comparisons(owner, [id], { scope: refs, signal });
       const prompt = media.promptRecord(id)?.prompt || status.prompt;
       return mcpJson({
         job_id: id,
         ...(ref ? { ref } : {}),
-        link: media.pageUrl(owner, id),
+        link: media.pageUrl(owner, id, index),
         ...media.summary(status),
         ...(prompt ? { prompt } : {}),
         ...(comparisons.length ? { comparisons } : {}),
@@ -76,6 +76,7 @@ export function registerResultTools({
                 {
                   ...media.outputFeedback(id, index, item),
                   url: media.url(owner, id, index),
+                  link: media.pageUrl(owner, id, index),
                 },
               ]
             : [],
@@ -94,7 +95,8 @@ export function registerResultTools({
       wait_seconds: wait,
     },
     async ({ job_id, wait_seconds }, signal) => {
-      if (/^\s*all\s*$/i.test(job_id)) return media.resultsAll(owner, refs, { signal });
+      if (/^\s*all\s*$/i.test(job_id))
+        return media.resultsAll(owner, refs, { signal, conversation });
       const set = media.setOutputs(owner, refs, job_id);
       if (set)
         return media.resultsAll(owner, refs, {

@@ -194,9 +194,20 @@ export const comparisonContext = (comparisons) =>
   comparisons.length
     ? `Studio comparisons: ${JSON.stringify(comparisons.map(({ id, link, winner }) => ({ id, link, winner })))}`
     : "";
+export const scopeMarkdown = ({ chat, turn, set, gallery }, kind) => {
+  const media = kind === "video" ? "Videos" : "Images";
+  return [
+    set && `[This Set](${set})`,
+    turn && `[This Turn's ${media}](${turn})`,
+    chat && `[Chat ${media}](${chat})`,
+    gallery && `[Gallery ${media}](${gallery})`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+};
 const feedbackContext = (outputs) =>
   outputs.length
-    ? `Recorded user feedback: ${JSON.stringify(outputs.map(({ caption, ...feedback }) => feedback))}`
+    ? `Recorded user feedback: ${JSON.stringify(outputs.map(({ caption, link, ...feedback }) => feedback))}`
     : "";
 const mcpOwner = (key, user, token) =>
   crypto
@@ -1243,7 +1254,10 @@ export class McpMedia {
     )?.[1];
     const linked = short ? this.rows.link(short) : undefined;
     if (linked?.jobId && linked.owner === owner)
-      return { jobId: linked.jobId, ...(linked.page ? {} : { index: linked.index }) };
+      return {
+        jobId: linked.jobId,
+        ...(linked.index !== undefined ? { index: linked.index } : {}),
+      };
     const chatNumber = Number(chatNumberPattern.exec(String(value || ""))?.[1]);
     if (chatNumber) {
       const jobId = this.rows.refJob(scope || this.referenceScope(owner), chatNumber);
@@ -1567,14 +1581,38 @@ export class McpMedia {
     });
     return id;
   }
-  /** A job's link, which opens it in Studio's viewer among its chat's results (studioUrl). */
-  pageUrl(owner, jobId) {
-    return `${this.publicUrl}/mcp/results/${this.shortId(owner, jobId)}`;
+  /** A job or exact output in Studio's viewer. Media links retain their original bytes. */
+  pageUrl(owner, jobId, index) {
+    const id =
+      index === undefined
+        ? this.shortId(owner, jobId)
+        : this.groupLink(owner, jobId, `page:${index}`, { jobId, index, page: true });
+    return `${this.publicUrl}/mcp/results/${id}`;
   }
-  /** A conversation's All Results link (the account's without a conversation), reused per scope; it opens in Studio (studioUrl). */
-  allUrl(owner, scope) {
-    const key = scope || this.referenceScope(owner);
-    return `${this.publicUrl}/mcp/results/${this.groupLink(owner, `refs:${key}`, "all", { scope: key, all: true })}`;
+  galleryUrl(owner, gallery) {
+    return `${this.publicUrl}/mcp/results/${this.groupLink(owner, `gallery:${JSON.stringify(gallery)}`, "gallery", { gallery })}`;
+  }
+  /** Scope links use the actor's conversation or the linked jobs' own recorded provenance. */
+  scopeLinks(owner, kind, jobIds, conversation = "") {
+    const records = jobIds.map((id) =>
+      this.rows.jobOwner(id) === owner ? this.promptRecord(id) : null,
+    );
+    const first = records[0];
+    const shared = (key) => first?.[key] && records.every((record) => record?.[key] === first[key]);
+    const chat = conversation || (shared("chat") ? first.chat : "");
+    const turn = chat && shared("chat") && first.chat === chat && shared("turn") ? first.turn : "";
+    const set = first?.resultSet?.id;
+    return {
+      ...(chat
+        ? { chat: this.galleryUrl(owner, { kind, chat }) }
+        : { gallery: this.galleryUrl(owner, { kind }) }),
+      ...(turn ? { turn: this.galleryUrl(owner, { kind, chat, turn }) } : {}),
+      ...(set && records.every((entry) => entry?.resultSet?.id === set)
+        ? {
+            set: this.galleryUrl(owner, { kind, ...(first.chat ? { chat: first.chat } : {}), set }),
+          }
+        : {}),
+    };
   }
   /** One contact-sheet JPEG of a run's image outputs (`items` as [jobId, index] pairs), reused for the same outputs. */
   sheetUrl(owner, items) {
@@ -1601,10 +1639,11 @@ export class McpMedia {
       if (
         !link ||
         link.audience !== this.publicUrl ||
-        (short[2] && (link.page || link.all)) ||
+        (short[2] && (link.page || link.all || link.gallery)) ||
         (link.sheet && !short[2])
       )
         throw new Error("Invalid result link.");
+      if (link.gallery) return { owner: link.owner, gallery: link.gallery };
       if (link.all) return { owner: link.owner, scope: link.scope, all: true };
       if (link.sheet) {
         for (const [jobId] of link.sheet) this.own(link.owner, jobId);
@@ -1614,7 +1653,8 @@ export class McpMedia {
       return {
         owner: link.owner,
         jobId: link.jobId,
-        ...(link.page ? { page: true } : { index: link.index }),
+        ...(link.page ? { page: true } : {}),
+        ...(link.index !== undefined ? { index: link.index } : {}),
         ...(short[2] ? { preview: true } : {}),
       };
     }
@@ -2130,7 +2170,8 @@ export class McpMedia {
     const job = await this.job(owner, jobId, seconds, { signal });
     const ref = this.refOf(jobId, index);
     const label = ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : "Studio result";
-    const named = { job_id: jobId, ...(ref ? { ref } : {}) };
+    const link = this.pageUrl(owner, jobId, index);
+    const named = { job_id: jobId, ...(ref ? { ref } : {}), link };
     if (!finished.has(job.status)) {
       const pending = !terminal.has(job.status);
       const message = pending
@@ -2141,14 +2182,18 @@ export class McpMedia {
             ? `${ref ? label : "This job"} failed: ${failedReason(job)} Do not resubmit unless the user asks.`
             : `${ref ? label : "This job"} ended with status ${job.status}. Do not resubmit unless the user asks.`;
       return {
-        content: [text(`${message} [${ref ? label : "Result"}](${this.pageUrl(owner, jobId)})`)],
+        content: [text(`${message} [${ref ? label : "Result"}](${link})`)],
         structuredContent: { ...named, status: job.status || "running" },
       };
     }
     const comparisons = await this.comparisons(owner, [jobId], { scope, signal });
     if (index !== undefined) this.available(job, index);
-    const { outputs, markdown } = await this.markdown(owner, [{ jobId, job, label, index }], scope);
+    const { outputs, markdown } = await this.markdown(owner, [{ jobId, job, label, index }]);
     if (!outputs.length) throw new Error("This completed job has no available output.");
+    const links = this.scopeLinks(owner, job.kind || "image", [jobId]);
+    const gallery = [`[Open in Studio](${link})`, scopeMarkdown(links, job.kind)]
+      .filter(Boolean)
+      .join(" · ");
     const feedback = this.feedback(jobId, job).filter(
       (output) => index === undefined || output.output_index === index,
     );
@@ -2159,6 +2204,7 @@ export class McpMedia {
             comparisonContext(comparisons),
             feedbackContext(feedback),
             `${label} is ready. ${replyRule}\n\n${markdown}`,
+            gallery,
           ]
             .filter(Boolean)
             .join("\n\n"),
@@ -2167,7 +2213,11 @@ export class McpMedia {
       structuredContent: {
         ...named,
         status: "done",
-        outputs: feedback,
+        links,
+        outputs: feedback.map((output) => ({
+          ...output,
+          link: this.pageUrl(owner, jobId, output.output_index),
+        })),
         ...(comparisons.length ? { comparisons } : {}),
       },
     };
@@ -2178,7 +2228,7 @@ export class McpMedia {
    * linking onward; videos get a View Video link each. The header and image share one paragraph so
    * renderers add no gap; videos are blank-line separated.
    */
-  async markdown(owner, entries, scope = "") {
+  async markdown(owner, entries) {
     const outputs = entries.flatMap(({ jobId, job, label, index: selected }) =>
       (job.outputs || []).flatMap((item, index) =>
         (selected === undefined || selected === index) && mcpOutputPath(item?.url)
@@ -2242,16 +2292,21 @@ export class McpMedia {
       owner,
       outputs.map(({ jobId, output_index }) => [jobId, output_index]),
     );
+    const links = this.scopeLinks(
+      owner,
+      job.kind || "image",
+      entries.map(({ jobId }) => jobId),
+    );
     return {
       outputs,
-      markdown: `${header(caption)}\n[![${caption}](${sheet})](${this.allUrl(owner, scope)})${captions(outputs.map(({ caption }) => caption))}`,
+      markdown: `${header(caption)}\n[![${caption}](${sheet})](${links.set || links.turn || links.chat || links.gallery})${captions(outputs.map(({ caption }) => caption))}`,
     };
   }
   /** A conversation's most recent results by number, each with its job status; unreadable jobs are skipped. */
-  async scopeJobs(owner, scope, { signal, credential, jobIds } = {}) {
+  async scopeJobs(owner, scope, { signal, credential, jobIds, conversation } = {}) {
     const refs = jobIds
       ? jobIds.map((jobId) => ({ jobId }))
-      : this.rows.latestRefs(scope || this.referenceScope(owner), maxListedResults);
+      : this.rows.latestRefs(scope || this.referenceScope(owner), maxListedResults, conversation);
     const jobs = await Promise.all(
       refs.map(async ({ jobId }) => {
         try {
@@ -2269,8 +2324,8 @@ export class McpMedia {
    * Every finished result of a conversation as one reply ("show me all"): the most recent few as
    * markdown under their Result headers, and the All Results link when there are more or some are pending.
    */
-  async resultsAll(owner, scope, { signal, jobIds } = {}) {
-    const jobs = await this.scopeJobs(owner, scope, { signal, jobIds });
+  async resultsAll(owner, scope, { signal, jobIds, conversation } = {}) {
+    const jobs = await this.scopeJobs(owner, scope, { signal, jobIds, conversation });
     if (!jobs.length)
       throw new Error(
         "There are no results in this conversation yet. For the user's earlier or liked work, call search (liked: true for liked).",
@@ -2293,7 +2348,15 @@ export class McpMedia {
       ref,
       job_id: jobId,
       status: job.status,
-      ...(finished.has(job.status) ? { outputs: this.feedback(jobId, job) } : {}),
+      link: this.pageUrl(owner, jobId),
+      ...(finished.has(job.status)
+        ? {
+            outputs: this.feedback(jobId, job).map((output) => ({
+              ...output,
+              link: this.pageUrl(owner, jobId, output.output_index),
+            })),
+          }
+        : {}),
     }));
     // One block per run: results queued together share their contact sheet.
     const runs = [];
@@ -2303,15 +2366,30 @@ export class McpMedia {
       if (set && runs.at(-1)?.set === set) runs.at(-1).entries.push(entry);
       else runs.push({ set, entries: [entry] });
     }
-    const blocks = await Promise.all(
-      runs.map(({ entries }) => this.markdown(owner, entries, scope)),
+    const blocks = await Promise.all(runs.map(({ entries }) => this.markdown(owner, entries)));
+    const media = [...new Set(jobs.map(({ job }) => job.kind || "image"))];
+    const links = Object.fromEntries(
+      media.map((kind) => [
+        kind,
+        this.scopeLinks(
+          owner,
+          kind,
+          jobs.filter(({ job }) => (job.kind || "image") === kind).map(({ jobId }) => jobId),
+          conversation,
+        ),
+      ]),
     );
-    const all =
-      done.length > 1 || pending.length ? `[All Results](${this.allUrl(owner, scope)})` : "";
+    const scopes = media
+      .map((kind) => {
+        const group = links[kind];
+        return group.chat || done.length > 1 || pending.length ? scopeMarkdown(group, kind) : "";
+      })
+      .filter(Boolean);
+
     const pendingLinks = pending.map(({ ref, jobId }) => `[${ref}](${this.pageUrl(owner, jobId)})`);
     const markdown = [
       ...blocks.map((block) => block.markdown),
-      [...pendingLinks, all].filter(Boolean).join(" · "),
+      [...pendingLinks, ...new Set(scopes)].join(" · "),
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -2333,6 +2411,7 @@ export class McpMedia {
       structuredContent: {
         status: pending.length ? "running" : "done",
         ...(comparisons.length ? { comparisons } : {}),
+        links,
         results,
       },
     };
@@ -2343,24 +2422,40 @@ export class McpMedia {
    * in the viewer. Studio's sign-in decides who sees them.
    */
   async studioUrl(claims) {
+    const path = (kind) => (kind === "video" ? "videos" : "images");
+    if (claims.gallery) {
+      const { kind, chat, turn, set } = claims.gallery;
+      const params = new URLSearchParams();
+      if (chat) params.set("chat", chat);
+      if (turn) params.set("turn", turn);
+      if (set) params.set("set", set);
+      return `${this.publicUrl}/${path(kind)}${params.size ? `?${params}` : ""}`;
+    }
     const jobId = claims.all ? this.rows.latestRefs(claims.scope, 1)[0]?.jobId : claims.jobId;
-    const record = (jobId && this.promptRecord(jobId)) || {};
+    const record =
+      (jobId && this.rows.jobOwner(jobId) === claims.owner && this.promptRecord(jobId)) || {};
     const params = new URLSearchParams();
-    if (record.chat) {
+    if (
+      record.chat &&
+      (!claims.all || this.referenceScope(claims.owner, record.chat) === claims.scope)
+    ) {
       params.set("chat", record.chat);
       if (record.turn) params.set("turn", record.turn);
       if (claims.all) params.set("show", "chat");
     }
     // Studio moves these parameters into the page's history state (GalleryPage cleanLocation).
-    const number = !claims.all && this.numberOf(claims.jobId);
-    const kind =
-      record.kind ||
-      (!claims.all && jobId
-        ? await this.job(claims.owner, jobId)
-            .then((job) => job.kind)
-            .catch(() => undefined)
-        : undefined);
-    return `${this.publicUrl}/${kind === "video" ? "videos" : "images"}${number ? `/${number}` : ""}${params.size ? `?${params}` : ""}`;
+    const index = claims.index ?? 0;
+    const number = !claims.all && this.numberOf(jobId, index);
+    const job =
+      !claims.all && jobId && (!record.kind || (claims.index !== undefined && !number))
+        ? await this.job(claims.owner, jobId).catch(() => undefined)
+        : undefined;
+    const target =
+      number ||
+      (!claims.all && this.numberOf(jobId, index)) ||
+      (claims.index !== undefined && job?.outputs?.[index]?.galleryItemId);
+    if (claims.index !== undefined && !target) throw new Error("Result not found.");
+    return `${this.publicUrl}/${path(record.kind || job?.kind)}${target ? `/${safeId(target)}` : ""}${params.size ? `?${params}` : ""}`;
   }
   summary(job) {
     return Object.fromEntries(

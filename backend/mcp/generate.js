@@ -49,7 +49,7 @@ import {
   mcpSize,
 } from "./controls.js";
 import { findCard } from "./manage.js";
-import { aboutTime, assertJobCount, mcpJson, readyIn, setItems } from "./media.js";
+import { aboutTime, assertJobCount, mcpJson, readyIn, scopeMarkdown, setItems } from "./media.js";
 import {
   accountRules,
   assertAvoided,
@@ -290,14 +290,18 @@ export function registerGenerateTools({
           },
         ]
       : [];
-    // Several results, or any still running, also get one All Results link to watch them in Studio.
-    const all = `[All Results](${media.allUrl(owner, refs)})`;
+    const links = media.scopeLinks(
+      owner,
+      profile.kind,
+      submission.jobs.map(({ job_id }) => job_id),
+      conversation,
+    );
     const pending = [
       ...submission.jobs.map(
         ({ ref, link, images }) =>
           `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})${images ? ` (${images} images)` : ""}`,
       ),
-      all,
+      scopeMarkdown(links, profile.kind),
     ].join(" · ");
     const message =
       submission.status === "queued"
@@ -307,6 +311,7 @@ export function registerGenerateTools({
       content: [{ type: "text", text: `${message}\n\n${pending}` }, ...extra],
       structuredContent: {
         ...structured,
+        links,
         ...(submission.error ? { error: submission.error } : {}),
       },
     };
@@ -367,6 +372,13 @@ export function registerGenerateTools({
       ({ profile, label, queued }, index) =>
         `${axis ? `${letter(index)} · ` : ""}${label || profile.label || profile.id}: ${queued.error || queued.jobs.map(link).join(" · ")}${left[index] ? ` (${aboutTime(left[index])})` : ""}${queued.ignored ? ` ${queued.ignored}` : ""}`,
     );
+    const kind = sets[0].profile.kind;
+    const links = media.scopeLinks(
+      owner,
+      kind,
+      sets.flatMap(({ queued }) => queued.jobs.map(({ job_id }) => job_id)),
+      conversation,
+    );
     const first = sets.find(({ queued }) => queued.jobs?.length)?.queued.jobs[0].ref || "result 1";
     const waits = [...new Set(await Promise.all(sets.map(({ profile }) => waiting(profile))))].join(
       "",
@@ -375,12 +387,13 @@ export function registerGenerateTools({
       content: [
         {
           type: "text",
-          text: `${axis ? `Queued options A–${letter(sets.length - 1)} varying ${axis} at one seed; the user picks a letter (variants pick).` : `Queued ${sets.length} sets, one per model.`} ${note}${waits}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. Never poll or resubmit. To change or animate one later, call reuse with its ref (such as "${first}") and its full prompt revised (status shows it).${compare ? " Share the comparison link first: it shows them side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
+          text: `${axis ? `Queued options A–${letter(sets.length - 1)} varying ${axis} at one seed; the user picks a letter (variants pick).` : `Queued ${sets.length} sets, one per model.`} ${note}${waits}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. Never poll or resubmit. To change or animate one later, call reuse with its ref (such as "${first}") and its full prompt revised (status shows it).${compare ? " Share the comparison link first: it shows them side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n${scopeMarkdown(links, kind)}`,
         },
       ],
       structuredContent: {
         status: "queued",
         ...(compare ? { compare } : {}),
+        links,
         sets: sets.map(({ profile, label, queued }, index) => ({
           profile: { id: profile.id, label: profile.label || profile.id },
           ...(label ? { label } : {}),
