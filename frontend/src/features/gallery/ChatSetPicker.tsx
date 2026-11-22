@@ -51,7 +51,13 @@ export function ChatSetPicker({
       renderOption={({ option, checked }) => {
         const set = byId.get(option.value);
         const description = set
-          ? [set.at === null ? "" : formatDateTime(set.at), set.notes].filter(Boolean).join(" · ")
+          ? [
+              set.series !== set.title && set.series,
+              set.at === null ? "" : formatDateTime(set.at),
+              set.notes,
+            ]
+              .filter(Boolean)
+              .join(" · ")
           : undefined;
         return (
           <ChipOption

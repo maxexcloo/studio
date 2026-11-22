@@ -265,6 +265,7 @@ export function galleryChatSets(ownerId, type, { conversationId, turnId }) {
   return statement(
     `SELECT set_id AS id, count(*) AS count, max(gallery_ms) AS at,
        json_extract(value, '$.resultSet.title') AS title,
+       json_extract(value, '$.resultSet.context.series') AS series,
        coalesce(nullif(json_extract(value, '$.resultSet.context.notes'), ''),
          json_extract(value, '$.resultSet.caption')) AS notes
      FROM studio_gallery INDEXED BY studio_gallery_chat

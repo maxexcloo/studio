@@ -110,11 +110,14 @@ const chatContext = z
     character: cardContext.optional(),
     outfit: cardContext.optional(),
     scene: cardContext.optional(),
-    series: z.string().optional(),
+    series: z
+      .string()
+      .optional()
+      .describe("The user's theme or series name, shared across its sets."),
     notes: z.string().max(maxContextNotes).optional(),
   })
   .describe(
-    "Who and what it shows; series names a story or project; notes: backstory for Studio's writers.",
+    "Who and what it shows; series names the user's theme; notes explain the direction for this set.",
   );
 const promptList = z.array(z.string().trim().min(1)).min(1).max(maxSplitJobs);
 /** A JSON array sent as one string, or a single prompt. */

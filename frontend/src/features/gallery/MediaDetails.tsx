@@ -930,7 +930,7 @@ export function MediaDetails({
         ),
       ],
       [
-        "Series",
+        "Theme",
         context?.series && (
           <Anchor key="series" component={Link} {...gallerySearch(item, context.series)} size="sm">
             {context.series}

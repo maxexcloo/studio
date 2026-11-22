@@ -11,6 +11,7 @@ export const galleryKey = ["gallery"] as const;
 export interface GalleryChatSet {
   id: string;
   title: string | null;
+  series: string | null;
   notes: string | null;
   count: number;
   at: number | null;

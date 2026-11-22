@@ -327,8 +327,15 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
   await page.route("**/api/gallery/chat-sets?**", (route) => {
     const query = new URL(route.request().url()).searchParams;
     const sets = [
-      { id: "set-0", title: "Lighting", count: 1, notes: "Window light", at: null },
-      { id: "set-1", title: "Lighting", count: 1, notes: "Hard flash", at: null },
+      { id: "set-0", title: "Lighting", count: 1, series: null, notes: "Window light", at: null },
+      {
+        id: "set-1",
+        title: "Lighting",
+        count: 1,
+        series: "Night Studies",
+        notes: "Hard flash",
+        at: null,
+      },
     ];
     return route.fulfill({ json: { sets: query.has("turn") ? sets.slice(0, 1) : sets } });
   });
@@ -345,7 +352,7 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
   await expect(tile(2)).toHaveCount(0);
   const chatSets = page.getByRole("button", { name: "Chat Sets", exact: true });
   await chatSets.click();
-  await page.getByRole("option").filter({ hasText: "Hard flash" }).click();
+  await page.getByRole("option").filter({ hasText: "Night Studies · Hard flash" }).click();
   await expect(tile(1)).toBeVisible();
   await expect(tile(0)).toHaveCount(0);
   await chatSets.click();

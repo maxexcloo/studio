@@ -227,7 +227,12 @@ test("chat sets separate identically titled runs within the owner's conversation
     item(id, date, {
       ownerId: "alice",
       chat: { conversationId: "chat", turnId },
-      resultSet: { id: setId, title: "Lighting", caption: "Caption", context: { notes: "Notes" } },
+      resultSet: {
+        id: setId,
+        title: "Lighting",
+        caption: "Caption",
+        context: { series: "Night Studies", notes: "Notes" },
+      },
       ...extra,
     });
   setGallery([
@@ -250,11 +255,19 @@ test("chat sets separate identically titled runs within the owner's conversation
       {
         id: "second",
         title: "Lighting",
+        series: null,
         count: 1,
         at: Date.parse("2026-01-04"),
         notes: "Another Caption",
       },
-      { id: "first", title: "Lighting", count: 2, at: Date.parse("2026-01-03"), notes: "Notes" },
+      {
+        id: "first",
+        title: "Lighting",
+        series: "Night Studies",
+        count: 2,
+        at: Date.parse("2026-01-03"),
+        notes: "Notes",
+      },
     ],
   );
   assert.deepEqual(ids(galleryChatSets("alice", "image", { conversationId })), [
