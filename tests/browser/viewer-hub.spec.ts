@@ -120,19 +120,22 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
     input: { prompt: "An amber bird at dusk", count: 2, steps: 28 },
   });
   // Desktop shows the run in the strip; a phone's editor returns to the gallery.
-  if (page.viewportSize()!.width >= 768)
+  if (page.viewportSize()!.width >= 768) {
     await expect(
       viewer.getByRole("list", { name: "Versions", exact: true }).getByRole("listitem"),
     ).toHaveCount(2);
-  // The bar stays in reach while phone details are open, without its prompt field.
-  else {
+  } else {
     await expect(viewer).toBeHidden();
     await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Close Details", exact: true })).toBeVisible();
+    const closeDetails = page.getByRole("button", { name: "Close Details", exact: true });
+    const edit = viewer.getByRole("button", { name: "Edit", exact: true });
+    await expect(closeDetails).toBeVisible();
     await expect(field).toBeHidden();
-    await expect(viewer.getByRole("button", { name: "Edit", exact: true })).toBeInViewport();
-    await viewer.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(edit).toBeHidden();
+    await closeDetails.click();
+    await expect(edit).toBeInViewport();
+    await edit.click();
     await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
     await expect(viewer).toBeHidden();
   }
@@ -679,9 +682,7 @@ test("The strip holds the item's versions, not the other results of its run", as
   await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
 
-test("A set's strip holds the shown result's versions in its place, as one strip", async ({
-  page,
-}) => {
+test("A set and the shown result's versions have separate strips", async ({ page }) => {
   const set = { id: "set-birds", title: "Birds" };
   const { viewer } = await seed(page, { resultSet: { ...set, index: 0 } }, async (_page, state) => {
     state.jobs.length = 0;
@@ -705,13 +706,13 @@ test("A set's strip holds the shown result's versions in its place, as one strip
   });
   const strip = viewer.getByRole("list", { name: "Set: Birds", exact: true });
   const versions = viewer.getByRole("list", { name: "Versions", exact: true });
-  await expect(versions).toHaveCount(0);
+  await expect(versions.getByRole("listitem")).toHaveCount(2);
   expect(
     await strip.getByRole("listitem").evaluateAll((all) => all.map((entry) => entry.ariaLabel)),
-  ).toEqual(["Show Grey Heron (1 of 2)", "Show Version 2", "Show Version 1"]);
+  ).toEqual(["Show Grey Heron (1 of 2)", "Show Amber Bird (2 of 2)"]);
   await expect(strip.getByRole("listitem").last()).toHaveAttribute("aria-current", "true");
   // A version outside the set shows its versions alone.
-  await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
+  await versions.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await expect(strip).toHaveCount(0);
   await expect(versions.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });

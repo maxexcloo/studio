@@ -37,12 +37,13 @@ function AppNotifications() {
   const phone = usePhone();
   const theme = useMantineTheme();
   const swipe = useRef<{ close: HTMLButtonElement; id: number; x: number; y: number } | null>(null);
-  // One banner at a time: the newest replaces any still shown, which takes no input or
-  // accessibility focus while it fades out.
+  // New feedback replaces what occupies its position. Fading feedback takes no input or focus.
   const { notifications: shown, queue } = useNotifications();
   useEffect(() => {
     if (!queue.length) return;
-    for (const { id } of shown) {
+    const waiting = new Set(queue.map(({ position }) => position ?? "top-center"));
+    for (const { id, position } of shown) {
+      if (!waiting.has(position ?? "top-center")) continue;
       const banner = document.getElementById(id!);
       banner?.setAttribute("inert", "");
       banner?.setAttribute("aria-hidden", "true");

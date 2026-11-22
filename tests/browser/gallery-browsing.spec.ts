@@ -747,9 +747,7 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
   expect(tiles.indexOf("retried")).toBeGreaterThan(tiles.indexOf("newest"));
 });
 
-test("One notification shows at a time: a second dislike replaces the first, with its own Undo", async ({
-  page,
-}) => {
+test("A second dislike replaces the first Undo and restores only its result", async ({ page }) => {
   const state = await fixtures(page);
   state.gallery.push(...results(2));
   await page.goto("/images");
@@ -760,13 +758,12 @@ test("One notification shows at a time: a second dislike replaces the first, wit
       .click();
     await selectionAction(page, "Dislike").click();
     await expect.poll(() => state.gallery[index].rating).toBe("disliked");
-    // The selection ends as the dislike's notification shows.
     await expect(page.getByRole("button", { name: "Select Items", exact: true })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
   }
-  const banner = page.getByRole("alert").filter({ hasText: "Disliked" });
+  const banner = page.getByRole("status").filter({ hasText: "Disliked" });
   await expect(banner).toHaveCount(1);
   await banner.getByRole("button", { name: "Undo", exact: true }).click();
   await expect.poll(() => state.gallery[1].rating).toBeUndefined();

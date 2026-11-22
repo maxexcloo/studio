@@ -1,4 +1,4 @@
-import { AppShell, FocusTrap, Modal, rem } from "@mantine/core";
+import { AppShell, FocusTrap, Modal } from "@mantine/core";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 
@@ -66,7 +66,7 @@ function Workspace() {
   return (
     <AppShell
       // The installed app draws under the status bar, so the header grows by its inset.
-      header={{ height: `calc(${rem(68)} + env(safe-area-inset-top))` }}
+      header={{ height: "var(--studio-header-height)" }}
       padding={{ base: "sm", md: "lg" }}
     >
       <AppShell.Header>
