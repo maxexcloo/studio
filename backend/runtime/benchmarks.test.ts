@@ -202,29 +202,45 @@ test("a benchmark batch runs one Job at a time and resumes its queued model afte
   await assert.rejects(benchmarks.logs("gone", 50), /gone/);
 });
 
-test("a failed Job reports why, and Stop deletes a Job still running", async () => {
+test("a dropped benchmark Job holds the next model until its last pod is gone", async () => {
   let deleted = "";
+  let jobGone = false;
+  let podGone = false;
+  const posted: unknown[] = [];
+  let saved: BenchmarkRun[] = [];
   let job: Record<string, unknown> = { failed: 1 };
   const request: KubernetesRequest = async (method, path, body) => {
-    if (method === "POST") return { status: 201, body };
+    if (method === "POST") {
+      posted.push(body);
+      return { status: 201, body };
+    }
     if (method === "DELETE") {
       deleted = path;
-      return { status: 200, body: {} };
+      return { status: jobGone ? 404 : 202, body: {} };
     }
     if (path.includes("/jobs/")) return { status: 200, body: { status: job } };
     if (path.includes("/log"))
       return { status: 200, body: "phases: decode\nHTTP 401 Unauthorized\n" };
-    return { status: 200, body: { items: [{ metadata: { name: "bench-pod" } }] } };
+    return {
+      status: 200,
+      body: { items: podGone ? [] : [{ metadata: { name: "bench-pod" } }] },
+    };
   };
-  const benchmarks = new Benchmarks({
+  const options = {
     request,
     workloads: [radiance],
     environment: { STUDIO_BENCHMARK_IMAGE: "image", STUDIO_BENCHMARK_SECRET: "radiance" },
-    fetchImpl: (async () =>
-      Response.json({ data: [{ id: qwen, state: "resident" }] })) as typeof fetch,
+    fetchImpl: (async () => modelResponse()) as typeof fetch,
     textModels,
     pollMs: 60_000,
-  });
+    store: {
+      read: () => structuredClone(saved),
+      write: (runs: BenchmarkRun[]) => {
+        saved = structuredClone(runs);
+      },
+    },
+  };
+  const benchmarks = new Benchmarks(options);
   await benchmarks.start("radiance", "local", [qwen]);
   await benchmarks.poll();
   assert.equal(benchmarks.list().runs[0].status, "failed");
@@ -241,22 +257,34 @@ test("a failed Job reports why, and Stop deletes a Job still running", async () 
   assert.equal(benchmarks.list().runs[0].error, "Job was active too long");
 
   job = {};
-  const [second] = await benchmarks.start("radiance", "local", [qwen]);
-  await benchmarks.stop(second.id);
-  assert.equal(second.status, "stopped");
+  const [second, third] = await benchmarks.start("radiance", "local", [qwen, gemma]);
+  const before = posted.length;
+  assert.equal((await benchmarks.stop(second.id)).status, "stopping");
+  assert.equal(saved.find(({ id }) => id === second.id)?.status, "stopping");
   assert.match(
     deleted,
-    new RegExp(`/jobs/studio-benchmark-${second.id}\\?propagationPolicy=Background$`),
+    new RegExp(`/jobs/studio-benchmark-${second.id}\\?propagationPolicy=Foreground$`),
   );
+
+  const restarted = new Benchmarks(options);
+  await restarted.poll();
+  jobGone = true;
+  await restarted.poll();
+  assert.equal(restarted.list().runs[0].status, "stopping");
+  assert.equal(posted.length, before);
+  podGone = true;
+  await restarted.poll();
+  assert.equal(posted.length, before + 1);
+  assert.equal(restarted.list().runs[0].id, third.id);
+  assert.equal(restarted.list().runs[0].status, "running");
+  assert.equal(restarted.list().runs[1].status, "stopped");
 
   // A Job that ended before Stop keeps its outcome and isn't deleted.
   deleted = "";
-  const [third] = await benchmarks.start("radiance", "local", [qwen]);
   job = { failed: 1 };
-  await benchmarks.stop(third.id);
-  assert.equal(third.status, "failed");
+  assert.equal((await restarted.stop(third.id)).status, "failed");
   assert.deepEqual(
-    benchmarks
+    restarted
       .list()
       .runs.slice(0, 2)
       .map((run) => run.id),

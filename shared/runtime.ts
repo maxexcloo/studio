@@ -124,7 +124,7 @@ export interface BenchmarkRun {
   label: string;
   /** The name the model's server reports, which the run measured. */
   model: string;
-  status: "queued" | "running" | "completed" | "failed" | "stopped";
+  status: "queued" | "running" | "stopping" | "completed" | "failed" | "stopped";
   requestedBy: string;
   startedAt?: string;
   finishedAt?: string;
@@ -133,7 +133,7 @@ export interface BenchmarkRun {
 }
 
 export const activeBenchmark = (run: BenchmarkRun) =>
-  run.status === "queued" || run.status === "running";
+  run.status === "queued" || run.status === "running" || run.status === "stopping";
 
 export interface BenchmarkModel {
   id: string;
