@@ -761,6 +761,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
     void imageSearch.completed(items);
     void faceCheck.completed(items);
     void characterSheets.completed(items);
+    nextSteps.prioritiseRecent();
     if (items.some((item) => item.dream)) dream.finished();
   },
   directCloud,
@@ -902,7 +903,7 @@ const suggestions = createSuggestions({
     (await assistantEngine?.supportsVision(textWriter(item.ownerId)))
       ? smallImage(item, upscaled)
       : null,
-  save: (item, nextSteps) => updateGalleryJob(galleryKey(item), { nextSteps }),
+  save: (item, field, steps) => updateGalleryJob(galleryKey(item), { [field]: steps }),
   ideas: () => flagEnabled("STUDIO_PROMPT_IDEAS"),
   nextSteps: () => flagEnabled("STUDIO_NEXT_STEPS"),
   target: (ownerId, item, profileId) =>
@@ -1279,18 +1280,18 @@ const suggester = createPromptSuggester({
   save: (item, suggestedPrompt) => updateGalleryJob(galleryKey(item), { suggestedPrompt }),
   explicit: explicitFor,
 });
-// Viewer next steps (domain/suggestions.ts), written while idle so the viewer shows them at once.
+// Completion kicks this bounded worker; it retries recent results without walking the old gallery.
 const nextSteps = createNextStepWork({
-  enabled: () => flagEnabled("STUDIO_NEXT_STEPS"),
+  enabled: () => Boolean(assistantEngine) && flagEnabled("STUDIO_NEXT_STEPS"),
   suggestions,
-  writer: assistantEngine,
-  text: textWriter,
   idle: galleryIdle,
   allowed: promptWriterOwner,
-  items: idleItems,
+  items: (since, after) => idleItems(Math.max(since ?? 0, Date.now() - 24 * 60 * 60_000), after),
   changes: galleryChangeCount,
-  visible: (item) => filterVisibleGallery([item]).length > 0,
-  image: smallImage,
+  visible: (item) =>
+    item.dream?.state === "unseen"
+      ? Boolean(item.url && hasGalleryMedia(item))
+      : filterVisibleGallery([item]).length > 0,
 });
 
 const backgroundWork = [

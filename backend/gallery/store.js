@@ -80,6 +80,7 @@ let listVersion = 0;
 const enrichment = new Set([
   "caption",
   "identity",
+  "motionIdeas",
   "nextSteps",
   "review",
   "suggestedPrompt",

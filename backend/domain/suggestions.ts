@@ -53,6 +53,8 @@ interface SuggestionItem extends IdleItem {
   caption?: { text?: string };
   /** The last next steps written for it, shown at once when the viewer opens. */
   nextSteps?: SavedSteps;
+  /** Saved image-to-video instructions for Animate, separate from rewrites. */
+  motionIdeas?: SavedSteps;
 }
 /**
  * The model that runs a change, as its writer needs it: its label, prompting guide and how an
@@ -261,8 +263,8 @@ export function createSuggestions({
   item: (ownerId: string, jobId: string, itemId?: string) => SuggestionItem | undefined;
   /** A small (≤512 px) copy of the image where the running text model reads images, else null. */
   image: (item: SuggestionItem, upscaled?: boolean) => Promise<ModelImage | null>;
-  /** Keeps an image's latest next steps with it. */
-  save: (item: SuggestionItem, nextSteps: SavedSteps) => void;
+  /** Keeps the suggestions for this exact result and menu. */
+  save: (item: SuggestionItem, field: "nextSteps" | "motionIdeas", steps: SavedSteps) => void;
   /** The Settings › Maintenance switch for the composer's prompt ideas (STUDIO_PROMPT_IDEAS). */
   ideas: () => boolean;
   /** The switch for next steps, an image's and the composer draft's (STUDIO_NEXT_STEPS). */
@@ -280,7 +282,10 @@ export function createSuggestions({
   fixed?: (kind: (typeof fixedKinds)[keyof typeof fixedKinds]) => string[];
   now?: () => number;
 }) {
-  const cache = new Map<string, { until: number; value: Promise<Suggestions> }>();
+  const cache = new Map<
+    string,
+    { until: number; value: Promise<Suggestions>; signal?: AbortSignal }
+  >();
   /** The latest ideas per owner and menu (composer kind, Animate's image or the draft), newest first. */
   const shown = new Map<string, string[]>();
   function rememberShown(menu: string, choices: PromptIdea[]) {
@@ -289,16 +294,32 @@ export function createSuggestions({
     if (shown.size >= cacheLimit) shown.delete(shown.keys().next().value!);
     shown.set(menu, [...choices.map(describeIdea), ...latest].slice(0, shownIdeas));
   }
-  function remember(key: string, value: Promise<Suggestions>) {
+  function remember(key: string, value: Promise<Suggestions>, signal?: AbortSignal) {
     for (const [stale, entry] of cache) if (entry.until <= now()) cache.delete(stale);
     // Maps keep insertion order, so the first key is the oldest.
     while (cache.size >= cacheLimit) cache.delete(cache.keys().next().value!);
-    cache.set(key, { until: now() + cacheMs, value });
+    cache.set(key, { until: now() + cacheMs, value, signal });
     // Only answers are kept: a failure or an empty reply is asked again next time.
     void value.then(
-      (result) => result.reason && cache.get(key)?.value === value && cache.delete(key),
+      (result) =>
+        (result.reason || signal?.aborted) && cache.get(key)?.value === value && cache.delete(key),
       () => cache.get(key)?.value === value && cache.delete(key),
     );
+  }
+
+  function saveSteps(
+    source: SuggestionItem,
+    field: "nextSteps" | "motionIdeas",
+    steps: PromptIdea[],
+    spicy: boolean,
+  ) {
+    save(source, field, {
+      steps: steps as NextStep[],
+      at: new Date(now()).toISOString(),
+      count: maxSuggestions,
+      revision: suggestionRevision,
+      ...(spicy ? { spicy } : {}),
+    });
   }
 
   async function write(
@@ -530,13 +551,7 @@ export function createSuggestions({
     });
     if (!answer.reason && !options.signal?.aborted) rememberShown(menu, answer.suggestions);
     if (!answer.reason && !options.signal?.aborted && options.save !== false)
-      save(source, {
-        steps: answer.suggestions as NextStep[],
-        at: new Date(now()).toISOString(),
-        count: maxSuggestions,
-        revision: suggestionRevision,
-        ...(spicy ? { spicy } : {}),
-      });
+      saveSteps(source, "nextSteps", answer.suggestions, spicy);
     return answer;
   }
 
@@ -626,16 +641,26 @@ export function createSuggestions({
     return { suggestions: [{ action, label, request, prompt }] };
   }
 
-  return {
+  const service = {
     /**
-     * Writes a finished image's next steps ahead of its viewer, from the image too where `image`
-     * is given; throws when none could be written, so idle work backs off a failing model.
+     * Prepares the same menu choices the owner can request when viewing the result.
+     * Throws when none could be written so idle work can back off a failing model.
      */
-    async prepare(source: SuggestionItem, signal: AbortSignal, image: ModelImage | null) {
-      const model = writer(source.ownerId || "");
-      if (!model) throw new Error("this account can't use suggestions");
-      const answer = await stepsFor(model, source.ownerId || "", source, { signal, image });
-      if (answer.reason && !signal.aborted) throw new Error(answer.reason);
+    async prepare(source: SuggestionItem, signal: AbortSignal): Promise<void> {
+      const surfaces = source.type === "image" ? ["viewer", "animate"] : ["viewer"];
+      for (const surface of surfaces) {
+        if (signal.aborted) return;
+        const answer = await service.suggest(
+          source.ownerId || "",
+          {
+            surface,
+            jobId: source.jobId,
+            itemId: source.id,
+          },
+          { prepared: source, signal },
+        );
+        if (answer.reason && !signal.aborted) throw new Error(answer.reason);
+      }
     },
     /** Looks at one owned still without changing the item, its rating or the queue. */
     async inspect(
@@ -716,6 +741,7 @@ export function createSuggestions({
         actions?: unknown;
         cardIds?: unknown;
       },
+      { prepared, signal }: { prepared?: SuggestionItem; signal?: AbortSignal } = {},
     ): Promise<Suggestions<PromptIdea | NextStep | Change>> {
       const surface = body.surface as SuggestionSurface;
       if (!surfaces.has(surface))
@@ -786,7 +812,7 @@ export function createSuggestions({
       let source: SuggestionItem | undefined;
       if (surface === "viewer" || surface === "animate") {
         if (typeof body.jobId !== "string" || !body.jobId) throw failure("Choose a result.", 400);
-        source = item(ownerId, body.jobId, itemId);
+        source = prepared ?? item(ownerId, body.jobId, itemId);
         if (!source) throw failure("Result not found.", 404);
         if ((surface === "animate" && source.type === "video") || source.status !== "done")
           return empty(
@@ -802,8 +828,10 @@ export function createSuggestions({
       const edited =
         surface === "viewer" &&
         typeof body.prompt === "string" &&
+        body.prompt !== source?.settings?.typedPrompt &&
         body.prompt !== (source?.prompt || source?.suggestedPrompt || "");
-      const saved = surface === "viewer" && !edited ? source?.nextSteps : undefined;
+      const saved =
+        surface === "animate" ? source?.motionIdeas : !edited ? source?.nextSteps : undefined;
       if (edited)
         source = { ...source!, prompt: body.prompt as string, suggestedPrompt: undefined };
       if (
@@ -813,7 +841,11 @@ export function createSuggestions({
         !fresh &&
         Boolean(saved.spicy) === spicy
       )
-        return { suggestions: saved.steps.filter(unlike(fixed("change"))) };
+        return {
+          suggestions: saved.steps.filter(
+            unlike(fixed(surface === "animate" ? "animate" : "change")),
+          ),
+        };
       const { known, lines } = tasteContext(ownerId);
       const drafted = surface === "composer" || surface === "draft";
       const kind = drafted ? (body.kind as "image" | "video") : "image";
@@ -851,12 +883,15 @@ export function createSuggestions({
         kind,
         cardDraft ?? prompt,
         appliedCards,
-        body.jobId ?? "",
-        itemId,
+        source?.jobId ?? body.jobId ?? "",
+        source?.id ?? itemId,
         spicy,
       ]);
       const cached = cache.get(key);
-      if (cached && cached.until > now() && !fresh) return cached.value;
+      if (cached && cached.until > now() && !fresh && !cached.signal?.aborted) {
+        const result = await cached.value;
+        return !signal && cached.signal?.aborted ? service.suggest(ownerId, body) : result;
+      }
       const answer = (async () => {
         try {
           model.settings();
@@ -867,8 +902,9 @@ export function createSuggestions({
         // Without the picture the steps still come from its prompt and caption.
         const picture =
           source && source.type !== "video" ? await image(source).catch(() => null) : null;
+        if (signal?.aborted) return empty("Suggestion writing was interrupted.");
         if (source && surface === "viewer")
-          return stepsFor(model, ownerId, source, { image: picture, save: !edited });
+          return stepsFor(model, ownerId, source, { image: picture, save: !edited, signal });
         const context = source
           ? [...lines, "", "The image:", describeItem(source)].join("\n")
           : [
@@ -887,10 +923,10 @@ export function createSuggestions({
             ? [kind, appliedCards, cardDraft]
             : surface === "draft"
               ? prompt
-              : [body.jobId, itemId],
+              : [source?.jobId, source?.id],
           spicy,
         ]);
-        const latest = shown.get(menu) ?? [];
+        const latest = shown.get(menu) ?? saved?.steps.map(describeIdea) ?? [];
         const ideas = await write(
           model,
           ownerId,
@@ -899,9 +935,9 @@ export function createSuggestions({
           latest.length
             ? `${context}\n\nAlready suggested (offer different ones): ${latest.join("; ")}`
             : context,
-          { image: picture, spicy, cardDraft },
+          { image: picture, spicy, cardDraft, signal },
         );
-        if (ideas.reason) return ideas;
+        if (ideas.reason || signal?.aborted) return ideas;
         const fresh = ideas.suggestions.filter(
           (idea) =>
             !latest.some(
@@ -911,6 +947,8 @@ export function createSuggestions({
         );
         rememberShown(menu, fresh);
         const choices = fresh.length ? fresh : ideas.suggestions;
+        if (source && surface === "animate" && !signal?.aborted)
+          saveSteps(source, "motionIdeas", choices, spicy);
         return {
           suggestions:
             cardDraft === undefined
@@ -918,49 +956,39 @@ export function createSuggestions({
               : choices.map((idea) => ({ ...idea, prompt: `${cardDraft}\n\n${idea.prompt}` })),
         };
       })();
-      remember(key, answer);
+      remember(key, answer, signal);
       return answer;
     },
   };
+  return service;
 }
 type SuggestionService = ReturnType<typeof createSuggestions>;
 
 /**
- * Writes finished images' viewer next steps ahead of time as idle work (domain/idle-work.ts), a
- * trickle of the newest first: from the image too where the text model the owner runs (`text`)
- * reads images, from its prompt and settings where it can't. Only for owners `allowed` to use the
- * prompt assistant.
+ * Prepares finished results' menus on completion and retries missing suggestions as idle work.
  */
 export function createNextStepWork(options: {
   /** The Settings › Maintenance switch (STUDIO_NEXT_STEPS). */
   enabled(): boolean;
   suggestions: Pick<SuggestionService, "prepare">;
-  writer: { supportsVision(writer: PromptWriter): Promise<boolean> } | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  /** The owner's text writer (account-policy.js `promptWriter`). */
-  text(ownerId: string): PromptWriter;
   items(since?: number): Iterable<SuggestionItem>;
   changes?(): number;
   visible(item: SuggestionItem): boolean;
-  /** A small (≤512 px) copy of the image, or null when there is none. */
-  image(item: SuggestionItem): Promise<ModelImage | null>;
   now?: () => number;
   log?: { info(message: string): void };
 }) {
-  const { writer } = options;
   return createIdleWork<SuggestionItem>({
     ...options,
     name: "Viewer next steps",
-    enabled: () => Boolean(writer) && options.enabled(),
     unavailable: async () => "",
     wanted: (item) =>
-      item.type === "image" && Boolean(item.jobId && item.prompt) && !item.nextSteps,
-    async run(item, signal) {
-      const vision = await writer!.supportsVision(options.text(item.ownerId || ""));
-      const image = vision ? await options.image(item) : null;
-      if (!signal.aborted) await options.suggestions.prepare(item, signal, image);
-    },
+      !item.uploaded &&
+      Boolean(item.jobId && item.id && (item.prompt || item.suggestedPrompt)) &&
+      ((item.type === "image" && (!item.nextSteps || !item.motionIdeas)) ||
+        (item.type === "video" && !item.nextSteps)),
+    run: options.suggestions.prepare,
   });
 }
 

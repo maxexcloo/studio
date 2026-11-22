@@ -3083,6 +3083,7 @@ export function createDream(options: {
           },
         });
       });
+      wake();
     },
     /**
      * Notes a view of the Dream page and answers when the visit before this one ended: views within

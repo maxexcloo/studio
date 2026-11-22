@@ -14,10 +14,10 @@ import type { TasteRecord, TasteWriter } from "./taste.ts";
 type Message = { role: string; content: string; images: number };
 function fixture(
   options: {
-    reply?: (system: string) => string;
+    reply?: (system: string) => string | Promise<string>;
     writer?: (owner: string) => boolean;
     online?: boolean;
-    image?: boolean;
+    image?: boolean | (() => boolean);
     explicit?: (owner: string) => boolean;
     switches?: { ideas?: boolean; nextSteps?: boolean };
     picked?: string;
@@ -47,7 +47,7 @@ function fixture(
             },
       );
       calls.push(seen);
-      return { text: (options.reply || replies)(seen[0].content) };
+      return { text: await (options.reply || replies)(seen[0].content) };
     },
   };
   const records: Record<string, Partial<TasteRecord>> = {
@@ -92,9 +92,10 @@ function fixture(
     image: async (item, upscaled) => {
       pictures.push(item);
       renditions.push(upscaled);
-      return options.image ? { mime: "image/jpeg", data: "AAAA" } : null;
+      const available = typeof options.image === "function" ? options.image() : options.image;
+      return available ? { mime: "image/jpeg", data: "AAAA" } : null;
     },
-    save: (item, nextSteps) => Object.assign(item, { nextSteps }),
+    save: (item, field, steps) => Object.assign(item, { [field]: steps }),
     ideas: () => options.switches?.ideas ?? true,
     nextSteps: () => options.switches?.nextSteps ?? true,
     target:
@@ -352,8 +353,8 @@ test("viewer next steps read the image itself where the text model can", async (
   assert.match(calls[0][0].content, /what the attached image shows/);
 });
 
-test("Animate's motion ideas come from the image, each its own instruction, and aren't kept with it", async () => {
-  const { calls, suggestions } = fixture({ image: true });
+test("Animate saves its own image-grounded motion instructions", async () => {
+  const { calls, items, suggestions } = fixture({ image: true });
   const result = await suggestions.suggest("alice", { surface: "animate", jobId: "job-a" });
   assert.deepEqual(result.suggestions[1], {
     label: "Closer Crop",
@@ -363,6 +364,8 @@ test("Animate's motion ideas come from the image, each its own instruction, and 
   assert.match(calls[0][0].content, /becomes a short video/);
   assert.match(calls[0][1].content, /Prompt: A harbour at dawn/);
   assert.equal(calls[0][1].images, 1);
+  assert.ok(items["alice:job-a"].motionIdeas);
+  assert.equal(items["alice:job-a"].nextSteps, undefined);
   // The viewer's next steps are still their own.
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
   assert.equal(calls.length, 2);
@@ -565,6 +568,48 @@ test("an image's next steps are kept with it, and More asks for different ones",
   );
 });
 
+test("opening a menu joins its initial preparation and reuses the saved choices", async () => {
+  let start!: () => void;
+  let release!: () => void;
+  const started = new Promise<void>((resolve) => (start = resolve));
+  const answer = new Promise<void>((resolve) => (release = resolve));
+  const { calls, suggestions, items, advance } = fixture({
+    reply: async (system) => {
+      start();
+      await answer;
+      return replies(system);
+    },
+  });
+  const source = {
+    ownerId: "alice",
+    id: "result-a",
+    jobId: "job-a",
+    type: "image",
+    status: "done",
+    prompt: "Trigger word, a harbour at dawn",
+    settings: { typedPrompt: "A harbour at dawn" },
+  };
+  items["alice:job-a"] = source;
+  const preparing = suggestions.prepare(source, new AbortController().signal);
+  await started;
+  const body = { jobId: source.jobId, itemId: source.id };
+  const opening = suggestions.suggest("alice", {
+    ...body,
+    surface: "viewer",
+    prompt: source.settings.typedPrompt,
+  });
+  release();
+  const first = await opening;
+  await preparing;
+  assert.equal(calls.length, 2, "one write for next steps, one for motion ideas");
+  assert.equal(first.suggestions.length, 2);
+  advance(11 * 60_000);
+  assert.deepEqual(await suggestions.suggest("alice", { ...body, surface: "viewer" }), first);
+  const motion = await suggestions.suggest("alice", { ...body, surface: "animate" });
+  assert.equal(motion.suggestions.length, 3);
+  assert.equal(calls.length, 2, "both saved menus outlive the request cache");
+});
+
 test("turning explicit wording on or off writes an image's kept next steps and cached drafts again", async () => {
   let explicit = false;
   const { calls, suggestions, advance } = fixture({ explicit: () => explicit });
@@ -593,9 +638,9 @@ test("turning explicit wording on or off writes an image's kept next steps and c
   assert.doesNotMatch(calls[4][0].content, /Explicit content is allowed/);
 });
 
-test("idle work writes next steps ahead of time, from the image where the model reads it", async () => {
-  const { calls, suggestions } = fixture();
+test("background work saves exact result changes and separate image motion ideas", async () => {
   let vision = true;
+  const { calls, suggestions } = fixture({ image: () => vision });
   const items = [
     { id: "a", jobId: "job-a", ownerId: "alice", type: "image", status: "done", prompt: "A" },
     { id: "b", jobId: "job-b", ownerId: "alice", type: "image", status: "done", prompt: "B" },
@@ -605,28 +650,32 @@ test("idle work writes next steps ahead of time, from the image where the model 
   const work = createNextStepWork({
     enabled: () => true,
     suggestions,
-    writer: { supportsVision: async () => vision },
     idle: () => true,
     allowed: () => true,
-    text: () => ({ side: "cloud", uncensored: false }),
     items: () => items,
     visible: () => true,
-    image: async () => ({ mime: "image/jpeg", data: "AAAA" }),
     now: () => clock,
     log: { info: () => {} },
   });
-  assert.equal(await work.tick(), "done");
+  work.prioritiseRecent();
+  await work.settled();
   assert.equal(calls[0][1].images, 1);
   assert.match(calls[0][0].content, /what the attached image shows/);
   assert.equal((items[0] as { nextSteps?: { steps: unknown[] } }).nextSteps?.steps.length, 2);
+  assert.match(calls[1][0].content, /becomes a short video/);
+  assert.equal((items[0] as { motionIdeas?: { steps: unknown[] } }).motionIdeas?.steps.length, 3);
   vision = false;
   clock += 10_000;
   assert.equal(await work.tick(), "done");
-  assert.equal(calls[1][1].images, 0);
-  assert.match(calls[1][1].content, /Prompt: B/);
+  assert.equal(calls[2][1].images, 0);
+  assert.match(calls[2][1].content, /Prompt: B/);
+  clock += 10_000;
+  assert.equal(await work.tick(), "done");
+  assert.match(calls[4][0].content, /changes to the clip/);
+  assert.match(calls[4][1].content, /Prompt: V/);
   clock += 10_000;
   assert.equal(await work.tick(), "none");
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 5);
 });
 
 test("switched off, prompt ideas and next steps are never written, while asked-for changes still are", async () => {
@@ -637,13 +686,10 @@ test("switched off, prompt ideas and next steps are never written, while asked-f
   const work = createNextStepWork({
     enabled: () => false,
     suggestions,
-    writer: { supportsVision: async () => true },
     idle: () => true,
     allowed: () => true,
-    text: () => ({ side: "cloud", uncensored: false }),
     items: () => items,
     visible: () => true,
-    image: async () => ({ mime: "image/jpeg", data: "AAAA" }),
     log: { info: () => {} },
   });
   assert.equal(await work.tick(), "off");

@@ -277,7 +277,10 @@ export function MediaViewer({
   const stage = useRef<HTMLDivElement>(null);
   function cycleChrome() {
     stage.current?.focus({ preventScroll: true });
-    setChrome((shown) => (shown === "standard" ? "full" : shown === "full" ? "image" : "standard"));
+    setChrome((shown) => {
+      if (shown === "image") return "standard";
+      return shown === "standard" && hasThumbnails ? "full" : "image";
+    });
   }
   const containStage = useCallback((view: HTMLDivElement | null) => {
     stage.current = view;
@@ -775,7 +778,10 @@ export function MediaViewer({
                         compare={compare}
                         iterate={iterate}
                         pending={pending}
-                        onCompare={() => setCompare((value) => !value)}
+                        onCompare={() => {
+                          if (!compare && phone && quiet && hasThumbnails) setChrome("full");
+                          setCompare(!compare);
+                        }}
                         onDelete={() => setDeleting(true)}
                         onRetried={onRetried}
                         onVersionChange={(id, active) => {
