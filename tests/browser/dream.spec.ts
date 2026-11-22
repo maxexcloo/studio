@@ -704,6 +704,46 @@ test("Dream says why it can't run in Settings › Dream, not over the deck", asy
   ).toContainText("The text model is offline.");
 });
 
+test("A Dream Set expands to its members and takes one verdict", async ({ page }) => {
+  await fixtures(page);
+  const member = (id: string, index: number) =>
+    dreamItem(id, {
+      resultSet: { id: "night-out", index, title: "Night Out", source: "dream" },
+    });
+  const dream = await serveDream(page, {
+    unseen: [
+      member("last", 2),
+      member("cover", 0),
+      member("middle", 1),
+      dreamItem("standalone", { createdAt: "2020-01-01T00:00:00.000Z" }),
+    ],
+  });
+  await page.goto("/dream");
+  const set = page.getByRole("group", { name: "Night Out", exact: true });
+  await expect(set).toContainText("Dream prompt cover");
+  await set.getByRole("button", { name: "View Set (3)", exact: true }).click();
+  const preview = page.getByRole("dialog");
+  await preview.getByRole("radio", { name: "2", exact: true }).press("Space");
+  await expect(preview.getByRole("region", { name: "Result 2", exact: true })).toBeVisible();
+  await preview.getByRole("button", { name: "Close Preview", exact: true }).click();
+  await dreamAction(page, "Accept Set");
+  await expect(current(page)).toContainText("Dream prompt standalone");
+  await expect
+    .poll(() => dream.requests.at(-1)?.body)
+    .toEqual({
+      ids: ["cover", "middle", "last"],
+      verdict: "keep",
+    });
+  await dreamAction(page, "Undo");
+  await expect(set).toContainText("Dream prompt cover");
+  await expect
+    .poll(() => dream.requests.at(-1)?.body)
+    .toEqual({
+      ids: ["cover", "middle", "last"],
+      setId: "night-out",
+    });
+});
+
 test("A Dream comparison asks its question and answers with swipes, keys and buttons", async ({
   page,
 }) => {

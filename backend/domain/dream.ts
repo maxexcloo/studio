@@ -1,7 +1,13 @@
 import { randomInt, randomUUID } from "node:crypto";
 
 import { type CardKind, type Character, suggestedCards } from "../../shared/characters.ts";
-import { type DreamSettings, dreamDefaults } from "../../shared/dream.ts";
+import {
+  type DreamResultSet,
+  type DreamSettings,
+  dreamDefaults,
+  dreamSeriesLength,
+  dreamSet,
+} from "../../shared/dream.ts";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import type { Project, ProjectContent, ProjectStats, Review } from "../../shared/projects.ts";
 import {
@@ -143,6 +149,7 @@ export type DreamItem = QueueMedia & {
   rating?: string;
   createdAt?: string;
   settings?: Record<string, unknown>;
+  resultSet?: DreamResultSet;
   /** The chat that asked for it. */
   chat?: { conversationId: string };
   dream?: DreamMark;
@@ -292,6 +299,8 @@ interface DreamRecord {
   recent: string[];
   /** The latest Dream ideas' titles (or opening words), newest first, for the writer to avoid. */
   subjects?: string[];
+  /** Optional motifs from recent fresh concepts, one entry per concept. */
+  motifs?: string[][];
   /** Gallery images judged in calibration, newest first, so unjudged ones come first. */
   judged?: string[];
   /** Gallery images comparisons started from, newest first, so each is varied once. */
@@ -356,8 +365,6 @@ const continueAxes: Record<string, string> = {
   pose: "the pose: how the subject stands, sits or moves",
   lens: "the lens: the camera's focal length, angle, distance and framing",
 };
-/** A series holds this many results. */
-const seriesLength = 4;
 /** Where a series is set, where the account has no scene card to set it in. */
 const seriesPlaces: [string, string][] = [
   ["Rooftop Bar", "a rooftop bar above the city"],
@@ -415,6 +422,8 @@ const freshLikes = 10;
  * by image are named to the writer as ground to move away from.
  */
 const diversity = { results: 20, floor: 0.2, alike: 0.9 };
+const motifWindow = 12;
+const motifFrequency = 2;
 /**
  * Every comparison's answer rates its two images by Elo: each starts at `start` and the winner takes
  * up to `k` from the loser, Both and Neither drawing them together. A draw of seeds also takes up to
@@ -611,6 +620,19 @@ const motionInstruction = (spicy: boolean) =>
 const kindOf = (value: { kind?: unknown; type?: unknown }): Kind =>
   value.kind === "video" || value.type === "video" ? "video" : "image";
 const normalised = (prompt: string) => prompt.toLowerCase().replace(/\s+/g, " ").trim();
+
+function ideaMotifs(value: unknown) {
+  return Array.isArray(value)
+    ? [...new Set(value.map((motif) => normalised(clean(motif, 48))).filter(Boolean))].slice(0, 5)
+    : [];
+}
+
+function recurringMotifs(history: string[][]) {
+  const counts = new Map<string, number>();
+  for (const idea of history.slice(0, motifWindow))
+    for (const motif of idea) counts.set(motif, (counts.get(motif) || 0) + 1);
+  return [...counts].filter(([, count]) => count >= motifFrequency).map(([motif]) => motif);
+}
 const clean = (value: unknown, limit: number) =>
   String(typeof value === "string" ? value : "")
     .replace(/\s+/g, " ")
@@ -839,6 +861,27 @@ export function createDream(options: {
     options.visibleGenerations(ownerId, generationQuery(query));
   const pool = (ownerId: string, state: DreamState) =>
     options.gallery(ownerId, { dreamState: state });
+  /** Comparisons and sets are ready when the rest of their work has finished. */
+  function unseen(ownerId: string) {
+    const all = pool(ownerId, "unseen");
+    const openSeries = all.some(dreamSet) ? read(ownerId).series?.id : undefined;
+    const pendingPairs = new Set<string>();
+    const pendingSets = new Set(openSeries ? [openSeries] : []);
+    for (const item of all) {
+      if (finishedItemStatuses.has(item.status || "")) continue;
+      if (item.dream?.pair) pendingPairs.add(item.dream.pair.id);
+      const set = dreamSet(item);
+      if (set) pendingSets.add(set.id);
+    }
+    return all
+      .filter((item) => {
+        if (item.status !== "done") return false;
+        if (item.dream?.pair) return !pendingPairs.has(item.dream.pair.id);
+        const set = dreamSet(item);
+        return !set || !pendingSets.has(set.id);
+      })
+      .reverse();
+  }
   let considering: { ownerId: string; latest?: DreamItem[] } | undefined;
   /** Dream's latest image results, leaving out comparisons and series, which are alike by design. */
   function dreamResults(ownerId: string) {
@@ -1073,19 +1116,21 @@ export function createDream(options: {
       ...scenes.filter((scene) => scene.rating !== "liked").map(placeOf),
       ...seriesPlaces,
     ];
-    const first = random(seriesNights.length - seriesLength + 1);
-    const stops = seriesNights.slice(first, first + seriesLength).map(([nightTitle, night]) => {
-      const pool = favourites.length ? favourites : places;
-      const [placeTitle, place] = pool.splice(random(pool.length), 1)[0];
-      return { title: `${placeTitle}, ${nightTitle}`, place, night };
-    });
+    const first = random(seriesNights.length - dreamSeriesLength + 1);
+    const stops = seriesNights
+      .slice(first, first + dreamSeriesLength)
+      .map(([nightTitle, night]) => {
+        const pool = favourites.length ? favourites : places;
+        const [placeTitle, place] = pool.splice(random(pool.length), 1)[0];
+        return { title: `${placeTitle}, ${nightTitle}`, place, night };
+      });
     const series: DreamSeries = {
       id: randomUUID(),
       itemId: String(seed.item.id),
       title: seed.item.title ? `${seed.item.title} · Night Out`.slice(0, 80) : "Night Out",
       stops,
       index: 0,
-      length: seriesLength,
+      length: dreamSeriesLength,
     };
     return { series, seed };
   }
@@ -1562,7 +1607,7 @@ export function createDream(options: {
       : [];
     // Rechecked here: the account may have lost Uncensored Models since the job was queued.
     const spicy = (job.input.writing as DreamWriting).spicy && access.uncensored;
-    const { recent, subjects = [], anchors = [] } = read(ownerId);
+    const { recent, subjects = [], anchors = [], motifs = [] } = read(ownerId);
     // The learnt summary is a look: only More Like This follows it, so other ideas don't converge.
     // Rules are limits the person set, kept by every idea; a reword only rephrases a kept one.
     const { summary, rules } = options.taste.read(ownerId);
@@ -1581,9 +1626,16 @@ export function createDream(options: {
           ...brief.map(([label, value]) => `- ${label}: ${value}`),
         ]
       : [];
-    const reply = `Reply with JSON only: {"prompt": "<the prompt>", "why": "<at most 15 words on which of their tastes it draws on>", "title": "<${titleRule}>"}.`;
+    const replyShape = `"prompt": "<the prompt>", "why": "<at most 15 words on which of their tastes it draws on>", "title": "<${titleRule}>"`;
+    const reply = `Reply with JSON only: {${replyShape}}.`;
     let messages: { role: "system" | "user"; content: string }[];
     const noveltyPrompts = [...recent];
+    const newConcept = media === "image" && !like && !seed && !series && !reword;
+    const fixed = normalised([...brief.map(([, value]) => value), ...rules].join("\n"));
+    const cooling = newConcept
+      ? recurringMotifs(motifs).filter((motif) => !fixed.includes(motif))
+      : [];
+    const conceptReply = `Reply with JSON only: {${replyShape}, "motifs": ["short labels for optional settings, props, actions and styles"]}.`;
     let drawnAnchors: string[] = [];
     // A series' results so far, so this one is a new moment.
     const shots = series
@@ -1714,11 +1766,16 @@ export function createDream(options: {
                     concept!.text,
                   ]
                 : [concept!.text]),
+            ...(newConcept
+              ? [
+                  "List up to five concrete optional motifs, such as the setting, a prop, an action or a style. Use brief, singular labels with the same wording for the same motif. Leave out the subject's identity and anything the brief or rules require.",
+                ]
+              : []),
             naturalFaces,
             spicy ? `Theme: ${spicyTheme}` : "Keep it safe for work.",
             contentRule(Boolean(spicy)),
             americanEnglish,
-            reply,
+            newConcept ? conceptReply : reply,
             guide,
           ].join("\n"),
         },
@@ -1742,6 +1799,9 @@ export function createDream(options: {
                   ...recent.slice(0, diversity.results).map((prompt) => `- ${prompt}`),
                 ]
               : []),
+            ...(cooling.length
+              ? [`Recently repeated optional motifs to leave out this time: ${cooling.join(", ")}.`]
+              : []),
             ...(passed.length
               ? ["Disliked subjects to avoid:", ...passed.map((subject) => `- ${subject}`)]
               : []),
@@ -1761,7 +1821,7 @@ export function createDream(options: {
     const recentWords = noveltyPrompts.map(contentWords);
     const recentSubjects = new Set(subjects.map(normalised));
     /** Why a reply can't be used, or "" when it can. */
-    const problem = (prompt: string, title: string) => {
+    const problem = (prompt: string, title: string, motifs: string[]) => {
       if (!prompt) return "Your reply had no usable prompt.";
       const minor = options.minorAge(prompt);
       if (minor)
@@ -1774,6 +1834,8 @@ export function createDream(options: {
         return normalised(prompt) === normalised(reword || seed || like!)
           ? "You repeated the prompt."
           : "";
+      const repeat = motifs.find((motif) => cooling.includes(motif));
+      if (repeat) return `The optional motif "${repeat}" has appeared in several recent ideas.`;
       // Compared as remembered: shortened, as each recent prompt is.
       const head = clean(prompt, recentPromptCharacters);
       const words = contentWords(head);
@@ -1798,7 +1860,7 @@ export function createDream(options: {
         onThinking,
         onDelta,
       });
-      let reply: { prompt?: unknown; why?: unknown; title?: unknown } = {};
+      let reply: { prompt?: unknown; why?: unknown; title?: unknown; motifs?: unknown } = {};
       try {
         reply = JSON.parse(/\{[\s\S]*\}/.exec(text)?.[0] || "");
       } catch {
@@ -1806,7 +1868,8 @@ export function createDream(options: {
       }
       const prompt = clean(reply.prompt, maxPromptCharacters);
       const title = replyTitle(reply.title);
-      const wrong = problem(prompt, title);
+      const chosenMotifs = newConcept ? ideaMotifs(reply.motifs) : [];
+      const wrong = problem(prompt, title, chosenMotifs);
       if (!wrong) {
         if (!reword && !series) {
           const latest = read(ownerId);
@@ -1815,6 +1878,8 @@ export function createDream(options: {
               ...drawnAnchors,
               ...(latest.anchors || []).filter((anchor) => !drawnAnchors.includes(anchor)),
             ].slice(0, usedLimit);
+          if (newConcept)
+            latest.motifs = [chosenMotifs, ...(latest.motifs || [])].slice(0, motifWindow);
           latest.recent = [clean(prompt, recentPromptCharacters), ...latest.recent].slice(
             0,
             recentIdeas,
@@ -2781,22 +2846,30 @@ export function createDream(options: {
       write(ownerId, record);
       return record.visit.since || null;
     },
-    /**
-     * Finished results waiting for a verdict, oldest first. A comparison's side waits for the other
-     * to finish; one whose other side failed shows on its own.
-     */
-    unseen(ownerId: string) {
-      const all = pool(ownerId, "unseen");
-      const pending = new Set<string>();
-      for (const item of all)
-        if (item.dream?.pair && !finishedItemStatuses.has(item.status || ""))
-          pending.add(item.dream.pair.id);
-      return all
-        .filter(
-          (item) =>
-            item.status === "done" && (!item.dream?.pair || !pending.has(item.dream.pair.id)),
-        )
-        .reverse();
+    unseen,
+    /** Judge the visible members together and teach taste once, using the cover. */
+    answerSet(ownerId: string, setId: string, ids: string[], verdict: "keep" | "discard" | "like") {
+      return runtimeTransaction(options.dataDir, () => {
+        const items = unseen(ownerId)
+          .filter((item) => dreamSet(item)?.id === setId)
+          .sort((a, b) => dreamSet(a)!.index - dreamSet(b)!.index);
+        if (items.length !== ids.length || items.some((item) => !ids.includes(String(item.id))))
+          throw failure("That Dream set has changed.", 409);
+        const [cover] = items;
+        const decidedAt = stamp();
+        for (const item of items)
+          options.mark(
+            ownerId,
+            String(item.id),
+            { ...item.dream!, state: verdict === "discard" ? "discarded" : "kept", decidedAt },
+            verdict === "discard"
+              ? "disliked"
+              : verdict === "like" && item === cover
+                ? "liked"
+                : undefined,
+          );
+        options.taste.record(ownerId, [tasteSignal(verdict, cover.jobId, itemValues(cover))]);
+      });
     },
     /** Answers a comparison: A or B keeps that side, Both keeps both and Neither discards both. */
     answer(ownerId: string, pairId: string, answer: PairAnswer, like = false) {
@@ -3009,10 +3082,16 @@ export function createDream(options: {
     undo(
       ownerId: string,
       ids: string[],
-      { calibration = false, rating }: { calibration?: boolean; rating?: Rating } = {},
+      {
+        calibration = false,
+        rating,
+        setId,
+      }: { calibration?: boolean; rating?: Rating; setId?: string } = {},
     ) {
       const items = options.items(ownerId, ids);
       if (items.length !== ids.length) throw failure("That result is unavailable.", 404);
+      if (setId && items.some((item) => dreamSet(item)?.id !== setId || !item.dream))
+        throw failure("That Dream set has changed.", 409);
       if (rating !== undefined && items[0].status !== "done")
         throw failure("That result is no longer finished.", 409);
       runtimeTransaction(options.dataDir, () => {

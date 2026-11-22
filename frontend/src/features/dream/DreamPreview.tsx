@@ -1,4 +1,4 @@
-import { Badge, Group, Modal, Stack, Text, VisuallyHidden } from "@mantine/core";
+import { Badge, Group, Modal, SegmentedControl, Stack, Text, VisuallyHidden } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import {
   type KeyboardEvent,
@@ -23,7 +23,7 @@ import { ViewerChrome, viewerBadge } from "../gallery/ViewerChrome";
 import { ViewerDetails } from "../gallery/ViewerDetails";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import type { Choice } from "./choices";
-import type { DeckCard, PairDeckCard } from "./deck";
+import type { DeckCard, MultiDeckCard } from "./deck";
 import { DeckButtons, DeckUndo } from "./DeckButtons";
 import { DeckMedia, MediaBackdrop } from "./DeckMedia";
 import { covers, useBoxShape } from "./mediaFit";
@@ -39,7 +39,7 @@ const ZoomImage = lazy(() =>
 );
 
 /** Why Dream made a result, its prompt and the LoRAs it tried, each rated here; `full` unclamped. */
-function Caption({ item, full }: { item: DreamItem; full: boolean }) {
+function Caption({ item, full, title }: { item: DreamItem; full: boolean; title?: string }) {
   const info = useQuery(loraInfoQuery);
   // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's Liked LoRAs.
   const loras = (Array.isArray(item.settings?.loras) ? item.settings.loras : [])
@@ -47,9 +47,9 @@ function Caption({ item, full }: { item: DreamItem; full: boolean }) {
     .map((lora) => String(lora.name));
   return (
     <div className={classes.caption}>
-      {item.dream?.why && (
+      {(title || item.dream?.why) && (
         <Text fw={600} lineClamp={full ? undefined : 1}>
-          {item.dream.why}
+          {title || item.dream?.why}
         </Text>
       )}
       <Text size="sm" c="dimmed" lineClamp={full ? undefined : 2}>
@@ -74,16 +74,18 @@ function Caption({ item, full }: { item: DreamItem; full: boolean }) {
 export function CardText({
   item,
   dreamt,
+  title,
   full = false,
 }: {
   item: MediaItem;
   dreamt: boolean;
+  title?: string;
   full?: boolean;
 }) {
   return (
     <div className={classes.overlay}>
       {dreamt ? (
-        <Caption item={item as DreamItem} full={full} />
+        <Caption item={item as DreamItem} full={full} title={title} />
       ) : (
         <div className={classes.caption}>
           <Text size="sm" c="dimmed" lineClamp={full ? undefined : 2}>
@@ -158,8 +160,7 @@ export function isPreviewBackdrop(target: HTMLElement, x: number, y: number) {
 }
 
 /**
- * A comparison's sides in the preview, one at a time: a sideways swipe over media at rest follows
- * the finger to the other side, while zoomed media pans instead.
+ * Comparison and set members follow sideways swipes at rest. Zoomed media pans.
  */
 export function PreviewSides({
   card,
@@ -170,7 +171,7 @@ export function PreviewSides({
   onTap,
   onLike,
 }: {
-  card: PairDeckCard;
+  card: MultiDeckCard;
   side: number;
   playing: boolean;
   setSide: (side: number) => void;
@@ -244,7 +245,7 @@ export function PreviewSides({
         <section
           key={item.id}
           className={classes.previewSide}
-          aria-label={sideLabel(card, index)}
+          aria-label={card.kind === "pair" ? sideLabel(card, index) : `Result ${index + 1}`}
           aria-hidden={index !== side}
           inert={index !== side}
         >
@@ -259,6 +260,7 @@ export function PreviewSides({
 export function DreamPreview({
   card,
   side,
+  setSide,
   canUndo,
   children,
   close,
@@ -270,6 +272,7 @@ export function DreamPreview({
 }: {
   card: DeckCard;
   side: number;
+  setSide: (side: number) => void;
   canUndo: boolean;
   children: ReactNode;
   close: () => void;
@@ -284,7 +287,7 @@ export function DreamPreview({
   const phone = usePhone();
   const [details, setDetails] = useState(false);
   const bottomBar = useRef<HTMLDivElement>(null);
-  const picked = card.kind === "pair" ? card.items[side] : card.item;
+  const picked = card.kind === "pair" || card.kind === "set" ? card.items[side] : card.item;
   const item = picked as DreamItem;
   return (
     <Modal
@@ -339,6 +342,20 @@ export function DreamPreview({
             focusClose
           />
           <div ref={bottomBar} className={classes.previewButtons}>
+            {card.kind === "set" && (
+              <Group justify="center" mb="xs">
+                <SegmentedControl
+                  aria-label="Set Results"
+                  size="sm"
+                  value={String(side)}
+                  onChange={(value) => setSide(Number(value))}
+                  data={card.items.map((_, index) => ({
+                    value: String(index),
+                    label: String(index + 1),
+                  }))}
+                />
+              </Group>
+            )}
             <DeckButtons
               card={card}
               act={act}

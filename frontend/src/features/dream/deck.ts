@@ -1,3 +1,4 @@
+import { dreamSet } from "../../../../shared/dream.ts";
 import type { MediaItem } from "../../types";
 import type { DreamItem, DreamMedia } from "./queries";
 
@@ -12,17 +13,57 @@ export type PairDeckCard = {
   pairId: string;
   labels?: [string, string];
 };
+type SetDeckCard = {
+  kind: "set";
+  key: string;
+  setId: string;
+  title: string;
+  item: DreamItem;
+  items: DreamItem[];
+};
+export type MultiDeckCard = PairDeckCard | SetDeckCard;
 export type DeckCard =
   | { kind: "dream"; key: string; item: DreamItem }
   | { kind: "library"; key: string; item: MediaItem }
-  | PairDeckCard;
+  | MultiDeckCard;
 
-/** The finished Dream results as cards: both sides of a comparison make one pair card. */
+/** A set's first available result is its cover. */
+function seriesCards(dream: DreamItem[]) {
+  const sets = new Map<string, DreamItem[]>();
+  for (const item of dream) {
+    const set = dreamSet(item);
+    if (!set) continue;
+    const list = sets.get(set.id);
+    if (list) list.push(item);
+    else sets.set(set.id, [item]);
+  }
+  for (const items of sets.values()) items.sort((a, b) => dreamSet(a)!.index - dreamSet(b)!.index);
+  return sets;
+}
+
 function dreamCards(dream: DreamItem[], limit: number): DeckCard[] {
   const cards: DeckCard[] = [];
   const paired = new Set<string>();
+  const sets = seriesCards(dream);
   for (const item of dream) {
     if (cards.length >= limit) break;
+    const set = dreamSet(item);
+    if (set) {
+      const members = sets.get(set.id);
+      if (!members) continue;
+      sets.delete(set.id);
+      if (members.length > 1) {
+        cards.push({
+          kind: "set",
+          key: `set:${set.id}`,
+          setId: set.id,
+          title: set.title,
+          item: members[0],
+          items: members,
+        });
+        continue;
+      }
+    }
     const pair = item.dream?.pair;
     if (pair && paired.has(pair.id)) continue;
     const other =
@@ -49,7 +90,7 @@ function dreamCards(dream: DreamItem[], limit: number): DeckCard[] {
 }
 
 export const cardIds = (card: DeckCard) =>
-  card.kind === "pair" ? card.items.map((item) => item.id) : [card.item.id];
+  (card.kind === "pair" || card.kind === "set" ? card.items : [card.item]).map((item) => item.id);
 
 /** Newest unseen Dream results first, keeping genuine comparisons and the active card together. */
 export function deckCards(

@@ -158,8 +158,9 @@ recur across features.
   and stamp its answer while the next card waits behind. Its actions sit below
   the card.
   Undo steps back through the session's judgements.
-  Dream shows unseen results and their comparisons. Library rates existing
-  results. Both use the same Images and Videos selector. The fullscreen
+  Dream shows one card per unseen idea, set or comparison. Expand a set to
+  inspect its members. A verdict applies to the whole set. Library rates
+  existing results. Both use the same Images and Videos selector. The fullscreen
   preview fills the stage above the verdicts and shares the viewer's
   top chrome, media controls and Details panel or phone sheet for the item
   shown. On comparisons, This Image picks the shown side. Like and an upward

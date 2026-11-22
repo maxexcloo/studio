@@ -1,4 +1,9 @@
-import { dreamCardCounts, dreamDefaults, dreamSettingError } from "../../shared/dream.ts";
+import {
+  dreamCardCounts,
+  dreamDefaults,
+  dreamSeriesLength,
+  dreamSettingError,
+} from "../../shared/dream.ts";
 import { maxDismissReason } from "../../shared/inbox.ts";
 import { type RouteAccount, type RouteRun, directRoute } from "./direct-route.ts";
 import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
@@ -63,8 +68,7 @@ export function registerDreamRoutes(
         ),
     },
   }));
-  // The header's badge: results waiting for a verdict, a comparison counting once, and whether
-  // Dream is running, so the count can change.
+  // The header's badge counts cards waiting for a verdict.
   route("GET", "/api/dream/count", (account) => {
     const ownerId = owner(account);
     const { settings } = dream.read(ownerId);
@@ -278,20 +282,38 @@ export function registerDreamRoutes(
       return refuse(error);
     }
   });
+  route("POST", "/api/dream/sets/:setId/answer", (account, { body, params }) => {
+    const { ids, verdict } = body || {};
+    if (
+      !Array.isArray(ids) ||
+      ids.length < 2 ||
+      ids.length > dreamSeriesLength ||
+      ids.some((id) => typeof id !== "string") ||
+      new Set(ids).size !== ids.length ||
+      (verdict !== "keep" && verdict !== "discard" && verdict !== "like")
+    )
+      return { status: 400, payload: { ok: false, error: "Choose a verdict for the set." } };
+    return answer(() => {
+      dream.answerSet(owner(account), params.setId, ids, verdict);
+      return { ok: true };
+    });
+  });
   route("POST", "/api/dream/undo", (account, { body }) => {
-    const { ids, calibration, rating } = body || {};
+    const { ids, calibration, rating, setId } = body || {};
     if (
       !Array.isArray(ids) ||
       !ids.length ||
-      ids.length > 2 ||
+      ids.length > (setId ? dreamSeriesLength : 2) ||
       ids.some((id) => typeof id !== "string") ||
+      (setId !== undefined &&
+        (typeof setId !== "string" || !setId || calibration || rating !== undefined)) ||
       (calibration !== undefined && typeof calibration !== "boolean") ||
       (rating !== undefined &&
         (ids.length !== 1 || (rating !== "liked" && rating !== "disliked" && rating !== null)))
     )
-      return { status: 400, payload: { ok: false, error: "Undo one result or one pair." } };
+      return { status: 400, payload: { ok: false, error: "Undo a result, comparison or set." } };
     try {
-      dream.undo(owner(account), ids, { calibration, rating });
+      dream.undo(owner(account), ids, { calibration, rating, setId });
       return { status: 200, payload: { ok: true } };
     } catch (error) {
       return refuse(error);

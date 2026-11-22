@@ -49,7 +49,7 @@ export const dreamQuery = queryOptions({
   refetchInterval: (query) =>
     query.state.data?.settings.enabled && !query.state.data.settings.paused ? 15_000 : false,
 });
-/** The header's count of results waiting for a verdict, a comparison counting once. */
+/** The header's count of cards waiting for a verdict. */
 export const dreamCountQuery = queryOptions({
   queryKey: ["dream", "count"],
   queryFn: () =>
@@ -86,6 +86,8 @@ export const dreamItemPath = (item: { id: string }, action: string) =>
   `/api/dream/${encodeURIComponent(item.id)}/${action}`;
 export const pairAnswerPath = (pairId: string) =>
   `/api/dream/pairs/${encodeURIComponent(pairId)}/answer`;
+export const setAnswerPath = (setId: string) =>
+  `/api/dream/sets/${encodeURIComponent(setId)}/answer`;
 
 /**
  * When Dream works, or why it doesn't, and how much of today's share it has made, such as "Dream

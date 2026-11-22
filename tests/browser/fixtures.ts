@@ -1629,6 +1629,10 @@ export async function serveDream(
       }
       return route.fulfill({ json: { project } });
     }
+    if (/^\/api\/dream\/sets\/[^/]+\/answer$/.test(path)) {
+      state.unseen = state.unseen.filter((item) => !body.ids.includes(item.id));
+      return route.fulfill({ json: { ok: true } });
+    }
     const answered = /^\/api\/dream\/pairs\/([^/]+)\/answer$/.exec(path);
     if (answered) {
       const pairId = decodeURIComponent(answered[1]);
