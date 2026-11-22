@@ -51,7 +51,7 @@
   display: flex;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
+  scroll-behavior: var(--studio-scroll-behavior);
   overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
