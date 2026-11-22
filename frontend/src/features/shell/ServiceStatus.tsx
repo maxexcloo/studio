@@ -4,8 +4,8 @@ import {
   Drawer,
   FocusTrap,
   Group,
-  Loader,
   Popover,
+  Progress,
   Text,
   Tooltip,
   UnstyledButton,
@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
 import { activeStatuses, pausedReason, terminalStatuses } from "../../../../shared/queue";
+import type { QueueJob } from "../../types";
 import { icons } from "../../ui/icons";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { PopupTooltip } from "../../ui/PopupTooltip";
@@ -28,6 +29,28 @@ import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../ru
 
 import classes from "./ServiceStatus.module.css";
 
+/** Include finished jobs whose lifetimes overlap the current uninterrupted stretch of work. */
+function queueProgress(jobs: QueueJob[], unfinished: QueueJob[]) {
+  if (!unfinished.length) return;
+  let start = unfinished.reduce(
+    (earliest, job) => (job.createdAt < earliest ? job.createdAt : earliest),
+    unfinished[0].createdAt,
+  );
+  const history = jobs
+    .filter((job) => terminalStatuses.has(job.status))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  let finished = 0;
+  let failed = 0;
+  for (const job of history) {
+    if (job.updatedAt < start) break;
+    if (job.createdAt < start) start = job.createdAt;
+    if (job.status === "cancelled") continue;
+    finished++;
+    if (job.status === "failed") failed++;
+  }
+  return { finished, failed, total: finished + unfinished.length };
+}
+
 /**
  * The one header entry to work in progress and service health on every breakpoint. Desktop opens
  * the queue as a dropdown under the icon; phones slide in a drawer.
@@ -38,8 +61,18 @@ export function StatusAction() {
   const phone = usePhone();
   const queue = useQueue();
   const summary = serviceSummary(useQuery(servicesStatusQuery));
+  const jobs = queue.data?.jobs ?? [];
   // Work a paused queue holds is waiting, not generating.
-  const unfinished = queue.data?.jobs.filter((job) => !terminalStatuses.has(job.status)) ?? [];
+  const unfinished = jobs.filter((job) => !terminalStatuses.has(job.status));
+  const progress = queueProgress(jobs, unfinished);
+  const progressLabel =
+    progress &&
+    [
+      `${progress.finished} of ${progress.total} Finished`,
+      progress.failed && `${progress.failed} Failed`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   const generating = unfinished.some((job) => job.reason !== pausedReason);
   const held = !generating && unfinished.length > 0;
   // The summary counts running work too, so it reads again as soon as the account's own starts or ends.
@@ -51,7 +84,7 @@ export function StatusAction() {
   }, [client, runningKey]);
   const title = "Queue";
   const downloads = useModelDownloads();
-  const count = (queue.data ? queueEntries(queue.data.jobs).length : 0) + downloads.length;
+  const count = queueEntries(jobs).length + downloads.length;
   const heading = count ? `${title} (${count})` : title;
   // A sideways touch drag pulls the drawer with the finger; far enough, and it closes.
   const swipe = useSwipeClose("left", close);
@@ -77,7 +110,9 @@ export function StatusAction() {
       document.removeEventListener("keydown", escape, true);
     };
   }, [phone, opened]);
-  const tooltip = generating ? "Generating" : held ? "Queue Paused" : summary.label;
+  const tooltip = [generating ? "Generating" : held ? "Queue Paused" : summary.label, progressLabel]
+    .filter(Boolean)
+    .join(" · ");
   const trigger = (
     <ActionIcon
       ref={target}
@@ -89,12 +124,14 @@ export function StatusAction() {
       color={generating || held ? "gray" : summary.colour}
       onClick={() => setOpened(!opened)}
     >
-      {generating ? (
-        <Loader size={18} color="gray" />
-      ) : held ? (
-        <icons.pause size={19} />
-      ) : (
-        <Activity size={19} />
+      {held ? <icons.pause size={19} /> : <Activity size={19} />}
+      {progress && (
+        <Progress
+          aria-hidden
+          className={classes.progress}
+          value={(100 * progress.finished) / progress.total}
+          size={3}
+        />
       )}
     </ActionIcon>
   );
@@ -142,6 +179,11 @@ export function StatusAction() {
               <Text fw={500}>{heading}</Text>
               <QueueActions />
             </Group>
+            {progressLabel && (
+              <Text size="xs" c="dimmed">
+                {progressLabel}
+              </Text>
+            )}
             <div className={classes.list}>
               <Queue downloads={downloads} />
             </div>
@@ -174,6 +216,11 @@ export function StatusAction() {
           </Drawer.Header>
           <Drawer.Body className={classes.body}>
             <FocusTrap.InitialFocus />
+            {progressLabel && (
+              <Text size="xs" c="dimmed">
+                {progressLabel}
+              </Text>
+            )}
             <div className={classes.list}>
               <Queue downloads={downloads} />
             </div>
