@@ -38,6 +38,7 @@ test("an output deleted outside the app drops out of the gallery", async () => {
   fs.writeFileSync(path.join(outputDir, "run", "keep.png"), "png");
   fs.writeFileSync(path.join(outputDir, "run", "gone.png"), "png");
   const items = [output("keep.png", "run"), output("gone.png", "run")];
+  setGallery(items);
   assert.deepEqual(
     filterVisibleGallery(items).map((item) => item.id),
     ["keep.png", "gone.png"],
@@ -46,6 +47,10 @@ test("an output deleted outside the app drops out of the gallery", async () => {
   await new Promise((resolve) => setTimeout(resolve, 1100));
   assert.deepEqual(
     filterVisibleGallery(items).map((item) => item.id),
+    ["keep.png"],
+  );
+  assert.deepEqual(
+    pageGallery({ sort: "oldest" }).items.map((item) => item.id),
     ["keep.png"],
   );
 });

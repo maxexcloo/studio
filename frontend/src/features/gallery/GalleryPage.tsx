@@ -23,7 +23,7 @@ import { ComposerDock } from "../generation/ComposerDock";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import type { OpenComposerState } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
-import { useTileCaptions } from "../settings/accountPreferences";
+import { preferencesQuery } from "../settings/accountPreferences";
 import { ShowToggles, emptyGalleryFilters } from "./GalleryFilters";
 import { GalleryImport, droppedFiles, useGalleryUpload } from "./GalleryImport";
 import { GallerySelectionBar } from "./GallerySelectionBar";
@@ -108,7 +108,8 @@ function Gallery() {
     changeKind(kind);
   }, [kind, changeKind]);
   const phone = usePhone();
-  const [captions] = useTileCaptions();
+  const preferences = useQuery(preferencesQuery).data?.preferences;
+  const captions = preferences?.tileCaptions ?? false;
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const [sort, setSort] = useRemembered<GallerySort>("gallery-sort", "newest");
   const [focusItem, setFocusItem] = useState<string | null>(null);
@@ -124,6 +125,8 @@ function Gallery() {
   const chat = state?.chat || "";
   const chatTurn = state?.turn || "";
   const turn = state?.show === "chat" ? "" : chatTurn;
+  const showWork =
+    !filters.uploads && Boolean(chat || setId || (preferences?.galleryWork ?? "none") !== "none");
   // Similar shows the gallery ranked by likeness to that image, within the filters, until its
   // chip is removed.
   const similar = state?.similar || "";
@@ -167,14 +170,17 @@ function Gallery() {
   // polls, for live previews; an idle gallery waits for the queue's own idle check.
   const jobs = useQuery({
     ...queueQuery,
-    select: (data) => ({
-      key: data.jobs.map((job) => `${job.id}:${job.status}`).join(),
-      active: data.jobs.some((job) => !terminalStatuses.has(job.status)),
-      retried: data.jobs
-        .filter((job) => job.galleryAt)
-        .map((job) => `${job.id}:${job.status}`)
-        .join(),
-    }),
+    select: (data) => {
+      const foreground = data.jobs.filter((job) => !job.dream);
+      return {
+        key: foreground.map((job) => `${job.id}:${job.status}`).join(),
+        active: foreground.some((job) => !terminalStatuses.has(job.status)),
+        retried: foreground
+          .filter((job) => job.galleryAt)
+          .map((job) => `${job.id}:${job.status}`)
+          .join(),
+      };
+    },
   }).data;
   const listing = useMemo(
     () => ({ search, kind, filters, similar, strictness, setId, chat, turn, sort }) as const,
@@ -285,15 +291,14 @@ function Gallery() {
     refresh.errorUpdatedAt,
     refreshFirst,
   ]);
-  // Active work's tiles are the newest, on the first page: only it polls, for live previews.
-  // Starting or finishing work uses the same first-page read, never a full pagination refetch.
+  // Pending tiles need polling for live previews only while the listing can show them.
   useEffect(() => {
-    if (!jobs?.active) return;
+    if (!showWork || !jobs?.active) return;
     const timer = setInterval(() => {
       if (!document.hidden) void refreshFirst();
     }, 3000);
     return () => clearInterval(timer);
-  }, [jobs?.active, refreshFirst]);
+  }, [showWork, jobs?.active, refreshFirst]);
   useEffect(
     () =>
       focusManager.subscribe((focused) => {

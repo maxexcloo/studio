@@ -86,6 +86,27 @@ const pendingMemoryRecovery = `status = 'failed'
 /** How many of an account's finished jobs its queue lists, newest first; older ones are read one at a time (`job`). */
 export const listedFinishedJobs = 200;
 const placeholders = (values: Iterable<unknown>) => [...values].map(() => "?").join(", ");
+const queueListing = `FROM studio_queue WHERE rowid IN (
+  SELECT rowid FROM studio_queue INDEXED BY studio_queue_status
+    WHERE status IN (${placeholders(openStatuses)}) AND owner_id = ?
+  UNION ALL
+  SELECT rowid FROM studio_queue INDEXED BY studio_queue_status
+    WHERE status = 'failed' AND owner_id = ? AND json_extract(record, '$.cleared') IS NULL
+  UNION ALL
+  SELECT rowid FROM (
+    SELECT rowid FROM studio_queue INDEXED BY studio_queue_owner
+      WHERE owner_id = ? AND status IN (${placeholders(terminalStatuses)})
+      ORDER BY created_at DESC, rowid DESC LIMIT ?
+  )
+)`;
+const queueListingArgs = (ownerId: string) => [
+  ...openStatuses,
+  ownerId,
+  ownerId,
+  ownerId,
+  ...terminalStatuses,
+  listedFinishedJobs,
+];
 
 export class Store {
   readonly db: DatabaseSync;
@@ -508,22 +529,34 @@ export class Store {
     return this.db
       .prepare(
         `SELECT ${results ? "record" : "json_remove(record, '$.items', '$.outputs') AS record"}
-        FROM studio_queue WHERE rowid IN (
-          SELECT rowid FROM studio_queue INDEXED BY studio_queue_status
-            WHERE status IN (${placeholders(openStatuses)}) AND owner_id = ?
-          UNION ALL
-          SELECT rowid FROM studio_queue INDEXED BY studio_queue_status
-            WHERE status = 'failed' AND owner_id = ? AND json_extract(record, '$.cleared') IS NULL
-          UNION ALL
-          SELECT rowid FROM (
-            SELECT rowid FROM studio_queue INDEXED BY studio_queue_owner
-              WHERE owner_id = ? AND status IN (${placeholders(terminalStatuses)})
-              ORDER BY created_at DESC, rowid DESC LIMIT ?
-          )
-        ) ORDER BY created_at, rowid`,
+        ${queueListing} ORDER BY created_at, rowid`,
       )
-      .all(...openStatuses, ownerId, ownerId, ownerId, ...terminalStatuses, listedFinishedJobs)
+      .all(...queueListingArgs(ownerId))
       .map((row) => JSON.parse(row.record as string));
+  }
+
+  /** Listing order and set state for every job, with records only for jobs changed since the poll. */
+  queueChanges(ownerId: string, since: string) {
+    const rows = this.db
+      .prepare(
+        `SELECT id, status,
+          json_extract(record, '$.resource') AS resource,
+          json_extract(record, '$.queueSet') AS queueSet,
+          ${jobPriority} AS priority,
+          CASE WHEN json_extract(record, '$.updatedAt') >= ?
+            THEN json_remove(record, '$.items', '$.outputs') END AS changed
+        ${queueListing} AND NOT coalesce(json_extract(record, '$.cleared'), 0)
+        ORDER BY created_at, rowid`,
+      )
+      .all(since, ...queueListingArgs(ownerId)) as (Pick<OwnedJob, "id" | "status" | "resource"> & {
+      queueSet: string | null;
+      priority: number | null;
+      changed: string | null;
+    })[];
+    return {
+      rows,
+      jobs: rows.flatMap(({ changed }) => (changed ? [JSON.parse(changed) as OwnedJob] : [])),
+    };
   }
 
   /** Some completed members may have aged out of the queue listing. */
