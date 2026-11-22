@@ -9,7 +9,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Image, Video } from "lucide-react";
 import { useId, useState } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 
 import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
@@ -17,6 +17,7 @@ import { StudioLogo } from "../../ui/StudioLogo";
 import { usePhone } from "../../ui/usePhone";
 import { useAccount, useGroupFeature } from "../auth/AccountGate";
 import { dreamCountQuery } from "../dream/queries";
+import { type GalleryState, galleryKind } from "../gallery/viewerLink";
 import { FinishedAway } from "./FinishedAway";
 import { HeaderOptions } from "./HeaderOptions";
 import { StatusAction } from "./ServiceStatus";
@@ -30,6 +31,9 @@ const modes = [
 ];
 function ModeSwitcher({ mode }: { mode: string }) {
   const phone = usePhone();
+  const location = useLocation();
+  const { chat, turn, show, set } = (location.state as GalleryState | null) || {};
+  const linkedGallery = galleryKind(location.pathname) && (chat || set);
   const [root, setRoot] = useState<HTMLElement | null>(null);
   const [selected, setSelected] = useState<HTMLElement | null>(null);
   const shown = { "/dream": useGroupFeature("dream") };
@@ -98,6 +102,9 @@ function ModeSwitcher({ mode }: { mode: string }) {
                   aria-describedby={count ? unseenId : undefined}
                   component={Link}
                   to={item.to}
+                  state={
+                    linkedGallery && galleryKind(item.to) ? { chat, turn, show, set } : undefined
+                  }
                   aria-label={item.label}
                   aria-current={active ? "page" : undefined}
                   variant="subtle"

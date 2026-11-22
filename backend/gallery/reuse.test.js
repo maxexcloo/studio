@@ -12,7 +12,14 @@ process.env.STUDIO_DATA_DIR = temporaryFolder("studio-data-");
 const { galleryRevisionValue, hideGalleryItems, pageGallery, replaceGalleryJob } =
   await import("./store.js");
 const { setGallery } = await import("../fixtures/gallery.js");
-const { makePendingItems } = await import("./records.js");
+const { generationSettings, makePendingItems } = await import("./records.js");
+
+test("the saved seed keeps zero and marks an unset seed Random", () => {
+  const baseline = generationSettings({ seed: 0 });
+  assert.equal(baseline.seed, 0);
+  assert.deepEqual(baseline.loras, []);
+  assert.equal(generationSettings({ seed: "" }).seed, "Random");
+});
 
 const url = (filename) =>
   `/comfy/view?${new URLSearchParams({ filename, subfolder: "", type: "media" })}`;
@@ -378,7 +385,6 @@ test("an image shown upscaled is used upscaled, at the original's size", async (
 });
 
 test("Radiance reference settings omit unsupported denoise", async () => {
-  const { generationSettings } = await import("./records.js");
   const { useWorkloadWorkers } = await import("../workers.js");
   useWorkloadWorkers([
     {

@@ -1,5 +1,4 @@
 import {
-  dreamCardCounts,
   dreamDefaults,
   dreamPairAnswers,
   dreamPassReasons,
@@ -41,14 +40,17 @@ export function registerDreamRoutes(
     const access = dream.access(ownerId);
     const record = dream.read(ownerId);
     const unseen = listed(dream.unseen(ownerId));
+    const daily = dream.daily(ownerId, record);
+    const { today, usage } = daily;
     return {
       settings: record.settings,
       unseen,
       since: record.visit?.since || null,
-      today: dream.today(ownerId),
+      today,
+      ...(usage.images !== today.images || usage.videos !== today.videos ? { usage } : {}),
       spicyAvailable: Boolean(access?.uncensored),
       locked: dream.locked(),
-      ...dream.status(ownerId),
+      ...dream.status(ownerId, daily),
     };
   };
   /** A Dream route, for an account with Dream only. */
@@ -71,14 +73,10 @@ export function registerDreamRoutes(
     },
   }));
   // The header's badge counts cards waiting for a verdict.
-  route("GET", "/api/dream/count", (account) => {
-    const ownerId = owner(account);
-    const { settings } = dream.read(ownerId);
-    return {
-      status: 200,
-      payload: dreamCardCounts(settings.enabled ? dream.unseen(ownerId) : [], settings),
-    };
-  });
+  route("GET", "/api/dream/count", (account) => ({
+    status: 200,
+    payload: dream.unseenCount(owner(account)),
+  }));
   route("POST", "/api/dream/visit", (account) => ({
     status: 200,
     payload: { since: dream.visit(owner(account)) },
@@ -111,6 +109,16 @@ export function registerDreamRoutes(
       return refuse(error);
     }
   };
+  route("POST", "/api/dream/reset-limit", (account, { body }) => {
+    const kind = body?.kind;
+    if (kind !== "image" && kind !== "video")
+      return { status: 400, payload: { ok: false, error: "Choose Images or Videos." } };
+    const ownerId = owner(account);
+    return answer(() => {
+      dream.resetLimit(ownerId, kind);
+      return show(ownerId);
+    });
+  });
   const chatOf = (body: Record<string, unknown> | undefined) => {
     const chat = body?.chat;
     if (typeof chat !== "string" || !chat || chat.length > 300)

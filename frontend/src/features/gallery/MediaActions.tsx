@@ -434,7 +434,7 @@ export function useMediaActions(
         ? () => onAnimate({ theme: template.id, profileId: animationProfileId })
         : () => run({ kind: "animate", theme: template.id, profileId: animationProfileId }),
   });
-  // Motions written for this image, asked for only once its Animate menu opens.
+  // Load the image's saved motions when its Animate menu opens.
   const [motionsFor, setMotionsFor] = useState<string>();
   const motions = useChangeSuggestions({
     query: motionIdeasQuery(item.jobId ?? "", item.id),
@@ -497,7 +497,7 @@ export function useMediaActions(
   const steps = useChangeSuggestions({
     query: nextStepsQuery(item.jobId ?? "", suggestionPrompt, item.id),
     fresh: () => askNextSteps(item.jobId!, true, suggestionPrompt, item.id),
-    enabled: assistedChanges && image && suggestions?.id === item.id,
+    enabled: assistedChanges && suggestions?.id === item.id,
     disabled: draft?.pending,
     onPick: (request) => {
       if (suggestions && !draft?.pending) pick(suggestions.mode, request);
@@ -539,7 +539,7 @@ export function useMediaActions(
             ]
           : []),
       ],
-      suggestions: assistedChanges && image ? steps.group : [],
+      suggestions: assistedChanges ? steps.group : [],
       templates: assistedChanges
         ? (assistant.data?.changes ?? []).map((change) => ({
             id: `change:${change.id}`,
@@ -672,7 +672,7 @@ export function useMediaActions(
       onClick: ready
         ? undefined
         : () => action.mutate({ operation: "image", prompt: changedPrompt }),
-      onOpen: image && canChange ? openChanges("recreate") : undefined,
+      onOpen: canChange ? openChanges("recreate") : undefined,
       menu: !ready
         ? undefined
         : item.uploaded

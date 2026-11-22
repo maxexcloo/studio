@@ -409,6 +409,23 @@ export class Store {
     );
   }
 
+  /** An admitted generation the account requested after the cutoff, including finished work. */
+  hasRecentGenerationRequest(ownerId: string, cutoff: string): boolean {
+    return Boolean(
+      this.db
+        .prepare(
+          `SELECT 1 FROM studio_queue
+          WHERE owner_id = ? AND created_at > ?
+            AND ${jobPriority} IN (${queuePriority.manual}, ${queuePriority.mcp})
+            AND json_extract(record, '$.operation') IS NOT 'upscale'
+            AND json_extract(record, '$.faceRedo') IS NOT 1
+            AND json_extract(record, '$.retried') IS NOT 1
+          LIMIT 1`,
+        )
+        .get(ownerId, cutoff),
+    );
+  }
+
   /** Open Dream work, without loading prompts, outputs or other accounts' own work. */
   openDreamJobs(ownerId?: string, waiting = false) {
     const statuses = waiting ? pendingStatuses : openStatuses;
@@ -457,7 +474,7 @@ export class Store {
   dreamJobsSince(ownerId: string, since: string) {
     return this.db
       .prepare(
-        `SELECT created_at AS createdAt, status, profile_id AS profileId,
+        `SELECT id, created_at AS createdAt, status, profile_id AS profileId,
           json_extract(record, '$.dream.at') AS dreamAt,
           json_extract(record, '$.input.kind') AS kind,
           json_extract(record, '$.input.type') AS type,
@@ -469,6 +486,7 @@ export class Store {
         ORDER BY created_at, rowid`,
       )
       .all(ownerId, since) as {
+      id: string;
       createdAt: string;
       status: string;
       profileId: string | null;
@@ -848,7 +866,7 @@ export class Store {
 export function publicJob({
   ownerId: _ownerId,
   resource: _resource,
-  cancelRequested: _cancelRequested,
+  cancelRequested,
   cleared: _cleared,
   replacementJobId: _replacementJobId,
   memoryRecovery: _memoryRecovery,
@@ -861,5 +879,12 @@ export function publicJob({
   ...job
 }: OwnedJob): QueueJob {
   // Its idempotency key would make a run reusing this input return this job instead of queuing.
-  return { ...job, input, ...(priority === queuePriority.dream ? { dream: true } : {}) };
+  return {
+    ...job,
+    input,
+    ...(cancelRequested && activeStatuses.has(job.status) && job.status !== "saving"
+      ? { cancelling: true }
+      : {}),
+    ...(priority === queuePriority.dream ? { dream: true } : {}),
+  };
 }

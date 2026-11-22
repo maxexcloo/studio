@@ -40,6 +40,7 @@ export function MediaTileActions({
     <>
       <Group
         className={classes.actions}
+        data-face-check={item.identity?.drifted || undefined}
         data-opened={opened || undefined}
         gap={4}
         justify="flex-end"

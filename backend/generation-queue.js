@@ -48,6 +48,7 @@ export function createGenerationQueue({
   cloudProvider,
   completed,
   directCloud,
+  dreamIdleWait,
   generationRoutes,
   promptStage,
   recoverRunningJobs,
@@ -57,6 +58,10 @@ export function createGenerationQueue({
   const { loadComfyContext, mediaModels, workerWorkloads } = catalogue;
   // This runtime owns only the IDs persisted in its own SQLite queue and gallery.
   const mediaLeases = new Map();
+  const releaseLease = (id) => {
+    mediaLeases.get(id)?.release();
+    mediaLeases.delete(id);
+  };
   // Jobs whose admission, which takes their lease, is under way.
   const admitting = new Set();
   // Work goes to a worker picked by load (pickWorker in workers.js); background work (MCP, Dream,
@@ -149,13 +154,9 @@ export function createGenerationQueue({
       if (!job.backend || !workerById(job.backend))
         return "Waiting for its worker to be configured.";
       const workloads = managedWorkloads(job);
-      const release = () => {
-        mediaLeases.get(job.id)?.release();
-        mediaLeases.delete(job.id);
-      };
       // A job moved to another worker leaves the lease its first worker gave it.
       const held = mediaLeases.get(job.id);
-      if (held && !workloads.includes(held.workload.id)) release();
+      if (held && !workloads.includes(held.workload.id)) releaseLease(job.id);
       let started = false;
       admitting.add(job.id);
       try {
@@ -167,7 +168,7 @@ export function createGenerationQueue({
         started = true;
         await loadComfyContext(job.backend);
       } catch (error) {
-        release();
+        releaseLease(job.id);
         // A started worker's timeout or dropped connection reads as it being slow, not a raw error.
         return started && isTransientComfyError(error)
           ? `Waiting for ${workerById(job.backend).name} to answer.`
@@ -180,8 +181,7 @@ export function createGenerationQueue({
       if (job.status === "failed")
         updateGalleryJob(job.id, { status: "failed", error: job.reason });
       if (job.status === "cancelled") updateGalleryJob(job.id, { status: "cancelled" });
-      mediaLeases.get(job.id)?.release();
-      mediaLeases.delete(job.id);
+      releaseLease(job.id);
     },
   });
   // Reconstruct leases synchronously before the HTTP listener accepts work.
@@ -275,6 +275,11 @@ export function createGenerationQueue({
     store,
     {
       ...generationAdapter,
+      dreamIdleWait: (job) => {
+        const reason = dreamIdleWait?.(job);
+        if (reason) releaseLease(job.id);
+        return reason;
+      },
       // Retries, recovered work and anything queued before the check tightened meet it here too.
       submit: (job) => {
         const refusal = minorAgeRefusal(job.input.prompt);

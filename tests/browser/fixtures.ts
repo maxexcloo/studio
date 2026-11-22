@@ -892,15 +892,7 @@ export async function fixtures(page: Page) {
       return respond({ unseen: 0, images: 0, videos: 0, active: false });
     if (path === "/api/dream")
       return respond({
-        settings: {
-          enabled: false,
-          paused: false,
-          dailyImages: 40,
-          dailyVideos: 4,
-          images: true,
-          videos: false,
-          spicy: false,
-        },
+        settings: dreamDefaults,
         today: { images: 0, videos: 0 },
         unseen: [],
         status: "off",
@@ -1079,7 +1071,6 @@ export function viewerChangeButton(page: Page, action: "Edit" | "Recreate" = "Ed
 
 /** Opens the viewer's prompt-change options. */
 export async function viewerChangeMenu(page: Page, action?: "Edit" | "Recreate") {
-  await showViewerControls(page.getByRole("dialog", { name: "Generation", exact: true }));
   await viewerChangeButton(page, action).click();
   return page.getByRole("menu");
 }
@@ -1105,11 +1096,15 @@ export async function editorMenu(scope: Page | Locator, box: string, tool: strin
   return menu;
 }
 
-/** Opens Gallery's controls when a test needs an action or thumbnail. */
-export async function showViewerControls(viewer: Locator) {
+/** Opens the gallery's thumbnail strips. */
+export async function showViewerThumbnails(viewer: Locator) {
   await expect(viewer).toBeVisible();
-  const reveal = viewer.getByRole("button", { name: "Show Controls", exact: true });
-  if (await reveal.count()) await reveal.click();
+  const chrome = viewer.locator("[data-viewer-chrome]");
+  if (!(await chrome.count())) return;
+  const stage = viewer.locator("[data-viewer-stage]");
+  if ((await chrome.getAttribute("data-viewer-chrome")) === "image") await stage.press("c");
+  if ((await chrome.getAttribute("data-viewer-chrome")) !== "full") await stage.press("c");
+  await expect(chrome).toHaveAttribute("data-viewer-chrome", "full");
 }
 
 /**
@@ -1118,7 +1113,6 @@ export async function showViewerControls(viewer: Locator) {
  */
 export async function viewerAction(page: Page, label: string, ...options: string[]) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await showViewerControls(viewer);
   await viewer
     .getByRole("button", { name: label, exact: true })
     .or(viewer.getByRole("link", { name: label, exact: true }))

@@ -160,6 +160,26 @@ export function useQueueAction(jobId?: string) {
       if (unconfirmed) throw new Error(unconfirmed.error);
       return result;
     },
+    onMutate: async ({ id, action }) => {
+      if (action !== "cancel" || !id) return;
+      const detail = queueJobQuery(id).queryKey;
+      await Promise.all([
+        client.cancelQueries({ queryKey: queueQuery.queryKey, exact: true }),
+        client.cancelQueries({ queryKey: detail, exact: true }),
+      ]);
+      const stopping = (job: QueueJob) =>
+        job.id === id && !terminalStatuses.has(job.status) && job.status !== "saving"
+          ? { ...job, cancelling: true as const, reason: "" }
+          : job;
+      client.setQueryData<QueueListing>(
+        queueQuery.queryKey,
+        (listing) => listing && { ...listing, jobs: listing.jobs.map(stopping) },
+      );
+      client.setQueryData<{ job: QueueJob }>(
+        detail,
+        (current) => current && { job: stopping(current.job) },
+      );
+    },
     onSettled: (_result, _error, { set, action }) => {
       if (set && action === "clear-failed")
         return client.invalidateQueries({ queryKey: queueQuery.queryKey, exact: true });
@@ -217,7 +237,7 @@ export function QueueJobAction({
   const [retrying, setRetrying] = useState(false);
   if (terminalStatuses.has(job.status) && job.status !== "failed") return null;
   const retry = job.status === "failed";
-  const label = retry ? "Retry" : "Stop";
+  const label = retry ? "Retry" : job.cancelling ? "Stopping" : "Stop";
   const pending = action.isPending || retrying;
   const onClick = async () => {
     if (!retry) return action.mutate({ id: job.id, action: "cancel" });
@@ -234,6 +254,7 @@ export function QueueJobAction({
       label={label}
       icon={retry ? icons.retry : icons.stop}
       pending={pending}
+      disabled={job.cancelling}
       onClick={() => void onClick()}
     />
   ) : (
@@ -243,7 +264,7 @@ export function QueueJobAction({
       radius="xl"
       leftSection={retry ? <icons.retry size={16} /> : <icons.stop size={16} />}
       loading={pending}
-      disabled={pending}
+      disabled={pending || job.cancelling}
       onClick={() => void onClick()}
     >
       {label}

@@ -83,8 +83,9 @@
   pointer-events: auto;
 }
 
-.viewerStage {
+.stage.viewerStage {
   grid-area: 1 / 1 / 3;
+  overflow: clip;
 }
 
 /* Fit and manual zoom share the same viewport. Fill and comparison still extend under the header. */

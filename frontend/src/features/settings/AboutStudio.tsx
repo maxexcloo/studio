@@ -45,6 +45,8 @@ const shortcuts: { keys: string[][]; action: string }[] = [
   { keys: [["/"], [mod, "F"]], action: "Search the Gallery" },
   { keys: [[mod, "Enter"]], action: "Generate" },
   { keys: [["←"], ["→"]], action: "Previous or Next in the Viewer" },
+  { keys: [["C"]], action: "Cycle Gallery Viewer Controls" },
+  { keys: [["↑"]], action: "Show Gallery Viewer Thumbnails or Details" },
   { keys: [["F"]], action: "Like the Viewed Item" },
   { keys: [["E"]], action: "Edit the Viewed Image" },
   { keys: [["U"]], action: "Upscale, or Show the Original" },

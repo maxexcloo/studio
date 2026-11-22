@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
-import type { DreamSettings } from "../../../../shared/dream";
+import type { DreamCounts, DreamSettings } from "../../../../shared/dream";
 import type { Inbox } from "../../../../shared/inbox";
 import type { Project, ProjectStats } from "../../../../shared/projects";
 import type { DreamActivity } from "../../../../shared/taste";
@@ -35,8 +35,10 @@ export interface Dream {
   unseen: DreamItem[];
   /** When the visit before this one ended; null on the first. */
   since: string | null;
-  /** What Dream has made today, counted against the daily caps. */
-  today: { images: number; videos: number };
+  /** What Dream has made today. */
+  today: DreamCounts;
+  /** Jobs counted towards the limits, when different from the day's totals. */
+  usage?: DreamCounts;
   spicyAvailable: boolean;
   /** The settings an administrator forces on every account, which this one can't change. */
   locked: (keyof DreamSettings)[];
@@ -96,7 +98,12 @@ export const setAnswerPath = (setId: string) =>
  * When Dream works, or why it doesn't, and how much of today's share it has made, such as "Dream
  * works when the queue is free · 12 of 40 today".
  */
-export const dreamWhen = ({ settings, today, status }: Dream) =>
+const dailyShare = (today: number, used: number, limit: number, kind: "images" | "videos") =>
+  used === today
+    ? `${today} of ${limit} ${kind === "images" ? "today" : "videos"}`
+    : `${today} ${kind} today · ${used} of ${limit} since reset`;
+
+export const dreamWhen = ({ settings, today, usage = today, status }: Dream) =>
   [
     status === "off"
       ? "Dream is off"
@@ -105,8 +112,12 @@ export const dreamWhen = ({ settings, today, status }: Dream) =>
         : status === "capped"
           ? "Dream has made today's share"
           : "Dream works when the queue is free",
-    ...(settings.images ? [`${today.images} of ${settings.dailyImages} today`] : []),
-    ...(settings.videos ? [`${today.videos} of ${settings.dailyVideos} videos`] : []),
+    ...(settings.images
+      ? [dailyShare(today.images, usage.images, settings.dailyImages, "images")]
+      : []),
+    ...(settings.videos
+      ? [dailyShare(today.videos, usage.videos, settings.dailyVideos, "videos")]
+      : []),
   ].join(" · ");
 
 export const projectsQuery = queryOptions({

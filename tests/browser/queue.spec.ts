@@ -192,11 +192,22 @@ test("a request's jobs group as one set that moves and stops together", async ({
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAccessibleDescription("Generating · 1 of 4 Finished");
   await expect(status.getByText("1/4", { exact: true })).toBeVisible();
+  const modes = page.getByRole("navigation", { name: "Creative Modes", exact: true });
+  await expect
+    .poll(async () => {
+      const [button, nav] = await Promise.all([status.boundingBox(), modes.boundingBox()]);
+      return Boolean(button && nav && button.x + button.width <= nav.x);
+    })
+    .toBe(true);
   await status.click();
   const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   // The set is one row: its title and progress, its jobs under it once opened.
   await expect(queue.getByText("Queue (2)", { exact: true })).toBeVisible();
   await expect(queue.getByText("1 of 4 Finished", { exact: true })).toBeVisible();
+  await expect(queue.getByRole("progressbar", { name: "Overall Queue Progress" })).toHaveAttribute(
+    "aria-valuenow",
+    "25",
+  );
   const set = queue.getByRole("button", { name: /^Fox Studies/ });
   await expect(set).toContainText("1 of 3 Done");
   await expect(set).toContainText("Queued – Krea 2 Turbo");
@@ -257,6 +268,43 @@ test("a request's jobs group as one set that moves and stops together", async ({
   }
   await expect(banner).toBeHidden();
   await expect(stopAll).toBeVisible();
+});
+
+test("a video stays visible as stopping while its provider confirms", async ({ page }) => {
+  const state = await fixtures(page);
+  const video = {
+    id: "stopping-video",
+    operation: "animate",
+    status: "running",
+    input: { kind: "video", prompt: "A lighthouse in fog" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  };
+  state.jobs.push(video);
+  let confirm!: () => void;
+  const confirmed = new Promise<void>((resolve) => {
+    confirm = resolve;
+  });
+  await page.route("**/api/queue/stopping-video/cancel", async (route) => {
+    Object.assign(video, { cancelling: true });
+    await confirmed;
+    video.status = "cancelled";
+    return route.fulfill({ json: { job: video } });
+  });
+  await page.goto("/videos");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
+  await queue.getByRole("button", { name: "Stop", exact: true }).click();
+  try {
+    await expect(queue.getByRole("button", { name: "Stopping", exact: true })).toBeDisabled();
+    await expect(queue.getByText("A lighthouse in fog", { exact: true })).toBeVisible();
+    expect(video.status).toBe("running");
+  } finally {
+    confirm();
+  }
+  await expect(queue.getByRole("button", { name: "Stopping", exact: true })).toHaveCount(0);
 });
 
 test("a request of several prompts lists each prompt once, its split runs stopping together", async ({

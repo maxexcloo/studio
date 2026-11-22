@@ -80,6 +80,7 @@ let listVersion = 0;
 const enrichment = new Set([
   "caption",
   "identity",
+  "motionIdeas",
   "nextSteps",
   "review",
   "suggestedPrompt",
@@ -250,6 +251,25 @@ export function galleryItems(query = {}, { ordered = true } = {}) {
   )
     .all(...params, ...limit)
     .map(parse);
+}
+
+/** Read Dream's badge inputs without loading whole gallery records or sorting them. */
+export function unseenDreamReadiness(ownerId) {
+  const query = { ownerId, dreamState: "unseen" };
+  const { sql, params } = where(query);
+  return statement(
+    `SELECT key, item_id AS id, type, status, json_extract(value, '$.dream') AS dream,
+         json_extract(value, '$.resultSet') AS resultSet
+       FROM studio_gallery ${indexFor(query)} ${sql}`,
+  )
+    .all(...params)
+    .map(({ key, id, type, status, dream, resultSet }) => ({
+      id,
+      type,
+      status: live.get(key)?.status ?? status,
+      dream: JSON.parse(dream),
+      resultSet: resultSet ? JSON.parse(resultSet) : undefined,
+    }));
 }
 
 const keyColumns = "key, value, gallery_ms, job_id, item_index, item_id";
