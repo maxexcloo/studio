@@ -70,6 +70,10 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
+import { createElement, forwardRef } from "react";
+
+const filled = (Icon: LucideIcon): LucideIcon =>
+  forwardRef((props, ref) => createElement(Icon, { fill: "currentColor", ...props, ref }));
 
 /** One icon per meaning: every action, mode and recurring control takes its icon from here. */
 export const icons = {
@@ -134,7 +138,7 @@ export const icons = {
   pacing: Activity,
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
-  pause: Pause,
+  pause: filled(Pause),
   /** A saved preset: the Presets chip and Library › Presets. */
   preset: Bookmark,
   /** Seeing a choice full screen before choosing it. */
@@ -156,7 +160,7 @@ export const icons = {
   /** Returning a text to where it started, such as the viewer's prompt. */
   reset: RotateCcw,
   /** Starting or resuming work, beside Pause or Stop. */
-  resume: Play,
+  resume: filled(Play),
   retry: RotateCw,
   /** Showing a written prompt for editing before it runs (Review Prompt). */
   review: ScanText,
@@ -174,7 +178,7 @@ export const icons = {
   similar: ScanSearch,
   sort: ArrowDownUp,
   sound: Volume2,
-  stop: Square,
+  stop: filled(Square),
   undo: Undo2,
   unfinished: ListRestart,
   upload: Upload,
