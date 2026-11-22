@@ -1,10 +1,12 @@
 import { type Page, expect, test } from "@playwright/test";
 
 import {
+  backToActionMenu,
   closeTextEditor,
   create,
   editorMenu,
   expandAssistantMenu,
+  expandComposer,
   fixtures,
   image,
   promptMenu,
@@ -58,7 +60,14 @@ async function suggest(page: Page) {
     const body = route.request().postDataJSON();
     asked.push(body);
     return route.fulfill({
-      json: { suggestions: body.surface === "viewer" ? steps : ideas },
+      json: {
+        suggestions:
+          body.surface === "composer"
+            ? ideas
+            : body.request
+              ? [{ ...steps[0], action: "recreate" }]
+              : steps,
+      },
     });
   });
   return asked;
@@ -96,12 +105,21 @@ async function openViewer(page: Page) {
   return state;
 }
 
-test("The empty composer prompt's AI menu offers Suggested ideas that fill it with Undo", async ({
+test("The composer groups ideas and draft suggestions in its compact and expanded AI menus", async ({
   page,
 }) => {
-  await fixtures(page);
+  const state = await fixtures(page);
   const asked = await suggest(page);
-  await create(page);
+  await page.goto("/images");
+  const dock = page.locator("[data-composer-dock]");
+  const compactMenu = await promptMenu(dock, "Prompt");
+  await expect(compactMenu.getByRole("menuitem", { name: "Templates", exact: true })).toBeVisible();
+  await expect(
+    compactMenu.getByRole("menuitem", { name: "Suggestions", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(compactMenu).toBeHidden();
+  await expandComposer(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(
     page
@@ -111,21 +129,34 @@ test("The empty composer prompt's AI menu offers Suggested ideas that fill it wi
   await prompt.click();
   expect(asked).toHaveLength(0);
   let menu = await promptMenu(page, "Prompt");
-  await expect(menu.getByText("Suggested", { exact: true })).toBeVisible();
+  await expandAssistantMenu(menu, "Suggestions");
+  const suggestions = menu.getByRole("group", { name: "Suggestions", exact: true });
   const sorted = ideas.map((idea) => idea.label).sort((a, b) => a.localeCompare(b));
-  await expect(menu.getByRole("menuitem").first()).toHaveText(sorted[0]);
+  await expect(suggestions.getByRole("menuitem").first()).toHaveText(sorted[0]);
   for (const idea of sorted)
     await expect(menu.getByRole("menuitem", { name: idea, exact: true })).toBeVisible();
   expect(asked).toEqual([{ surface: "composer", kind: "image", fresh: false }]);
+  await backToActionMenu(menu);
   await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
   await expect.poll(() => asked.at(-1)?.fresh).toBe(true);
+  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: ideas[1].label, exact: true }).click();
   await expect(prompt).toHaveValue(ideas[1].prompt);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("");
   await prompt.fill("A fox");
   menu = await promptMenu(page, "Prompt");
-  await expect(menu.getByText("Suggested", { exact: true })).toHaveCount(0);
+  await expandAssistantMenu(menu, "Suggestions");
+  await expect(
+    suggestions.getByRole("menuitem", { name: steps[0].label, exact: true }),
+  ).toBeVisible();
+  expect(asked.at(-1)).toEqual({ surface: "draft", kind: "image", prompt: "A fox", fresh: false });
+  await suggestions.getByRole("menuitem", { name: steps[0].label, exact: true }).click();
+  await expect(prompt).toHaveValue(steps[0].prompt);
+  await expect(page.getByLabel("Proposed Action", { exact: true })).toHaveText("Generate");
+  expect(state.jobs).toHaveLength(0);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(prompt).toHaveValue("A fox");
 });
 
 test("The viewer groups Suggestions and Templates without styles or item descriptions", async ({
@@ -169,6 +200,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   await expandAssistantMenu(menu, "Suggestions");
   release[0]();
   await expect(menu.getByRole("menuitem", { name: steps[0].label, exact: true })).toBeVisible();
+  await backToActionMenu(menu);
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem").last()).toHaveText("Edit in Composer");
   expect(asked).toEqual([
@@ -177,6 +209,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
   await expect(thinking).toBeVisible();
   release[1]();
+  await expandAssistantMenu(menu, "Suggestions");
   await expect(menu.getByRole("menuitem", { name: "Snowfall", exact: true })).toBeVisible();
   expect(asked.at(-1)).toEqual({
     surface: "viewer",
@@ -186,6 +219,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
     itemId: "hub",
   });
   // Custom… asks for the change in a box of its own, leaving the prompt as it was.
+  await backToActionMenu(menu);
   await menu.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   await expect(page.getByRole("menu")).toHaveCount(0);
   const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
@@ -319,7 +353,7 @@ test("Animate offers motions written for the image, then its templates and Custo
   await expect(viewer.getByRole("button", { name: "Animate", exact: true })).toBeVisible();
   expect(asked).toEqual([]);
   await viewerAction(page, "Animate");
-  const menu = page.getByRole("menu");
+  const menu = page.getByRole("menu").first();
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Refresh", exact: true })).toBeVisible();
@@ -365,12 +399,15 @@ test("Suggestions show why Studio has none, and no ideas show", async ({ page })
   await expect(viewer).toBeHidden();
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
-  const [, ideas] = await Promise.all([
-    page.waitForResponse("**/api/suggestions"),
-    promptMenu(page, "Prompt"),
-  ]);
+  const ideas = await promptMenu(page, "Prompt");
   await expect(ideas.getByRole("menuitem", { name: "Recent Prompts", exact: true })).toBeVisible();
-  await expect(ideas.getByText("Suggested", { exact: true })).toHaveCount(0);
+  await expandAssistantMenu(ideas, "Suggestions");
+  await expect(
+    ideas.getByRole("menuitem", {
+      name: "Like a few results so Studio learns your taste.",
+      exact: true,
+    }),
+  ).toBeDisabled();
 });
 
 test("Review stays off after editing and Reset, while an explicit opt-in preserves the current prompt for Undo", async ({

@@ -57,15 +57,17 @@ window.addEventListener(
     pressed = { event, layers };
     const top = layers.at(-1);
     const context = top && popups.get(top);
+    const submenu = top?.hasAttribute("data-action-submenu");
     // Inside the dropdown, Mantine's native handler also returns focus synchronously.
     if (
       event.key === "Escape" &&
       !event.isComposing &&
       top &&
       context?.closeOnEscape &&
-      !top.contains(event.target as Node)
+      (submenu || !top.contains(event.target as Node))
     ) {
       dismiss(context);
+      if (submenu) document.getElementById(context.getTargetId())?.focus({ preventScroll: true });
       event.preventDefault();
       event.stopPropagation();
     }
@@ -143,6 +145,16 @@ window.addEventListener(
       trigger;
     closing =
       top.dataset.popupOutside !== "false" && !top.contains(target) && !control?.contains(target);
+    if (
+      closing &&
+      event.pointerType !== "touch" &&
+      top.hasAttribute("data-action-submenu") &&
+      target.closest("[data-menu-dropdown]")?.contains(top)
+    ) {
+      // A parent menu command still acts on the press that closes its hovered submenu.
+      dismiss(context);
+      closing = false;
+    }
     if (closing) {
       dismiss(context);
       // The same press must not arm a hold or another action beneath the popup.

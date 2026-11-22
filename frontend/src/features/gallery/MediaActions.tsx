@@ -80,12 +80,13 @@ import type { ViewerAsk, ViewerChange, ViewerDraftActions } from "./ViewerPrompt
 
 /**
  * An action whose options come to one runs that option itself, so no submenu holds just one.
- * Animate stays a menu, as its templates load after it shows, and so does AI, which names no
- * action.
+ * Animate loads templates as it opens. AI and Upscale can hold a choice that differs from
+ * the menu's name.
  */
 function withoutLoneOption(action: Action): Action {
   const options = action.menu?.flat() ?? [];
-  if (options.length !== 1 || action.note || ["ai", "animate"].includes(action.id)) return action;
+  if (options.length !== 1 || action.note || ["ai", "animate", "upscale"].includes(action.id))
+    return action;
   const [option] = options;
   return {
     ...action,
@@ -508,7 +509,6 @@ export function useMediaActions(
                 id: "recreate-count",
                 label: "Count",
                 choice: {
-                  showLabel: true,
                   value: String(recreateCount),
                   options: Array.from({ length: countLimit }, (_, index) => {
                     const count = String(index + 1);
@@ -859,9 +859,8 @@ export function useMediaDialogs(
 export function MediaActionMenu({
   item,
   onSelect,
-  submenus,
   ...options
-}: MediaActionOptions & { item: MediaItem; onSelect?: () => void; submenus: boolean }) {
+}: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
   const groups = useMediaActions(item, options).flatMap((group) =>
     group.some(({ id }) => id === "ai" || id === "share")
       ? group.map((action) => action.menu?.flat() ?? [action])
@@ -869,7 +868,6 @@ export function MediaActionMenu({
   );
   return (
     <ActionMenuItems
-      submenus={submenus}
       groups={
         onSelect
           ? [[{ id: "select", label: "Select", icon: icons.select, onClick: onSelect }], ...groups]

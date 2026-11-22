@@ -17,7 +17,6 @@ import { useMergedRef } from "@mantine/hooks";
 import { ArrowUp, Check, type LucideIcon } from "lucide-react";
 import {
   type CSSProperties,
-  Fragment,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
@@ -32,12 +31,12 @@ import {
 import { createPortal } from "react-dom";
 
 import { menuWidth } from "../theme";
-import { type Action, ActionMenuItems } from "./ActionBar";
+import { type Action, type ActionGroups, ActionMenuItems, useActionMenuBounds } from "./ActionBar";
 import { useCopy } from "./clipboard";
 import { icons } from "./icons";
 import { layerAbove, popupLayer } from "./popupClicks";
 import { PopupTooltip } from "./PopupTooltip";
-import { useKeyboard, useKeyboardDrop, useVisibleRect } from "./useKeyboard";
+import { useKeyboard, useKeyboardDrop } from "./useKeyboard";
 import { usePhone } from "./usePhone";
 
 import classes from "./TextBox.module.css";
@@ -52,7 +51,7 @@ const keepFocus = (event: MouseEvent) => event.preventDefault();
  */
 export const TextToolsBar = createContext<HTMLElement | null>(null);
 
-/** Shared text editing, with a flat tools menu and a full-screen phone editor. */
+/** Shared text editing with a tools menu and a full-screen phone editor. */
 export function TextBox({
   value,
   onChange,
@@ -183,7 +182,7 @@ export function TextBox({
     bar !== null &&
     bar.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]');
   const inBar = barred && active ? bar : null;
-  const restingTools = barred && !active && !hideTools && (ai || Boolean(send));
+  const restingTools = barred && !active && !hideTools && Boolean(tools?.length || send);
   const spins =
     tools !== undefined &&
     (!phone || editing || ai) &&
@@ -223,9 +222,20 @@ export function TextBox({
     ] as const)
       line.current.style[key] = style[key];
   });
-  // Keep every option under its tool's name, including its later action groups.
-  const listed = tools?.filter((action) => action.menu) || [];
-  const others = tools?.filter((action) => !action.menu) || [];
+  const groups: ActionGroups = [
+    ...(tools ?? []).flatMap((tool) => {
+      if (!tool.menu) return [];
+      const groups = tool.menu
+        .filter((group) => group.length)
+        .map((group) =>
+          group.map((option) => ({ ...option, disabled: option.disabled || tool.disabled })),
+        );
+      if (groups.some((group) => group.some((option) => option.heading))) return groups;
+      const [first = [], ...rest] = groups;
+      return [[{ id: tool.id, label: tool.label, heading: true }, ...first], ...rest];
+    }),
+    (tools ?? []).filter((action) => !action.menu),
+  ];
   // Without tools a desktop box has no menu, and a busy tool spins its Reset instead.
   const menuless = !mobile && tools?.length === 0;
   const inlineEdit = (edit || (menuless && busy)) && (
@@ -242,17 +252,18 @@ export function TextBox({
       </ActionIcon>
     </Tooltip>
   );
-  const visible = useVisibleRect(menuOpened);
-  const bounds = { padding: 12, rootBoundary: visible ?? ("viewport" as const) };
+  const bounds = useActionMenuBounds(
+    menuOpened,
+    groups.some((group) => group.some(({ menu }) => menu)),
+  );
   const menu = tools && tools.length > 0 && (
     <Menu
       // In place at rest, the button stands at the text's top, so the menu drops from it.
       position={mobile && inline && !inBar ? "bottom-end" : "top-end"}
       width={menuWidth}
-      // A long list scrolls within the visible room, above a phone's keyboard and toolbar.
-      middlewares={{ flip: bounds, shift: bounds, size: bounds }}
+      {...bounds}
       // Compact rows, as on desktop, keep the list short on a phone.
-      styles={{ item: { minHeight: 36 } }}
+      styles={{ ...bounds.styles, item: { minHeight: 36 } }}
       // Above any dialog holding the box: a card's sits over the popovers it opens from.
       zIndex={getDefaultZIndex("max")}
       opened={menuOpened}
@@ -320,26 +331,7 @@ export function TextBox({
           )}
         </Menu.Target>
       </PopupTooltip>
-      <Menu.Dropdown style={{ overflowY: "auto", overscrollBehavior: "contain" }}>
-        {listed.map((tool, index) => (
-          <Fragment key={tool.id}>
-            {index > 0 && <Menu.Divider />}
-            {!tool.menu!.flat().some((option) => option.heading) && (
-              <Menu.Label>{tool.label}</Menu.Label>
-            )}
-            <ActionMenuItems
-              groups={tool.menu!.map((group) =>
-                group.map((option) => ({
-                  ...option,
-                  disabled: option.disabled || tool.disabled,
-                })),
-              )}
-            />
-          </Fragment>
-        ))}
-        {listed.length > 0 && others.length > 0 && <Menu.Divider />}
-        <ActionMenuItems groups={[others]} />
-      </Menu.Dropdown>
+      <Menu.Dropdown>{menuOpened && <ActionMenuItems groups={groups} />}</Menu.Dropdown>
     </Menu>
   );
   // At rest the tools stand over the text's end; while it has focus, the bar leads with the menu
@@ -426,7 +418,7 @@ export function TextBox({
           boxTools
         ) : restingTools ? (
           <div className={classes.restingTools} data-text-tools onMouseDown={keepFocus}>
-            {ai && menu}
+            {menu}
             {send}
           </div>
         ) : (

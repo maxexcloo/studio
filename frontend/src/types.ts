@@ -275,6 +275,10 @@ export interface Models {
   defaults?: { imageModel?: string; videoModel?: string };
   /** Why a default runs on the other side from the account's preference. */
   defaultNotes?: Partial<Record<MediaKind, string>>;
+  backends?: Record<
+    MediaKind | "upscale",
+    { configured: boolean; available: boolean; parked?: boolean }
+  >;
   workers?: {
     id: string;
     name: string;

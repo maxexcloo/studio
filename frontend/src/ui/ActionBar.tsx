@@ -1,7 +1,6 @@
 import {
   ActionIcon,
   Button,
-  Collapse,
   Divider,
   type FloatingPosition,
   Loader,
@@ -13,7 +12,7 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
-import { Check, ChevronDown, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import {
   type ComponentProps,
   Fragment,
@@ -29,7 +28,7 @@ import { menuWidth, popupMiddlewares } from "../theme";
 import { icons } from "./icons";
 import { PopupTooltip } from "./PopupTooltip";
 import { useVisibleRect } from "./useKeyboard";
-import { usePhone } from "./usePhone";
+import { usePhone, useTouch } from "./usePhone";
 
 import classes from "./ActionBar.module.css";
 
@@ -145,21 +144,104 @@ const itemLabel = ({ label, description }: Action, describedBy: string) =>
 const described = ({ label, description }: Action, describedBy: string) =>
   description ? { "aria-label": label, "aria-describedby": describedBy } : {};
 
-/** Context submenus sit inside their parent's DOM and must be free to open beyond it. */
-export const submenuParentProps = {
-  middlewares: popupMiddlewares,
-  styles: { dropdown: { overflowY: "visible" as const } },
-};
+function useSideMenus() {
+  const phone = usePhone();
+  const touch = useTouch();
+  return !phone && !touch;
+}
 
 /** The groups as Menu items. Render inside a Menu.Dropdown. */
 export function ActionMenuItems({
   groups,
-  onSelected,
-  submenus = false,
+  leading,
 }: {
   groups: ActionGroups;
+  leading?: ReactNode;
+}) {
+  const sideMenus = useSideMenus();
+  const [path, setPath] = useState<string[]>([]);
+  const focus = useRef<string | null>(null);
+  const uid = useId();
+  const levels: Action[] = [];
+  let items = groups;
+  if (!sideMenus)
+    for (const id of path) {
+      const branch = items.flat().find((item) => item.id === id);
+      if (!branch?.menu) break;
+      levels.push(branch);
+      items = branch.menu;
+    }
+  const level = levels.at(-1);
+  const backId = `${uid}-back`;
+  const goBack = () => {
+    if (!level) return;
+    if (document.activeElement?.closest("[data-menu-dropdown]"))
+      focus.current = `${uid}-${level.id}`;
+    setPath(path.slice(0, levels.length - 1));
+  };
+  useLayoutEffect(() => {
+    if (!focus.current) return;
+    document.getElementById(focus.current)?.focus();
+    focus.current = null;
+  }, [path]);
+  const rows = (
+    <MenuRows
+      groups={items}
+      uid={uid}
+      onSelected={level ? goBack : undefined}
+      drill={
+        sideMenus
+          ? undefined
+          : (id, keyboard) => {
+              const active = document.activeElement;
+              if (keyboard || active?.closest("[data-menu-dropdown]")) focus.current = backId;
+              setPath([...path.slice(0, levels.length), id]);
+            }
+      }
+    />
+  );
+  if (!level)
+    return (
+      <>
+        {leading}
+        {rows}
+      </>
+    );
+  return (
+    <div className={classes.menuPage}>
+      <Menu.Item
+        id={backId}
+        aria-label="Back"
+        leftSection={<ChevronLeft size={16} />}
+        rightSection={
+          <Text size="xs" c="dimmed" truncate className={classes.menuTitle}>
+            {level.label}
+          </Text>
+        }
+        closeMenuOnClick={false}
+        onClick={goBack}
+      >
+        Back
+      </Menu.Item>
+      <Menu.Divider />
+      <div role="group" aria-label={level.label} className={classes.menuOptions} key={level.id}>
+        {note(level)}
+        {rows}
+      </div>
+    </div>
+  );
+}
+
+function MenuRows({
+  groups,
+  uid,
+  drill,
+  onSelected,
+}: {
+  groups: ActionGroups;
+  uid: string;
+  drill?: (id: string, keyboard: boolean) => void;
   onSelected?: () => void;
-  submenus?: boolean;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const selectionTrigger = useRef<HTMLButtonElement>(null);
@@ -167,7 +249,7 @@ export function ActionMenuItems({
     setExpanded(null);
     selectionTrigger.current?.focus();
   };
-  const uid = useId();
+  const childUid = useId();
   return shown(groups).map((group, index) => (
     <Fragment key={group[0].id}>
       {index > 0 && <Menu.Divider />}
@@ -215,58 +297,70 @@ export function ActionMenuItems({
             ref: radioMenu ? selectionTrigger : undefined,
             ...described(action, describedBy),
           };
-          const options = (
-            <>
-              {note(action)}
-              <ActionMenuItems
-                groups={action.menu}
-                submenus={submenus}
-                onSelected={radioMenu ? closeSelection : undefined}
-              />
-            </>
-          );
-          if (submenus) {
+          if (!drill) {
             const leaf = !action.menu.some((group) => group.some((option) => option.menu));
             return (
               <Menu.Sub
                 key={id}
-                opened={radioMenu ? open : undefined}
-                onChange={radioMenu ? (next) => setExpanded(next ? id : null) : undefined}
+                opened={open}
+                openDelay={100}
+                onChange={(next) =>
+                  setExpanded((previous) => (next ? id : previous === id ? null : previous))
+                }
                 middlewares={
                   leaf ? { ...popupMiddlewares, size: { padding: 12 } } : popupMiddlewares
                 }
               >
                 <Menu.Sub.Target>
-                  <Menu.Sub.Item {...trigger}>{itemLabel(action, describedBy)}</Menu.Sub.Item>
+                  <Menu.Sub.Item
+                    {...trigger}
+                    onClick={(event) => {
+                      setExpanded(id);
+                      if (event.detail !== 0) return;
+                      const target = event.currentTarget;
+                      requestAnimationFrame(() => {
+                        const controls = target.getAttribute("aria-controls");
+                        if (controls)
+                          document
+                            .getElementById(controls)
+                            ?.querySelector<HTMLElement>("[data-menu-item]:not([data-disabled])")
+                            ?.focus();
+                      });
+                    }}
+                  >
+                    {itemLabel(action, describedBy)}
+                  </Menu.Sub.Item>
                 </Menu.Sub.Target>
                 <Menu.Sub.Dropdown
+                  data-action-submenu
                   w={menuWidth}
                   style={leaf ? { overflowY: "auto", overscrollBehavior: "contain" } : undefined}
                 >
-                  {options}
+                  <div role="group" aria-label={label}>
+                    {note(action)}
+                    <MenuRows
+                      groups={action.menu}
+                      uid={`${childUid}-${id}`}
+                      onSelected={radioMenu ? closeSelection : undefined}
+                    />
+                  </div>
                 </Menu.Sub.Dropdown>
               </Menu.Sub>
             );
           }
           return (
-            <Fragment key={id}>
-              <Menu.Item
-                {...trigger}
-                rightSection={<ChevronDown size={14} className={classes.expand} />}
-                aria-expanded={open}
-                data-expanded={open || undefined}
-                closeMenuOnClick={false}
-                onClick={() => setExpanded(open ? null : id)}
-              >
-                {itemLabel(action, describedBy)}
-              </Menu.Item>
-              {/* Unmounted when closed, so arrow keys skip the hidden options. */}
-              <Collapse expanded={open} keepMounted={false}>
-                <div role="group" aria-label={label} className={classes.inline}>
-                  {options}
-                </div>
-              </Collapse>
-            </Fragment>
+            <Menu.Item
+              key={id}
+              {...trigger}
+              id={describedBy}
+              rightSection={<ChevronRight size={14} />}
+              aria-haspopup="menu"
+              aria-expanded={false}
+              closeMenuOnClick={false}
+              onClick={(event) => drill(id, event.detail === 0)}
+            >
+              {itemLabel(action, describedBy)}
+            </Menu.Item>
           );
         }
         return (
@@ -327,10 +421,13 @@ export function ActionMenuItems({
 }
 
 /** Phone action menus follow the visible room as the keyboard or browser chrome moves. */
-export function useActionMenuBounds(opened: boolean) {
-  const phone = usePhone();
-  const visible = useVisibleRect(phone && opened);
-  if (!phone) return {};
+export function useActionMenuBounds(opened: boolean, nested = true) {
+  const sideMenus = useSideMenus();
+  const visible = useVisibleRect(!sideMenus && opened);
+  if (sideMenus)
+    return nested
+      ? { middlewares: popupMiddlewares, styles: { dropdown: { overflowY: "visible" as const } } }
+      : {};
   const bounds = { padding: 12, rootBoundary: visible ?? ("viewport" as const) };
   return {
     middlewares: { flip: bounds, shift: { ...bounds, crossAxis: true }, size: bounds },
@@ -348,7 +445,7 @@ function OptionsMenu({
   position: FloatingPosition;
   target: ReactNode;
 }) {
-  // Each opening starts with every option collapsed.
+  // Each opening starts at the top level.
   const [opening, setOpening] = useState(0);
   const [opened, setOpened] = useState(false);
   const bounds = useActionMenuBounds(opened);
@@ -380,13 +477,23 @@ function OptionsMenu({
       onOpen={() => {
         opener.current =
           document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        action.onOpen?.();
         setOpening((count) => count + 1);
       }}
     >
       {target}
       <Menu.Dropdown ref={dropdown}>
-        {note(action)}
-        <ActionMenuItems key={opening} groups={action.menu!} />
+        <ActionMenuItems
+          key={opening}
+          groups={action.menu!}
+          leading={
+            action.note && (
+              <Menu.Label fw={400} maw={menuWidth}>
+                {action.note}
+              </Menu.Label>
+            )
+          }
+        />
       </Menu.Dropdown>
     </Menu>
   );

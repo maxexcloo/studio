@@ -1,6 +1,7 @@
 import { type Page, expect, test } from "@playwright/test";
 
 import {
+  backToActionMenu,
   closeLoras,
   closePresets,
   create,
@@ -307,6 +308,7 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
   ]);
   // Styles show their names alone.
   await expect(menu.getByText("A person in focus.", { exact: true })).toHaveCount(0);
+  await backToActionMenu(menu);
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
   const request = dialog.getByRole("textbox", { name: "Change", exact: true });

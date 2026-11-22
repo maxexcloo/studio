@@ -142,17 +142,29 @@
   padding: 4px;
 }
 
-/* Each menu section's options are indented under its trigger. */
-.inline {
-  padding-left: 12px;
+:global([data-menu-dropdown]):has(> .menuPage) {
+  display: flex;
+  flex-direction: column;
 }
 
-.expand {
-  transition: transform var(--studio-motion-duration) var(--studio-ease-enter);
+.menuPage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-[data-expanded] .expand {
-  transform: rotate(180deg);
+.menuPage > :not(.menuOptions) {
+  flex-shrink: 0;
+}
+
+.menuOptions {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.menuTitle {
+  max-width: 8rem;
 }
 
 /* A setting's switch sits at the row's end and leaves the press to the row. */
