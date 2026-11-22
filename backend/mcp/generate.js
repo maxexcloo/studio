@@ -27,6 +27,7 @@ import { resolutions } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { upscaleQualities } from "../../shared/upscale.ts";
 import { accessFeatures } from "../account-policy.js";
+import { maxResultCaption } from "../gallery/records.js";
 import { minorAgeRefusal } from "../minor-age.js";
 import { savedDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { promptStyleStore } from "../prompt-styles.js";
@@ -562,6 +563,7 @@ export function registerGenerateTools({
                     ? { prompt_references: args.prompt_references.slice(at, at + size) }
                     : {}),
                   ...(args.titles ? { titles: args.titles.slice(at, at + size) } : {}),
+                  ...(args.captions ? { captions: args.captions.slice(at, at + size) } : {}),
                   ...(args.result_set ? { result_set: { ...args.result_set, first: at } } : {}),
                   ...(Number.isInteger(args.seed) && !args.same_seed
                     ? { seed: args.seed + at * count }
@@ -951,6 +953,11 @@ export function registerGenerateTools({
         .max(maxSplitJobs)
         .optional()
         .describe("One per prompt; Title Case."),
+      captions: z
+        .array(z.string().trim().max(maxResultCaption))
+        .max(maxSplitJobs)
+        .optional()
+        .describe("One per prompt or LoRA strength."),
       context: chatContext.optional(),
       preview: z.boolean().optional(),
       count: jobCount
@@ -1269,6 +1276,10 @@ export function registerGenerateTools({
         throw new Error(`axis compares at most ${compareVariants.max} values.`);
       args.count = 1;
     }
+    if (args.captions && args.captions.length !== (strengths?.length ?? args.prompts.length))
+      throw new Error(
+        "Pass one caption per prompt or LoRA strength, with an empty string to skip one.",
+      );
     if (several && args.loras?.length)
       throw new Error(
         "LoRAs belong to one model: pass them with profile_id, or leave loras out for several models.",
@@ -1580,10 +1591,10 @@ export function registerGenerateTools({
     // A call of several results, or one the chat titled or described, is one titled set, with the
     // character it was made with and the chat's context; the gallery titles each prompt's results
     // by titles, by a one-prompt call's title, or by its prompt where they are missing.
-    const resultSet = (axis || jobs > 1 || title || args.titles || context) && {
+    const resultSet = (axis || jobs > 1 || title || args.titles || args.captions || context) && {
       id: crypto.randomUUID(),
       // A character's set is named for it unless the chat named the set.
-      title: title || card?.name || promptWords(args.prompts[0]),
+      title: title || card?.name || promptWords(args.prompts[0]) || "Untitled Generation",
       source: actor.client || "MCP",
       ...(card ? { character: { id: card.id, name: card.name } } : {}),
       ...(context ? { context } : {}),
@@ -1612,12 +1623,14 @@ export function registerGenerateTools({
       const runs = several
         ? plans
         : strengths
-          ? strengths.map((strength) => ({
+          ? strengths.map((strength, index) => ({
               profile,
               note,
               label: String(strength),
               plan: {
                 ...plan,
+                captions: plan.captions && [plan.captions[index]],
+                ...(plan.result_set ? { result_set: { ...plan.result_set, first: index } } : {}),
                 loras: plan.loras.map((lora, index) => (index ? lora : { ...lora, strength })),
               },
             }))
@@ -1629,6 +1642,7 @@ export function registerGenerateTools({
                 ...plan,
                 prompts: [prompt],
                 titles: plan.titles && [plan.titles[index]],
+                captions: plan.captions && [plan.captions[index]],
                 ...(plan.result_set ? { result_set: { ...plan.result_set, first: index } } : {}),
               },
             }));
@@ -1785,7 +1799,7 @@ export function registerGenerateTools({
       }
       for (const count of [...new Set(chosen.map((item) => item.count))]) {
         const group = chosen.filter((item) => item.count === count);
-        const { titles, result_set, ...args } = plan.args;
+        const { captions, titles, result_set, ...args } = plan.args;
         runs.push({
           profile,
           plan: {
@@ -1793,6 +1807,7 @@ export function registerGenerateTools({
             prompts: group.map((item) => changed(plan.prompts[item.prompt])),
             count,
             ...(titles ? { titles: group.map((item) => titles[item.prompt]) } : {}),
+            ...(captions ? { captions: group.map((item) => captions[item.prompt]) } : {}),
             ...(plan.args.prompt_references
               ? { prompt_references: group.map((item) => plan.args.prompt_references[item.prompt]) }
               : {}),
@@ -1840,7 +1855,7 @@ export function registerGenerateTools({
     server,
     "reuse",
     "reuse result",
-    `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. A set ref ("set 3") reruns it, or only failed or disliked images, add or swap changing each prompt. mode animate makes an image a video, extend continues a video from its last frame; prompt is the motion, or pass theme; length is seconds. tier or profile_id picks the model. runs_on, only if asked, keeps animate or extend local or cloud. mode reference returns it as a reference_asset_id for generate. mode upscale enlarges it in place, only when asked.`,
+    `Follow up on one finished result. again reruns it with the revised prompt and a new seed unless preserve_seed. A set ref ("set 3") reruns it; only filters, add and swap change prompts. animate moves an image; extend continues from the last frame. Give motion in prompt or theme, length in seconds, tier or profile_id for the model, runs_on only if asked. reference returns its reference_asset_id; upscale enlarges it in place when asked.`,
     {
       ...output,
       job_id: z

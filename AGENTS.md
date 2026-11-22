@@ -151,10 +151,10 @@ recur across features.
   sideways.
 - Like and Dislike rate an item and teach taste. A Dislike never deletes: it
   hides the item with Undo, and the gallery's Disliked filter shows it again.
-  Dream's Accept keeps a result unrated; its Like accepts and rates it.
+  Dream's Accept keeps a result unrated. Super Like accepts and rates it.
 - The Dream Deck alone has its own look, as dating apps have it: cards filled
   by their media with the text over the bottom on a dark scrim, large round
-  Dislike (✕), Like (♥) and Accept (✓) buttons, and swipes that tilt the card
+  Pass (✕), Super Like (♥) and Accept (✓) buttons, and swipes that tilt the card
   and stamp its answer while the next card waits behind. Its actions sit below
   the card.
   Undo steps back through the session's judgements.
@@ -162,9 +162,13 @@ recur across features.
   inspect its members. A verdict applies to the whole set. Library rates
   existing results. Both use the same Images and Videos selector. The fullscreen
   preview fills the stage above the verdicts and shares the viewer's
-  top chrome, media controls and Details panel or phone sheet for the item
-  shown. On comparisons, This Image picks the shown side. Like and an upward
-  swipe pick and rate it. Sideways swipes in the preview switch sides.
+  gestures, top chrome, media controls and Details surface. Verdicts in
+  fullscreen use the buttons. Pass offers a reason before dismissing the card.
+  Not My Taste records a dislike. Comparisons offer Pass, the lettered choices
+  and Accept. A three-way comparison picks its winner through A, B or C.
+  On a set, Deny All dislikes every member. Super Like keeps the set and rates
+  the image shown, or the cover when the set is closed. An explicit Like
+  or Deny on a member overrides the set verdict for that member.
 - A finished selection action ends the selection, keeping selected only the
   items it failed for; opening a menu does not. Quick selects take every
   match, not only loaded pages, and deletion confirms.

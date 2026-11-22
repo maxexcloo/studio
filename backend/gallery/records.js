@@ -71,6 +71,8 @@ const shortText = (value, max) =>
         .slice(0, max)
     : "";
 
+export const maxResultCaption = 240;
+
 /**
  * The MCP result set a run belongs to (mcp/media.js queue): one generate call's id and title, the
  * client that asked (`source`), the character card it was made with (`character`), what the chat
@@ -84,6 +86,7 @@ export function storedResultSet(value) {
   const title = titleCase(shortText(value.title, 80));
   if (!id || !title) return null;
   const variation = titleCase(shortText(value.variation, 80));
+  const caption = shortText(value.caption, maxResultCaption);
   const source = shortText(value.source, 40);
   const characterId =
     typeof value.character?.id === "string" && /^[\w-]{1,64}$/.test(value.character.id)
@@ -97,6 +100,7 @@ export function storedResultSet(value) {
     title,
     index,
     ...(variation ? { variation } : {}),
+    ...(caption ? { caption } : {}),
     ...(source ? { source } : {}),
     ...(characterId && characterName
       ? { character: { id: characterId, name: characterName } }

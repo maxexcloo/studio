@@ -402,6 +402,7 @@ export class Store {
           json_extract(record, '$.input.kind') AS kind,
           json_extract(record, '$.input.type') AS type,
           json_extract(record, '$.dream.projectId') AS projectId,
+          json_extract(record, '$.dream.pair.id') AS pairId,
           json_extract(record, '$.dream.draft') AS draft
         FROM studio_queue INDEXED BY studio_queue_priority
         WHERE status IN (${placeholders(statuses)}) AND ${dreamPriority}${ownerId === undefined ? "" : " AND owner_id = ?"}
@@ -414,6 +415,7 @@ export class Store {
       kind: string | null;
       type: string | null;
       projectId: string | null;
+      pairId: string | null;
       draft: string | null;
     }[];
   }

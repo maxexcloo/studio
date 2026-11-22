@@ -1,4 +1,4 @@
-import { Drawer, type DrawerProps, FocusTrap, VisuallyHidden } from "@mantine/core";
+import { Drawer, type DrawerProps, FocusTrap, Group, VisuallyHidden } from "@mantine/core";
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { useMotionDuration } from "./Appearance";
@@ -26,6 +26,7 @@ type SheetProps = Pick<
 > & {
   id?: string;
   title: string;
+  titleAction?: ReactNode;
   hidden?: boolean;
   fieldTitles?: Record<string, string>;
   children: (typing: SheetTyping) => ReactNode;
@@ -41,6 +42,7 @@ const sheetField = (panel: HTMLElement, target: unknown) =>
 export function TextEntrySheet({
   id,
   title,
+  titleAction,
   hidden,
   fieldTitles,
   onClose,
@@ -77,21 +79,10 @@ export function TextEntrySheet({
 
   const fieldTitle = field && fieldTitles?.[field];
   return (
-    <Drawer
+    <Drawer.Root
       {...props}
       id={sheetId}
       onClose={closeWhenTop(sheetId, onClose)}
-      title={
-        fieldTitle ? (
-          <>
-            <VisuallyHidden>{title}</VisuallyHidden>
-            <span aria-hidden>{fieldTitle}</span>
-          </>
-        ) : (
-          title
-        )
-      }
-      closeButtonProps={{ "aria-label": `Close ${fieldTitle || title}` }}
       position="bottom"
       size="100%"
       transitionProps={{ duration }}
@@ -107,38 +98,59 @@ export function TextEntrySheet({
         } as CSSProperties,
       }}
     >
-      <FocusTrap.InitialFocus ref={sheetFocus} />
-      <div
-        ref={(panel) => {
-          sheet.current = panel?.closest<HTMLElement>(".mantine-Drawer-content") ?? null;
-        }}
-        className={classes.panel}
-        data-typing={field}
-        onPointerDown={(event) => {
-          const target = event.target;
-          const name = sheetField(event.currentTarget, target);
-          tapping.current = name !== undefined;
-          // A tap on text already focused by its tools raises the keyboard again.
-          if (name && target === document.activeElement) setField(name);
-        }}
-        onFocus={(event) => {
-          const name = sheetField(event.currentTarget, event.target);
-          if (name && (tapping.current || field !== undefined)) setField(name);
-          tapping.current = false;
-        }}
-        onBlur={(event) => {
-          const next = event.relatedTarget;
-          if (
-            !sheetField(event.currentTarget, next) &&
-            !(next instanceof Element && next.closest(`${popupLayer}, [data-text-tools]`))
-          )
-            setField(undefined);
-        }}
-        aria-hidden={hidden || !props.opened || undefined}
-        inert={!props.opened}
-      >
-        {children({ field, done })}
-      </div>
-    </Drawer>
+      <Drawer.Overlay />
+      <Drawer.Content>
+        <Drawer.Header>
+          <Group wrap="nowrap" gap="xs" miw={0}>
+            <Drawer.Title>
+              {fieldTitle ? (
+                <>
+                  <VisuallyHidden>{title}</VisuallyHidden>
+                  <span aria-hidden>{fieldTitle}</span>
+                </>
+              ) : (
+                title
+              )}
+            </Drawer.Title>
+            {!fieldTitle && titleAction}
+          </Group>
+          <Drawer.CloseButton aria-label={`Close ${fieldTitle || title}`} />
+        </Drawer.Header>
+        <Drawer.Body>
+          <FocusTrap.InitialFocus ref={sheetFocus} />
+          <div
+            ref={(panel) => {
+              sheet.current = panel?.closest<HTMLElement>(".mantine-Drawer-content") ?? null;
+            }}
+            className={classes.panel}
+            data-typing={field}
+            onPointerDown={(event) => {
+              const target = event.target;
+              const name = sheetField(event.currentTarget, target);
+              tapping.current = name !== undefined;
+              // A tap on text already focused by its tools raises the keyboard again.
+              if (name && target === document.activeElement) setField(name);
+            }}
+            onFocus={(event) => {
+              const name = sheetField(event.currentTarget, event.target);
+              if (name && (tapping.current || field !== undefined)) setField(name);
+              tapping.current = false;
+            }}
+            onBlur={(event) => {
+              const next = event.relatedTarget;
+              if (
+                !sheetField(event.currentTarget, next) &&
+                !(next instanceof Element && next.closest(`${popupLayer}, [data-text-tools]`))
+              )
+                setField(undefined);
+            }}
+            aria-hidden={hidden || !props.opened || undefined}
+            inert={!props.opened}
+          >
+            {children({ field, done })}
+          </div>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }

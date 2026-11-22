@@ -3,15 +3,15 @@ import type { MediaItem } from "../../types";
 import type { DreamItem, DreamMedia } from "./queries";
 
 /**
- * A Dream comparison asks about two results alike except for the difference the labels name.
+ * A Dream comparison asks about results alike except for the difference the labels name.
  */
 export type PairDeckCard = {
   kind: "pair";
   key: string;
-  items: [DreamItem, DreamItem];
+  items: DreamItem[];
   question: string;
   pairId: string;
-  labels?: [string, string];
+  labels?: string[];
 };
 type SetDeckCard = {
   kind: "set";
@@ -43,7 +43,15 @@ function seriesCards(dream: DreamItem[]) {
 
 function dreamCards(dream: DreamItem[], limit: number): DeckCard[] {
   const cards: DeckCard[] = [];
-  const paired = new Set<string>();
+  const comparisons = new Map<string, DreamItem[]>();
+  for (const item of dream) {
+    const pair = item.dream?.pair;
+    if (!pair) continue;
+    const members = comparisons.get(pair.id);
+    if (members) members.push(item);
+    else comparisons.set(pair.id, [item]);
+  }
+  const emitted = new Set<string>();
   const sets = seriesCards(dream);
   for (const item of dream) {
     if (cards.length >= limit) break;
@@ -65,26 +73,29 @@ function dreamCards(dream: DreamItem[], limit: number): DeckCard[] {
       }
     }
     const pair = item.dream?.pair;
-    if (pair && paired.has(pair.id)) continue;
-    const other =
-      pair &&
-      dream.find(
-        (entry) => entry !== item && entry.type === item.type && entry.dream?.pair?.id === pair.id,
-      );
-    if (!pair || !other) {
-      cards.push({ kind: "dream", key: item.id, item });
-      continue;
+    if (pair && emitted.has(pair.id)) continue;
+    const members = pair && comparisons.get(pair.id)!;
+    const size = pair?.size ?? 2;
+    if (pair && members && members.length === size) {
+      members.sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side);
+      if (
+        members.every(
+          ({ dream }, index) => dream!.pair!.side === index && (dream!.pair!.size ?? 2) === size,
+        )
+      ) {
+        emitted.add(pair.id);
+        cards.push({
+          kind: "pair",
+          key: pair.id,
+          items: members,
+          question: pair.question,
+          pairId: pair.id,
+          labels: members.map((entry) => entry.dream!.pair!.label),
+        });
+        continue;
+      }
     }
-    paired.add(pair.id);
-    const [a, b] = pair.side ? [other, item] : [item, other];
-    cards.push({
-      kind: "pair",
-      key: pair.id,
-      items: [a, b],
-      question: pair.question,
-      pairId: pair.id,
-      labels: [a.dream!.pair!.label, b.dream!.pair!.label],
-    });
+    cards.push({ kind: "dream", key: item.id, item });
   }
   return cards;
 }

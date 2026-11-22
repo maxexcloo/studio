@@ -188,13 +188,12 @@ export function TextBox({
     bar !== null &&
     bar.closest('[role="dialog"]') === field.current?.closest('[role="dialog"]');
   const inBar = barred && active ? bar : null;
-  // At rest it keeps only an AI menu, in the text's corner as on desktop.
-  const restingAi = barred && !active && ai && !hideTools;
+  const restingTools = barred && !active && !hideTools && (ai || Boolean(send));
   const spins =
     tools !== undefined &&
     (!phone || editing || ai) &&
     !hideTools &&
-    (!barred || active || restingAi);
+    (!barred || active || restingTools);
   const description =
     busy && !spins ? (
       <span className={classes.busy} role="status">
@@ -458,9 +457,19 @@ export function TextBox({
         if (phone && !props.readOnly && !props.disabled) setEditing(true);
       }}
       // While the phone editor is open, it alone carries the actions.
-      rightSection={editing ? undefined : inside ? boxTools : restingAi ? menu : rightSection}
-      {...((inside || restingAi) && {
-        // The resting AI menu's section keeps its default width, which the text's padding reserves.
+      rightSection={
+        editing ? undefined : inside ? (
+          boxTools
+        ) : restingTools ? (
+          <div className={classes.restingTools} data-text-tools onMouseDown={keepFocus}>
+            {ai && menu}
+            {send}
+          </div>
+        ) : (
+          rightSection
+        )
+      }
+      {...((inside || restingTools) && {
         rightSectionWidth: inside ? "auto" : undefined,
         rightSectionPointerEvents: "all" as const,
         rightSectionProps: { style: { alignItems: "flex-start", paddingTop: inside ? 4 : 0 } },
@@ -566,10 +575,7 @@ export function TextBox({
         >
           <div className={classes.columned}>
             {textarea}
-            {inBar
-              ? createPortal(toolGroup, inBar)
-              : (tools || send) &&
-                (barred ? send && <div className={classes.corner}>{send}</div> : toolGroup)}
+            {inBar ? createPortal(toolGroup, inBar) : !barred && (tools || send) && toolGroup}
           </div>
           {below && <div className={classes.below}>{below}</div>}
           {popups && <div className={classes.anchor}>{popups}</div>}

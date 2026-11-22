@@ -218,14 +218,11 @@
 .answer[data-size="large"] {
   --answer-size: 66px;
 }
-.answer[data-size="small"] {
-  --answer-size: 48px;
-}
-:where(:root[data-phone]:not([data-phone="sideways"])) .buttons[data-pair-deck] .answer {
+:where(:root[data-phone]:not([data-phone="sideways"])) .buttons[data-comparison-size] .answer {
   --answer-size: 44px;
 }
 :where(:root[data-phone]:not([data-phone="sideways"]))
-  .buttons[data-pair-deck]
+  .buttons[data-comparison-size]
   .answer[data-size="large"] {
   --answer-size: clamp(44px, 14vw, 66px);
 }
@@ -235,6 +232,12 @@
 :where(:root[data-phone="sideways"]) .answer[data-size="large"] {
   --answer-size: 56px;
 }
+.buttons[data-comparison-size="3"] .answer {
+  --answer-size: 44px;
+}
+:where(:root[data-phone]) .buttons[data-comparison-size="3"] .answer {
+  --answer-size: 38px;
+}
 .thumb {
   display: block;
   width: 100%;
@@ -242,14 +245,18 @@
   object-fit: cover;
 }
 .pair {
+  --comparison-size: 2;
   flex: 1;
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--comparison-size), minmax(0, 1fr));
   grid-template-rows: minmax(0, 1fr);
   gap: var(--mantine-spacing-xs);
   padding: 0 var(--mantine-spacing-xs) var(--mantine-spacing-xs);
+}
+.pair[data-comparison-size="3"] {
+  --comparison-size: 3;
 }
 /* Each side fills its cell, its media fitted there as on a single card. */
 .choice {
@@ -275,6 +282,9 @@
 .choice[data-side="1"] .frame {
   opacity: calc(1 - 0.7 * var(--dream-left) - 0.6 * var(--dream-down));
   outline-color: rgb(from var(--mantine-primary-color-filled) r g b / var(--dream-right));
+}
+.choice[data-side="2"] .frame {
+  opacity: calc(1 - 0.6 * var(--dream-down));
 }
 .choice[data-picked="true"] .frame {
   outline-color: var(--mantine-primary-color-filled);
@@ -306,7 +316,7 @@
 /* One side above the other where that wastes less room (mediaFit.ts's besideFits). */
 .pair[data-stacked] {
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--comparison-size), minmax(0, 1fr));
 }
 /* A phone held sideways keeps a comparison's full height for its sides: the question stands beside
    them, scrolling when it outgrows the card. */
@@ -347,23 +357,13 @@
 }
 .card[data-full] {
   max-width: none;
-  flex-direction: column;
-}
-.card[data-full] .hint:not([data-hint="up"]) {
-  top: calc(env(safe-area-inset-top) + 4.5rem);
-}
-.previewSides {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  transition: transform var(--studio-motion-duration) var(--studio-ease-enter);
+  cursor: auto;
 }
 .previewSide {
-  position: relative;
-  flex: 0 0 100%;
-  min-width: 0;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  height: 100%;
 }
 .previewContent .previewMain {
   flex-direction: column;

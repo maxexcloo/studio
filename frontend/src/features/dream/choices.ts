@@ -2,9 +2,10 @@ import { type LucideIcon, X } from "lucide-react";
 
 import type { Action, ActionGroups } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
+import { letter } from "../compare/inputs";
 import type { ViewerActions } from "../gallery/MediaViewerActions";
 import type { DeckCard } from "./deck";
-import type { PairAnswer } from "./queries";
+import { type PairAnswer, comparisonVotes } from "./queries";
 
 export type Verdict = "discard" | "keep" | "variations" | "like" | "animate" | "refine" | "more";
 
@@ -21,7 +22,7 @@ export interface Choice {
 }
 
 /**
- * The top card's choices, in groups: a comparison's Neither, A, B and Both; a single card's Edit
+ * The top card's choices, in groups: a comparison's Pass, sides and Accept; a single card's Edit
  * and Animate, Variations and More Like This, then its ratings. Dislike hides it, Like accepts it
  * and rates it Liked, and Accept keeps it unrated. Edit, Animate, Variations and More Like This
  * need a Dream image.
@@ -31,8 +32,12 @@ export function dreamChoices(card: DeckCard): Choice[][] {
     return [
       [
         { choice: "neither", id: "neither", label: "Neither", icon: X },
-        { choice: "a", id: "a", label: "A", icon: icons.winner },
-        { choice: "b", id: "b", label: "B", icon: icons.winner },
+        ...comparisonVotes.slice(0, card.items.length).map((choice, index) => ({
+          choice,
+          id: choice,
+          label: letter(index),
+          icon: icons.winner,
+        })),
         { choice: "both", id: "both", label: "Both", icon: icons.keep },
       ],
     ];

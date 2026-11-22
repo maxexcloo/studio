@@ -34,7 +34,7 @@ import {
   verifyAccountMcpToken,
 } from "./account-store.js";
 import { listenForAgentSignIn } from "./agent-sign-in.js";
-import { animateProfile, dreamVideoProfile } from "./animate-profile.js";
+import { dreamVideoProfile } from "./animate-profile.js";
 import { createAssistantContext } from "./assistant-context.js";
 import { promptAssistantOff, registerAssistantRoutes } from "./assistant-routes.js";
 import {
@@ -131,6 +131,7 @@ import {
   removeGalleryItems,
   resultNumbers,
   setGalleryRatings,
+  unseenDreamItem,
   updateGalleryJob,
   visibleGallery,
   visibleGenerationItems,
@@ -829,13 +830,16 @@ registerCompareRoutes(app, {
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
   read: readComparisons,
   write: (records) => writeRuntimeDocument(dataDir, "comparisons", records),
-  gallery: (req, { jobIds = [], itemIds = [] }) =>
-    recordsForRequest(
-      visibleGallery({ jobIds }).concat(
-        visibleGallery({ ids: itemIds }).filter((item) => !jobIds.includes(item.jobId)),
-      ),
-      req,
-    ),
+  gallery: (req, { jobIds = [], itemIds = [], unseenSourceId }) => {
+    const items = visibleGallery({ jobIds }).concat(
+      visibleGallery({ ids: itemIds }).filter((item) => !jobIds.includes(item.jobId)),
+    );
+    if (unseenSourceId) {
+      const source = unseenDreamItem(ownerIdForRequest(req), unseenSourceId);
+      if (source) items.push(source);
+    }
+    return recordsForRequest(items, req);
+  },
   pendingItems: makePendingItems,
   numbered: (items) => resultNumbers.numbered(items),
   voted: (ownerId, image, others) => {
@@ -888,6 +892,7 @@ const suggestions = createSuggestions({
   explicit: explicitFor,
   cards: accountCards,
   item: (ownerId, jobId, itemId) =>
+    (itemId ? unseenDreamItem(ownerId, itemId, jobId) : undefined) ??
     filterVisibleGallery(galleryJobItems(jobId, ownerId)).find(
       (item) => !itemId || item.id === itemId,
     ),
@@ -1048,31 +1053,14 @@ const dream = createDream({
   },
   reference: (account, itemId, frame) =>
     referenceAssetForAccount(account, itemId, frame ? { frame } : undefined),
-  videoProfile: async (ownerId, account, { width, height, extend, backend }) => {
+  videoProfile: async (ownerId, account, choice) => {
     const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
-    const profiles = dreamCatalogue(models).profiles.filter(
-      (profile) => isCloudProfile(profile) === (backend === "cloud"),
-    );
-    if (extend && !profiles.some((profile) => profile.id === extend))
-      throw new Error("The source video's model isn't ready.");
-    if (backend === "cloud") {
-      const pool = extend ? profiles.filter((profile) => profile.id === extend) : profiles;
-      return animateProfile(pool, {
-        where: "cloud",
-        preferred: kindDefaults(accountPreferences(ownerId), "videos"),
-        defaultId: models.defaults?.videoModel,
-        width,
-        height,
-      });
-    }
-    return dreamVideoProfile(profiles, {
+    return dreamVideoProfile(dreamCatalogue(models).profiles, {
+      ...choice,
       preferred: kindDefaults(accountPreferences(ownerId), "videos"),
-      extend,
       defaultId: models.defaults?.videoModel,
       localRunning: models.backends?.video?.available !== false,
       localParked: models.backends?.video?.parked === true,
-      width,
-      height,
     });
   },
   cards: accountCards,

@@ -327,7 +327,7 @@ test("Where Work Runs saves each group’s processing and default models", async
   await options.first().click();
   await expect.poll(() => state.preferences.preferences.textCloud).toBeNull();
   const area = (kind: string) =>
-    group(kind).getByRole("radiogroup", { name: "Default", exact: true });
+    group(kind).getByRole("radiogroup", { name: "Run On", exact: true });
   const choose = (name: string, choice: string) =>
     area(name).locator("label").filter({ hasText: choice }).click();
   await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();

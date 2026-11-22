@@ -1,15 +1,15 @@
 import { Text, UnstyledButton } from "@mantine/core";
 
 import { useSideways } from "../../ui/usePhone";
+import { letter } from "../compare/inputs";
 import type { PairDeckCard } from "./deck";
 import { DeckMedia } from "./DeckMedia";
 import { besideFits, useBoxShape } from "./mediaFit";
 
 import classes from "./DreamPage.module.css";
 
-export const sideNames = ["A", "B"] as const;
 export const sideLabel = (card: PairDeckCard, index: number) =>
-  `${sideNames[index]}${card.labels ? ` · ${card.labels[index]}` : ""}`;
+  `${letter(index)}${card.labels ? ` · ${card.labels[index]}` : ""}`;
 
 /** Comparison media opens the shared preview; the bottom bar owns the choices. */
 export function PairContent({
@@ -24,10 +24,10 @@ export function PairContent({
   card: PairDeckCard;
   top: boolean;
   playing: boolean;
-  picked?: 0 | 1;
+  picked?: number;
   shown?: number;
-  select: (side: 0 | 1) => void;
-  view: (index: 0 | 1) => void;
+  select: (side: number) => void;
+  view: (index: number) => void;
 }) {
   const [first] = card.items;
   const sideways = useSideways();
@@ -57,9 +57,13 @@ export function PairContent({
           </Text>
         )}
       </div>
-      <div ref={pair} className={classes.pair} data-stacked={!beside || undefined}>
-        {card.items.map((item, index) => {
-          const side = index as 0 | 1;
+      <div
+        ref={pair}
+        className={classes.pair}
+        data-stacked={!beside || undefined}
+        data-comparison-size={card.items.length}
+      >
+        {card.items.map((item, side) => {
           const label = sideLabel(card, side);
           return (
             <div

@@ -215,6 +215,11 @@
   gap: 4px;
 }
 
+.restingTools {
+  display: flex;
+  flex-direction: column;
+}
+
 /* While the text has focus, its tools lead its form's action bar, centred on the bar's row. */
 .barTools {
   display: flex;

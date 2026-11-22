@@ -216,6 +216,7 @@ export interface MediaItem {
     title: string;
     index: number;
     variation?: string;
+    caption?: string;
     source?: string;
     character?: { id: string; name: string };
     context?: ResultContext;

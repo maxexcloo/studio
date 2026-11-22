@@ -74,6 +74,27 @@ test("a Dream set takes one card and opens on the first available result", () =>
   );
 });
 
+test("only complete three-way comparisons group, in side order", () => {
+  const triple = ([2, 0, 1] as const).map((side) => ({
+    ...dated(`test-${side}`, 12),
+    dream: {
+      prompt: "",
+      why: "",
+      at: "",
+      state: "unseen" as const,
+      pair: { id: "test", size: 3 as const, side, question: "Which?", label: String(side) },
+    },
+  }));
+  const [card] = deckCards(triple);
+  assert.equal(card.kind, "pair");
+  assert.deepEqual(card.kind === "pair" && card.items.map(({ id }) => id), [
+    "test-0",
+    "test-1",
+    "test-2",
+  ]);
+  assert.deepEqual(keys(deckCards(triple.slice(1))), ["test-0", "test-1"]);
+});
+
 test("Undo restores the exact comparison ahead of arrivals without repeating or splitting it", () => {
   const original = pair("original", 10);
   const [current] = deckCards(original);

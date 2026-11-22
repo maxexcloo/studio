@@ -11,6 +11,7 @@ const {
   hasGalleryMedia,
   pageGallery,
   setGalleryRatings,
+  unseenDreamItem,
   updateGalleryJob,
 } = await import("./gallery/store.js");
 const { setGallery } = await import("./fixtures/gallery.js");
@@ -72,6 +73,23 @@ test("Dream results stay out of the gallery, its delta and MCP job reads until k
     ),
     ["mine"],
   );
+});
+
+test("An explicit Dream source is finished, unseen and owned by the caller", () => {
+  setGallery([
+    item("unseen", "unseen"),
+    item("draft", "draft"),
+    item("gone", "discarded"),
+    { ...item("running", "unseen"), status: "running" },
+  ]);
+  assert.equal(unseenDreamItem("alice", "unseen", "job-unseen")?.id, "unseen");
+  assert.equal(unseenDreamItem("alice", "unseen")?.id, "unseen");
+  assert.equal(unseenDreamItem("alice", "unseen", "job-draft"), undefined);
+  assert.equal(unseenDreamItem("bob", "unseen", "job-unseen"), undefined);
+  for (const id of ["draft", "gone", "running"]) {
+    assert.equal(unseenDreamItem("alice", id), undefined);
+  }
+  assert.deepEqual(pageGallery({ ownerId: "alice" }).items, []);
 });
 
 test("Dream reads its results, an owner's liked items and a chat's items by query", () => {

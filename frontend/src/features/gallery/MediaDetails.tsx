@@ -734,6 +734,11 @@ export function MediaDetails({
   const faceCheck = Boolean(item.identity || item.faceRedo);
   return (
     <Stack gap="lg" fz="sm">
+      {item.resultSet?.caption && (
+        <DetailSection title="Run Caption" copy={item.resultSet.caption}>
+          <DetailText>{item.resultSet.caption}</DetailText>
+        </DetailSection>
+      )}
       <Caption item={item} />
       {details.profile && (
         <DetailSection title="Model">

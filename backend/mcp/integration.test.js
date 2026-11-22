@@ -7954,17 +7954,27 @@ test("axis varies one thing at one seed, one image each, as a lettered side-by-s
   assert.match(texts(reply), /Compare Side by Side/);
   assert.match(texts(reply), /options A–C varying hair colour/);
 
-  await call(client, "generate", {
-    profile_id: imageProfile.id,
-    prompts: ["A cat"],
-    loras: [{ name: "fixture-effect" }],
-    axis: "strength",
-    strengths: [0.4, 0.8],
-  });
-  assert.deepEqual(
-    f.submitted.splice(0).map((body) => body.loras[0].strength),
-    [0.4, 0.8],
+  const sweep = data(
+    await call(client, "generate", {
+      profile_id: imageProfile.id,
+      prompts: ["A cat"],
+      loras: [{ name: "fixture-effect" }],
+      axis: "strength",
+      strengths: [0.4, 0.8],
+      captions: ["Light effect", "Strong effect"],
+    }),
   );
+  assert.deepEqual(
+    f.submitted.splice(0).map((body) => [body.loras[0].strength, body.resultSet.caption]),
+    [
+      [0.4, "Light effect"],
+      [0.8, "Strong effect"],
+    ],
+  );
+  finish(f);
+  const shown = await call(client, "result", { job_id: sweep.sets[1].jobs[0].ref });
+  assert.equal(data(shown).outputs[0].caption, "Strong effect");
+  assert.match(texts(shown), /\n\nStrong effect$/);
   const other = { ...imageProfile, id: "fixture-image-other", label: "Other" };
   await f.profiles([imageProfile, other]);
   const models = await call(client, "generate", {

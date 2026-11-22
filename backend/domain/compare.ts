@@ -68,7 +68,7 @@ const sized = (list: unknown[]) =>
   list.length >= compareVariants.min && list.length <= compareVariants.max;
 
 /** The jobs and chosen items a comparison reads from the gallery. */
-type ComparisonIds = { jobIds?: string[]; itemIds?: string[] };
+type ComparisonIds = { jobIds?: string[]; itemIds?: string[]; unseenSourceId?: string };
 
 /** Compare runs queue as one set and read back against the caller's current gallery. */
 export function registerCompareRoutes(
@@ -405,7 +405,10 @@ export function registerCompareRoutes(
   }
   directRoute(app, "POST", "/api/comparisons/run", async (account, { body }) => {
     const source = body?.parentItemId;
-    const items = galleryFor(account, { itemIds: typeof source === "string" ? [source] : [] });
+    const items = galleryFor(
+      account,
+      typeof source === "string" ? { itemIds: [source], unseenSourceId: source } : {},
+    );
     return items ? run(account, items, body || {}) : galleryOff;
   });
   // Variants of one result: its recorded run and seed, each variant with its own prompt, lettered
