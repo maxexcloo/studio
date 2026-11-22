@@ -337,19 +337,34 @@ export class Benchmarks {
       const run = this.runs.find((item) => item.id === id);
       if (!run) throw new RuntimeRequestError("No benchmark has that id.");
       if (run.status === "running") await this.checkJob(run);
-      if (!activeBenchmark(run)) return run;
-      const job = this.jobFor(run);
-      if (job) {
-        const response = await this.call(
-          "DELETE",
-          `/apis/batch/v1/namespaces/${job.namespace}/jobs/${job.name}?propagationPolicy=Background`,
-        );
-        if (response.status !== 404 && (response.status < 200 || response.status >= 300))
-          throw new RuntimeUnavailable(`Kubernetes returned HTTP ${response.status} for the Job.`);
-      }
-      this.finish(run, { status: "stopped" });
+      if (!activeBenchmark(run) || run.status === "stopping") return run;
+      run.status = "stopping";
+      this.save();
+      await this.stopJob(run);
       return run;
     });
+  }
+
+  private async stopJob(run: BenchmarkRun) {
+    const job = this.jobFor(run);
+    if (!job) return this.finish(run, { status: "stopped" });
+    const { name, namespace } = job;
+    const response = await this.options
+      .request(
+        "DELETE",
+        `/apis/batch/v1/namespaces/${namespace}/jobs/${name}?propagationPolicy=Foreground`,
+      )
+      .catch(() => undefined);
+    if (!response || response.status >= 500 || response.status === 429) return;
+    if (response.status === 404) {
+      if (await this.jobPodsGone(namespace, name)) this.finish(run, { status: "stopped" });
+      return;
+    }
+    if (response.status < 200 || response.status >= 300) {
+      run.status = run.startedAt ? "running" : "queued";
+      this.save();
+      throw new RuntimeUnavailable(`Kubernetes returned HTTP ${response.status} for the Job.`);
+    }
   }
 
   private finish(run: BenchmarkRun, outcome: Partial<BenchmarkRun>) {
@@ -367,6 +382,11 @@ export class Benchmarks {
 
   poll() {
     return (this.checking ??= this.serialise(async () => {
+      const stopping = this.runs.find((run) => run.status === "stopping");
+      if (stopping) {
+        await this.stopJob(stopping);
+        if (this.runs.some((run) => run.status === "stopping")) return;
+      }
       const running = this.runs.find((run) => run.status === "running");
       if (running) {
         await this.checkJob(running);
@@ -401,8 +421,11 @@ export class Benchmarks {
     if (!job) return this.finish(run, { status: "failed", error: "Its workload is gone." });
     const { name, namespace } = job;
     const state = await this.call("GET", `/apis/batch/v1/namespaces/${namespace}/jobs/${name}`);
-    if (state.status === 404)
-      return this.finish(run, { status: "failed", error: "Its Job no longer exists." });
+    if (state.status === 404) {
+      if (await this.jobPodsGone(namespace, name))
+        this.finish(run, { status: "failed", error: "Its Job no longer exists." });
+      return;
+    }
     if (state.status !== 200) return;
     const status = (state.body as Record<string, any>).status ?? {};
     if (!status.succeeded && !status.failed) return;
@@ -435,12 +458,25 @@ export class Benchmarks {
     return { pods: await engine.jobLogs(workload.namespace, this.jobFor(run)!.name, lines) };
   }
 
-  /** The Job's pod log tail, whose last line is the summary, and whether it ran out of memory. */
-  private async log(namespace: string, job: string) {
-    const pods = await this.call(
+  private jobPods(namespace: string, job: string) {
+    return this.call(
       "GET",
       `/api/v1/namespaces/${namespace}/pods?labelSelector=${encodeURIComponent(`batch.kubernetes.io/job-name=${job}`)}`,
     );
+  }
+
+  private async jobPodsGone(namespace: string, job: string) {
+    // A pod can briefly outlive its Job even during foreground deletion.
+    const { status, body } = await this.jobPods(namespace, job);
+    return (
+      status === 404 ||
+      (status === 200 && (body as { items?: unknown[] } | null)?.items?.length === 0)
+    );
+  }
+
+  /** The Job's pod log tail, whose last line is the summary, and whether it ran out of memory. */
+  private async log(namespace: string, job: string) {
+    const pods = await this.jobPods(namespace, job);
     const pod = ((pods.body as Record<string, any>)?.items ?? [])[0];
     if (!pod) return { log: "", killed: false };
     const killed = pod.status?.containerStatuses?.[0]?.state?.terminated?.reason === "OOMKilled";

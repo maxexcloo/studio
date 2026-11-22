@@ -2,19 +2,23 @@ import { Button, Center, Loader, Stack, Text } from "@mantine/core";
 import type { UseInfiniteQueryResult } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const pageMargin = 800;
+
 /**
- * Loads a listing's next page as its end nears `root`'s view (the window's without one), keeping
+ * Loads a neighbouring page as the listing's edge nears `root`'s view (the window's without one), keeping
  * the pages loaded. A page that fails stops the loading and offers Retry until `results`, the
  * listing's search and filters, changes. Nothing loads while `paused`.
  */
 export function MorePages({
   listing,
   results,
+  direction = "next",
   root = null,
   paused = false,
 }: {
   listing: UseInfiniteQueryResult;
   results: string;
+  direction?: "next" | "previous";
   root?: Element | null;
   paused?: boolean;
 }) {
@@ -26,45 +30,59 @@ export function MorePages({
     setFailed(false);
   }
   const [near, setNear] = useState(false);
-  const { hasNextPage, isFetching, isFetchNextPageError, dataUpdatedAt, fetchNextPage } = listing;
+  const { isFetching, dataUpdatedAt } = listing;
+  const previous = direction === "previous";
+  const hasPage = previous ? listing.hasPreviousPage : listing.hasNextPage;
+  const fetching = previous ? listing.isFetchingPreviousPage : listing.isFetchingNextPage;
+  const fetchError = previous ? listing.isFetchPreviousPageError : listing.isFetchNextPageError;
+  const fetchPage = previous ? listing.fetchPreviousPage : listing.fetchNextPage;
   const more = useCallback(
     () =>
-      void fetchNextPage({ cancelRefetch: false }).then((result) =>
-        setFailed(result.isFetchNextPageError),
+      void fetchPage({ cancelRefetch: false }).then((result) =>
+        setFailed(previous ? result.isFetchPreviousPageError : result.isFetchNextPageError),
       ),
-    [fetchNextPage],
+    [fetchPage, previous],
   );
   useEffect(() => {
     const element = trigger.current;
     if (!element) return;
     const observer = new IntersectionObserver(
       (entries) => setNear(entries[entries.length - 1].isIntersecting),
-      { root, rootMargin: "800px" },
+      { root, rootMargin: `${pageMargin}px` },
     );
     observer.observe(element);
     return () => {
       observer.disconnect();
       setNear(false);
     };
-  }, [hasNextPage, root]);
+  }, [hasPage, root]);
   // Each loaded page checks again: a quick page's fetching and fetched states can reach one render.
   useEffect(() => {
-    if (near && hasNextPage && !isFetching && !failed && !isFetchNextPageError && !paused) more();
-  }, [near, hasNextPage, isFetching, isFetchNextPageError, failed, more, paused, dataUpdatedAt]);
-  if (!hasNextPage) return null;
+    if (!near || !hasPage || isFetching || failed || fetchError || paused) return;
+    // Prepending holds the current tile in place and moves the trigger away before the observer runs.
+    if (
+      previous &&
+      trigger.current &&
+      trigger.current.getBoundingClientRect().bottom <
+        (root?.getBoundingClientRect().top ?? 0) - pageMargin
+    )
+      return;
+    more();
+  }, [near, hasPage, isFetching, fetchError, failed, more, paused, dataUpdatedAt, previous, root]);
+  if (!hasPage) return null;
   return (
     <Center ref={trigger} mih={44}>
-      {failed || isFetchNextPageError ? (
+      {failed || fetchError ? (
         <Stack gap={4} align="center">
           <Text size="sm" c="dimmed">
             More results couldn't be loaded.
           </Text>
-          <Button variant="default" radius="xl" loading={listing.isFetchingNextPage} onClick={more}>
+          <Button variant="default" radius="xl" loading={fetching} onClick={more}>
             Retry
           </Button>
         </Stack>
       ) : (
-        listing.isFetchingNextPage && <Loader size="sm" color="gray" aria-label="Loading More" />
+        fetching && <Loader size="sm" color="gray" aria-label="Loading More" />
       )}
     </Center>
   );
