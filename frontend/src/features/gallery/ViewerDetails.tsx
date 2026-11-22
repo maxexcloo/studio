@@ -60,7 +60,7 @@ export function ViewerDetails({
             overflow: "hidden",
             pointerEvents: opened ? undefined : "none",
           },
-          header: { position: "static", paddingBottom: 0, touchAction: "none" },
+          header: { position: "static", alignItems: "flex-start", touchAction: "none" },
           body: { overflowY: "auto", overscrollBehavior: "none" },
         }}
       >
@@ -68,12 +68,18 @@ export function ViewerDetails({
         <Drawer.Content {...swipe}>
           <FocusTrap.InitialFocus />
           <Drawer.Header>
-            <Drawer.Title>{title}</Drawer.Title>
+            <Stack gap={2} miw={0}>
+              <Drawer.Title>
+                <Text span fw={600} lh={1.2} lineClamp={2}>
+                  {title}
+                </Text>
+              </Drawer.Title>
+              <MediaDetailsMetadata item={item} />
+            </Stack>
             <Drawer.CloseButton aria-label="Close Details" />
           </Drawer.Header>
           <Drawer.Body>
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
-              <MediaDetailsMetadata item={item} />
               {details}
             </Stack>
           </Drawer.Body>
@@ -96,7 +102,7 @@ export function ViewerDetails({
         <ScrollArea h="100%" type="hover" offsetScrollbars overscrollBehavior="none">
           <Stack gap="lg" p="md" pt="lg">
             <Stack gap={2} miw={0}>
-              <Text fw={600} lineClamp={2}>
+              <Text fw={600} lineClamp={2} lh={1.2}>
                 {title}
               </Text>
               <MediaDetailsMetadata item={item} />

@@ -571,11 +571,7 @@ function Gallery() {
     }
     void routerNavigate(base, { replace: true, state });
   }, [state, base, routerNavigate]);
-  // Phones leave out the time, keeping a pinned caption to two lines.
-  const detail = useCallback(
-    (item: MediaItem) => mediaDetail(item, profiles, !phone),
-    [profiles, phone],
-  );
+  const detail = useCallback((item: MediaItem) => mediaDetail(item, profiles), [profiles]);
   // Phones without captions hold a tile for its menu instead of showing More.
   const hideMore = phone && !captions;
   const renderTileActions = useCallback(

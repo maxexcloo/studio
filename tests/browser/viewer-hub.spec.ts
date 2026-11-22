@@ -68,6 +68,7 @@ async function seed(
 }
 
 test("The viewer resolves an older result’s checkpoint to its profile name", async ({ page }) => {
+  await page.clock.setFixedTime(new Date(stamp));
   const model = "krea2_turbo_int8_convrot";
   const { viewer } = await seed(page, { settings: { modelName: model } }, async (page) => {
     await serveProfiles(page, [
@@ -81,6 +82,9 @@ test("The viewer resolves an older result’s checkpoint to its profile name", a
   const header = viewer.getByRole("group", { name: "Viewer Header", exact: true });
   await expect(header.getByText("Amber Bird", { exact: true })).toBeVisible();
   await expect(header.getByText("Krea 2 Turbo", { exact: true })).toBeVisible();
+  const timestamp = header.locator("time");
+  await expect(timestamp).toHaveAttribute("datetime", stamp);
+  await expect(timestamp).toHaveText(/^Today, (?:[01]\d|2[0-3]):[0-5]\d$/);
 });
 
 /** Recreate › Run Again: queues the same settings with a new seed, without the composer. */

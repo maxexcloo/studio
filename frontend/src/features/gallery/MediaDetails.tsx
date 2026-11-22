@@ -36,7 +36,7 @@ import { backendLabel, isProfile, profileForBackend } from "../generation/payloa
 import { WritingThinking } from "../generation/PromptWriting";
 import { queueQuery } from "../generation/Queue";
 import { referenceAssetQuery } from "../generation/references";
-import { mediaProfileName, mediaTitle } from "./mediaLabels";
+import { mediaProfileName, mediaTimestamp, mediaTitle } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
 import { galleryItemQuery } from "./queries";
 import { derivations } from "./versions";
@@ -63,20 +63,20 @@ const time = (value?: string) => {
 /** When it was made, its size and a video's length, under the title in the panel and phone sheet. */
 export function MediaDetailsMetadata({ item }: { item: MediaItem }) {
   const source = mediaSource(item);
-  const created = time(item.createdAt);
+  const timestamp = mediaTimestamp(item);
   const settings = item.settings || {};
   const seconds =
     Number(settings.duration) || Number(settings.frames) / Number(settings.fps) || undefined;
   const line = [
-    created && `${item.uploaded ? "Uploaded " : ""}${created}`,
-    source.width ? `${source.width} × ${source.height}` : "",
+    timestamp?.label,
+    source.width && source.height ? `${source.width} × ${source.height}` : "",
     item.type === "video" && seconds ? `${Math.round(seconds * 10) / 10}s` : "",
   ]
     .filter(Boolean)
     .join(" · ");
   return (
     line && (
-      <Text size="xs" c="dimmed">
+      <Text size="xs" c="dimmed" lh={1.25}>
         {line}
       </Text>
     )
@@ -297,6 +297,7 @@ function generationDetails(
       ["File", item.outputName || item.filename],
       ["File Size", size === null ? pendingValue : formatBytes(size)],
       ["Time", time(item.createdAt)],
+      ["Added to Gallery", item.galleryAt !== item.createdAt && time(item.galleryAt)],
     ]),
     // The stages in the order they ran, then their totals.
     timing: rows([
