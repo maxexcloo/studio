@@ -1,6 +1,6 @@
 import { ActionIcon, type MantineColor, Text, Tooltip } from "@mantine/core";
 import { Check, Heart, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 import { icons } from "../../ui/icons";
 import { type Choice, dreamChoices } from "./choices";
@@ -16,6 +16,68 @@ const looks: Record<string, { glyph: ReactNode; color: MantineColor }> = {
   neither: { glyph: <X size={30} strokeWidth={2.5} />, color: "red" },
   both: { glyph: <Check size={30} strokeWidth={2.5} />, color: "green" },
 };
+
+const holdTime = 500;
+const holdSlop = 10;
+
+function usePassHold(cardId: string, open: () => void) {
+  const press = useRef<{ x: number; y: number; timer: number }>(undefined);
+  const suppressClick = useRef(false);
+  function stop() {
+    window.clearTimeout(press.current?.timer);
+    press.current = undefined;
+  }
+  function cancel() {
+    if (press.current) suppressClick.current = true;
+    stop();
+  }
+  useEffect(() => stop, [cardId]);
+  return {
+    onPointerDown(event: React.PointerEvent<HTMLButtonElement>) {
+      stop();
+      if (!event.isPrimary) {
+        suppressClick.current = true;
+        return;
+      }
+      if (event.button !== 0) return;
+      suppressClick.current = false;
+      const button = event.currentTarget;
+      button.setPointerCapture(event.pointerId);
+      press.current = {
+        x: event.clientX,
+        y: event.clientY,
+        timer: window.setTimeout(() => {
+          suppressClick.current = true;
+          button.focus({ preventScroll: true });
+          open();
+        }, holdTime),
+      };
+    },
+    onPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+      const start = press.current;
+      if (!start || Math.hypot(event.clientX - start.x, event.clientY - start.y) <= holdSlop)
+        return;
+      cancel();
+    },
+    onPointerUp: stop,
+    onPointerCancel: cancel,
+    onLostPointerCapture: cancel,
+    onContextMenu(event: React.MouseEvent<HTMLButtonElement>) {
+      event.preventDefault();
+      if (event.button === 2) open();
+    },
+    onKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+      if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+      event.preventDefault();
+      open();
+    },
+    consumeClick(event: React.MouseEvent<HTMLButtonElement>) {
+      if (!event.detail || !suppressClick.current) return false;
+      suppressClick.current = false;
+      return true;
+    },
+  };
+}
 
 export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   return (
@@ -38,6 +100,7 @@ export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: ()
 export function DeckButtons({
   card,
   act,
+  askPass,
   hidden,
   expanded,
   leading,
@@ -45,6 +108,7 @@ export function DeckButtons({
 }: {
   card: DeckCard;
   act: (choice: Choice["choice"]) => void;
+  askPass: () => void;
   hidden: boolean;
   expanded?: boolean;
   leading?: ReactNode;
@@ -59,6 +123,7 @@ export function DeckButtons({
     neither: "Pass",
   };
   const rate = expanded ? "Rate This Image & Keep Set" : "Rate Cover & Keep Set";
+  const { consumeClick, ...hold } = usePassHold(card.key, askPass);
   return (
     <div
       role="group"
@@ -72,7 +137,12 @@ export function DeckButtons({
       {answers.map(({ choice, id, label }) => {
         const side = id === "a" || id === "b" || id === "c";
         const title = labels[id] ?? label;
-        const description = id === "like" && card.kind === "set" ? rate : undefined;
+        const pass = id === "neither" || (id === "discard" && card.kind !== "set");
+        const description = pass
+          ? "Hold to Add a Reason"
+          : id === "like" && card.kind === "set"
+            ? rate
+            : undefined;
         return (
           <Tooltip key={id} label={description ?? title}>
             <ActionIcon
@@ -85,7 +155,12 @@ export function DeckButtons({
               }
               aria-label={title}
               aria-description={description}
-              onClick={() => act(choice)}
+              aria-keyshortcuts={pass ? "Shift+F10" : undefined}
+              data-pass={pass || undefined}
+              {...(pass && hold)}
+              onClick={(event) => {
+                if (!pass || !consumeClick(event)) act(choice);
+              }}
             >
               {side ? (
                 <Text fw={700} fz={26}>

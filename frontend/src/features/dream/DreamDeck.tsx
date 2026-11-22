@@ -11,7 +11,7 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 
-import { type DreamPassReason, dreamPassReasons } from "../../../../shared/dream";
+import type { DreamPassReason } from "../../../../shared/dream";
 import { failure, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
@@ -76,12 +76,12 @@ const keyDirections: Record<string, Direction> = {
   ArrowUp: "up",
   ArrowDown: "down",
 };
-const passLabels: Record<DreamPassReason, string> = {
+const passLabels = {
   taste: "Not My Taste",
   similar: "Too Similar",
   glitch: "Glitch",
-  skip: "Skip Feedback",
-};
+} satisfies Record<Exclude<DreamPassReason, "skip">, string>;
+const passReasons = Object.keys(passLabels) as (keyof typeof passLabels)[];
 /** Warms the browser cache for a card that is not on screen yet. */
 function usePrefetch(card?: DeckCard) {
   useEffect(() => {
@@ -250,7 +250,7 @@ export function DreamDeck({
   const [picked, setPicked] = useState<{ key: string; side: number } | null>(null);
   const [setDraft, setSetDraft] = useState<{ key: string; overrides: SetOverrides }>();
   const [passing, setPassing] = useState<string>();
-  const [passReason, setPassReason] = useState<DreamPassReason>();
+  const [passReason, setPassReason] = useState(passReasons[0]);
   const passDialogId = useId();
   const closePass = closeWhenTop(passDialogId, () => setPassing(undefined));
   /** Puts a card back on the deck, after a failed verdict or an Undo. */
@@ -339,12 +339,13 @@ export function DreamDeck({
   const isPass = (choice: Verdict | PairAnswer) =>
     top?.kind === "pair" ? choice === "neither" : top?.kind !== "set" && choice === "discard";
   const askPass = () => {
-    setPassReason(undefined);
-    setPassing(top?.key);
+    if (!top || busy.current) return;
+    setPassReason(passReasons[0]);
+    setPassing(top.key);
   };
   async function act(choice: Verdict | PairAnswer, reason?: DreamPassReason) {
     if (!top || busy.current) return;
-    if (isPass(choice) && !reason) return askPass();
+    const passReason = isPass(choice) ? (reason ?? "skip") : undefined;
     busy.current = true;
     const out = (viewing ? previewFly : fly).current;
     try {
@@ -355,7 +356,7 @@ export function DreamDeck({
         if (side >= top.items.length) return;
         if (side >= 0) setPicked({ key: top.key, side });
         await out?.(answerDirections[answer]);
-        return commit({ card: top, verdict: answer, passReason: reason });
+        return commit({ card: top, verdict: answer, passReason });
       }
       if (!(choice in directions)) return;
       const likedId =
@@ -365,7 +366,7 @@ export function DreamDeck({
         card: top,
         verdict: choice as Verdict,
         likedId,
-        passReason: reason,
+        passReason,
         ...(top.kind === "dream" && choice === "like" && { superLike: true }),
       });
     } finally {
@@ -489,10 +490,6 @@ export function DreamDeck({
         onSwipe={(direction) => {
           const choice = intent(card, direction);
           if (!choice || card !== top || busy.current) return false;
-          if (isPass(choice)) {
-            askPass();
-            return false;
-          }
           void act(choice);
           return true;
         }}
@@ -546,6 +543,7 @@ export function DreamDeck({
       <DeckButtons
         card={top}
         act={(choice) => void act(choice)}
+        askPass={askPass}
         hidden={!!viewing}
         leading={undoButton}
         trailing={
@@ -573,6 +571,7 @@ export function DreamDeck({
           label={cardLabel(top, true)}
           fly={previewFly}
           act={(choice) => void act(choice)}
+          askPass={askPass}
           undo={undo}
         />
       )}
@@ -580,18 +579,22 @@ export function DreamDeck({
         <Modal id={passDialogId} opened onClose={closePass} title="Why Pass?" size="xs">
           <Radio.Group
             aria-label="Pass Reason"
-            value={passReason ?? ""}
-            onChange={(value) => setPassReason(value as DreamPassReason)}
+            value={passReason}
+            onChange={(value) => setPassReason(value as keyof typeof passLabels)}
           >
             <Stack gap="sm">
-              {dreamPassReasons.map((reason) => (
-                <Radio key={reason} value={reason} label={passLabels[reason]} />
+              {passReasons.map((reason) => (
+                <Radio
+                  key={reason}
+                  value={reason}
+                  label={passLabels[reason]}
+                  data-autofocus={reason === passReason || undefined}
+                />
               ))}
             </Stack>
           </Radio.Group>
           <DialogFooter onCancel={closePass}>
             <Button
-              disabled={!passReason}
               onClick={() => {
                 setPassing(undefined);
                 void act(top.kind === "pair" ? "neither" : "discard", passReason);

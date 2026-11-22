@@ -215,6 +215,10 @@
 .answer:active {
   transform: scale(0.93);
 }
+.answer[data-pass] {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
 .answer[data-size="large"] {
   --answer-size: 66px;
 }
