@@ -4,6 +4,7 @@ import {
   closeLoras,
   closePresets,
   create,
+  expandAssistantMenu,
   finishTyping,
   fixtures,
   loadSaved,
@@ -19,6 +20,7 @@ import {
 // A single style is named Improve Prompt too.
 async function assist(page: Page, action: string) {
   const menu = await promptMenu(page, "Prompt");
+  if (action === "Improve Prompt") await expandAssistantMenu(menu, "Templates");
   await menu.getByRole("menuitem", { name: action, exact: true }).click();
 }
 
@@ -260,7 +262,7 @@ test("Prompt assistance finishes before a generation is submitted", async ({ pag
   expect(state.jobs[0].input.prompt).toBe("A cinematic amber bird");
 });
 
-test("Improve Prompt lists its styles alphabetically with descriptions and Custom… last, which asks what to change", async ({
+test("Improve Prompt groups its styles in Templates and opens Custom… directly", async ({
   page,
 }) => {
   await fixtures(page);
@@ -289,12 +291,19 @@ test("Improve Prompt lists its styles alphabetically with descriptions and Custo
     await expect(tools.getByRole("button", { name: "Clear", exact: true })).toBeVisible();
   }
   await expect(menu.getByRole("menuitem")).toHaveText([
+    "Suggestions",
+    "Templates",
+    "Custom…",
+    "Refresh",
+    "Write Negative",
+    "Recent Prompts",
+  ]);
+  await expandAssistantMenu(menu, "Templates");
+  const templates = menu.getByRole("group", { name: "Templates", exact: true });
+  await expect(templates.getByRole("menuitemcheckbox")).toHaveText([
     "Candid",
     "Enhance",
     "Portrait",
-    "Custom…",
-    "Write Negative",
-    "Recent Prompts",
   ]);
   // Styles show their names alone.
   await expect(menu.getByText("A person in focus.", { exact: true })).toHaveCount(0);

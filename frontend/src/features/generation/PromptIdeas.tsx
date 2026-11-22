@@ -47,7 +47,7 @@ export function usePromptIdeas({
     .slice(0, maxSuggestions)
     .sort((a, b) => compareNames(a.label, b.label));
   const { options, again } = suggested(
-    ideas.isFetching || ideas.isPending,
+    ideas.isFetching,
     list.map((idea) => ({
       id: `idea:${idea.label}`,
       label: idea.label,
@@ -60,20 +60,19 @@ export function usePromptIdeas({
     ideas.error?.message || ideas.data?.reason,
   );
   const offered =
-    enabled &&
-    mayUseAssistant &&
-    assistant.data?.available &&
-    (cards || !prompt.trim()) &&
-    (cards || ideas.isPending || list.length);
+    enabled && mayUseAssistant && assistant.data?.available && (cards || !prompt.trim());
   return {
-    tool: offered
-      ? ({
-          id: "ideas",
-          label: "Suggested",
-          icon: icons.assistant,
-          menu: [[...options, again]],
-          onOpen: () => load(),
-        } satisfies Action)
+    suggestions: offered
+      ? {
+          action: {
+            id: "suggestions",
+            label: "Suggestions",
+            icon: icons.assistant,
+            menu: [ideas.isPending ? [] : options],
+            onOpen: () => load(),
+          } satisfies Action,
+          refresh: again,
+        }
       : undefined,
     label: current?.label,
     undo: current && (
