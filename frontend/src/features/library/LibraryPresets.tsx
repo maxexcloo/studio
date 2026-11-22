@@ -1,5 +1,4 @@
 import { Alert, Anchor, Button, Group, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
-import { SquareCheck } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
@@ -92,7 +91,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
           actions={
             <ToolbarAction
               label="Select"
-              icon={SquareCheck}
+              icon={icons.select}
               iconOnly
               variant="default"
               aria-pressed={selection !== null}

@@ -63,7 +63,7 @@ import { logEvent, logWarning } from "./crash-log.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { appVersion, dataDir } from "./data-dir.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
-import { dreamImageSwitchMinutes, dreamOverrides, flagEnabled } from "./deployment-settings.js";
+import { dreamOverrides, dreamTimingMinutes, flagEnabled } from "./deployment-settings.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
@@ -767,7 +767,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
     if (items.some((item) => item.dream)) dream.finished();
   },
   directCloud,
-  dreamImageSwitchMinutes,
+  dreamImageSwitchMinutes: () => dreamTimingMinutes("imageSwitchMinutes"),
   dreamIdleWait: (job) => dream.idleWaitForJob(job),
   generationRoutes,
   promptStage,
@@ -934,6 +934,8 @@ registerSuggestionRoutes(app, {
 const projects = createProjects({ cards: accountCards, dataDir });
 const dream = createDream({
   dataDir,
+  idleMinutes: (kind) =>
+    dreamTimingMinutes(kind === "image" ? "imageIdleMinutes" : "videoIdleMinutes"),
   overrides: dreamOverrides,
   store,
   taste,

@@ -5,8 +5,8 @@ import { type Locator, type Page, expect } from "@playwright/test";
 import {
   dreamCardCounts,
   dreamDefaults,
-  dreamImageSwitchSetting,
   dreamOverrideKeys,
+  dreamTimingSettings,
 } from "../../shared/dream";
 import type { QueueRetryResponse } from "../../shared/queue";
 
@@ -1756,7 +1756,7 @@ export function videoClip() {
   }
 }
 
-/** Dream Policy with the shared default delay and no account overrides. */
+/** Dream administration with shared default delays and no account overrides. */
 export const dreamPolicyFixture = () =>
   Object.fromEntries([
     ...Object.entries(dreamOverrideKeys).map(
@@ -1765,13 +1765,8 @@ export const dreamPolicyFixture = () =>
         { key, value: null, source: "default", locked: false },
       ],
     ),
-    [
-      "imageSwitchMinutes",
-      {
-        key: dreamImageSwitchSetting.key,
-        value: dreamImageSwitchSetting.defaultValue,
-        source: "default",
-        locked: false,
-      },
-    ],
+    ...Object.entries(dreamTimingSettings).map(
+      ([name, { key, defaultValue }]) =>
+        [name, { key, value: defaultValue, source: "default", locked: false }] as const,
+    ),
   ]);

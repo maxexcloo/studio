@@ -25,7 +25,7 @@ import {
   useState,
 } from "react";
 
-import { menuWidth } from "../theme";
+import { menuWidth, popupMiddlewares } from "../theme";
 import { icons } from "./icons";
 import { PopupTooltip } from "./PopupTooltip";
 import { useVisibleRect } from "./useKeyboard";
@@ -62,13 +62,13 @@ export interface Action {
   /** The menu stays open for actions that finish in place. */
   keepOpen?: boolean;
   /**
-   * Its options: a click opens them, expanding in place in menus. The first is its usual action,
+   * Its options: a click opens them. The first is its usual action,
    * so a control with options has no click of its own.
    */
   menu?: ActionGroups;
   /** A setting between a few values (Cloud or Local), a segmented control in menus. */
   choice?: {
-    label?: string;
+    showLabel?: boolean;
     value: string;
     options: { value: string; label: string }[];
     onChange: (value: string) => void;
@@ -145,13 +145,21 @@ const itemLabel = ({ label, description }: Action, describedBy: string) =>
 const described = ({ label, description }: Action, describedBy: string) =>
   description ? { "aria-label": label, "aria-describedby": describedBy } : {};
 
-/** The groups as Menu items, with options expanded under their item. Render inside a Menu.Dropdown. */
+/** Context submenus sit inside their parent's DOM and must be free to open beyond it. */
+export const submenuParentProps = {
+  middlewares: popupMiddlewares,
+  styles: { dropdown: { overflowY: "visible" as const } },
+};
+
+/** The groups as Menu items. Render inside a Menu.Dropdown. */
 export function ActionMenuItems({
   groups,
   onSelected,
+  submenus = false,
 }: {
   groups: ActionGroups;
   onSelected?: () => void;
+  submenus?: boolean;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const selectionTrigger = useRef<HTMLButtonElement>(null);
@@ -183,32 +191,70 @@ export function ActionMenuItems({
         if (action.heading) return <Menu.Label key={id}>{label}</Menu.Label>;
         if (action.choice)
           return (
-            <div key={id} className={classes.choice}>
-              {action.choice.label && <Menu.Label>{action.choice.label}</Menu.Label>}
-              <SegmentedControl
-                size="xs"
-                fullWidth
-                aria-label={label}
-                disabled={disabled}
-                value={action.choice.value}
-                onChange={action.choice.onChange}
-                data={action.choice.options}
-              />
-            </div>
+            <Fragment key={id}>
+              {action.choice.showLabel && <Menu.Label>{label}</Menu.Label>}
+              <div className={classes.choice}>
+                <SegmentedControl
+                  size="xs"
+                  fullWidth
+                  aria-label={label}
+                  disabled={disabled}
+                  value={action.choice.value}
+                  onChange={action.choice.onChange}
+                  data={action.choice.options}
+                />
+              </div>
+            </Fragment>
           );
         if (action.menu) {
           const open = expanded === id;
+          const trigger = {
+            color,
+            leftSection: Icon && <Icon size={16} />,
+            disabled,
+            ref: radioMenu ? selectionTrigger : undefined,
+            ...described(action, describedBy),
+          };
+          const options = (
+            <>
+              {note(action)}
+              <ActionMenuItems
+                groups={action.menu}
+                submenus={submenus}
+                onSelected={radioMenu ? closeSelection : undefined}
+              />
+            </>
+          );
+          if (submenus) {
+            const leaf = !action.menu.some((group) => group.some((option) => option.menu));
+            return (
+              <Menu.Sub
+                key={id}
+                opened={radioMenu ? open : undefined}
+                onChange={radioMenu ? (next) => setExpanded(next ? id : null) : undefined}
+                middlewares={
+                  leaf ? { ...popupMiddlewares, size: { padding: 12 } } : popupMiddlewares
+                }
+              >
+                <Menu.Sub.Target>
+                  <Menu.Sub.Item {...trigger}>{itemLabel(action, describedBy)}</Menu.Sub.Item>
+                </Menu.Sub.Target>
+                <Menu.Sub.Dropdown
+                  w={menuWidth}
+                  style={leaf ? { overflowY: "auto", overscrollBehavior: "contain" } : undefined}
+                >
+                  {options}
+                </Menu.Sub.Dropdown>
+              </Menu.Sub>
+            );
+          }
           return (
             <Fragment key={id}>
               <Menu.Item
-                color={color}
-                leftSection={Icon && <Icon size={16} />}
+                {...trigger}
                 rightSection={<ChevronDown size={14} className={classes.expand} />}
                 aria-expanded={open}
-                ref={radioMenu ? selectionTrigger : undefined}
-                {...described(action, describedBy)}
                 data-expanded={open || undefined}
-                disabled={disabled}
                 closeMenuOnClick={false}
                 onClick={() => setExpanded(open ? null : id)}
               >
@@ -217,11 +263,7 @@ export function ActionMenuItems({
               {/* Unmounted when closed, so arrow keys skip the hidden options. */}
               <Collapse expanded={open} keepMounted={false}>
                 <div role="group" aria-label={label} className={classes.inline}>
-                  {note(action)}
-                  <ActionMenuItems
-                    groups={action.menu}
-                    onSelected={radioMenu ? closeSelection : undefined}
-                  />
+                  {options}
                 </div>
               </Collapse>
             </Fragment>

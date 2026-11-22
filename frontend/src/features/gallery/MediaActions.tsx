@@ -3,20 +3,15 @@ import {
   ArrowLeftRight,
   Camera,
   Check,
-  FastForward,
-  Film,
   Flame,
   ImageDown,
-  ImagePlus,
   ListChecks,
   Loader,
   type LucideIcon,
   MessagesSquare,
   Repeat,
   Rewind,
-  Shuffle,
   Snail,
-  SquareCheck,
   TextQuote,
   Waves,
   Wind,
@@ -134,6 +129,7 @@ function useRetryAction(
   if (queue.error)
     return itemAction("retry", {
       label: "Reload Status",
+      icon: icons.refresh,
       onClick: () => void queue.refetch(),
     });
   if (!job)
@@ -205,7 +201,7 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
   return {
     id: "use-reference",
     label: video ? "Use Frame as Reference" : "Use as Reference",
-    icon: ImagePlus,
+    icon: icons.reference,
     disabled: !(takes || fallback) || reference.isPending,
     keepOpen: true,
     onClick: () => {
@@ -527,7 +523,7 @@ export function useMediaActions(
                 id: "recreate-count",
                 label: "Count",
                 choice: {
-                  label: "Count",
+                  showLabel: true,
                   value: String(recreateCount),
                   options: Array.from({ length: countLimit }, (_, index) => {
                     const count = String(index + 1);
@@ -639,7 +635,7 @@ export function useMediaActions(
               ? {
                   id: "extend",
                   label: "Extend in Composer",
-                  icon: FastForward,
+                  icon: icons.extend,
                   disabled: animateDisabled,
                   onClick: () =>
                     action.mutate({ operation: "extend", profileId: animationProfileId }),
@@ -708,7 +704,7 @@ export function useMediaActions(
                   {
                     id: "new-seed",
                     label: "Run Again",
-                    icon: Shuffle,
+                    icon: icons.shuffle,
                     disabled: changedPrompt === "",
                     onClick: () =>
                       run({ kind: "regenerate", prompt: changedPrompt, count: recreateCount }),
@@ -785,7 +781,9 @@ export function useMediaActions(
             onClick: () => void copyText(item.prompt || "", "Prompt"),
           },
           // A video also downloads as a GIF, beside it rather than in a submenu.
-          ...(gif ? [{ id: "download-gif", label: "Download GIF", icon: Film, link: gif }] : []),
+          ...(gif
+            ? [{ id: "download-gif", label: "Download GIF", icon: icons.download, link: gif }]
+            : []),
           ...(ready
             ? [
                 {
@@ -876,8 +874,9 @@ export function useMediaDialogs(
 export function MediaActionMenu({
   item,
   onSelect,
+  submenus,
   ...options
-}: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
+}: MediaActionOptions & { item: MediaItem; onSelect?: () => void; submenus: boolean }) {
   const groups = useMediaActions(item, options).flatMap((group) =>
     group.some(({ id }) => id === "ai" || id === "share")
       ? group.map((action) => action.menu?.flat() ?? [action])
@@ -885,9 +884,10 @@ export function MediaActionMenu({
   );
   return (
     <ActionMenuItems
+      submenus={submenus}
       groups={
         onSelect
-          ? [[{ id: "select", label: "Select", icon: SquareCheck, onClick: onSelect }], ...groups]
+          ? [[{ id: "select", label: "Select", icon: icons.select, onClick: onSelect }], ...groups]
           : groups
       }
     />

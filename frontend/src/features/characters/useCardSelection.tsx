@@ -1,6 +1,5 @@
 import { Alert, Checkbox, Group, Text, getDefaultZIndex } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { SquareCheck } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -114,7 +113,7 @@ export function useCardSelection(
     toggle: (
       <ToolbarAction
         label="Select"
-        icon={SquareCheck}
+        icon={icons.select}
         iconOnly
         variant="default"
         aria-pressed={selection !== null}

@@ -262,6 +262,9 @@ export function MediaGrid({
   const firstTile = layout ? firstAt(layout.tiles, span.top - layout.tallest) : 0;
   const lastTile = layout ? firstAt(layout.tiles, span.bottom) : 0;
   const within = (top: number, height: number) => top < span.bottom && top + height > span.top;
+  // The span reserves one viewport on either side. Give the visible tiles a head start.
+  const visibleTop = span.top + window.innerHeight;
+  const visibleBottom = span.bottom - window.innerHeight;
   return (
     <>
       <div
@@ -305,6 +308,7 @@ export function MediaGrid({
               top={tile.top}
               width={cell}
               height={tile.height}
+              eager={tile.top < visibleBottom && tile.top + tile.height > visibleTop}
               menuItem={menuItem}
               setMenuItem={setMenuItem}
               onArrow={onArrow}
@@ -369,6 +373,7 @@ const GridCell = memo(function GridCell({
   setMenuItem: (id: string | null) => void;
   onArrow: (index: number, event: KeyboardEvent<HTMLButtonElement>) => void;
   hold: ReturnType<typeof useHoldToSelect>;
+  eager: boolean;
 }) {
   return (
     <MediaTile

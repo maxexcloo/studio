@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { dreamImageSwitchSetting } from "../shared/dream.ts";
+import { dreamTimingSettings, maxDreamIdleMinutes } from "../shared/dream.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-deployment-settings-"));
@@ -178,21 +178,20 @@ test("Generation administration validates and applies Dream overrides and the de
     });
     assert.equal(cleared.body.dream.videoBackend.value, null);
 
-    const switchKey = dreamImageSwitchSetting.key;
-    assert.equal(read.body.dream.imageSwitchMinutes.value, dreamImageSwitchSetting.defaultValue);
-    assert.equal(
-      (await request("POST", { key: switchKey, value: 0 }, { role: "user" })).statusCode,
-      403,
-    );
-    assert.equal((await request("POST", { key: switchKey, value: -1 })).statusCode, 400);
-    assert.equal(
-      (await request("POST", { key: switchKey, value: 0 })).body.dream.imageSwitchMinutes.value,
-      0,
-    );
-    assert.equal(settings.dreamImageSwitchMinutes(), 0);
-    assert.equal(readRuntimeDocument(temporary, "settings")[switchKey], "0");
-    await request("POST", { key: switchKey, value: dreamImageSwitchSetting.defaultValue });
-    assert.equal(readRuntimeDocument(temporary, "settings")[switchKey], undefined);
+    for (const [name, { key, defaultValue }] of Object.entries(dreamTimingSettings)) {
+      assert.equal(read.body.dream[name].value, defaultValue);
+      const value = defaultValue ? 0 : 8;
+      assert.equal((await request("POST", { key, value }, { role: "user" })).statusCode, 403);
+      assert.equal(
+        (await request("POST", { key, value: maxDreamIdleMinutes + 1 })).statusCode,
+        400,
+      );
+      assert.equal((await request("POST", { key, value })).body.dream[name].value, value);
+      assert.equal(settings.dreamTimingMinutes(name), value);
+      assert.equal(readRuntimeDocument(temporary, "settings")[key], String(value));
+      await request("POST", { key, value: defaultValue });
+      assert.equal(readRuntimeDocument(temporary, "settings")[key], undefined);
+    }
 
     const key = "STUDIO_DEFAULT_TEXT_PROFILE";
     assert.deepEqual((await request("GET")).body.defaults.textModels, [

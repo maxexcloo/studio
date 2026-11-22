@@ -1,7 +1,7 @@
 import {
-  dreamImageSwitchSetting,
   dreamOverrideKeys,
   dreamSettingError,
+  dreamTimingSettings,
   maxDreamIdleMinutes,
 } from "../shared/dream.ts";
 import { defaultTextProfileKey } from "./account-preferences.js";
@@ -68,13 +68,14 @@ export function registerDeploymentRoutes(
     if (!requireAdmin(req, res)) return;
     const key = String(req.body?.key || "");
     const value = req.body?.value;
-    if (key === dreamImageSwitchSetting.key) {
+    const timing = Object.values(dreamTimingSettings).find((setting) => setting.key === key);
+    if (timing) {
       if (!Number.isInteger(value) || value < 0 || value > maxDreamIdleMinutes)
         return res.status(400).json({
           ok: false,
           error: `Set the delay to a whole number from 0 to ${maxDreamIdleMinutes}.`,
         });
-      saveDeploymentSetting(key, value === dreamImageSwitchSetting.defaultValue ? "" : value);
+      saveDeploymentSetting(key, value === timing.defaultValue ? "" : value);
       res.json({ ok: true, dream: describeDreamPolicy() });
       return;
     }

@@ -279,10 +279,7 @@ export function MediaViewer({
   const stage = useRef<HTMLDivElement>(null);
   function cycleChrome() {
     stage.current?.focus({ preventScroll: true });
-    setChrome((shown) => {
-      if (shown === "image") return "standard";
-      return shown === "standard" && hasThumbnails ? "full" : "image";
-    });
+    setChrome((shown) => (shown === "standard" ? "full" : shown === "full" ? "image" : "standard"));
   }
   const containStage = useCallback((view: HTMLDivElement | null) => {
     stage.current = view;
@@ -331,7 +328,13 @@ export function MediaViewer({
   const jobs = useQuery(queueQuery).data?.jobs;
   const family = useRunFamily(item, queued, related, jobs);
   const members = setMembers(related, item);
-  const hasThumbnails = family.length > 1 || members.length > 1;
+  const hasRelatedThumbnails = family.length > 1 || members.length > 1;
+  const nearby =
+    quiet && thumbnailsOpen && !hasRelatedThumbnails
+      ? currentIndex < 0
+        ? [displayed]
+        : viewable.slice(Math.max(0, currentIndex - 4), currentIndex + 5)
+      : undefined;
   function showDetails() {
     if (phone) setSheet(true);
     else {
@@ -564,8 +567,7 @@ export function MediaViewer({
             onPointerMove={(event) => {
               if (
                 quiet &&
-                !thumbnailsOpen &&
-                hasThumbnails &&
+                chrome === "standard" &&
                 event.pointerType === "mouse" &&
                 window.innerHeight - event.clientY < 12 &&
                 !layerAbove(stage.current)
@@ -715,7 +717,24 @@ export function MediaViewer({
                         </Suspense>
                       </div>
                     ) : (
-                      <Suspense fallback={<LoadingState label="Loading Image" fill />}>
+                      <Suspense
+                        fallback={
+                          source.thumbnailUrl ? (
+                            <img
+                              src={source.thumbnailUrl}
+                              alt=""
+                              aria-hidden
+                              className={classes.viewerPlaceholder}
+                              width={source.width}
+                              height={source.height}
+                              draggable={false}
+                              onClick={(event) => event.stopPropagation()}
+                            />
+                          ) : (
+                            <LoadingState label="Loading Image" fill />
+                          )
+                        }
+                      >
                         <ZoomImage
                           mediaId={item.id}
                           src={source.displayUrl}
@@ -748,6 +767,7 @@ export function MediaViewer({
                   family={family}
                   jobs={jobs}
                   set={members}
+                  nearby={nearby}
                   showThumbnails={thumbnailsOpen}
                   choose={(next) => {
                     setCompare(false);
@@ -790,7 +810,7 @@ export function MediaViewer({
                         iterate={iterate}
                         pending={pending}
                         onCompare={() => {
-                          if (!compare && phone && quiet && hasThumbnails) setChrome("full");
+                          if (!compare && phone && quiet && hasRelatedThumbnails) setChrome("full");
                           setCompare(!compare);
                         }}
                         onDelete={() => setDeleting(true)}

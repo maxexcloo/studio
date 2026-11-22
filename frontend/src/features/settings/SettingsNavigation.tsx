@@ -1,4 +1,4 @@
-import { Boxes, Info, Route, Server, Shield, UserRound, UsersRound, Wrench } from "lucide-react";
+import { Boxes, Route, Server, Shield, UsersRound, Wrench } from "lucide-react";
 
 import { icons } from "../../ui/icons";
 import {
@@ -13,7 +13,7 @@ const settingSections = {
   account: {
     label: "Account",
     description: "Your sign-in details and personal MCP access.",
-    icon: UserRound,
+    icon: icons.account,
     group: "Personal",
   },
   dream: {
@@ -35,7 +35,7 @@ const settingSections = {
     group: "Personal",
   },
   "dream-policy": {
-    label: "Dream Policy",
+    label: "Dream",
     description: "Shared queue rules and Dream overrides for all accounts.",
     icon: icons.dream,
     admin: true,
@@ -79,7 +79,7 @@ const settingSections = {
   about: {
     label: "About",
     description: "Version, help, licences and credits.",
-    icon: Info,
+    icon: icons.details,
     apart: true,
   },
 };

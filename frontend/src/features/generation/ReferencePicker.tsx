@@ -1,11 +1,12 @@
 import { ActionIcon, Button, Image, ScrollArea, Stack, Text } from "@mantine/core";
-import { ChevronDown, ImagePlus } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { type ClipboardEvent, type DragEvent, useState } from "react";
 
 import { startImageSlot } from "../../../../shared/characters";
 import type { GallerySort } from "../../../../shared/gallery-sort";
 import { slotCapacity } from "../../../../shared/profiles";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
+import { icons } from "../../ui/icons";
 import { SortMenu } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
@@ -408,7 +409,7 @@ export function ReferencePicker({
           fallbackSrc=""
         />
       ) : (
-        <ImagePlus size={20} />
+        <icons.reference size={20} />
       )}
     </ActionIcon>
   ) : (
@@ -423,7 +424,7 @@ export function ReferencePicker({
     >
       <ChipContent
         label="References"
-        icon={ImagePlus}
+        icon={icons.reference}
         items={references.map((asset, index) => ({
           key: referenceKey(asset),
           label: referenceLabel(asset, index, profile),

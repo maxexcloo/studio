@@ -1904,7 +1904,20 @@ test("A phone swipe up opens Details directly", async ({ page }, testInfo) => {
 test("A double click or tap zooms; a single click cycles the viewer controls", async ({
   page,
 }, testInfo) => {
-  const { viewer } = await seed(page);
+  const { viewer } = await seed(page, {}, async (_page, state) => {
+    if (!testInfo.project.use.isMobile)
+      state.gallery.push({
+        id: "other-bird",
+        type: "image",
+        status: "done",
+        url: image,
+        thumbnailUrl: image,
+        prompt: "A blue bird",
+        width: 1024,
+        height: 1024,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+  });
   const picture = viewer.getByRole("img", { name: "An amber bird", exact: true });
   const zoom = viewer.locator("[data-zoom-mode]");
   await expect(picture).toBeVisible();
@@ -1916,18 +1929,33 @@ test("A double click or tap zooms; a single click cycles the viewer controls", a
   const y = box.y + box.height * 0.3;
   if (!testInfo.project.use.isMobile) {
     const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
+    const strip = viewer.getByRole("list", { name: "Gallery Results", exact: true });
     const prompt = actions.getByRole("textbox", { name: "Prompt", exact: true });
+    await expect(strip).toBeHidden();
     await prompt.click();
     await expect(prompt).toBeFocused();
     await page.mouse.click(x, y);
     await expect(prompt).not.toBeFocused();
+    await expect(strip.getByRole("listitem", { name: "Show Amber Bird" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    await expect(actions).toBeVisible();
+    await picture.click();
     await expect(actions).toBeHidden();
+    await expect(strip).toBeHidden();
     await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
     await picture.dblclick();
     await expect(zoom).toHaveAttribute("data-zoom-mode", "Custom");
     await expect(actions).toBeHidden();
     await picture.dblclick();
     await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
+    await picture.click();
+    await expect(actions.getByRole("button", { name: "Generate", exact: true })).toBeVisible();
+    await expect(strip).toBeHidden();
+    await picture.click();
+    await strip.getByRole("listitem", { name: "Show Blue Bird" }).click();
+    await expect(viewer.getByRole("img", { name: "A blue bird", exact: true })).toBeVisible();
     return;
   }
   const webkit = testInfo.project.use.browserName === "webkit";

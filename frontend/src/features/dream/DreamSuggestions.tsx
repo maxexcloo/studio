@@ -1,6 +1,5 @@
 import { ActionIcon, Menu, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
-import { FastForward } from "lucide-react";
 import { useState } from "react";
 
 import { menuWidth } from "../../theme";
@@ -106,7 +105,7 @@ export function DreamSuggestions({
           <>
             {available && <Menu.Divider />}
             <Menu.Item
-              leftSection={<FastForward size={16} />}
+              leftSection={<icons.extend size={16} />}
               onClick={() => prepare.mutate({ operation: "extend" })}
             >
               Extend in Composer

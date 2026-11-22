@@ -833,10 +833,12 @@ export function turnShares(
  * one Dream job per worker, queued below every account's own work, where it waits until that work
  * is done.
  * Results stay in Dream's pool, out of every gallery listing, until the person keeps them.
- * Settings live per account in the runtime document store as `dream:<ownerId>`.
+ * Personal settings live in the runtime document store as `dream:<ownerId>`.
  */
 export function createDream(options: {
   dataDir: string;
+  /** The shared delay measured from each account's most recent generation request. */
+  idleMinutes(kind: Kind): number;
   /** The settings an administrator forces on every account, over its own choice. */
   overrides?(): Partial<DreamSettings>;
   store: Store;
@@ -1174,8 +1176,8 @@ export function createDream(options: {
     return { due, imagesDone: settings.dailyImages > 0 && settings.images && !image };
   }
   /** A recently admitted request still holds off this kind of background work. */
-  function idleWait(ownerId: string, kind: Kind, settings = read(ownerId).settings) {
-    const minutes = kind === "image" ? settings.imageIdleMinutes : settings.videoIdleMinutes;
+  function idleWait(ownerId: string, kind: Kind) {
+    const minutes = options.idleMinutes(kind);
     if (!minutes) return;
     const cutoff = new Date(now() - minutes * 60_000).toISOString();
     if (store.hasRecentGenerationRequest(ownerId, cutoff))
@@ -2331,7 +2333,7 @@ export function createDream(options: {
     let reason = "";
     let idle = "";
     for (const kind of due) {
-      const delay = idleWait(ownerId, kind, record.settings);
+      const delay = idleWait(ownerId, kind);
       if (delay) {
         idle = delay;
         continue;
@@ -3938,7 +3940,7 @@ export function createDream(options: {
       );
       if (forced)
         throw failure(
-          `An administrator set ${forced} for every account in Settings › Dream Policy.`,
+          `An administrator set ${forced} for every account in Settings › Administration › Dream.`,
           409,
         );
       const record = read(ownerId);

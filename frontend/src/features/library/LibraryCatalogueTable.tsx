@@ -401,6 +401,12 @@ export function LibraryCatalogueTable({
           const source = item.links?.civitaiCom || item.links?.hf || item.links?.civitaiRed;
           const latest = item.update?.latest;
           const free = item.update?.freeAlternative;
+          const install =
+            item.install?.state === "failed"
+              ? { label: "Retry Install", icon: icons.retry }
+              : item.install?.state === "paused"
+                ? { label: "Resume Install", icon: icons.resume }
+                : { label: "Install", icon: icons.download };
           const edit = onEdit && (
             <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => onEdit(item)}>
               Edit
@@ -438,18 +444,14 @@ export function LibraryCatalogueTable({
               )}
               {onInstall && item.installable && (
                 <Menu.Item
-                  leftSection={<icons.download size={16} />}
+                  leftSection={<install.icon size={16} />}
                   disabled={
                     item.key === installingKey ||
                     ["queued", "downloading"].includes(item.install?.state || "")
                   }
                   onClick={() => onInstall(item)}
                 >
-                  {item.install?.state === "failed"
-                    ? "Retry Install"
-                    : item.install?.state === "paused"
-                      ? "Resume Install"
-                      : "Install"}
+                  {install.label}
                 </Menu.Item>
               )}
               {onUpdate &&
