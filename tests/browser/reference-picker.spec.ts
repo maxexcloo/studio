@@ -481,9 +481,10 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
     const closeDetails = page.getByRole("button", { name: "Close Details", exact: true });
     await expect(closeDetails).toBeVisible();
     await closeDetails.click();
+    await expect(closeDetails).toBeHidden();
     await expect(preview).toBeVisible();
   }
-  await page.keyboard.press("Escape");
+  await preview.getByRole("button", { name: "Close Preview", exact: true }).press("Escape");
   await expect(preview).toBeHidden();
   await expect(picker).toBeVisible();
   await tile.focus();
