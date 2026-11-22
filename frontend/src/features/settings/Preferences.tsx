@@ -1,6 +1,7 @@
-import { Button, SegmentedControl, Stack, Switch } from "@mantine/core";
+import { Button, SegmentedControl, Select, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
+import { imageAspects, resolutions } from "../../../../shared/resolution";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
@@ -85,6 +86,48 @@ function GalleryWork() {
   );
 }
 
+function ImageSizePreferences() {
+  const preferences = useQuery(preferencesQuery).data?.preferences;
+  const save = useSavePreferences();
+  if (!preferences) return null;
+  return (
+    <SettingGroup title="Images">
+      <SettingRow
+        wide
+        label="Default Aspect"
+        description="The shape to start with when the profile supports it."
+      >
+        <Select
+          aria-label="Default Aspect"
+          placeholder="Profile Default"
+          data={[...imageAspects]}
+          value={preferences.imageAspect ?? null}
+          clearable
+          onChange={(choice) =>
+            save.mutate({ imageAspect: imageAspects.find((value) => value === choice) ?? null })
+          }
+        />
+      </SettingRow>
+      <SettingRow
+        wide
+        label="Default Resolution"
+        description="The resolution for new and cleared image drafts when supported."
+      >
+        <Select
+          aria-label="Default Resolution"
+          placeholder="Profile Default"
+          data={[...resolutions]}
+          value={preferences.imageResolution ?? null}
+          clearable
+          onChange={(choice) =>
+            save.mutate({ imageResolution: resolutions.find((value) => value === choice) ?? null })
+          }
+        />
+      </SettingRow>
+    </SettingGroup>
+  );
+}
+
 /** Settings › Preferences: how Studio works for this account, saved with it. */
 export function Preferences() {
   const keep = useKeepRecentPrompts(true);
@@ -124,6 +167,7 @@ export function Preferences() {
           </Button>
         </SettingRow>
       </SettingGroup>
+      <ImageSizePreferences />
       <ModelChoices />
       <SettingGroup title="Prompts">
         <SettingRow
