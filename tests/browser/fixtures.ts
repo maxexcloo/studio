@@ -1326,8 +1326,22 @@ export async function openLoraChoices(page: Page) {
 
 /** Returns from the phone's LoRA choices to the stack; desktop shows both. */
 export async function showLoraStack(page: Page) {
+  const chip = page.getByRole("button", {
+    name: "Choose LoRAs",
+    exact: true,
+    expanded: true,
+    includeHidden: true,
+  });
+  if (
+    !(await chip.count()) ||
+    !(await page.evaluate(() => "phone" in document.documentElement.dataset))
+  )
+    return;
+  const stack = page.getByRole("dialog", { name: "LoRAs", exact: true });
+  await expect(stack).toBeVisible();
+  const add = stack.getByRole("button", { name: "Add LoRAs", exact: true, expanded: true });
+  if (!(await add.count())) return;
   const adding = page.getByRole("dialog", { name: "Add LoRAs", exact: true });
-  if (!(await adding.isVisible())) return;
   await adding.getByRole("button", { name: "Done", exact: true }).click();
   await expect(adding).toBeHidden();
 }

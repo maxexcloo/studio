@@ -9,6 +9,7 @@ import {
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
+import { useMergedRef } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import {
   type KeyboardEvent,
@@ -219,11 +220,13 @@ export function DreamPreview({
   const phone = usePhone();
   const [details, setDetails] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
+  const [playbackRoot, setPlaybackRoot] = useState<HTMLDivElement | null>(null);
+  const stageRef = useMergedRef(stage, setPlaybackRoot);
   const items = card.kind === "pair" || card.kind === "set" ? card.items : undefined;
   const item = (
     card.kind === "pair" || card.kind === "set" ? card.items[side] : card.item
   ) as DreamItem;
-  const { play, sound } = useDreamPlayback(stage, item.type === "video", item.id);
+  const { play, sound } = useDreamPlayback(stage, !!playbackRoot && item.type === "video", item.id);
   const previous = items?.[side - 1];
   const next = items?.[side + 1];
   function swipe(direction: SwipeDirection) {
@@ -277,7 +280,7 @@ export function DreamPreview({
       <div className={viewerClasses.layout}>
         <div className={`${viewerClasses.main} ${classes.previewMain}`}>
           <div
-            ref={stage}
+            ref={stageRef}
             className={classes.previewStage}
             onClick={(event) => {
               if (
