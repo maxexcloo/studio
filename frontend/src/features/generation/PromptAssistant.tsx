@@ -7,7 +7,6 @@ import { maxLoras } from "../../../../shared/profiles";
 import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import type { Action as ToolAction } from "../../ui/ActionBar";
-import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { CustomDialog } from "./CustomDialog";
 
@@ -313,48 +312,33 @@ export function usePromptAssistant({
     });
   }
   if (!info?.available || !profile || !info.presets.length)
-    return { action: null, working: undefined, dialog: null, suggestions: null };
+    return { working: undefined, dialog: null, suggestions: null };
   const disabled = !input.prompt.trim();
   const run = (action: Action, style?: string) => {
     if (style) setPresetId(style);
     assistance.mutate({ action, preset: style });
   };
-  // Styles in Library › Prompt Styles' order, with Custom… last: a change to the draft where there
-  // is one, else the Custom style.
   const custom = change || info.presets.some((item) => item.id === "custom");
-  const styles = info.presets
-    .filter((item) => item.id !== "custom")
-    .sort((a, b) => compareNames(a.label, b.label));
-  const improve: ToolAction[] = [
-    // Each style is a choice that runs at once; the last one used carries a check.
-    ...(styles.length > 1
-      ? styles.map((item) => ({
-          id: `style:${item.id}`,
-          label: item.label,
-          checked: item.id === preset?.id,
-          disabled,
-          onClick: () => run("rewrite", item.id),
-        }))
-      : [
-          {
-            id: "improve",
-            label: "Improve Prompt",
-            disabled,
-            onClick: () => run("rewrite", preset?.id),
-          },
-        ]),
-    ...(custom
-      ? [
-          {
-            id: "custom",
-            label: "Custom…",
-            // A change can write a prompt from nothing; the Custom style rewrites one.
-            disabled: !change && disabled,
-            onClick: () => setAsking(true),
-          },
-        ]
-      : []),
-  ];
+  const styles = info.presets.filter((item) => item.id !== "custom");
+  const templates: ToolAction[] = styles.map((item) => ({
+    id: `style:${item.id}`,
+    label: styles.length === 1 ? "Improve Prompt" : item.label,
+    checked: styles.length > 1 ? item.id === preset?.id : undefined,
+    disabled,
+    onClick: () => run("rewrite", item.id),
+  }));
+  const customActions: ToolAction[] = custom
+    ? [
+        {
+          id: "custom",
+          label: "Custom…",
+          icon: icons.custom,
+          // A change can write a prompt from nothing; the Custom style rewrites one.
+          disabled: !change && disabled,
+          onClick: () => setAsking(true),
+        },
+      ]
+    : [];
   const more: ToolAction[] = [
     ...(lorasOffered
       ? [{ id: "loras", label: "Suggest LoRAs", disabled, onClick: () => run("loras") }]
@@ -369,20 +353,14 @@ export function usePromptAssistant({
       ? workingLabels[assistance.variables.action]
       : undefined;
   // While it works the box's ⋯ spins and this offers Stop. A change can't be stopped.
-  const action: ToolAction = assistance.isPending
+  const stop: ToolAction | undefined = assistance.isPending
     ? {
         id: "assistant",
         label: "Stop Assistance",
         icon: icons.stop,
         onClick: () => controller.current?.abort(),
       }
-    : {
-        id: "assistant",
-        label: "Improve Prompt",
-        icon: icons.assistant,
-        disabled: change?.pending,
-        menu: [improve, more],
-      };
+    : undefined;
   // A change lands in the prompt as a proposal; the Custom style's rewrite, ready to edit.
   function ask(text: string) {
     if (change) change.send(text);
@@ -435,5 +413,5 @@ export function usePromptAssistant({
       })}
     </Stack>
   ) : null;
-  return { action, working, dialog, suggestions: list };
+  return { templates, custom: customActions, more, stop, working, dialog, suggestions: list };
 }

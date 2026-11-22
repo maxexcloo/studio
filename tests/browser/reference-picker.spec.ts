@@ -5,6 +5,7 @@ import {
   closeReferences,
   create,
   expandComposer,
+  finishTyping,
   fixtures,
   image,
   openReferenceChoices,
@@ -167,10 +168,12 @@ test("The compact composer expands on interaction and keeps picked or dragged re
     })),
   );
   await page.goto("/");
+  if (testInfo.project.use.isMobile) await expandComposer(page);
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Preserve the working direction");
-  await expandComposer(page);
+  await finishTyping(page);
+  if (!testInfo.project.use.isMobile) await expandComposer(page);
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
   await (
     await openReferenceChoices(page)

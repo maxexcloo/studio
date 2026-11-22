@@ -469,7 +469,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
   expect(dream.settings.paused).toBe(true);
 
-  await page.goto("/settings#dream");
+  await page.getByRole("link", { name: "Dream Settings", exact: true }).click();
   const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
   const imageSettings = settings.getByRole("region", { name: "Images", exact: true });
   const videoSettings = settings.getByRole("region", { name: "Videos", exact: true });
@@ -490,6 +490,33 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await imageSettings.getByRole("switch", { name: "Enable", exact: true }).click({ force: true });
   await expect(images).toBeDisabled();
   await expect.poll(() => dream.settings.images).toBe(false);
+});
+
+test("Dream displays allocations and resets the exhausted kind from its toolbar", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const dream = await serveDream(page);
+  Object.assign(dream.settings, { dailyImages: 12, videos: true });
+  await page.goto("/dream");
+  const status = page.getByRole("button", { name: "Dream Allocation", exact: true });
+  await status.click();
+  const allocation = page.getByRole("dialog", { name: "Daily Dream Allocation", exact: true });
+  await expect(allocation.getByRole("progressbar", { name: "Images Allocation" })).toHaveAttribute(
+    "aria-valuenow",
+    "100",
+  );
+  await expect(allocation.getByRole("progressbar", { name: "Videos Allocation" })).toHaveAttribute(
+    "aria-valuenow",
+    "25",
+  );
+  await allocation.getByRole("button", { name: "Reset Image Limit", exact: true }).click();
+  await expect(status).toBeHidden();
+  expect(dream.requests.at(-1)).toEqual({
+    method: "POST",
+    path: "/api/dream/reset-limit",
+    body: { kind: "image" },
+  });
 });
 
 test("Dream settings an administrator forces stay locked for the account", async ({ page }) => {

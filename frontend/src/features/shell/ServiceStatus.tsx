@@ -146,22 +146,19 @@ export function StatusAction() {
       )}
     </ActionIcon>
   );
-  // Administrators open Settings › Workers from the summary; it stays read-only for others.
   const admin = useIsAdmin();
   const location = useLocation();
-  const status = admin ? (
+  const status = (
     <UnstyledButton
       component={Link}
-      to="/settings#workers"
+      to={admin ? "/settings#workers" : "/settings#where-work-runs"}
       state={{ backgroundLocation: location }}
-      aria-label="Open Workers"
+      aria-label={admin ? "Open Workers" : "Open Where Work Runs"}
       className={classes.summary}
       onClick={close}
     >
       <ServiceHealthSummary />
     </UnstyledButton>
-  ) : (
-    <ServiceHealthSummary />
   );
   if (!phone)
     return (

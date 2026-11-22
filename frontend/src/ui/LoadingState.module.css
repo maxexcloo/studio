@@ -1,5 +1,6 @@
 .indicator {
-  animation: reveal var(--studio-motion-duration) var(--studio-ease-enter) 150ms both;
+  animation: reveal var(--studio-motion-duration) var(--studio-ease-enter)
+    min(150ms, var(--studio-motion-duration)) both;
 }
 
 @keyframes reveal {

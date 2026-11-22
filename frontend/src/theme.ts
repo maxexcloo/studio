@@ -74,10 +74,14 @@ export const easing = {
   exit: "cubic-bezier(0.4, 0, 1, 1)",
 } as const;
 const exitDuration = (duration: number) => Math.round(duration * 0.7);
-// Popups and dialogs grow slightly from their trigger side instead of fading in place.
+// Phone overlays rise into place. Desktop overlays grow slightly from their trigger.
 const raise = {
-  in: { opacity: 1, transform: "scale(1)" },
-  out: { opacity: 0, transform: "scale(0.98)" },
+  in: { opacity: 1, transform: "translateY(0) scale(1)" },
+  out: {
+    opacity: 0,
+    transform:
+      "translateY(var(--studio-overlay-rise, 0px)) scale(var(--studio-overlay-scale, 0.98))",
+  },
   transitionProperty: "transform, opacity",
 };
 export type Rounding = Appearance["rounding"];
@@ -211,7 +215,7 @@ export function studioTheme({
     // One size and emphasis scale (AGENTS.md › UI Patterns › Theme & Layout). Standard controls take these
     // defaults; compact surfaces (rows, toolbars, chip rails, popover forms) step down one tier.
     components: {
-      ActionBar: ActionBar.extend({ defaultProps: { transitionProps } }),
+      ActionBar: ActionBar.extend({ defaultProps: { transitionProps: popupTransition } }),
       // Icons take the bar density; the radius follows the Corners setting. Default
       // icons take the glass fill without a backdrop blur of their own: tiles and the viewer show
       // dozens at once, and each blur layer stalls rendering on slow phones.
@@ -535,6 +539,7 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--studio-motion-exit": `${exitDuration(theme.other.motionDuration)}ms`,
       "--studio-ease-enter": easing.enter,
       "--studio-ease-exit": easing.exit,
+      "--studio-scroll-behavior": theme.other.motionDuration ? "smooth" : "auto",
       "--studio-glass-filter": transparency ? "blur(24px) saturate(1.5)" : "none",
       "--mantine-primary-color-filled-hover": alpha("var(--mantine-primary-color-filled)", 0.9),
     },

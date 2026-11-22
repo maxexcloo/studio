@@ -142,8 +142,10 @@ recur across features.
   menus, the viewer and the selection bar. `MediaActions.tsx` owns their availability and
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
   The context menu shows AI and Share options in unlabelled sections.
-  Mouse context menus open options in side submenus. Action bars and touch
-  context menus expand options in place. Assistant menus share `assistMenu`.
+  Desktop menus open options in side submenus on hover or by keyboard.
+  Phone menus move into their options and provide Back. Assistant menus share `assistMenu`:
+  Suggestions and Templates carry icons and list text-only options, with
+  Custom… and Refresh at the top level.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
   phone media item bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and
@@ -212,10 +214,11 @@ recur across features.
   the page behind never shows or scrolls, even as the keyboard moves it or iOS
   bounces; the shared theme owns this. On touch screens, popups and option lists open
   with the keyboard down; their search waits for a tap.
-- Preserve drafts and focus through expansion. Actions staging a gallery draft
+- Preserve drafts and focus through expansion. The positive and negative
+  prompts share the same borderless layout. Actions staging a gallery draft
   use `useOpenComposer`.
-- Use the shared `TextBox`. Desktop fields with tools expose one menu button
-  holding them in one flat menu, each tool's options under its name; Copy and
+- Use the shared `TextBox`. Fields with tools expose one menu button
+  with each tool's options under its name. On desktop, Copy and
   Clear are left to the browser, and a box starting from its own text shows
   Reset, then Undo, as one icon beside it while it can act. The button is ⋯,
   or the AI icon when the box has an AI tool; the AI icon (`icons.assistant`)
@@ -230,7 +233,8 @@ recur across features.
   to the text the box had when typing began. Other phone text boxes open the
   shared full-screen editor, and AI tools stay beside the text before it
   opens. That editor shares the same tools row and keeps its heading and close
-  button. The viewer offers AI Suggestions there to review in the field. The tools menu stays
+  button. The viewer offers Suggestions and Templates beside the prompt and in
+  its editor. The tools menu stays
   an anchored menu on phones, fitted to the visual viewport. A box without
   tools has no ⋯, Copy or Clear.
 - Respect safe areas and the phone keyboard. The viewport uses
@@ -254,7 +258,7 @@ recur across features.
   itself; there is no worker choice. Trigger words apply when submitting,
   without altering the typed prompt.
 - Replacing unsaved work with a preset asks first. Assistant proposals replace
-  text in place with Undo and a label naming the action and the words changed.
+  text in place with Undo and show the action and changed words below the field.
   Suggestions never act on their own, and nothing floats over the text.
 - Report actual endpoint health: configuration alone does not prove readiness.
   A deliberately parked worker reads Stopped, not failing; an unexpectedly

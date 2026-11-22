@@ -381,6 +381,7 @@ export async function fixtures(page: Page) {
           "soft-style.safetensors": { title: "Soft Style", families: ["test"], type: "style" },
         },
       });
+    if (path === "/api/prompts") return respond({ enabled: true, prompts: [] });
     if (path === "/api/assistant")
       return respond({
         available: true,
@@ -1055,7 +1056,7 @@ export async function promptTool(scope: Page | Locator, box: string, label: stri
   await menu.getByRole("menuitem", { name: label, exact: true }).click();
 }
 
-/** Opens a text box's ⋯ menu, which lists each tool's options under its name, one level deep. */
+/** Opens a text box's tools menu. */
 export async function promptMenu(scope: Page | Locator, box: string) {
   const page = "page" in scope ? scope.page() : scope;
   const button = scope.getByRole("button", { name: new RegExp(`^(AI|More) ${box} Actions$`) });
@@ -1065,7 +1066,7 @@ export async function promptMenu(scope: Page | Locator, box: string) {
     .getByRole("textbox", { name: box, exact: true });
   if (!(await button.isVisible()) && (await text.isVisible())) await text.click();
   await button.click();
-  return page.getByRole("menu");
+  return page.getByRole("menu").first();
 }
 
 /** Edit or Recreate in the viewer's action bar. */
@@ -1078,13 +1079,19 @@ export function viewerChangeButton(page: Page, action: "Edit" | "Recreate" = "Ed
 /** Opens the viewer's prompt-change options. */
 export async function viewerChangeMenu(page: Page, action?: "Edit" | "Recreate") {
   await viewerChangeButton(page, action).click();
-  return page.getByRole("menu");
+  return page.getByRole("menu").first();
+}
+
+export async function backToActionMenu(scope: Page | Locator) {
+  const back = scope.getByRole("menuitem", { name: "Back", exact: true });
+  if (await back.isVisible()) await back.click();
 }
 
 export async function expandAssistantMenu(
   scope: Page | Locator,
   label: "Suggestions" | "Templates",
 ) {
+  await backToActionMenu(scope);
   const section = scope.getByRole("menuitem", { name: label, exact: true });
   await expect(section).toBeVisible();
   if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
@@ -1098,7 +1105,7 @@ export async function closeTextEditor(page: Page, title: string) {
   await expect(editor).toHaveCount(0);
 }
 
-/** Opens a tool's options in a box's phone editor through its flat More menu. */
+/** Opens a tool's options in a box's phone editor. */
 export async function editorMenu(scope: Page | Locator, box: string, tool: string) {
   await scope.getByRole("textbox", { name: box, exact: true }).click();
   const page = "page" in scope ? scope.page() : scope;
@@ -1430,6 +1437,8 @@ export async function serveDream(
     spicyAvailable: options.spicyAvailable ?? false,
     calibration: options.calibration ?? [],
     library: options.library ?? [],
+    today: { images: 12, videos: 1 },
+    usage: undefined as import("../../shared/dream").DreamCounts | undefined,
     reviewed: new Set<string>(),
     judged: new Set<string>(),
     /** Every Dream result served, so Undo can bring one back. */
@@ -1442,7 +1451,8 @@ export async function serveDream(
     settings: state.settings,
     unseen: state.unseen,
     since: options.since ?? null,
-    today: { images: 12, videos: 1 },
+    today: state.today,
+    usage: state.usage,
     spicyAvailable: state.spicyAvailable,
     locked: options.locked ?? [],
     status: !state.settings.enabled
@@ -1572,6 +1582,13 @@ export async function serveDream(
       return route.fulfill({ json: dreamCardCounts(state.unseen, state.settings) });
     if (path === "/api/dream/settings") {
       Object.assign(state.settings, body);
+      return route.fulfill({ json: show() });
+    }
+    if (path === "/api/dream/reset-limit") {
+      state.usage = {
+        ...(state.usage ?? state.today),
+        [body.kind === "image" ? "images" : "videos"]: 0,
+      };
       return route.fulfill({ json: show() });
     }
     if (path === "/api/dream/calibration") {

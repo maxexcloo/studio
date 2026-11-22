@@ -13,6 +13,7 @@ import {
 test("Images and Videos tabs keep an expanding bottom composer", async ({ page }, testInfo) => {
   const state = await fixtures(page);
   await page.goto("/");
+  if (testInfo.project.use.isMobile) await expandComposer(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An amber bird");
   await finishTyping(page);
   const primary = page.getByRole("button", { name: "Generate Image", exact: true });

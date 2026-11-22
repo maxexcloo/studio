@@ -9,6 +9,7 @@ import {
 import {
   grokPinnedResolutions,
   grokVideoDefaultResolution,
+  profileStartingSize,
   selectedResolution,
   withResolution,
 } from "../../../../shared/resolution.ts";
@@ -48,6 +49,7 @@ export function profileForBackend(
   return profile && option?.profile
     ? {
         ...option.profile,
+        imageSizePreference: profile.imageSizePreference,
         backendOptions: profile.backendOptions,
         failing: profile.failing,
         workerIds: profile.workerIds,
@@ -81,8 +83,25 @@ export function profileForLoras(
 export function backendInputPatch(input: GenerationInput, profile: Profile, backend: string) {
   const next = profileForBackend(profile, backend)!;
   const patch: Partial<GenerationInput> = { profileBackend: backend };
-  for (const [key, value] of Object.entries(next.defaults))
-    if (input[key] === undefined || input[key] === profile.defaults[key]) patch[key] = value;
+  const previousSize = profileStartingSize(profile);
+  const nextSize = profileStartingSize(next);
+  const previousDefaults: Record<string, string | number | undefined> = {
+    ...profile.defaults,
+    ...previousSize,
+  };
+  const nextDefaults = { ...next.defaults, ...nextSize };
+  for (const [key, value] of Object.entries(nextDefaults))
+    if (
+      key !== "resolutionTier" &&
+      (input[key] === undefined || input[key] === previousDefaults[key])
+    )
+      patch[key] = value;
+  if (
+    input.width === previousSize.width &&
+    input.height === previousSize.height &&
+    input.resolutionTier === previousSize.resolutionTier
+  )
+    patch.resolutionTier = nextSize.resolutionTier;
   return patch;
 }
 

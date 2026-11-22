@@ -69,7 +69,6 @@ export function useCardIdeas({
     options.map((idea): Action => ({
       id: `idea:${idea}`,
       label: idea,
-      icon: icons.assistant,
       onClick: () => pick(idea),
     })),
     { onClick: () => again.mutate(undefined) },

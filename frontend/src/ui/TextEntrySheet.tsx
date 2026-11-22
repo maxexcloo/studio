@@ -1,9 +1,9 @@
 import { Drawer, type DrawerProps, FocusTrap, Group, VisuallyHidden } from "@mantine/core";
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
-import { useMotionDuration } from "./Appearance";
 import { closeWhenTop, layerAbove, popupLayer } from "./popupClicks";
 import { useKeyboard, useKeyboardDrop, useTypingIn } from "./useKeyboard";
+import { useSwipeClose } from "./useSwipeClose";
 
 import classes from "./TextEntrySheet.module.css";
 
@@ -51,7 +51,6 @@ export function TextEntrySheet({
 }: SheetProps) {
   const generatedId = useId();
   const sheetId = id ?? generatedId;
-  const duration = useMotionDuration();
   const sheet = useRef<HTMLElement>(null);
   const sheetFocus = useRef<HTMLSpanElement>(null);
   const tapping = useRef(false);
@@ -78,6 +77,11 @@ export function TextEntrySheet({
   });
 
   const fieldTitle = field && fieldTitles?.[field];
+  const swipe = useSwipeClose(
+    "down",
+    onClose,
+    props.opened && !hidden && !field && !keyboard.inset,
+  );
   return (
     <Drawer.Root
       {...props}
@@ -85,7 +89,6 @@ export function TextEntrySheet({
       onClose={closeWhenTop(sheetId, onClose)}
       position="bottom"
       size="100%"
-      transitionProps={{ duration }}
       classNames={{
         content: classes.sheet,
         header: fieldTitle ? undefined : classes.header,
@@ -99,7 +102,7 @@ export function TextEntrySheet({
       }}
     >
       <Drawer.Overlay />
-      <Drawer.Content>
+      <Drawer.Content {...swipe}>
         <Drawer.Header>
           <Group wrap="nowrap" gap="xs" miw={0}>
             <Drawer.Title>

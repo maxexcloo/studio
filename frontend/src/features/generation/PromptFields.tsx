@@ -1,15 +1,20 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { type Ref, memo } from "react";
 
 import type { ChangeAction } from "../../../../shared/suggestions";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
+import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
+import { usePhone } from "../../ui/usePhone";
 import { askDraftChange, askDraftSteps, draftStepsQuery } from "../taste/suggestions";
 import {
   ChangeSuggestions,
   ProposalLabel,
   UndoButton,
+  assistMenu,
   proposedClass,
   useAskChange,
+  useChangeSuggestions,
 } from "./AskChange";
 import type { Draft } from "./GenerationProvider";
 import { usePromptAssistant } from "./PromptAssistant";
@@ -67,7 +72,7 @@ export function useDraftChange({
     sendRequest: (request: string) => ask.send(request, { prompt: input.prompt, operation }),
   };
 }
-type DraftChange = ReturnType<typeof useDraftChange>;
+export type DraftChange = ReturnType<typeof useDraftChange>;
 
 /**
  * The composer's prompt and negative prompt with their history and assistant, and the assistant's
@@ -83,6 +88,7 @@ export function PromptFields({
   onNegativeWritten,
   textareaRef,
   autoFocus = false,
+  compact = false,
   fill = false,
   ideas: offerIdeas = false,
   ask,
@@ -98,6 +104,7 @@ export function PromptFields({
   textareaRef?: Ref<HTMLTextAreaElement>;
   /** Lets the surrounding focus trap start in the prompt. */
   autoFocus?: boolean;
+  compact?: boolean;
   /** Fills the phone Generate sheet: the prompt takes the room left above the settings, typed in place. */
   fill?: boolean;
   /** Offers ideas in the AI menu for an empty prompt or a draft with applied cards. */
@@ -105,9 +112,19 @@ export function PromptFields({
   /** Sends the assistant's Custom… as a change to the draft (`useDraftChange`). */
   ask?: DraftChange;
 }) {
+  const client = useQueryClient();
+  const phone = usePhone();
   const proposal = ask?.proposal;
   // Suggestions change the prompt as it was before any proposal.
   const base = ask?.typed?.prompt ?? input.prompt;
+  const steps = draftStepsQuery(input.kind, base.trim());
+  const draftSuggestions = useChangeSuggestions({
+    query: steps,
+    fresh: () => askDraftSteps(input.kind, base.trim(), true),
+    enabled: false,
+    disabled: ask?.pending,
+    onPick: (request) => ask?.sendRequest(request),
+  });
   const assistant = usePromptAssistant({
     scopeKey: assistantScope,
     input,
@@ -121,7 +138,7 @@ export function PromptFields({
           pending: ask.pending,
           suggestions: (pick, render) => (
             <ChangeSuggestions
-              query={draftStepsQuery(input.kind, base.trim())}
+              query={steps}
               fresh={() => askDraftSteps(input.kind, base.trim(), true)}
               disabled={!base.trim() || ask.pending}
               onPick={pick}
@@ -143,38 +160,56 @@ export function PromptFields({
     enabled: offerIdeas && !proposal && !ask?.pending,
     onChange: (prompt) => onChange({ prompt }),
   });
+  const suggestions =
+    ideas.suggestions ??
+    (ask?.available && base.trim()
+      ? {
+          ...draftSuggestions,
+          action: {
+            ...draftSuggestions.action,
+            onOpen: () => void client.fetchQuery(steps).catch(() => {}),
+          },
+        }
+      : undefined);
+  const assistantTool =
+    assistant.stop ??
+    (assistant.templates || suggestions
+      ? {
+          id: "assistant",
+          label: "Improve Prompt",
+          icon: icons.assistant,
+          disabled: ask?.pending,
+          menu: assistMenu({
+            suggestions,
+            templates: assistant.templates ?? [],
+            custom: assistant.custom,
+            others: [assistant.more ?? []],
+            last: [],
+          }),
+        }
+      : undefined);
   return (
     <>
-      <div
-        className={classes.area}
-        data-split={negative || undefined}
-        data-fill={fill || undefined}
-        data-text-box="prompt"
-      >
+      <div className={classes.area} data-fill={fill || undefined} data-text-box="prompt">
         <TextBox
           ref={textareaRef}
-          tools={[ideas.tool, assistant.action, history.action].filter((tool) => !!tool)}
+          tools={[assistantTool, history.action].filter((tool) => !!tool)}
           send={proposal ? <UndoButton onClick={ask.undo} /> : offerIdeas && ideas.undo}
           busy={assistant.working}
           popups={history.popup}
-          data-expanded-prompt
-          classNames={{ input: classes.input }}
+          data-composer-prompt={compact || undefined}
+          data-expanded-prompt={!compact || undefined}
+          classNames={compact ? undefined : { input: classes.input }}
           className={proposal ? proposedClass : undefined}
-          // The proposal's action names it over the prompt; Generate runs it.
-          description={
-            proposal ? (
-              <ProposalLabel proposal={proposal} before={base} labels={draftLabels} />
-            ) : (
-              ideas.label
-            )
-          }
           variant="unstyled"
           aria-label="Prompt"
           data-autofocus={autoFocus || undefined}
           placeholder="Prompt…"
           autosize={!fill}
-          minRows={negative ? 4 : 3}
-          maxRows={negative ? 4 : 10}
+          minRows={compact ? 1 : negative ? 4 : 3}
+          maxRows={compact ? 1 : negative ? 4 : 10}
+          wrap={compact ? "off" : undefined}
+          onClick={compact && phone ? (event) => event.preventDefault() : undefined}
           inline={fill}
           value={input.prompt}
           onChange={(prompt) => onChange({ prompt })}
@@ -185,7 +220,18 @@ export function PromptFields({
               ask.undo();
             }
           }}
-          below={assistant.suggestions}
+          below={
+            (proposal || ideas.label || assistant.suggestions) && (
+              <>
+                {proposal ? (
+                  <ProposalLabel proposal={proposal} before={base} labels={draftLabels} />
+                ) : (
+                  ideas.label
+                )}
+                {assistant.suggestions}
+              </>
+            )
+          }
         />
         {assistant.dialog}
       </div>

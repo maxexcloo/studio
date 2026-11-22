@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { menuWidth } from "../../theme";
 import type { MediaItem } from "../../types";
-import { submenuParentProps, useActionMenuBounds } from "../../ui/ActionBar";
+import { useActionMenuBounds } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { ratingLabel } from "./itemActions";
@@ -21,7 +21,6 @@ export function MediaTileActions({
   onOpenedChange,
   onSelect,
   hideMore,
-  submenus,
 }: {
   item: MediaItem;
   opened: boolean;
@@ -29,7 +28,6 @@ export function MediaTileActions({
   onSelect?: () => void;
   /** Hides More for a tile whose menu opens by holding; the hidden button still anchors it. */
   hideMore?: boolean;
-  submenus: boolean;
 }) {
   const [deleting, setDeleting] = useState(false);
   const menuBounds = useActionMenuBounds(opened);
@@ -79,7 +77,7 @@ export function MediaTileActions({
           </Tooltip>
         )}
         <Menu
-          {...(submenus ? submenuParentProps : menuBounds)}
+          {...menuBounds}
           opened={opened}
           onChange={onOpenedChange}
           position="bottom-end"
@@ -102,7 +100,6 @@ export function MediaTileActions({
                 item={item}
                 transfer={transfer}
                 onSelect={onSelect}
-                submenus={submenus}
                 onApplied={() => onOpenedChange(false)}
                 onDelete={() => setDeleting(true)}
                 {...handlers}

@@ -1,4 +1,4 @@
-import { ActionIcon, Group, Text, Textarea, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
@@ -22,6 +22,7 @@ import {
 } from "./GenerationProvider";
 import { generationInput, isProfile, profileForBackend, referencePatch } from "./payload";
 import { PresetPicker } from "./PresetPicker";
+import { PromptFields, useDraftChange } from "./PromptFields";
 import { queueQuery } from "./Queue";
 import { ReferencePicker } from "./ReferencePicker";
 
@@ -130,6 +131,24 @@ export function GenerationForm({
   });
   const label = submitLabel ?? submitState.label;
   const { blockedReason } = submitState;
+  const ask = useDraftChange({
+    input,
+    references: draft.references,
+    operation: draft.operation,
+    onChange: update,
+    onOperationChange: (operation) => setDraft((value) => ({ ...value, operation })),
+  });
+  const assistantScope = JSON.stringify([
+    input.kind,
+    draft.sessionId,
+    draft.parentJobId,
+    draft.presetId,
+    draft.operation,
+  ]);
+  const generate = () => {
+    ask.done();
+    submit.mutate(undefined);
+  };
   const referenceProfile = profileForBackend(profile, input.profileBackend, true);
   const supportsReferences = Boolean(
     referenceProfile?.mediaInputs?.length ||
@@ -149,27 +168,24 @@ export function GenerationForm({
         onKeyDown={(event) => submitShortcut(event, !!blockedReason || submit.isPending)}
         onSubmit={(event) => {
           event.preventDefault();
-          if (!blockedReason && !submit.isPending) submit.mutate(undefined);
+          if (!blockedReason && !submit.isPending) generate();
         }}
       >
         {/* Bottom aligned, so the actions stay at the bottom as the prompt grows. */}
         <Group wrap="nowrap" gap="xs" align="flex-end">
-          <Textarea
-            data-composer-prompt
-            aria-label="Prompt"
-            placeholder="Prompt…"
-            autosize
-            minRows={1}
-            maxRows={1}
-            // One line that scrolls sideways: a wrapped second line would show through the padding.
-            wrap="off"
-            variant="unstyled"
-            className={classes.compactPrompt}
-            // A phone tap opens the Generate sheet, so the bar never raises the keyboard.
-            inputMode={phone ? "none" : undefined}
-            value={input.prompt}
-            onChange={(event) => update({ prompt: event.currentTarget.value })}
-          />
+          <div className={classes.compactPrompt}>
+            <PromptFields
+              compact
+              ideas
+              input={input}
+              profile={profile}
+              references={draft.references}
+              onChange={update}
+              assistantScope={assistantScope}
+              negative={false}
+              ask={ask}
+            />
+          </div>
           {/* Shown while profiles load so Submit doesn't move when they arrive. */}
           {(models.isPending || supportsReferences) && <ReferencePicker compact />}
           <Tooltip label={blockedReason || label}>
@@ -232,20 +248,14 @@ export function GenerationForm({
           },
         }));
       }}
-      onSubmit={() => submit.mutate(undefined)}
+      onSubmit={generate}
       operation={draft.operation}
-      onOperationChange={(operation) => setDraft((value) => ({ ...value, operation }))}
+      ask={ask}
       pending={submit.isPending}
       error={submit.error}
       blockedReason={draft.compare ? comparison.blockedReason : undefined}
       submitLabel={submitLabel}
-      assistantScope={JSON.stringify([
-        input.kind,
-        draft.sessionId,
-        draft.parentJobId,
-        draft.presetId,
-        draft.operation,
-      ])}
+      assistantScope={assistantScope}
       presets={
         <PresetPicker
           input={input}
