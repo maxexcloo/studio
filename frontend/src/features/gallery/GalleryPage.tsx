@@ -761,6 +761,7 @@ function Gallery() {
       )}
       {selected && (
         <MediaViewer
+          quiet
           item={shown || selected}
           items={viewerItems}
           related={loaded}

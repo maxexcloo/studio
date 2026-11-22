@@ -1,4 +1,4 @@
-import type { CardKind } from "../../shared/characters";
+import type { CardKind, ResultContext } from "../../shared/characters";
 import type { LoraBase } from "../../shared/profiles";
 import type { Review } from "../../shared/projects";
 import type { QueueJob as SharedQueueJob } from "../../shared/queue";
@@ -145,16 +145,6 @@ export interface GenerationInput extends Record<string, unknown> {
   /** The backend a combined profile runs on; the profile's current one when absent. */
   profileBackend?: string;
 }
-/** What an MCP chat said its results show (backend/gallery/records.js storedResultSet). */
-export interface ResultContext {
-  character?: { name: string; description?: string };
-  outfit?: { name: string; description?: string };
-  scene?: { name: string; description?: string };
-  series?: string;
-  /** Backstory or scene notes for Studio's prompt writers. */
-  notes?: string;
-}
-
 export interface MediaItem {
   id: string;
   jobId?: string;

@@ -1,6 +1,5 @@
 import {
   ActionIcon,
-  Badge,
   Group,
   Modal,
   SegmentedControl,
@@ -31,7 +30,7 @@ import { letter } from "../compare/inputs";
 import { mediaSource } from "../gallery/mediaSource";
 import type { SwipeDirection, SwipeGesture } from "../gallery/swipe";
 import { VideoPlayButton } from "../gallery/VideoPlayButton";
-import { ViewerChrome, viewerBadge } from "../gallery/ViewerChrome";
+import { ViewerChrome } from "../gallery/ViewerChrome";
 import { ViewerDetails } from "../gallery/ViewerDetails";
 import { Neighbour, useStrip, useTouchSwipe } from "../gallery/ViewerMediaStrip";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
@@ -281,7 +280,7 @@ export function DreamPreview({
         <div className={`${viewerClasses.main} ${classes.previewMain}`}>
           <div
             ref={stageRef}
-            className={classes.previewStage}
+            className={`${classes.previewStage} ${viewerClasses.viewerStage}`}
             onClick={(event) => {
               if (
                 event.detail &&
@@ -312,13 +311,6 @@ export function DreamPreview({
           </div>
           <ViewerChrome
             item={item}
-            label={
-              card.kind === "pair" && (
-                <Badge {...viewerBadge} aria-live="polite">
-                  {sideLabel(card, side)}
-                </Badge>
-              )
-            }
             actions={sound}
             details={{ phone, opened: details, toggle: () => setDetails((open) => !open) }}
             close={close}
@@ -374,7 +366,7 @@ export function DreamPreview({
               act={act}
               hidden={false}
               expanded
-              trailing={<DreamSuggestions card={card} side={side} />}
+              trailing={<DreamSuggestions card={card} side={side} onMore={() => act("more")} />}
               leading={<DeckUndo disabled={!canUndo} onClick={undo} />}
             />
           </div>

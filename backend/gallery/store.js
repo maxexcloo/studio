@@ -157,6 +157,11 @@ function where(query = {}) {
   }
   if (query.dreamDraft !== undefined)
     add("json_extract(value, '$.dream.draft') = ?", query.dreamDraft);
+  if (query.dreamSuperLiked) add("json_extract(value, '$.dream.superLiked') = 1");
+  if (query.dreamPassReason)
+    add("json_extract(value, '$.dream.passReason') = ?", query.dreamPassReason);
+  if (query.dreamDecidedSince)
+    add("json_extract(value, '$.dream.decidedAt') >= ?", query.dreamDecidedSince);
   if (query.dreamProject !== undefined) add(`${dreamProject} = ?`, query.dreamProject);
   if (query.dreamArm !== undefined) {
     const prefixes = [query.dreamArm].flat();

@@ -34,6 +34,7 @@ import {
   listWorkers,
   workerById,
 } from "./workers.js";
+import { runProfile } from "./workflow-modes.js";
 
 /**
  * Studio's generation queue (domain/queue.ts) and its adapters: local workers, with their GPU
@@ -421,9 +422,7 @@ export function createGenerationQueue({
     const listed = (await mediaModels().catch(() => null))?.models?.profiles?.find(
       (profile) => profile.id === input.profileId,
     );
-    const sized =
-      listed?.backendOptions?.find((option) => option.id === input.profileBackend)?.profile ||
-      listed;
+    const sized = runProfile(listed, input.profileBackend);
     try {
       Object.assign(input, withResolution(input, sized));
     } catch (error) {

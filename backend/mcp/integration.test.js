@@ -331,6 +331,7 @@ async function fixture(
             settings: {
               profileId: body.profileId,
               steps: body.steps,
+              ...(body.resolution ? { resolution: body.resolution } : {}),
               cfg: body.cfg,
               sampler: body.sampler || "",
               scheduler: body.scheduler || "",
@@ -1951,6 +1952,15 @@ test("create_characters saves each card with its story and queues its portrait, 
   const before = f.submitted.length;
   await failure(client, "create_characters", {
     characters: [{ name: "mara", description: "Ranger", portrait: "A ranger" }],
+  });
+  await failure(client, "create_characters", {
+    characters: [
+      { name: "Cora", description: "Ranger", portrait: "A ranger" },
+      { name: " cora ", description: "Smith", portrait: "A smith" },
+    ],
+  });
+  await failure(client, "create_characters", {
+    characters: [{ name: "Cora", description: "", portrait: "A ranger" }],
   });
   await failure(client, "create_characters", {
     characters: [{ name: "Kit", description: "Ranger", portrait: "A ranger", age: 16 }],
@@ -7928,6 +7938,87 @@ test("set reruns refuse changed project constraints before admission and preserv
   assert.equal(f.submitted.length, 2);
   for (const key of ["prompt", "profileId", "count", "width", "height", "loras"])
     assert.deepEqual(f.submitted[1][key], saved[key]);
+});
+
+test("single-result reuse checks the attached project against the effective run", async (t) => {
+  const f = await fixture(t);
+  const profile = {
+    ...imageProfile,
+    defaults: { ...imageProfile.defaults, width: 1024, height: 768 },
+  };
+  const other = {
+    ...profile,
+    id: "other-image",
+    label: "Other Image",
+    defaults: { ...profile.defaults, resolution: "1K" },
+    options: { ...profile.options, resolutions: ["1K", "2K"] },
+  };
+  const video = {
+    ...videoProfile,
+    defaults: { ...videoProfile.defaults, width: 1024, height: 768 },
+    mediaInputs: [{ ...imageProfile.mediaInputs[0], role: "start" }],
+    aspectPolicy: "reference",
+  };
+  const otherVideo = { ...video, id: "other-video", label: "Other Video", ready: false };
+  await f.profiles([profile, other, video, otherVideo]);
+  let project = null;
+  f.app.post("/api/dream/projects/activity", (_req, res) => res.json({ project }));
+  const client = await chat(t, f, "alice", "reuse-project");
+  const original = await generate(client, {
+    prompts: ["A fox"],
+    loras: [{ name: "fixture-effect", strength: 0.8 }],
+  });
+  finish(f);
+  const job_id = original.jobs[0].ref;
+  const base = { profiles: [profile.id], loras: true, aspect: "landscape", resolution: "1K" };
+  project = {
+    id: "foxes",
+    name: "Foxes",
+    brief: { subjects: "", styles: "", avoid: "lantern" },
+    constraints: base,
+  };
+  const blocked = async (change, args, reason) => {
+    project.constraints = { ...base, ...change };
+    const submitted = f.submitted.length;
+    const refused = await call(client, "reuse", { job_id, ...args });
+    assert.equal(refused.isError, true);
+    assert.match(texts(refused), reason);
+    assert.equal(f.submitted.length, submitted);
+  };
+  await blocked({ loras: false }, {}, /This LoRA stack conflicts with Foxes/);
+  await blocked({ profiles: [other.id] }, {}, /Fixture Image conflicts with Foxes/);
+  await blocked({ aspect: "portrait" }, {}, /1024×768 aspect conflicts with Foxes/);
+  await blocked({ resolution: "2K" }, {}, /1024×768 size conflicts with Foxes/);
+  await blocked({}, { prompt: "A fox with a lantern" }, /which Foxes avoids/);
+  await blocked({}, { profile_id: other.id }, /Other Image conflicts with Foxes/);
+  // A retarget drops the LoRA. Its effective settings can fit even though the source's do not.
+  project.constraints = { profiles: [other.id], loras: false, aspect: "landscape", resolution: "" };
+  data(await call(client, "reuse", { job_id, profile_id: other.id }));
+  assert.deepEqual(f.submitted.at(-1).loras, []);
+
+  project.constraints = base;
+  data(await call(client, "reuse", { job_id }));
+  assert.deepEqual(f.submitted.at(-1).loras, f.submitted[0].loras);
+
+  const animate = { mode: "animate", profile_id: video.id };
+  await blocked({ profiles: [otherVideo.id] }, animate, /Fixture Video conflicts with Foxes/);
+  await blocked({ aspect: "portrait" }, animate, /1024×768 aspect conflicts with Foxes/);
+  await blocked({ resolution: "2K" }, animate, /1024×768 size conflicts with Foxes/);
+  project.constraints = { ...base, profiles: [video.id], loras: false };
+  const animated = data(await call(client, "reuse", { job_id, ...animate }));
+  finish(f, "mp4");
+  const extend = { job_id: animated.jobs[0].ref, mode: "extend" };
+  await blocked({ resolution: "2K" }, extend, /1024×768 size conflicts with Foxes/);
+  await blocked({ profiles: [otherVideo.id] }, extend, /Fixture Video conflicts with Foxes/);
+  project.constraints = { ...base, profiles: [video.id] };
+  data(await call(client, "reuse", extend));
+  assert.equal(f.submitted.at(-1).profileId, video.id);
+
+  project.constraints = { ...base, profiles: [other.id], resolution: "2K" };
+  const native = await generate(client, { profile_id: other.id });
+  finish(f);
+  data(await call(client, "reuse", { job_id: native.jobs[0].ref }));
+  assert.equal(f.submitted.at(-1).resolution, "2K");
 });
 
 test("axis varies one thing at one seed, one image each, as a lettered side-by-side comparison", async (t) => {

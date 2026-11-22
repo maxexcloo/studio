@@ -24,10 +24,6 @@ const dayAndTime = dateFormat({
   minute: "2-digit",
 });
 
-/** Its result number, as chats name it ("#12"), or "" before Studio numbers it. */
-export const mediaNumber = (item: Pick<MediaItem, "number">) =>
-  item.number ? `#${item.number}` : "";
-
 const modelFile = (value: unknown) =>
   String(value || "")
     .split(/[\\/]/)
@@ -60,7 +56,7 @@ export function mediaProfileName(item: MediaItem, profiles: Profile[]) {
   return names.size === 1 ? [...names][0] : "";
 }
 
-/** Its number · when it was made (unless `withTime` is false) · the profile's name, plus a video's length. */
+/** When it was made, its profile name and the duration for videos. */
 export function mediaDetail(item: MediaItem, profiles: Profile[], withTime: boolean) {
   const settings = item.settings || {};
   const created = item.createdAt ? new Date(item.createdAt) : null;
@@ -72,7 +68,7 @@ export function mediaDetail(item: MediaItem, profiles: Profile[], withTime: bool
   const seconds =
     Number(settings.duration) || Number(settings.frames) / Number(settings.fps) || undefined;
   const duration = item.type === "video" && seconds ? `${Math.round(seconds * 10) / 10} s` : "";
-  return [mediaNumber(item), time, name, duration].filter(Boolean).join(" · ");
+  return [time, name, duration].filter(Boolean).join(" · ");
 }
 
 /** The local day an item was made, as `YYYY-MM-DD`, or "" when it has no date. */

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
 
-import { fixtures, stamp, viewerAction } from "./fixtures";
+import { fixtures, showViewerControls, stamp, viewerAction } from "./fixtures";
 
 const original = await sharp({
   create: { width: 800, height: 1200, channels: 3, background: "#46a3ff" },
@@ -196,9 +196,7 @@ test("The viewer fits a large image but never enlarges a small one beyond its ac
   await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBeLessThan(1);
 });
 
-test("The viewer centres wide and tall images above the actions and updates both badges", async ({
-  page,
-}) => {
+test("Fit leaves room for the header and keeps its bounds when controls open", async ({ page }) => {
   const state = await fixtures(page);
   for (const [shape, width, height, model] of [
     ["wide", 2048, 768, "Wide Rendering Profile"],
@@ -233,29 +231,36 @@ test("The viewer centres wide and tall images above the actions and updates both
   ] as const) {
     if (index === 2) await page.keyboard.press("ArrowRight");
     const picture = viewer.getByRole("img", { name: `A ${shape} scene`, exact: true });
-    const position = header.getByText(`${index} / 2`, { exact: true });
+    const position = header.getByRole("status", { name: "Current Result", exact: true });
     const badge = header.getByText(model, { exact: true });
     await expect(picture).toBeVisible();
-    await expect(position).toBeVisible();
+    await expect(position).toHaveText(`${index} / 2`);
     await expect(badge).toBeVisible();
     await expect
       .poll(async () => {
         const bounds = (await picture.boundingBox())!;
-        const bar = (await actions.boundingBox())!;
         const stage = (await viewer.locator("[data-zoom-mode]").boundingBox())!;
-        const place = (await position.boundingBox())!;
+        const heading = (await header.boundingBox())!;
         const label = (await badge.boundingBox())!;
         const dismiss = (await close.boundingBox())!;
         return {
-          centred: Math.abs(bounds.y * 2 + bounds.height - bar.y) <= 2,
+          centred: Math.abs(2 * (bounds.y - stage.y) + bounds.height - stage.height) <= 2,
           fitted:
             shape === "wide"
               ? Math.abs(bounds.width - stage.width) <= 2
-              : Math.abs(bounds.height - bar.y) <= 2,
-          badgesFit: place.x + place.width < label.x && label.x + label.width < dismiss.x,
+              : Math.abs(bounds.height - stage.height) <= 2,
+          headerClear: bounds.y >= heading.y + heading.height - 1,
+          titleFits: label.x + label.width < dismiss.x,
         };
       })
-      .toEqual({ centred: true, fitted: true, badgesFit: true });
+      .toEqual({ centred: true, fitted: true, headerClear: true, titleFits: true });
+    if (index === 1) {
+      const bounds = await picture.boundingBox();
+      await expect(actions).toBeHidden();
+      await showViewerControls(viewer);
+      await expect(actions).toBeVisible();
+      await expect.poll(() => picture.boundingBox()).toEqual(bounds);
+    }
   }
 });
 
