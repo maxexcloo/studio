@@ -100,7 +100,11 @@ async function sendField(page: Page, name: string, text: string, send: string) {
   }
   await field.click();
   const editor = page.getByRole("dialog", { name, exact: true });
-  await editor.getByRole("textbox", { name, exact: true }).fill(text);
+  const input = editor.getByRole("textbox", { name, exact: true });
+  await input.tap();
+  await expect(input).toBeFocused();
+  await input.fill(text);
+  await expect(input).toHaveValue(text);
   await editor.getByRole("button", { name: send, exact: true }).click();
 }
 
