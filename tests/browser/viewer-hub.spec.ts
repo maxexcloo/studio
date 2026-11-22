@@ -528,6 +528,7 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   await viewerAction(page, "Animate");
   await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
+  await expect(page.getByRole("menu", { name: "Animate", exact: true })).toBeHidden();
   const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });
   const summary = dialog.getByRole("textbox", { name: "Instruction", exact: true });
   const phone = testInfo.project.use.isMobile;
@@ -557,17 +558,18 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
     await expect(field).toHaveValue("The bird unfolds its wings.");
   }
   await more.click();
-  await expect(page.getByRole("menu").getByText("Suggestions", { exact: true })).toBeVisible();
+  const tools = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
+  await expect(tools.getByText("Suggestions", { exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
   await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(tools).toBeHidden();
   await expect(surface).toBeVisible();
   await expect(dialog).toBeVisible();
   await more.click();
   // Dismissing the tools by a press on the field leaves the editor and its parent intact.
   await field.click();
-  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(tools).toBeHidden();
   await expect(surface).toBeVisible();
   if (phone) {
     await field.press("Escape");
@@ -2308,7 +2310,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     .toBeGreaterThan(fitScale);
   await page.keyboard.press("Digit0");
   await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
-  await dialog.getByRole("img", { name: "Viewer Study", exact: true }).click();
+  await dialog.getByRole("button", { name: "Zoom: Fit", exact: true }).click();
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Zoom: Fill", exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Zoom: Fill", exact: true }).click();
