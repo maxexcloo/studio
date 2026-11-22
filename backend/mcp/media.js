@@ -591,7 +591,7 @@ export class McpMedia {
   /**
    * Queues one job per prompt and count. `record` keeps the user's request and exact source result.
    */
-  async queue(owner, request, scope = "", record = {}, queueSet = crypto.randomUUID()) {
+  async queue(owner, request, scope = "", record = {}, queueSet = crypto.randomUUID(), validate) {
     let profile = (await this.profiles("all", owner)).find(
       (item) => item.id === request.profile_id,
     );
@@ -755,6 +755,7 @@ export class McpMedia {
       );
       Object.assign(body, fitted);
     }
+    validate?.(profile, body);
     const ignored = changes.filter(Boolean).join(" ");
     // Large draws decode in tiles, matching the browser's generation path.
     if (
@@ -1737,6 +1738,10 @@ export class McpMedia {
         value !== profile.defaults?.[key]
       )
         args[key] = value;
+    // Provider-native sizes are separate from the output's recorded dimensions.
+    const resolution = settings.resolution?.toUpperCase();
+    if (profile.options?.resolutions?.length && controls.resolution?.options.includes(resolution))
+      args.resolution = resolution;
     if (item.negative && controls.negative_prompt) args.negative_prompt = item.negative;
     const saved = controls.loras
       ? (settings.loras || [])

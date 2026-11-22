@@ -17,12 +17,13 @@ import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
-import { maxCardDescription, maxCardName } from "../../../../shared/characters";
+import { cardKinds, maxCardDescription, maxCardName } from "../../../../shared/characters";
 import {
   type Accepted,
   type Inbox,
   type Proposal,
   type ProposalChange,
+  type SavedCard,
   maxDismissReason,
 } from "../../../../shared/inbox";
 import type { Project } from "../../../../shared/projects";
@@ -31,7 +32,7 @@ import { post } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
-import { SettingGroup } from "../../ui/SettingRows";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { CardDialog, CardForm, CardThumbnails } from "../characters/CardImages";
@@ -475,6 +476,7 @@ export function ProposalList({ proposals, projects }: { proposals: Shown[]; proj
 /** Dream › Projects' Inbox: what Dream proposes, above the projects; nothing shows when empty. */
 export function ProjectInbox({ projects }: { projects: Project[] }) {
   const inbox = useQuery(inboxQuery);
+  const client = useQueryClient();
   const settled = useSettled();
   const [clearing, setClearing] = useState(false);
   const clear = useMutation({
@@ -486,35 +488,65 @@ export function ProjectInbox({ projects }: { projects: Project[] }) {
       setClearing(false);
     },
   });
+  const undoSave = useMutation({
+    meta: { inlineError: true },
+    mutationFn: (card: SavedCard) => post<Inbox<DreamItem>>(proposalPath(card, "undo"), {}),
+    onSuccess: (next, card) => {
+      settled(next);
+      void client.invalidateQueries({ queryKey: [card.kind] });
+    },
+  });
   const proposals = inbox.data?.proposals || [];
+  const saved = inbox.data?.savedCards || [];
   if (inbox.isError) return <Alert color="red">{inbox.error.message}</Alert>;
-  if (!proposals.length) return null;
   return (
-    <SettingGroup
-      title={`Inbox (${proposals.length})`}
-      toolbar={
-        <Button
-          size="compact-sm"
-          variant="default"
-          onClick={() => {
-            clear.reset();
-            setClearing(true);
-          }}
+    <>
+      {!!saved.length && (
+        <SettingGroup title="Saved Cards">
+          {saved.map((card) => (
+            <SettingRow key={card.id} label={card.title} description={cardKinds[card.kind].name}>
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                disabled={undoSave.isPending}
+                aria-label={`Undo saving ${card.title}`}
+                onClick={() => undoSave.mutate(card)}
+              >
+                Undo
+              </Button>
+            </SettingRow>
+          ))}
+          {undoSave.error && <Alert color="red">{undoSave.error.message}</Alert>}
+        </SettingGroup>
+      )}
+      {!!proposals.length && (
+        <SettingGroup
+          title={`Inbox (${proposals.length})`}
+          toolbar={
+            <Button
+              size="compact-sm"
+              variant="default"
+              onClick={() => {
+                clear.reset();
+                setClearing(true);
+              }}
+            >
+              Clear Inbox
+            </Button>
+          }
         >
-          Clear Inbox
-        </Button>
-      }
-    >
-      <ProposalList proposals={proposals} projects={projects} />
-      <DismissDialog
-        key={String(clearing)}
-        title="Clear Inbox"
-        opened={clearing}
-        pending={clear.isPending}
-        error={clear.error?.message}
-        onDismiss={(reason) => clear.mutate(reason)}
-        onClose={() => setClearing(false)}
-      />
-    </SettingGroup>
+          <ProposalList proposals={proposals} projects={projects} />
+          <DismissDialog
+            key={String(clearing)}
+            title="Clear Inbox"
+            opened={clearing}
+            pending={clear.isPending}
+            error={clear.error?.message}
+            onDismiss={(reason) => clear.mutate(reason)}
+            onClose={() => setClearing(false)}
+          />
+        </SettingGroup>
+      )}
+    </>
   );
 }

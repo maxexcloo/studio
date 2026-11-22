@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 
+import type { ResultContext } from "../../shared/characters.ts";
 import {
   type GenerationInput,
   type PromptWriting,
@@ -82,6 +83,7 @@ export interface WrittenPrompt {
   model: string;
   why?: string;
   title?: string;
+  cardContext?: ResultContext;
 }
 /**
  * Writes a job's prompt (`input.writing`), passing the text model's thinking and reply pieces on
@@ -127,6 +129,7 @@ export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
             ...job.dream,
             prompt: written.prompt,
             ...(written.why ? { why: written.why } : {}),
+            ...(written.cardContext ? { cardContext: written.cardContext } : {}),
           },
         }
       : {}),

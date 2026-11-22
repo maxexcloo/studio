@@ -10,6 +10,7 @@ import {
   selectionAction,
   serveRetries,
   showOnly,
+  showViewerControls,
   stamp,
   toolbarSearch,
   touch,
@@ -655,6 +656,7 @@ test("MCP set results appear individually and the viewer can jump along the set 
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const current = currentResult(viewer);
   await expect(current).toHaveText(place("Bear Hug", 1));
+  await showViewerControls(viewer);
   const strip = viewer.getByRole("list", { name: "Set: Variety Test", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(3);
   await strip.getByRole("listitem", { name: "Show Fox Wizard (3 of 3)", exact: true }).click();
@@ -1366,6 +1368,7 @@ test("The viewer's set strip shows only its own set", async ({ page }) => {
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Prompt A-1", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await showViewerControls(viewer);
   const strip = viewer.getByRole("list", { name: "Set: Set A", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
   await strip.getByRole("listitem", { name: "Show Prompt A-0 (2 of 2)", exact: true }).click();

@@ -2,7 +2,6 @@ import { ActionIcon, Group, Paper, Text, Tooltip } from "@mantine/core";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { useGenerationActions } from "../generation/GenerationProvider";
@@ -10,19 +9,11 @@ import { mediaProfileName, mediaTitle } from "./mediaLabels";
 
 import classes from "./MediaViewer.module.css";
 
-export const viewerBadge = {
-  variant: "default",
-  size: "lg",
-  radius: "xl",
-  style: glass,
-  fw: 500,
-  miw: 0,
-} as const;
-
 export function ViewerChrome({
   item,
   label,
   actions,
+  controls,
   close,
   closeLabel,
   details,
@@ -31,6 +22,7 @@ export function ViewerChrome({
   item?: MediaItem;
   label?: ReactNode;
   actions?: ReactNode;
+  controls?: { id: string; opened: boolean; toggle: () => void };
   close: () => void;
   closeLabel: string;
   details?: { opened: boolean; phone: boolean; toggle: () => void };
@@ -39,6 +31,7 @@ export function ViewerChrome({
   const { profiles } = useGenerationActions();
   const title = item && mediaTitle(item);
   const model = item && mediaProfileName(item, profiles);
+  const controlsLabel = controls?.opened ? "Hide Controls" : "Show Controls";
   return (
     <Group
       className={classes.topBar}
@@ -67,6 +60,19 @@ export function ViewerChrome({
       </Group>
       <Group gap={6} wrap="nowrap" className={classes.topActions}>
         {actions}
+        {controls && (
+          <Tooltip label={controlsLabel}>
+            <ActionIcon
+              variant="default"
+              aria-label={controlsLabel}
+              aria-controls={controls.id}
+              aria-expanded={controls.opened}
+              onClick={controls.toggle}
+            >
+              <icons.viewerControls size={18} />
+            </ActionIcon>
+          </Tooltip>
+        )}
         {details && (
           <Tooltip
             label={details.phone ? "Details" : details.opened ? "Hide Details" : "Show Details"}

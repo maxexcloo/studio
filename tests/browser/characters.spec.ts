@@ -92,6 +92,40 @@ test("Library card ratings hide with Undo and feed the References sort", async (
   await expect(options.first()).toHaveAccessibleName("Use character: Mara");
 });
 
+test("Library bulk actions undo a dislike and keep the card that failed deletion selected", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.characters.push(mara, { ...mara, id: "chr-ada", name: "Ada" });
+  const failedDelete = "**/api/characters/chr-ada";
+  await page.route(failedDelete, (route) =>
+    route.request().method() === "DELETE"
+      ? route.fulfill({ status: 409, json: { error: "Ada is in use." } })
+      : route.fallback(),
+  );
+  await page.goto("/library#characters");
+  const list = page.getByRole("list", { name: "Characters", exact: true });
+  const selection = page.getByRole("group", { name: "Card Selection", exact: true });
+  const select = async () => {
+    await page.getByRole("button", { name: "Select", exact: true }).click();
+    await selection.getByRole("checkbox", { name: "Select All", exact: true }).check();
+  };
+  await select();
+  await selection.getByRole("button", { name: "Dislike", exact: true }).click();
+  await expect(list).toBeHidden();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+
+  await select();
+  await selection.getByRole("button", { name: "Delete", exact: true }).click();
+  const confirmation = page.getByRole("dialog", { name: "Delete Characters", exact: true });
+  await expect(confirmation.getByText(/images stay in the gallery/i)).toBeVisible();
+  await confirmation.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(list.getByRole("checkbox", { name: "Select Ada", exact: true })).toBeChecked();
+  await expect(selection.getByText("1 selected", { exact: true })).toBeVisible();
+});
+
 test("Picking a character places its first image and leads the prompt with it, and picking it again takes both out", async ({
   page,
 }) => {

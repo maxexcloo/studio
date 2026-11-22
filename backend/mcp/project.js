@@ -2,6 +2,7 @@
 import { z } from "zod";
 
 import { briefSummary } from "../../shared/projects.ts";
+import { resolutionSize, snapDimension } from "../../shared/resolution.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { maxJobsPerCall } from "./controls.js";
 import { mcpJson } from "./media.js";
@@ -156,6 +157,44 @@ export function projectTargets({ name, constraints }, targets, known, { referenc
     targets: [{ profile: pick, note: "" }],
     note: `${name} runs only on ${listed.map(label).join(", ")}, so ${label(pick)} ran instead of ${others.join(", ")}. `,
   };
+}
+
+function matchesAspect(aspect, { width, height }, profile) {
+  if (!(width > 0 && height > 0)) return false;
+  if (aspect === "portrait") return height > width;
+  if (aspect === "landscape") return width > height;
+  if (aspect === "square") return width === height;
+  const [across, down] = aspect.split(":").map(Number);
+  const widthStep = profile.constraints?.width?.step || 16;
+  const heightStep = profile.constraints?.height?.step || 16;
+  // A named ratio can land between points on the model's dimension grid.
+  return Math.abs(width * down - height * across) <= (widthStep * down + heightStep * across) / 2;
+}
+
+/** An exact follow-up keeps its selected settings or is refused before admission. */
+export function assertProjectReuse(project, profile, input, known) {
+  const { name, constraints } = project;
+  const refuse = (setting) => {
+    throw new Error(
+      `${setting} conflicts with ${name}'s current constraints. Call generate to follow them, or change the project before reusing this result.`,
+    );
+  };
+  const { targets } = projectTargets(project, [{ profile }], known);
+  if (targets[0].profile.id !== profile.id) refuse(profile.label || profile.id);
+  if (!constraints.loras && input.loras.length) refuse("This LoRA stack");
+  if (constraints.aspect && !matchesAspect(constraints.aspect, input, profile))
+    refuse(`This run's ${input.width}×${input.height} aspect`);
+  if (constraints.resolution) {
+    const { width, height } = input;
+    const dimension = width >= height ? "width" : "height";
+    const { step } = profile.constraints?.[dimension] ?? {};
+    const target = resolutionSize({ width: 1, height: 1 }, constraints.resolution).width;
+    const matches =
+      profile.options?.resolutions?.length && input.resolution
+        ? String(input.resolution).toUpperCase() === constraints.resolution
+        : Math.max(width, height) === snapDimension(target, { step });
+    if (!matches) refuse(`This run's ${input.resolution || `${width}×${height}`} size`);
+  }
 }
 
 /**

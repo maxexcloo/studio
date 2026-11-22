@@ -14,6 +14,10 @@ import {
   identitySlot,
   keepsCharacterFaces,
   keepsIdentity,
+  maxCardDescription,
+  maxCardName,
+  maxCharacterAge,
+  maxCharacterTrait,
   maxContextNotes,
   maxNewCharacters,
   minCharacterAge,
@@ -49,6 +53,7 @@ import { aboutTime, assertJobCount, mcpJson, readyIn, setItems } from "./media.j
 import {
   accountRules,
   assertAvoided,
+  assertProjectReuse,
   briefLine,
   converging,
   keptChoices,
@@ -542,7 +547,7 @@ export function registerGenerateTools({
    * Queues a submission with the request behind it. The profile's guide goes to a conversation that has
    * not had it, marked before any wait, so the chat writes its later prompts itself.
    */
-  const submit = async (profile, args, record = {}, { guide = true } = {}) => {
+  const submit = async (profile, args, record = {}, { guide = true, validate } = {}) => {
     const fresh = guide && review(refs, profile.id);
     // Transport chunks share one set; each prompt keeps its own execution batch.
     const count = args.count ?? mcpGenerationCount;
@@ -573,6 +578,7 @@ export function registerGenerateTools({
             refs,
             { ...record, ...(conversation ? { conversation, turn } : {}) },
             queueSet,
+            validate,
           )
           .catch((error) => {
             if (!queued) throw error;
@@ -2102,13 +2108,26 @@ export function registerGenerateTools({
       }
       // A plain run again keeps the result's prompt, so it keeps how that prompt was written (Recreate does the same).
       const carried = !prompt && !moved ? item.assistant || recorded?.assistant : null;
-      const submission = await submit(plan.profile, plan.args, {
-        parentItemId: item.id,
-        ...((request || !prompt) && (request || recorded?.request)
-          ? { request: request || recorded.request }
-          : {}),
-        ...(carried ? { assistant: carried } : {}),
-      });
+      const project = await attachedProject(signal);
+      if (project) assertAvoided(project, plan.args.prompts);
+      const known = project?.constraints.profiles.length
+        ? (await media.catalogue(owner)).profiles
+        : [];
+      const validate = project
+        ? (profile, input) => assertProjectReuse(project, profile, input, known || [])
+        : undefined;
+      const submission = await submit(
+        plan.profile,
+        plan.args,
+        {
+          parentItemId: item.id,
+          ...((request || !prompt) && (request || recorded?.request)
+            ? { request: request || recorded.request }
+            : {}),
+          ...(carried ? { assistant: carried } : {}),
+        },
+        { validate },
+      );
       const dropped = plan.droppedLoras?.length
         ? `Left out ${plan.droppedLoras.length === 1 ? "a LoRA" : `${plan.droppedLoras.length} LoRAs`} made for another model (${plan.droppedLoras.join(", ")}); tell the user. `
         : "";
@@ -2152,13 +2171,28 @@ export function registerGenerateTools({
         owner,
         { signal },
       );
-      // Checked before any portrait queues, so a retried call makes no second set.
-      const taken = characters.filter(({ name }) => findCard(existing, name));
-      if (taken.length)
-        throw new Error(
-          `${taken.map(({ name }) => name).join(", ")} already exist${taken.length === 1 ? "s" : ""}: pick other names, or change them with cards update.`,
-        );
+      const nameKey = (name) => name.trim().normalize("NFKC").toLowerCase();
+      const taken = new Set(existing.map(({ name }) => nameKey(name)));
       for (const { portrait, ...card } of characters) {
+        const { name, description, age } = card;
+        if (!name.trim() || name.trim().length > maxCardName)
+          throw new Error(`Give each character a name of at most ${maxCardName} characters.`);
+        if (!description.trim() || description.trim().length > maxCardDescription)
+          throw new Error(
+            `Describe ${name}'s lasting looks in at most ${maxCardDescription} characters.`,
+          );
+        if (!portrait.trim()) throw new Error(`Write a portrait prompt for ${name}.`);
+        if (age > maxCharacterAge)
+          throw new Error(`Give ${name} an age from ${minCharacterAge} to ${maxCharacterAge}.`);
+        const trait = characterTraits.find((key) => card[key]?.trim().length > maxCharacterTrait);
+        if (trait)
+          throw new Error(`Keep ${name}'s ${trait} within ${maxCharacterTrait} characters.`);
+        const key = nameKey(name);
+        if (taken.has(key))
+          throw new Error(
+            `${name} is already named in this request or Library. Pick a different name or update the existing card.`,
+          );
+        taken.add(key);
         const refusal = minorAgeRefusal(Object.values(card).join("\n"));
         if (refusal) throw new Error(refusal);
       }

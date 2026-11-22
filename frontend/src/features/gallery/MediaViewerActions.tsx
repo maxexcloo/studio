@@ -52,7 +52,6 @@ export function MediaViewerActions({
   onRetried,
   onVersionChange,
   shortcuts,
-  hidden,
 }: {
   item: MediaItem;
   compare: boolean;
@@ -66,8 +65,6 @@ export function MediaViewerActions({
   onVersionChange: (id: string, active: boolean) => void;
   /** Holds the current actions for the viewer's keyboard shortcuts. */
   shortcuts?: RefObject<ActionGroups>;
-  /** Hides the bar without discarding the prompt draft while the phone details sheet is open. */
-  hidden?: boolean;
 }) {
   const transfer = useMediaTransfer(item, true);
   const { handlers, dialogs } = useMediaDialogs(item, iterate);
@@ -91,8 +88,6 @@ export function MediaViewerActions({
       aria-label="Generation Actions"
       radius="lg"
       className={classes.actions}
-      data-actions-hidden={hidden || undefined}
-      inert={hidden}
       onClick={(event) => event.stopPropagation()}
     >
       {item.jobId && (

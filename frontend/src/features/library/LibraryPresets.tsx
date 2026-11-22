@@ -1,11 +1,12 @@
-import { Alert, Button, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
+import { Alert, Button, Group, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
+import { SquareCheck } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
-import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import {
   defaultProfile,
   draftForInput,
@@ -15,7 +16,7 @@ import {
 } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import { generationInput } from "../generation/payload";
-import { usePresets } from "../generation/PresetPicker";
+import { useDeletePresets, usePresets } from "../generation/PresetPicker";
 import {
   type Preset,
   loadPresetInput,
@@ -33,12 +34,16 @@ const savedOn = (preset: Preset) =>
  */
 export function LibraryPresets({ heading }: { heading: ReactNode }) {
   const presets = usePresets();
+  const bulkDelete = useDeletePresets();
   const { setDraft, draftForKind, profiles, models } = useGeneration();
   const openComposer = useOpenComposer();
   const [query, setQuery] = useState("");
   const [renaming, setRenaming] = useState<Preset | null>(null);
   const [name, setName] = useState("");
-  const [deleting, setDeleting] = useState<Preset | null>(null);
+  const [deleting, setDeleting] = useState<Preset | "selected" | null>(null);
+  const [selection, setSelection] = useState<Set<string> | null>(null);
+  const selected = presets.records.filter(({ id }) => selection?.has(id));
+  const failed = bulkDelete.data?.failed ?? [];
   const [replacing, setReplacing] = useState<Preset | null>(null);
   const taken = presets.records.some(
     (preset) =>
@@ -84,8 +89,47 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
           label="Presets"
           query={query}
           onQueryChange={presets.records.length ? setQuery : undefined}
+          actions={
+            <ToolbarAction
+              label="Select"
+              icon={SquareCheck}
+              variant="default"
+              aria-pressed={selection !== null}
+              disabled={(!selection && !presets.records.length) || bulkDelete.isPending}
+              onClick={() => {
+                bulkDelete.reset();
+                setSelection(selection ? null : new Set());
+              }}
+            />
+          }
         />
       </SectionHeader>
+      {selection && (
+        <Group
+          gap="xs"
+          justify="space-between"
+          role="group"
+          aria-label="Preset Selection"
+          aria-busy={bulkDelete.isPending}
+        >
+          <Text size="sm" c="dimmed" aria-live="polite">
+            {selected.length} selected
+          </Text>
+          <ToolbarAction
+            label="Delete"
+            icon={icons.delete}
+            color="red"
+            variant="subtle"
+            disabled={!selected.length || bulkDelete.isPending}
+            onClick={() => setDeleting("selected")}
+          />
+        </Group>
+      )}
+      {failed.length > 0 && (
+        <Alert color="red" role="alert">
+          Couldn’t delete {failed.length} {failed.length === 1 ? "preset" : "presets"}.
+        </Alert>
+      )}
       {presets.error ? (
         <Alert color="red">{presets.error.message}</Alert>
       ) : (
@@ -99,6 +143,23 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
           searchText={(preset) => [preset.title, presetHolds(preset)]}
           initialSort={{ key: "name", descending: false }}
           empty="No Presets"
+          selection={
+            selection
+              ? {
+                  selected: selection,
+                  disabled: bulkDelete.isPending,
+                  onChange: (ids, checked) =>
+                    setSelection((previous) => {
+                      const next = new Set(previous);
+                      for (const id of ids) {
+                        if (checked) next.add(id);
+                        else next.delete(id);
+                      }
+                      return next;
+                    }),
+                }
+              : undefined
+          }
           columns={[
             {
               key: "name",
@@ -133,36 +194,40 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
               ),
             },
           ]}
-          rowActions={(preset) => (
-            <>
-              <Menu.Item
-                leftSection={<icons.edit size={16} />}
-                onClick={() => {
-                  if (loading(preset).replaces) setReplacing(preset);
-                  else edit(preset);
-                }}
-              >
-                Edit in Composer
-              </Menu.Item>
-              <Menu.Item
-                leftSection={<icons.rename size={16} />}
-                onClick={() => {
-                  setName(preset.title);
-                  setRenaming(preset);
-                }}
-              >
-                Rename
-              </Menu.Item>
-              <Menu.Divider />
-              <Menu.Item
-                color="red"
-                leftSection={<icons.delete size={16} />}
-                onClick={() => setDeleting(preset)}
-              >
-                Delete
-              </Menu.Item>
-            </>
-          )}
+          rowActions={
+            selection
+              ? undefined
+              : (preset) => (
+                  <>
+                    <Menu.Item
+                      leftSection={<icons.edit size={16} />}
+                      onClick={() => {
+                        if (loading(preset).replaces) setReplacing(preset);
+                        else edit(preset);
+                      }}
+                    >
+                      Edit in Composer
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<icons.rename size={16} />}
+                      onClick={() => {
+                        setName(preset.title);
+                        setRenaming(preset);
+                      }}
+                    >
+                      Rename
+                    </Menu.Item>
+                    <Menu.Divider />
+                    <Menu.Item
+                      color="red"
+                      leftSection={<icons.delete size={16} />}
+                      onClick={() => setDeleting(preset)}
+                    >
+                      Delete
+                    </Menu.Item>
+                  </>
+                )
+          }
         />
       )}
       <Modal opened={!!renaming} onClose={() => setRenaming(null)} title="Rename Preset">
@@ -200,16 +265,28 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
       </ConfirmDialog>
       <ConfirmDialog
         opened={!!deleting}
-        title="Delete Preset"
+        title={deleting === "selected" ? "Delete Presets" : "Delete Preset"}
         action="Delete"
-        pending={false}
+        pending={bulkDelete.isPending}
+        disabled={deleting === "selected" && !selected.length}
         onConfirm={() => {
-          if (deleting) presets.remove(deleting);
-          setDeleting(null);
+          if (deleting === "selected") {
+            bulkDelete.mutate(selected, {
+              onSuccess: ({ failed }) => {
+                setSelection(failed.length ? new Set(failed.map(({ id }) => id)) : null);
+                setDeleting(null);
+              },
+            });
+          } else if (deleting) {
+            presets.remove(deleting);
+            setDeleting(null);
+          }
         }}
         onClose={() => setDeleting(null)}
       >
-        Delete {deleting?.title}? Drafts made from it stay as they are.
+        {deleting === "selected"
+          ? `Delete ${selected.length} ${selected.length === 1 ? "preset" : "presets"}? Drafts made from them stay as they are.`
+          : `Delete ${deleting?.title}? Drafts made from it stay as they are.`}
       </ConfirmDialog>
     </Stack>
   );

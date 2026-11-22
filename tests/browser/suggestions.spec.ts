@@ -7,6 +7,7 @@ import {
   fixtures,
   image,
   promptMenu,
+  showViewerControls,
   stamp,
   viewerAction,
   viewerChangeButton,
@@ -380,6 +381,7 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const phone = testInfo.project.use.isMobile;
   const editPrompt = async (value: string) => {
+    await showViewerControls(viewer);
     const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
     if (phone) await field.click();
     const surface = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
