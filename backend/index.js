@@ -200,6 +200,7 @@ import {
   animatedPhoto,
   bytesForReferenceAccount,
   galleryStill,
+  publicGalleryBuffer,
   referenceAssetForAccount,
 } from "./references.js";
 import { hostAllowed, requestGuard } from "./request-guard.js";
@@ -897,8 +898,10 @@ const suggestions = createSuggestions({
     filterVisibleGallery(galleryJobItems(jobId, ownerId)).find(
       (item) => !itemId || item.id === itemId,
     ),
-  image: async (item) =>
-    (await assistantEngine?.supportsVision(textWriter(item.ownerId))) ? smallImage(item) : null,
+  image: async (item, upscaled) =>
+    (await assistantEngine?.supportsVision(textWriter(item.ownerId)))
+      ? smallImage(item, upscaled)
+      : null,
   save: (item, nextSteps) => updateGalleryJob(galleryKey(item), { nextSteps }),
   ideas: () => flagEnabled("STUDIO_PROMPT_IDEAS"),
   nextSteps: () => flagEnabled("STUDIO_NEXT_STEPS"),
@@ -1135,10 +1138,21 @@ function promptWriterOwner(ownerId) {
   return Boolean(ownerId && mayUseFeature(accountAccessForId(ownerId), "promptAssistant"));
 }
 /** A small (≤512 px) JPEG of a gallery image (a video's first frame) for the text model, or null without sharp. */
-async function smallImage(item) {
+async function smallImage(item, upscaled = false) {
   const sharp = await loadSharp();
   if (!sharp) return null;
-  const data = await sharp(await galleryStill(item))
+  const version = upscaled ? item.upscale : undefined;
+  if (upscaled && (version?.status !== "done" || !version.url)) return null;
+  const buffer = version
+    ? (
+        await publicGalleryBuffer({
+          id: version.url,
+          url: version.url,
+          outputName: version.outputName,
+        })
+      ).buffer
+    : await galleryStill(item);
+  const data = await sharp(buffer)
     .rotate()
     .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 80 })
