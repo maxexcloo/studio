@@ -1,5 +1,6 @@
 import { appearanceChoices } from "../shared/appearance.ts";
 import { defaultModelKeys } from "../shared/profiles.ts";
+import { imageAspects, resolutions } from "../shared/resolution.ts";
 import { dataDir } from "./data-dir.js";
 import {
   deleteRuntimeDocument,
@@ -33,10 +34,15 @@ const preferenceChoices = Object.freeze({
   text: ["cloud", "local"],
   videos: ["cloud", "local"],
 });
+const imageSizeChoices = Object.freeze({
+  imageAspect: imageAspects,
+  imageResolution: resolutions,
+});
 const modelKeys = new Set(Object.values(defaultModelKeys).flatMap((sides) => Object.values(sides)));
 const known = (key) =>
   Object.hasOwn(preferenceDefaults, key) ||
   Object.hasOwn(preferenceChoices, key) ||
+  Object.hasOwn(imageSizeChoices, key) ||
   modelKeys.has(key) ||
   key === "appearance";
 const cache = new Map();
@@ -87,6 +93,11 @@ export function saveAccountPreferences(ownerId, patch) {
   const entries = Object.entries(patch || {});
   if (!entries.length) throw new Error("Choose a preference to change.");
   for (const [key, value] of entries) {
+    if (Object.hasOwn(imageSizeChoices, key)) {
+      if (value !== null && !imageSizeChoices[key].includes(value))
+        throw new Error(`Set ${key} to ${imageSizeChoices[key].join(", ")}.`);
+      continue;
+    }
     const choices = preferenceChoices[key];
     if (choices) {
       if (!choices.includes(value)) throw new Error(`Set ${key} to ${choices.join(", ")}.`);
@@ -110,7 +121,7 @@ export function saveAccountPreferences(ownerId, patch) {
     if (!known(key)) throw new Error(`Unknown preference ${key}.`);
     if (typeof value !== "boolean") throw new Error(`Set ${key} to true or false.`);
   }
-  // A default model set to null goes back to the deployment's.
+  // Setting a generation preference to null restores its default.
   const next = Object.fromEntries(
     Object.entries({ ...saved(ownerId), ...patch }).filter(([, value]) => value !== null),
   );

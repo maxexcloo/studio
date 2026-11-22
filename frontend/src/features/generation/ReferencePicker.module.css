@@ -28,7 +28,6 @@
   background: var(--mantine-color-default);
   transition:
     border-color var(--studio-motion-duration) var(--studio-ease-enter),
-    box-shadow var(--studio-motion-duration) var(--studio-ease-enter),
     opacity var(--studio-motion-duration) var(--studio-ease-enter);
   width: 64px;
   height: 64px;
@@ -36,7 +35,6 @@
 }
 
 .cell[data-empty] {
-  border-style: dashed;
   background: transparent;
 }
 
@@ -47,7 +45,6 @@
 .cell[data-target],
 .cell[data-over] {
   border-color: var(--mantine-primary-color-filled);
-  box-shadow: 0 0 0 1px var(--mantine-primary-color-filled);
 }
 
 .cell:focus-visible {

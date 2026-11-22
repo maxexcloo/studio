@@ -452,19 +452,21 @@ test("Clear Failed Set removes the collapsed set from the queue and keeps failed
   expect(state.gallery).toContainEqual(tile);
 });
 
-test("an administrator opens Settings › Workers from the summary under the queue", async ({
-  page,
-}) => {
-  await fixtures(page);
-  await signIn(page, { id: "admin", role: "administrator" });
-  await page.goto("/");
-  await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
-  // An administrator opens Settings › Workers from the summary under the queue.
-  await queue.getByRole("link", { name: "Open Workers", exact: true }).click();
-  await expect(page).toHaveURL(/\/settings#workers$/);
-  await expect(queue).toBeHidden();
-});
+for (const [role, link, section] of [
+  ["administrator", "Open Workers", "workers"],
+  ["user", "Open Where Work Runs", "where-work-runs"],
+] as const) {
+  test(`a ${role} opens their work settings from the queue summary`, async ({ page }) => {
+    await fixtures(page);
+    await signIn(page, { id: role, role });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open Status", exact: true }).click();
+    const queue = page.getByRole("dialog", { name: "Queue", exact: true });
+    await queue.getByRole("link", { name: link, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/settings#${section}$`));
+    await expect(queue).toBeHidden();
+  });
+}
 
 test("while work runs the queue polls only for changes and still shows the work finishing", async ({
   page,

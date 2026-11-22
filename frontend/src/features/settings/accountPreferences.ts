@@ -2,6 +2,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 
 import type { Appearance } from "../../../../shared/appearance";
 import { defaultModelKeys } from "../../../../shared/profiles";
+import type { ImageSizePreference } from "../../../../shared/resolution";
 import { api } from "../../api";
 import { accountQuery, useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
@@ -32,7 +33,9 @@ interface PreferenceValues {
   appearance?: Partial<Appearance>;
 }
 /** Each kind's default model per side (a profile ID or gateway text model); null clears one. */
-export type Preferences = PreferenceValues & Partial<Record<DefaultModelKey, string | null>>;
+export type Preferences = PreferenceValues &
+  ImageSizePreference &
+  Partial<Record<DefaultModelKey, string | null>>;
 export interface PreferencesStatus {
   preferences: Preferences;
   /** The preferences the account has saved itself. */
@@ -71,7 +74,12 @@ export function useSavePreferences() {
       // Default models follow where the account prefers each kind to run and its chosen defaults.
       const changed = (kind: WorkKind) =>
         kind in patch || Object.values(defaultModelKeys[kind]).some((key) => key in patch);
-      if (changed("images") || changed("videos"))
+      if (
+        changed("images") ||
+        changed("videos") ||
+        "imageAspect" in patch ||
+        "imageResolution" in patch
+      )
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
       if (changed("videos")) void client.invalidateQueries({ queryKey: ["animate-profile"] });
       if (changed("text")) void client.invalidateQueries({ queryKey: ["assistant"] });

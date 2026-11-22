@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { dayHeading } from "./mediaLabels";
 import type { GalleryDate } from "./queries";
@@ -10,12 +10,37 @@ export interface GallerySection {
   top: number;
 }
 const noDates: GalleryDate[] = [];
+const countFormat = new Intl.NumberFormat();
 const clamp = (fraction: number) => Math.min(Math.max(fraction, 0), 1);
 const dateLabel = (day: string) => (day ? dayHeading(day) : "Undated");
 const topInset = (grid: HTMLElement) => parseFloat(getComputedStyle(grid).scrollMarginTop) || 0;
 
+function dateDensity(days: GalleryDate[]) {
+  if (days.length < 2) return;
+  // Average adjacent dates when the history exceeds the number of readable bands.
+  const bands = Math.min(days.length, 64);
+  const density = Array.from({ length: bands }, (_, index) => {
+    const start = Math.floor((index * days.length) / bands);
+    const end = Math.floor(((index + 1) * days.length) / bands);
+    let count = 0;
+    for (let day = start; day < end; day++) count += days[day].count;
+    return { start, end, level: Math.log1p(count / (end - start)) };
+  });
+  const peak = Math.max(...density.map(({ level }) => level), 1);
+  const stops = density.map(({ start, end, level }) => {
+    const alpha = Math.round(14 + (52 * level) / peak);
+    const middle = (50 * (start + end)) / days.length;
+    const half = `min(1px, ${(12 * (end - start)) / days.length}%)`;
+    const first = `calc(${middle}% - ${half})`;
+    const last = `calc(${middle}% + ${half})`;
+    const colour = `color-mix(in srgb, var(--mantine-primary-color-filled) ${alpha}%, transparent)`;
+    return `transparent ${first}, ${colour} ${first} ${last}, transparent ${last}`;
+  });
+  return `linear-gradient(${stops.join(", ")})`;
+}
+
 /** Scrub the date index without reading media until a jump is committed. Ordinary scrolling follows the visible day. */
-export function DateScrubber({
+export const DateScrubber = memo(function DateScrubber({
   host,
   gridId,
   sections,
@@ -41,8 +66,10 @@ export function DateScrubber({
   const [active, setActive] = useState(false);
   const [focus, setFocus] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
+  const pointer = useRef<{ bounds: DOMRect; fraction: number; frame: number } | null>(null);
   const handled = useRef<string | undefined>(undefined);
   const indices = useMemo(() => new Map(timeline.map(({ day }, i) => [day, i])), [timeline]);
+  const density = useMemo(() => dateDensity(timeline), [timeline]);
   const indexed = timeline.length > 1 && Boolean(onDate);
   const visible = indexed || (sections.some(({ day }) => day) && height > 3 * window.innerHeight);
 
@@ -116,20 +143,30 @@ export function DateScrubber({
     update();
     setActive(false);
     window.addEventListener("scroll", scroll, { passive: true });
-    window.addEventListener("resize", scroll);
+    const resize = () => {
+      if (pointer.current && track.current)
+        pointer.current.bounds = track.current.getBoundingClientRect();
+      scroll();
+    };
+    window.addEventListener("resize", resize);
     return () => {
       window.removeEventListener("scroll", scroll);
-      window.removeEventListener("resize", scroll);
+      window.removeEventListener("resize", resize);
       window.cancelAnimationFrame(frame);
       window.clearTimeout(idle);
     };
   }, [visible, indexed, sections, height, host, indices, timeline.length]);
 
+  useEffect(
+    () => () => {
+      if (pointer.current) window.cancelAnimationFrame(pointer.current.frame);
+    },
+    [],
+  );
+
   if (!visible) return null;
-  const fromPointer = (clientY: number) => {
-    const { top, height } = track.current!.getBoundingClientRect();
-    return clamp((clientY - top) / height);
-  };
+  const fromPointer = (clientY: number, { top, height }: DOMRect) =>
+    clamp((clientY - top) / Math.max(height, 1));
   const indexAt = (fraction: number) =>
     Math.min(Math.floor(fraction * timeline.length), timeline.length - 1);
   const showDate = (date: GalleryDate, fraction = 0) => {
@@ -145,19 +182,30 @@ export function DateScrubber({
     }
     setDrag(fraction);
   };
+  const endDrag = () => {
+    if (pointer.current) window.cancelAnimationFrame(pointer.current.frame);
+    pointer.current = null;
+    setDrag(null);
+  };
   const pendingIndex = seekPending && jumpDay !== undefined ? indices.get(jumpDay) : undefined;
   const pendingPosition =
     pendingIndex === undefined ? position.fraction : (pendingIndex + 0.5) / timeline.length;
   const fraction = indexed && drag !== null ? drag : pendingPosition;
   const previewing = indexed && (drag !== null || pendingIndex !== undefined);
   const day = previewing ? timeline[indexAt(fraction)].day : position.day;
-  const label = dateLabel(day);
+  const dayIndex = indices.get(day);
+  const count = indexed && dayIndex !== undefined ? timeline[dayIndex].count : undefined;
+  const label =
+    count === undefined
+      ? dateLabel(day)
+      : `${dateLabel(day)} · ${countFormat.format(count)} ${count === 1 ? "result" : "results"}`;
   return (
     <div
       ref={track}
       className={classes.scrubber}
-      data-active={active || drag !== null || focus || undefined}
+      data-active={active || drag !== null || focus || pendingIndex !== undefined || undefined}
       data-indexed={indexed || undefined}
+      style={indexed ? { backgroundImage: density } : undefined}
       role="scrollbar"
       tabIndex={0}
       aria-label="Gallery Dates"
@@ -198,40 +246,42 @@ export function DateScrubber({
         if (!event.isPrimary || event.button !== 0) return;
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
-        if (indexed) dragTo(fromPointer(event.clientY));
-        else setDrag(position.fraction);
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const fraction = indexed ? fromPointer(event.clientY, bounds) : position.fraction;
+        pointer.current = { bounds, fraction, frame: 0 };
+        setDrag(fraction);
       }}
       onPointerMove={(event) => {
-        if (event.currentTarget.hasPointerCapture(event.pointerId))
-          dragTo(fromPointer(event.clientY));
+        const gesture = pointer.current;
+        if (!gesture || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        gesture.fraction = fromPointer(event.clientY, gesture.bounds);
+        gesture.frame ||= window.requestAnimationFrame(() => {
+          gesture.frame = 0;
+          dragTo(gesture.fraction);
+        });
       }}
       onPointerUp={(event) => {
-        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        const gesture = pointer.current;
+        if (!gesture || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
         if (indexed) {
-          const fraction = fromPointer(event.clientY);
+          const fraction = fromPointer(event.clientY, gesture.bounds);
           const index = indexAt(fraction);
           showDate(timeline[index], fraction * timeline.length - index);
+        } else if (gesture.frame) {
+          dragTo(gesture.fraction);
         }
-        setDrag(null);
+        endDrag();
       }}
-      onLostPointerCapture={() => setDrag(null)}
+      onLostPointerCapture={endDrag}
     >
-      {indexed && drag === null && (
-        <>
-          <span className={classes.endpoint} aria-hidden>
-            {dateLabel(timeline[0].day)}
-          </span>
-          <span className={classes.endpoint} aria-hidden>
-            {dateLabel(timeline.at(-1)!.day)}
-          </span>
-        </>
-      )}
       <div
         className={classes.thumb}
         style={{ top: `calc(${fraction} * (100% - var(--scrubber-thumb)))` }}
       >
-        {(drag !== null || (focus && !indexed)) && <span className={classes.date}>{label}</span>}
+        {(drag !== null || focus || pendingIndex !== undefined) && (
+          <span className={classes.date}>{label}</span>
+        )}
       </div>
     </div>
   );
-}
+});

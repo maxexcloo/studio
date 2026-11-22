@@ -5,12 +5,7 @@ import { useNavigate } from "react-router";
 
 import { failure, post } from "../../api";
 import { menuWidth } from "../../theme";
-import {
-  ActionBarGroups,
-  ActionMenuItems,
-  submenuParentProps,
-  useActionMenuBounds,
-} from "../../ui/ActionBar";
+import { ActionBarGroups, ActionMenuItems, useActionMenuBounds } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
@@ -45,13 +40,11 @@ export function GallerySelectionBar({
   tryAgain,
   menu,
   onMenuClose,
-  submenus,
 }: {
   selection: GallerySelection;
   tryAgain: ReturnType<typeof useTryAgain>;
   menu: { x: number; y: number } | null;
   onMenuClose: () => void;
-  submenus: boolean;
 }) {
   const phone = usePhone();
   const menuBounds = useActionMenuBounds(menu !== null);
@@ -213,7 +206,6 @@ export function GallerySelectionBar({
             .map((template) => ({
               id: `animate-${template.id}`,
               label: template.label,
-              icon: icons.animate,
               disabled: animate.isPending || length.loading,
               onClick: () => animate.mutate({ theme: template.id, profileId }),
             })),
@@ -221,7 +213,7 @@ export function GallerySelectionBar({
         }),
       }),
     // Each image upscales with Upscale's remembered settings.
-    finishedImages.length > 0 &&
+    (upscale.available || upscale.isPending) &&
       itemAction("upscale", {
         loading: upscale.isPending,
         menu: [
@@ -231,7 +223,7 @@ export function GallerySelectionBar({
               id: "upscale-run",
               label: "Upscale",
               icon: icons.upscale,
-              disabled: upscale.isPending,
+              disabled: upscale.isPending || !upscale.canQueue,
               onClick: () =>
                 upscale.mutate(undefined, {
                   onSuccess: ({ failed, error }) => {
@@ -427,7 +419,7 @@ export function GallerySelectionBar({
         </div>
       </div>
       <Menu
-        {...(submenus ? submenuParentProps : menuBounds)}
+        {...menuBounds}
         opened={menu !== null}
         onChange={(opened) => !opened && onMenuClose()}
         width={menuWidth}
@@ -439,8 +431,12 @@ export function GallerySelectionBar({
           />
         </Menu.Target>
         <Menu.Dropdown aria-label="Selection Actions">
-          <Menu.Label>{selected.length} Selected</Menu.Label>
-          <ActionMenuItems groups={actions} submenus={submenus} />
+          {menu && (
+            <ActionMenuItems
+              groups={actions}
+              leading={<Menu.Label>{selected.length} Selected</Menu.Label>}
+            />
+          )}
         </Menu.Dropdown>
       </Menu>
       <DeleteMediaDialog

@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 
-import { profileImageSize } from "../../../../shared/resolution";
+import { profileStartingSize } from "../../../../shared/resolution";
 import { api } from "../../api";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
 import { useRememberedKey } from "../auth/useRemembered";
@@ -48,7 +48,7 @@ export function inputForProfile(previous: GenerationInput, profile: Profile): Ge
   return {
     ...initialInput,
     ...profile.defaults,
-    ...profileImageSize(profile),
+    ...profileStartingSize(profile),
     prompt: previous.prompt,
     cardParts: previous.cardParts,
     negative: previous.negative,

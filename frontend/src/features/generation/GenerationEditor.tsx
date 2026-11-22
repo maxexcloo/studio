@@ -21,7 +21,7 @@ import { GenerationInputControls } from "./GenerationInputControls";
 import { type Draft, defaultProfile, useGeneration } from "./GenerationProvider";
 import { useLoraPicker } from "./LoraPicker";
 import { primaryReference, profileForBackend, referenceDetails, usesNegative } from "./payload";
-import { PromptFields, useDraftChange } from "./PromptFields";
+import { type DraftChange, PromptFields } from "./PromptFields";
 import { ReferencePicker } from "./ReferencePicker";
 import { useReferenceBrowser } from "./useReferenceBrowser";
 
@@ -144,9 +144,9 @@ export function GenerationEditor({
   onKindChange,
   onClear,
   onUndoClear,
-  onSubmit: submitDraft,
+  onSubmit,
   operation,
-  onOperationChange,
+  ask,
   pending,
   blockedReason: callerReason,
   error,
@@ -182,8 +182,7 @@ export function GenerationEditor({
   onUndoClear?: () => void;
   onSubmit: () => void;
   operation?: Draft["operation"];
-  /** Sends Improve Prompt › Custom… as a change to the draft, whose Edit or fresh run sets the operation. */
-  onOperationChange?: (operation: Draft["operation"]) => void;
+  ask: DraftChange;
   pending: boolean;
   blockedReason?: string;
   error?: unknown;
@@ -233,18 +232,6 @@ export function GenerationEditor({
   });
   const label = submitLabel ?? submitState.label;
   const { blockedReason } = submitState;
-  const ask = useDraftChange({
-    input,
-    references,
-    operation: operation ?? "image",
-    onChange,
-    onOperationChange: (next) => onOperationChange?.(next),
-  });
-  // Generate runs a proposed change, which ends its review.
-  const onSubmit = () => {
-    ask.done();
-    submitDraft();
-  };
   const placedCaret = useRef(false);
   useLayoutEffect(() => {
     const element = prompt.current;
@@ -343,7 +330,7 @@ export function GenerationEditor({
               autoFocus={autoFocusPrompt}
               fill={fill}
               ideas={offerIdeas}
-              ask={onOperationChange && ask}
+              ask={ask}
             />
           </TextToolsBar.Provider>
           {!fill && inputs}

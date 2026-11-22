@@ -1,6 +1,8 @@
 import { SegmentedControl, type SegmentedControlProps } from "@mantine/core";
 import { useEffect, useRef, useState } from "react";
 
+import { useMotionDuration } from "./Appearance";
+
 import classes from "./ScrollingSegments.module.css";
 
 // Wide enough to clear the edge fade, so the chosen choice sits fully in view.
@@ -14,6 +16,7 @@ const margin = 28;
  * `className` styles the strip.
  */
 export function ScrollingSegments({ className, value, ...props }: SegmentedControlProps) {
+  const motion = useMotionDuration();
   const strip = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: false, end: false });
   const measure = () => {
@@ -45,10 +48,10 @@ export function ScrollingSegments({ className, value, ...props }: SegmentedContr
         : target.right > box.right - margin
           ? target.right - box.right + margin
           : 0;
-    const still = !opened.current || matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const still = !opened.current || !motion;
     opened.current = true;
     if (offset) element.scrollBy({ left: offset, behavior: still ? "instant" : "smooth" });
-  }, [value]);
+  }, [value, motion]);
   return (
     <div
       ref={strip}

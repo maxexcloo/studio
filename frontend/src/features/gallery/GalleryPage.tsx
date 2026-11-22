@@ -17,7 +17,7 @@ import type { MediaItem, MediaKind, QueueJob } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { usePhone, useTouch } from "../../ui/usePhone";
+import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { ComposerDock } from "../generation/ComposerDock";
@@ -113,8 +113,6 @@ function Gallery() {
     changeKind(kind);
   }, [kind, changeKind]);
   const phone = usePhone();
-  const touch = useTouch();
-  const submenus = !phone && !touch;
   const preferences = useQuery(preferencesQuery).data?.preferences;
   const captions = preferences?.tileCaptions ?? false;
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
@@ -563,10 +561,9 @@ function Gallery() {
         onOpenedChange={onOpenedChange}
         onSelect={() => selection.toggle([item])}
         hideMore={hideMore}
-        submenus={submenus}
       />
     ),
-    [hideMore, selection, submenus],
+    [hideMore, selection],
   );
   const openSelectionMenu = useCallback((x: number, y: number) => setMenu({ x, y }), []);
   const tryAgainItem = useCallback(
@@ -599,7 +596,6 @@ function Gallery() {
       selection={{ ...selection, end: doneSelecting }}
       tryAgain={tryAgain}
       menu={menu}
-      submenus={submenus}
       onMenuClose={() => setMenu(null)}
     />
   );

@@ -82,7 +82,7 @@ export function DreamSuggestions({
         {available && (
           <>
             {card.kind === "pair" && <Menu.Label>{sideLabel(card, side)}</Menu.Label>}
-            <ActionMenuItems groups={suggestions.action.menu!} />
+            <ActionMenuItems groups={[...suggestions.action.menu, [suggestions.refresh]]} />
           </>
         )}
         {canEditPair && (

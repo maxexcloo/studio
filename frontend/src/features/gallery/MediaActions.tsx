@@ -1,21 +1,16 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
-  Camera,
   Check,
-  Flame,
   ImageDown,
   ListChecks,
   Loader,
   type LucideIcon,
-  MessagesSquare,
   Repeat,
   Rewind,
   Snail,
   TextQuote,
   Waves,
-  Wind,
-  Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -85,12 +80,13 @@ import type { ViewerAsk, ViewerChange, ViewerDraftActions } from "./ViewerPrompt
 
 /**
  * An action whose options come to one runs that option itself, so no submenu holds just one.
- * Animate stays a menu, as its templates load after it shows, and so does AI, which names no
- * action.
+ * Animate loads templates as it opens. AI and Upscale can hold a choice that differs from
+ * the menu's name.
  */
 function withoutLoneOption(action: Action): Action {
   const options = action.menu?.flat() ?? [];
-  if (options.length !== 1 || action.note || ["ai", "animate"].includes(action.id)) return action;
+  if (options.length !== 1 || action.note || ["ai", "animate", "upscale"].includes(action.id))
+    return action;
   const [option] = options;
   return {
     ...action,
@@ -102,16 +98,6 @@ function withoutLoneOption(action: Action): Action {
     loading: action.loading || option.loading,
   };
 }
-
-// Seeded templates have their own icons; others share Animate's.
-const templateIcons: Record<string, LucideIcon> = {
-  cinematic: Camera,
-  living: Wind,
-  action: Zap,
-  dialogue: MessagesSquare,
-  spicy: Flame,
-  custom: icons.custom,
-};
 
 /** A failed item's Retry; the new pending tile replaces it (`onRetried` gets the new job). */
 function useRetryAction(
@@ -435,7 +421,7 @@ export function useMediaActions(
   const templateItem = (template: AssistantOption): Action => ({
     id: `animate-${template.id}`,
     label: `${template.label}${template.id === "custom" ? "…" : ""}`,
-    icon: templateIcons[template.id] ?? icons.animate,
+    icon: template.id === "custom" ? icons.custom : undefined,
     disabled: animateDisabled,
     onClick:
       template.id === "custom" || review
@@ -523,7 +509,6 @@ export function useMediaActions(
                 id: "recreate-count",
                 label: "Count",
                 choice: {
-                  showLabel: true,
                   value: String(recreateCount),
                   options: Array.from({ length: countLimit }, (_, index) => {
                     const count = String(index + 1);
@@ -874,9 +859,8 @@ export function useMediaDialogs(
 export function MediaActionMenu({
   item,
   onSelect,
-  submenus,
   ...options
-}: MediaActionOptions & { item: MediaItem; onSelect?: () => void; submenus: boolean }) {
+}: MediaActionOptions & { item: MediaItem; onSelect?: () => void }) {
   const groups = useMediaActions(item, options).flatMap((group) =>
     group.some(({ id }) => id === "ai" || id === "share")
       ? group.map((action) => action.menu?.flat() ?? [action])
@@ -884,7 +868,6 @@ export function MediaActionMenu({
   );
   return (
     <ActionMenuItems
-      submenus={submenus}
       groups={
         onSelect
           ? [[{ id: "select", label: "Select", icon: icons.select, onClick: onSelect }], ...groups]

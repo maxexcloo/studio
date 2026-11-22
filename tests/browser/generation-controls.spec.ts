@@ -6,6 +6,7 @@ import {
   closePresets,
   closeReferences,
   create,
+  expandAssistantMenu,
   expandComposer,
   fixtures,
   image,
@@ -174,10 +175,6 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
     .fill("Use this portrait as a composition reference");
   const size = page.getByRole("button", { name: "Aspect", exact: true });
   await size.click();
-  await page
-    .getByRole("radiogroup", { name: "Resolution", exact: true })
-    .getByText("Custom")
-    .click();
   await page.getByRole("textbox", { name: "Width", exact: true }).fill("1280");
   await page.getByRole("textbox", { name: "Height", exact: true }).fill("768");
   await size.click();
@@ -939,10 +936,31 @@ test("Phone prompt boxes copy and undoably clear in place; desktop leaves both t
   await expect(prompt).not.toBeFocused();
   await expect(actions.getByRole("button", { name: "Generate Image", exact: true })).toBeVisible();
   // Closing returns the page and its dock where they were.
-  await generate.getByRole("button", { name: "Close Generate", exact: true }).click();
+  if (testInfo.project.use.browserName === "chromium") {
+    const heading = generate.getByRole("heading", { name: "Generate", exact: true });
+    await heading.click({ trial: true });
+    const box = (await heading.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    const touch = await page.context().newCDPSession(page);
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    for (const offset of [40, 80, 125])
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x, y: y + offset }],
+      });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await touch.detach();
+  } else {
+    await generate.getByRole("button", { name: "Close Generate", exact: true }).click();
+  }
   await expect(generate).toBeHidden();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollY);
   await expect.poll(() => page.locator("[data-composer-dock]").boundingBox()).toEqual(dock);
+  await page.locator("[data-composer-prompt]").click();
+  await expect(generate.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "A lantern in fog at dusk",
+  );
 });
 
 test("Image presets draw at the chosen resolution within profile constraints", async ({ page }) => {
@@ -1279,6 +1297,7 @@ test("A phone prompt's AI menu lets the keyboard go and fits above it", async ({
       return box.y >= 0 && box.y + box.height <= visible && box.width < 390;
     })
     .toBe(true);
+  await expandAssistantMenu(menu, "Templates");
   await menu.getByRole("menuitem", { name: "Improve Prompt", exact: true }).click();
   await expect(menu).toBeHidden();
   await expect(prompt).toHaveValue("A cinematic amber bird");
