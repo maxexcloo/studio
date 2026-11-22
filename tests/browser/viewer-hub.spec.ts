@@ -818,7 +818,7 @@ test("Details shows the source, exact set, original chat and applied reference",
   await seed(
     page,
     {
-      chat: { conversationId },
+      chat: { conversationId, turnId: "turn-2" },
       parentItemId: "parent",
       resultSet,
       settings: {
@@ -847,6 +847,7 @@ test("Details shows the source, exact set, original chat and applied reference",
         ...state.gallery[0],
         id: "parent",
         parentItemId: undefined,
+        chat: { conversationId, turnId: "turn-1" },
         resultSet: { ...resultSet, id: "different-set" },
         settings: { seed: 0, loras: [{ name: "Detail.safetensors", strength: 0.4 }] },
         prompt: "A grey heron",
@@ -864,11 +865,23 @@ test("Details shows the source, exact set, original chat and applied reference",
   const chat = page.getByRole("link", { name: "Continue in Chat", exact: true });
   await expect(chat).toHaveAttribute("href", `https://chat.example.test/c/${conversationId}`);
   await expect(chat).toHaveAttribute("target", "_blank");
+  await expect(
+    page.getByRole("link", { name: "Results From This Chat", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Identity", { exact: true })).toBeVisible();
   await expect(page.getByText("Heron Upload", { exact: true })).toBeVisible();
   await expect(page.getByText("Strength 0.7", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Bird Studies", exact: true }).click();
   await expect(page.getByRole("button", { name: "Remove Set: Bird Studies Filter" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open image: Grey Heron", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
+  await page.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await page.getByRole("link", { name: "Results From This Turn", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Remove This Turn Filter", exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Open image: Grey Heron", exact: true }),
   ).toHaveCount(0);
@@ -1727,7 +1740,7 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
   await expect(page.getByRole("menuitem", { name: /Back & Forth/ })).toHaveCount(0);
 });
 
-test("Details fold only a long caption, keep its tags in sight and copy the prompts", async ({
+test("Details keep the caption, run notes and source ahead of model and prompts", async ({
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
@@ -1743,19 +1756,49 @@ test("Details fold only a long caption, keep its tags in sight and copy the prom
     "\n",
   );
   const caption = Array.from({ length: 12 }, (_, line) => `Caption line ${line + 1}`).join("\n");
-  const { viewer } = await seed(page, {
-    title: "my favourite bird",
-    number: 866,
-    settings: { profileId: "image:test", profileName: "Retired Image · ComfyUI · Quality" },
-    negative,
-    caption: {
-      text: caption,
-      tags: ["branch", "bird"],
-      model: "vision-model",
-      at: stamp,
-      version: 2,
+  const notes = "A softer palette for the second version.";
+  const runCaption = "Second palette study.";
+  const { viewer } = await seed(
+    page,
+    {
+      title: "my favourite bird",
+      number: 866,
+      parentItemId: "lineage-source",
+      resultSet: {
+        id: "set-bird",
+        title: "Bird Studies",
+        caption: runCaption,
+        context: { notes },
+        index: 0,
+      },
+      settings: {
+        profileId: "image:test",
+        profileName: "Retired Image · ComfyUI · Quality",
+        loras: [{ name: "linen.safetensors", strength: 0.5 }],
+      },
+      negative,
+      caption: {
+        text: caption,
+        tags: ["branch", "bird"],
+        model: "vision-model",
+        at: stamp,
+        version: 2,
+      },
     },
-  });
+    async (_page, state) => {
+      state.gallery.push({
+        id: "lineage-source",
+        type: "image",
+        status: "done",
+        number: 865,
+        title: "Original Bird",
+        prompt: "A brown bird",
+        url: image,
+        thumbnailUrl: image,
+        createdAt: stamp,
+      });
+    },
+  );
   let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
   await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
   if (testInfo.project.use.isMobile)
@@ -1771,15 +1814,27 @@ test("Details fold only a long caption, keep its tags in sight and copy the prom
   const tags = details.getByLabel("Caption Tags", { exact: true });
   await expect(tags.getByRole("link")).toHaveText(["bird", "branch"]);
   await expect(tags).toBeVisible();
+  await expect(
+    details.getByRole("heading", {
+      name: /^(Caption|Lineage|Model|LoRAs|Prompt|Negative Prompt)$/,
+    }),
+  ).toHaveText(["Caption", "Lineage", "Model", "LoRAs", "Prompt", "Negative Prompt"]);
+  await expect(details.getByText(notes, { exact: true })).toBeVisible();
+  await expect(details.getByText(runCaption, { exact: true })).toBeVisible();
+  await expect(details.getByRole("link", { name: "Original Bird", exact: true })).toHaveAttribute(
+    "href",
+    "/images/865",
+  );
   const expand = details.getByRole("button", { name: "Expand Caption", exact: true });
   await expand.click();
   await details.getByRole("button", { name: "Collapse Caption", exact: true }).click();
   await expect(expand).toBeVisible();
   // Every other section shows in full, however long.
   await expect(details.getByRole("button", { name: /^Expand / })).toHaveCount(1);
-  // Only the prompts have Copy.
+  // Run notes and prompts can be copied without changing the text.
   const copied = () => page.evaluate(() => (window as any).copied);
-  await expect(details.getByRole("button", { name: /^Copy / })).toHaveCount(2);
+  await details.getByRole("button", { name: "Copy Notes", exact: true }).click();
+  await expect.poll(copied).toBe(`${notes}\n\n${runCaption}`);
   await details.getByRole("button", { name: "Copy Prompt", exact: true }).click();
   await expect.poll(copied).toBe("An amber bird");
   await details.getByRole("button", { name: "Copy Negative Prompt", exact: true }).click();

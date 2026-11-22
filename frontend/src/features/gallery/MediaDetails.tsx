@@ -360,6 +360,25 @@ function DetailText({ children }: { children: React.ReactNode }) {
   );
 }
 
+function CopyDetail({ title, text }: { title: string; text: string }) {
+  const copier = useCopy();
+  return (
+    <Tooltip label={copier.copied ? "Copied" : `Copy ${title}`}>
+      <ActionIcon
+        size="sm"
+        my={-6}
+        variant="subtle"
+        color="gray"
+        aria-label={`Copy ${title}`}
+        disabled={!text}
+        onClick={() => copier.copy(text)}
+      >
+        {copier.copied ? <Check size={14} /> : <icons.copy size={14} />}
+      </ActionIcon>
+    </Tooltip>
+  );
+}
+
 /** The shown file's size from a one-byte range request; gallery records do not store it. */
 function useMediaSize(url: string) {
   return useQuery({
@@ -391,27 +410,11 @@ function DetailSection({
   after?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const copier = useCopy();
   return (
     <Stack gap={6}>
       <Group justify="space-between" wrap="nowrap">
         <Title order={6}>{title}</Title>
-        {copy !== undefined && (
-          <Tooltip label={copier.copied ? "Copied" : `Copy ${title}`}>
-            {/* Hung over the heading's line, so it adds no height to the section. */}
-            <ActionIcon
-              size="sm"
-              my={-6}
-              variant="subtle"
-              color="gray"
-              aria-label={`Copy ${title}`}
-              disabled={!copy}
-              onClick={() => copier.copy(copy)}
-            >
-              {copier.copied ? <Check size={14} /> : <icons.copy size={14} />}
-            </ActionIcon>
-          </Tooltip>
-        )}
+        {copy !== undefined && <CopyDetail title={title} text={copy} />}
       </Group>
       {children}
       {after}
@@ -497,14 +500,17 @@ function CaptionText({ text }: { text: string }) {
   );
 }
 
-/** The gallery caption in the prompt's style, folding until Expand when long, then all its tags. */
+/** The gallery caption, its searchable tags and any notes saved with the run. */
 function Caption({ item }: { item: MediaItem }) {
   const caption = item.caption;
-  if (!caption?.text && !caption?.tags?.length) return null;
-  const tags = [...(caption.tags || [])].sort(compareNames);
+  const notes = Array.from(
+    new Set([item.resultSet?.context?.notes?.trim(), item.resultSet?.caption?.trim()]),
+  ).filter((note): note is string => Boolean(note));
+  if (!caption?.text && !caption?.tags?.length && !notes.length) return null;
+  const tags = [...(caption?.tags || [])].sort(compareNames);
   return (
     <DetailSection title="Caption">
-      {caption.text && <CaptionText text={caption.text} />}
+      {caption?.text && <CaptionText text={caption.text} />}
       {!!tags.length && (
         <Group gap={4} aria-label="Caption Tags">
           {tags.map((tag) => (
@@ -523,6 +529,17 @@ function Caption({ item }: { item: MediaItem }) {
             </Badge>
           ))}
         </Group>
+      )}
+      {notes.length > 0 && (
+        <Stack gap={2}>
+          <Group justify="space-between" wrap="nowrap">
+            <PartLabel>Notes</PartLabel>
+            <CopyDetail title="Notes" text={notes.join("\n\n")} />
+          </Group>
+          {notes.map((note) => (
+            <DetailText key={note}>{note}</DetailText>
+          ))}
+        </Stack>
       )}
     </DetailSection>
   );
@@ -770,7 +787,7 @@ function ReferenceLink({
 }
 
 /**
- * Details › Caption (with its tags), Model, Prompt, Negative Prompt, Lineage, LoRAs, References,
+ * Details › Caption, Lineage, Model, LoRAs, Prompt, Negative Prompt, References,
  * Settings, Output and Timing for one result. Lineage looks among the `loaded` items too, and `open`
  * shows a related result in the viewer.
  */
@@ -784,20 +801,27 @@ export function MediaDetails({
   open?: (item: MediaItem) => void;
 }) {
   const jobs = useQuery(queueQuery).data?.jobs;
-  const related = useMemo(() => derivations(item, loaded || [], jobs || []), [item, loaded, jobs]);
-  const parentId = item.parentItemId || "";
+  const local = useMemo(() => derivations(item, loaded || [], jobs || []), [item, loaded, jobs]);
   const parent = useQuery({
-    ...galleryItemQuery(parentId),
-    enabled: Boolean(parentId && !related.source),
+    ...galleryItemQuery(local.sourceId || ""),
+    enabled: Boolean(local.sourceId && !local.source),
   });
-  const source = related.source ?? parent.data?.item;
+  const fetched = parent.data?.item;
+  const related = useMemo(
+    () =>
+      fetched && !local.source
+        ? derivations(item, [...(loaded || []), fetched], jobs || [])
+        : local,
+    [fetched, item, jobs, loaded, local],
+  );
+  const source = related.source;
   const url = item.status === "done" ? mediaSource(item).url : "";
   const size = useMediaSize(url);
   const details = useGenerationDetails(item, url && size.isPending ? null : size.data, source);
   const set = item.resultSet;
   const context = set?.context;
   const chatUrl = useAccount().data?.chatUrl;
-  const conversation = item.chat?.conversationId;
+  const { conversationId: conversation, turnId: turn } = item.chat || {};
   // LibreChat conversations have UUIDs; MCP session and placeholder IDs are not routable chats.
   const chatAddress =
     chatUrl && conversation && /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(conversation)
@@ -809,34 +833,74 @@ export function MediaDetails({
     chatAddress.hash = "";
   }
   const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
-  // Where it came from, what it is part of and what was made from it, A–Z.
+  // The nearest source first, then its ancestry and offshoots.
   const lineage = (
     [
       [
-        "Chat",
-        chatAddress && (
-          <Anchor key="chat" href={chatAddress.href} target="_blank" rel="noreferrer" size="sm">
-            Continue in Chat
-          </Anchor>
-        ),
-      ],
-      [
-        "From",
-        source && (
+        "Made From",
+        source ? (
           <Stack gap={4} key="from">
             <RelatedLinks items={[source]} open={open} />
             {details.changes.length > 0 && (
-              <Text component="ul" size="xs" c="dimmed" m={0} ps="md">
-                {details.changes.map((change) => (
-                  <li key={change}>{change}</li>
-                ))}
-              </Text>
+              <Stack gap={2}>
+                <PartLabel>Changes From Source</PartLabel>
+                <Text component="ul" size="xs" c="dimmed" m={0} ps="md">
+                  {details.changes.map((change) => (
+                    <li key={change}>{change}</li>
+                  ))}
+                </Text>
+              </Stack>
+            )}
+          </Stack>
+        ) : (
+          related.sourceId && (
+            <Text size="sm" c="dimmed">
+              {parent.isPending ? "Loading…" : "Source Result Unavailable"}
+            </Text>
+          )
+        ),
+      ],
+      ["Original", related.original && <RelatedLinks items={[related.original]} open={open} />],
+      [
+        "Versions",
+        related.versions.length > 0 && <RelatedLinks items={related.versions} open={open} />,
+      ],
+      [
+        "Derived",
+        related.derived.length > 0 && <RelatedLinks items={related.derived} open={open} />,
+      ],
+      [
+        "Chat",
+        conversation && (
+          <Stack gap={2} align="flex-start">
+            <Anchor
+              component={Link}
+              to={galleryPath(item.type)}
+              state={{ chat: conversation, turn, show: "chat" } satisfies GalleryState}
+              size="sm"
+            >
+              Results From This Chat
+            </Anchor>
+            {turn && (
+              <Anchor
+                component={Link}
+                to={galleryPath(item.type)}
+                state={{ chat: conversation, turn } satisfies GalleryState}
+                size="sm"
+              >
+                Results From This Turn
+              </Anchor>
+            )}
+            {chatAddress && (
+              <Anchor href={chatAddress.href} target="_blank" rel="noreferrer" size="sm">
+                Continue in Chat
+              </Anchor>
             )}
           </Stack>
         ),
       ],
       [
-        "Source",
+        "Imported From",
         item.source && (
           <Anchor key="source" href={item.source.url} target="_blank" rel="noreferrer" size="sm">
             {item.source.title || item.source.url}
@@ -873,34 +937,17 @@ export function MediaDetails({
           </Anchor>
         ),
       ],
-      [
-        "Derived",
-        related.derived.length > 0 && (
-          <RelatedLinks key="derived" items={related.derived} open={open} />
-        ),
-      ],
     ] as [string, React.ReactNode][]
   ).filter(([, value]) => Boolean(value));
   const faceCheck = Boolean(item.identity || item.faceRedo);
   return (
     <Stack gap="lg" fz="sm">
-      {item.resultSet?.caption && (
-        <DetailSection title="Run Caption" copy={item.resultSet.caption}>
-          <DetailText>{item.resultSet.caption}</DetailText>
-        </DetailSection>
-      )}
       <Caption item={item} />
+      <Section title="Lineage" rows={lineage} inOrder />
       {details.profile && (
         <DetailSection title="Model">
           <Text size="sm">{details.profile}</Text>
         </DetailSection>
-      )}
-      <DetailsPrompt item={item} />
-      {/* One link needs no label of its own. */}
-      {lineage.length === 1 ? (
-        <DetailSection title="Lineage">{lineage[0][1]}</DetailSection>
-      ) : (
-        <Section title="Lineage" rows={lineage} />
       )}
       {!!details.loras.length && (
         <DetailSection title="LoRAs">
@@ -916,6 +963,7 @@ export function MediaDetails({
           ))}
         </DetailSection>
       )}
+      <DetailsPrompt item={item} />
       {!!(
         details.references.length ||
         details.unused.length ||
@@ -930,7 +978,7 @@ export function MediaDetails({
                   reference={reference}
                   source={galleryReference(reference.id, [
                     ...(loaded || []),
-                    ...(related.source ? [related.source] : []),
+                    ...(source ? [source] : []),
                   ])}
                   open={open}
                 />
