@@ -50,7 +50,7 @@ export function ViewerChrome({
               {title}
             </Text>
             {model && (
-              <Text size="xs" c="dimmed" truncate title={model}>
+              <Text size="xs" truncate title={model}>
                 {model}
               </Text>
             )}

@@ -49,6 +49,7 @@ export function MediaViewerActions({
   onApplied,
   onCompare,
   onDelete,
+  onReportQueued,
   onRetried,
   onVersionChange,
   shortcuts,
@@ -61,13 +62,14 @@ export function MediaViewerActions({
   onApplied: () => void;
   onCompare: () => void;
   onDelete: () => void;
+  onReportQueued: (jobId: string) => void;
   onRetried: (jobId: string) => void;
   onVersionChange: (id: string, active: boolean) => void;
   /** Holds the current actions for the viewer's keyboard shortcuts. */
   shortcuts?: RefObject<ActionGroups>;
 }) {
   const transfer = useMediaTransfer(item, true);
-  const { handlers, dialogs } = useMediaDialogs(item, iterate);
+  const { handlers, dialogs } = useMediaDialogs(item, iterate, onReportQueued);
   const prompt = useViewerPrompt(item, iterate);
   const groups = useMediaActions(item, {
     transfer,

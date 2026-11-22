@@ -387,6 +387,13 @@
   padding: 0;
 }
 
+:where(:root[data-phone]) .dock > .strip {
+  max-width: min(
+    calc(100% - 2 * max(env(safe-area-inset-left), env(safe-area-inset-right))),
+    var(--studio-composer-width)
+  );
+}
+
 :where(:root[data-phone]) .dock > .actions {
   width: 100%;
   border-end-start-radius: 0;

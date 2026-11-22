@@ -370,6 +370,8 @@
 .previewButtons {
   grid-area: 3 / 1;
   padding: var(--mantine-spacing-sm) var(--mantine-spacing-sm) 0;
+  padding-inline: max(var(--mantine-spacing-sm), env(safe-area-inset-left))
+    max(var(--mantine-spacing-sm), env(safe-area-inset-right));
   background: var(--studio-glass-chrome);
   border-top: 1px solid var(--studio-glass-border);
 }
