@@ -10,7 +10,7 @@ import { SortMenu } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
-import { cardSortLabels, useCardListing } from "../characters/cardListing";
+import { cardSortGroups, useCardListing } from "../characters/cardListing";
 import { CharacterChoices } from "../characters/CharacterChoices";
 import { PromptCardChoices } from "../characters/PromptCardChoices";
 import { chipProps } from "./chip";
@@ -297,7 +297,7 @@ export function ReferencePicker({
           actions={
             <SortMenu
               label="Sort References"
-              labels={cardSortLabels}
+              groups={cardSortGroups}
               value={cardOrder.sort}
               onChange={cardOrder.setSort}
             />

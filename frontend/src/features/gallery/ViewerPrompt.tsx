@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
@@ -8,11 +9,14 @@ import {
   ProposalLabel,
   SendButton,
   UndoButton,
+  assistMenu,
+  changeTemplates,
   proposalText,
   proposedClass,
   useChangeSuggestions,
 } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
+import { assistantQuery } from "../generation/PromptAssistant";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import { useItemChange } from "./useItemChange";
 import { type Iteration, typedPrompt, useMediaReview } from "./useMediaAction";
@@ -56,13 +60,13 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
     show: (proposal) => setPrompt(proposalText(proposal)),
     restore: setPrompt,
   });
-  const pick = (action: ViewerChange, request: string, profileId?: string) =>
-    ask.send(request, prompt, item.type === "video" ? "animate" : action, profileId);
-  const [customAction, setCustomAction] = useState<Pick<ViewerAsk, "action" | "profileId"> | null>(
-    null,
-  );
-  const openCustom = (action: ViewerChange, profileId?: string) =>
-    setCustomAction({ action, profileId });
+  const pick = (action: ViewerChange, request: string, profileId?: string, preview?: boolean) =>
+    ask.send(request, prompt, item.type === "video" ? "animate" : action, profileId, preview);
+  const [customAction, setCustomAction] = useState<
+    (Pick<ViewerAsk, "action" | "profileId"> & { preview?: boolean }) | null
+  >(null);
+  const openCustom = (action: ViewerChange, profileId?: string, preview?: boolean) =>
+    setCustomAction({ action, profileId, preview });
   // A tile's menu opened the viewer with its choice, asked once the assistant is ready.
   const location = useLocation();
   const navigate = useNavigate();
@@ -78,9 +82,10 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
       opened={Boolean(customAction)}
       onClose={() => setCustomAction(null)}
       title="Custom Change"
-      action={review ? "Ask" : "Run"}
+      action={review || customAction?.preview ? "Ask" : "Run"}
       onSend={(request) =>
-        customAction && pick(customAction.action, request, customAction.profileId)
+        customAction &&
+        pick(customAction.action, request, customAction.profileId, customAction.preview)
       }
     />
   );
@@ -91,7 +96,7 @@ export function useViewerPrompt(item: MediaItem, iterate: (iteration: Iteration)
     pick,
     custom: openCustom,
   };
-  return { item, original, prompt, setPrompt, field, ask, custom, draft };
+  return { item, original, prompt, setPrompt, field, ask, custom, draft, openCustom, pick };
 }
 
 export type ViewerPromptState = ReturnType<typeof useViewerPrompt>;
@@ -106,23 +111,38 @@ export function ViewerPrompt({
   iterate: (iteration: Iteration) => void;
   pending?: Iteration;
 }) {
-  const { item, original, prompt, setPrompt, field, ask, custom } = state;
+  const { item, original, prompt, setPrompt, field, ask, custom, openCustom } = state;
+  const assistant = useQuery(assistantQuery).data;
   const change = ask.proposal;
   const running = pending?.kind === "prompt";
   const [requested, setRequested] = useState<{ itemId: string; prompt?: string }>();
   const queried = requested?.itemId === item.id && requested;
   const base = queried ? queried.prompt : undefined;
+  const pick = (request: string) => state.pick("recreate", request, undefined, true);
   const suggestions = useChangeSuggestions({
     query: nextStepsQuery(item.jobId ?? "", base, item.id),
     fresh: () => askNextSteps(item.jobId!, true, base, item.id),
     enabled: ask.available && Boolean(queried),
     disabled: ask.pending,
-    onPick: (request) => ask.send(request, prompt, "recreate", undefined, true),
+    onPick: pick,
   });
   const editorTools = ask.available
     ? [
         {
-          ...suggestions.action,
+          id: "viewer-changes",
+          label: "Suggestions & Templates",
+          icon: icons.assistant,
+          menu: assistMenu({
+            expandable: true,
+            suggestions,
+            ...changeTemplates(
+              assistant?.changes ?? [],
+              pick,
+              () => openCustom("recreate", undefined, true),
+              ask.pending,
+            ),
+            last: [],
+          }),
           onOpen: () => {
             const typed = ask.typed ?? prompt;
             setRequested({ itemId: item.id, prompt: typed !== original ? typed : undefined });

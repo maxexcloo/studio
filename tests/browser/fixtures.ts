@@ -1075,6 +1075,17 @@ export async function viewerChangeMenu(page: Page, action?: "Edit" | "Recreate")
   return page.getByRole("menu");
 }
 
+export async function expandAssistantMenu(
+  scope: Page | Locator,
+  label: "Suggestions" | "Templates",
+) {
+  const page = "page" in scope ? scope.page() : scope;
+  if (!(await page.locator("html[data-phone]").count())) return;
+  const section = scope.getByRole("menuitem", { name: label, exact: true });
+  await expect(section).toBeVisible();
+  if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
+}
+
 /** Returns from the shared phone text editor when a test continues on its parent surface. */
 export async function closeTextEditor(page: Page, title: string) {
   const editor = page.getByRole("dialog", { name: title, exact: true, includeHidden: true });

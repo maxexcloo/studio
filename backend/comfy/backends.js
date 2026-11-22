@@ -1,5 +1,6 @@
 import { logWarning } from "../crash-log.js";
 import { getCustomWorkflow } from "../custom-workflows.js";
+import { mediaDefaultProfileKeys } from "../generation-defaults.js";
 import { radianceImageNode, radianceVideoNode } from "../providers/radiance.ts";
 import {
   capabilityForProfile,
@@ -300,11 +301,11 @@ export function mergeWorkerModels(entries, empty = {}) {
     defaults: {
       imageModel: selected(
         images,
-        process.env.STUDIO_DEFAULT_IMAGE_PROFILE || first("image")?.defaults?.imageModel,
+        process.env[mediaDefaultProfileKeys.image] || first("image")?.defaults?.imageModel,
       ),
       videoModel: selected(
         videos,
-        process.env.STUDIO_DEFAULT_VIDEO_PROFILE ||
+        process.env[mediaDefaultProfileKeys.video] ||
           first("video")?.defaults?.videoModel ||
           first("image")?.defaults?.videoModel,
       ),

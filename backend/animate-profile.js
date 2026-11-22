@@ -1,5 +1,6 @@
 import { isCloudProfile } from "../shared/profiles.ts";
-import { profileImageSize, referenceImageSize } from "./generation-defaults.js";
+import { profileImageSize } from "../shared/resolution.ts";
+import { referenceImageSize } from "./generation-defaults.js";
 import { chooseProfile, takesFirstFrame, tierDistance, tierOf } from "./mcp/tiers.js";
 
 /**

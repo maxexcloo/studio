@@ -6,6 +6,7 @@ import { formatDateTime } from "../../frontend/src/ui/dates";
 import {
   closeLoras,
   closeTextEditor,
+  expandAssistantMenu,
   fixtures,
   image,
   pressGenerate,
@@ -218,6 +219,7 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
   const askForChange = async (mode: "Edit" | "Recreate", request?: string, profile?: string) => {
     await viewerChangeMenu(page, mode);
     if (profile) await editProfile(profile);
+    await expandAssistantMenu(page, "Templates");
     await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
     const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
     if (request) await custom.getByRole("textbox", { name: "Change", exact: true }).fill(request);
@@ -526,6 +528,7 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   });
   const { state } = await seed(page);
   await viewerAction(page, "Animate");
+  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });
   const summary = dialog.getByRole("textbox", { name: "Instruction", exact: true });
@@ -642,6 +645,7 @@ test("The phone viewer prompt offers suggestions for review above Generate", asy
   await expect(editor.getByRole("button", { name: "Close Prompt", exact: true })).toBeVisible();
   const suggest = async () => {
     await editor.getByRole("button", { name: "AI Prompt Actions", exact: true }).click();
+    await expandAssistantMenu(page, "Suggestions");
     await page.getByRole("menuitem", { name: "At Dusk", exact: true }).click();
     await expect(text).toHaveValue("An amber bird at dusk");
   };
@@ -658,7 +662,12 @@ test("The phone viewer prompt offers suggestions for review above Generate", asy
 test("Viewer runs queue into the strip and Recreate › Recreate in Composer opens the composer", async ({
   page,
 }) => {
-  const { state, viewer } = await seed(page);
+  const { state, viewer } = await seed(page, {}, async (_page, state) => {
+    Object.assign(state.jobs[0].input, {
+      chat: { conversationId: "source-chat" },
+      resultSet: { id: "source-set", title: "Original Set", index: 0 },
+    });
+  });
   await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again, Same Seed", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -668,6 +677,8 @@ test("Viewer runs queue into the strip and Recreate › Recreate in Composer ope
     parentItemId: "hub",
     input: { count: 2, seed: 1234567 },
   });
+  expect(state.jobs[1].input.chat).toBeUndefined();
+  expect(state.jobs[1].input.resultSet).toBeUndefined();
   await showViewerThumbnails(viewer);
   const strip = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
@@ -682,6 +693,50 @@ test("Viewer runs queue into the strip and Recreate › Recreate in Composer ope
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
   );
+});
+
+test("Explore Three Directions stages an editable comparison from the viewed image", async ({
+  page,
+}) => {
+  const directions = [
+    { request: "scene", label: "On The Cliffs", prompt: "An amber bird on sea cliffs" },
+    { request: "outfit", label: "Field Harness", prompt: "An amber bird in a field harness" },
+    { request: "style", label: "Brush Study", prompt: "A brush study of an amber bird" },
+  ];
+  const { state, viewer } = await seed(page, {}, (page) =>
+    page.route("**/api/suggestions", (route) => {
+      const request = route.request().postDataJSON();
+      expect(request).toMatchObject({
+        itemId: "hub",
+        directions: directions.map(({ request }) => request),
+      });
+      return route.fulfill({
+        json: {
+          suggestions: directions.map((direction) => ({ ...direction, action: "recreate" })),
+        },
+      });
+    }),
+  );
+  await viewerAction(page, "AI", "Keep & Vary", "Explore Three Directions");
+  const review = page.getByRole("dialog", { name: "Explore Three Directions", exact: true });
+  await review.getByRole("button", { name: "Open Composer", exact: true }).click();
+  await expect(viewer).toBeHidden();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    directions[0].prompt,
+  );
+  expect(state.jobs).toHaveLength(1);
+  await page
+    .getByRole("group", { name: "Generation Actions", exact: true })
+    .getByRole("button", { name: "Compare", exact: true })
+    .click();
+  await expect.poll(() => state.jobs.length).toBe(4);
+  for (const [index, direction] of directions.entries()) {
+    expect(state.jobs[index + 1]).toMatchObject({
+      parentJobId: "job-hub",
+      parentItemId: "hub",
+      input: { prompt: direction.prompt, seed: "1234567" },
+    });
+  }
 });
 
 test("A regenerated result has its own tile and remains linked in the viewer", async ({ page }) => {
@@ -752,16 +807,39 @@ test("A set and the shown result's versions have separate strips", async ({ page
   await expect(versions.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
 
-test("Lineage compares the exact source and opens the exact set", async ({ page }) => {
+test("Details shows the source, exact set, original chat and applied reference", async ({
+  page,
+}) => {
   const resultSet = { id: "heron-set", title: "Bird Studies", index: 0 };
+  const conversationId = "baf8947b-9e24-45be-a8b0-90a9b4569bef";
   await seed(
     page,
     {
+      chat: { conversationId },
       parentItemId: "parent",
       resultSet,
-      settings: { seed: 25, loras: [{ name: "Detail.safetensors", strength: 0.8 }] },
+      settings: {
+        profileId: profiles[0].id,
+        seed: 25,
+        loras: [{ name: "Detail.safetensors", strength: 0.8 }],
+        referenceAssets: [
+          { slot: "identity", assetId: "my-ref", name: "Heron Upload", strength: 0.7 },
+        ],
+      },
     },
-    async (_page, state) => {
+    async (page, state) => {
+      await serveProfiles(page, [
+        {
+          ...profiles[0],
+          mediaInputs: [
+            {
+              id: "identity",
+              role: "identity",
+              strength: { min: 0, max: 1, step: 0.1, default: 1 },
+            },
+          ],
+        },
+      ]);
       state.gallery.push({
         ...state.gallery[0],
         id: "parent",
@@ -780,6 +858,12 @@ test("Lineage compares the exact source and opens the exact set", async ({ page 
   await expect(page.getByText("Seed: 0 → 25", { exact: true })).toBeVisible();
   await expect(page.getByText("Detail: 0.4 → 0.8", { exact: true })).toBeVisible();
   await expect(page.getByText("Prompt changed", { exact: true })).toBeVisible();
+  const chat = page.getByRole("link", { name: "Continue in Chat", exact: true });
+  await expect(chat).toHaveAttribute("href", `https://chat.example.test/c/${conversationId}`);
+  await expect(chat).toHaveAttribute("target", "_blank");
+  await expect(page.getByText("Identity", { exact: true })).toBeVisible();
+  await expect(page.getByText("Heron Upload", { exact: true })).toBeVisible();
+  await expect(page.getByText("Strength 0.7", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Bird Studies", exact: true }).click();
   await expect(page.getByRole("button", { name: "Remove Set: Bird Studies Filter" })).toBeVisible();
   await expect(
@@ -1009,6 +1093,7 @@ test("An Animate theme queues a video in one click; the queue item writes its mo
 
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Spicy", exact: true })).toHaveCount(0);
+  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
@@ -1106,6 +1191,7 @@ test("An Animate run stays with the image it started on while the viewer moves b
     await expect(shown).toBeVisible();
   }
   await animate.click();
+  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect(animate).toHaveAttribute("data-loading");
 
@@ -1155,6 +1241,7 @@ test("Review Prompt writes the motion prompt for editing, and Run queues exactly
   await expect(review).toHaveAttribute("aria-checked", "false");
   await review.click();
   await expect(review).toHaveAttribute("aria-checked", "true");
+  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Review Prompt", exact: true });
   const prompt = dialog.getByRole("textbox", { name: "Prompt", exact: true });
@@ -1187,6 +1274,7 @@ test("Review Prompt writes the motion prompt for editing, and Run queues exactly
   await page.reload();
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(review).toHaveAttribute("aria-checked", "true");
+  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Cinematic Camera", exact: true }).click();
   await expect(prompt).toHaveValue("The bird lifts off.");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -1304,6 +1392,7 @@ test("Animate can pick a compatible profile over the saved default route", async
   await localProfile.click();
   await expect(localProfile).toBeHidden();
   await expect(profileMenu).toContainText("Motion Quality");
+  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
@@ -1316,6 +1405,7 @@ test("With local video stopped, an Animate theme queues on Grok", async ({ page 
   const { state, viewer } = await seed(page, {}, offline);
 
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Cinematic Camera", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
@@ -1368,6 +1458,7 @@ test("A video's Animate template continues it from its last frame, and Edit make
   await expect(
     page.getByRole("menuitem", { name: "Extend in Composer", exact: true }),
   ).toBeVisible();
+  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.referenceRequests.at(-1)).toEqual({ galleryItemId: "clip", frame: "last" });
@@ -1411,6 +1502,7 @@ test("With neither local video nor Grok, Animate's options are disabled", async 
   );
 
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await expandAssistantMenu(page, "Templates");
   await expect(page.getByRole("menuitem", { name: "Living Photo", exact: true })).toBeDisabled();
   await expect(
     page.getByRole("menuitem", { name: "Animate in Composer", exact: true }),

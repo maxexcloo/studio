@@ -17,6 +17,7 @@ import { Check } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
+import { guidingRoles } from "../../../../shared/profiles";
 import { titleCase } from "../../../../shared/titles";
 import type { MediaItem, Profile } from "../../types";
 import { formatBytes } from "../../ui/bytes";
@@ -24,14 +25,14 @@ import { useCopy } from "../../ui/clipboard";
 import { compareNames } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
-import { useGroupFeature } from "../auth/AccountGate";
+import { useAccount, useGroupFeature } from "../auth/AccountGate";
 import { identityNote } from "../characters/identity";
 import { charactersQuery, promptCardsQuery } from "../characters/queries";
 import { useStartCard } from "../characters/useCardFrom";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
-import { backendLabel, isProfile } from "../generation/payload";
+import { backendLabel, isProfile, profileForBackend } from "../generation/payload";
 import { WritingThinking } from "../generation/PromptWriting";
 import { queueQuery } from "../generation/Queue";
 import { referenceAssetQuery } from "../generation/references";
@@ -88,6 +89,7 @@ const sortRows = <T extends [string, unknown]>(rows: T[]) =>
 /** A reference the run took: the role it ran as and, where recorded, how strongly it applied. */
 interface RanReference {
   id: string;
+  name?: string;
   role: string;
   strength: string;
 }
@@ -197,14 +199,21 @@ function generationDetails(
     entries
       .filter(([, value]) => value !== "" && value !== undefined && value !== null && value !== 0)
       .map(([label, value]) => [label, String(value)]);
-  const recorded = profiles.find((profile) => isProfile(profile, settings.profileId));
   const shown = mediaSource(item);
   const inpaint = settings.inpaint as { strength?: number } | undefined;
   const video = item.type === "video";
   // Radiance runs its own text encoder, VAE and sampler, so ComfyUI's recorded choices don't apply.
   const comfyui = (value: unknown) => (settings.profileBackend === "radiance" ? "" : value);
   const staged = (Array.isArray(settings.referenceAssets) ? settings.referenceAssets : []).filter(
-    (reference): reference is { slot?: string; assetId: string } => Boolean(reference?.assetId),
+    (
+      reference,
+    ): reference is { slot?: string; assetId: string; name?: string; strength?: number } =>
+      Boolean(reference?.assetId),
+  );
+  const recorded = profileForBackend(
+    profiles.find((profile) => isProfile(profile, settings.profileId)),
+    typeof settings.profileBackend === "string" ? settings.profileBackend : undefined,
+    Boolean(staged.length),
   );
   const guides = !inpaint && settings.referenceRole === "reference";
   const slots = recorded?.mediaInputs || [];
@@ -212,19 +221,26 @@ function generationDetails(
   const primarySlot = (slots.find((slot) => slot.role === "start") || slots[0])?.id;
   const primary = staged.find((reference) => reference.slot === primarySlot) || staged[0];
   const denoise = Number(settings.denoise);
-  const references = staged.map(({ slot, assetId: id }, index): RanReference => {
-    // A video's frames read by their slot, such as First Frame; an unlabelled one by its ID.
-    const named = slots.find((input) => input.id === slot)?.label || titleCase(String(slot || ""));
-    if (video) return { id, role: named || `Reference ${index + 1}`, strength: "" };
-    if (staged[index] !== primary || guides)
-      return { id, role: `Reference ${index + 1}`, strength: "Guides the picture" };
+  const references = staged.map((reference, index): RanReference => {
+    const { slot, assetId: id, name, strength } = reference;
+    const input = slots.find((input) => input.id === slot);
+    const guiding =
+      input?.role && Object.hasOwn(guidingRoles, input.role) && guidingRoles[input.role];
+    const applied = input?.strength && Number.isFinite(strength) ? `Strength ${strength}` : "";
+    if (video) {
+      const role = input?.label || titleCase(slot || "") || `Reference ${index + 1}`;
+      return { id, name, role, strength: applied };
+    }
+    if (guiding || reference !== primary || guides)
+      return { id, name, role: guiding || `Reference ${index + 1}`, strength: applied };
     if (inpaint)
       return {
         id,
+        name,
         role: "Edit Source · Masked",
         strength: inpaint.strength === undefined ? "" : `Inpaint ${inpaint.strength}`,
       };
-    return { id, role: "Edit Source", strength: denoise > 0 ? `Denoise ${denoise}` : "" };
+    return { id, name, role: "Edit Source", strength: denoise > 0 ? `Denoise ${denoise}` : "" };
   });
   return {
     profile: mediaProfileName(item, profiles),
@@ -703,7 +719,7 @@ function ReferenceLink({
   source,
   open,
 }: {
-  reference: { id: string; role: string };
+  reference: RanReference;
   source?: MediaItem;
   open?: (item: MediaItem) => void;
 }) {
@@ -716,8 +732,19 @@ function ReferenceLink({
         id: asset.galleryItemId,
         type: isFrameReference(reference.id) ? "video" : "image",
       });
-  const thumbnail = (
-    <Image src={`${address}/thumbnail`} alt="" w={48} h={48} radius="sm" fallbackSrc="" />
+  const presentation = (
+    <Group gap="xs" wrap="nowrap">
+      <Image src={`${address}/thumbnail`} alt="" w={48} h={48} radius="sm" fallbackSrc="" />
+      <Stack gap={0} miw={0}>
+        <Text size="sm">{reference.role}</Text>
+        {reference.name && (
+          <Text size="xs" c="dimmed" truncate title={reference.name}>
+            {reference.name}
+          </Text>
+        )}
+        {reference.strength && <PartLabel>{reference.strength}</PartLabel>}
+      </Stack>
+    </Group>
   );
   return target ? (
     <UnstyledButton
@@ -727,7 +754,7 @@ function ReferenceLink({
       aria-label={`Open ${reference.role}`}
       onClick={source && openHere(source, open)}
     >
-      {thumbnail}
+      {presentation}
     </UnstyledButton>
   ) : (
     <UnstyledButton
@@ -737,7 +764,7 @@ function ReferenceLink({
       rel="noreferrer"
       aria-label={`Open ${reference.role}`}
     >
-      {thumbnail}
+      {presentation}
     </UnstyledButton>
   );
 }
@@ -769,10 +796,30 @@ export function MediaDetails({
   const details = useGenerationDetails(item, url && size.isPending ? null : size.data, source);
   const set = item.resultSet;
   const context = set?.context;
+  const chatUrl = useAccount().data?.chatUrl;
+  const conversation = item.chat?.conversationId;
+  // LibreChat conversations have UUIDs; MCP session and placeholder IDs are not routable chats.
+  const chatAddress =
+    chatUrl && conversation && /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(conversation)
+      ? new URL(chatUrl)
+      : null;
+  if (chatAddress) {
+    chatAddress.pathname = `${chatAddress.pathname.replace(/\/+$/, "")}/c/${conversation}`;
+    chatAddress.search = "";
+    chatAddress.hash = "";
+  }
   const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
   // Where it came from, what it is part of and what was made from it, A–Z.
   const lineage = (
     [
+      [
+        "Chat",
+        chatAddress && (
+          <Anchor key="chat" href={chatAddress.href} target="_blank" rel="noreferrer" size="sm">
+            Continue in Chat
+          </Anchor>
+        ),
+      ],
       [
         "From",
         source && (
@@ -875,9 +922,8 @@ export function MediaDetails({
         contextCards.some(({ key }) => context?.[key])
       ) && (
         <DetailSection title="References">
-          {/* Thumbnails alone, in the run's order; each names its role to assistive technology. */}
           {details.references.length > 0 && (
-            <Group gap="xs">
+            <Stack align="stretch" gap="xs">
               {details.references.map((reference) => (
                 <ReferenceLink
                   key={`${reference.role}:${reference.id}`}
@@ -889,7 +935,7 @@ export function MediaDetails({
                   open={open}
                 />
               ))}
-            </Group>
+            </Stack>
           )}
           {details.unused.map((note) => (
             <Text key={note} size="sm" c="yellow">

@@ -1,4 +1,5 @@
 import {
+  Anchor,
   AspectRatio,
   Badge,
   Box,
@@ -254,12 +255,14 @@ export function LibraryCard({
   name,
   images,
   menu,
+  onUse,
   selection,
   children,
 }: {
   name: string;
   images: ReferenceAsset[];
   menu: ReactNode;
+  onUse?: () => void;
   selection?: ReactNode;
   children: ReactNode;
 }) {
@@ -307,9 +310,23 @@ export function LibraryCard({
       ) : null}
       <Stack gap={4} mt={cover ? "sm" : 0}>
         <Group justify="space-between" wrap="nowrap" align="flex-start">
-          <Text size="sm" fw={500}>
-            {name}
-          </Text>
+          {onUse ? (
+            <Anchor
+              component="button"
+              type="button"
+              size="sm"
+              fw={500}
+              ta="left"
+              aria-label={`Use ${name} in Composer`}
+              onClick={onUse}
+            >
+              {name}
+            </Anchor>
+          ) : (
+            <Text size="sm" fw={500}>
+              {name}
+            </Text>
+          )}
           {!cover && (selection || menu)}
         </Group>
         {children}

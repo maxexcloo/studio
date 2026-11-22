@@ -1,0 +1,49 @@
+{
+  "studio": {
+    "id": "radiance-qwen-image",
+    "name": "Qwen Image 2.1",
+    "description": "Text-to-image on a Radiance worker. Match the model ID to the worker's configuration.",
+    "kind": "image",
+    "family": "qwen_image_21",
+    "capabilities": {
+      "prompt": true,
+      "seed": true,
+      "steps": true,
+      "variations": true
+    },
+    "defaults": {
+      "count": 1,
+      "height": 1024,
+      "model": "qwen-image-2.1-iq8r",
+      "steps": 28,
+      "width": 1024
+    },
+    "controls": {
+      "count": { "node": "1", "input": "count" },
+      "height": { "node": "1", "input": "height" },
+      "model": { "node": "1", "input": "model" },
+      "prompt": { "node": "1", "input": "prompt" },
+      "seed": { "node": "1", "input": "seed" },
+      "steps": { "node": "1", "input": "steps" },
+      "width": { "node": "1", "input": "width" }
+    }
+  },
+  "graph": {
+    "1": {
+      "class_type": "RadianceImageGenerate",
+      "inputs": {
+        "count": 1,
+        "height": 1024,
+        "model": "qwen-image-2.1-iq8r",
+        "prompt": "",
+        "seed": 0,
+        "steps": 28,
+        "width": 1024
+      }
+    },
+    "2": {
+      "class_type": "SaveImage",
+      "inputs": { "filename_prefix": "studio", "images": ["1", 0] }
+    }
+  }
+}

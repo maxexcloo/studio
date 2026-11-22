@@ -4,7 +4,6 @@ import {
   Button,
   Chip,
   Group,
-  Menu,
   type PopoverProps,
   ScrollArea,
   Scroller,
@@ -12,11 +11,13 @@ import {
   Stack,
   Switch,
   Text,
+  Tooltip,
 } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
+import { ratingSortLabels } from "../../../../shared/gallery-sort";
 import {
   type LoraConstraints,
   loraDefaultStrength,
@@ -28,14 +29,12 @@ import {
 } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import type { GenerationInput, Profile, Rating } from "../../types";
-import { contextMenuHandlers } from "../../ui/contextMenu";
 import { compareNames } from "../../ui/DataTable";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { OrderedItems } from "../../ui/OrderedItems";
-import { PopupTooltip } from "../../ui/PopupTooltip";
-import { SortMenu } from "../../ui/SortMenu";
+import { SortMenu, nameSortLabels } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "./chip";
@@ -103,15 +102,16 @@ export const unavailableFor = (profile: Profile | undefined, info?: LoraInfo) =>
   profile?.loraAdapter === "radiance-tags-v1" ? info?.unavailableReason : undefined;
 
 const ratingOrder = (rating?: Rating) => (rating === "liked" ? 0 : rating === "disliked" ? 2 : 1);
-const loraSortLabels = {
+const usageSortLabels = {
   used: "Most Used",
   "least-used": "Least Used",
-  rating: "Liked First",
-  disliked: "Disliked First",
-  "name-asc": "Name A–Z",
-  "name-desc": "Name Z–A",
 };
-type LoraSort = keyof typeof loraSortLabels;
+const loraSortGroups = [
+  usageSortLabels,
+  { rating: ratingSortLabels.liked, disliked: ratingSortLabels.disliked },
+  nameSortLabels,
+];
+type LoraSort = keyof typeof usageSortLabels | "rating" | "disliked" | keyof typeof nameSortLabels;
 
 export function useLoraPicker() {
   const [opened, setOpened] = useState(false);
@@ -463,7 +463,12 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
             comboboxProps={{ withinPortal: false }}
             data-mantine-stop-propagation
           />
-          <SortMenu labels={loraSortLabels} value={picker.loraSort} onChange={picker.setLoraSort} />
+          <SortMenu
+            label="Sort LoRAs"
+            groups={loraSortGroups}
+            value={picker.loraSort}
+            onChange={picker.setLoraSort}
+          />
         </>
       }
     />
@@ -640,7 +645,6 @@ function StackEntry({
   onChange: (patch: Partial<Lora>) => void;
   onRemove: () => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const range = info?.strengthRange;
   const { min, max, step } = loraStrengthRange(info);
   const enabled = lora.enabled !== false;
@@ -654,52 +658,51 @@ function StackEntry({
         ? triggers.filter((word) => (lora.triggers as string[]).includes(word))
         : triggers;
   return (
-    <Stack
-      gap={4}
-      className={classes.entry}
-      data-disabled={!enabled || undefined}
-      {...contextMenuHandlers(() => setMenuOpen(true))}
-    >
+    <Stack gap={4} className={classes.entry} data-disabled={!enabled || undefined}>
       <Group gap="xs" wrap="nowrap">
-        <Switch
-          classNames={{ root: classes.enable, body: classes.enable, labelWrapper: classes.enable }}
-          label={
-            <Text size="sm" fw={500} truncate>
-              {title}
-            </Text>
-          }
-          aria-label={`Enable ${title}`}
-          checked={enabled}
-          onChange={(event) => onChange({ enabled: event.currentTarget.checked })}
-        />
-        <Menu position="bottom-end" withinPortal={false} opened={menuOpen} onChange={setMenuOpen}>
-          <PopupTooltip label={`${title} Actions`}>
-            <Menu.Target>
-              <ActionIcon variant="subtle" color="gray" aria-label={`${title} Actions`}>
-                <icons.more size={16} />
-              </ActionIcon>
-            </Menu.Target>
-          </PopupTooltip>
-          <Menu.Dropdown aria-label={`${title} Actions`}>
-            <Menu.CheckboxItem checked={enabled} onChange={(enabled) => onChange({ enabled })}>
-              Enabled
-            </Menu.CheckboxItem>
-            {info?.sourceUrl && (
-              <Menu.Item
+        <Group gap={4} wrap="nowrap" className={classes.heading}>
+          <Switch
+            classNames={{
+              root: classes.enable,
+              body: classes.enable,
+              labelWrapper: classes.enable,
+            }}
+            label={
+              <Text size="sm" fw={500} truncate>
+                {title}
+              </Text>
+            }
+            aria-label={`Enable ${title}`}
+            checked={enabled}
+            onChange={(event) => onChange({ enabled: event.currentTarget.checked })}
+          />
+          {info?.sourceUrl && (
+            <Tooltip label="View Source">
+              <ActionIcon
                 component="a"
                 href={info.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                leftSection={<icons.external size={16} />}
+                size="sm"
+                variant="subtle"
+                color="gray"
+                aria-label={`View Source for ${title}`}
               >
-                View Source
-              </Menu.Item>
-            )}
-            <Menu.Item leftSection={<icons.clear size={16} />} onClick={onRemove}>
-              Remove
-            </Menu.Item>
-          </Menu.Dropdown>
-        </Menu>
+                <icons.external size={14} />
+              </ActionIcon>
+            </Tooltip>
+          )}
+        </Group>
+        <Tooltip label="Remove">
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            aria-label={`Remove ${title}`}
+            onClick={onRemove}
+          >
+            <icons.clear size={16} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
       <Stack gap={4} className={classes.details}>
         <StrengthControl

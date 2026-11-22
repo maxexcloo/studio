@@ -4,6 +4,7 @@ import {
   closeTextEditor,
   create,
   editorMenu,
+  expandAssistantMenu,
   fixtures,
   image,
   promptMenu,
@@ -125,9 +126,10 @@ test("The viewer directly offers Suggested and Templates without styles or item 
   await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const menu = await viewerChangeMenu(page);
+  const phone = testInfo.project.use.isMobile;
   await expect(menu.getByRole("menuitem", { name: "Use as Character", exact: true })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toHaveCount(0);
-  await expect(menu.getByText("Suggested", { exact: true })).toBeVisible();
+  await expect(menu.getByText(phone ? "Suggestions" : "Suggested", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Review Prompt", exact: true })).toHaveAttribute(
     "aria-checked",
     "false",
@@ -135,6 +137,7 @@ test("The viewer directly offers Suggested and Templates without styles or item 
   await page.keyboard.press("Escape");
   await expect(viewerChangeButton(page)).toBeFocused();
   await viewerChangeMenu(page);
+  await expandAssistantMenu(menu, "Suggestions");
   // Refresh reads Loading… while they load, with no placeholder row.
   const thinking = menu.getByRole("menuitem", { name: "Loading…", exact: true });
   await expect(thinking).toBeVisible();
@@ -142,7 +145,6 @@ test("The viewer directly offers Suggested and Templates without styles or item 
   release[0]();
   await expect(menu.getByRole("menuitem", { name: steps[0].label, exact: true })).toBeVisible();
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem").last()).toHaveText("Edit in Composer");
   expect(asked).toEqual([
     { surface: "viewer", jobId: "job-hub", fresh: false, prompt: "An amber bird", itemId: "hub" },
@@ -159,6 +161,7 @@ test("The viewer directly offers Suggested and Templates without styles or item 
     itemId: "hub",
   });
   // Custom… asks for the change in a box of its own, leaving the prompt as it was.
+  await expandAssistantMenu(menu, "Templates");
   await menu.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   await expect(page.getByRole("menu")).toHaveCount(0);
   const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
@@ -205,6 +208,7 @@ test("Custom Animation suggests what could happen from the image, filling the in
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   await viewerAction(page, "Animate");
+  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });
   const menu = phone
@@ -217,7 +221,10 @@ test("Custom Animation suggests what could happen from the image, filling the in
   );
 });
 
-test("The prompt offers Library's fixed changes with the image's suggestions", async ({ page }) => {
+test("The prompt offers Library's fixed changes with the image's suggestions", async ({
+  page,
+  isMobile,
+}) => {
   await openViewer(page);
   const asked: any[] = [];
   await page.route("**/api/assistant", (route) =>
@@ -261,17 +268,19 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
   const menu = await viewerChangeMenu(page, "Recreate");
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByText("Gentler contrast.", { exact: true })).toHaveCount(0);
-  await expect(menu.getByRole("menuitem")).toHaveText([
-    "Review Prompt",
-    ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
-    "Refresh",
-    "Softer Shadows",
-    "Custom…",
-    "Run Again",
-    "Run Again, Same Seed",
-    "Compare in Composer",
-    "Recreate in Composer",
-  ]);
+  if (!isMobile)
+    await expect(menu.getByRole("menuitem")).toHaveText([
+      "Review Prompt",
+      ...steps.map((step) => step.label).sort((a, b) => a.localeCompare(b)),
+      "Refresh",
+      "Softer Shadows",
+      "Custom…",
+      "Run Again",
+      "Run Again, Same Seed",
+      "Compare in Composer",
+      "Recreate in Composer",
+    ]);
+  await expandAssistantMenu(menu, "Templates");
   await menu.getByRole("menuitem", { name: "Softer Shadows", exact: true }).click();
   await expect
     .poll(() => asked.find((body) => body.surface === "change"))
@@ -280,6 +289,7 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
 
 test("Animate offers motions written for the image, then its templates and Custom…", async ({
   page,
+  isMobile,
 }) => {
   const state = await openViewer(page);
   const motion = [
@@ -308,24 +318,31 @@ test("Animate offers motions written for the image, then its templates and Custo
   await viewerAction(page, "Animate");
   const menu = page.getByRole("menu");
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
-  await expect
-    .poll(() =>
-      menu
-        .getByRole("menuitem")
-        .evaluateAll((items) => items.map((item) => item.ariaLabel || item.textContent)),
-    )
-    .toEqual([
-      "Profile",
-      "Review Prompt",
-      ...motion.map((idea) => idea.label).sort((a, b) => a.localeCompare(b)),
-      "Refresh",
-      "Action",
-      "Cinematic Camera",
-      "Dialogue",
-      "Living Photo",
-      "Custom…",
-      "Animate in Composer",
-    ]);
+  if (!isMobile)
+    await expect
+      .poll(() =>
+        menu
+          .getByRole("menuitem")
+          .evaluateAll((items) => items.map((item) => item.ariaLabel || item.textContent)),
+      )
+      .toEqual([
+        "Profile",
+        "Review Prompt",
+        ...motion.map((idea) => idea.label).sort((a, b) => a.localeCompare(b)),
+        "Refresh",
+        "Action",
+        "Cinematic Camera",
+        "Dialogue",
+        "Living Photo",
+        "Custom…",
+        "Animate in Composer",
+      ]);
+  if (isMobile) {
+    await expandAssistantMenu(menu, "Templates");
+    await expect(menu.getByRole("menuitem", { name: "Living Photo", exact: true })).toBeVisible();
+    await expandAssistantMenu(menu, "Suggestions");
+    await expect(menu.getByRole("menuitem", { name: "Living Photo", exact: true })).toBeHidden();
+  }
   await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.writing).toMatchObject({
@@ -404,6 +421,7 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   await closeTextEditor(page, "Prompt");
   menu = await viewerChangeMenu(page);
   await expect(review()).toHaveAttribute("aria-checked", "true");
+  await expandAssistantMenu(menu, "Suggestions");
   await expect(menu.getByRole("menuitem", { name: "Night Version", exact: true })).toBeVisible();
   await expect
     .poll(() => asked.filter((body) => body.surface === "viewer").at(-1))
@@ -434,10 +452,11 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
   await expect(menu).toBeHidden();
   menu = await viewerChangeMenu(page, "Recreate");
   await expect(review()).toHaveAttribute("aria-checked", "false");
-  await expect(menu.getByText("Suggested", { exact: true })).toBeVisible();
+  await expect(menu.getByText(phone ? "Suggestions" : "Suggested", { exact: true })).toBeVisible();
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem").nth(-2)).toHaveText("Compare in Composer");
   await expect(menu.getByRole("menuitem").last()).toHaveText("Recreate in Composer");
+  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: "Night Version", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(asked.filter((body) => body.surface === "change").at(-1)).toMatchObject({

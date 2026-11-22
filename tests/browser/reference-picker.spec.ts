@@ -459,6 +459,30 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   );
   await expect(header.getByText("Reference Model", { exact: true })).toBeVisible();
   await expect(preview.getByRole("group", { name: "Generation Actions" })).toHaveCount(0);
+  if (test.info().project.use.isMobile) {
+    await preview.locator('[data-zoom-mode="Fit"]').evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      for (const [type, distance] of [
+        ["pointerdown", 0],
+        ["pointermove", 150],
+        ["pointerup", 150],
+      ] as const)
+        node.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            pointerType: "touch",
+            pointerId: 7,
+            isPrimary: true,
+            clientX: box.x + box.width / 2,
+            clientY: box.y + box.height / 2 - distance,
+          }),
+        );
+    });
+    const closeDetails = page.getByRole("button", { name: "Close Details", exact: true });
+    await expect(closeDetails).toBeVisible();
+    await closeDetails.click();
+    await expect(preview).toBeVisible();
+  }
   await page.keyboard.press("Escape");
   await expect(preview).toBeHidden();
   await expect(picker).toBeVisible();

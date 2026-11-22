@@ -17,7 +17,7 @@ address on port 8188. The worker answers the readiness probe at `/studio/worker`
 
 Studio starts and stops workers by scaling their Kubernetes deployments between 0
 and 1 replicas; see
-[runtime control](../README.md#runtime-control) for
+[runtime control](../CONFIGURATION.md#runtime-control) for
 the labels and annotations a deployment needs and the service account role.
 Workers without them stay unmanaged. Media output saving retains admission until
 finished, so a switch waits for it.

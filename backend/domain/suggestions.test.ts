@@ -145,7 +145,10 @@ function replies(system: string) {
           request: "crop closer",
           prompt: "A close crop of a harbour at dawn",
         },
-        { label: "Broken", request: "no prompt" },
+        {
+          label: "Small Movement",
+          request: system.includes("becomes a short video") ? "take a step" : "",
+        },
       ],
     })}`;
   return "  They favour misty   harbours.  ";
@@ -301,7 +304,7 @@ test("composer ideas keep applied cards and the full draft, even before Studio l
   await suggestions.suggest("carol", body);
   assert.equal(calls.length, 1, "the same draft reuses its ideas");
   const next = await suggestions.suggest("carol", { ...body, prompt: `${prompt} At noon.` });
-  assert.match(next.suggestions[0].prompt, /At noon/);
+  assert.match(next.suggestions[0].prompt || "", /At noon/);
   assert.equal(calls.length, 2);
 });
 
@@ -369,11 +372,11 @@ test("Animate saves its own image-grounded motion instructions", async () => {
   // The viewer's next steps are still their own.
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
   assert.equal(calls.length, 2);
-  assert.match(calls[1][0].content, /spread across different areas/);
+  assert.match(calls[1][0].content, /each in a distinct area/);
 });
 
 test("viewer next steps vary across relevant areas, specific, and spicy only where the account may", async () => {
-  const step = (area: string, label: string) => ({ area, label, request: label, prompt: label });
+  const step = (area: string, label: string) => ({ area, label, request: label });
   const reply = () =>
     JSON.stringify({
       steps: [
@@ -394,9 +397,12 @@ test("viewer next steps vary across relevant areas, specific, and spicy only whe
     "Red Satin Dress",
     "Neon Rim Light",
   ]);
-  assert.match(calls[0][0].content, /\(body, face, hair, outfit, pose, setting, lighting, camera;/);
-  assert.match(calls[0][0].content, /never a vague style or mood tweak/);
-  assert.match(calls[0][0].content, /state the new result in absolute words/);
+  assert.match(
+    calls[0][0].content,
+    /\(expression, outfit, action, setting, lighting, framing, style\)/,
+  );
+  assert.match(calls[0][0].content, /Name the actual visible change/);
+  assert.match(calls[0][0].content, /Keep the subject's identity/);
   assert.doesNotMatch(calls[0][0].content, /body-shape, proportion or build alternative/);
   await labels("bob", "job-b");
   assert.match(calls[1][0].content, /clearly adult human subject.*body-shape, proportion or build/);
@@ -415,7 +421,7 @@ test("suggestions never repeat a fixed option in the same menu, and the writer i
     /The menu already offers \(suggest different ideas\): Night Version$/,
   );
   // Matching ignores case and punctuation, and each menu has its own fixed options.
-  assert.deepEqual(await labels("animate"), ["Warmer Light Please Now", "Broken"]);
+  assert.deepEqual(await labels("animate"), ["Warmer Light Please Now", "Small Movement"]);
   assert.match(calls[1][1].content, /already offers[^\n]*: closer-crop!$/);
   fixed.improve = ["WARMER light, please now"];
   assert.deepEqual(await labels("draft", { kind: "image", prompt: "A harbour" }), ["Closer Crop"]);
@@ -480,7 +486,7 @@ test("viewer ideas and chosen changes use current wording without changing saved
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a", prompt });
   assert.match(calls[1][1].content, /Prompt: A brindle greyhound with a white chest/);
   assert.equal(calls[1][1].images, 1);
-  assert.match(calls[1][0].content, /Prompting guide/);
+  assert.match(calls[1][0].content, /Write requests only/);
   assert.deepEqual(source, saved, "draft ideas never replace a result's saved steps or prompt");
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a", prompt, fresh: true });
   assert.match(calls[2][1].content, /Already suggested.*make the light warmer/);
@@ -517,6 +523,33 @@ test("uploaded media ideas use its recreation prompt for both still and motion c
       /Prompt: An adult Irish wolfhound with a shaggy grey coat/,
     );
   }
+});
+
+test("sets up distinct variations of one owned image in a single writing request", async () => {
+  const { suggestions, calls } = fixture({
+    reply: () =>
+      JSON.stringify({
+        scene: { label: "Mountain Lake", prompt: "Rae by a mountain lake at dawn" },
+        outfit: { label: "Field Jacket", prompt: "Rae in a field jacket by the harbour at dawn" },
+        style: { label: "Tinted Film", prompt: "Rae by the harbour at dawn on tinted film" },
+      }),
+  });
+  const request = {
+    surface: "change",
+    jobId: "job-a",
+    itemId: "result-a",
+    directions: ["scene", "outfit", "style"],
+    actions: ["recreate"],
+  };
+  const answer = await suggestions.suggest("alice", request);
+  assert.deepEqual(
+    answer.suggestions.map((option) => "request" in option && option.request),
+    request.directions,
+  );
+  assert.equal(calls.length, 1);
+  assert.match(calls[0][0].content, /Preserve any exact subject description/);
+  await assert.rejects(suggestions.suggest("bob", request), { status: 404 });
+  assert.equal(calls.length, 1);
 });
 
 test("each output supplies its own picture and saved ideas without crossing owners or jobs", async () => {
@@ -657,7 +690,7 @@ test("background work saves exact result changes and separate image motion ideas
     now: () => clock,
     log: { info: () => {} },
   });
-  work.prioritiseRecent();
+  work.prioritiseRecent([items[0]]);
   await work.settled();
   assert.equal(calls[0][1].images, 1);
   assert.match(calls[0][0].content, /what the attached image shows/);

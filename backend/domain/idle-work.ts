@@ -86,6 +86,7 @@ const failureStreak = 3;
 const turnMs = 10;
 const backoffMs = 60_000;
 const rateWindow = 20;
+const priorityLimit = 64;
 
 /** The items, giving the event loop a turn every `turnMs`: a large gallery takes a while to walk. */
 async function* turns<Item>(items: Iterable<Item>) {
@@ -169,6 +170,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
   // walk last began at the top).
   const top = { state: "", at: -Infinity, after: undefined as Item | undefined };
   let resume = top;
+  const priority = new Map<string, Item>();
   const running = () => options.continuous || pass?.state === "running";
   const counting = () => !options.continuous && pass?.state === "running";
 
@@ -179,11 +181,9 @@ export function createIdleWork<Item extends IdleItem>(options: {
     scope: pass?.scope || "outdated",
     startedAt: pass?.startedAt || "",
   });
-  /** Items open to the work at all, before `wanted` weighs them. */
-  function* open(items: Iterable<Item>) {
-    for (const item of items)
-      if (item.status === "done" && !failed.has(key(item)) && !direct.has(key(item))) yield item;
-  }
+  /** Whether a record is open to the work before `wanted` weighs it. */
+  const open = (item: Item) =>
+    item.status === "done" && !failed.has(key(item)) && !direct.has(key(item));
   /** Whether the item's owner may have the work done and the item shows in the gallery. */
   function shown() {
     const allowed = new Map<string, boolean>();
@@ -196,8 +196,8 @@ export function createIdleWork<Item extends IdleItem>(options: {
   async function* eligible(all: boolean, items: Iterable<Item> = options.items()) {
     const passing = all ? target() : undefined;
     const visible = shown();
-    for await (const item of turns(open(items)))
-      if (options.wanted(item, all, passing) && visible(item)) yield item;
+    for await (const item of turns(items))
+      if (open(item) && options.wanted(item, all, passing) && visible(item)) yield item;
   }
   /** How many items each scope's pass would take, counted in one walk over the gallery. */
   // The last counts, until the gallery, the pass or the failures change (or a while passes):
@@ -215,7 +215,8 @@ export function createIdleWork<Item extends IdleItem>(options: {
     const startedAt = running() ? target().startedAt : stamp();
     const counts = { all: 0, outdated: 0, missing: 0 };
     const visible = shown();
-    for await (const item of turns(open(options.items()))) {
+    for await (const item of turns(options.items())) {
+      if (!open(item)) continue;
       const wanted = passScopes.filter((scope) => options.wanted(item, true, { scope, startedAt }));
       if (wanted.length && visible(item)) for (const scope of wanted) counts[scope] += 1;
     }
@@ -230,7 +231,31 @@ export function createIdleWork<Item extends IdleItem>(options: {
     pending.add(run);
   }
 
+  let selecting = false;
   async function tick(): Promise<IdleTick> {
+    if (selecting) return "busy";
+    selecting = true;
+    const claim = await select().finally(() => (selecting = false));
+    if (typeof claim === "string") return claim;
+    const { item, controller, all } = claim;
+    if (all && inflight.size < passConcurrency) spawn();
+    const watch = setInterval(() => {
+      if (!options.idle()) controller.abort();
+    }, watchMs);
+    watch.unref?.();
+    const result = await runOne(item, controller, all).finally(() => {
+      clearInterval(watch);
+      inflight.delete(key(item));
+      finished += 1;
+    });
+    if (result === "yielded") resume = top;
+    if (all && running() && (result === "done" || result === "failed")) spawn();
+    return result;
+  }
+
+  async function select(): Promise<
+    IdleTick | { item: Item; controller: AbortController; all: boolean }
+  > {
     if (!options.enabled()) return "off";
     const all = running();
     if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
@@ -267,7 +292,13 @@ export function createIdleWork<Item extends IdleItem>(options: {
         passed = item;
       }
     }
-    if (walk)
+    for await (const candidate of eligible(all, priority.values()))
+      if (!inflight.has(key(candidate))) {
+        item = candidate;
+        break;
+      }
+    const prioritised = Boolean(item);
+    if (!item && walk)
       for await (const candidate of eligible(
         all,
         recent
@@ -291,26 +322,15 @@ export function createIdleWork<Item extends IdleItem>(options: {
       return "none";
     }
     // More may wait beyond the recent records, so the next tick walks the whole gallery again.
-    if (whole) {
+    if (prioritised) priority.delete(key(item));
+    else if (whole) {
       nothing = cleared;
       if (passed) resume = { ...resume, after: passed };
     }
     if (!all) last = time;
     const controller = new AbortController();
     inflight.set(key(item), controller);
-    if (all && inflight.size < passConcurrency) spawn();
-    const watch = setInterval(() => {
-      if (!options.idle()) controller.abort();
-    }, watchMs);
-    watch.unref?.();
-    const result = await runOne(item, controller, all).finally(() => {
-      clearInterval(watch);
-      inflight.delete(key(item));
-      finished += 1;
-    });
-    if (result === "yielded") resume = top;
-    if (all && running() && (result === "done" || result === "failed")) spawn();
-    return result;
+    return { item, controller, all };
   }
 
   async function runOne(item: Item, controller: AbortController, all: boolean): Promise<IdleTick> {
@@ -364,8 +384,11 @@ export function createIdleWork<Item extends IdleItem>(options: {
   return {
     tick,
     /** Give newly saved results the next scheduled turn before resuming the previous walk. */
-    prioritiseRecent() {
-      resume = top;
+    prioritiseRecent(items: Item[]) {
+      for (const item of items) {
+        priority.set(key(item), item);
+        if (priority.size > priorityLimit) priority.delete(priority.keys().next().value!);
+      }
       spawn();
     },
     /** Waits for every item started in the background (a pass's parallel and follow-on ones). */
@@ -392,7 +415,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
       const wanted: Item[] = [];
       for await (const item of eligible(false, items)) wanted.push(item);
       for (const item of wanted) {
-        if (inflight.has(key(item))) continue;
+        if (inflight.has(key(item)) || direct.has(key(item))) continue;
         direct.add(key(item));
         await options
           .run(item, new AbortController().signal)

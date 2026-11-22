@@ -1,4 +1,5 @@
 import { appearanceChoices } from "../shared/appearance.ts";
+import { defaultModelKeys } from "../shared/profiles.ts";
 import { dataDir } from "./data-dir.js";
 import {
   deleteRuntimeDocument,
@@ -31,12 +32,6 @@ const preferenceChoices = Object.freeze({
   images: ["cloud", "local"],
   text: ["cloud", "local"],
   videos: ["cloud", "local"],
-});
-/** Each kind's default model per side, by the kind's preference key. */
-export const defaultModelKeys = Object.freeze({
-  images: { cloud: "imageCloud", local: "imageLocal" },
-  text: { cloud: "textCloud", local: "textLocal" },
-  videos: { cloud: "videoCloud", local: "videoLocal" },
 });
 const modelKeys = new Set(Object.values(defaultModelKeys).flatMap((sides) => Object.values(sides)));
 const known = (key) =>
