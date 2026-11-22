@@ -69,13 +69,8 @@
   grid-area: 3 / 1;
 }
 
-.main[data-viewer-chrome] .dockedControls {
+:where(:root:not([data-phone])) .main[data-viewer-chrome] .dockedControls {
   padding-top: var(--mantine-spacing-xs);
-}
-
-:where(:root[data-phone]) .main[data-viewer-chrome] .dockedControls {
-  background: var(--studio-glass-chrome);
-  border-top: 1px solid var(--studio-glass-border);
 }
 
 .topBar {
@@ -386,7 +381,7 @@
   }
 }
 
-/* Phone controls reach the safe edges over the media. */
+/* Phone controls form one surface down to the bottom safe area. */
 :where(:root[data-phone]) .dock {
   padding: 0;
 }
@@ -400,10 +395,11 @@
 
 :where(:root[data-phone]) .dock > .actions {
   width: 100%;
-  border-end-start-radius: 0;
-  border-end-end-radius: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   padding-inline: max(4px, env(safe-area-inset-left)) max(4px, env(safe-area-inset-right));
-  padding-bottom: calc(4px + env(safe-area-inset-bottom));
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
 }
 
 .topActions {
