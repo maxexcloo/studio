@@ -765,7 +765,7 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   assert.match(state.calls.at(-1)!.user, /Inspiration prompt: a lighthouse in a storm/);
   assert.match(state.calls.at(-1)!.system, /Start from the inspiration prompt/);
   assert.equal(inspired?.dream?.why, "Inspired by an import · You like foxes.");
-  // Without an import, an explored prompt goes beyond their taste on the profile it drew.
+  // Without an import, an explored prompt still uses their taste on the profile it drew.
   state.access.alice!.uncensored = false;
   state.loras = {};
   state.rolls = [99];
@@ -774,17 +774,34 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   const beyond = await dreamOnce();
   assert.deepEqual([beyond?.input.profileId, beyond?.dream?.arm], ["qwen", "explore:prompt"]);
   assert.doesNotMatch(state.calls.at(-1)!.user, /Inspiration/);
-  assert.match(state.calls.at(-1)!.system, /Explore this time: go beyond their taste profile/);
+  assert.match(state.calls.at(-1)!.system, /Explore a fresh idea within their taste/);
 });
 
 test("Dream draws from the models and tags a person set over those it learnt", async (t) => {
   const { dream, state, taste, dreamOnce } = fixture(t);
   taste.record("alice", [tasteSignal("like", "a", { profileId: "qwen", tags: ["fox"] })]);
-  taste.edit("alice", { models: ["flux"], tags: ["harbour"] });
+  taste.edit("alice", {
+    models: ["flux"],
+    tags: ["harbour"],
+    likes: ["quiet candid portraits"],
+    styles: ["documentary photography"],
+    avoid: ["surreal props"],
+  });
   await dream.save("alice", { enabled: true });
   const job = await dreamOnce();
   assert.deepEqual([job?.input.profileId, job?.dream?.arm], ["flux", "exploit"]);
   assert.match(state.calls[0].system, /Keep this taste they like: harbour\./);
+  state.rolls = [99];
+  const explored = await dreamOnce();
+  assert.equal(explored?.dream?.arm, "explore:profile");
+  const { system, user } = state.calls.at(-1)!;
+  assert.match(
+    user,
+    /Avoids: surreal props\nLikes: quiet candid portraits\nPreferred Styles: documentary photography/,
+  );
+  assert.match(system, /Treat recurring props and settings as incidental/);
+  assert.match(system, /Use at most one/);
+  assert.doesNotMatch(system, /Possible starting points:.*(?:\bsubject:|medium or style:)/);
 });
 
 test("Fresh concepts rotate anchors and inspirations without overriding a model experiment", async (t) => {
@@ -2212,8 +2229,7 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
   // The same image never starts a second comparison.
   assert.deepEqual(dream.read("alice").compared, ["base"]);
 
-  // More Like This keeps the result and steers the next ideas toward it, the only idea that
-  // follows the learnt look; every idea keeps the person's rules.
+  // More Like This keeps the result and steers the next ideas toward its specific prompt.
   taste.edit("alice", { likes: ["lighthouses"], rules: ["no visible text"] });
   await dreamOnce();
   const [next] = dream.unseen("alice");
@@ -2226,17 +2242,14 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
     /Taste profile: Likes lighthouses[\s\S]*Their rules:\n- no visible text/,
   );
   assert.equal(dream.read("alice").steer?.remaining, 1);
-  // Past the steer's last run, ideas no longer read the learnt look.
+  // After the steer expires, new concepts still use taste and rules without the specific prompt.
   const before = state.calls.length;
   for (let run = 0; run < 4; run++) await dreamOnce();
   const later = state.calls
     .slice(before)
     .filter((call) => !call.user.includes("More like this one"));
-  assert.ok(later.length);
-  for (const call of later) {
-    assert.doesNotMatch(call.user, /Taste profile|lighthouses/);
-    assert.match(call.user, /Their rules:\n- no visible text/);
-  }
+  assert.ok(later.some((call) => /Taste profile:\nLikes: lighthouses/.test(call.user)));
+  for (const call of later) assert.match(call.user, /Their rules:\n- no visible text/);
 });
 
 test("A Dream job's writing request keeps its own fields through admission", () => {
