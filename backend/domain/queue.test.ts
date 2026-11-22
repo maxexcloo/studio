@@ -158,6 +158,44 @@ test("Waiting positions follow tier, model affinity and manual moves at dispatch
   assert.deepEqual(submitted, [running.id, later.id]);
 });
 
+test("Waiting photos precede videos of the same priority on their worker", async (t) => {
+  const { store, queue, submitted, observations } = fixture();
+  t.after(() => store.close());
+  const alice = store.createSession("alice");
+  const bob = store.createSession("bob");
+  const add = (
+    owner: string,
+    session: string,
+    kind: "image" | "video",
+    model: string,
+    priority: number = queuePriority.manual,
+  ) =>
+    store.enqueue(owner, session, { kind, model }, "image", undefined, "worker:gpu", undefined, {
+      priority,
+    });
+
+  const running = add("alice", alice.id, "image", "warm");
+  await queue.tick();
+  const video = add("alice", alice.id, "video", "warm");
+  const photo = add("alice", alice.id, "image", "cold");
+  const mcpPhoto = add("bob", bob.id, "image", "warm", queuePriority.mcp);
+  await queue.tick();
+
+  assert.deepEqual(submitted, [running.id]);
+  assert.deepEqual(
+    [photo, video, mcpPhoto].map(({ id }) => queue.queuePosition(id)),
+    [1, 2, 3],
+  );
+
+  observations.set(running.id, { status: "completed" });
+  await queue.tick();
+  assert.deepEqual(submitted, [running.id, photo.id]);
+
+  observations.set(photo.id, { status: "completed" });
+  await queue.tick();
+  assert.deepEqual(submitted, [running.id, photo.id, video.id]);
+});
+
 test("Waiting positions reflect the spare slot's reordered list during eligibility", async () => {
   const { store, queue, adapter, submitted } = fixture();
   const checking = deferred();
@@ -702,6 +740,60 @@ test("Dream rechecks the owner's idle delay before dispatching a prepared job", 
   }
 });
 
+test("Dream reuses a loaded model but waits for an empty queue before loading another", async (t) => {
+  const { store, queue, adapter, submitted, observations } = fixture();
+  t.after(() => store.close());
+  let now = 0;
+  queue.now = () => now;
+  const session = store.createSession("alice").id;
+  const enqueue = (model: string, priority: number = queuePriority.manual) =>
+    store.enqueue(
+      "alice",
+      session,
+      { kind: "image", model },
+      "image",
+      undefined,
+      "worker:gpu",
+      undefined,
+      {
+        priority,
+      },
+    );
+  const manual = enqueue("warm");
+  await queue.tick();
+
+  now += 180_000;
+  const cold = enqueue("cold", queuePriority.dream);
+  const warm = enqueue("warm", queuePriority.dream);
+  observations.set(manual.id, { status: "completed" });
+  await queue.tick();
+  assert.deepEqual(submitted, [manual.id, warm.id]);
+  assert.match(queue.dreamModelWait(cold) || "", /idle/);
+
+  observations.set(warm.id, { status: "completed" });
+  await queue.tick();
+  now += 120_000;
+  let interveningRequest: OwnedJob | undefined;
+  adapter.eligible = async (job) => {
+    if (job.id === cold.id) interveningRequest = enqueue("warm");
+  };
+  await queue.tick();
+  assert.ok(interveningRequest);
+  assert.deepEqual(submitted, [manual.id, warm.id]);
+  adapter.eligible = undefined;
+  await queue.tick();
+  assert.deepEqual(submitted, [manual.id, warm.id, interveningRequest.id]);
+
+  observations.set(interveningRequest.id, { status: "completed" });
+  await queue.tick();
+  now += 119_000;
+  await queue.tick();
+  assert.match(store.job("alice", cold.id)?.reason || "", /idle/);
+  now += 1_000;
+  await queue.tick();
+  assert.deepEqual(submitted, [manual.id, warm.id, interveningRequest.id, cold.id]);
+});
+
 test("an idle worker takes waiting work, manual work first", async () => {
   const queue = fixture();
   const { store, observations } = queue;
@@ -1189,6 +1281,7 @@ test("beside a running video, a worker's other slot takes only work for the vide
     const enqueue = (input: Record<string, unknown>) =>
       store.enqueue("alice", session, input, "image", undefined, "worker:radiance").id;
     const video = enqueue({ model: "wan", kind: "video" });
+    await queue.tick();
     const other = enqueue({ model: "flux" });
     await queue.tick();
     assert.deepEqual(submitted, [video]);

@@ -1063,22 +1063,14 @@ export function createDream(options: {
         .map(([id]) => id),
     );
   }
-  /** The kinds still due today, the one it is behind on first, and whether images reached their cap. */
-  function kinds(settings: DreamSettings, { today, usage }: ReturnType<typeof daily>) {
+  /** The kinds still due today and whether images reached their cap. */
+  function kinds(settings: DreamSettings, { usage }: ReturnType<typeof daily>) {
     const image = settings.images && usage.images < settings.dailyImages;
     const video = settings.videos && usage.videos < settings.dailyVideos;
-    // Videos keep pace with their share of the day's images.
-    const videoDue =
-      video &&
-      (!image || (today.videos + 1) * settings.dailyImages <= today.images * settings.dailyVideos);
-    return {
-      due: [
-        ...(videoDue ? (["video"] as Kind[]) : []),
-        ...(image ? (["image"] as Kind[]) : []),
-        ...(video && !videoDue ? (["video"] as Kind[]) : []),
-      ],
-      imagesDone: settings.dailyImages > 0 && settings.images && !image,
-    };
+    const due: Kind[] = [];
+    if (image) due.push("image");
+    if (video) due.push("video");
+    return { due, imagesDone: settings.dailyImages > 0 && settings.images && !image };
   }
   /** A recently admitted request still holds off this kind of background work. */
   function idleWait(ownerId: string, kind: Kind, settings = read(ownerId).settings) {

@@ -570,12 +570,11 @@ test("Dream fills every free worker in one tick: images beside running work, vid
   for (const job of live("alice")) finish("alice", job.id);
   store.save({ ...store.job("bob", bob.id)!, status: "completed" });
 
-  // Idle, the video due goes first and the other slot takes an image, not a second video.
+  // Idle, Dream makes the last image of its allowance before filling the other slot with a video.
+  await dream.save("alice", { dailyImages: dream.today("alice").images + 1 });
   await dream.tick();
   assert.deepEqual(
-    live("alice")
-      .map((job) => job.input.kind)
-      .sort(),
+    live("alice").map((job) => job.input.kind),
     ["image", "video"],
   );
 });

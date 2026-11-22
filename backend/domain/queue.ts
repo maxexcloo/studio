@@ -48,6 +48,8 @@ export interface QueueAdapter {
   saveOutputs(job: OwnedJob): Promise<JobObservation | void>;
   eligible?(job: OwnedJob): Promise<string | undefined>;
   dreamIdleWait?(job: OwnedJob): string | undefined;
+  /** Releases readiness resources when work arrives while admission is in flight. */
+  releaseAdmission?(job: OwnedJob): void;
   settled?(job: OwnedJob): Promise<void>;
   /** Other resources that could run this queued job now, best first (an idle worker takes it). */
   alternatives?(job: OwnedJob): string[];
@@ -166,11 +168,14 @@ const loadCost = (job: OwnedJob, warm: OwnedJob[]) => {
   return model && warm.some((other) => modelOf(other.input) === model) ? 1 : 2;
 };
 const reuseBypassLimit = 3;
+const tier = (job: OwnedJob) => job.priority ?? queuePriority.manual;
+const mediaRank = (job: OwnedJob) => tier(job) + (job.input.kind === "video" ? 0.5 : 0);
 /** A local video job: on a worker, not a cloud provider. */
 const localVideo = (job: OwnedJob) =>
   job.resource.startsWith("worker:") && job.input.kind === "video";
 const videoWaitReason = "Waiting for another video to finish.";
 const videoModelReason = "Waiting for the running video to finish before loading another model.";
+const dreamModelIdleMinutes = 2;
 /** How long a worker's run may show no progress before it is given up: a video's steps take longer. */
 const stallMinutes = (job: OwnedJob) => (job.input.kind === "video" ? 30 : 10);
 
@@ -193,6 +198,7 @@ export class GenerationQueue {
    * the worker stops, restarts or goes offline (`unload`).
    */
   private loaded = new Map<string, OwnedJob>();
+  private modelIdleSince?: number;
   /** Jobs whose prompt is being written, to abort on cancel or stop. */
   private writing = new Map<string, AbortController>();
   private positions = new Map<string, number>();
@@ -249,6 +255,33 @@ export class GenerationQueue {
   /** Forgets what a resource has loaded: its worker stopped, restarted or went offline. */
   unload(resource: string) {
     this.loaded.delete(resource);
+  }
+
+  private updateModelIdle(jobs: Iterable<OwnedJob>) {
+    for (const job of jobs) {
+      if (terminalStatuses.has(job.status)) continue;
+      // Dream jobs waiting for this quiet period cannot themselves keep the queue busy.
+      if (tier(job) !== queuePriority.dream || this.acceptedIds.has(job.id) || started(job)) {
+        this.modelIdleSince = undefined;
+        return;
+      }
+    }
+    this.modelIdleSince ??= this.now();
+  }
+
+  dreamModelWait(job: OwnedJob) {
+    if (tier(job) !== queuePriority.dream || !job.resource.startsWith("worker:")) return;
+    const model = modelOf(job.input);
+    if (!model) return;
+    const loaded = this.loaded.get(job.resource)?.input;
+    if (loaded && modelOf(loaded) === model && loaded.profileBackend === job.input.profileBackend)
+      return;
+    this.updateModelIdle(this.store.openJobs());
+    if (
+      this.modelIdleSince === undefined ||
+      this.now() - this.modelIdleSince < dreamModelIdleMinutes * 60_000
+    )
+      return `Dream waits for the queue to be idle for ${dreamModelIdleMinutes} minutes before loading another model.`;
   }
 
   isWriting(id: string) {
@@ -358,6 +391,7 @@ export class GenerationQueue {
       job.priority === queuePriority.dream ? this.adapter.dreamIdleWait?.(job) : undefined;
     // Read once until the observations below are awaited; this tick's saves update the list.
     const jobs = new Map(this.store.openJobs().map((job) => [job.id, job]));
+    this.updateModelIdle(jobs.values());
     const save = (job: OwnedJob) => {
       const saved = this.store.save(job);
       jobs.set(saved.id, saved);
@@ -384,11 +418,10 @@ export class GenerationQueue {
         });
       else if (!held(job) && job.reason === pausedReason) save({ ...job, reason: "" });
     }
-    // The shared text model writes at most maxWrites prompts at once, higher tiers first, then FIFO;
-    // the rest wait in their writing stage.
+    // The shared text model writes at most maxWrites prompts at once, in priority and media order.
     const unwritten = [...jobs.values()]
       .filter((job) => job.status === "writing" && !this.writing.has(job.id) && !held(job))
-      .sort((a, b) => (a.priority ?? queuePriority.manual) - (b.priority ?? queuePriority.manual));
+      .sort((a, b) => mediaRank(a) - mediaRank(b));
     for (const job of unwritten) {
       const delay = dreamDelay(job);
       if (!delay && this.writing.size < maxWrites) this.write(job);
@@ -458,6 +491,7 @@ export class GenerationQueue {
     if (this.stopped) return;
     // Read again: jobs were added, observed or cancelled while the observations were awaited.
     const all = this.store.schedulable(reuseBypassLimit);
+    this.updateModelIdle(all);
     const running = new Map<string, OwnedJob[]>();
     for (const job of all)
       if (!terminalStatuses.has(job.status) && this.acceptedIds.has(job.id))
@@ -467,22 +501,18 @@ export class GenerationQueue {
     const occupied = new Set([...running.keys()].filter((resource) => free(resource) <= 0));
     const isStarted = (job: OwnedJob) =>
       this.acceptedIds.has(job.id) || Boolean(job.providerJobId) || started(job);
-    // A started MCP set finishes before other work of its tier and below, so its jobs stay
-    // contiguous; manual work still goes first.
+    // A started set goes ahead of other waiting jobs of the same priority and media kind.
     const startedSets = new Set(
       all.filter((job) => job.queueSet && isStarted(job)).map((job) => job.queueSet),
     );
     const rank = (job: OwnedJob) =>
-      (job.priority ?? queuePriority.manual) -
-      (job.queueSet && startedSets.has(job.queueSet) ? 0.5 : 0);
+      mediaRank(job) - (job.queueSet && startedSets.has(job.queueSet) ? 0.25 : 0);
     this.rebalance(all, occupied, rank, held);
     const waitingNow = (item: OwnedJob) =>
       ["queued", "waiting"].includes(item.status) && !this.acceptedIds.has(item.id) && !held(item);
     // Dream starts only while no one's own work waits, on any worker: a free worker otherwise
     // keeps for the work routed to another.
-    const ownWaiting = all.some(
-      (item) => waitingNow(item) && (item.priority ?? queuePriority.manual) < queuePriority.dream,
-    );
+    const ownWaiting = all.some((item) => waitingNow(item) && tier(item) < queuePriority.dream);
     const waiting = new Map<string, OwnedJob[]>();
     const heldBack = new Map<string, OwnedJob[]>();
     const writers: OwnedJob[] = [];
@@ -503,16 +533,17 @@ export class GenerationQueue {
     this.positions.clear();
     const showOrder = (jobs: OwnedJob[]) =>
       jobs.forEach((job, index) => this.positions.set(job.id, index + 1));
-    const tier = (job: OwnedJob) => job.priority ?? queuePriority.manual;
-    showOrder(writers.sort((a, b) => Number(held(a)) - Number(held(b)) || tier(a) - tier(b)));
+    showOrder(
+      writers.sort((a, b) => Number(held(a)) - Number(held(b)) || mediaRank(a) - mediaRank(b)),
+    );
     for (const [resource, jobs] of heldBack)
       if (!waiting.has(resource)) showOrder(jobs.sort((a, b) => rank(a) - rank(b)));
     if (!waiting.size) return;
-    // Lower tiers wait while higher ones are queued (no aging); the stable sort keeps FIFO within a tier.
-    // Within a tier, jobs reusing what the resource holds go first: the model and LoRAs of a job
+    // Higher tiers go first, with photos ahead of videos within each tier.
+    // At the same rank, jobs reusing what the resource holds go first: the model and LoRAs of a job
     // running there or the last one it ran, then its model alone. A resource with several slots
     // reorders after each start, so its slots share a model rather than load another beside it.
-    // Once an older job of a tier has been overtaken reuseBypassLimit times, the tier runs strictly
+    // Once an older job of a tier has been overtaken reuseBypassLimit times, its rank runs strictly
     // FIFO. Overtakes are counted from the stored jobs (later jobs of the same resource and tier that
     // started), so the bound survives restarts. Started work is never pre-empted.
     const laterStarts = new Map<string, number>();
@@ -561,6 +592,12 @@ export class GenerationQueue {
               skipped.push(job);
               continue;
             }
+            const delay = dreamDelay(job) || this.dreamModelWait(job);
+            if (delay) {
+              wait(job, delay);
+              skipped.push(job);
+              continue;
+            }
             const active = running.get(resource);
             if (active?.length && this.adapter.slotWait) {
               const reason = await this.adapter.slotWait(job, active);
@@ -573,12 +610,6 @@ export class GenerationQueue {
               const latest = this.store.job(job.ownerId, job.id);
               if (!latest || !waitingNow(latest) || this.held()(latest)) continue;
               job = latest;
-            }
-            const delay = dreamDelay(job);
-            if (delay) {
-              wait(job, delay);
-              skipped.push(job);
-              continue;
             }
             let reason: string | undefined;
             this.checkingEligibility.add(job.id);
@@ -605,7 +636,9 @@ export class GenerationQueue {
             // node run it out of system memory. A two-GPU worker holds the node alone, so it never
             // meets this. Synchronous from here to "starting", so two workers' passes can't both start.
             // A user can submit during an asynchronous readiness check.
-            reason ||= dreamDelay(job);
+            const delayed = dreamDelay(job) || this.dreamModelWait(job);
+            if (delayed) this.adapter.releaseAdmission?.(job);
+            reason ||= delayed;
             if (!reason && localVideo(job) && this.videoRunning(job.id)) reason = videoWaitReason;
             if (reason) {
               wait(job, reason);
@@ -621,6 +654,7 @@ export class GenerationQueue {
             // Persist starting before crossing the provider boundary: interrupted responses are never resubmitted.
             this.positions.delete(job.id);
             this.acceptedIds.add(job.id);
+            this.modelIdleSince = undefined;
             this.loaded.set(resource, job);
             this.submitting.add(job.id);
             try {
@@ -763,7 +797,6 @@ export class GenerationQueue {
     held: (job: OwnedJob) => boolean,
   ) {
     if (!this.adapter.alternatives) return;
-    const tier = (job: OwnedJob) => job.priority ?? queuePriority.manual;
     const pending = (job: OwnedJob) =>
       ["queued", "waiting"].includes(job.status) && !this.acceptedIds.has(job.id) && !held(job);
     // An unknown model never matches, so without model information nothing moves for affinity.
@@ -796,7 +829,7 @@ export class GenerationQueue {
             (modelOf(job.input) && !hasModel(job.resource, job))) &&
           !this.scheduling.has(job.resource),
       )
-      .sort((a, b) => tier(a.job) - tier(b.job));
+      .sort((a, b) => mediaRank(a.job) - mediaRank(b.job));
     for (const { job } of movable) {
       const batch = job.queueBatch ? batches.get(job.queueBatch)! : [job];
       const members = batch.filter(pending);
