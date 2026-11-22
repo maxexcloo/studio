@@ -14,6 +14,7 @@ import {
   type DreamResultSet,
   type DreamSettings,
   type PairAnswer,
+  dreamCardCounts,
   dreamDefaults,
   dreamSeriesLength,
   dreamSet,
@@ -177,6 +178,7 @@ export type DreamItem = QueueMedia & {
   /** How it fits its project's brief (domain/review.ts). */
   review?: Review;
 };
+type DreamReadiness = Pick<DreamItem, "id" | "type" | "status" | "dream" | "resultSet">;
 /** A ready generation profile the account may use. */
 export interface DreamProfile {
   id: string;
@@ -763,6 +765,8 @@ export function createDream(options: {
   negative(profile: DreamProfile, input: GenerationInput): string;
   /** The owner's gallery records the query matches, Dream's pool included, newest first. */
   gallery(ownerId: string, query: DreamQuery): DreamItem[];
+  /** Only the fields needed to decide which of the owner's unseen results are ready. */
+  unseenReadiness(ownerId: string): DreamReadiness[];
   /** How many of the owner's gallery records the query matches. */
   count(ownerId: string, query: DreamQuery): number;
   /** The owner's gallery records with these ids, Dream's pool included. */
@@ -917,9 +921,9 @@ export function createDream(options: {
   const pool = (ownerId: string, state: DreamState) =>
     options.gallery(ownerId, { dreamState: state });
   const admittingComparisons = new Set<string>();
-  const orderedSides = (items: DreamItem[]) =>
+  const orderedSides = <T extends DreamReadiness>(items: T[]) =>
     items.sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side);
-  function completeComparison(items: DreamItem[]) {
+  function completeComparison(items: DreamReadiness[]) {
     const pair = items[0]?.dream?.pair;
     return (
       pair &&
@@ -930,12 +934,10 @@ export function createDream(options: {
     );
   }
   /** Comparisons and sets are ready when the rest of their work has finished. */
-  function unseen(ownerId: string) {
-    const all = pool(ownerId, "unseen");
-    const openSeries = all.some(dreamSet) ? read(ownerId).series?.id : undefined;
+  function readyUnseen<T extends DreamReadiness>(ownerId: string, all: T[], openSeries?: string) {
     const pendingPairs = new Set<string>();
     const pendingSets = new Set(openSeries ? [openSeries] : []);
-    const triples = new Map<string, DreamItem[]>();
+    const triples = new Map<string, T[]>();
     for (const item of all) {
       const pair = item.dream?.pair;
       if (pair?.size === 3 && item.status === "done") {
@@ -956,23 +958,26 @@ export function createDream(options: {
     const runningTriples = new Set(
       incomplete.size ? store.openDreamJobs(ownerId).map((job) => job.pairId) : [],
     );
-    return all
-      .flatMap((item) => {
-        if (item.status !== "done") return [];
-        const pair = item.dream?.pair;
-        if (pair) {
-          if (admittingComparisons.has(pair.id)) return [];
-          // A failed or interrupted triple leaves its finished results for individual review.
-          if (incomplete.has(pair.id))
-            return runningTriples.has(pair.id)
-              ? []
-              : [{ ...item, dream: { ...item.dream!, pair: undefined } }];
-          return pair.size === 3 || !pendingPairs.has(pair.id) ? [item] : [];
-        }
-        const set = dreamSet(item);
-        return !set || !pendingSets.has(set.id) ? [item] : [];
-      })
-      .reverse();
+    return all.flatMap((item) => {
+      if (item.status !== "done") return [];
+      const pair = item.dream?.pair;
+      if (pair) {
+        if (admittingComparisons.has(pair.id)) return [];
+        // A failed or interrupted triple leaves its finished results for individual review.
+        if (incomplete.has(pair.id))
+          return runningTriples.has(pair.id)
+            ? []
+            : [{ ...item, dream: { ...item.dream!, pair: undefined } }];
+        return pair.size === 3 || !pendingPairs.has(pair.id) ? [item] : [];
+      }
+      const set = dreamSet(item);
+      return !set || !pendingSets.has(set.id) ? [item] : [];
+    });
+  }
+  function unseen(ownerId: string) {
+    const all = pool(ownerId, "unseen");
+    const openSeries = all.some(dreamSet) ? read(ownerId).series?.id : undefined;
+    return readyUnseen(ownerId, all, openSeries).reverse();
   }
   let considering: { ownerId: string; latest?: DreamItem[] } | undefined;
   /** Dream's latest image results, leaving out comparisons and series, which are alike by design. */
@@ -3046,6 +3051,13 @@ export function createDream(options: {
       return record.visit.since || null;
     },
     unseen,
+    unseenCount(ownerId: string) {
+      const { settings, series } = read(ownerId);
+      const items = settings.enabled
+        ? readyUnseen(ownerId, options.unseenReadiness(ownerId), series?.id)
+        : [];
+      return dreamCardCounts(items, settings);
+    },
     /** An explicit Dream Super Like qualifies the result for automatic continuation. */
     superLike(ownerId: string, itemId: string) {
       return runtimeTransaction(options.dataDir, () => {

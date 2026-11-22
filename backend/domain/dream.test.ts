@@ -227,6 +227,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       state.reads.push(query);
       return matching(ownerId, query);
     },
+    unseenReadiness: (ownerId) => matching(ownerId, { dreamState: "unseen" }),
     items: (ownerId, ids) =>
       state.items.filter((item) => item.ownerId === ownerId && ids.includes(String(item.id))),
     visible,

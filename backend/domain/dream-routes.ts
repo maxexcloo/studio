@@ -1,5 +1,4 @@
 import {
-  dreamCardCounts,
   dreamDefaults,
   dreamPairAnswers,
   dreamPassReasons,
@@ -71,14 +70,10 @@ export function registerDreamRoutes(
     },
   }));
   // The header's badge counts cards waiting for a verdict.
-  route("GET", "/api/dream/count", (account) => {
-    const ownerId = owner(account);
-    const { settings } = dream.read(ownerId);
-    return {
-      status: 200,
-      payload: dreamCardCounts(settings.enabled ? dream.unseen(ownerId) : [], settings),
-    };
-  });
+  route("GET", "/api/dream/count", (account) => ({
+    status: 200,
+    payload: dream.unseenCount(owner(account)),
+  }));
   route("POST", "/api/dream/visit", (account) => ({
     status: 200,
     payload: { since: dream.visit(owner(account)) },
