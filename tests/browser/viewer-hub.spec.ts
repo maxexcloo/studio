@@ -11,7 +11,7 @@ import {
   pressGenerate,
   profiles,
   serveProfiles,
-  showViewerControls,
+  showViewerThumbnails,
   stamp,
   viewerAction,
   viewerChangeMenu,
@@ -21,7 +21,6 @@ async function seed(
   page: Page,
   extra: Record<string, unknown> = {},
   routes?: (page: Page, state: Awaited<ReturnType<typeof fixtures>>) => Promise<unknown>,
-  quiet = false,
 ) {
   const state = await fixtures(page);
   const settings = {
@@ -63,7 +62,6 @@ async function seed(
   await page.goto("/images");
   await page.getByRole("button", { name: `Open image: ${mediaTitle(item)}`, exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  if (!quiet) await showViewerControls(viewer);
   return { state, viewer };
 }
 
@@ -125,13 +123,13 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
   });
   // Desktop shows the run in the strip; a phone's editor returns to the gallery.
   if (page.viewportSize()!.width >= 768) {
+    await showViewerThumbnails(viewer);
     await expect(
       viewer.getByRole("list", { name: "Versions", exact: true }).getByRole("listitem"),
     ).toHaveCount(2);
   } else {
     await expect(viewer).toBeHidden();
     await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
-    await showViewerControls(viewer);
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
     const closeDetails = page.getByRole("button", { name: "Close Details", exact: true });
     const edit = viewer.getByRole("button", { name: "Edit", exact: true });
@@ -164,7 +162,6 @@ test("A video's prompt field runs its edited prompt again as a video", async ({ 
   await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await showViewerControls(viewer);
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "A rolling wave",
   );
@@ -657,6 +654,7 @@ test("Viewer runs queue into the strip and Recreate › Recreate in Composer ope
     parentItemId: "hub",
     input: { count: 2, seed: 1234567 },
   });
+  await showViewerThumbnails(viewer);
   const strip = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
   // Newest first: the new version leads.
@@ -681,7 +679,7 @@ test("A regenerated result has its own tile and remains linked in the viewer", a
   const tiles = page.getByRole("button", { name: /^Open image: Amber Bird/ });
   await expect(tiles).toHaveCount(2);
   await page.locator('[data-media-id="hub"]').click();
-  await showViewerControls(viewer);
+  await showViewerThumbnails(viewer);
   await viewer.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await expect(tiles.and(page.locator(':not([data-media-id="hub"])'))).toBeFocused();
@@ -696,6 +694,7 @@ test("The strip holds the item's versions, not the other results of its run", as
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({ parentJobId: "job-hub", parentItemId: "hub" });
+  await showViewerThumbnails(viewer);
   const strip = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
   await expect(strip.getByRole("listitem").last()).toHaveAttribute("aria-current", "true");
@@ -725,6 +724,7 @@ test("A set and the shown result's versions have separate strips", async ({ page
       },
     );
   });
+  await showViewerThumbnails(viewer);
   const strip = viewer.getByRole("list", { name: "Set: Birds", exact: true });
   const versions = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(versions.getByRole("listitem")).toHaveCount(2);
@@ -788,6 +788,7 @@ test("A version keeps its strip once the runs have left the queue, and runs from
       parentItemId: "hub",
     });
   });
+  await showViewerThumbnails(viewer);
   const strip = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
   await expect(strip.getByRole("listitem").last()).toHaveAttribute("aria-current", "true");
@@ -823,6 +824,7 @@ test("The strip shows iterations of iterations as a tree, newest first and the o
       version("hub-snow", 1, "hub", "An amber bird in snow"),
     );
   });
+  await showViewerThumbnails(viewer);
   const strip = viewer.getByRole("list", { name: "Versions", exact: true });
   // Each branch stays together; a version away from its source names it.
   await expect(strip).toMatchAriaSnapshot(`
@@ -1056,7 +1058,6 @@ test("An Animate run stays with the image it started on while the viewer moves b
     .getByRole("button", { name: `Open image: ${mediaTitle({ prompt: bird })}`, exact: true })
     .click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await showViewerControls(viewer);
   const animate = viewer.getByRole("button", { name: "Animate", exact: true });
   // Desktop uses the arrows, Chromium phones swipe and WebKit phones take the arrow keys.
   const { isMobile, browserName } = testInfo.project.use;
@@ -1114,6 +1115,7 @@ test("An Animate run stays with the image it started on while the viewer moves b
       writing: { kind: "animate", theme: "living", source: bird },
     },
   });
+  await showViewerThumbnails(viewer);
   const versions = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(versions).toHaveCount(0);
   await move(fox, bird);
@@ -1169,7 +1171,6 @@ test("Review Prompt writes the motion prompt for editing, and Run queues exactly
   // The choice is remembered; Cancel queues nothing.
   // The viewer opens again from the URL.
   await page.reload();
-  await showViewerControls(viewer);
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(review).toHaveAttribute("aria-checked", "true");
   await page.getByRole("menuitem", { name: "Cinematic Camera", exact: true }).click();
@@ -1343,7 +1344,6 @@ test("A video's Animate template continues it from its last frame, and Edit make
   await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await showViewerControls(viewer);
   await viewer.getByRole("button", { name: "Recreate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Run Again", exact: true }).click();
   await expect(
@@ -1494,15 +1494,15 @@ test("Near-misses beside the viewer's controls keep it open; the empty stage clo
   page,
 }) => {
   const { viewer } = await seed(page);
+  const image = viewer.getByRole("button", { name: "Change Image Zoom", exact: true });
+  await expect(image).toBeVisible();
   const actions = (await viewer
     .getByRole("group", { name: "Generation Actions", exact: true })
     .boundingBox())!;
   await page.mouse.click(actions.x + actions.width / 2, actions.y - 10);
-  await expect(viewer).toBeVisible();
+  await expect(image).toBeVisible();
   const stage = (await viewer.locator("[data-zoom-mode]").boundingBox())!;
-  const picture = (await viewer
-    .getByRole("button", { name: "Change Image Zoom", exact: true })
-    .boundingBox())!;
+  const picture = (await image.boundingBox())!;
   // The square image leaves empty stage above or beside it.
   const blank =
     picture.x - stage.x > 80
@@ -1743,12 +1743,21 @@ test("Phone Details hides the viewer actions and swipes closed", async ({
   await expect.poll(() => picture.boundingBox()).toEqual(position);
 });
 
-test("Phone swipes first reveal controls, then Details", async ({ page }, testInfo) => {
+test("Phone swipes first reveal thumbnails, then Details", async ({ page }, testInfo) => {
   test.skip(
     !testInfo.project.use.isMobile || testInfo.project.use.browserName === "webkit",
     "Touch input is dispatched through Chromium's protocol.",
   );
-  const { viewer } = await seed(page, {}, undefined, true);
+  const { viewer } = await seed(page, {}, async (_page, state) => {
+    state.gallery.unshift({
+      ...state.gallery[0],
+      id: "hub-night",
+      jobId: "job-night",
+      prompt: "An amber bird at night",
+      createdAt: "2026-12-01T00:00:00.000Z",
+      parentItemId: "hub",
+    });
+  });
   const picture = viewer.getByRole("img", { name: "An amber bird", exact: true });
   await expect(picture).toBeVisible();
   const touch = await page.context().newCDPSession(page);
@@ -1776,14 +1785,18 @@ test("Phone swipes first reveal controls, then Details", async ({ page }, testIn
   await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await expect.poll(async () => Math.round((await picture.boundingBox())!.x - start.x)).toBe(0);
   const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
+  const thumbnails = viewer.getByRole("list", { name: "Versions", exact: true });
   const sheet = page.getByRole("dialog", { name: "Amber Bird", exact: true });
-  await expect(actions).toBeHidden();
+  await expect(actions).toBeVisible();
+  await expect(thumbnails).toBeHidden();
   await swipe(-120);
+  await expect(thumbnails).toBeVisible();
   await expect(actions).toBeVisible();
   await expect(sheet).toBeHidden();
   await expect.poll(() => picture.boundingBox()).toEqual(start);
   await swipe(-120);
   await expect(sheet.getByText("1234567", { exact: true })).toBeVisible();
+  await expect(actions).toBeHidden();
   await sheet.getByRole("button", { name: "Close Details", exact: true }).click();
   await expect(sheet).toBeHidden();
   await swipe(120);
@@ -1793,7 +1806,7 @@ test("Phone swipes first reveal controls, then Details", async ({ page }, testIn
 test("A double tap zooms in at the tapped point and back to Fit; a click still cycles", async ({
   page,
 }, testInfo) => {
-  const { viewer } = await seed(page, {}, undefined, true);
+  const { viewer } = await seed(page);
   const picture = viewer.getByRole("img", { name: "An amber bird", exact: true });
   const zoom = viewer.locator("[data-zoom-mode]");
   await expect(picture).toBeVisible();
@@ -1823,19 +1836,13 @@ test("A double tap zooms in at the tapped point and back to Fit; a click still c
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   }
   const fitScale = Number(await zoom.getAttribute("data-zoom-scale"));
-  // A tap reveals controls without zooming or moving the fitted image.
-  const fitted = await picture.boundingBox();
-  const revealed = viewer.getByRole("button", { name: "Hide Controls", exact: true });
-  await expect(viewer.getByRole("button", { name: "Show Controls", exact: true })).toBeVisible();
-  await tap();
-  await expect(revealed).toBeVisible();
-  await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
-  await expect.poll(() => picture.boundingBox()).toEqual(fitted);
+  const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
+  await expect(actions).toBeVisible();
   await tap();
   await page.waitForTimeout(100);
   await tap();
   await expect(zoom).toHaveAttribute("data-zoom-mode", "Custom");
-  await expect(revealed).toBeVisible();
+  await expect(actions).toBeVisible();
   await expect
     .poll(async () => Number(await zoom.getAttribute("data-zoom-scale")))
     .toBeCloseTo(fitScale * 2.5);
@@ -1854,10 +1861,9 @@ test("A double tap zooms in at the tapped point and back to Fit; a click still c
   await expect(viewer).toBeVisible();
 });
 
-test("A tap toggles gallery controls while leaving the header and picture in place", async ({
+test("The viewer cycles its chrome without moving the fitted picture", async ({
   page,
 }, testInfo) => {
-  test.skip(!testInfo.project.use.isMobile, "Only touch screens hide the chrome.");
   const state = await fixtures(page);
   for (const [index, [id, prompt, createdAt]] of [
     ["tap-first", "A quiet harbour", stamp],
@@ -1881,7 +1887,21 @@ test("A tap toggles gallery controls while leaving the header and picture in pla
   const picture = viewer.getByRole("img", { name: "A quiet harbour", exact: true });
   await expect(picture).toBeVisible();
   const close = viewer.getByRole("button", { name: "Close Generation", exact: true });
+  const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const strip = viewer.getByRole("list", { name: "Set: Tap Set", exact: true });
+  const fitted = await picture.boundingBox();
+  await expect(strip).toBeHidden();
+  await expect(close).toBeVisible();
+  await expect(actions).toBeVisible();
+
+  if (!testInfo.project.use.isMobile) {
+    const viewport = page.viewportSize()!;
+    await page.mouse.move(viewport.width / 2, viewport.height - 2);
+    await expect(strip).toBeVisible();
+    await expect.poll(() => picture.boundingBox()).toEqual(fitted);
+    return;
+  }
+
   const webkit = testInfo.project.use.browserName === "webkit";
   const touch = webkit ? undefined : await page.context().newCDPSession(page);
   async function centre() {
@@ -1894,15 +1914,16 @@ test("A tap toggles gallery controls while leaving the header and picture in pla
     await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   }
-  await expect(strip).toBeHidden();
-  const fitted = await picture.boundingBox();
   await tap();
   await expect(strip).toBeVisible();
   await expect(close).toBeVisible();
+  await expect(actions).toBeVisible();
   await expect.poll(() => picture.boundingBox()).toEqual(fitted);
   await tap();
   await expect(strip).toBeHidden();
-  await expect(close).toBeVisible();
+  await expect(close).toBeHidden();
+  await expect(actions).toBeHidden();
+  await expect.poll(() => picture.boundingBox()).toEqual(fitted);
 
   // A swipe while hidden moves to the next image and keeps the chrome hidden.
   const { x, y } = await centre();
@@ -1936,7 +1957,16 @@ test("A tap toggles gallery controls while leaving the header and picture in pla
     );
   await expect(viewer.getByRole("img", { name: "A windy cliff", exact: true })).toBeVisible();
   await expect(strip).toBeHidden();
+  await expect(close).toBeHidden();
+
+  const next = viewer.getByRole("img", { name: "A windy cliff", exact: true });
+  await expect.poll(() => next.boundingBox()).toEqual(fitted);
+  const nextFit = (await next.boundingBox())!;
+  await page.touchscreen.tap(nextFit.x + nextFit.width / 2, nextFit.y + nextFit.height / 2);
   await expect(close).toBeVisible();
+  await expect(strip).toBeHidden();
+  await expect(actions).toBeVisible();
+  await expect.poll(() => next.boundingBox()).toEqual(nextFit);
 
   await page.keyboard.press("ArrowUp");
   await expect(strip).toBeVisible();
@@ -2054,7 +2084,6 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   const phone = viewport.width < 768;
   if (phone) {
     // Phone actions remain accessible as icons on one row.
-    await showViewerControls(dialog);
     const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
     const row = [
       "Animate",
@@ -2293,7 +2322,6 @@ test("The viewer bar shows every action without scrolling on a tablet or narrow 
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Tablet Study", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await showViewerControls(viewer);
   const remove = viewer.getByRole("button", { name: "Delete", exact: true });
   await expect(remove).toBeVisible();
   if (!mobile) {

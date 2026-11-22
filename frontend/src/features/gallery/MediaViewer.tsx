@@ -9,16 +9,7 @@ import {
   getDefaultZIndex,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Suspense,
-  lazy,
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
 import { glass } from "../../theme";
@@ -65,12 +56,12 @@ const deadZone = 24;
 function nearControl(event: React.MouseEvent<HTMLElement>) {
   return [
     ...event.currentTarget.querySelectorAll(
-      "button, a[href], input, textarea, video, [role=slider]",
+      `button, a[href], input, textarea, video, [role=slider], .${classes.dock} > *`,
     ),
   ].some((control) => {
     if (
-      control.closest(".react-transform-wrapper") ||
-      !control.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+      control.closest(".react-transform-wrapper, [inert]") ||
+      !control.checkVisibility({ visibilityProperty: true })
     )
       return false;
     const box = control.getBoundingClientRect();
@@ -104,6 +95,7 @@ function ViewerVideo({
   height,
   swipe,
   onTap,
+  hideControls,
 }: {
   /** The item's id, so Use Frame as Reference finds the frame showing. */
   id: string;
@@ -114,6 +106,7 @@ function ViewerVideo({
   height?: number;
   swipe: ReturnType<typeof useTouchSwipe>;
   onTap?: () => void;
+  hideControls?: boolean;
 }) {
   const { muted, onVolumeChange } = useVideoSound();
   const player = useRef<HTMLVideoElement>(null);
@@ -147,7 +140,7 @@ function ViewerVideo({
         poster={poster}
         width={width}
         height={height}
-        controls={controls || refused}
+        controls={(!hideControls && controls) || refused}
         // Generated clips are short, so they repeat like a live photo.
         loop
         playsInline
@@ -160,7 +153,7 @@ function ViewerVideo({
         onPointerDown={swipe.onPointerDown}
         onPointerUp={(event) => {
           if (!swipe.onPointerUp(event)) return;
-          if (!controls && !refused && !closingPopup()) onTap?.();
+          if ((!controls || hideControls) && !refused && !closingPopup()) onTap?.();
           reveal();
         }}
         onFocus={reveal}
@@ -245,7 +238,7 @@ export function MediaViewer({
   sideBySide?: boolean;
   /** Only the media and its navigation, over any dialog: no details, actions or item keys. */
   bare?: boolean;
-  /** The gallery opens without bottom controls. */
+  /** The gallery opens with its actions and leaves thumbnails collapsed. */
   quiet?: boolean;
 }) {
   const phone = usePhone();
@@ -272,12 +265,16 @@ export function MediaViewer({
   const [sheet, setSheet] = useState(false);
   const detailsOpen = phone ? sheet : details;
   const showDetails = () => (phone ? setSheet(true) : setDetails(true));
-  const controlsId = useId();
-  const [controlsOpen, setControlsOpen] = useState(!quiet);
-  const toggleControls = () => setControlsOpen((opened) => !opened);
-  const reveal = () => (!quiet || controlsOpen ? showDetails() : setControlsOpen(true));
+  const [chrome, setChrome] = useState<"standard" | "full" | "image">("standard");
+  const immersive = quiet && chrome === "image";
+  const actionsOpen = !immersive && !sheet;
+  const thumbnailsOpen = !quiet || chrome === "full";
   // Navigation replaces the media, and focus on it would fall out of the viewer beyond its keys.
   const stage = useRef<HTMLDivElement>(null);
+  function cycleChrome() {
+    stage.current?.focus({ preventScroll: true });
+    setChrome((shown) => (shown === "standard" ? "full" : shown === "full" ? "image" : "standard"));
+  }
   const containStage = useCallback((view: HTMLDivElement | null) => {
     stage.current = view;
     // Keys reach the viewer from the start, before the dialog's own focus lands on its control.
@@ -325,6 +322,12 @@ export function MediaViewer({
   const jobs = useQuery(queueQuery).data?.jobs;
   const family = useRunFamily(item, queued, related, jobs);
   const members = setMembers(related, item);
+  const hasThumbnails = family.length > 1 || members.length > 1;
+  function reveal() {
+    if (!thumbnailsOpen && hasThumbnails) setChrome("full");
+    else if (immersive) setChrome("standard");
+    else showDetails();
+  }
   const position =
     canNavigate && itemLabel
       ? itemLabel(item)
@@ -387,6 +390,7 @@ export function MediaViewer({
         })
       }
       opened={detailsOpen}
+      hidden={immersive}
       phone={phone}
       zIndex={bare ? getDefaultZIndex("max") : undefined}
       close={() => setSheet(false)}
@@ -507,7 +511,7 @@ export function MediaViewer({
               !action.loading &&
               !event.repeat
             ) {
-              if (!controlsOpen) flushSync(() => setControlsOpen(true));
+              if (immersive) flushSync(() => setChrome("standard"));
               action.onClick();
             }
           } else if (
@@ -525,6 +529,9 @@ export function MediaViewer({
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             reveal();
+          } else if (quiet && event.key.toLowerCase() === "c") {
+            event.preventDefault();
+            if (!event.repeat) cycleChrome();
           } else if (canNavigate && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
             event.preventDefault();
             move(event.key === "ArrowLeft" ? -1 : 1);
@@ -543,7 +550,22 @@ export function MediaViewer({
             if (!nearControl(event)) close();
           }}
         >
-          <div className={classes.main} data-docked={!quiet && !bare ? true : undefined}>
+          <div
+            className={classes.main}
+            data-docked={!quiet && !bare ? true : undefined}
+            data-viewer-chrome={quiet ? chrome : undefined}
+            onPointerMove={(event) => {
+              if (
+                quiet &&
+                !thumbnailsOpen &&
+                hasThumbnails &&
+                event.pointerType === "mouse" &&
+                window.innerHeight - event.clientY < 12 &&
+                !layerAbove(stage.current)
+              )
+                setChrome("full");
+            }}
+          >
             <ViewerChrome
               item={displayed}
               label={
@@ -553,9 +575,7 @@ export function MediaViewer({
                   </VisuallyHidden>
                 )
               }
-              controls={
-                quiet ? { id: controlsId, opened: controlsOpen, toggle: toggleControls } : undefined
-              }
+              hidden={immersive}
               details={{ opened: detailsOpen, phone, toggle: toggleDetails }}
               focusClose={bare}
               closeLabel={bare ? "Close Preview" : "Close Generation"}
@@ -564,6 +584,7 @@ export function MediaViewer({
             <div
               ref={containStage}
               className={`${classes.stage} ${classes.viewerStage}`}
+              data-viewer-stage
               tabIndex={-1}
             >
               {showTogether ? (
@@ -608,7 +629,7 @@ export function MediaViewer({
               ) : (
                 <>
                   {/* Phones swipe between items instead. */}
-                  {canNavigate && !phone && (
+                  {canNavigate && !phone && !immersive && (
                     <Group
                       className={classes.navigation}
                       data-chrome
@@ -661,7 +682,8 @@ export function MediaViewer({
                         width={source.width}
                         height={source.height}
                         swipe={touchSwipe}
-                        onTap={quiet ? toggleControls : undefined}
+                        onTap={quiet ? cycleChrome : undefined}
+                        hideControls={immersive}
                       />
                     ) : compare && item.upscale?.url ? (
                       <div className={classes.comparison}>
@@ -685,7 +707,8 @@ export function MediaViewer({
                           width={source.width}
                           height={source.height}
                           swipe={strip.gesture}
-                          onTap={quiet ? toggleControls : undefined}
+                          onTap={quiet ? cycleChrome : undefined}
+                          hideControls={immersive}
                         />
                       </Suspense>
                     )}
@@ -696,11 +719,10 @@ export function MediaViewer({
             </div>
             {!bare && (
               <div
-                id={controlsId}
                 className={quiet ? classes.controls : classes.dockedControls}
-                data-open={(quiet && controlsOpen && !sheet) || undefined}
+                data-open={(quiet && actionsOpen) || undefined}
                 data-actions-hidden={(!quiet && sheet) || undefined}
-                inert={!controlsOpen || sheet}
+                inert={!actionsOpen}
                 onClick={(event) => event.stopPropagation()}
               >
                 <MediaViewerDock
@@ -708,6 +730,7 @@ export function MediaViewer({
                   family={family}
                   jobs={jobs}
                   set={members}
+                  showThumbnails={thumbnailsOpen}
                   choose={(next) => {
                     setCompare(false);
                     navigate?.(next);

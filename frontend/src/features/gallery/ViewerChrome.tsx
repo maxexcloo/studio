@@ -13,7 +13,7 @@ export function ViewerChrome({
   item,
   label,
   actions,
-  controls,
+  hidden,
   close,
   closeLabel,
   details,
@@ -22,7 +22,7 @@ export function ViewerChrome({
   item?: MediaItem;
   label?: ReactNode;
   actions?: ReactNode;
-  controls?: { id: string; opened: boolean; toggle: () => void };
+  hidden?: boolean;
   close: () => void;
   closeLabel: string;
   details?: { opened: boolean; phone: boolean; toggle: () => void };
@@ -31,13 +31,14 @@ export function ViewerChrome({
   const { profiles } = useGenerationActions();
   const title = item && mediaTitle(item);
   const model = item && mediaProfileName(item, profiles);
-  const controlsLabel = controls?.opened ? "Hide Controls" : "Show Controls";
   return (
     <Group
       className={classes.topBar}
       data-chrome
       role="group"
       aria-label="Viewer Header"
+      inert={hidden}
+      style={hidden ? { visibility: "hidden" } : undefined}
       justify="space-between"
       align="flex-start"
       wrap="nowrap"
@@ -60,19 +61,6 @@ export function ViewerChrome({
       </Group>
       <Group gap={6} wrap="nowrap" className={classes.topActions}>
         {actions}
-        {controls && (
-          <Tooltip label={controlsLabel}>
-            <ActionIcon
-              variant="default"
-              aria-label={controlsLabel}
-              aria-controls={controls.id}
-              aria-expanded={controls.opened}
-              onClick={controls.toggle}
-            >
-              <icons.viewerControls size={18} />
-            </ActionIcon>
-          </Tooltip>
-        )}
         {details && (
           <Tooltip
             label={details.phone ? "Details" : details.opened ? "Hide Details" : "Show Details"}
