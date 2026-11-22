@@ -29,6 +29,7 @@ export function ViewerChrome({
   focusClose?: boolean;
 }) {
   const { profiles } = useGenerationActions();
+  if (hidden) return null;
   const title = item && mediaTitle(item);
   const model = item && mediaProfileName(item, profiles);
   return (
@@ -37,8 +38,6 @@ export function ViewerChrome({
       data-chrome
       role="group"
       aria-label="Viewer Header"
-      inert={hidden}
-      style={hidden ? { visibility: "hidden" } : undefined}
       justify="space-between"
       align="flex-start"
       wrap="nowrap"

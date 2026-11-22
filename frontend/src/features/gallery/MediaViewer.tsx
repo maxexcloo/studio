@@ -24,7 +24,7 @@ import { queueQuery } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaJobStatus } from "./MediaJobStatus";
 import { mediaTitle } from "./mediaLabels";
-import { mediaSource, playbackUrl } from "./mediaSource";
+import { isTallMedia, mediaSource, playbackUrl } from "./mediaSource";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, type QueuedRun, useRunFamily } from "./MediaViewerDock";
 import { setMembers, setPosition } from "./resultSets";
@@ -268,7 +268,6 @@ export function MediaViewer({
     quiet || bare ? [localDetails, setLocalDetails] : [rememberedDetails, setRememberedDetails];
   const [sheet, setSheet] = useState(false);
   const detailsOpen = phone ? sheet : details;
-  const showDetails = () => (phone ? setSheet(true) : setDetails(true));
   const [chrome, setChrome] = useState<"standard" | "full" | "image">("standard");
   const immersive = quiet && chrome === "image";
   const actionsOpen = !immersive && !sheet;
@@ -330,10 +329,13 @@ export function MediaViewer({
   const family = useRunFamily(item, queued, related, jobs);
   const members = setMembers(related, item);
   const hasThumbnails = family.length > 1 || members.length > 1;
-  function reveal() {
-    if (!thumbnailsOpen && hasThumbnails) setChrome("full");
-    else if (immersive) setChrome("standard");
-    else showDetails();
+  function showDetails() {
+    if (bare) return;
+    if (phone) setSheet(true);
+    else {
+      if (immersive) setChrome("standard");
+      setDetails(true);
+    }
   }
   const position =
     canNavigate && itemLabel
@@ -415,9 +417,8 @@ export function MediaViewer({
       gestureClick.current = false;
     });
     if (direction === "down") close();
-    else if (direction === "up") {
-      reveal();
-    } else return Boolean(move(direction === "left" ? 1 : -1));
+    else if (direction === "up") showDetails();
+    else return Boolean(move(direction === "left" ? 1 : -1));
     return false;
   }
   const previous = canNavigate ? viewable[currentIndex - 1] : undefined;
@@ -535,7 +536,7 @@ export function MediaViewer({
             setDeleting(true);
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
-            reveal();
+            showDetails();
           } else if (quiet && event.key.toLowerCase() === "c") {
             event.preventDefault();
             if (!event.repeat) cycleChrome();
@@ -592,6 +593,7 @@ export function MediaViewer({
               ref={containStage}
               className={`${classes.stage} ${classes.viewerStage}`}
               data-viewer-stage
+              data-tall={isTallMedia(source) || undefined}
               tabIndex={-1}
             >
               {showTogether ? (

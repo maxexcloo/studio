@@ -83,7 +83,7 @@ export function ViewerDetails({
   return (
     <div
       className={classes.asideTrack}
-      data-open={opened || undefined}
+      data-open={(opened && !hidden) || undefined}
       inert={hidden}
       style={hidden ? { visibility: "hidden" } : undefined}
     >
