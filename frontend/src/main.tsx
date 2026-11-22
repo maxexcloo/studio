@@ -94,7 +94,8 @@ document.addEventListener(
   (event) => {
     if (!event.cancelable || event.touches.length !== 1) return;
     const edge = 20;
-    const { clientX } = event.touches[0];
+    const start = event.touches[0];
+    const { clientX } = start;
     if (clientX > edge && clientX < window.innerWidth - edge) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
@@ -106,8 +107,30 @@ document.addEventListener(
     if (
       target.closest("a, button") &&
       (!target.closest("[data-zoom-mode]") || target.closest("[data-zoom-controls]"))
-    )
+    ) {
+      // Leave taps alone. Only an inward drag from the edge consumes the control's touch.
+      const edgeGesture = new AbortController();
+      const { signal } = edgeGesture;
+      const finish = () => edgeGesture.abort();
+      document.addEventListener("touchend", finish, { capture: true, signal });
+      document.addEventListener("touchcancel", finish, { capture: true, signal });
+      document.addEventListener(
+        "touchmove",
+        (move) => {
+          const touch = move.touches[0];
+          if (move.touches.length !== 1 || touch.identifier !== start.identifier) {
+            finish();
+            return;
+          }
+          const inward = (touch.clientX - clientX) * (clientX <= edge ? 1 : -1);
+          const vertical = Math.abs(touch.clientY - start.clientY);
+          if (vertical >= 8 && vertical >= inward) finish();
+          else if (inward >= 8 && move.cancelable) move.preventDefault();
+        },
+        { capture: true, passive: false, signal },
+      );
       return;
+    }
     event.preventDefault();
   },
   { capture: true, passive: false },
