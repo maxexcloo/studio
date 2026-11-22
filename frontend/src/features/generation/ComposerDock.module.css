@@ -20,7 +20,6 @@
 }
 
 .dock[data-reference-drop] > .surface {
-  border-color: var(--mantine-primary-color-filled);
   outline: 2px solid var(--mantine-primary-color-filled);
   outline-offset: 3px;
 }
