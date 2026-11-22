@@ -8,7 +8,7 @@ import { NumberSetting } from "../../ui/NumberSetting";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { type Dream, type DreamSettings, dreamCountQuery, dreamQuery } from "./queries";
 
-/** Notes a setting an administrator forces on every account (Settings › Generation). */
+/** Notes a setting an administrator forces on every account (Settings › Dream Policy). */
 export const lockedByAdministrator = "Set by an administrator.";
 
 /** Saves part of the Dream settings and shows the result at once. */
@@ -57,12 +57,7 @@ export function DreamPreferences() {
     </SettingRow>
   );
   const number = (
-    key:
-      | "dailyImages"
-      | "dailyVideos"
-      | "imageIdleMinutes"
-      | "imageSwitchMinutes"
-      | "videoIdleMinutes",
+    key: "dailyImages" | "dailyVideos" | "imageIdleMinutes" | "videoIdleMinutes",
     label: string,
     description: string,
     disabled: boolean,
@@ -127,12 +122,6 @@ export function DreamPreferences() {
           500,
         )}
         {idle("imageIdleMinutes")}
-        {number(
-          "imageSwitchMinutes",
-          "Model & LoRA Switch Delay",
-          "Minutes the queue must be idle before Dream changes the local model or LoRAs. Images can reuse the loaded model and LoRAs during this wait.",
-          !settings.images || settings.imageBackend !== "local",
-        )}
         {backend("imageBackend")}
       </SettingGroup>
       <SettingGroup title="Videos">

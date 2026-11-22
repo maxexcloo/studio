@@ -2,7 +2,12 @@ import { execFileSync } from "node:child_process";
 
 import { type Locator, type Page, expect } from "@playwright/test";
 
-import { dreamCardCounts, dreamDefaults, dreamOverrideKeys } from "../../shared/dream";
+import {
+  dreamCardCounts,
+  dreamDefaults,
+  dreamImageSwitchSetting,
+  dreamOverrideKeys,
+} from "../../shared/dream";
 import type { QueueRetryResponse } from "../../shared/queue";
 
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
@@ -188,7 +193,7 @@ export async function fixtures(page: Page) {
     canChangePassword: true,
   };
 
-  const deploymentDream = dreamOverridesFixture();
+  const deploymentDream = dreamPolicyFixture();
   let deploymentTextProfile = "";
   const administration = {
     accounts: [
@@ -1079,8 +1084,6 @@ export async function expandAssistantMenu(
   scope: Page | Locator,
   label: "Suggestions" | "Templates",
 ) {
-  const page = "page" in scope ? scope.page() : scope;
-  if (!(await page.locator("html[data-phone]").count())) return;
   const section = scope.getByRole("menuitem", { name: label, exact: true });
   await expect(section).toBeVisible();
   if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
@@ -1753,11 +1756,22 @@ export function videoClip() {
   }
 }
 
-/** Settings › Generation with no Dream overrides: every account chooses for itself. */
-export const dreamOverridesFixture = () =>
-  Object.fromEntries(
-    Object.entries(dreamOverrideKeys).map(([name, key]) => [
-      name,
-      { key, value: null as unknown, source: "default", locked: false },
-    ]),
-  );
+/** Dream Policy with the shared default delay and no account overrides. */
+export const dreamPolicyFixture = () =>
+  Object.fromEntries([
+    ...Object.entries(dreamOverrideKeys).map(
+      ([name, key]): [string, { key: string; value: unknown; source: string; locked: boolean }] => [
+        name,
+        { key, value: null, source: "default", locked: false },
+      ],
+    ),
+    [
+      "imageSwitchMinutes",
+      {
+        key: dreamImageSwitchSetting.key,
+        value: dreamImageSwitchSetting.defaultValue,
+        source: "default",
+        locked: false,
+      },
+    ],
+  ]);

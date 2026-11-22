@@ -34,9 +34,16 @@ const settingSections = {
     icon: Route,
     group: "Personal",
   },
+  "dream-policy": {
+    label: "Dream Policy",
+    description: "Shared queue rules and Dream overrides for all accounts.",
+    icon: icons.dream,
+    admin: true,
+    group: "Administration",
+  },
   generation: {
     label: "Generation",
-    description: "Default profiles and Dream settings for all accounts.",
+    description: "Default profiles and failed items across all accounts.",
     icon: Boxes,
     admin: true,
     group: "Administration",

@@ -35,6 +35,8 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 `STUDIO_DEFAULT_IMAGE_PROFILE` and `STUDIO_DEFAULT_VIDEO_PROFILE` pick a fresh composer's profiles (else the first ready one).
 
+Set `STUDIO_DREAM_IMAGE_SWITCH_MINUTES` to manage the shared Dream image switch delay through deployment configuration. Otherwise administrators can change it in **Settings › Dream Policy**.
+
 ### Radiance
 
 1. Start [Radiance](https://radiance.stilldeadco.de/docs/#40-the-configuration-file) with an image or video model. Make its server address reachable from Studio. On the same host with the Docker quick start, its default port is `8000`.

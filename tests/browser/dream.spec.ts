@@ -484,9 +484,9 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await images.fill("200");
   await images.press("Enter");
   await expect.poll(() => dream.settings.dailyImages).toBe(200);
-  const modelSwitch = imageSettings.getByRole("textbox", { name: "Model & LoRA Switch Delay" });
-  await modelSwitch.fill("8");
-  await modelSwitch.press("Enter");
+  const idle = imageSettings.getByRole("textbox", { name: "Idle Delay", exact: true });
+  await idle.fill("8");
+  await idle.press("Enter");
   await expect(settings.getByRole("switch", { name: "Spicy", exact: true })).toBeVisible();
   await expect
     .poll(() => dream.requests.map((request) => request.body))
@@ -495,11 +495,11 @@ test("Dream explains itself while off and saves its settings in Settings", async
       { paused: true },
       { videos: true },
       { dailyImages: 200 },
-      { imageSwitchMinutes: 8 },
+      { imageIdleMinutes: 8 },
     ]);
   await imageSettings.getByRole("switch", { name: "Enable", exact: true }).click({ force: true });
   await expect(images).toBeDisabled();
-  await expect(modelSwitch).toBeDisabled();
+  await expect(idle).toBeDisabled();
   await expect.poll(() => dream.settings.images).toBe(false);
 });
 

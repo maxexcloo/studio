@@ -9,9 +9,8 @@ import { ProfileSelect } from "../generation/ProfilePicker";
 import { TextModelSelect, textModelName } from "../generation/TextModelSelect";
 import { DeleteFailedItems } from "./DeleteFailedItems";
 import { type Setting, deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
-import { DreamAdministration } from "./DreamAdministration";
 
-/** Settings › Generation: the default profiles, Dream's overrides and every account's failed items. */
+/** Settings › Generation: the default profiles and every account's failed items. */
 export function GenerationSettings() {
   const deployment = useQuery(deploymentQuery);
   const profiles = useQuery(modelsQuery).data?.profiles ?? [];
@@ -68,7 +67,6 @@ export function GenerationSettings() {
           />
         </SettingRow>
       </SettingGroup>
-      <DreamAdministration />
       {multiUser && (
         <SettingGroup title="Danger Zone" danger>
           <DeleteFailedItems others />

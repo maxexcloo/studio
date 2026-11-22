@@ -115,6 +115,7 @@ export function useCardSelection(
       <ToolbarAction
         label="Select"
         icon={SquareCheck}
+        iconOnly
         variant="default"
         aria-pressed={selection !== null}
         disabled={(!selection && !cards?.length) || batch.isPending}

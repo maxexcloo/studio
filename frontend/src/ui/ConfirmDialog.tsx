@@ -1,8 +1,9 @@
 import { Alert, Box, Button, FocusTrap, Group, Menu, Modal, Stack, Text } from "@mantine/core";
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useId, useRef } from "react";
 
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
+import { closeWhenTop } from "./popupClicks";
 import { PopupTooltip } from "./PopupTooltip";
 import { usePhone } from "./usePhone";
 
@@ -112,6 +113,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  const id = useId();
   const close = () => {
     if (!pending) onClose();
   };
@@ -125,8 +127,9 @@ export function ConfirmDialog({
   wasOpen.current = opened;
   return (
     <Modal
+      id={id}
       opened={opened}
-      onClose={close}
+      onClose={closeWhenTop(id, close)}
       title={title}
       size="md"
       zIndex={zIndex}

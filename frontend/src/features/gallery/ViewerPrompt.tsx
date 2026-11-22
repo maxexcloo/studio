@@ -133,7 +133,6 @@ export function ViewerPrompt({
           label: "Suggestions & Templates",
           icon: icons.assistant,
           menu: assistMenu({
-            expandable: true,
             suggestions,
             ...changeTemplates(
               assistant?.changes ?? [],

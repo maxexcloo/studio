@@ -794,16 +794,13 @@ test("Dream reuses a loaded model but waits for an empty queue before loading an
   assert.deepEqual(submitted, [manual.id, warm.id, interveningRequest.id, cold.id]);
 });
 
-test("Dream can reuse a loaded photo setup immediately but waits the account's switch delay for changed LoRAs", async (t) => {
+test("Dream can reuse a loaded photo setup immediately but waits the shared switch delay for changed LoRAs", async (t) => {
   const { store, queue, adapter, submitted, observations } = fixture();
   t.after(() => store.close());
   let now = 0;
   let minutes = 3;
   queue.now = () => now;
-  adapter.dreamImageSwitchMinutes = (ownerId) => {
-    assert.equal(ownerId, "alice");
-    return minutes;
-  };
+  adapter.dreamImageSwitchMinutes = () => minutes;
   const session = store.createSession("alice").id;
   const stack = [
     { name: "grain", strength: 0.5 },
