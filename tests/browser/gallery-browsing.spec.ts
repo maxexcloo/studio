@@ -10,7 +10,7 @@ import {
   selectionAction,
   serveRetries,
   showOnly,
-  showViewerControls,
+  showViewerThumbnails,
   stamp,
   toolbarSearch,
   touch,
@@ -336,6 +336,15 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByText(/^[12] \/ 2$/)).toBeVisible();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  const modes = page.getByRole("navigation", { name: "Creative Modes", exact: true });
+  await modes.getByRole("link", { name: "Videos", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Remove This Chat Filter" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open video: Chat Video", exact: true }),
+  ).toBeVisible();
+  await modes.getByRole("link", { name: "Images", exact: true }).click();
+  await expect(tile(1)).toBeVisible();
+  await expect(tile(2)).toHaveCount(0);
   const output = page.getByRole("radiogroup", { name: "Generation Output", exact: true });
   await expandComposer(page);
   await output.locator("label").filter({ hasText: "Video" }).click();
@@ -656,7 +665,7 @@ test("MCP set results appear individually and the viewer can jump along the set 
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const current = currentResult(viewer);
   await expect(current).toHaveText(place("Bear Hug", 1));
-  await showViewerControls(viewer);
+  await showViewerThumbnails(viewer);
   const strip = viewer.getByRole("list", { name: "Set: Variety Test", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(3);
   await strip.getByRole("listitem", { name: "Show Fox Wizard (3 of 3)", exact: true }).click();
@@ -1368,7 +1377,7 @@ test("The viewer's set strip shows only its own set", async ({ page }) => {
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Prompt A-1", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await showViewerControls(viewer);
+  await showViewerThumbnails(viewer);
   const strip = viewer.getByRole("list", { name: "Set: Set A", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
   await strip.getByRole("listitem", { name: "Show Prompt A-0 (2 of 2)", exact: true }).click();
@@ -1947,7 +1956,6 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
         await photo.dispatchEvent("touchend", { touches: [], changedTouches: [] });
       }
     }
-    await showViewerControls(viewer);
     const saved = page.waitForResponse("**/api/gallery/favorite");
     await viewer.getByRole("button", { name: "Dislike", exact: true }).focus();
     await page.keyboard.press("Space");
@@ -1994,7 +2002,6 @@ test("Closing a disliked item focuses its next visible gallery neighbour", async
   await page.goto("/images/browse-1");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
-  await showViewerControls(viewer);
   await viewer.getByRole("button", { name: "Dislike", exact: true }).focus();
   await page.keyboard.press("Space");
   await expect.poll(() => state.gallery[1].rating).toBe("disliked");

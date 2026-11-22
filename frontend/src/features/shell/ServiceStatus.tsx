@@ -5,6 +5,8 @@ import {
   FocusTrap,
   Group,
   Popover,
+  Progress,
+  Stack,
   Text,
   Tooltip,
   UnstyledButton,
@@ -63,7 +65,6 @@ export function StatusAction() {
   // Work a paused queue holds is waiting, not generating.
   const unfinished = jobs.filter((job) => !terminalStatuses.has(job.status));
   const progress = queueProgress(jobs, unfinished);
-  const percent = progress ? Math.floor((100 * progress.finished) / progress.total) : 0;
   const progressLabel =
     progress &&
     [
@@ -112,6 +113,18 @@ export function StatusAction() {
   const tooltip = [generating ? "Generating" : held ? "Queue Paused" : summary.label, progressLabel]
     .filter(Boolean)
     .join(" · ");
+  const overall = progress && (
+    <Stack gap={4}>
+      <Text size="xs" c="dimmed">
+        {progressLabel}
+      </Text>
+      <Progress
+        aria-label="Overall Queue Progress"
+        size="xs"
+        value={(progress.finished * 100) / progress.total}
+      />
+    </Stack>
+  );
   const trigger = (
     <ActionIcon
       ref={target}
@@ -121,20 +134,15 @@ export function StatusAction() {
       aria-expanded={opened}
       variant="subtle"
       color={generating || held ? "gray" : summary.colour}
+      className={progress ? classes.counted : undefined}
+      data-queue-count={Boolean(progress) || undefined}
       onClick={() => setOpened(!opened)}
     >
-      {progress ? (
-        <span
-          aria-hidden
-          className={classes.progress}
-          style={{
-            backgroundImage: `linear-gradient(90deg, var(--mantine-primary-color-filled) ${percent}%, transparent ${percent}%)`,
-          }}
-        >
-          {progress.total > 99 ? `${percent}%` : `${progress.finished}/${progress.total}`}
+      <icons.queue size={19} />
+      {progress && (
+        <span aria-hidden className={classes.progress}>
+          {progress.finished}/{progress.total}
         </span>
-      ) : (
-        <icons.queue size={19} />
       )}
     </ActionIcon>
   );
@@ -182,11 +190,7 @@ export function StatusAction() {
               <Text fw={500}>{heading}</Text>
               <QueueActions />
             </Group>
-            {progressLabel && (
-              <Text size="xs" c="dimmed">
-                {progressLabel}
-              </Text>
-            )}
+            {overall}
             <div className={classes.list}>
               <Queue downloads={downloads} />
             </div>
@@ -219,11 +223,7 @@ export function StatusAction() {
           </Drawer.Header>
           <Drawer.Body className={classes.body}>
             <FocusTrap.InitialFocus />
-            {progressLabel && (
-              <Text size="xs" c="dimmed">
-                {progressLabel}
-              </Text>
-            )}
+            {overall}
             <div className={classes.list}>
               <Queue downloads={downloads} />
             </div>

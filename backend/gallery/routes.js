@@ -293,9 +293,11 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const fromChat = (item) =>
       !chat || (item.chat?.conversationId === chat && (!turn || item.chat.turnId === turn));
     // Unfinished work shows only as the account chooses (Settings › Preferences › Gallery): none,
-    // work in progress, or queued work too; unsaved, none. A chat's results show all of it, as
-    // its links are opened to watch them.
-    const work = chat ? "queued" : accountPreferences(account?.userId || "").galleryWork || "none";
+    // work in progress, or queued work too; unsaved, none. Links to chats and sets include queued work.
+    const work =
+      chat || query.set
+        ? "queued"
+        : accountPreferences(account?.userId || "").galleryWork || "none";
     const owned = ownedQuery(account);
     const page = owned
       ? pageGallery({

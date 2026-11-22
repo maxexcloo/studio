@@ -41,9 +41,11 @@ function AppNotifications() {
   const { notifications: shown, queue } = useNotifications();
   useEffect(() => {
     if (!queue.length) return;
-    const waiting = new Set(queue.map(({ position }) => position ?? "top-center"));
-    for (const { id, position } of shown) {
-      if (!waiting.has(position ?? "top-center")) continue;
+    for (const { id, position = "top-center", priority = 0 } of shown) {
+      const replaces = queue.some(
+        (next) => (next.position ?? "top-center") === position && (next.priority ?? 0) >= priority,
+      );
+      if (!replaces) continue;
       const banner = document.getElementById(id!);
       banner?.setAttribute("inert", "");
       banner?.setAttribute("aria-hidden", "true");

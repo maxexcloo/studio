@@ -15,6 +15,7 @@ export function ViewerDetails({
   related,
   follow,
   opened,
+  hidden,
   phone,
   close,
   zIndex,
@@ -25,6 +26,7 @@ export function ViewerDetails({
   related?: MediaItem[];
   follow?: (item: MediaItem) => void;
   opened: boolean;
+  hidden?: boolean;
   phone: boolean;
   close: () => void;
   zIndex?: number;
@@ -79,7 +81,12 @@ export function ViewerDetails({
       </Drawer.Root>
     );
   return (
-    <div className={classes.asideTrack} data-open={opened || undefined}>
+    <div
+      className={classes.asideTrack}
+      data-open={opened || undefined}
+      inert={hidden}
+      style={hidden ? { visibility: "hidden" } : undefined}
+    >
       <aside
         className={classes.aside}
         data-chrome

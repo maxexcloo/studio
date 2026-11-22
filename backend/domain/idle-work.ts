@@ -363,6 +363,11 @@ export function createIdleWork<Item extends IdleItem>(options: {
   let timer: ReturnType<typeof setInterval> | undefined;
   return {
     tick,
+    /** Give newly saved results the next scheduled turn before resuming the previous walk. */
+    prioritiseRecent() {
+      resume = top;
+      spawn();
+    },
     /** Waits for every item started in the background (a pass's parallel and follow-on ones). */
     async settled() {
       while (pending.size) await Promise.allSettled([...pending]);

@@ -12,6 +12,7 @@ interface McpLink {
   page?: boolean;
   all?: boolean;
   scope?: string;
+  gallery?: { kind: "image" | "video"; chat?: string; turn?: string; set?: string };
   sheet?: [string, number][];
 }
 
@@ -19,12 +20,13 @@ interface McpLink {
 export const mcpLinkKey = (audience: string, owner: string, target: string, index?: unknown) =>
   JSON.stringify([audience, owner, target, index ?? "page"]);
 
-export const linkKeyOf = (link: McpLink) =>
-  link.all
-    ? mcpLinkKey(link.audience, link.owner, `refs:${link.scope}`, "all")
-    : link.sheet
-      ? mcpLinkKey(link.audience, link.owner, `sheet:${JSON.stringify(link.sheet)}`, "sheet")
-      : mcpLinkKey(link.audience, link.owner, link.jobId!, link.index);
+export const linkKeyOf = (link: McpLink) => {
+  const { audience, owner, jobId, index, page, all, scope, sheet, gallery } = link;
+  if (all) return mcpLinkKey(audience, owner, `refs:${scope}`, "all");
+  if (sheet) return mcpLinkKey(audience, owner, `sheet:${JSON.stringify(sheet)}`, "sheet");
+  if (gallery) return mcpLinkKey(audience, owner, `gallery:${JSON.stringify(gallery)}`, "gallery");
+  return mcpLinkKey(audience, owner, jobId!, page && index !== undefined ? `page:${index}` : index);
+};
 
 /**
  * MCP's records, a row per change: each job's and reference's MCP owner, each conversation's
@@ -122,12 +124,19 @@ export function mcpOwnership(db: DatabaseSync) {
       get("SELECT job_id FROM studio_mcp_refs WHERE scope = ? AND number = ?", scope, number)
         ?.job_id as string | undefined,
     /** The scope's latest `limit` results, oldest first. */
-    latestRefs: (scope: string, limit: number) =>
-      (
+    latestRefs: (scope: string, limit: number, conversation?: string) => {
+      const authored = conversation
+        ? "AND (SELECT json_extract(value, '$.chat') FROM studio_mcp_prompts WHERE job_id = ref.job_id) = ?"
+        : "";
+      return (
         run(
-          "SELECT number, job_id AS jobId FROM studio_mcp_refs WHERE scope = ? ORDER BY number DESC LIMIT ?",
-        ).all(scope, limit) as { number: number; jobId: string }[]
-      ).reverse(),
+          `SELECT number, job_id AS jobId FROM studio_mcp_refs AS ref WHERE scope = ? ${authored} ORDER BY number DESC LIMIT ?`,
+        ).all(scope, ...(conversation ? [conversation] : []), limit) as {
+          number: number;
+          jobId: string;
+        }[]
+      ).reverse();
+    },
     /** Adds the scope's next set; a number is never reused. */
     addSet: (scope: string, set: ChatSet) =>
       get(

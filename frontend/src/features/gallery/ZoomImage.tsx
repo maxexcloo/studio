@@ -19,6 +19,7 @@ export function ZoomImage({
   placeholder,
   swipe,
   onTap,
+  hideControls,
   fill = false,
 }: {
   mediaId?: string;
@@ -34,6 +35,7 @@ export function ZoomImage({
   swipe?: SwipeGesture;
   /** A lone touch tap on the picture, once it is plainly not the first of a double tap. */
   onTap?: () => void;
+  hideControls?: boolean;
   /** Rests filling the viewport, cropped, rather than whole; it doesn't pan there. */
   fill?: boolean;
 }) {
@@ -259,6 +261,7 @@ export function ZoomImage({
       <VisuallyHidden id={instructions}>
         Click to cycle Fit, Fill and Actual Size, or double-tap to zoom. Drag to pan. Use the mouse
         wheel or pinch to zoom.
+        {onTap && " Tap once or press C to cycle the viewer controls."}
         {swipe &&
           " At Fit, swipe left or right to move between generations, up for details and down to close."}
       </VisuallyHidden>
@@ -360,7 +363,7 @@ export function ZoomImage({
           </Button>
         </Stack>
       )}
-      <MediaZoomControls zoom={zoom} />
+      {!hideControls && <MediaZoomControls zoom={zoom} />}
     </div>
   );
 }

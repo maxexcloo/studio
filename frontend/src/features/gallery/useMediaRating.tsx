@@ -157,6 +157,7 @@ export function showDisliked(
   const notification = notifications.show({
     autoClose: 8000,
     position: "top-right",
+    priority: 1,
     role: "status",
     withCloseButton: false,
     message: (

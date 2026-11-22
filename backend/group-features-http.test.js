@@ -136,6 +136,15 @@ test(
       body: ideas,
     });
     assert.deepEqual([refused.status, refused.body.error], [403, off]);
+    const inspect = (cookie) =>
+      call("/api/suggestions/inspect", { method: "POST", cookie, body: {} });
+    const allowedInspect = await inspect(cookies.member);
+    assert.deepEqual(
+      [allowedInspect.status, allowedInspect.body.error],
+      [400, "Choose an image result."],
+    );
+    const refusedInspect = await inspect(cookies.limited);
+    assert.deepEqual([refusedInspect.status, refusedInspect.body.error], [403, off]);
   },
 );
 

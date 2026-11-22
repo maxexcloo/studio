@@ -20,3 +20,8 @@ export interface Change extends NextStep {
 export type Suggestions<T = PromptIdea> =
   | { suggestions: T[]; reason?: undefined }
   | { suggestions: []; reason: string };
+
+export type ImageInspection =
+  | { status: "issue"; issue: string }
+  | { status: "clear" }
+  | { status: "unavailable"; reason: string };

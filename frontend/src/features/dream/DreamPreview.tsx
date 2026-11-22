@@ -200,6 +200,7 @@ export function DreamPreview({
   fly,
   close,
   act,
+  askPass,
   undo,
 }: {
   card: DeckCard;
@@ -212,6 +213,7 @@ export function DreamPreview({
   fly: RefObject<Fly | null>;
   close: () => void;
   act: (choice: Choice["choice"]) => void;
+  askPass: () => void;
   undo: () => void;
 }) {
   const id = useId();
@@ -364,6 +366,7 @@ export function DreamPreview({
             <DeckButtons
               card={card}
               act={act}
+              askPass={askPass}
               hidden={false}
               expanded
               trailing={<DreamSuggestions card={card} side={side} onMore={() => act("more")} />}

@@ -1,8 +1,8 @@
-/* The bottom-right corner of the stage, which ends above the action bar; clear of a side safe area. */
+/* The gallery dock overlays the stage; keep the zoom buttons clear of its full height. */
 .controls {
   position: absolute;
   right: calc(var(--mantine-spacing-sm) + env(safe-area-inset-right));
-  bottom: var(--mantine-spacing-sm);
+  bottom: calc(var(--mantine-spacing-sm) + var(--studio-viewer-dock-height, 0px));
   z-index: 3;
   padding: 2px;
   border: 1px solid var(--studio-glass-border);

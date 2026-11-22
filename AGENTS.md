@@ -163,7 +163,8 @@ recur across features.
   existing results. Both use the same Images and Videos selector. The fullscreen
   preview fills the stage above the verdicts and shares the viewer's
   gestures, top chrome, media controls and Details surface. Verdicts in
-  fullscreen use the buttons. Pass offers a reason before dismissing the card.
+  fullscreen use the buttons. Passing moves on without a rating. Holding Pass
+  opens the reason picker.
   Not My Taste records a dislike. Comparisons offer Pass, the lettered choices
   and Accept. A three-way comparison picks its winner through A, B or C.
   On a set, Deny All dislikes every member. Super Like keeps the set and rates
@@ -264,10 +265,11 @@ recur across features.
   fill the viewport, keep the current image visible until the next loads,
   stop navigation at the first and last item, and on closing reveal and focus
   the current tile.
-- The gallery viewer opens with its header and media. The header control
-  and a touch tap toggle the bottom controls without moving the media.
-  Swipe up reveals those controls first, then opens Details. Dream
-  fullscreen keeps its verdicts and opens Details on the first swipe up.
+- The gallery viewer opens with its header and bottom actions. A touch tap
+  cycles through those controls, those controls with thumbnails and media
+  alone without moving the media. Swipe up first reveals thumbnails, then
+  opens Details. Dream fullscreen keeps its verdicts and opens Details on
+  the first swipe up.
 - The gallery defaults to newest first, with a tile per result. Sets and
   versions have separate thumbnail strips in the viewer. Version grouping
   has one owner in `gallery/versions.ts`. Viewing and upscale
@@ -300,8 +302,9 @@ recur across features.
   `MutationCache` default notification; avoid duplicate error surfaces.
 - Routine success appears where it happened: a saved row, a copy check or a
   brief action label (`useFlash`). Notifications serve failures, Undo and
-  outcomes with nowhere else to show: small banners that drop from the top
-  and swipe back up. Generation submission
+  outcomes with nowhere else to show. Action errors and Undo use compact,
+  timed banners below the header. Banners can be dismissed with an upward
+  swipe. Generation submission
   and completion appear in their gallery or strip as soon as the queue reports
   them.
 

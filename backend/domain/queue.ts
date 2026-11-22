@@ -47,6 +47,7 @@ export interface QueueAdapter {
   cancel(job: OwnedJob): Promise<JobObservation | void>;
   saveOutputs(job: OwnedJob): Promise<JobObservation | void>;
   eligible?(job: OwnedJob): Promise<string | undefined>;
+  dreamIdleWait?(job: OwnedJob): string | undefined;
   settled?(job: OwnedJob): Promise<void>;
   /** Other resources that could run this queued job now, best first (an idle worker takes it). */
   alternatives?(job: OwnedJob): string[];
@@ -353,6 +354,8 @@ export class GenerationQueue {
 
   private async run() {
     const held = this.held();
+    const dreamDelay = (job: OwnedJob) =>
+      job.priority === queuePriority.dream ? this.adapter.dreamIdleWait?.(job) : undefined;
     // Read once until the observations below are awaited; this tick's saves update the list.
     const jobs = new Map(this.store.openJobs().map((job) => [job.id, job]));
     const save = (job: OwnedJob) => {
@@ -386,9 +389,14 @@ export class GenerationQueue {
     const unwritten = [...jobs.values()]
       .filter((job) => job.status === "writing" && !this.writing.has(job.id) && !held(job))
       .sort((a, b) => (a.priority ?? queuePriority.manual) - (b.priority ?? queuePriority.manual));
-    for (const job of unwritten)
-      if (this.writing.size < maxWrites) this.write(job);
-      else if (job.reason !== writeWaitReason) save({ ...job, reason: writeWaitReason });
+    for (const job of unwritten) {
+      const delay = dreamDelay(job);
+      if (!delay && this.writing.size < maxWrites) this.write(job);
+      else {
+        const reason = delay || writeWaitReason;
+        if (job.reason !== reason) save({ ...job, reason });
+      }
+    }
     await Promise.all(
       [...jobs.values()]
         .filter(
@@ -566,6 +574,12 @@ export class GenerationQueue {
               if (!latest || !waitingNow(latest) || this.held()(latest)) continue;
               job = latest;
             }
+            const delay = dreamDelay(job);
+            if (delay) {
+              wait(job, delay);
+              skipped.push(job);
+              continue;
+            }
             let reason: string | undefined;
             this.checkingEligibility.add(job.id);
             try {
@@ -590,6 +604,8 @@ export class GenerationQueue {
             // One local video runs at a time across workers: two at once on one-GPU workers sharing a
             // node run it out of system memory. A two-GPU worker holds the node alone, so it never
             // meets this. Synchronous from here to "starting", so two workers' passes can't both start.
+            // A user can submit during an asynchronous readiness check.
+            reason ||= dreamDelay(job);
             if (!reason && localVideo(job) && this.videoRunning(job.id)) reason = videoWaitReason;
             if (reason) {
               wait(job, reason);

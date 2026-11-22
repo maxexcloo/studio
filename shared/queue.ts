@@ -92,6 +92,8 @@ export interface QueueJob {
   parentItemId?: string;
   operation: GenerationOperation;
   status: QueueStatus;
+  /** A stop has been requested and the generation is still active. */
+  cancelling?: true;
   reason: string;
   input: GenerationInput;
   items: QueueMedia[];
