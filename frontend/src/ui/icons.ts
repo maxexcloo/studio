@@ -28,6 +28,7 @@ import {
   Layers,
   LayoutDashboard,
   Link,
+  List,
   ListFilter,
   ListRestart,
   ListX,
@@ -149,6 +150,7 @@ export const icons = {
   project: FolderOpen,
   /** Editing a prompt and the composer's settings. */
   prompt: SlidersHorizontal,
+  queue: List,
   /** Running an item again (Recreate). */
   recreate: Repeat2,
   redo: Redo2,

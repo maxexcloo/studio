@@ -191,6 +191,7 @@ test("a request's jobs group as one set that moves and stops together", async ({
   await page.goto("/");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAccessibleDescription("Generating · 1 of 4 Finished");
+  await expect(status.getByText("1/4", { exact: true })).toBeVisible();
   await status.click();
   const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   // The set is one row: its title and progress, its jobs under it once opened.

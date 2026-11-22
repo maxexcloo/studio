@@ -363,6 +363,23 @@ export class Store {
       .map((row) => JSON.parse(row.record as string));
   }
 
+  /** The last started job per resource, for restoring its loaded model and LoRAs on restart. */
+  loadedJobs(): OwnedJob[] {
+    return this.db
+      .prepare(
+        `SELECT record FROM studio_queue WHERE rowid IN (
+          SELECT job_rowid FROM (
+            SELECT rowid AS job_rowid, row_number() OVER (
+              PARTITION BY json_extract(record, '$.resource')
+              ORDER BY json_extract(record, '$.updatedAt') DESC, created_at DESC, rowid DESC
+            ) AS position FROM studio_queue WHERE status NOT IN (${placeholders(pendingStatuses)}, 'cancelled')
+          ) WHERE position = 1
+        )`,
+      )
+      .all(...pendingStatuses)
+      .map((row) => JSON.parse(row.record as string));
+  }
+
   /** Journal the confirmed provider failure before it is published to the in-memory adapter. */
   rememberMemoryFailure(ownerId: string, id: string, reason: string) {
     const job = this.job(ownerId, id);
@@ -752,7 +769,9 @@ export class Store {
   saveWorkerModels(id: string, url: string, models: Record<string, any>) {
     this.db
       .prepare(
-        "INSERT INTO studio_worker_models VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET url = excluded.url, record = excluded.record",
+        `INSERT INTO studio_worker_models VALUES (?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET url = excluded.url, record = excluded.record
+        WHERE studio_worker_models.url <> excluded.url OR studio_worker_models.record <> excluded.record`,
       )
       .run(id, url, JSON.stringify(models));
     this.workerModelRecords.set(id, { url, record: models });

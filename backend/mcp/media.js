@@ -578,7 +578,9 @@ export class McpMedia {
   }
   /** Images the account's unfinished MCP jobs are expected to make. */
   async pendingOutputs(owner, signal) {
-    const { jobs = [] } = await this.request("GET", "/api/queue", undefined, owner, { signal });
+    const { jobs = [] } = await this.request("GET", "/api/queue?outputCounts=1", undefined, owner, {
+      signal,
+    });
     return jobs
       .filter(
         (job) =>

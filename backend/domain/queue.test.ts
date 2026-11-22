@@ -557,12 +557,22 @@ test("restart follows only recorded provider jobs and never resubmits uncertain 
   const filename = path.join(dir, "studio.sqlite");
   const first = fixture(filename);
   const session = first.store.createSession("alice");
+  const warm = first.store.enqueue(
+    "alice",
+    session.id,
+    { profileId: "loaded-model" },
+    "image",
+    undefined,
+    "worker:idle",
+  );
+  first.store.save({ ...warm, status: "completed" });
   const accepted = first.store.enqueue("alice", session.id, {}, "image");
   const queued = first.store.enqueue("alice", session.id, {}, "refine");
   await first.queue.tick();
   first.store.close();
   const restored = fixture(filename);
   try {
+    assert.equal(restored.queue.loads().get("worker:idle")?.model, "loaded-model");
     await restored.queue.tick();
     assert.deepEqual(restored.submitted, []);
     assert.equal(restored.store.job("alice", queued.id)?.status, "waiting");

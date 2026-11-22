@@ -5,7 +5,9 @@ import path from "node:path";
 import test from "node:test";
 
 import { createGenerationAdmission } from "../domain/admission.ts";
+import { findDirectRoute } from "../domain/direct-route.ts";
 import { GenerationQueue } from "../domain/queue.ts";
+import { registerQueueRoutes } from "../domain/routes.ts";
 import { Store } from "../domain/store.ts";
 import { openDatabase } from "../persistence/runtime.ts";
 import { McpMedia } from "./media.js";
@@ -45,6 +47,14 @@ test("MCP generation uses shared durable admission and owned reads without HTTP"
     revision: () => 1,
   });
   const calls = [];
+  const app = {};
+  registerQueueRoutes(app, {
+    store,
+    queue,
+    admit,
+    media: () => assert.fail("counting unfinished outputs should not load gallery media"),
+    ownsItem: () => false,
+  });
   const media = new McpMedia({
     dataDir: directory,
     publicUrl: "http://localhost:1",
@@ -53,6 +63,14 @@ test("MCP generation uses shared durable admission and owned reads without HTTP"
       const account = accounts.get(owner);
       if (method === "POST") return admit(input, account);
       if (!account?.authenticated) return { status: 401, payload: {} };
+      const url = new URL(route, "http://localhost");
+      if (url.pathname === "/api/queue") {
+        const found = findDirectRoute(app, method, url.pathname);
+        return found.run(account, {
+          params: found.params,
+          query: Object.fromEntries(url.searchParams),
+        });
+      }
       const job = store.job(owner, route.split("/").pop());
       return {
         status: 200,
@@ -121,6 +139,15 @@ test("MCP generation uses shared durable admission and owned reads without HTTP"
     assert.equal(store.jobs("disabled").length, 0);
     assert.equal(calls.length, 7);
     assert.deepEqual(submitted, []);
+
+    const batch = store.enqueue("alice", sessionId, { kind: "image", count: 3 }, "image");
+    const video = store.enqueue("alice", sessionId, { kind: "video" }, "animate");
+    const finished = store.enqueue("alice", sessionId, { kind: "image", count: 8 }, "image");
+    store.save({ ...finished, status: "completed" });
+    store.enqueue("alice", sessionId, { kind: "image", count: 7 }, "image");
+    media.adopt("alice", "chat", { jobs: [batch.id, video.id, finished.id] });
+    assert.equal(await media.pendingOutputs("alice"), 3);
+    assert.equal(await media.pendingOutputs("bob"), 0);
   } finally {
     queue.stop();
     store.close();
