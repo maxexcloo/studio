@@ -1,10 +1,8 @@
 import { Title } from "@mantine/core";
 import {
-  type Dispatch,
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
-  type SetStateAction,
   memo,
   useCallback,
   useEffect,
@@ -20,16 +18,14 @@ import { mediaIdentity } from "./mediaSource";
 import { MediaTile } from "./MediaTile";
 import { useGalleryLayout, useHoldToSelect, useScrollAnchor } from "./useGalleryLayout";
 import type { GallerySelection } from "./useGallerySelection";
-import type { VersionGroup } from "./versions";
 
 import classes from "./MediaGrid.module.css";
 
-export interface GalleryViewProps {
+interface GalleryViewProps {
   items: MediaItem[];
   /** The search, filters and mode the items answer: new results lay out afresh. */
   results: string;
-  /** Opens an item in the viewer; `run`, a job id, keeps its flipping to that run's results. */
-  open: (item: MediaItem, run?: string) => void;
+  open: (item: MediaItem) => void;
   selection: GallerySelection;
   focusItem: string | null;
   caption: "hover" | "pinned" | "none";
@@ -41,21 +37,13 @@ export interface GalleryViewProps {
   ) => ReactNode;
   onSelectionMenu: (x: number, y: number) => void;
   onTryAgain: (item: MediaItem) => void;
-  /** Each tile's versions, by its original; Grid shows one tile per group. */
-  versions?: Map<string, VersionGroup>;
   /** Items in time order: Grid heads each day and adds the date scrubber. */
   byDay?: boolean;
 }
 
-/**
- * Focuses a mounted tile, or the run stack holding it, now; returns false while virtualisation
- * has yet to render it.
- */
-export function focusTile(host: HTMLElement | null, id: string) {
-  const value = CSS.escape(id);
-  const button =
-    host?.querySelector<HTMLButtonElement>(`[data-media-id="${value}"]:not([data-media-group])`) ||
-    host?.querySelector<HTMLButtonElement>(`[data-media-group~="${value}"]`);
+/** Focuses a tile if it is mounted. */
+function focusTile(host: HTMLElement | null, id: string) {
+  const button = host?.querySelector<HTMLButtonElement>(`[data-media-id="${CSS.escape(id)}"]`);
   if (!button) return false;
   button.focus({ preventScroll: true });
   button.scrollIntoView({ block: "nearest" });
@@ -70,13 +58,14 @@ interface GridLayout {
   /** Each day's first tile and where its heading sits; one undated section when not by day. */
   sections: { day: string; first: number; top: number }[];
   height: number;
+  tallest: number;
 }
 // A day heading's height, and the space above each day after the first.
 const headingHeight = 36;
 const sectionSpace = 12;
 
-/** A layout being built, with each lane's next free top and the last tile's result set. */
-type Building = GridLayout & { lanes: number[]; lastSet?: string };
+/** A layout being built, with each lane's next free top. */
+type Building = GridLayout & { lanes: number[] };
 
 /**
  * Adds `items` to a masonry of `columns` lanes: each tile joins the shortest lane. With `byDay`,
@@ -93,10 +82,7 @@ function place(
   for (const item of items) {
     const index = layout.tiles.length;
     const day = byDay ? mediaDay(item) : "";
-    // An undated item, and a result set's later results, stay in the day before them.
-    const setMate = Boolean(item.resultSet && item.resultSet.id === layout.lastSet);
-    layout.lastSet = item.resultSet?.id;
-    if (!index || (day && !setMate && day !== layout.sections.at(-1)!.day)) {
+    if (!index || (day && day !== layout.sections.at(-1)!.day)) {
       const top = index ? Math.max(...layout.lanes) - gap + sectionSpace : 0;
       layout.sections.push({ day, first: index, top });
       layout.lanes = Array(columns).fill(top + (day ? headingHeight : 0));
@@ -105,6 +91,7 @@ function place(
     const height = (cell * (item.height || 1024)) / (item.width || 1024);
     layout.tiles.push({ top: layout.lanes[lane], left: lane * (cell + gap), height });
     layout.lanes[lane] += height + gap;
+    layout.tallest = Math.max(layout.tallest, height);
   }
   layout.height = layout.tiles.length ? Math.max(...layout.lanes) - gap : 0;
   return layout;
@@ -117,7 +104,14 @@ const layOut = (
   gap: number,
   byDay: boolean,
 ): Building =>
-  place({ tiles: [], sections: [], height: 0, lanes: [] }, items, columns, cell, gap, byDay);
+  place(
+    { tiles: [], sections: [], height: 0, tallest: 0, lanes: [] },
+    items,
+    columns,
+    cell,
+    gap,
+    byDay,
+  );
 
 /**
  * The part of the grid within a screen of the viewport, or of the `root` it scrolls in, in grid
@@ -153,12 +147,23 @@ export function useWindowSpan(
   return span;
 }
 
+/** Tile starts are ordered because each tile joins the shortest lane. */
+function firstAt(tiles: { top: number }[], top: number) {
+  let start = 0;
+  let end = tiles.length;
+  while (start < end) {
+    const middle = (start + end) >>> 1;
+    if (tiles[middle].top < top) start = middle + 1;
+    else end = middle;
+  }
+  return start;
+}
+
 /** Where the grid starts in window scroll coordinates. */
 const gridTop = (host: HTMLElement) => host.getBoundingClientRect().top + window.scrollY;
 
 /**
- * A virtualised masonry of every loaded item, or of each version group's original. `byDay` (the
- * gallery in time order) heads each day and adds the date scrubber.
+ * A virtualised masonry of every loaded item. In time order, it heads each day and adds the date scrubber.
  */
 export function MediaGrid({
   items,
@@ -171,12 +176,9 @@ export function MediaGrid({
   renderActions,
   onSelectionMenu,
   onTryAgain,
-  versions,
   byDay = false,
 }: GalleryViewProps) {
   const { columns, host, width, cell, gap, anchor } = useGalleryLayout();
-  // The version each tile shows while flipping, by the tile's original.
-  const [shown, setShown] = useState<Record<string, number>>({});
   const pendingFocus = useRef<string | null>(null);
   const [menuItem, setMenuItem] = useState<string | null>(null);
   const hold = useHoldToSelect(items, selection, setMenuItem);
@@ -191,11 +193,7 @@ export function MediaGrid({
     [layout],
   );
   useScrollAnchor(host, places, `${columns}:${width}:${byDay}:${results}`);
-  /** The tile showing an item, which may be one of a grouped tile's versions. */
-  const tileIndex = (id: string) =>
-    items.findIndex(
-      (item) => item.id === id || versions?.get(item.id)?.some((version) => version.id === id),
-    );
+  const tileIndex = (id: string) => items.findIndex((item) => item.id === id);
   /** Scrolls a tile into view only as far as it must, as a focus move does. */
   const scrollToTile = useCallback(
     (index: number) => {
@@ -243,14 +241,13 @@ export function MediaGrid({
     if (!layout || shownFocus.current === focusItem) return;
     const index = tileIndex(focusItem);
     if (index < 0) return;
-    // A grouped tile is marked by the version it shows.
-    const original = items[index].id;
-    const id = versions?.get(original)?.[shown[original]]?.id || original;
     shownFocus.current = focusItem;
-    pendingFocus.current = id;
+    pendingFocus.current = focusItem;
     scrollToTile(index);
-    if (focusTile(host.current, id)) pendingFocus.current = null;
+    if (focusTile(host.current, focusItem)) pendingFocus.current = null;
   }, [focusItem, layout]);
+  const firstTile = layout ? firstAt(layout.tiles, span.top - layout.tallest) : 0;
+  const lastTile = layout ? firstAt(layout.tiles, span.bottom) : 0;
   const within = (top: number, height: number) => top < span.bottom && top + height > span.top;
   return (
     <>
@@ -260,36 +257,39 @@ export function MediaGrid({
         {...hold.handlers}
         style={{ height: layout?.height, position: "relative", touchAction: "pan-x pan-y" }}
       >
-        {layout?.sections.map(
-          (section) =>
-            section.day &&
-            within(section.top, headingHeight) && (
-              <Title
-                key={`${section.day}:${section.first}`}
-                order={2}
-                size="h5"
-                className={classes.day}
-                style={{ transform: `translateY(${section.top}px)` }}
-              >
-                {dayHeading(section.day)}
-              </Title>
-            ),
-        )}
-        {layout?.tiles.map((tile, index) => {
+        {layout?.sections
+          .slice(
+            firstAt(layout.sections, span.top - headingHeight),
+            firstAt(layout.sections, span.bottom),
+          )
+          .map(
+            (section) =>
+              section.day &&
+              within(section.top, headingHeight) && (
+                <Title
+                  key={`${section.day}:${section.first}`}
+                  order={2}
+                  size="h5"
+                  className={classes.day}
+                  style={{ transform: `translateY(${section.top}px)` }}
+                >
+                  {dayHeading(section.day)}
+                </Title>
+              ),
+          )}
+        {layout?.tiles.slice(firstTile, lastTile).map((tile, offset) => {
+          const index = firstTile + offset;
           if (!within(tile.top, tile.height)) return null;
-          const original = items[index];
+          const item = items[index];
           return (
             <GridCell
-              key={mediaIdentity(original)}
-              original={original}
+              key={mediaIdentity(item)}
+              item={item}
               index={index}
               left={tile.left}
               top={tile.top}
               width={cell}
               height={tile.height}
-              versions={versions?.get(original.id)}
-              version={selection.selecting ? undefined : shown[original.id]}
-              setShown={setShown}
               menuItem={menuItem}
               setMenuItem={setMenuItem}
               onArrow={onArrow}
@@ -343,11 +343,7 @@ function DateScrubber({
         if (sections[middle].top <= offset + window.innerHeight / 3) low = middle;
         else high = middle - 1;
       }
-      const day =
-        sections
-          .slice(0, low + 1)
-          .reverse()
-          .find((section) => section.day)?.day || "";
+      const day = sections[low].day;
       setPosition({ fraction: range > 0 ? Math.min(window.scrollY / range, 1) : 0, day });
       setActive(true);
       window.clearTimeout(idle);
@@ -406,15 +402,12 @@ function DateScrubber({
  * only those entering the window render. Every prop is a value or a stable callback.
  */
 const GridCell = memo(function GridCell({
-  original,
+  item,
   index,
   left,
   top,
   width,
   height,
-  versions,
-  version,
-  setShown,
   menuItem,
   setMenuItem,
   onArrow,
@@ -426,33 +419,21 @@ const GridCell = memo(function GridCell({
   GalleryViewProps,
   "open" | "selection" | "caption" | "detail" | "renderActions" | "onSelectionMenu" | "onTryAgain"
 > & {
-  original: MediaItem;
+  item: MediaItem;
   index: number;
   left: number;
   top: number;
   width: number;
   height: number;
-  versions?: VersionGroup;
-  version?: number;
-  setShown: Dispatch<SetStateAction<Record<string, number>>>;
   menuItem: string | null;
   setMenuItem: (id: string | null) => void;
   onArrow: (index: number, event: KeyboardEvent<HTMLButtonElement>) => void;
   hold: ReturnType<typeof useHoldToSelect>;
 }) {
-  const item = (version !== undefined && versions?.[version]) || original;
   return (
     <MediaTile
       {...tile}
       item={item}
-      group={[original]}
-      versions={versions}
-      version={version}
-      onVersion={(index) =>
-        setShown(({ [original.id]: _, ...rest }) =>
-          index === undefined ? rest : { ...rest, [original.id]: index },
-        )
-      }
       detail={detail(item)}
       style={{
         position: "absolute",

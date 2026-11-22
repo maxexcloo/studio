@@ -69,14 +69,24 @@ export function versionTree(items: MediaItem[], sources: Map<string, string>): V
   const children = new Map<string, MediaItem[]>();
   for (const item of items) {
     const source = sources.get(item.id);
-    if (source && ids.has(source)) children.set(source, [...(children.get(source) || []), item]);
-    else originals.push(item);
+    if (source && ids.has(source)) {
+      const siblings = children.get(source);
+      if (siblings) siblings.push(item);
+      else children.set(source, [item]);
+    } else originals.push(item);
   }
   // Each item's index (newest first) or its latest version's, whichever is newer.
   const latest = new Map<MediaItem, number>();
   items.forEach((item, index) => latest.set(item, index));
-  const newest = (item: MediaItem): number =>
-    Math.min(latest.get(item)!, ...(children.get(item.id) || []).map(newest));
+  const branchesNewest = new Map<string, number>();
+  const newest = (item: MediaItem): number => {
+    const cached = branchesNewest.get(item.id);
+    if (cached !== undefined) return cached;
+    let index = latest.get(item)!;
+    for (const child of children.get(item.id) || []) index = Math.min(index, newest(child));
+    branchesNewest.set(item.id, index);
+    return index;
+  };
   const branches = (versions: MediaItem[] = []) =>
     versions
       .map((item) => ({ item, newest: newest(item) }))

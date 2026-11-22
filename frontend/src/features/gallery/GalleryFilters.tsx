@@ -429,7 +429,7 @@ export function FilterToggle({
 
 /**
  * The Show filters the gallery and the reference picker share: Comparisons (images), Liked or
- * Disliked, and Originals Only where `onOriginalsOnly` is given. Liked and Disliked turn Uploads off.
+ * Disliked. Liked and Disliked turn Uploads off.
  */
 export function ShowToggles({
   kind,
@@ -472,17 +472,14 @@ export function ShowToggles({
 }
 
 /**
- * The filters, shared by the gallery's Filter popup and the reference picker: the gallery's `view`
- * (Grid or Runs) and the `toggles` (`ShowToggles`), then the date and each facet. Uploads sits
- * outside it, the gallery's toggle and the picker's tab. Choices apply at once.
+ * The gallery's Filter popup and the reference picker share the Show toggles, date and facets.
  */
 export function GalleryFilterPanel({
   kind,
   value,
   onChange,
-  view,
   toggles,
-}: FilterProps & { view?: ReactNode; toggles?: ReactNode }) {
+}: FilterProps & { toggles?: ReactNode }) {
   const { facets, options } = useFacetOptions(kind, value);
   // Tags list the most used first, each with its count, and keep a chosen tag no longer among them.
   const counts = new Map(options.tag.map((option) => [option.value, option.count]));
@@ -574,12 +571,9 @@ export function GalleryFilterPanel({
           Couldn't Load Filters
         </Button>
       )}
-      {(view || toggles) && (
+      {toggles && (
         <>
-          <Stack gap="md">
-            {view && <Input.Wrapper label="View">{view}</Input.Wrapper>}
-            {toggles}
-          </Stack>
+          <Stack gap="md">{toggles}</Stack>
           <Divider />
         </>
       )}

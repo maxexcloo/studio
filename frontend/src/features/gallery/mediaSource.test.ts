@@ -36,6 +36,17 @@ test("new results extend both ends without reordering the viewer's existing neig
   ]);
 });
 
+test("a new result that arrives between neighbours can be opened without reopening the viewer", () => {
+  const recent = item("recent");
+  const newResult = item("new");
+  const older = item("older");
+  assert.deepEqual(reconcileViewerItems([recent, older], [recent, newResult, older]), [
+    recent,
+    newResult,
+    older,
+  ]);
+});
+
 test("viewer reconciliation removes excluded results and retains updated metadata", () => {
   const a = item("a"),
     b = item("b");

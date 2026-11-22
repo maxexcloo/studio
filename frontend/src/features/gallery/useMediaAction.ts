@@ -19,6 +19,7 @@ import { lengthChoices } from "../generation/length";
 import { useOpenComposer } from "../generation/openComposer";
 import {
   backendLabel,
+  generationCountLimit,
   generationInput,
   isProfile,
   profileForBackend,
@@ -327,7 +328,8 @@ export function useAnimateTemplates() {
   return assistant?.available ? assistant.themes : [];
 }
 export type Iteration =
-  | { kind: "regenerate" | "repeat"; prompt?: string }
+  | { kind: "regenerate"; prompt?: string; count?: number }
+  | { kind: "repeat"; prompt?: string }
   | ({ kind: "animate"; written?: WrittenPrompt } & AnimateRequest)
   | {
       kind: "prompt";
@@ -382,8 +384,16 @@ export function useIterate() {
     const prompt = animate ? (written?.prompt ?? "") : (iteration.prompt ?? draft.input.prompt);
     const repeat = iteration.kind === "repeat";
     const sameSeed = repeat || Boolean(given?.sameSeed);
-    // Recreate keeps the recorded Count. A reference edit or animation runs once.
-    const count = animate || (given && given.operation !== "image") ? 1 : draft.input.count;
+    let count = animate || (given && given.operation !== "image") ? 1 : draft.input.count;
+    if (iteration.kind === "regenerate" && iteration.count !== undefined) {
+      const run = profileForBackend(
+        profile,
+        draft.input.profileBackend,
+        Boolean(draft.references.length || draft.input.referenceAssets?.length),
+        Boolean(draft.input.loras?.length),
+      );
+      count = Math.min(iteration.count, generationCountLimit(run, draft.input.kind));
+    }
     const payload = {
       ...generationInput(
         { ...draft.input, prompt, seed: sameSeed ? (seed ?? "") : "", count },

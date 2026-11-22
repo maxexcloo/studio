@@ -101,7 +101,9 @@ export function registerResultTools({
           signal,
           jobIds: [...new Set(set.map(({ jobId }) => jobId))],
         });
-      return media.result(owner, await resolve(job_id, signal), wait_seconds, {
+      const { jobId, index } = await resolveOutput(job_id, signal);
+      return media.result(owner, jobId, wait_seconds, {
+        index,
         scope: refs,
         signal,
       });
@@ -112,7 +114,7 @@ export function registerResultTools({
     server,
     "search",
     "search gallery",
-    "Search the user's whole gallery by words, file name or look, with refs (♥ liked); filter by liked, disliked, model or lora (part of a name), aspect or before/after a date; cursor pages. summary: what all matches share. uploads: the user's uploads, as reference_asset_ids.",
+    "Find gallery results by words, file name or look. Filter by rating, model, LoRA, aspect or date. Cursor pages. summary: what matches share. uploads: true finds chat attachments and other uploads by file name, as reference_asset_ids.",
     {
       query: z.string().trim().max(200).default(""),
       kind: z.enum(["image", "video"]).optional(),
@@ -474,7 +476,7 @@ export function registerResultTools({
     server,
     "upload_link",
     "upload link",
-    "A one-time page where the user uploads an image attached in chat, with its reference_asset_id.",
+    "One-time image upload link and reference_asset_id. Search uploads first for chat attachments.",
     {},
     async () => {
       const { url, expires, reference } = media.uploadUrl(owner);

@@ -1,11 +1,11 @@
-/* Focusing text cannot scroll the drawer and move its action bar. */
-.sheet {
+/* Override Mantine's Paper and Drawer regardless of stylesheet order. */
+.sheet.sheet {
   display: flex;
   flex-direction: column;
   overflow: clip;
 }
 
-.body {
+.sheet .body {
   flex: 1;
   min-height: 0;
   display: flex;

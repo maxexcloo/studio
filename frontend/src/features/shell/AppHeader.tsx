@@ -17,9 +17,9 @@ import { StudioLogo } from "../../ui/StudioLogo";
 import { usePhone } from "../../ui/usePhone";
 import { useAccount, useGroupFeature } from "../auth/AccountGate";
 import { dreamCountQuery } from "../dream/queries";
+import { FinishedAway } from "./FinishedAway";
 import { HeaderOptions } from "./HeaderOptions";
 import { StatusAction } from "./ServiceStatus";
-import { useFinishedAway } from "./useFinishedAway";
 
 import classes from "./AppHeader.module.css";
 
@@ -121,7 +121,6 @@ function ModeSwitcher({ mode }: { mode: string }) {
 export function AppHeader({ mode }: { mode: string }) {
   const { appearance } = useAppearance();
   const phone = usePhone();
-  useFinishedAway();
   return (
     <Group
       h="100%"
@@ -133,6 +132,7 @@ export function AppHeader({ mode }: { mode: string }) {
       mx="auto"
       maw={appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined}
     >
+      <FinishedAway />
       <Group gap="xs" wrap="nowrap" className={classes.bar}>
         <Link to="/images" replace={mode === "/images"} className={classes.home}>
           <StudioLogo order={phone ? 3 : 2} />

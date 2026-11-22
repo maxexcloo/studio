@@ -113,19 +113,21 @@ export function useRatings() {
   });
 }
 
-let lastDisliked: string | undefined;
-
 /**
- * A dislike's notification: the item left the gallery, with Undo to restore it. It replaces the
- * previous dislike's, so its Undo is always the latest; earlier ones stay under Disliked.
+ * A dislike leaves a brief Undo beside the gallery. Earlier ones stay under Disliked.
  */
-export function showDisliked(count: number, undo: () => void) {
-  const owner = document.activeElement?.closest<HTMLElement>('[role="dialog"]');
-  if (lastDisliked) notifications.hide(lastDisliked);
+export function showDisliked(
+  count: number,
+  undo: () => void,
+  owner = document.activeElement?.closest<HTMLElement>('[role="dialog"]'),
+) {
   const notification = notifications.show({
     autoClose: 8000,
+    position: "top-right",
+    role: "status",
+    withCloseButton: false,
     message: (
-      <Group justify="space-between" wrap="nowrap">
+      <Group gap="xs" wrap="nowrap">
         <Text size="sm">{count === 1 ? "Disliked" : `${count} disliked`}</Text>
         <Button
           size="compact-sm"
@@ -141,7 +143,6 @@ export function showDisliked(count: number, undo: () => void) {
       </Group>
     ),
   });
-  lastDisliked = notification;
 }
 
 /** One item's Like and Dislike toggles, pending while a change to that item is. */
@@ -155,8 +156,13 @@ export function useMediaRating(item: MediaItem) {
   const rate = (rating: Rating) => {
     const was = item.rating ?? null;
     const next = was === rating ? null : rating;
-    ratings.mutate({ ids: [item.id], rating: next });
-    if (next === "disliked") showDisliked(1, () => ratings.mutate({ ids: [item.id], rating: was }));
+    const change = { ids: [item.id], rating: next };
+    if (next !== "disliked") return ratings.mutate(change);
+    const owner = document.activeElement?.closest<HTMLElement>('[role="dialog"]');
+    void ratings.mutateAsync(change).then(
+      () => showDisliked(1, () => ratings.mutate({ ids: change.ids, rating: was }), owner),
+      () => {},
+    );
   };
   return {
     isPending: pending > 0,

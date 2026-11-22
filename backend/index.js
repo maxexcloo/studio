@@ -1198,7 +1198,8 @@ const imageSearch = createImageSearch({
   idle: galleryIdle,
   items: idleItems,
   changes: galleryChangeCount,
-  visible: (item) => filterVisibleGallery([item]).length > 0,
+  // Dream's repeat check also uses images that have not been shown in the gallery.
+  visible: (item) => (item.dream ? hasGalleryMedia(item) : filterVisibleGallery([item]).length > 0),
   image: galleryStill,
   load: runtimeLoad("image-search"),
   persist: (document) => writeRuntimeDocument(dataDir, "image-search", document),

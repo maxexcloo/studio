@@ -84,7 +84,7 @@ interface Router {
 const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "animate", "change", "draft"]);
 const cacheMs = 10 * 60_000;
 const cacheLimit = 500;
-const suggestionRevision = 1;
+const suggestionRevision = 2;
 /** Ideas avoid this many of the latest shown in the same menu. */
 const shownIdeas = 9;
 const maxIdea = 160;

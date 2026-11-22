@@ -35,7 +35,6 @@ export function GalleryToolbar({
   sort,
   onSortChange,
   extraChips,
-  view,
   toggles,
   count,
   actions,
@@ -47,10 +46,7 @@ export function GalleryToolbar({
   onChange: (value: GalleryFilterValues) => void;
   sort: GallerySort;
   onSortChange: (sort: GallerySort) => void;
-  /** View choices that narrow what shows, such as collapsed versions, as removable chips. */
   extraChips: FilterChip[];
-  /** Grid or Runs, followed by the view's on/off filters. */
-  view: ReactNode;
   toggles: ReactNode;
   count?: number;
   actions: ReactNode;
@@ -177,13 +173,7 @@ export function GalleryToolbar({
           />
         }
       >
-        <GalleryFilterPanel
-          kind={kind}
-          value={value}
-          onChange={onChange}
-          view={view}
-          toggles={toggles}
-        />
+        <GalleryFilterPanel kind={kind} value={value} onChange={onChange} toggles={toggles} />
       </ChipPopup>
       <FilterToggle
         label="Liked"

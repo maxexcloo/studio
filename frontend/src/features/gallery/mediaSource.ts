@@ -60,24 +60,37 @@ export function currentMedia(items: MediaItem[], item: MediaItem) {
 export const mediaIdentity = (item: MediaItem) =>
   item.jobId && item.index !== undefined ? `${item.jobId}:${item.index}` : item.id;
 
-/** Keep the order of existing neighbours and extend either end as more results arrive. */
+/** Keep existing neighbours in order, inserting new results beside their next known neighbour. */
 export function reconcileViewerItems(
   previous: MediaItem[],
   incoming: MediaItem[],
   retained: MediaItem[] = [],
 ) {
   const known = new Set(previous.map(mediaIdentity));
-  const current = new Map([...retained, ...incoming].map((item) => [mediaIdentity(item), item]));
-  let first = -1;
-  let last = -1;
-  incoming.forEach((item, index) => {
-    if (!known.has(mediaIdentity(item))) return;
-    if (first < 0) first = index;
-    last = index;
-  });
+  const current = new Map(retained.map((item) => [mediaIdentity(item), item]));
+  const before = new Map<string, MediaItem[]>();
+  let first: MediaItem[] = [];
+  let added: MediaItem[] = [];
+  let anchored = false;
+  for (const item of incoming) {
+    const id = mediaIdentity(item);
+    current.set(id, item);
+    if (!known.has(id)) {
+      added.push(item);
+      continue;
+    }
+    if (!anchored) first = added;
+    else if (added.length) before.set(id, added);
+    anchored = true;
+    added = [];
+  }
   return [
-    ...incoming.slice(0, Math.max(0, first)),
-    ...previous.flatMap((item) => current.get(mediaIdentity(item)) || []),
-    ...incoming.slice(last + 1),
+    ...first,
+    ...previous.flatMap((item) => {
+      const id = mediaIdentity(item);
+      const shown = current.get(id);
+      return shown ? [...(before.get(id) || []), shown] : [];
+    }),
+    ...added,
   ];
 }

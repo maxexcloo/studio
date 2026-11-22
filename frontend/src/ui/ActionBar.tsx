@@ -28,6 +28,7 @@ import {
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
 import { PopupTooltip } from "./PopupTooltip";
+import { useVisibleRect } from "./useKeyboard";
 import { usePhone, useTouch } from "./usePhone";
 
 import classes from "./ActionBar.module.css";
@@ -331,6 +332,18 @@ export function ActionMenuItems({
   ));
 }
 
+/** Phone action menus follow the visible room as the keyboard or browser chrome moves. */
+export function useActionMenuBounds(opened: boolean) {
+  const phone = usePhone();
+  const visible = useVisibleRect(phone && opened);
+  if (!phone) return {};
+  const bounds = { padding: 12, rootBoundary: visible ?? ("viewport" as const) };
+  return {
+    middlewares: { flip: bounds, shift: { ...bounds, crossAxis: true }, size: bounds },
+    preventPositionChangeWhenVisible: false,
+  };
+}
+
 /** A control's options as a menu opening on the `position` side; the tooltip never lingers over it. */
 function OptionsMenu({
   action,
@@ -343,10 +356,13 @@ function OptionsMenu({
 }) {
   // Each opening starts with every option collapsed.
   const [opening, setOpening] = useState(0);
+  const [opened, setOpened] = useState(false);
+  const bounds = useActionMenuBounds(opened);
   const dropdown = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   return (
     <Menu
+      {...bounds}
       position={position}
       width={menuWidth}
       // An option that moves focus itself (a Custom… dialog) keeps it; otherwise it
@@ -359,6 +375,7 @@ function OptionsMenu({
         })
       }
       onChange={(open) => {
+        setOpened(open);
         // The closing menu lets go of focus at once rather than at the end of its transition: an
         // option that turns its control busy disables it, so focus can't return there, and keys
         // meanwhile would land in the fading menu instead of the page around it.

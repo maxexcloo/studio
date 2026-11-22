@@ -481,8 +481,6 @@ export function MediaViewer({
     }
     shownId.current = item.id;
   }, [item.id]);
-  // The phone details sheet opens above the action bar, which stays in reach without its prompt.
-  const bar = useRef<HTMLDivElement>(null);
   const [ZoomImage] = useState(() => zoomImage || LazyZoomImage);
   const [deleting, setDeleting] = useState(false);
   const shortcutActions = useRef<ActionGroups>([]);
@@ -556,7 +554,6 @@ export function MediaViewer({
       phone={phone}
       zIndex={bare ? getDefaultZIndex("max") : undefined}
       close={() => setSheet(false)}
-      bottomBar={bar}
     />
   );
   const toggleDetails = () => {
@@ -877,10 +874,10 @@ export function MediaViewer({
                 actions={
                   actions ? (
                     <ActionBarSurface
-                      ref={bar}
                       aria-label={actions.label}
                       radius="lg"
                       className={classes.actions}
+                      display={phone && sheet ? "none" : undefined}
                       onClick={(event) => event.stopPropagation()}
                     >
                       <ViewerActionGroups
@@ -918,8 +915,7 @@ export function MediaViewer({
                         if (shownId.current === id) setVersion({ id, active });
                       }}
                       shortcuts={shortcutActions}
-                      ref={bar}
-                      promptHidden={phone && sheet}
+                      hidden={phone && sheet}
                       onApplied={() => {
                         restoreFocus.current = false;
                         close();

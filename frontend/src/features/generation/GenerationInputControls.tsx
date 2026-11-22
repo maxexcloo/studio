@@ -9,7 +9,7 @@ import { chipProps, iconChipProps } from "./chip";
 import { GenerationSettings } from "./GenerationSettings";
 import { lengthChoices } from "./length";
 import { LoraPicker, type LoraPickerState } from "./LoraPicker";
-import { backendInputPatch, backendLabel, profileForLoras } from "./payload";
+import { backendInputPatch, backendLabel, generationCountLimit, profileForLoras } from "./payload";
 import { ProfilePicker } from "./ProfilePicker";
 import { SizePicker } from "./SizePicker";
 
@@ -143,8 +143,7 @@ export function GenerationInputControls({
   loraPicker: LoraPickerState;
   settings: { opened: boolean; onOpenedChange: (opened: boolean) => void };
 }) {
-  const countMax = Math.min(profile?.constraints?.count?.max ?? 8, 8);
-  const counted = (profile?.capabilities.variations ?? input.kind === "image") && countMax > 1;
+  const countMax = generationCountLimit(profile, input.kind);
   const backends = profile?.backendOptions || [];
   const seed = input.seed === "" || input.seed == null ? "" : String(input.seed);
   const length = lengthChoices(input, profile);
@@ -171,7 +170,7 @@ export function GenerationInputControls({
         <LoraPicker value={input} onChange={onChange} picker={loraPicker} />
       )}
       <SizePicker input={input} profile={profile} onChange={onChange} />
-      {counted && (
+      {countMax > 1 && (
         <ChoiceChip
           label="Count"
           value={String(input.count || 1)}

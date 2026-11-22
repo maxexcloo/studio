@@ -75,6 +75,7 @@ test("The viewer resolves an older result’s checkpoint to its profile name", a
     ]);
   });
   const header = viewer.getByRole("group", { name: "Viewer Header", exact: true });
+  await expect(header.getByText("Amber Bird", { exact: true })).toBeVisible();
   await expect(header.getByText("Krea 2 Turbo", { exact: true })).toBeVisible();
 });
 
@@ -119,19 +120,22 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
     input: { prompt: "An amber bird at dusk", count: 2, steps: 28 },
   });
   // Desktop shows the run in the strip; a phone's editor returns to the gallery.
-  if (page.viewportSize()!.width >= 768)
+  if (page.viewportSize()!.width >= 768) {
     await expect(
       viewer.getByRole("list", { name: "Versions", exact: true }).getByRole("listitem"),
     ).toHaveCount(2);
-  // The bar stays in reach while phone details are open, without its prompt field.
-  else {
+  } else {
     await expect(viewer).toBeHidden();
     await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Close Details", exact: true })).toBeVisible();
+    const closeDetails = page.getByRole("button", { name: "Close Details", exact: true });
+    const edit = viewer.getByRole("button", { name: "Edit", exact: true });
+    await expect(closeDetails).toBeVisible();
     await expect(field).toBeHidden();
-    await expect(viewer.getByRole("button", { name: "Edit", exact: true })).toBeInViewport();
-    await viewer.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(edit).toBeHidden();
+    await closeDetails.click();
+    await expect(edit).toBeInViewport();
+    await edit.click();
     await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
     await expect(viewer).toBeHidden();
   }
@@ -648,9 +652,7 @@ test("Viewer runs queue into the strip and Recreate › Recreate in Composer ope
   );
 });
 
-test("A regenerated result shows beside its source until Originals Only collapses them", async ({
-  page,
-}) => {
+test("A regenerated result has its own tile and remains linked in the viewer", async ({ page }) => {
   const { state, viewer } = await seed(page);
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -658,16 +660,10 @@ test("A regenerated result shows beside its source until Originals Only collapse
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   const tiles = page.getByRole("button", { name: /^Open image: Amber Bird/ });
   await expect(tiles).toHaveCount(2);
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Originals Only", exact: true }).click();
-  await expect(tiles).toHaveCount(1);
-  await expect(tiles).toHaveAccessibleName("Open image: Amber Bird, Version 1 of 2");
-  // Closing on the other version returns to the tile holding it.
-  await page.keyboard.press("Escape");
-  await tiles.click();
+  await page.locator('[data-media-id="hub"]').click();
   await viewer.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
-  await expect(tiles).toBeFocused();
+  await expect(tiles.and(page.locator(':not([data-media-id="hub"])'))).toBeFocused();
 });
 
 test("The strip holds the item's versions, not the other results of its run", async ({ page }) => {
@@ -686,9 +682,7 @@ test("The strip holds the item's versions, not the other results of its run", as
   await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
 
-test("A set's strip holds the shown result's versions in its place, as one strip", async ({
-  page,
-}) => {
+test("A set and the shown result's versions have separate strips", async ({ page }) => {
   const set = { id: "set-birds", title: "Birds" };
   const { viewer } = await seed(page, { resultSet: { ...set, index: 0 } }, async (_page, state) => {
     state.jobs.length = 0;
@@ -712,13 +706,13 @@ test("A set's strip holds the shown result's versions in its place, as one strip
   });
   const strip = viewer.getByRole("list", { name: "Set: Birds", exact: true });
   const versions = viewer.getByRole("list", { name: "Versions", exact: true });
-  await expect(versions).toHaveCount(0);
+  await expect(versions.getByRole("listitem")).toHaveCount(2);
   expect(
     await strip.getByRole("listitem").evaluateAll((all) => all.map((entry) => entry.ariaLabel)),
-  ).toEqual(["Show Grey Heron (1 of 2)", "Show Version 2", "Show Version 1"]);
+  ).toEqual(["Show Grey Heron (1 of 2)", "Show Amber Bird (2 of 2)"]);
   await expect(strip.getByRole("listitem").last()).toHaveAttribute("aria-current", "true");
   // A version outside the set shows its versions alone.
-  await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
+  await versions.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await expect(strip).toHaveCount(0);
   await expect(versions.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
@@ -1631,28 +1625,19 @@ test("Desktop details stay where the viewer left them", async ({ page }, testInf
   await expect(details).toBeHidden();
 });
 
-test("Phone Details stays above usable viewer actions and swipes closed", async ({
+test("Phone Details hides the viewer actions and swipes closed", async ({
   page,
   isMobile,
 }, testInfo) => {
   test.skip(!isMobile, "Phones show Details in a sheet.");
   const { viewer } = await seed(page);
+  const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
+  await expect(actions).toBeVisible();
   await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "Amber Bird", exact: true });
   await expect(sheet.getByText("1234567", { exact: true })).toBeVisible();
-  const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
-  await expect
-    .poll(async () => {
-      const [panel, bar] = await Promise.all([sheet.boundingBox(), actions.boundingBox()]);
-      return panel && bar && panel.y + panel.height <= bar.y + 1;
-    })
-    .toBe(true);
-  await actions.getByRole("button", { name: "Share", exact: true }).click();
-  const copy = page.getByRole("menuitem", { name: "Copy Details", exact: true });
-  await expect(copy).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(copy).toBeHidden();
-  await expect(sheet).toBeVisible();
+  await expect(actions).toBeHidden();
+  await expect(sheet).toBeInViewport({ ratio: 1 });
 
   if (testInfo.project.use.browserName === "chromium") {
     const header = (await sheet.getByRole("heading", { name: "Amber Bird" }).boundingBox())!;
@@ -1666,9 +1651,11 @@ test("Phone Details stays above usable viewer actions and swipes closed", async 
         touchPoints: [{ x, y: y + offset }],
       });
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-    await expect(sheet).toBeHidden();
-    await expect(viewer).toBeVisible();
+  } else {
+    await sheet.getByRole("button", { name: "Close Details", exact: true }).click();
   }
+  await expect(sheet).toBeHidden();
+  await expect(actions).toBeVisible();
 });
 
 test("Phone swipes reveal details and close the viewer", async ({ page }, testInfo) => {

@@ -56,6 +56,24 @@ test("arrivals wait behind the active Dream card, then become next", () => {
   assert.deepEqual(keys(deckCards(arrived.slice(1))), ["new", "middle"]);
 });
 
+test("a Dream set takes one card and opens on the first available result", () => {
+  const result = (index: number, day: number) => ({
+    ...dated(`result-${index}`, day),
+    dream: { prompt: "", why: "", at: "", state: "unseen" as const },
+    resultSet: { id: "night-out", title: "Night Out", index, source: "dream" },
+  });
+  const dream = [result(3, 10), dated("single", 12), result(1, 15), result(2, 14)];
+  const [set, single] = deckCards(dream);
+  assert.equal(set.kind, "set");
+  assert.equal(single.key, "single");
+  if (set.kind !== "set") return;
+  assert.equal(set.item.id, "result-1");
+  assert.deepEqual(
+    set.items.map((item) => item.id),
+    ["result-1", "result-2", "result-3"],
+  );
+});
+
 test("Undo restores the exact comparison ahead of arrivals without repeating or splitting it", () => {
   const original = pair("original", 10);
   const [current] = deckCards(original);

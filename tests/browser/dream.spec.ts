@@ -704,6 +704,46 @@ test("Dream says why it can't run in Settings › Dream, not over the deck", asy
   ).toContainText("The text model is offline.");
 });
 
+test("A Dream Set expands to its members and takes one verdict", async ({ page }) => {
+  await fixtures(page);
+  const member = (id: string, index: number) =>
+    dreamItem(id, {
+      resultSet: { id: "night-out", index, title: "Night Out", source: "dream" },
+    });
+  const dream = await serveDream(page, {
+    unseen: [
+      member("last", 2),
+      member("cover", 0),
+      member("middle", 1),
+      dreamItem("standalone", { createdAt: "2020-01-01T00:00:00.000Z" }),
+    ],
+  });
+  await page.goto("/dream");
+  const set = page.getByRole("group", { name: "Night Out", exact: true });
+  await expect(set).toContainText("Dream prompt cover");
+  await set.getByRole("button", { name: "View Set (3)", exact: true }).click();
+  const preview = page.getByRole("dialog");
+  await preview.getByRole("radio", { name: "2", exact: true }).press("Space");
+  await expect(preview.getByRole("region", { name: "Result 2", exact: true })).toBeVisible();
+  await preview.getByRole("button", { name: "Close Preview", exact: true }).click();
+  await dreamAction(page, "Accept Set");
+  await expect(current(page)).toContainText("Dream prompt standalone");
+  await expect
+    .poll(() => dream.requests.at(-1)?.body)
+    .toEqual({
+      ids: ["cover", "middle", "last"],
+      verdict: "keep",
+    });
+  await dreamAction(page, "Undo");
+  await expect(set).toContainText("Dream prompt cover");
+  await expect
+    .poll(() => dream.requests.at(-1)?.body)
+    .toEqual({
+      ids: ["cover", "middle", "last"],
+      setId: "night-out",
+    });
+});
+
 test("A Dream comparison asks its question and answers with swipes, keys and buttons", async ({
   page,
 }) => {
@@ -739,7 +779,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
         .getByRole("button")
         .evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Undo", "Neither", "This Image", "Like", "Both"]);
+    .toEqual(["Undo", "Neither", "A", "B", "Like", "Both"]);
 
   // A side opens in the preview; closing it returns to the same comparison.
   await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
@@ -1388,7 +1428,7 @@ test("Projects shows and accepts new card proposals while the Inbox stays open",
   await expect(page.getByText("No Projects", { exact: true })).toBeVisible();
 });
 
-test("Dream plays one comparison side with the viewer's sound choice", async ({
+test("Dream autoplays silently when sound is blocked and lets the viewer choose a comparison side", async ({
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
@@ -1397,14 +1437,15 @@ test("Dream plays one comparison side with the viewer's sound choice", async ({
       "click",
       (event) => {
         const target = event.target as Element;
-        if (target.closest("button")?.textContent?.trim() === "Play") playRequested = true;
+        if (target.closest("button")?.getAttribute("aria-label") === "Unmute") playRequested = true;
       },
       true,
     );
     HTMLMediaElement.prototype.play = function () {
-      return playRequested || this.muted
-        ? Promise.resolve()
-        : Promise.reject(new DOMException("Autoplay blocked", "NotAllowedError"));
+      if (!playRequested && !this.muted)
+        return Promise.reject(new DOMException("Autoplay blocked", "NotAllowedError"));
+      this.dataset.playing = "true";
+      return Promise.resolve();
     };
   });
   await fixtures(page);
@@ -1430,12 +1471,13 @@ test("Dream plays one comparison side with the viewer's sound choice", async ({
   const playerB = pair.locator("video").last();
   await expect(pair.locator("video")).toHaveCount(2);
   await expect(page.locator("video")).toHaveCount(2);
-  await expect(playerA).toHaveJSProperty("muted", false);
+  await expect(playerA).toHaveJSProperty("muted", true);
   await expect(playerB).toHaveJSProperty("muted", true);
-  const play = pair.getByRole("button", { name: "Play", exact: true });
-  await expect(play).toBeVisible();
-  await play.click();
-  await expect(play).toBeHidden();
+  await expect(playerA).toHaveAttribute("data-playing", "true");
+  await expect(playerB).toHaveAttribute("data-playing", "true");
+  await expect(pair.getByRole("button", { name: "Play", exact: true })).toBeHidden();
+  await pair.getByRole("button", { name: "Unmute", exact: true }).click();
+  await expect(playerA).toHaveJSProperty("muted", false);
 
   await pair.getByRole("radio", { name: "Audio B", exact: true }).press("Space");
   await expect(playerA).toHaveJSProperty("muted", true);
@@ -1533,8 +1575,7 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   await expect(page.getByRole("radio", { name: "Videos", exact: true })).toBeChecked();
   await showView(page, "Dream");
   await expect(pair).toBeVisible();
-  await pair.getByRole("button", { name: "Select B · Later", exact: true }).click();
-  await page.getByRole("button", { name: "This Image", exact: true }).click();
+  await page.getByRole("button", { name: "B", exact: true }).click();
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
   await showView(page, "History");
   await expect
@@ -1576,7 +1617,7 @@ test("new Dream generations follow the active comparison and survive Undo", asyn
   await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
   await refreshed;
   await expect(original).toBeVisible();
-  await page.getByRole("button", { name: "This Image", exact: true }).click();
+  await page.getByRole("button", { name: "A", exact: true }).click();
   await expect(current(page)).toContainText("Dream prompt latest");
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(original).toBeVisible();

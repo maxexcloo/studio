@@ -5,12 +5,14 @@ import type { Action } from "../../ui/ActionBar";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
+import { TextEntrySheet } from "../../ui/TextEntrySheet";
 import { usePhone } from "../../ui/usePhone";
 
+import textClasses from "../../ui/TextBox.module.css";
+
 /**
- * Custom…'s box: what to change, typed in a small dialog of its own (full screen on phones) rather
- * than over the text it changes, sent with `action` or Enter. The last request stays for the next
- * time; `suggestions` (given what picking one does) fill it and send at once.
+ * Custom…'s request, sent with `action` or Enter. The last request stays for the next time.
+ * Picking a suggestion fills the request and sends it at once.
  */
 export function CustomDialog({
   opened,
@@ -43,26 +45,32 @@ export function CustomDialog({
     onClose();
     onSend(text);
   };
+  const trimmed = request.trim();
+  const submit = () => {
+    if (trimmed) send(trimmed);
+  };
   const form = (tools: Action[] = []) => (
     <form
+      className={phone ? textClasses.body : undefined}
+      data-text-box={phone ? "request" : undefined}
       onSubmit={(event) => {
         event.preventDefault();
-        // React carries a submit through the portal to the composer's own form, which would Generate.
+        // A submit from the portal would also reach the composer's form.
         event.stopPropagation();
-        if (request.trim()) send(request.trim());
+        submit();
       }}
     >
-      <Stack>
+      <Stack flex={phone ? 1 : undefined} mih={phone ? 0 : undefined}>
         <TextBox
           label={label}
           aria-label={label || "Change"}
           placeholder={placeholder}
-          autosize
+          autosize={!phone}
           minRows={3}
-          // The dialog is already full screen on phones.
           inline
           tools={tools}
-          data-autofocus
+          submit={phone ? [{ label: action, disabled: !trimmed, onSubmit: submit }] : undefined}
+          data-autofocus={!phone || undefined}
           value={request}
           onChange={setRequest}
           // Enter sends; Shift+Enter adds a line.
@@ -72,33 +80,46 @@ export function CustomDialog({
             event.currentTarget.form?.requestSubmit();
           }}
         />
-        <DialogFooter onCancel={onClose}>
-          <Button type="submit" disabled={!request.trim()}>
-            {action}
-          </Button>
-        </DialogFooter>
+        {!phone && (
+          <DialogFooter onCancel={onClose}>
+            <Button type="submit" disabled={!trimmed}>
+              {action}
+            </Button>
+          </DialogFooter>
+        )}
       </Stack>
     </form>
   );
-  return (
+  const content = suggestions
+    ? suggestions(
+        (picked) => {
+          setRequest(picked);
+          send(picked);
+        },
+        (action) => form([action]),
+      )
+    : form();
+  return phone ? (
+    <TextEntrySheet
+      opened={opened}
+      id={id}
+      onClose={onClose}
+      title={title}
+      fieldTitles={{ request: title }}
+      zIndex={zIndex}
+    >
+      {() => content}
+    </TextEntrySheet>
+  ) : (
     <Modal
       opened={opened}
       id={id}
       onClose={closeWhenTop(id, onClose)}
       title={title}
       size="sm"
-      fullScreen={phone}
       zIndex={zIndex}
     >
-      {suggestions
-        ? suggestions(
-            (picked) => {
-              setRequest(picked);
-              send(picked);
-            },
-            (action) => form([action]),
-          )
-        : form()}
+      {content}
     </Modal>
   );
 }

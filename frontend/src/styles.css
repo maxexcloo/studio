@@ -1,5 +1,6 @@
 :root {
   --studio-composer-gap: 1rem;
+  --studio-header-height: calc(4.25rem * var(--mantine-scale) + env(safe-area-inset-top));
 }
 html,
 body {
@@ -66,6 +67,11 @@ select {
   width: calc(
     100% - var(--mantine-spacing-sm) * 2 - env(safe-area-inset-left) - env(safe-area-inset-right)
   );
+}
+.mantine-Notifications-root[data-position="top-right"] {
+  top: calc(var(--studio-header-height) + var(--mantine-spacing-xs));
+  right: calc(var(--mantine-spacing-xs) + env(safe-area-inset-right));
+  width: fit-content;
 }
 .mantine-Notifications-notification {
   transition-timing-function: var(--studio-ease-enter) !important;

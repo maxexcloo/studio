@@ -1,12 +1,6 @@
 import type { MediaItem } from "../../types";
 import { mediaTitle } from "./mediaLabels";
 
-/**
- * An MCP generate call's results (`resultSet`): the run Runs groups and the viewer flips through
- * in place of their jobs, newest first as the gallery lists them.
- */
-export const runKey = (item: MediaItem) => item.resultSet?.id || item.jobId;
-
 // Work without a time yet is the newest.
 const setOrder = (a: MediaItem, b: MediaItem) =>
   (b.galleryAt || b.createdAt || "~").localeCompare(a.galleryAt || a.createdAt || "~") ||
@@ -20,10 +14,6 @@ export function setMembers(items: MediaItem[], item: MediaItem) {
   if (!members.some((member) => member.id === item.id)) members.push(item);
   return members.sort(setOrder);
 }
-
-/** Items of one run in the set's order, or as given outside a set. */
-export const inRunOrder = (items: MediaItem[]) =>
-  items[0]?.resultSet ? [...items].sort(setOrder) : items;
 
 /** "Fox Wizard · 3 / 5": the result's title and its place; Details holds the set's name. */
 export function setPosition(item: MediaItem, members: MediaItem[]) {

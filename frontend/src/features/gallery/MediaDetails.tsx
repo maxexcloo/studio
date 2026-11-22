@@ -12,13 +12,12 @@ import {
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { queryOptions, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { titleCase } from "../../../../shared/titles";
-import { api } from "../../api";
 import type { MediaItem, Profile } from "../../types";
 import { formatBytes } from "../../ui/bytes";
 import { useCopy } from "../../ui/clipboard";
@@ -38,6 +37,7 @@ import { queueQuery } from "../generation/Queue";
 import { referenceAssetQuery } from "../generation/references";
 import { mediaProfileName, mediaTitle } from "./mediaLabels";
 import { mediaSource } from "./mediaSource";
+import { galleryItemQuery } from "./queries";
 import { derivations } from "./versions";
 import { type GalleryState, galleryPath, viewerPath } from "./viewerLink";
 
@@ -493,14 +493,6 @@ function ContextCards({ item }: { item: MediaItem }) {
   });
 }
 
-/** One gallery item in full: gallery pages leave out its prompt's thinking, which Details reads here. */
-export const galleryItemQuery = (id: string) =>
-  queryOptions({
-    queryKey: ["gallery-item", id],
-    queryFn: () => api<{ item: MediaItem }>(`/api/gallery/items/${encodeURIComponent(id)}`),
-    retry: false,
-  });
-
 /**
  * Details › Prompt with any Refused Prompt and the prompt's thinking, then any Negative Prompt as its
  * own section.
@@ -689,6 +681,12 @@ export function MediaDetails({
 }) {
   const jobs = useQuery(queueQuery).data?.jobs;
   const related = useMemo(() => derivations(item, loaded || [], jobs || []), [item, loaded, jobs]);
+  const parentId = item.parentItemId || "";
+  const parent = useQuery({
+    ...galleryItemQuery(parentId),
+    enabled: Boolean(parentId && !related.source),
+  });
+  const source = related.source ?? parent.data?.item;
   const url = item.status === "done" ? mediaSource(item).url : "";
   const size = useMediaSize(url);
   const details = useGenerationDetails(item, url && size.isPending ? null : size.data);
@@ -697,7 +695,7 @@ export function MediaDetails({
   // Where it came from, what it is part of and what was made from it, A–Z.
   const lineage = (
     [
-      ["From", related.source && <RelatedLinks key="from" items={[related.source]} open={open} />],
+      ["From", source && <RelatedLinks key="from" items={[source]} open={open} />],
       [
         "Source",
         item.source && (

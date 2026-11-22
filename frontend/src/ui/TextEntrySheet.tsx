@@ -22,6 +22,7 @@ type SheetProps = Pick<
   | "returnFocus"
   | "onEnterTransitionEnd"
   | "onExitTransitionEnd"
+  | "zIndex"
 > & {
   id?: string;
   title: string;

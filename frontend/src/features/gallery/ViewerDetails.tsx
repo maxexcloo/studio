@@ -112,7 +112,7 @@ export function ViewerDetails({
               </Text>
               <MediaDetailsMetadata item={item} />
             </Stack>
-            {details}
+            {opened && details}
           </Stack>
         </ScrollArea>
       </aside>
