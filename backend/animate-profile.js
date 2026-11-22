@@ -135,27 +135,39 @@ export function animateProfile(
         : `${notRunning}, so this runs on ${label}.`,
   );
 }
-/**
- * The video profile Dream animates or, given `extend` (the video's profile ID), extends with: only
- * local GPUs, never Cloud, the account's Local default (`preferred.local`) as animateProfile
- * chooses; an Extend keeps its video's model where that is local and runs.
- */
-export function dreamVideoProfile(profiles, { extend, ...options }) {
-  const own =
-    extend &&
-    profiles.find(
-      (profile) =>
-        profile.id === extend &&
-        profile.kind === "video" &&
-        !isCloudProfile(profile) &&
-        profile.ready !== false &&
-        profile.mediaInputs?.length &&
-        !["offline", "parked"].includes(profile.availability),
+/** The single input Dream can fill from a still or from the end of a video. */
+export function dreamVideoSlot(profile) {
+  const inputs = profile.mediaInputs || [];
+  const first = inputs[0];
+  const slot =
+    inputs.find((input) => input.role === "start") ||
+    (first && (!first.role || first.role === "reference") ? first : undefined);
+  return slot && !inputs.some((input) => input !== slot && input.required) ? slot : undefined;
+}
+
+/** Dream stays on its selected side and extends a video on that video's own profile. */
+export function dreamVideoProfile(profiles, options) {
+  const { backend, extend, unavailable, alternate, width, height, ...placement } = options;
+  const pool = profiles.filter(
+    (profile) =>
+      profile.kind === "video" &&
+      isCloudProfile(profile) === (backend === "cloud") &&
+      profile.ready !== false &&
+      !["offline", "parked"].includes(profile.availability) &&
+      dreamVideoSlot(profile),
+  );
+  const candidates = extend ? pool.filter((profile) => profile.id === extend) : pool;
+  if (extend && !candidates.length) throw new Error("The source video's model isn't ready.");
+  const healthy = candidates.filter((profile) => !unavailable.has(profile.id));
+  if (!healthy.length && candidates.length) {
+    const [profile] = candidates;
+    throw new Error(
+      `Dream's last video on ${profile.label || profile.id} failed; it waits to try again.`,
     );
-  const choice = own
-    ? withSize({ profile: own }, options.width, options.height)
-    : animateProfile(profiles, { ...options, where: "local" });
-  return { profile: choice.profile, size: choice.size };
+  }
+  if (extend) return withSize({ profile: healthy[0] }, width, height);
+  const { profile } = animateProfile(healthy, { ...placement, where: backend });
+  return withSize({ profile: alternate?.(healthy, profile) ?? profile }, width, height);
 }
 const withSize = (choice, width, height) =>
   width > 0 && height > 0 ? { ...choice, size: frameSize(choice.profile, width, height) } : choice;

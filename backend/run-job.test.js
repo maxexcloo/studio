@@ -82,6 +82,7 @@ test("a run goes from queued through progress to a finished gallery image", asyn
     title: "Variety Test",
     index: 2,
     variation: "Fox Wizard",
+    caption: "LoRA control, same seed",
     character: { id: "chr-mara", name: "Mara" },
     context: {
       character: { name: "Mara", description: "Red-haired ranger" },

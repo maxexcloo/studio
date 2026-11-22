@@ -147,15 +147,22 @@ test("A video framed by its start frame draws at the frame's proportions unless 
   assert.equal(startFrameSize({ ...framed, aspectPolicy: "manual" }, run()), null);
 });
 
-test("Dream's videos run only on local GPUs, even for an account that prefers Cloud", () => {
+test("Dream videos stay on their selected backend and extend on the source model", () => {
   const dream = (options) =>
-    dreamVideoProfile(profiles, { defaultId: "fl-quality", localRunning: true, ...options });
+    dreamVideoProfile(profiles, {
+      backend: "local",
+      defaultId: "fl-quality",
+      localRunning: true,
+      unavailable: new Set(),
+      ...options,
+    });
   assert.equal(dream({ preferred: { side: "cloud", cloud: "grok-video" } }).profile.id, "fl-fast");
   assert.equal(dream({ preferred: { local: "fl-quality" } }).profile.id, "fl-quality");
-  // An Extend keeps a local video's model, but a Grok video's continues locally.
+  assert.equal(dream({ backend: "cloud", localRunning: false }).profile.id, "grok-video");
   assert.equal(dream({ extend: "fl-quality" }).profile.id, "fl-quality");
-  assert.equal(dream({ extend: "grok-video" }).profile.id, "fl-fast");
-  // Without local video it refuses rather than fall back to Grok.
+  assert.throws(() => dream({ extend: "grok-video" }), {
+    message: "The source video's model isn't ready.",
+  });
   assert.throws(() => dream({ localRunning: false }), {
     message: "Local video isn't running.",
   });

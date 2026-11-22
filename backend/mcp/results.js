@@ -74,7 +74,7 @@ export function registerResultTools({
           mcpOutputPath(item.url)
             ? [
                 {
-                  ...media.outputFeedback(id, index, item.rating),
+                  ...media.outputFeedback(id, index, item),
                   url: media.url(owner, id, index),
                 },
               ]
@@ -205,6 +205,7 @@ export function registerResultTools({
         output_index: item.index,
         link: media.url(owner, item.jobId, item.index),
         rating: item.rating || "unrated",
+        ...(item.resultSet?.caption ? { caption: item.resultSet.caption } : {}),
       }));
       // A line each: its ref, then a gist; Details and the link keep the whole prompt.
       const lines = hits.map((item, position) => {
@@ -212,7 +213,7 @@ export function registerResultTools({
         return [
           `- [${ref}](${link})${item.rating === "liked" ? " ♥" : ""}`,
           `user feedback: ${item.rating || "unrated"}`,
-          shortPrompt(item.title || item.prompt || "", 80),
+          shortPrompt(item.resultSet?.caption || item.title || item.prompt || "", 80),
           item.settings?.modelName || item.model || item.settings?.profileId,
           String(item.createdAt || "").slice(0, 10),
         ]

@@ -22,18 +22,14 @@ const sides: { value: SidePreference; label: string }[] = [
   { value: "cloud", label: "Cloud" },
   { value: "local", label: "Local" },
 ];
-const kinds: { kind: WorkKind; label: string; description: string }[] = [
-  { kind: "images", label: "Images", description: "Where new images run until you pick a model." },
-  {
-    kind: "videos",
-    label: "Videos",
-    description: "Where new videos and Animate run until you pick a model.",
-  },
+const kinds: { kind: WorkKind; label: string; description?: string }[] = [
+  { kind: "images", label: "Images" },
+  { kind: "videos", label: "Videos", description: "Applies to video generation and Animate." },
   {
     kind: "text",
     label: "Text",
     description:
-      "Where prompt writing, titles, captions, suggestions and Dream's writing run. Local shares a GPU with images.",
+      "Applies to writing and captions, including Dream. Local shares a GPU with images.",
   },
 ];
 
@@ -58,7 +54,7 @@ export function WhereWorkRuns() {
       (model) => model.startsWith("local/") === (side === "local"),
     );
     return (
-      <SettingRow key={key} wide label={name} description="Used until you pick another model.">
+      <SettingRow key={key} wide label={name}>
         {kind === "text" ? (
           <TextModelSelect
             name={name}
@@ -89,9 +85,9 @@ export function WhereWorkRuns() {
       {kinds.map(({ kind, label, description }) => (
         <SettingGroup key={kind} title={label}>
           {cloud && (
-            <SettingRow wide label="Default" description={description}>
+            <SettingRow wide label="Run On" description={description}>
               <SegmentedControl
-                aria-label="Default"
+                aria-label="Run On"
                 fullWidth
                 data={sides}
                 value={

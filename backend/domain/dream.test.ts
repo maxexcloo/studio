@@ -10,6 +10,7 @@ import express from "express";
 
 import type { CardKind, Character } from "../../shared/characters.ts";
 import { type DreamSettings, dreamDefaults } from "../../shared/dream.ts";
+import { dreamVideoProfile } from "../animate-profile.js";
 import { closeRuntimeDatabase, openDatabase, readRuntimeDocument } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import { registerDreamRoutes } from "./dream-routes.ts";
@@ -258,10 +259,13 @@ function fixture(t: TestContext, catalogue = profiles) {
       return { id: frame ? `${frame}-frame-${itemId}` : `asset-${itemId}`, source: "gallery" };
     },
     // As Animate chooses: an Extend keeps its video's model.
-    videoProfile: async (_ownerId, _account, { extend }) => {
+    videoProfile: async (_ownerId, _account, choice) => {
       if (state.videoRefusal) throw new Error(state.videoRefusal);
-      const own = catalogue.find((profile) => profile.id === extend);
-      return { profile: own || catalogue.find((profile) => profile.id === state.video)! };
+      return dreamVideoProfile(catalogue, {
+        ...choice,
+        localRunning: true,
+        preferred: { local: state.video, cloud: state.video },
+      });
     },
     cards: () => state.cards,
     inbox: {
@@ -1894,6 +1898,109 @@ test("Dream mostly compares models and LoRAs, rarely steps or guidance, and step
   ]);
 });
 
+test("Three-way Dream comparisons settle together, teach one choice and fall back to singles on failure", async (t) => {
+  const fx = fixture(t, [...profiles, { id: "sdxl", kind: "image", label: "SDXL" }]);
+  const { dream, state, store, taste, finish, live, dreamOnce } = fx;
+  state.owners = ["alice"];
+  const session = store.createSession("alice", "Gallery").id;
+  const base = store.enqueue(
+    "alice",
+    session,
+    { kind: "image", profileId: "flux", prompt: "a fox in snow" },
+    "image",
+  );
+  store.save({ ...base, status: "completed" });
+  state.items.push({
+    id: "base",
+    jobId: base.id,
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    rating: "liked",
+    prompt: "a fox in snow",
+    settings: { profileId: "flux" },
+  });
+  await dream.save("alice", { enabled: true, dailyImages: 6 });
+  for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
+  state.draws[4] = [0, 3];
+  await dream.tick();
+  const jobs = live("alice").sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side);
+  assert.equal(jobs.length, 3);
+  assert.deepEqual(
+    new Set(jobs.map((job) => job.input.profileId)),
+    new Set(["flux", "qwen", "sdxl"]),
+  );
+  assert.equal(new Set(jobs.map((job) => job.input.seed)).size, 1);
+  assert.deepEqual(
+    jobs.map((job) => job.dream?.pair?.size),
+    [3, 3, 3],
+  );
+
+  const request = await serve(t, fx);
+  const pair = jobs[0].dream!.pair!.id;
+  const answer = `/pairs/${pair}/answer`;
+  const items = jobs.map((job) => state.items.find((item) => item.jobId === job.id)!);
+  finish("alice", jobs[0].id);
+  finish("alice", jobs[1].id);
+  assert.ok(items.every(({ id }) => !dream.unseen("alice").some((item) => item.id === id)));
+  assert.equal((await request(answer, { answer: "c" })).status, 404);
+  const before = (await request("/count")).body.images;
+  finish("alice", jobs[2].id);
+  assert.equal(dream.unseen("alice").filter((item) => item.dream?.pair?.id === pair).length, 3);
+  assert.equal((await request("/count")).body.images, before + 1);
+  assert.equal((await request(answer, { answer: "c", like: true })).status, 200);
+  assert.deepEqual(
+    items.map((item) => item.dream?.state),
+    ["discarded", "discarded", "kept"],
+  );
+  assert.equal(items[2].rating, "liked");
+  assert.deepEqual(
+    items.map((item) => item.dream?.comparison?.delta),
+    [-8, -8, 16],
+  );
+  const { scores, signals: recorded } = taste.read("alice");
+  const signals = recorded.filter((signal) => signal.kind === "preferred");
+  assert.equal(signals.length, 1);
+  assert.deepEqual(
+    [signals[0].jobId, signals[0].over?.jobId, signals[0].third?.jobId],
+    [jobs[2].id, jobs[0].id, jobs[1].id],
+  );
+  const [first, second, winner] = jobs.map(
+    (job) => scores.get(`profile:${job.input.profileId}`)!.score,
+  );
+  assert.ok(first < 0 && second === first && winner === -2 * first);
+  assert.equal((await request("/undo", { ids: [items[2].id] })).status, 409);
+  assert.equal((await request("/undo", { ids: items.map((item) => item.id) })).status, 200);
+  assert.ok(items.every((item) => item.dream?.state === "unseen" && !item.rating));
+  assert.deepEqual(dream.read("alice").ratings, {});
+  assert.equal(taste.read("alice").signals.length, 0);
+
+  const ids = items.map((item) => item.id);
+  assert.equal((await request("/pass", { ids: ids.slice(0, 2), reason: "glitch" })).status, 409);
+  assert.equal((await request("/pass", { ids, reason: "glitch" })).status, 200);
+  assert.ok(items.every((item) => item.dream?.passReason === "glitch" && !item.rating));
+  assert.equal(taste.read("alice").signals.length, 0);
+  assert.equal((await request("/undo", { ids })).status, 200);
+  assert.ok(items.every((item) => item.dream?.state === "unseen" && !item.dream.passReason));
+  assert.equal((await request("/pass", { ids, reason: "taste" })).status, 200);
+  assert.ok(items.every((item) => item.rating === "disliked"));
+  assert.equal(taste.read("alice").signals[0].kind, "pair-neither");
+  assert.equal((await request("/undo", { ids })).status, 200);
+  assert.equal(taste.read("alice").signals.length, 0);
+
+  // The third job can finish with no usable result, even with a stale pending tile.
+  store.save({ ...store.job("alice", jobs[2].id)!, status: "failed" });
+  items[2].status = "pending";
+  const surviving = dream.unseen("alice").filter((item) => items.some(({ id }) => item.id === id));
+  assert.deepEqual(
+    new Set(surviving.map((item) => item.id)),
+    new Set(items.slice(0, 2).map(({ id }) => id)),
+  );
+  assert.ok(surviving.every((item) => !item.dream?.pair));
+  assert.equal((await request(answer, { answer: "a" })).status, 404);
+  assert.equal(taste.read("alice").signals.length, 0);
+});
+
 test("Every fourth image compares one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
   const fx = fixture(t);
   const { dream, state, store, taste, finish, live, dreamOnce } = fx;
@@ -2442,23 +2549,73 @@ test("A series follows a liked image's character, visiting liked scene cards fir
     (await request(`/sets/${setId}/answer`, { ...verdict, ids: ids.slice(0, 2) })).status,
     409,
   );
+  assert.equal(
+    (await request(`/sets/${setId}/answer`, { ...verdict, likedId: "mara" })).status,
+    409,
+  );
   assert.equal((await request(`/sets/${setId}/answer`, verdict)).status, 200);
-  assert.equal(dream.unseen("alice").length, 0);
   const members = () => ids.map((id) => state.items.find((item) => item.id === id)!);
+  assert.equal(members()[0].rating, "liked");
+  assert.equal((await request("/undo", { ids, setId })).status, 200);
+  assert.equal(
+    (await request(`/sets/${setId}/answer`, { ...verdict, likedId: ids[2] })).status,
+    200,
+  );
+  assert.equal(dream.unseen("alice").length, 0);
   assert.deepEqual(
     members().map((item) => item.dream?.state),
     Array(4).fill("kept"),
   );
   assert.deepEqual(
     members().map((item) => item.rating),
-    ["liked", undefined, undefined, undefined],
+    [undefined, undefined, "liked", undefined],
   );
   assert.deepEqual(
-    taste.read("alice").signals.map(({ kind }) => kind),
-    ["like"],
+    taste.read("alice").signals.map(({ kind, jobId }) => [kind, jobId]),
+    [["like", jobs[2].id]],
   );
   assert.equal((await request("/undo", { ids, setId })).status, 200);
   assert.equal((await request("/count")).body.images, 1);
+  assert.ok(members().every((item) => item.dream?.state === "unseen" && !item.rating));
+  assert.deepEqual(taste.read("alice").signals, []);
+  assert.equal(
+    (await request(`/sets/${setId}/answer`, { ...verdict, overrides: { mara: "like" } })).status,
+    409,
+  );
+  assert.equal(
+    (
+      await request(`/sets/${setId}/answer`, {
+        ...verdict,
+        verdict: "discard",
+        overrides: { [ids[0]]: "like" },
+      })
+    ).status,
+    200,
+  );
+  assert.deepEqual(
+    members().map((item) => item.rating),
+    ["liked", "disliked", "disliked", "disliked"],
+  );
+  assert.deepEqual(
+    members().map((item) => item.dream?.state),
+    ["kept", "discarded", "discarded", "discarded"],
+  );
+  assert.equal((await request("/undo", { ids, setId })).status, 200);
+  assert.equal(
+    (
+      await request(`/sets/${setId}/answer`, {
+        ...verdict,
+        likedId: ids[0],
+        overrides: { [ids[0]]: "discard", [ids[1]]: "like" },
+      })
+    ).status,
+    200,
+  );
+  assert.deepEqual(
+    members().map((item) => item.rating),
+    ["disliked", "liked", undefined, undefined],
+  );
+  assert.equal((await request("/undo", { ids, setId })).status, 200);
   assert.ok(members().every((item) => item.dream?.state === "unseen" && !item.rating));
   assert.deepEqual(taste.read("alice").signals, []);
   // The series is done; with a share's roll against it the next idea is an ordinary one.
@@ -2737,7 +2894,20 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
     kind: "video",
     mediaInputs: [{ id: "start", required: true }],
   };
-  const fx = fixture(t, [...profiles, cloud]);
+  const alternate = {
+    ...cloud,
+    id: "custom:another-cloud-video",
+    mediaInputs: [
+      { id: "end-frame", role: "end" },
+      { id: "source-frame", role: "start", required: true },
+    ],
+  };
+  const needsTwo = {
+    ...alternate,
+    id: "custom:two-frame-video",
+    mediaInputs: alternate.mediaInputs.map((input) => ({ ...input, required: true })),
+  };
+  const fx = fixture(t, [...profiles, cloud, needsTwo, alternate]);
   await fx.dream.save("alice", {
     enabled: true,
     images: false,
@@ -2756,6 +2926,7 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
   });
   const job = await fx.dreamOnce();
   assert.equal(job?.input.profileId, cloud.id);
+  assert.equal(job.parentItemId, "kept");
   assert.equal(
     (job?.input.referenceAssets as { assetId: string }[] | undefined)?.[0]?.assetId,
     "asset-kept",
@@ -2769,11 +2940,29 @@ test("Dream videos honour a separate Cloud preference and retain source lineage"
     rating: "liked",
     settings: { profileId: "wan" },
   });
+  fx.generated({
+    id: "other-still",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    rating: "liked",
+  });
+  fx.state.draws[3] = [1];
+  const varied = await fx.dreamOnce();
+  assert.equal(varied?.input.profileId, alternate.id);
+  assert.equal(varied.parentItemId, "other-still");
+  assert.deepEqual(varied.input.referenceAssets, [
+    { assetId: "asset-other-still", source: "gallery", slot: "source-frame" },
+  ]);
   assert.equal(await fx.dreamOnce(), undefined);
-  assert.match(fx.dream.status("alice").reason!, /No video model is ready/);
+  assert.match(fx.dream.status("alice").reason!, /source video's model isn't ready/);
   await fx.dream.save("alice", { videoBackend: "local" });
   fx.state.online.video = true;
   const extension = await fx.dreamOnce();
   assert.equal(extension?.input.profileId, "wan");
   assert.equal(extension?.dream?.arm, "extend");
+  assert.equal(extension.parentItemId, "clip");
+  assert.deepEqual(extension.input.referenceAssets, [
+    { assetId: "last-frame-clip", source: "gallery", slot: "start" },
+  ]);
 });

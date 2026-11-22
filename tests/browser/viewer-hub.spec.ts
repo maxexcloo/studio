@@ -1633,11 +1633,18 @@ test("Phone Details hides the viewer actions and swipes closed", async ({
   const { viewer } = await seed(page);
   const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   await expect(actions).toBeVisible();
-  await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  const details = viewer.getByRole("button", { name: "Generation Details", exact: true });
+  const picture = viewer.getByRole("img", { name: "An amber bird", exact: true });
+  await expect(picture).toHaveJSProperty("complete", true);
+  await details.click({ trial: true });
+  const position = await picture.boundingBox();
+  expect(position).not.toBeNull();
+  await details.click();
   const sheet = page.getByRole("dialog", { name: "Amber Bird", exact: true });
   await expect(sheet.getByText("1234567", { exact: true })).toBeVisible();
   await expect(actions).toBeHidden();
   await expect(sheet).toBeInViewport({ ratio: 1 });
+  await expect.poll(() => picture.boundingBox()).toEqual(position);
 
   if (testInfo.project.use.browserName === "chromium") {
     const header = (await sheet.getByRole("heading", { name: "Amber Bird" }).boundingBox())!;
@@ -1656,6 +1663,7 @@ test("Phone Details hides the viewer actions and swipes closed", async ({
   }
   await expect(sheet).toBeHidden();
   await expect(actions).toBeVisible();
+  await expect.poll(() => picture.boundingBox()).toEqual(position);
 });
 
 test("Phone swipes reveal details and close the viewer", async ({ page }, testInfo) => {

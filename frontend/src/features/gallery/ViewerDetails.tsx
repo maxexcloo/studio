@@ -1,5 +1,5 @@
 import { Drawer, FocusTrap, ScrollArea, Stack, Text } from "@mantine/core";
-import { type ReactNode, type RefObject, useId, useLayoutEffect, useState } from "react";
+import { type ReactNode, useId } from "react";
 
 import type { MediaItem } from "../../types";
 import { closeWhenTop } from "../../ui/popupClicks";
@@ -17,7 +17,6 @@ export function ViewerDetails({
   opened,
   phone,
   close,
-  bottomBar,
   zIndex,
   children,
 }: {
@@ -28,28 +27,12 @@ export function ViewerDetails({
   opened: boolean;
   phone: boolean;
   close: () => void;
-  bottomBar?: RefObject<HTMLDivElement | null>;
   zIndex?: number;
   children?: ReactNode;
 }) {
   const id = useId();
   const closeSheet = closeWhenTop(id, close);
   const swipe = useSwipeClose("down", closeSheet);
-  const [barOffset, setBarOffset] = useState(0);
-  useLayoutEffect(() => {
-    const bar = bottomBar?.current;
-    if (!phone || !opened || !bar) return;
-    const measure = () =>
-      setBarOffset(Math.max(0, window.innerHeight - bar.getBoundingClientRect().top));
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(bar);
-    window.addEventListener("resize", measure);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [bottomBar, item.id, phone, opened]);
   const details = (
     <>
       {children}
@@ -67,9 +50,8 @@ export function ViewerDetails({
         size="80%"
         radius="lg"
         styles={{
-          // Clip the sheet's slide above the actions, including while it moves with a swipe.
-          inner: { bottom: barOffset, overflow: "clip" },
-          overlay: { bottom: barOffset, pointerEvents: opened ? undefined : "none" },
+          inner: { overflow: "clip" },
+          overlay: { pointerEvents: opened ? undefined : "none" },
           content: {
             display: "flex",
             flexDirection: "column",

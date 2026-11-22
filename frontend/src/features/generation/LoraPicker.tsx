@@ -52,6 +52,7 @@ import {
   PopupHeading,
   SavedName,
   useNaming,
+  usePickerChoices,
 } from "./Picker";
 import { usePresets } from "./PresetPicker";
 import type { Preset } from "./presets";
@@ -147,7 +148,7 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
   const context = useGeneration();
   const input = value || context.input;
   const phone = usePhone();
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = usePickerChoices(phone && picker.opened, !input.loras.length);
   const { update } = useLoraDraft({ value, onChange });
   const clear = { onClear: () => update([]), clearDisabled: !input.loras.length };
   // The picker's data loads with the chip, so its first frame is final.
@@ -183,17 +184,14 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
   );
   const choices = <LoraChoices value={value} onChange={onChange} picker={picker} />;
   const stack = <LoraStack value={value} onChange={onChange} picker={picker} />;
-  // Phones open the stack, with Add LoRAs opening the choices in a sheet over it.
   if (phone)
     return (
       <ChipPopup
         title="LoRAs"
         width="100%"
         opened={picker.opened}
-        onOpenedChange={(opened) => {
-          picker.setOpened(opened);
-          if (!opened) setAdding(false);
-        }}
+        onOpenedChange={picker.setOpened}
+        trap={!adding}
         target={trigger}
         name={<StackPreset value={value} onChange={onChange} picker={picker} />}
         {...clear}
@@ -201,10 +199,15 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
           <ChipPopup
             title="Add LoRAs"
             width="100%"
-            opened={adding}
+            opened={picker.opened && adding}
             onOpenedChange={setAdding}
             target={
-              <Button variant="default" aria-label="Add LoRAs" onClick={() => setAdding(true)}>
+              <Button
+                variant="default"
+                aria-label="Add LoRAs"
+                aria-expanded={picker.opened && adding}
+                onClick={() => setAdding(true)}
+              >
                 Add
               </Button>
             }

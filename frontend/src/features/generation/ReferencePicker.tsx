@@ -17,7 +17,14 @@ import { chipProps } from "./chip";
 import { GalleryChoices, galleryTabs } from "./GalleryChoices";
 import { draftForProfile, useGeneration } from "./GenerationProvider";
 import { controlRange, referenceDetails, referenceGroup, referenceGroups } from "./payload";
-import { ChipContent, ChipPopup, PickerHeader, PopupHeading, UploadTile } from "./Picker";
+import {
+  ChipContent,
+  ChipPopup,
+  PickerHeader,
+  PopupHeading,
+  UploadTile,
+  usePickerChoices,
+} from "./Picker";
 import {
   type ReferenceTarget,
   galleryReferenceType,
@@ -82,7 +89,6 @@ export function ReferencePicker({
   const setOpened = (opened: boolean) => {
     setLocalOpen(opened);
     onOpenedChange?.(opened);
-    if (!opened) setAdding(false);
   };
   const phone = usePhone();
   const { draft, setDraft } = useGeneration();
@@ -95,8 +101,6 @@ export function ReferencePicker({
   const [cardQuery, setCardQuery] = useState("");
   // A dialog over the sheet, such as a preview or a card's editor, holds its focus and clicks.
   const [layer, setLayer] = useState(false);
-  // Phones choose in a sheet over the stack.
-  const [adding, setAdding] = useState(false);
   const list = useReferenceList({
     value,
     onChange,
@@ -108,6 +112,7 @@ export function ReferencePicker({
     referenceDetails(value || draft.references, selectedInput || draft.input, profile),
     profile,
   );
+  const [adding, setAdding] = usePickerChoices(phone && opened, !references.length);
   const placement = useReferencePlacement(list);
   // An img2img start image's Strength is the profile's denoise, where the profile maps one.
   const input = selectedInput || draft.input;
@@ -434,7 +439,6 @@ export function ReferencePicker({
     },
     clearDisabled: !references.length,
   };
-  // Phones open the stack, with Add opening the choices in a sheet over it, as LoRAs do.
   if (phone)
     return (
       <ChipPopup
@@ -442,7 +446,7 @@ export function ReferencePicker({
         width="100%"
         opened={opened}
         onOpenedChange={setOpened}
-        trap={!layer}
+        trap={!layer && !adding}
         target={trigger}
         detail={count}
         {...clear}

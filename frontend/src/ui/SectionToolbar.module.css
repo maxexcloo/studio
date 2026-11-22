@@ -8,17 +8,22 @@
 }
 /* A phone's open search takes a full row under the heading. */
 .header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  column-gap: var(--mantine-spacing-md);
+  gap: 4px var(--mantine-spacing-md);
+}
+.header > :first-child:not(:last-child) {
+  flex: 1 0 min(100%, 13rem);
+  min-width: 0;
 }
 .header > :last-child {
+  margin-inline-start: auto;
+  max-width: 100%;
   min-width: 0;
 }
 .header > :last-child:has(.searching) {
-  grid-column: 1 / -1;
-  grid-row: 2;
+  flex-basis: 100%;
 }
 @keyframes enter {
   from {

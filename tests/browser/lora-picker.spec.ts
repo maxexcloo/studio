@@ -307,7 +307,7 @@ test("LoRAs without a family show under All Families", async ({ page }) => {
   await expect(page.getByText("Detail Slider supports strength 0.2 to 0.8.")).toBeVisible();
 });
 
-test("Phones open the stack first and add LoRAs from a list that scrolls under its search", async ({
+test("Phones open empty LoRA choices directly and reopen a populated stack", async ({
   page,
   isMobile,
 }) => {
@@ -323,25 +323,6 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   const stack = page.getByRole("dialog", { name: "LoRAs", exact: true });
-  await expect(stack.getByText("Choose LoRAs or a preset.", { exact: true })).toBeVisible();
-  await expect(page.getByRole("list", { name: "LoRA Choices", exact: true })).toHaveCount(0);
-  // The footer's Add, Clear and Done share one row in that order, Add at the left edge.
-  await expect(stack).toHaveCSS("opacity", "1");
-  const [add, clear, done] = await stack
-    .getByRole("button", { name: /^(Add LoRAs|Clear|Done)$/ })
-    .evaluateAll((buttons) =>
-      buttons.map((button) => {
-        const { height, right, x, y } = button.getBoundingClientRect();
-        return { centre: y + height / 2, right, x };
-      }),
-    );
-  expect(add.x).toBeLessThan(page.viewportSize()!.width / 4);
-  expect(add.right).toBeLessThan(clear.x - 40);
-  expect(clear.right).toBeLessThanOrEqual(done.x);
-  // Centred on one row, within a pixel, as layout rounds to device pixels.
-  for (const button of [add, clear])
-    expect(Math.abs(button.centre - done.centre)).toBeLessThanOrEqual(1);
-  await stack.getByRole("button", { name: "Add LoRAs", exact: true }).click();
   const adding = page.getByRole("dialog", { name: "Add LoRAs", exact: true });
   // The search waits for a tap, so the keyboard stays down.
   const search = adding.getByRole("textbox", { name: "Search LoRAs", exact: true });
@@ -363,6 +344,28 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
   await expect(
     stack.getByRole("textbox", { name: "Detail Slider Strength", exact: true }),
   ).toBeVisible();
+  await closeLoras(page);
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await expect(
+    stack.getByRole("switch", { name: "Enable Detail Slider", exact: true }),
+  ).toBeChecked();
+  await expect(adding).toBeHidden();
+  // The footer's Add, Clear and Done share one row in that order, Add at the left edge.
+  await expect(stack).toHaveCSS("opacity", "1");
+  const [add, clear, done] = await stack
+    .getByRole("button", { name: /^(Add LoRAs|Clear|Done)$/ })
+    .evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const { height, right, x, y } = button.getBoundingClientRect();
+        return { centre: y + height / 2, right, x };
+      }),
+    );
+  expect(add.x).toBeLessThan(page.viewportSize()!.width / 4);
+  expect(add.right).toBeLessThan(clear.x - 40);
+  expect(clear.right).toBeLessThanOrEqual(done.x);
+  // Centred on one row, within a pixel, as layout rounds to device pixels.
+  for (const button of [add, clear])
+    expect(Math.abs(button.centre - done.centre)).toBeLessThanOrEqual(1);
   await closeLoras(page);
 });
 

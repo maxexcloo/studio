@@ -32,9 +32,13 @@ test("The Library opens on Presets, groups Cards and Generation, and sets Files 
   const order = ["Presets", ...Object.values(groups).flat(), "Files", "Imports"];
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
-    await expect(select).toHaveValue("Presets");
-    await select.click();
+    await expect(select).toHaveText("Presets");
+    await expect(select).toHaveJSProperty("tagName", "BUTTON");
+    await select.press("ArrowDown");
     await expect(page.getByRole("option")).toHaveText(order);
+    await select.press("Escape");
+    await expect(select).toBeFocused();
+    await expect(page.getByRole("listbox")).toBeHidden();
   } else {
     const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
     await expect(nav.getByRole("link", { name: "Presets", exact: true })).toHaveAttribute(

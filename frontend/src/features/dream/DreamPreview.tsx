@@ -1,9 +1,18 @@
-import { Badge, Group, Modal, SegmentedControl, Stack, Text, VisuallyHidden } from "@mantine/core";
+import {
+  ActionIcon,
+  Badge,
+  Group,
+  Modal,
+  SegmentedControl,
+  Stack,
+  Text,
+  Tooltip,
+  VisuallyHidden,
+} from "@mantine/core";
+import { useMergedRef } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import {
   type KeyboardEvent,
-  type PointerEvent,
-  type ReactNode,
   type RefObject,
   Suspense,
   lazy,
@@ -15,21 +24,25 @@ import {
 
 import { loraName } from "../../../../shared/profiles";
 import type { MediaItem } from "../../types";
-import { closeWhenTop } from "../../ui/popupClicks";
+import { icons } from "../../ui/icons";
+import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
+import { letter } from "../compare/inputs";
 import { mediaSource } from "../gallery/mediaSource";
-import { dragAxis, swipeDirection } from "../gallery/swipe";
+import type { SwipeDirection, SwipeGesture } from "../gallery/swipe";
+import { VideoPlayButton } from "../gallery/VideoPlayButton";
 import { ViewerChrome, viewerBadge } from "../gallery/ViewerChrome";
 import { ViewerDetails } from "../gallery/ViewerDetails";
+import { Neighbour, useStrip, useTouchSwipe } from "../gallery/ViewerMediaStrip";
 import { LoraRatings, loraInfoQuery } from "../generation/LoraPicker";
 import type { Choice } from "./choices";
-import type { DeckCard, MultiDeckCard } from "./deck";
+import type { DeckCard } from "./deck";
 import { DeckButtons, DeckUndo } from "./DeckButtons";
-import { DeckMedia, MediaBackdrop } from "./DeckMedia";
-import { covers, useBoxShape } from "./mediaFit";
+import { DeckMedia, MediaBackdrop, useDreamPlayback } from "./DeckMedia";
+import { DreamSuggestions } from "./DreamSuggestions";
 import { sideLabel } from "./PairCard";
-import type { DreamItem } from "./queries";
-import { tapDistance } from "./SwipeCard";
+import type { DreamItem, SetOverride, SetOverrides } from "./queries";
+import { type Fly, SwipeCard } from "./SwipeCard";
 
 import viewerClasses from "../gallery/MediaViewer.module.css";
 import classes from "./DreamPage.module.css";
@@ -97,17 +110,11 @@ export function CardText({
   );
 }
 
-/**
- * Media filling the preview: a picture zooms with pinch, double tap and wheel, resting filled where
- * little is cropped (`covers`) and otherwise whole over its backdrop; a video plays as on the card.
- */
-function PreviewImage({ item }: { item: MediaItem }) {
+function PreviewImage({ item, swipe }: { item: MediaItem; swipe: SwipeGesture }) {
   const source = mediaSource(item);
-  const { ref, box } = useBoxShape<HTMLDivElement>();
-  const cover = !!source.width && !!source.height && covers(source.width / source.height, box);
   return (
-    <div ref={ref} className={classes.fit}>
-      {!cover && <MediaBackdrop src={source.thumbnailUrl || source.displayUrl} />}
+    <div className={classes.fit}>
+      <MediaBackdrop src={source.thumbnailUrl || source.displayUrl} />
       <Suspense fallback={<DeckMedia item={item} />}>
         <ZoomImage
           mediaId={item.id}
@@ -117,28 +124,44 @@ function PreviewImage({ item }: { item: MediaItem }) {
           placeholder={source.thumbnailUrl}
           width={source.width}
           height={source.height}
-          fill={cover}
+          swipe={swipe}
         />
       </Suspense>
     </div>
   );
 }
 
-/** A preview fills its stage. A comparison's hidden side shows a still. */
-export function PreviewFace({ item, active = true }: { item: MediaItem; active?: boolean }) {
+function PreviewFace({ item, swipe }: { item: MediaItem; swipe: SwipeGesture }) {
+  const videoSwipe = useTouchSwipe(swipe);
+  const dragged = useRef(false);
   return (
-    <div className={classes.media}>
+    <div
+      className={classes.media}
+      {...(item.type === "video" && {
+        ...videoSwipe,
+        onPointerDown(event: React.PointerEvent) {
+          dragged.current = false;
+          videoSwipe.onPointerDown(event);
+        },
+        onPointerUp(event: React.PointerEvent) {
+          dragged.current = event.pointerType === "touch" && !videoSwipe.onPointerUp(event);
+        },
+        onClick(event: React.MouseEvent) {
+          if (dragged.current) event.stopPropagation();
+        },
+      })}
+    >
       {item.type === "image" ? (
-        <PreviewImage item={item} />
+        <PreviewImage item={item} swipe={swipe} />
       ) : (
-        <DeckMedia item={item} playing={active} />
+        <DeckMedia key={item.id} item={item} playing />
       )}
     </div>
   );
 }
 
 /** Whether the press was on the stage's letterbox, outside the picture or video. */
-export function isPreviewBackdrop(target: HTMLElement, x: number, y: number) {
+function isPreviewBackdrop(target: HTMLElement, x: number, y: number) {
   if (target.closest("button, a, [data-zoomed], [data-zoom-controls]")) return false;
   const fit = target.closest<HTMLElement>(`.${classes.fit}`);
   if (!fit) return false;
@@ -159,136 +182,84 @@ export function isPreviewBackdrop(target: HTMLElement, x: number, y: number) {
   );
 }
 
-/**
- * Comparison and set members follow sideways swipes at rest. Zoomed media pans.
- */
-export function PreviewSides({
-  card,
-  side,
-  playing,
-  setSide,
-  onClose,
-  onTap,
-  onLike,
-}: {
-  card: MultiDeckCard;
-  side: number;
-  playing: boolean;
-  setSide: (side: number) => void;
-  onClose: () => void;
-  onTap: (target: HTMLElement, x: number, y: number) => void;
-  onLike?: () => void;
-}) {
-  const strip = useRef<HTMLDivElement>(null);
-  const press = useRef<{ id: number; x: number; y: number; drag?: "x" | "y" } | null>(null);
-  const shown = useRef(side);
-  const place = (dx: number, animate: boolean) => {
-    const node = strip.current!;
-    node.style.transition = animate ? "" : "none";
-    node.style.transform = `translateX(calc(${-side * 100}% + ${dx}px))`;
-  };
-  // It opens on its side, and slides only when the side changes.
-  useLayoutEffect(() => {
-    place(0, shown.current !== side);
-    shown.current = side;
-  }, [side]);
-  const release = (event: PointerEvent) => {
-    const from = press.current;
-    if (from?.id !== event.pointerId) return;
-    press.current = null;
-    const direction =
-      event.type === "pointerup"
-        ? swipeDirection(event.clientX - from.x, event.clientY - from.y)
-        : undefined;
-    if (direction === "down") return onClose();
-    if (direction === "up" && onLike) return onLike();
-    if (
-      event.type === "pointerup" &&
-      !from.drag &&
-      Math.hypot(event.clientX - from.x, event.clientY - from.y) < tapDistance
-    )
-      return onTap(event.target as HTMLElement, from.x, from.y);
-    const next = direction === "left" ? side + 1 : direction === "right" ? side - 1 : side;
-    if (next !== side && next >= 0 && next < card.items.length) setSide(next);
-    else place(0, true);
-  };
-  return (
-    <div
-      ref={strip}
-      className={classes.previewSides}
-      onPointerDown={(event) => {
-        if (event.button !== 0) return;
-        // A second finger pinches.
-        if (press.current) {
-          press.current = null;
-          return place(0, true);
-        }
-        const pressed = event.target as HTMLElement;
-        if (pressed.closest("[data-zoomed], [data-scrolls], [data-zoom-controls]")) return;
-        pressed.setPointerCapture(event.pointerId);
-        press.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
-      }}
-      onPointerMove={(event) => {
-        const from = press.current;
-        if (from?.id !== event.pointerId) return;
-        const dx = event.clientX - from.x;
-        from.drag ??= dragAxis(dx, event.clientY - from.y);
-        if (from.drag !== "x") return;
-        // Past either end it resists.
-        const open = dx < 0 ? side < card.items.length - 1 : side > 0;
-        place(open ? dx : dx / 3, false);
-      }}
-      onPointerUp={release}
-      onPointerCancel={release}
-    >
-      {card.items.map((item, index) => (
-        <section
-          key={item.id}
-          className={classes.previewSide}
-          aria-label={card.kind === "pair" ? sideLabel(card, index) : `Result ${index + 1}`}
-          aria-hidden={index !== side}
-          inert={index !== side}
-        >
-          <PreviewFace item={item} active={playing && index === side} />
-        </section>
-      ))}
-    </div>
-  );
-}
+const previewKeys: Partial<Record<string, SwipeDirection>> = {
+  ArrowLeft: "right",
+  ArrowRight: "left",
+  ArrowUp: "up",
+  ArrowDown: "down",
+};
 
 /** The deck's cards in the shared viewer chrome, with Dream's own verdicts and Undo. */
 export function DreamPreview({
   card,
   side,
   setSide,
+  overrides,
+  toggleOverride,
   canUndo,
-  children,
+  label,
+  fly,
   close,
-  backdropTap,
   act,
   undo,
-  suggest,
-  onKeyDown,
 }: {
   card: DeckCard;
   side: number;
   setSide: (side: number) => void;
+  overrides?: SetOverrides;
+  toggleOverride: (id: string, value: SetOverride) => void;
   canUndo: boolean;
-  children: ReactNode;
+  label: string;
+  fly: RefObject<Fly | null>;
   close: () => void;
-  backdropTap: RefObject<boolean>;
   act: (choice: Choice["choice"]) => void;
   undo: () => void;
-  suggest?: ReactNode;
-  onKeyDown: (event: KeyboardEvent) => void;
 }) {
   const id = useId();
   const closeIfTop = closeWhenTop(id, close);
   const phone = usePhone();
   const [details, setDetails] = useState(false);
-  const bottomBar = useRef<HTMLDivElement>(null);
-  const picked = card.kind === "pair" || card.kind === "set" ? card.items[side] : card.item;
-  const item = picked as DreamItem;
+  const stage = useRef<HTMLDivElement>(null);
+  const [playbackRoot, setPlaybackRoot] = useState<HTMLDivElement | null>(null);
+  const stageRef = useMergedRef(stage, setPlaybackRoot);
+  const items = card.kind === "pair" || card.kind === "set" ? card.items : undefined;
+  const item = (
+    card.kind === "pair" || card.kind === "set" ? card.items[side] : card.item
+  ) as DreamItem;
+  const { play, sound } = useDreamPlayback(stage, !!playbackRoot && item.type === "video", item.id);
+  const previous = items?.[side - 1];
+  const next = items?.[side + 1];
+  function swipe(direction: SwipeDirection) {
+    if (layerAbove(stage.current) || (phone && details)) return false;
+    if (direction === "down") closeIfTop();
+    else if (direction === "up") setDetails(true);
+    else if (direction === "left" ? next : previous) {
+      setSide(side + (direction === "left" ? 1 : -1));
+      return true;
+    }
+    return false;
+  }
+  const strip = useStrip({ previous: Boolean(previous), next: Boolean(next) }, swipe);
+  useLayoutEffect(() => strip.arrived(), [item.id]);
+  function onKeyDown(event: KeyboardEvent) {
+    const target = event.target as HTMLElement;
+    if (
+      !event.currentTarget.contains(target) ||
+      target.closest("aside, input, textarea, select, [contenteditable='true'], [role='slider']") ||
+      event.defaultPrevented ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      layerAbove(stage.current, event)
+    )
+      return;
+    if (event.key === "u" || event.key === "z") return undo();
+    const direction = previewKeys[event.key];
+    if (!direction) return;
+    event.preventDefault();
+    swipe(direction);
+  }
   return (
     <Modal
       id={id}
@@ -304,28 +275,40 @@ export function DreamPreview({
         header: viewerClasses.header,
         body: viewerClasses.body,
       }}
-      onKeyDown={(event) => {
-        const target = event.target as HTMLElement;
-        if (!event.currentTarget.contains(target) || target.closest("aside") || (phone && details))
-          return;
-        onKeyDown(event);
-      }}
+      onKeyDown={onKeyDown}
     >
       <div className={viewerClasses.layout}>
         <div className={`${viewerClasses.main} ${classes.previewMain}`}>
           <div
+            ref={stageRef}
             className={classes.previewStage}
-            onPointerDownCapture={() => {
-              backdropTap.current = false;
-            }}
             onClick={(event) => {
-              if (!event.detail || !backdropTap.current) return;
-              backdropTap.current = false;
-              // Wait for the tap's click so it cannot take the returned focus away.
-              closeIfTop();
+              if (
+                event.detail &&
+                isPreviewBackdrop(event.target as HTMLElement, event.clientX, event.clientY)
+              )
+                closeIfTop();
             }}
           >
-            {children}
+            <SwipeCard key={card.key} depth={0} full fly={fly} label={label} hints={{}}>
+              <div ref={strip.ref} className={viewerClasses.mediaStrip}>
+                <Neighbour item={previous} side="previous" />
+                <section
+                  className={classes.previewSide}
+                  aria-label={
+                    card.kind === "pair"
+                      ? sideLabel(card, side)
+                      : card.kind === "set"
+                        ? `Result ${side + 1}`
+                        : undefined
+                  }
+                >
+                  <PreviewFace item={item} swipe={strip.gesture} />
+                </section>
+                <Neighbour item={next} side="next" />
+              </div>
+            </SwipeCard>
+            {play && <VideoPlayButton play={play} />}
           </div>
           <ViewerChrome
             item={item}
@@ -336,43 +319,67 @@ export function DreamPreview({
                 </Badge>
               )
             }
+            actions={sound}
             details={{ phone, opened: details, toggle: () => setDetails((open) => !open) }}
             close={close}
             closeLabel="Close Preview"
             focusClose
           />
-          <div ref={bottomBar} className={classes.previewButtons}>
-            {card.kind === "set" && (
-              <Group justify="center" mb="xs">
+          <div
+            className={classes.previewButtons}
+            data-actions-hidden={(phone && details) || undefined}
+            inert={phone && details}
+          >
+            {items && (
+              <Group justify="center" gap="xs" wrap="nowrap" mb="xs">
                 <SegmentedControl
-                  aria-label="Set Results"
+                  aria-label={card.kind === "pair" ? "Comparison Results" : "Set Results"}
                   size="sm"
                   value={String(side)}
                   onChange={(value) => setSide(Number(value))}
-                  data={card.items.map((_, index) => ({
+                  data={items.map((_, index) => ({
                     value: String(index),
-                    label: String(index + 1),
+                    label: card.kind === "pair" ? letter(index) : String(index + 1),
                   }))}
                 />
+                {card.kind === "set" &&
+                  (
+                    [
+                      { value: "like", label: "Like This Image", icon: icons.like, colour: "pink" },
+                      {
+                        value: "discard",
+                        label: "Deny This Image",
+                        icon: icons.dislike,
+                        colour: "red",
+                      },
+                    ] as const
+                  ).map(({ value, label, icon: Icon, colour }) => (
+                    <Tooltip key={value} label={label}>
+                      <ActionIcon
+                        size="md"
+                        color={colour}
+                        variant={overrides?.[item.id] === value ? "light" : "default"}
+                        aria-label={label}
+                        aria-pressed={overrides?.[item.id] === value}
+                        onClick={() => toggleOverride(item.id, value)}
+                      >
+                        <Icon size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  ))}
               </Group>
             )}
             <DeckButtons
               card={card}
               act={act}
               hidden={false}
-              shown={card.kind === "pair" ? side : undefined}
-              trailing={suggest}
+              expanded
+              trailing={<DreamSuggestions card={card} side={side} />}
               leading={<DeckUndo disabled={!canUndo} onClick={undo} />}
             />
           </div>
         </div>
-        <ViewerDetails
-          item={item}
-          opened={details}
-          phone={phone}
-          close={() => setDetails(false)}
-          bottomBar={bottomBar}
-        >
+        <ViewerDetails item={item} opened={details} phone={phone} close={() => setDetails(false)}>
           {item.dream && (
             <Stack gap={4}>
               <Text size="sm" fw={600}>
