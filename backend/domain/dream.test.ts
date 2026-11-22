@@ -958,6 +958,54 @@ test("Motif cooldowns recognise unlabelled laundry and smoking across different 
   assert.match(state.calls[3].user, /The optional motif "smoking" has appeared/);
 });
 
+test("Dream retries explicit avoids without cooling required or explicitly absent motifs", async (t) => {
+  const { dataDir, dream, projects, state, taste, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  taste.edit("alice", { avoid: ["smoking"] });
+  projects.create("alice", {
+    name: "Evening Light",
+    brief: {
+      rules: "No laundry. Include a paper lantern. Avoid lightning while indoors.",
+      avoid: "neon signs",
+    },
+  });
+  writeRuntimeDocument(dataDir, "dream:alice", {
+    ...dream.read("alice"),
+    motifs: [["paper lantern"], ["paper lantern"]],
+    recent: ["An old laundromat stands empty in a storm.", "A clothesline spans a mountain path."],
+  });
+
+  const kept = [
+    {
+      prompt: "A poet reads by a paper lantern, no smoking, cigarettes or laundry.",
+      motifs: ["paper lantern", "cigarette", "laundry"],
+    },
+    { prompt: "A paper lantern lights an astronomer under a sandstone arch as lightning strikes." },
+    { prompt: "A paper lantern leads a night parade across a castle's drawbridge." },
+  ];
+  state.replies = [
+    { prompt: "A washing machine hums in the corner of a spaceship." },
+    kept[0],
+    { prompt: "There is no smoking indoors, but she lights a cigarette on the balcony." },
+    kept[1],
+    { prompt: "Neon signs light a flooded road in the distance." },
+    kept[2],
+  ];
+  for (const value of kept) {
+    state.rolls = [99];
+    assert.equal((await dreamOnce())?.input.prompt, value.prompt);
+  }
+
+  assert.match(
+    state.calls[0].user,
+    /Recently repeated optional motifs to leave out this time: laundry/,
+  );
+  assert.match(state.calls[1].user, /"laundry", which their rules or brief say to avoid/);
+  assert.match(state.calls[3].user, /"smoking", which their rules or brief say to avoid/);
+  assert.match(state.calls[5].user, /"neon signs", which their rules or brief say to avoid/);
+  assert.deepEqual(dream.read("alice").motifs?.[2], ["paper lantern"]);
+});
+
 test("Dream rotates a liked Gallery image through size, model and LoRA recreations once each", async (t) => {
   const mediaInputs = [{ id: "image", role: "reference" }];
   const native = {

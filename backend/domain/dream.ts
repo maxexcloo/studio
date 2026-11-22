@@ -58,6 +58,7 @@ import {
   cooledMotifs,
   direction,
   diversity,
+  forbiddenMotifs,
   freshConceptProblem,
   ideaMotifs,
   motifWindow,
@@ -1410,6 +1411,12 @@ export function createDream(options: {
   const repeats = (item: DreamItem, recent: DreamItem[]) =>
     recent.some((prior) => related(item, prior) || sameConcept(item, prior));
 
+  const seedMotifs = (ownerId: string, record: DreamRecord) => {
+    const { preferences, rules } = options.taste.read(ownerId);
+    const forbidden = forbiddenMotifs(preferences.avoid ?? [], rules);
+    return [...forbidden, ...cooledMotifs(record, rules.join("\n"), forbidden)];
+  };
+
   /** Three independent Super Likes on the same concept can seed an automatic variant. */
   async function seedPick(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const strong = await readyGenerations(ownerId, {
@@ -1421,7 +1428,7 @@ export function createDream(options: {
     });
     if (strong.length < 3) return null;
     const recent = cooled(ownerId, record);
-    const motifs = cooledMotifs(record, options.taste.read(ownerId).rules.join("\n"));
+    const motifs = seedMotifs(ownerId, record);
     for (const item of strong) {
       if (repeats(item, recent)) continue;
       const group = [item];
@@ -1706,7 +1713,11 @@ export function createDream(options: {
     const spicy = (job.input.writing as DreamWriting).spicy && access.uncensored;
     const record = read(ownerId);
     const { recent, subjects = [], anchors = [] } = record;
-    const { summary, rules, likes, styles, avoid } = options.taste.read(ownerId);
+    const { summary, rules, likes, styles, avoid, preferences } = options.taste.read(ownerId);
+    const forbidden = forbiddenMotifs(
+      [...(preferences.avoid ?? []), project?.brief.avoid ?? ""],
+      [...rules, project?.brief.rules ?? ""],
+    );
     const contentTaste = [
       ...(avoid.length ? [`Avoids: ${avoid.join(", ")}`] : []),
       ...(likes.length ? [`Likes: ${likes.join(", ")}`] : []),
@@ -1737,7 +1748,7 @@ export function createDream(options: {
       ...brief.filter(([label]) => label !== "Avoid").map(([, value]) => value),
       ...rules,
     ].join("\n");
-    const cooling = newConcept ? cooledMotifs(record, fixed) : [];
+    const cooling = newConcept ? cooledMotifs(record, fixed, forbidden) : [];
     const conceptReply = `Reply with JSON only: {${replyShape}, "motifs": ["short labels for optional settings, props, actions and styles"]}.`;
     let drawnAnchors: string[] = [];
     // A series' results so far, so this one is a new moment.
@@ -1974,6 +1985,9 @@ export function createDream(options: {
       const minor = options.minorAge(prompt);
       if (minor)
         return `"${minor}" reads as someone under 18; drop it, without adding "adult" or an age.`;
+      const excluded = repeatedMotif(prompt, forbidden);
+      if (excluded)
+        return `Your prompt includes "${excluded}", which their rules or brief say to avoid.`;
       if (series)
         return shots.some((shot) => normalised(shot) === normalised(prompt))
           ? "You repeated an earlier result of the series."
@@ -2020,7 +2034,7 @@ export function createDream(options: {
               idea,
               title,
               chosenMotifs,
-              newConcept && latest ? cooledMotifs(latest, fixed) : [],
+              newConcept && latest ? cooledMotifs(latest, fixed, forbidden) : [],
             );
       if (!wrong) {
         if (latest) {
@@ -2913,7 +2927,7 @@ export function createDream(options: {
   async function pairBase(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const used = new Set(record.compared);
     const recent = cooled(ownerId, record);
-    const motifs = cooledMotifs(record, options.taste.read(ownerId).rules.join("\n"));
+    const motifs = seedMotifs(ownerId, record);
     const [base] = (await drawSeeds(ownerId, record, profiles)).filter(
       ({ item, input, prompt }) =>
         !used.has(String(item.id)) &&
