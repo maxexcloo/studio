@@ -283,10 +283,13 @@ test("a video stays visible as stopping while its provider confirms", async ({ p
     updatedAt: stamp,
   };
   state.jobs.push(video);
-  const confirmed = Promise.withResolvers<void>();
+  let confirm!: () => void;
+  const confirmed = new Promise<void>((resolve) => {
+    confirm = resolve;
+  });
   await page.route("**/api/queue/stopping-video/cancel", async (route) => {
     Object.assign(video, { cancelling: true });
-    await confirmed.promise;
+    await confirmed;
     video.status = "cancelled";
     return route.fulfill({ json: { job: video } });
   });
@@ -299,7 +302,7 @@ test("a video stays visible as stopping while its provider confirms", async ({ p
     await expect(queue.getByText("A lighthouse in fog", { exact: true })).toBeVisible();
     expect(video.status).toBe("running");
   } finally {
-    confirmed.resolve();
+    confirm();
   }
   await expect(queue.getByRole("button", { name: "Stopping", exact: true })).toHaveCount(0);
 });
