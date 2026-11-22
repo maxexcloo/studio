@@ -34,8 +34,8 @@ import { loraAllowed } from "./model/catalogue.js";
 import { recordPrompt } from "./prompt-history.js";
 import { RadianceClient, isRadianceNode, radianceSizeStep } from "./providers/radiance.ts";
 import { referenceExistsForAccount, stageReferenceAssetsForAccount } from "./references.js";
-import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
-import { upscaleTargets } from "./upscale.js";
+import { dropsAutoUpscale, planRunUpscale } from "./upscale/combined-run.js";
+import { upscaleTargets } from "./upscale/graph.js";
 import { fastTwin, sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {
   capabilityForProfile,
@@ -489,7 +489,7 @@ export function createGenerationSubmission({
 
   /**
    * An explicitly requested Smart upscale goes into the run's own graph, so
-   * a run and its upscale are one ComfyUI job (run-upscale.js). When ComfyUI's
+   * a run and its upscale are one ComfyUI job (upscale/combined-run.js). When ComfyUI's
    * node list is out of reach the run still goes ahead, without the upscale.
    */
   async function smartUpscalePrepare(graph, body) {

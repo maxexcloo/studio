@@ -25,7 +25,7 @@ import { withPngText } from "./png-text.js";
 import { writingIssue, writingRequest } from "./prompt-stage.js";
 import { providerMediaWriter } from "./providers/media.ts";
 import { recoverRadianceJob } from "./radiance-jobs.js";
-import { runUpscaleJob } from "./upscale-jobs.js";
+import { runUpscaleJob } from "./upscale/jobs.js";
 import { resultSource } from "./version-sources.js";
 import {
   capabilityForProfile,

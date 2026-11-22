@@ -5,7 +5,7 @@
 import { families } from "./family-catalogue.js";
 import { encoderKinds, vaeKinds } from "./model/components.js";
 import { existingCopy } from "./model/downloads.js";
-import { modelFiles } from "./upscale.js";
+import { modelFiles } from "./upscale/weights.js";
 
 // The commit each repository's files are fetched at, so a download is always the file its
 // `sha256` names. When a file changes upstream, the Library's update check offers it as an Update
@@ -727,7 +727,7 @@ const checkpointDownloads = {
   ],
 };
 
-// The Impact Pack's face detector for Face Detail (upscale.js), in Subpack's `ultralytics_bbox`
+// The Impact Pack's face detector for Face Detail, in Subpack's `ultralytics_bbox`
 // folder (models/ultralytics/bbox). Ultralytics loads only pickled `.pt` weights, so the worker
 // accepts that one type in this one folder; the pinned hash is what makes it the reviewed file.
 const detectorDownloads = {

@@ -214,7 +214,7 @@ import { createLocalText, createServicesObserver, parkedWorkers } from "./runtim
 import { loadSharp } from "./sharp-loader.js";
 import { installShutdown } from "./shutdown.js";
 import { registerStatusRoutes } from "./status-routes.js";
-import { registerUpscaleRoutes } from "./upscale-routes.js";
+import { registerUpscaleRoutes } from "./upscale/routes.js";
 import {
   dedicatedModelLibrary,
   installedWorkerFiles,

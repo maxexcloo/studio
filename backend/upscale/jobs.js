@@ -1,17 +1,17 @@
 import { setTimeout as delay } from "node:timers/promises";
 
-import { workerUrl } from "./comfy/backends.js";
-import { comfy, comfyOn, normalizeComfyError } from "./comfy/comfy.js";
-import { cancelPrompt, promptTracker } from "./comfy/queue.js";
-import { forgetComfyRun } from "./comfy/traces.js";
-import { outputsFrom } from "./gallery/records.js";
-import { findGalleryItem, updateGalleryJob } from "./gallery/store.js";
-import { nameSavesForRun, saveIntoStudioFolder } from "./graphs.js";
-import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
-import { ingestRunResults, removeComfyFiles } from "./media-store.js";
-import { recordUpscale, upscaleEstimate } from "./timings.js";
-import { upscaleWork } from "./upscale-timing.js";
-import { faceDetailSource, noteWorkerUpscale, upscaleGraph, upscalePlan } from "./upscale.js";
+import { workerUrl } from "../comfy/backends.js";
+import { comfy, comfyOn, normalizeComfyError } from "../comfy/comfy.js";
+import { cancelPrompt, promptTracker } from "../comfy/queue.js";
+import { forgetComfyRun } from "../comfy/traces.js";
+import { outputsFrom } from "../gallery/records.js";
+import { findGalleryItem, updateGalleryJob } from "../gallery/store.js";
+import { nameSavesForRun, saveIntoStudioFolder } from "../graphs.js";
+import { jobs, setTerminalJob, trackUpscale } from "../jobs.js";
+import { ingestRunResults, removeComfyFiles } from "../media-store.js";
+import { recordUpscale, upscaleEstimate } from "../timings.js";
+import { faceDetailSource, noteWorkerUpscale, upscaleGraph, upscalePlan } from "./graph.js";
+import { upscaleWork } from "./timing.js";
 
 export function findUpscaleTarget(id) {
   return findGalleryItem({ named: [id] }) || null;
@@ -126,7 +126,7 @@ export async function runUpscaleJob(
       startedAt: new Date().toISOString(),
       error: "",
     });
-    // How long it should take, from every SeedVR2 upscale here before (upscale-timing.js).
+    // How long it should take, from every SeedVR2 upscale here before (upscale/timing.js).
     const learn = {
       quality: plan.quality,
       model: plan.model || "",
@@ -242,7 +242,7 @@ function waitForOpen(socket) {
 /**
  * Plans one image's upscale, already staged in ComfyUI as `imageName`: the
  * upscale arrow on a finished image. Smart upscale as part of a run is
- * run-upscale.js.
+ * combined-run.js.
  */
 export function prepareUpscale({
   item,

@@ -23,8 +23,9 @@ import { maxJobsPerCall, maxSplitJobs } from "./controls.js";
 import { createGuideLog, registerGenerateTools } from "./generate.js";
 import { controlInstructions, registerGpuTools } from "./gpu.js";
 import { registerManageTools } from "./manage.js";
-import { McpMedia, maxUploadMegabytes, resultPage, uploadPage } from "./media.js";
+import { McpMedia, resultPage, uploadPage } from "./media.js";
 import { createChatChoices, registerProjectTool } from "./project.js";
+import { maxUploadBytes, maxUploadMegabytes } from "./reference-uploads.js";
 import { registerResultTools } from "./results.js";
 import { registerVariantsTool } from "./variants.js";
 
@@ -333,7 +334,7 @@ export function registerMcpRoutes(
     const resolve = async (value, signal) => (await resolveOutput(value, signal)).jobId;
     // A reference asset id, or a result's number or option letter ("#12", "B") as its image's.
     const referenceAsset = async (value, signal) => {
-      if (!media.namesResult(value)) return media.referenceId(value);
+      if (!media.namesResult(value)) return media.uploads.resolve(value);
       const found = await resolveOutput(value, signal);
       return (await media.resultReference(owner, found.jobId, found.index ?? 0, signal)).asset.id;
     };
@@ -496,7 +497,7 @@ export function registerMcpRoutes(
     app.post(
       "/mcp/uploads",
       guard,
-      express.raw({ type: () => true, limit: maxUploadMegabytes * 1_000_000 }),
+      express.raw({ type: () => true, limit: maxUploadBytes }),
       async (req, res) => {
         const { scope, owner } = req.mcpActor;
         if (scope !== "media" || !owner)
@@ -504,7 +505,7 @@ export function registerMcpRoutes(
             error: scope === "unlinked" ? unlinkedMessage : "Only a person's media access uploads.",
           });
         try {
-          const { asset } = await media.store(
+          const { asset } = await media.uploads.store(
             owner,
             Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0),
             String(req.query.name || "chat-image"),
@@ -584,7 +585,7 @@ export function registerMcpRoutes(
       if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase())
         throw new Error("Invalid host.");
       if (!["GET", "POST"].includes(req.method)) throw new Error("Unsupported method.");
-      claims = media.uploadClaims(req.params.token);
+      claims = media.uploads.claims(req.params.token);
     } catch {
       return send(404, {
         message: "This upload link has been used or has expired. Ask the chat for a new one.",
@@ -594,7 +595,7 @@ export function registerMcpRoutes(
     if (req.method === "GET") return send(200, {});
     // At most the largest image and its form; a body without a length is refused before it is read.
     const length = Number(req.headers["content-length"]);
-    if (!(length > 0) || length > maxUploadMegabytes * 1_000_000 + 100_000)
+    if (!(length > 0) || length > maxUploadBytes + 100_000)
       return send(413, { message: `The photo must be at most ${maxUploadMegabytes} MB.` });
     try {
       const form = await new Request("http://upload.invalid/", {
@@ -606,7 +607,7 @@ export function registerMcpRoutes(
       const file = form.get("image");
       if (!(file instanceof Blob) || !file.size)
         return send(400, { message: "Choose a photo to upload." });
-      await media.uploadByLink(
+      await media.uploads.redeem(
         claims,
         { buffer: Buffer.from(await file.arrayBuffer()), name: file.name || "photo" },
         accountMode ? { internal: true } : undefined,
@@ -615,7 +616,7 @@ export function registerMcpRoutes(
     } catch (error) {
       return send(400, {
         message: error?.message || "Studio could not save this photo.",
-        open: media.uploadLinks.has(claims.nonce),
+        open: media.uploads.isOpen(claims),
       });
     }
   });

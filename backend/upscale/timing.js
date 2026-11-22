@@ -13,7 +13,7 @@
  * within about 35%.
  */
 
-import { median } from "./generation-timing.js";
+import { median } from "../generation-timing.js";
 
 const PER_KEY = 30;
 const TOTAL = 200;

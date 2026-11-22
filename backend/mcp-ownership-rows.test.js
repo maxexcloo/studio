@@ -74,7 +74,7 @@ test("mcpOwnership moves MCP's records into rows, and its links, numbers and res
   assert.equal((await media.resolve("owner-1", "scope1", "B")).jobId, "job-b");
   assert.equal(media.reference("owner-1", "scope1", "job-c"), 3);
   assert.deepEqual(media.promptRecord("job-a"), { prompt: "a lighthouse" });
-  assert.equal(media.referenceId("upload-link:abcdefghijklmnop"), "asset-1");
+  assert.equal(media.uploads.resolve("upload-link:abcdefghijklmnop"), "asset-1");
   assert.doesNotThrow(() => media.own("owner-2", "asset-2", "assets"));
   assert.throws(() => media.own("owner-2", "job-a"), /submitted by this account/);
 });

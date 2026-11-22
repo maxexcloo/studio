@@ -3,8 +3,8 @@ import { upscaleQualities } from "../shared/upscale.ts";
 import { listSchedule } from "./domain/eta.ts";
 import { jobs, queueClearsAt } from "./jobs.js";
 import { generationEstimate, upscaleEstimate } from "./timings.js";
-import { upscaleWork } from "./upscale-timing.js";
-import { upscalePlan } from "./upscale.js";
+import { upscalePlan } from "./upscale/graph.js";
+import { upscaleWork } from "./upscale/timing.js";
 import { listWorkers } from "./workers.js";
 
 /**

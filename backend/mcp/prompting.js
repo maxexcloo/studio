@@ -56,3 +56,28 @@ export function loadMcpPrompting(file) {
     for (const kind of Object.keys(kinds)) guideOf({ family, kind });
   return (profile) => mergedPrompting(guideOf(profile), profile.prompting);
 }
+
+/**
+ * A profile guide as one paragraph: the family's summary, rules, pitfalls and example, then its
+ * mode's and variant's, without sources; `max` caps it for a preview.
+ */
+export function compactGuide(guide, max = Infinity) {
+  if (!guide || typeof guide !== "object") return "";
+  const parts = [];
+  const add = (value) => {
+    for (const item of [value].flat())
+      if (typeof item === "string" && item.trim()) parts.push(item.replace(/\s+/g, " ").trim());
+  };
+  for (const source of [guide, guide.mode, guide.variant])
+    if (source && typeof source === "object") {
+      add(source.summary);
+      add(source.rules);
+      add(source.pitfalls);
+      if (source.example)
+        add(
+          `Example: ${typeof source.example === "string" ? source.example : JSON.stringify(source.example)}`,
+        );
+    }
+  const textValue = parts.join(" ");
+  return textValue.length > max ? `${textValue.slice(0, max - 1)}…` : textValue;
+}
