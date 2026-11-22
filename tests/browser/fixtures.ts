@@ -381,6 +381,7 @@ export async function fixtures(page: Page) {
           "soft-style.safetensors": { title: "Soft Style", families: ["test"], type: "style" },
         },
       });
+    if (path === "/api/prompts") return respond({ enabled: true, prompts: [] });
     if (path === "/api/assistant")
       return respond({
         available: true,

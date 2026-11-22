@@ -4,6 +4,7 @@ import { mediaTitle } from "../../frontend/src/features/gallery/mediaLabels";
 import type { Profile } from "../../frontend/src/types";
 import { formatDateTime } from "../../frontend/src/ui/dates";
 import {
+  backToActionMenu,
   closeLoras,
   closeTextEditor,
   expandAssistantMenu,
@@ -1502,6 +1503,7 @@ test("With neither local video nor Grok, Animate's options are disabled", async 
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expandAssistantMenu(page, "Templates");
   await expect(page.getByRole("menuitem", { name: "Living Photo", exact: true })).toBeDisabled();
+  await backToActionMenu(page);
   await expect(
     page.getByRole("menuitem", { name: "Animate in Composer", exact: true }),
   ).toBeDisabled();

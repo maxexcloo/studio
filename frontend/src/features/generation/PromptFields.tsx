@@ -209,7 +209,7 @@ export function PromptFields({
           minRows={compact ? 1 : negative ? 4 : 3}
           maxRows={compact ? 1 : negative ? 4 : 10}
           wrap={compact ? "off" : undefined}
-          readOnly={compact && phone}
+          onClick={compact && phone ? (event) => event.preventDefault() : undefined}
           inline={fill}
           value={input.prompt}
           onChange={(prompt) => onChange({ prompt })}

@@ -33,6 +33,10 @@ export const closingPopup = () => closing;
 const seenOpen = new WeakSet<HTMLElement>();
 const shown = (layer: HTMLElement) => {
   if (!layer.getClientRects().length) return false;
+  if (layer.hasAttribute("data-action-submenu")) {
+    const parent = layer.parentElement?.closest<HTMLElement>(popupLayer);
+    if (parent && !shown(parent)) return false;
+  }
   const context = popups.get(layer);
   if (context) return context.opened;
   const expanded = document.getElementById(layer.id.replace(/-dropdown$/, ""))?.ariaExpanded;

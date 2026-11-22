@@ -410,7 +410,8 @@ export function TextBox({
       inputMode={phone ? "none" : props.inputMode}
       onClick={(event) => {
         onClick?.(event);
-        if (phone && !props.readOnly && !props.disabled) setEditing(true);
+        if (phone && !event.defaultPrevented && !props.readOnly && !props.disabled)
+          setEditing(true);
       }}
       // While the phone editor is open, it alone carries the actions.
       rightSection={

@@ -301,11 +301,7 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
   ]);
   await expandAssistantMenu(menu, "Templates");
   const templates = menu.getByRole("group", { name: "Templates", exact: true });
-  await expect(templates.getByRole("menuitemcheckbox")).toHaveText([
-    "Candid",
-    "Enhance",
-    "Portrait",
-  ]);
+  await expect(templates.getByRole("menuitem")).toHaveText(["Candid", "Enhance", "Portrait"]);
   // Styles show their names alone.
   await expect(menu.getByText("A person in focus.", { exact: true })).toHaveCount(0);
   await backToActionMenu(menu);

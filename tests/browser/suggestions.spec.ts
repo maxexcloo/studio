@@ -392,6 +392,12 @@ test("Suggestions show why Studio has none, and no ideas show", async ({ page })
       exact: true,
     }),
   ).toBeDisabled();
+  await backToActionMenu(menu);
+  const side = menu.getByRole("menu", { name: "Suggestions", exact: true });
+  if (await side.isVisible()) {
+    await page.keyboard.press("Escape");
+    await expect(side).toBeHidden();
+  }
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toHaveCount(0);
   await closeTextEditor(page, "Prompt");
