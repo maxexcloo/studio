@@ -892,15 +892,7 @@ export async function fixtures(page: Page) {
       return respond({ unseen: 0, images: 0, videos: 0, active: false });
     if (path === "/api/dream")
       return respond({
-        settings: {
-          enabled: false,
-          paused: false,
-          dailyImages: 40,
-          dailyVideos: 4,
-          images: true,
-          videos: false,
-          spicy: false,
-        },
+        settings: dreamDefaults,
         today: { images: 0, videos: 0 },
         unseen: [],
         status: "off",

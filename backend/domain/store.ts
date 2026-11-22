@@ -409,6 +409,23 @@ export class Store {
     );
   }
 
+  /** An admitted generation the account requested after the cutoff, including finished work. */
+  hasRecentGenerationRequest(ownerId: string, cutoff: string): boolean {
+    return Boolean(
+      this.db
+        .prepare(
+          `SELECT 1 FROM studio_queue
+          WHERE owner_id = ? AND created_at > ?
+            AND ${jobPriority} IN (${queuePriority.manual}, ${queuePriority.mcp})
+            AND json_extract(record, '$.operation') IS NOT 'upscale'
+            AND json_extract(record, '$.faceRedo') IS NOT 1
+            AND json_extract(record, '$.retried') IS NOT 1
+          LIMIT 1`,
+        )
+        .get(ownerId, cutoff),
+    );
+  }
+
   /** Open Dream work, without loading prompts, outputs or other accounts' own work. */
   openDreamJobs(ownerId?: string, waiting = false) {
     const statuses = waiting ? pendingStatuses : openStatuses;

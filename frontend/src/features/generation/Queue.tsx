@@ -163,7 +163,10 @@ export function useQueueAction(jobId?: string) {
     onMutate: async ({ id, action }) => {
       if (action !== "cancel" || !id) return;
       const detail = queueJobQuery(id).queryKey;
-      await client.cancelQueries({ queryKey: queueQuery.queryKey });
+      await Promise.all([
+        client.cancelQueries({ queryKey: queueQuery.queryKey, exact: true }),
+        client.cancelQueries({ queryKey: detail, exact: true }),
+      ]);
       const stopping = (job: QueueJob) =>
         job.id === id && !terminalStatuses.has(job.status) && job.status !== "saving"
           ? { ...job, cancelling: true as const, reason: "" }

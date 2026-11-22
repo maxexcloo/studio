@@ -4,6 +4,8 @@ export const dreamDefaults = {
   paused: false,
   dailyImages: 40,
   dailyVideos: 4,
+  imageIdleMinutes: 0,
+  videoIdleMinutes: 5,
   images: true,
   videos: false,
   spicy: false,
@@ -11,6 +13,7 @@ export const dreamDefaults = {
   videoBackend: "local" as "local" | "cloud",
 };
 export type DreamSettings = typeof dreamDefaults;
+export const maxDreamIdleMinutes = 120;
 export type DreamCounts = { images: number; videos: number };
 
 export function dreamLimitReached(
@@ -77,8 +80,13 @@ export type DreamOverride = keyof typeof dreamOverrideKeys;
 export function dreamSettingError(key: keyof DreamSettings, value: unknown): string {
   if (key === "imageBackend" || key === "videoBackend")
     return value === "local" || value === "cloud" ? "" : `Choose Local or Cloud for ${key}.`;
-  if (key === "dailyImages" || key === "dailyVideos") {
-    const max = key === "dailyImages" ? 500 : 100;
+  if (
+    key === "dailyImages" ||
+    key === "dailyVideos" ||
+    key === "imageIdleMinutes" ||
+    key === "videoIdleMinutes"
+  ) {
+    const max = key === "dailyImages" ? 500 : key === "dailyVideos" ? 100 : maxDreamIdleMinutes;
     return Number.isInteger(value) && Number(value) >= 0 && Number(value) <= max
       ? ""
       : `Set ${key} to a whole number from 0 to ${max}.`;

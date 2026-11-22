@@ -1080,6 +1080,15 @@ export function createDream(options: {
       imagesDone: settings.dailyImages > 0 && settings.images && !image,
     };
   }
+  /** A recently admitted request still holds off this kind of background work. */
+  function idleWait(ownerId: string, kind: Kind, settings = read(ownerId).settings) {
+    const minutes = kind === "image" ? settings.imageIdleMinutes : settings.videoIdleMinutes;
+    if (!minutes) return;
+    const cutoff = new Date(now() - minutes * 60_000).toISOString();
+    if (store.hasRecentGenerationRequest(ownerId, cutoff))
+      return `Dream ${kind}s wait ${minutes} ${minutes === 1 ? "minute" : "minutes"} after your most recent generation request.`;
+  }
+
   /** What stands in the way before counting today's work. */
   function blockedBySettings(ownerId: string, { settings }: DreamRecord) {
     if (!settings.enabled) return { status: "off" as const };
@@ -2105,6 +2114,11 @@ export function createDream(options: {
     let reason = "";
     let idle = "";
     for (const kind of due) {
+      const delay = idleWait(ownerId, kind, record.settings);
+      if (delay) {
+        idle = delay;
+        continue;
+      }
       const backend = record.settings[kind === "image" ? "imageBackend" : "videoBackend"];
       const online = await options.online(kind, backend);
       if (online.text !== "online")
@@ -3039,6 +3053,7 @@ export function createDream(options: {
     },
     /** A Dream job finished: its worker is free now, so the next starts without waiting a tick. */
     finished: wake,
+    idleWaitForJob: (job: OwnedJob) => idleWait(job.ownerId, kindOf(job.input)),
     access: (ownerId: string) => options.access(ownerId),
     status(
       ownerId: string,

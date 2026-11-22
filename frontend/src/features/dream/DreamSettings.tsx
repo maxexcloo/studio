@@ -1,6 +1,7 @@
 import { Alert, SegmentedControl, Switch, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { maxDreamIdleMinutes } from "../../../../shared/dream";
 import { api } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
 import { NumberSetting } from "../../ui/NumberSetting";
@@ -67,6 +68,21 @@ export function DreamPreferences() {
       />
     </SettingRow>
   );
+  const idle = (key: "imageIdleMinutes" | "videoIdleMinutes") => (
+    <SettingRow
+      label="Idle Delay"
+      description="Minutes to wait after your latest generation request. Set to 0 for no extra delay."
+    >
+      <NumberSetting
+        label="Idle Delay"
+        value={settings[key]}
+        min={0}
+        max={maxDreamIdleMinutes}
+        disabled={!settings[key === "imageIdleMinutes" ? "images" : "videos"]}
+        onSave={(value) => save.mutate({ [key]: value })}
+      />
+    </SettingRow>
+  );
   const backend = (key: "imageBackend" | "videoBackend") => (
     <SettingRow
       wide
@@ -101,11 +117,13 @@ export function DreamPreferences() {
       <SettingGroup title="Images">
         {toggle("images", "Enable", "Make new images.")}
         {number("dailyImages", 500, "The most images Dream makes a day.")}
+        {idle("imageIdleMinutes")}
         {backend("imageBackend")}
       </SettingGroup>
       <SettingGroup title="Videos">
         {toggle("videos", "Enable", "Animate kept or liked images too.")}
         {number("dailyVideos", 100, "The most videos Dream makes a day.")}
+        {idle("videoIdleMinutes")}
         {backend("videoBackend")}
       </SettingGroup>
       {save.error && (

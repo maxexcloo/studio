@@ -765,6 +765,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
     if (items.some((item) => item.dream)) dream.finished();
   },
   directCloud,
+  dreamIdleWait: (job) => dream.idleWaitForJob(job),
   generationRoutes,
   promptStage,
   recoverRunningJobs,
