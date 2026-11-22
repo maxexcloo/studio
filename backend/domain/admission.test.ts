@@ -17,7 +17,7 @@ test("a profile that can't batch queues Count as separate seeded runs in one set
     revision: () => 0,
     separateRuns: (input) => input.profileId === "single",
   });
-  const run = async (profileId: string, seed: string) => {
+  const run = async (profileId: string, seed?: number | string) => {
     const done = await admit({ kind: "image", prompt: "p", profileId, count: 3, seed } as never, {
       userId: "alice",
       role: "user",
@@ -34,11 +34,13 @@ test("a profile that can't batch queues Count as separate seeded runs in one set
   assert.ok(split[0].queueSet);
   assert.equal(split[0].queueBatch, split[0].id);
   assert.ok(split.every((job) => job.queueBatch === split[0].id));
-  const random = await run("single", "");
-  assert.deepEqual(
-    random.map((job) => job.input.seed),
-    ["", "", ""],
-  );
+  for (const seed of [0, "0", "", undefined]) {
+    const jobs = await run("single", seed);
+    assert.deepEqual(
+      jobs.map((job) => job.input.seed),
+      seed === 0 || seed === "0" ? ["0", "1", "2"] : ["", "", ""],
+    );
+  }
   const batched = await run("batch", "10");
   assert.deepEqual(
     batched.map((job) => job.input.count),

@@ -211,9 +211,9 @@ export async function accountRules(media, owner, signal) {
 /** Whether the account's recent results are converging on one look (domain/reflection.ts). */
 export async function converging(media, owner, signal) {
   const reflection = await media
-    .request("GET", "/api/taste/reflection", undefined, owner, { signal })
+    .request("GET", "/api/taste/reflection?view=convergence", undefined, owner, { signal })
     .catch(() => null);
-  return Boolean(reflection?.sameness?.made?.converging);
+  return Boolean(reflection?.converging);
 }
 
 /** The rules as generate's reply gives them, or "" when there are none. */

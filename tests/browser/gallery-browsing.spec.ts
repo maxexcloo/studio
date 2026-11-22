@@ -1665,6 +1665,46 @@ test("Incoming results wait behind New Results while scrolled, keeping loaded pa
   ).toBeVisible();
 });
 
+test("Work stopped elsewhere leaves the open Gallery when the queue refreshes", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const [ready] = results(1);
+  state.gallery.push(
+    {
+      ...ready,
+      id: "stopped-item",
+      jobId: "stopped-job",
+      title: "Queued Result",
+      status: "pending",
+      url: "",
+    },
+    ready,
+  );
+  const job = {
+    id: "stopped-job",
+    sessionId: "s",
+    operation: "image",
+    status: "queued",
+    input: { prompt: "Queued Result", profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  };
+  state.jobs.push(job);
+  await page.goto("/images");
+  const queued = page.getByRole("button", { name: "Open image: Queued Result", exact: true });
+  const finished = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
+  await expect(queued).toBeVisible();
+  await expect(finished).toBeVisible();
+
+  job.status = "cancelled";
+  state.gallery.shift();
+  await expect(queued).toHaveCount(0);
+  await expect(finished).toBeVisible();
+});
+
 test("Incoming results keep the viewer on its current item and return focus to that tile", async ({
   page,
 }) => {

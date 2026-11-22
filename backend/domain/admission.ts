@@ -41,7 +41,7 @@ function splitRuns(input: GenerationInput, separate?: boolean): GenerationInput[
   return Array.from({ length: count }, (_, index) => ({
     ...input,
     count: 1,
-    seed: input.seed && Number.isFinite(seed) ? String(seed + index) : "",
+    seed: (input.seed === 0 || input.seed) && Number.isFinite(seed) ? String(seed + index) : "",
   }));
 }
 

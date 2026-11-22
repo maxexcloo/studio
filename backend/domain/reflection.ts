@@ -148,16 +148,21 @@ export function createReflection(options: {
     return value;
   };
   const images = { type: "image", status: "done", limit: 2 * sameness.window };
-  const samenessFor = (ownerId: string) =>
-    cached(["sameness", ownerId], () => ({
-      made: samenessOf(
+  const made = (ownerId: string) =>
+    cached(["made", ownerId], () =>
+      samenessOf(
         options.gallery(ownerId, { ...images, uploaded: false, unlisted: false }),
         options.likeness,
       ),
-      liked: samenessOf(options.gallery(ownerId, { ...images, rating: "liked" }), options.likeness),
-    }));
+    );
+  const samenessFor = (ownerId: string) => ({
+    made: made(ownerId),
+    liked: cached(["liked", ownerId], () =>
+      samenessOf(options.gallery(ownerId, { ...images, rating: "liked" }), options.likeness),
+    ),
+  });
   return {
-    sameness: samenessFor,
+    converging: (ownerId: string) => made(ownerId).converging,
     read: (ownerId: string, zone: string) => ({
       sameness: samenessFor(ownerId),
       days: cached(["days", ownerId, zone], () => {
@@ -177,9 +182,12 @@ export type Reflection = ReturnType<typeof createReflection>;
 /** The caller's own reflection; days follow `zone`, the browser's time zone. */
 export function registerReflectionRoutes(app: object, { reflection }: { reflection: Reflection }) {
   directRoute(app, "GET", "/api/taste/reflection", (account: RouteAccount, { query }) => {
+    const ownerId = account?.userId || "";
+    if (query.view === "convergence")
+      return { status: 200, payload: { converging: reflection.converging(ownerId) } };
     const zone = typeof query.zone === "string" && query.zone ? query.zone : "UTC";
     if (zone !== "UTC" && !Intl.supportedValuesOf("timeZone").includes(zone))
       return { status: 400, payload: { ok: false, error: "Supply a valid time zone." } };
-    return { status: 200, payload: reflection.read(account?.userId || "", zone) };
+    return { status: 200, payload: reflection.read(ownerId, zone) };
   });
 }

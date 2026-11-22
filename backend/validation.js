@@ -375,7 +375,7 @@ export function sanitizeGenerateBody(
     denoise: snapNumber(input.denoise, fallback("denoise", denoiseRange), denoiseRange),
     sampler: String(input.sampler || ""),
     scheduler: String(input.scheduler || ""),
-    seed: String(input.seed || ""),
+    seed: input.seed === 0 ? "0" : String(input.seed || ""),
     count:
       customWorkflow.capabilities?.variations === false
         ? 1

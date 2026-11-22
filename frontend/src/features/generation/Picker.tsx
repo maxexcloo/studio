@@ -40,7 +40,6 @@ import { ClearButton } from "../../ui/ClearButton";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { compareNames } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
-import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { ScrollingSegments } from "../../ui/ScrollingSegments";
@@ -658,13 +657,6 @@ export function ChipContent({
   );
 }
 
-export type SavedSort = "name-asc" | "name-desc" | "newest" | "oldest";
-export const savedSortLabels: Record<SavedSort, string> = {
-  newest: "Newest First",
-  oldest: "Oldest First",
-  "name-asc": "Name A–Z",
-  "name-desc": "Name Z–A",
-};
 interface SavedItem {
   id: string;
   name: string;
@@ -672,87 +664,6 @@ interface SavedItem {
   savedAt?: string;
   /** A note under the name, such as where an older record came from. */
   detail?: string;
-}
-
-/** Saved items filtered by the query and sorted; `items` arrive oldest first. */
-export function savedItems<T extends SavedItem>(items: T[], query: string, sort: SavedSort) {
-  const terms = query.trim().toLocaleLowerCase();
-  const time = (item: T, index: number) => Date.parse(item.savedAt || "") || index;
-  return items
-    .map((item, index) => ({ item, at: time(item, index) }))
-    .filter(({ item }) => !terms || item.name.toLocaleLowerCase().includes(terms))
-    .sort((a, b) =>
-      sort === "name-asc"
-        ? compareNames(a.item.name, b.item.name)
-        : sort === "name-desc"
-          ? compareNames(b.item.name, a.item.name)
-          : sort === "newest"
-            ? b.at - a.at
-            : a.at - b.at,
-    )
-    .map(({ item }) => item);
-}
-
-/**
- * The Library's imported images in the Presets popup: choosing one loads it, asking first when it
- * would replace what is there.
- */
-export function SavedList<T extends SavedItem>({
-  label,
-  items,
-  empty,
-  replaces,
-  replaceMessage,
-  onLoad,
-}: {
-  label: string;
-  items: T[];
-  empty: string;
-  /** Whether loading would overwrite the current draft, so it asks first. */
-  replaces: boolean | ((item: T) => boolean);
-  replaceMessage: string;
-  onLoad: (item: T) => void;
-}) {
-  const [confirming, setConfirming] = useState<string | null>(null);
-  if (!items.length) return <EmptyState fill>{empty}</EmptyState>;
-  return (
-    <div className={classes.saved} role="list" aria-label={label}>
-      {items.map((item) => (
-        <div key={item.id} role="listitem">
-          <div className={classes.savedRow}>
-            <UnstyledButton
-              className={classes.savedName}
-              aria-label={`Load: ${item.name}`}
-              onClick={() =>
-                (typeof replaces === "function" ? replaces(item) : replaces)
-                  ? setConfirming(item.id)
-                  : onLoad(item)
-              }
-            >
-              <Text size="sm" truncate>
-                {item.name}
-              </Text>
-              {item.detail && (
-                <Text size="xs" c="dimmed" truncate>
-                  {item.detail}
-                </Text>
-              )}
-            </UnstyledButton>
-          </div>
-          {confirming === item.id && (
-            <ReplaceConfirm
-              message={replaceMessage}
-              onCancel={() => setConfirming(null)}
-              onReplace={() => {
-                setConfirming(null);
-                onLoad(item);
-              }}
-            />
-          )}
-        </div>
-      ))}
-    </div>
-  );
 }
 
 /** Asks in place before a saved record replaces the draft. */

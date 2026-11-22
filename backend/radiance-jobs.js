@@ -31,6 +31,17 @@ import { resolveImageMode } from "./workflow-modes.js";
 
 const videoPollMs = 2000;
 const modelPollMs = 1000;
+const activeImages = new Set();
+
+/** Synchronous images can still save while Studio drains. Videos have their own recovery IDs. */
+export async function drainRadianceImages(deadline) {
+  const remaining = deadline - Date.now();
+  if (remaining > 0 && activeImages.size)
+    await Promise.race([
+      Promise.allSettled(activeImages),
+      delay(remaining, undefined, { ref: false }),
+    ]);
+}
 const stopping = (id) => ["cancelling", "cancelled"].includes(jobs.get(id)?.status);
 /** Ended outside the run, as when an administrator restarts Radiance: it saves nothing more. */
 const ended = (id) => Boolean(jobs.get(id)?.terminalAt);
@@ -256,7 +267,18 @@ function radianceTiming(body, marks) {
  * save accepted results. Videos keep their provider ID and exact submitted body in the existing
  * provider journal, and are deleted only after their outputs and gallery records are durable.
  */
-export async function runRadianceJob(
+export async function runRadianceJob(id, body, worker, options) {
+  const run = runRadiance(id, body, worker, options);
+  if (body.kind !== "image") return run;
+  activeImages.add(run);
+  try {
+    return await run;
+  } finally {
+    activeImages.delete(run);
+  }
+}
+
+async function runRadiance(
   id,
   body,
   worker,
@@ -264,6 +286,7 @@ export async function runRadianceJob(
 ) {
   const ownerId = body.ownerId || "";
   let record = store?.providerRecord(ownerId, id);
+  if (!recovered && record?.video === false && !record.outputs?.length) record = undefined;
   let imageTimingBody;
   let imageEstimate;
   const save = () => store?.saveProviderRecord(ownerId, id, record);
@@ -451,10 +474,31 @@ function publishFailure(id, failure) {
   updateGalleryJob(id, { status: "failed", filename: failure.title, failure });
 }
 
-/** Recover a recorded result or failure without submitting the job again. */
-export function recoverRadianceJob(job, store) {
+/** Pick up durable output, or allow one new attempt once an interrupted image's worker is idle. */
+export async function recoverRadianceJob(job, store, client) {
   const record = store.providerRecord(job.ownerId, job.id);
   const body = record?.body;
+  const worker = workerById(job.backend);
+  if (
+    body &&
+    record.video === false &&
+    !record.outputs?.length &&
+    !job.memoryRecovery &&
+    (client || worker)
+  ) {
+    const idle = await (client || new RadianceClient(worker.url)).idle();
+    if (!idle)
+      return /** @type {const} */ ({
+        status: "starting",
+        reason: "Waiting for its worker to finish the interrupted image.",
+      });
+    const seed = record.values?.seed;
+    return /** @type {const} */ ({
+      status: "queued",
+      restartInterrupted: /^\d+$/.test(String(seed ?? "")) ? { seed: String(seed) } : {},
+      reason: "Studio restarted during this image's last run.",
+    });
+  }
   jobs.set(job.id, {
     ownerId: job.ownerId || undefined,
     comfyBackend: job.backend,
