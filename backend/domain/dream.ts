@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 
 import {
   type CardKind,
@@ -29,6 +29,12 @@ import {
   finishedItemStatuses,
   maxPromptCharacters,
 } from "../../shared/queue.ts";
+import {
+  availableResolutions,
+  isResolution,
+  resolutionSize,
+  resolutions,
+} from "../../shared/resolution.ts";
 import type { DreamActivity } from "../../shared/taste.ts";
 import { replyTitle, titleRule } from "../../shared/titles.ts";
 import { dreamVideoSlot } from "../animate-profile.js";
@@ -39,6 +45,7 @@ import {
   runtimeTransaction,
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
+import { resolveImageMode, runProfile } from "../workflow-modes.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import { logFailure } from "./log-failure.ts";
 import type { Chats } from "./projects.ts";
@@ -69,7 +76,7 @@ export interface DreamOrigin {
    * How the idea came about: "exploit", "explore:<axis>" for the first thing it tried,
    * "continue:<axis>" for the one thing it varied of a liked or kept image or of its project's
    * chat work, "series" for a
-   * series' result, or "animate" and "extend" for a video of a still or more of a video.
+   * series' result, "recreate" for a larger re-render, or "animate" and "extend" for videos.
    */
   arm?: string;
   /** The project whose brief the idea follows. */
@@ -182,7 +189,7 @@ export type DreamItem = QueueMedia & {
 };
 type DreamReadiness = Pick<DreamItem, "id" | "type" | "status" | "dream" | "resultSet">;
 /** A ready generation profile the account may use. */
-export interface DreamProfile {
+export interface DreamProfile extends NonNullable<Parameters<typeof availableResolutions>[0]> {
   id: string;
   provider?: string;
   kind?: string;
@@ -195,7 +202,9 @@ export interface DreamProfile {
   /** Whether it edits with its references, keeping a character's identity in new scenes. */
   editReferences?: boolean;
   /** The LoRA files this profile can load. */
-  options?: { loras?: string[] };
+  options?: { loras?: string[]; resolutions?: string[] };
+  backendOptions?: { id: string; profile?: DreamProfile; ready?: boolean }[];
+  aspectPresets?: { sizes?: Record<string, { w: number; h: number }> }[];
 }
 /** The account's LoRA library: liked or disliked per LoRA. */
 export interface DreamLoraLibrary {
@@ -434,6 +443,7 @@ const avoidDislikes = 8;
  * sometimes includes Dream's own results and keeps.
  */
 const seedSample = 9;
+const recreateEvery = 10;
 const ownSeedEvery = 4;
 /** Recent automatic variants block their source concepts from being picked again. */
 const recentSeeds = 30;
@@ -728,6 +738,36 @@ function repeatedMotif(prompt: string, cooling: string[], motifs: string[] = pro
   if (!cooling.length) return;
   const words = ` ${phraseWords(prompt)} `;
   return cooling.find((motif) => motifs.includes(motif) || words.includes(` ${motif} `));
+}
+
+function largerImageSize(
+  profile: DreamProfile,
+  input: GenerationInput,
+  size: { width: number; height: number },
+) {
+  const { width, height } = size;
+  const larger = (w: number, h: number) => w >= width && h >= height && (w > width || h > height);
+  if (input.inpaint) return;
+  if (isCloudProfile(profile)) {
+    const choices = profile.options?.resolutions || [];
+    const aspect = profile.aspectPresets?.find(({ sizes }) =>
+      Object.values(sizes || {}).some(({ w, h }) => w === width && h === height),
+    );
+    const previous = choices.indexOf(String(input.resolution || ""));
+    for (const resolution of choices.slice(previous + 1)) {
+      const next = aspect?.sizes?.[resolution];
+      if (next && larger(next.w, next.h))
+        return { label: resolution.toUpperCase(), resolution, width: next.w, height: next.h };
+    }
+    return;
+  }
+  const prior = input.resolutionTier;
+  const previous = isResolution(prior) ? resolutions.indexOf(prior) : -1;
+  for (const tier of availableResolutions(profile, { ...input, ...size })) {
+    if (resolutions.indexOf(tier) <= previous) continue;
+    const next = resolutionSize(size, tier, profile);
+    if (larger(next.width, next.height)) return { label: tier, resolutionTier: tier, ...next };
+  }
 }
 
 const clean = (value: unknown, limit: number) =>
@@ -2258,6 +2298,20 @@ export function createDream(options: {
         reason = refused;
         continue;
       }
+      const limit = record.settings.dailyImages;
+      const lastSmallSlot = limit < recreateEvery && counts.usage.images === limit - 1;
+      if (!steer && (lastSmallSlot || counts.usage.images % recreateEvery === recreateEvery - 1)) {
+        if (
+          await recreate(
+            ownerId,
+            record,
+            access,
+            catalogue.profiles,
+            lastSmallSlot ? (limit * 100) / recreateEvery : 100,
+          )
+        )
+          return { status: "generating" };
+      }
       const taste = options.taste.read(ownerId);
       const weigh = spread(ownerId);
       // More Like This keeps its result's profile where it is still ready.
@@ -2446,6 +2500,104 @@ export function createDream(options: {
     }
     if (idle) return { status: "waiting", reason: idle };
     return { status: "unavailable", reason, imagesDone };
+  }
+
+  async function recreate(
+    ownerId: string,
+    record: DreamRecord,
+    access: DreamAccess,
+    profiles: DreamProfile[],
+    probability: number,
+  ) {
+    const ready = profiles.filter((profile) => kindOf(profile) === "image");
+    if (!ready.length) return false;
+    const liked = await readyGenerations(ownerId, {
+      type: "image",
+      status: "done",
+      rating: "liked",
+      uploaded: false,
+      promptedProfiles: ready.map(({ id }) => id),
+      sample: seedSample,
+    });
+    for (const item of liked) {
+      if (!item.id || item.dream?.arm === "recreate") continue;
+      const id = `dream-recreate-${createHash("sha256")
+        .update(JSON.stringify([ownerId, item.id]))
+        .digest("hex")}`;
+      if (store.job(ownerId, id)) continue;
+      const source = seedOf(ownerId, item, ready);
+      const saved = item.settings || {};
+      const seed = saved.seed;
+      const hasSeed = /^\d+$/.test(String(seed ?? ""));
+      const width = Number(item.width);
+      const height = Number(item.height);
+      if (!source || !(width > 0 && height > 0)) continue;
+      const cloud = isCloudProfile(source.profile);
+      if (!cloud && !hasSeed) continue;
+      const profileBackend = saved.profileBackend ?? source.input.profileBackend;
+      if (
+        source.profile.backendOptions?.length &&
+        !source.profile.backendOptions.some(
+          (option) => option.id === profileBackend && option.profile && option.ready !== false,
+        )
+      )
+        continue;
+      const profile: DreamProfile = runProfile(source.profile, profileBackend);
+      const referenceAssets = saved.referenceAssets ?? source.input.referenceAssets;
+      const referenceRole = saved.referenceRole ?? source.input.referenceRole;
+      const sizing: GenerationInput = { ...source.input, referenceAssets, referenceRole };
+      const savedModel = saved.modelName;
+      const currentModel =
+        resolveImageMode(profile, sizing).defaults?.model ?? profile.defaults?.model;
+      if (savedModel && currentModel && savedModel !== currentModel) continue;
+      const target = largerImageSize(
+        profile,
+        { ...sizing, ...saved, referenceAssets, referenceRole },
+        { width, height },
+      );
+      if (!target) continue;
+      if (probability < 100 && !chance(probability)) return false;
+      probability = 100;
+      const {
+        chat: _chat,
+        resultSet: _set,
+        resolutionTier: _tier,
+        variationCount: _variations,
+        writing: _writing,
+        galleryAt: _galleryAt,
+        ...input
+      } = sizing;
+      const prompt = typeof saved.typedPrompt === "string" ? saved.typedPrompt : source.prompt;
+      const { label, ...size } = target;
+      const result = await options.admit(
+        {
+          ...input,
+          ...settingsOf(saved),
+          profileBackend,
+          ...size,
+          autoUpscale: null,
+          clientJobId: id,
+          count: 1,
+          ...(Array.isArray(saved.loras) ? { loras: saved.loras } : {}),
+          ...(typeof item.negative === "string" ? { negative: item.negative } : {}),
+          prompt,
+          seed: hasSeed ? seed : undefined,
+        },
+        access.account,
+        { sessionId: session(ownerId, record), operation: "image", parentItemId: item.id },
+        {
+          priority: queuePriority.dream,
+          dream: {
+            arm: "recreate",
+            at: stamp(),
+            prompt,
+            why: `Recreated a liked image at ${label}`,
+          },
+        },
+      );
+      if (result.status < 400) return true;
+    }
+    return false;
   }
 
   /** Whether a job is Spicy: a share of them, where the setting and Uncensored Models allow. */
