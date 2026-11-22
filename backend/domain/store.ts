@@ -784,8 +784,10 @@ export class Store {
 
   /** Whether the owner's job is recorded and not yet completed, failed or cancelled. */
   unfinished(ownerId: string, id: string): boolean {
-    const job = this.job(ownerId, id);
-    return Boolean(job && !terminalStatuses.has(job.status));
+    const job = this.db
+      .prepare("SELECT status FROM studio_queue WHERE id = ? AND owner_id = ?")
+      .get(id, ownerId);
+    return Boolean(job && !terminalStatuses.has(job.status as QueueJob["status"]));
   }
 
   save(job: OwnedJob): OwnedJob {

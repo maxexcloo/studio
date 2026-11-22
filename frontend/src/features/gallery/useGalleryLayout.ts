@@ -192,22 +192,34 @@ export function useScrollAnchor(
   host: React.RefObject<HTMLDivElement | null>,
   places: Map<string, number> | null,
   key: string,
+  leading = "",
 ) {
-  const last = useRef<{ places: Map<string, number>; key: string } | null>(null);
+  const last = useRef<{
+    places: Map<string, number>;
+    key: string;
+    leading: string;
+    top: number;
+  } | null>(null);
   useLayoutEffect(() => {
+    if (!host.current) return;
+    const topOfGrid = host.current.getBoundingClientRect().top + window.scrollY;
     const before = last.current;
-    last.current = places && { places, key };
-    if (!places || !before || before.key !== key || !host.current) return;
-    // How far the grid's top is scrolled above the viewport; with it in view, nothing is held.
-    const offset = -host.current.getBoundingClientRect().top;
-    if (offset <= 0) return;
+    last.current = places && { places, key, leading, top: topOfGrid };
+    if (!places || !before || before.key !== key) return;
+    const prepended = leading !== before.leading;
+    // At the top, show new arrivals immediately, but hold position when paging back from a jump.
+    const offset = window.scrollY - (prepended ? before.top : topOfGrid);
+    if (offset <= 0 && !prepended) return;
     let anchor: string | undefined;
     let top = Infinity;
     for (const [id, place] of before.places)
       if (place >= offset && place < top && places.has(id)) [anchor, top] = [id, place];
-    const moved = anchor === undefined ? 0 : places.get(anchor)! - top;
+    const moved =
+      anchor === undefined
+        ? 0
+        : places.get(anchor)! - top + (prepended ? topOfGrid - before.top : 0);
     if (moved) window.scrollBy(0, moved);
-  }, [places, key, host]);
+  }, [places, key, host, leading]);
 }
 
 // A still press this long (ms) is a hold; moving further than this (px) is a scroll instead.

@@ -5,7 +5,7 @@ import {
   type RefObject,
   memo,
   useCallback,
-  useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -13,9 +13,11 @@ import {
 } from "react";
 
 import type { MediaItem } from "../../types";
+import { DateScrubber, type GallerySection } from "./DateScrubber";
 import { dayHeading, mediaDay } from "./mediaLabels";
 import { mediaIdentity } from "./mediaSource";
 import { MediaTile } from "./MediaTile";
+import type { GalleryDate } from "./queries";
 import { useGalleryLayout, useHoldToSelect, useScrollAnchor } from "./useGalleryLayout";
 import type { GallerySelection } from "./useGallerySelection";
 
@@ -39,6 +41,11 @@ interface GalleryViewProps {
   onTryAgain: (item: MediaItem) => void;
   /** Items in time order: Grid heads each day and adds the date scrubber. */
   byDay?: boolean;
+  timeline?: GalleryDate[];
+  onDate?: (date: GalleryDate) => void;
+  jumpDay?: string;
+  seekPending?: boolean;
+  leadingPage?: string;
 }
 
 /** Focuses a tile if it is mounted. */
@@ -56,7 +63,7 @@ const arrows: Record<string, number> = { ArrowLeft: -1, ArrowUp: -1, ArrowRight:
 interface GridLayout {
   tiles: { top: number; left: number; height: number }[];
   /** Each day's first tile and where its heading sits; one undated section when not by day. */
-  sections: { day: string; first: number; top: number }[];
+  sections: (GallerySection & { first: number })[];
   height: number;
   tallest: number;
 }
@@ -82,7 +89,7 @@ function place(
   for (const item of items) {
     const index = layout.tiles.length;
     const day = byDay ? mediaDay(item) : "";
-    if (!index || (day && day !== layout.sections.at(-1)!.day)) {
+    if (!index || day !== layout.sections.at(-1)!.day) {
       const top = index ? Math.max(...layout.lanes) - gap + sectionSpace : 0;
       layout.sections.push({ day, first: index, top });
       layout.lanes = Array(columns).fill(top + (day ? headingHeight : 0));
@@ -177,8 +184,14 @@ export function MediaGrid({
   onSelectionMenu,
   onTryAgain,
   byDay = false,
+  timeline,
+  onDate,
+  jumpDay,
+  seekPending,
+  leadingPage,
 }: GalleryViewProps) {
   const { columns, host, width, cell, gap, anchor } = useGalleryLayout();
+  const gridId = useId();
   const pendingFocus = useRef<string | null>(null);
   const [menuItem, setMenuItem] = useState<string | null>(null);
   const hold = useHoldToSelect(items, selection, setMenuItem);
@@ -192,7 +205,7 @@ export function MediaGrid({
       layout && new Map(layout.tiles.map((tile, index) => [mediaIdentity(items[index]), tile.top])),
     [layout],
   );
-  useScrollAnchor(host, places, `${columns}:${width}:${byDay}:${results}`);
+  useScrollAnchor(host, places, `${columns}:${width}:${byDay}:${results}`, leadingPage);
   const tileIndex = (id: string) => items.findIndex((item) => item.id === id);
   /** Scrolls a tile into view only as far as it must, as a focus move does. */
   const scrollToTile = useCallback(
@@ -253,7 +266,9 @@ export function MediaGrid({
     <>
       <div
         ref={host}
+        id={gridId}
         data-gallery-view
+        className={classes.grid}
         {...hold.handlers}
         style={{ height: layout?.height, position: "relative", touchAction: "pan-x pan-y" }}
       >
@@ -305,104 +320,20 @@ export function MediaGrid({
           );
         })}
       </div>
-      {byDay && layout && <DateScrubber host={host} layout={layout} />}
+      {byDay && layout && (
+        <DateScrubber
+          host={host}
+          gridId={gridId}
+          sections={layout.sections}
+          height={layout.height}
+          timeline={timeline}
+          onDate={onDate}
+          jumpDay={jumpDay}
+          seekPending={seekPending}
+          results={results}
+        />
+      )}
     </>
-  );
-}
-
-/**
- * The right-edge date scrubber: its thumb follows the page while it scrolls, and dragging it scrolls
- * the gallery, naming the day under the top of the screen. It shows only once the gallery is a few
- * screens long, and fades while the page is still.
- */
-function DateScrubber({
-  host,
-  layout,
-}: {
-  host: RefObject<HTMLDivElement | null>;
-  layout: GridLayout;
-}) {
-  const track = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ fraction: 0, day: "" });
-  const [active, setActive] = useState(false);
-  const [dragging, setDragging] = useState(false);
-  const long =
-    layout.sections.some((section) => section.day) && layout.height > 3 * window.innerHeight;
-  useEffect(() => {
-    if (!long) return;
-    let frame = 0;
-    let idle = 0;
-    const update = () => {
-      frame = 0;
-      const range = document.documentElement.scrollHeight - window.innerHeight;
-      const offset = window.scrollY - (host.current ? gridTop(host.current) : 0);
-      // The last day starting above the middle of the screen.
-      const sections = layout.sections;
-      let low = 0;
-      let high = sections.length - 1;
-      while (low < high) {
-        const middle = Math.ceil((low + high) / 2);
-        if (sections[middle].top <= offset + window.innerHeight / 3) low = middle;
-        else high = middle - 1;
-      }
-      const day = sections[low].day;
-      const fraction = range > 0 ? Math.min(window.scrollY / range, 1) : 0;
-      setPosition((previous) =>
-        previous.fraction === fraction && previous.day === day ? previous : { fraction, day },
-      );
-    };
-    const scroll = () => {
-      if (!frame) frame = window.requestAnimationFrame(update);
-      setActive(true);
-      window.clearTimeout(idle);
-      idle = window.setTimeout(() => setActive(false), 1500);
-    };
-    update();
-    setActive(false);
-    window.addEventListener("scroll", scroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", scroll);
-      window.cancelAnimationFrame(frame);
-      window.clearTimeout(idle);
-    };
-  }, [long, layout, host]);
-  if (!long) return null;
-  const scrollTo = (clientY: number) => {
-    const rect = track.current!.getBoundingClientRect();
-    const fraction = Math.min(Math.max((clientY - rect.top) / rect.height, 0), 1);
-    window.scrollTo({
-      top: fraction * (document.documentElement.scrollHeight - window.innerHeight),
-    });
-  };
-  const label = position.day ? dayHeading(position.day) : "";
-  return (
-    <div
-      ref={track}
-      className={classes.scrubber}
-      data-active={active || dragging || undefined}
-      role="scrollbar"
-      aria-label="Gallery Dates"
-      aria-orientation="vertical"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(position.fraction * 100)}
-      aria-valuetext={label}
-    >
-      <div
-        className={classes.thumb}
-        style={{ top: `calc(${position.fraction} * (100% - var(--scrubber-thumb)))` }}
-        onPointerDown={(event) => {
-          event.preventDefault();
-          event.currentTarget.setPointerCapture(event.pointerId);
-          setDragging(true);
-        }}
-        onPointerMove={(event) => dragging && scrollTo(event.clientY)}
-        onPointerUp={() => setDragging(false)}
-        onPointerCancel={() => setDragging(false)}
-      >
-        {dragging && label && <span className={classes.date}>{label}</span>}
-      </div>
-    </div>
   );
 }
 

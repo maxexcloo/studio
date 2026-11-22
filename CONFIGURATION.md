@@ -2,9 +2,17 @@
 
 Run one Studio replica. Two schedulers must not control the same workers or SQLite database. Mount a writable data directory and use exact [released image versions](https://github.com/maxexcloo/studio/releases).
 
-Studio reads process environment variables first, then its settings file on startup. The Docker image reads `/data/.env` and a source checkout reads `.env` in the project folder. Docker's `--env-file` can also supply process environment variables. Values an administrator saves in **Settings** apply at once. A value from the environment appears locked there.
+The repository's [config directory](config/) holds a Docker environment example, the LibreChat server entry and starter profiles. Copy the files you need and keep your deployment's settings and credentials outside this repository.
 
-For the Docker quick start, keep your deployment settings in a local `studio.env` file. Pass `--env-file studio.env` before the image name and recreate the container with the same data volume when the file changes. Use `NAME=value` on each line. In Docker's env file, write JSON values directly without surrounding shell quotes.
+Studio reads process environment variables first, then its settings file on startup. The image reads `/data/.env` and a source checkout reads `.env` in the project folder. Values an administrator saves in **Settings** apply at once. A value supplied by the deployment appears locked there.
+
+## Docker
+
+Copy [studio.env.example](config/studio.env.example) to `.env` in your deployment directory. For the [Docker quick start](README.md#run-with-docker), pass `--env-file .env` in place of `-e HOST=127.0.0.1`. Recreate the container with the same data volume after changing the file. Use `NAME=value` on each line and write JSON values without shell quotes.
+
+The Docker example points to a ComfyUI server on the same Linux host. Edit the worker URL for your installation, or follow the [Radiance setup](#radiance). Chat integrations and the prompt assistant are optional.
+
+## Source Checkout
 
 ```bash
 HOST=127.0.0.1
@@ -12,22 +20,11 @@ PORT=8787
 STUDIO_DATA_DIR=./data
 ```
 
-`STUDIO_ALLOWED_HOSTS` lists the extra names Studio answers to (comma-separated); TLS terminates at the proxy in front of it. See [Security](SECURITY.md).
-
 ## Workers
 
 Studio connects directly to ComfyUI and Radiance workers. It saves outputs to `STUDIO_MEDIA_DIR` (`<STUDIO_DATA_DIR>/media` by default) without a shared worker mount. For the packaged ComfyUI worker, set the same `STUDIO_WORKER_TOKEN` on Studio and the worker. See [Studio Worker](worker/README.md).
 
-On Kubernetes, leave `STUDIO_WORKERS` unset: the image and video workloads Studio finds are its workers (see [Runtime Control](#runtime-control)). Elsewhere, `STUDIO_WORKERS` lists them; `[]` runs Studio with no workers, and a malformed value stops it at start:
-
-```bash
-STUDIO_WORKERS='[
-  {"id": "primary", "name": "Primary", "url": "http://comfyui-primary:8188", "capabilities": ["image", "video", "upscale", "models"]},
-  {"id": "secondary", "name": "Secondary", "url": "http://comfyui-secondary:8188", "capabilities": ["image", "video", "upscale"]}
-]'
-```
-
-With the [Docker quick start](README.md#run-with-docker), use `http://127.0.0.1:8188` for a ComfyUI worker on the same Linux host. Worker URLs must be reachable from Studio. For the packaged worker, model mounts and downloads, see [Studio Worker](worker/README.md).
+Studio discovers image and video workers when [Kubernetes Runtime Control](#runtime-control) is enabled and `STUDIO_WORKERS` is unset. To supply worker addresses directly, use a JSON array on one line in `STUDIO_WORKERS`. The [environment example](config/studio.env.example) has one worker. Add an object for each worker reachable from Studio, or use `[]` to run with no workers.
 
 Keep each `id` stable (it defaults to the lower-case name): jobs, previews, cancellation and recovery follow a job's worker by id. Capabilities are `image`, `video`, `upscale` and `models`; the `models` worker holds the model library and receives downloads, so mount its models read-write. `"backend": "radiance"` marks a Radiance worker (the default is `comfyui`).
 
@@ -43,10 +40,10 @@ Set `STUDIO_DREAM_IMAGE_SWITCH_MINUTES` to manage the shared Dream image switch 
 2. Add the worker to `STUDIO_WORKERS` in Studio's settings file and restart Studio. When Radiance requires an API key, set the matching `STUDIO_RADIANCE_KEY` in Studio.
 
    ```dotenv
-   STUDIO_WORKERS='[{"id":"radiance","name":"Radiance","backend":"radiance","url":"http://127.0.0.1:8000","capabilities":["image"]}]'
+   STUDIO_WORKERS=[{"id":"radiance","name":"Radiance","backend":"radiance","url":"http://127.0.0.1:8000","capabilities":["image"]}]
    ```
 
-3. In **Library › Profiles**, open **Qwen Image 2.1** or use **Import Workflow** to open the [Radiance image sample](backend/samples/radiance-qwen-image.json) if the profile is missing. In **Advanced JSON**, set `graph["1"].inputs.model` to the model ID Radiance returns from `/v1/models`. Choose **Create** or **Save**, then select the profile in Generate. Add the `video` capability only when the worker serves a video model and you have a matching Studio video profile.
+3. In **Library › Profiles**, open **Qwen Image 2.1** or use **Import Workflow** to open the [Radiance image sample](config/profiles/radiance-qwen-image.json) if the profile is missing. In **Advanced JSON**, set `graph["1"].inputs.model` to the model ID Radiance returns from `/v1/models`. Choose **Create** or **Save**, then select the profile in Generate. Add the `video` capability only when the worker serves a video model and you have a matching Studio video profile.
 
 This path uses Radiance's own media API. Install the [ComfyUI worker](worker/README.md) separately if you need ComfyUI workflows, model downloads or conversions.
 
@@ -58,7 +55,7 @@ This path uses Radiance's own media API. Install the [ComfyUI worker](worker/REA
 
 `STUDIO_MULTI_USER=1` turns on accounts. Create the recovery administrator from a browser connected directly over loopback, then add accounts in **Settings › Users** and grant features in **Settings › Groups**. Without it, Studio is single-user and answers only direct loopback connections.
 
-For a Docker host network deployment, start with the [Docker quick start](README.md#run-with-docker) and add `-e STUDIO_MULTI_USER=1` before the image name. Create the administrator at <http://127.0.0.1:8787> before adding a TLS proxy. Keep the same data volume when recreating the container, and set `STUDIO_ALLOWED_HOSTS` to the proxy's public hostname. See [Security](SECURITY.md) for the trust rules.
+For the [Docker quick start](README.md#run-with-docker), set `STUDIO_MULTI_USER=1` in `.env` and create the administrator at <http://127.0.0.1:8787> before adding a TLS proxy. Keep the same data volume when recreating the container. `STUDIO_ALLOWED_HOSTS` lists the public hostnames Studio answers to, separated by commas. See [Security](SECURITY.md) for the trust rules.
 
 Single sign-on (Pocket ID or another OpenID Connect provider) needs `STUDIO_OIDC_ISSUER`, `STUDIO_OIDC_CLIENT_ID` and `STUDIO_OIDC_REDIRECT_URI` (`https://<studio>/api/accounts/oidc/callback`); `STUDIO_OIDC_CLIENT_SECRET` serves confidential clients and `STUDIO_OIDC_LABEL` names the button. Setting only some stops Studio at start. `/?password=1` keeps the password form reachable. The provider decides who may sign in; roles and groups never come from it.
 
@@ -86,22 +83,20 @@ Every MCP action calls the route its UI action calls with the caller's own crede
 
 Enable Studio accounts and create a personal MCP token in **Settings › Account**. In [LibreChat MCP Settings](https://www.librechat.ai/docs/features/mcp), add `https://studio.example.com/mcp` as Streamable HTTP with a Bearer API key supplied by each user. From other remote MCP clients, use the same URL and send the token as `Authorization: Bearer <token>`.
 
-To share the server definition across LibreChat users, define it in [`librechat.yaml`](https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers). Each user enters their own Studio token.
+To share the server definition across users, merge the [sample server entry](config/librechat.yaml) into your `librechat.yaml` and replace the URL. Each LibreChat user supplies their own Studio token. The example passes conversation and turn IDs so Studio can group result links. See [LibreChat’s MCP server settings](https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers).
 
-```yaml
-mcpServers:
-  studio:
-    type: streamable-http
-    url: https://studio.example.com/mcp
-    requiresOAuth: false
-    startup: false
-    apiKey:
-      source: user
-      authorization_type: bearer
-    requestHeaders:
-      X-Studio-Conversation-Id: "{{LIBRECHAT_BODY_CONVERSATIONID}}"
-      X-Studio-Turn-Id: "{{LIBRECHAT_BODY_PARENTMESSAGEID}}"
-```
+### Open WebUI
+
+In Open WebUI's administrator settings, open **Integrations › External Tool Servers** and add a connection.
+
+| Field          | Value                                                   |
+| -------------- | ------------------------------------------------------- |
+| Type           | MCP (Streamable HTTP)                                   |
+| Server URL     | `https://studio.example.com/mcp`                        |
+| Authentication | Bearer                                                  |
+| Key            | A Studio personal MCP token from **Settings › Account** |
+
+Use an ordinary Studio account for this shared connection. Every authorised Open WebUI user of that connection acts through the same Studio account. Enable the tool server in a chat and try “List the image models available in Studio”. Use a tool-capable chat model. See [Open WebUI’s MCP setup](https://docs.openwebui.com/features/extensibility/mcp/).
 
 ## Prompt Assistant
 
@@ -122,6 +117,8 @@ Library › Imports downloads to the `models` worker. `CIVITAI_API_TOKEN` and `H
 ## Profiles, Guides & Catalogue
 
 Studio's data folder is the only source of live definitions: profiles in `workflows/`, prompting guides in `guides/` and catalogue changes in `library/`. Administrators edit, approve, export and revert them in Library; every edit keeps a version.
+
+When a data folder first starts, Studio copies the [starter profiles](config/profiles/) into its workflows and records their first versions. An existing Library retains the profiles you installed, edited or removed. To use another starter profile later, import its JSON in **Library › Profiles**. Each worker still needs the model files and custom nodes that its chosen profile uses.
 
 A profile can run one model on Radiance or ComfyUI. Its `studio` block holds the shared fields, the backend it runs on and each backend's own block, whose fields replace the shared ones of the same name:
 
@@ -160,17 +157,19 @@ For the Radiance 2 cutover, version profiles through the administrator editor fi
 
 ## Runtime Control
 
-On Kubernetes, Studio scales its GPU workloads between 0 and 1 replicas itself. At start it finds the deployments labelled `studio.excloo.dev/kind` (`image` or `video`) in `STUDIO_KUBERNETES_NAMESPACES`; `STUDIO_KUBERNETES_GPUS` gives the GPUs per node pool:
+For a Kubernetes deployment, run Studio as a one-replica Deployment with the `Recreate` strategy and a writable persistent volume at `/data`. Set `STUDIO_MULTI_USER=1` and supply worker settings through a ConfigMap and credentials through a Secret. The image listens on port 8787. Use `/api/ping` for liveness and `/api/ready` for readiness. Forward the pod's port with `kubectl port-forward deployment/studio 8787:8787` and open <http://127.0.0.1:8787> to set up the first administrator. Set the allowed hostname and add your HTTPS ingress after setup.
 
-```bash
-STUDIO_KUBERNETES_GPUS='{"gpu": 2, "gaming": 1}'
+Set `STUDIO_WORKERS` to connect directly to an existing worker Service. To give Studio control of GPU placement, set `STUDIO_KUBERNETES_NAMESPACES` and let it discover deployments labelled `studio.excloo.dev/kind` (`image` or `video`). Studio scales those deployments between zero and one replicas. `STUDIO_KUBERNETES_GPUS` gives the GPUs per node pool.
+
+```dotenv
+STUDIO_KUBERNETES_GPUS={"gpu":2,"gaming":1}
 STUDIO_KUBERNETES_NAMESPACES=comfyui-image,comfyui-video,radiance
 STUDIO_LOCAL_TEXT_MODEL=local/auto
 ```
 
 Each deployment's name is its workload id, its node selector names its pool, its resource claim templates give its GPUs, and the one Service selecting its pods gives its address. Optional `studio.excloo.dev/` annotations add `label`, `worker`, `capabilities` and `backend` (`radiance` for a Radiance worker). A `text` capability means the workload serves `STUDIO_LOCAL_TEXT_MODEL` while it runs (through the gateway), and `vision: "true"` that its text models read images. Studio sends `STUDIO_RADIANCE_KEY`, when set, to Radiance as its API key. Anything missing or ambiguous stops Studio at start with the deployment's name; restart Studio after changing a workload. Its service account needs, in each namespace, to list deployments, Services and `resourceclaimtemplates`, read pods and their logs, and update `deployments/scale`. `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
 
-With `STUDIO_BENCHMARK_IMAGE` (a [BetterBench](https://github.com/GGZ14/BetterBench) image), administrators can benchmark a running workload's local text from Settings › Workers: Studio runs a Job in the workload's namespace whose pods are labelled `app.kubernetes.io/name: betterbench`, so its network policy must admit them. The benchmark names `STUDIO_LOCAL_TEXT_MODEL` without its gateway provider (`auto`), which the workload serves. `STUDIO_BENCHMARK_SECRET` names the Secret there whose `API_KEY` is the workload's key. The service account also needs to create, get and delete Jobs and list pods in that namespace.
+With `STUDIO_BENCHMARK_IMAGE` (a [BetterBench](https://github.com/GGZ14/BetterBench) image), administrators can benchmark available local text models in **Settings › Workers**. Studio runs them one at a time as Jobs in the workload's namespace. Its network policy must admit pods labelled `app.kubernetes.io/name: betterbench`. `STUDIO_BENCHMARK_SECRET` names the Secret in that namespace which holds the workload's key in `API_KEY`. Give Studio's service account permission to create, get and delete Jobs and list pods there.
 
 Administrators choose the running workloads in **Settings › Workers**.
 

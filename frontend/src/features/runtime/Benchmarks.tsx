@@ -34,11 +34,19 @@ const benchmarkModelsQuery = (workload: string) =>
 
 const shortDateTime = dateFormat({ dateStyle: "short", timeStyle: "short" });
 const statusColour = (status: BenchmarkRun["status"]) =>
-  ({ queued: "gray", running: "blue", completed: "green", failed: "red", stopped: "gray" })[status];
+  ({
+    queued: "gray",
+    running: "blue",
+    stopping: "gray",
+    completed: "green",
+    failed: "red",
+    stopped: "gray",
+  })[status];
 const statusLabel = (status: BenchmarkRun["status"]) =>
   ({
     queued: "Queued",
     running: "Running",
+    stopping: "Stopping",
     completed: "Completed",
     failed: "Failed",
     stopped: "Stopped",
@@ -46,6 +54,7 @@ const statusLabel = (status: BenchmarkRun["status"]) =>
 const rate = (value: number | null | undefined, digits = 0) =>
   value == null ? "—" : `${value.toFixed(digits)} tok/s`;
 const thousands = (tokens: number) => `${Math.round(tokens / 1000)}K`;
+const canStop = (run: BenchmarkRun) => run.status === "queued" || run.status === "running";
 
 /** Choose which text models to benchmark on the selected workload. */
 export function BenchmarkDialog({
@@ -156,14 +165,14 @@ export function BenchmarkResults() {
         rowName={(run) => run.label}
         empty="No Benchmarks"
         rowActions={(run) =>
-          (run.startedAt || activeBenchmark(run)) && (
+          (run.startedAt || canStop(run)) && (
             <>
               {run.startedAt && (
                 <Menu.Item leftSection={<icons.log size={16} />} onClick={() => setLogId(run.id)}>
                   View Logs
                 </Menu.Item>
               )}
-              {activeBenchmark(run) && (
+              {canStop(run) && (
                 <Menu.Item
                   color="red"
                   leftSection={<icons.stop size={16} />}

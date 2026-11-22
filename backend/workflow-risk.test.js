@@ -70,7 +70,7 @@ test("the import review carries them", () => {
 test("Profile import previews the standalone Radiance sample and checks the graph and controls", () => {
   const file = "radiance-qwen-image.json";
   const profile = JSON.parse(
-    fs.readFileSync(new URL(`./samples/${file}`, import.meta.url), "utf8"),
+    fs.readFileSync(new URL(`../config/profiles/${file}`, import.meta.url), "utf8"),
   );
   const model = "qwen-image-2.1-bf16";
   profile.graph["1"].inputs.model = model;

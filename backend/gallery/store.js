@@ -891,39 +891,58 @@ function listedItems(entries) {
   return entries.flatMap((entry) => (byKey.has(entry.key) ? [byKey.get(entry.key)] : []));
 }
 
-/** A page cut from a kept list; its cursor names its last item and where it stood. */
-function listPage(list, cursor, limit, ranked, sort) {
+const listCursorFor = ({ key, position }) =>
+  `k|${encodeURIComponent(key)}|${encodeURIComponent(JSON.stringify(position))}`;
+
+/** A page cut from a kept list, on either side of its cursor. */
+function listPage(list, cursor, limit, ranked, sort, backwards, window) {
   let start = 0;
   if (ranked) start = Number(/^r\|(\d+)$/.exec(cursor)?.[1] || 0);
   else if (cursor) {
-    const [, key = "", position = "null"] = String(cursor).split("|").map(decodeURIComponent);
-    const at = list.positions.get(key);
-    if (at !== undefined) start = at + 1;
-    else {
-      // Its item has left the list: carry on after where it stood.
-      const after = (() => {
-        try {
-          return JSON.parse(position);
-        } catch {
-          return null;
-        }
-      })();
-      const found = after
-        ? list.entries.findIndex((entry) => compareGalleryKeys(entry.position, after, sort) > 0)
-        : -1;
-      start = found < 0 ? list.entries.length : found;
+    try {
+      const [, key = "", position = "null"] = String(cursor).split("|").map(decodeURIComponent);
+      const at = list.positions.get(key);
+      if (at !== undefined) start = backwards ? at : at + 1;
+      else {
+        // Its item has left the list: carry on from where it stood.
+        const seek = JSON.parse(position);
+        const found = seek
+          ? list.entries.findIndex((entry) => compareGalleryKeys(entry.position, seek, sort) > 0)
+          : -1;
+        start = found < 0 ? list.entries.length : found;
+      }
+    } catch {
+      start = list.entries.length;
     }
   }
-  const slice = list.entries.slice(start, start + limit);
-  const end = start + slice.length;
+  const end = backwards ? start : Math.min(start + limit, list.entries.length);
+  if (backwards) start = Math.max(0, end - limit);
+  const slice = list.entries.slice(start, end);
   const last = slice.at(-1);
   const nextCursor =
-    end >= list.entries.length
-      ? ""
-      : ranked
-        ? `r|${end}`
-        : `k|${encodeURIComponent(last.key)}|${encodeURIComponent(JSON.stringify(last.position))}`;
-  return { items: listedItems(slice), nextCursor };
+    !last || end >= list.entries.length ? "" : ranked ? `r|${end}` : listCursorFor(last);
+  return {
+    items: listedItems(slice),
+    nextCursor,
+    ...(window && {
+      previousCursor: start > 0 && slice.length ? listCursorFor(slice[0]) : "",
+    }),
+  };
+}
+
+/** The visible days and the seek position before each begins, without loading media records. */
+function galleryTimeline(list, dates) {
+  const timeZone = dates.resolvedOptions().timeZone;
+  if (list.timeline?.timeZone === timeZone) return list.timeline.days;
+  const days = [];
+  for (const [index, { position }] of list.entries.entries()) {
+    const day = position.time === null ? "" : dates.format(position.time);
+    const last = days.at(-1);
+    if (last?.day === day) last.count += 1;
+    else days.push({ day, count: 1, cursor: index ? listCursorFor(list.entries[index - 1]) : "" });
+  }
+  list.timeline = { timeZone, days };
+  return days;
 }
 
 /**
@@ -931,7 +950,8 @@ function listPage(list, cursor, limit, ranked, sort) {
  * `query` narrows it in SQL (galleryItems' fields) and `filter` tests each item in JS, with
  * `filterKey` naming everything `filter` depends on so its list is kept between pages. `rank`
  * (Find Similar) orders by its score instead, highest first, leaving out items it can't score.
- * `selection` reads all or only failed members of the same list in one request.
+ * `selection` reads all or only failed members of the same list in one request. `dates` indexes
+ * a date-ordered list's days, and `window` pages in either direction from one of its cursors.
  */
 export function pageGallery({
   type = "",
@@ -945,8 +965,11 @@ export function pageGallery({
   rank = null,
   sort = "newest",
   selection,
+  dates = null,
+  window = false,
+  beforeCursor = "",
 } = {}) {
-  const safeLimit = Math.max(1, Math.min(500, Number(limit || 200)));
+  const safeLimit = Math.max(1, Math.min(500, Math.trunc(Number(limit)) || 200));
   const sql = {
     ...query,
     uploaded: uploads,
@@ -957,7 +980,10 @@ export function pageGallery({
     notStatus: [query.notStatus ?? [], "cancelled", ...(includeFailed ? [] : ["failed"])].flat(),
   };
   const list =
-    filter || rank || sort !== "newest" ? keptList(sql, filter, filterKey, rank, sort) : null;
+    filter || rank || sort !== "newest" || dates || window
+      ? keptList(sql, filter, filterKey, rank, sort)
+      : null;
+  if (dates) return { days: galleryTimeline(list, dates) };
   if (selection) {
     const failed = selection === "failed";
     const items = list
@@ -974,7 +1000,15 @@ export function pageGallery({
     };
   }
   if (list) {
-    const page = listPage(list, cursor, safeLimit, Boolean(rank), sort);
+    const page = listPage(
+      list,
+      beforeCursor || cursor,
+      safeLimit,
+      Boolean(rank),
+      sort,
+      Boolean(beforeCursor),
+      window,
+    );
     return {
       ...page,
       hasMore: Boolean(page.nextCursor),
@@ -1265,32 +1299,35 @@ function dedupeGallery(items) {
 }
 
 /** `queue` is the queue's records (domain/store.ts): a tile's job runs while its record is unfinished. */
-export function cleanupGalleryState(queue) {
-  // Called on every gallery page: most of the time there is nothing pending and no upscale running.
-  const open = statement(
-    `SELECT value FROM studio_gallery INDEXED BY studio_gallery_status WHERE status = 'pending'
-     UNION ALL SELECT value FROM studio_gallery INDEXED BY studio_gallery_upscale
-     WHERE upscale_status = 'running' AND status IS NOT 'pending'`,
-  )
-    .all()
-    .map(parse);
+export function cleanupGalleryState(queue, query = {}) {
+  const { sql, params } = where(query);
+  const scope = sql ? `${sql} AND` : "WHERE";
+  const open =
+    query.jobId !== undefined
+      ? statement(
+          `SELECT value FROM studio_gallery INDEXED BY studio_gallery_job
+           ${scope} (status = 'pending' OR upscale_status = 'running')`,
+        ).all(...params)
+      : statement(
+          `SELECT value FROM studio_gallery INDEXED BY studio_gallery_status ${scope} status = 'pending'
+           UNION ALL SELECT value FROM studio_gallery INDEXED BY studio_gallery_upscale
+           ${scope} upscale_status = 'running' AND status IS NOT 'pending'`,
+        ).all(...params, ...params);
   if (!open.length) return;
-  const finished = (jobId) => hasGalleryItems({ jobId, status: "done" });
   const updated = [];
   const removed = [];
-  for (const before of open) {
+  for (const row of open) {
+    const before = parse(row);
+    const ownerId = before.ownerId || "";
     let item = before;
     // An upscale whose job is no longer unfinished (or was never recorded) is not running anymore.
-    if (
-      item.upscale?.status === "running" &&
-      !queue.unfinished(item.ownerId || "", item.upscale.jobId)
-    )
+    if (item.upscale?.status === "running" && !queue.unfinished(ownerId, item.upscale.jobId))
       item = { ...item, upscale: { ...item.upscale, status: "cancelled", progress: null } };
     if (item.status === "pending") {
       // A job still unfinished after a restart waits for recovery; a tile without one never arrives.
-      if (item.jobId && !queue.unfinished(item.ownerId || "", item.jobId))
+      if (item.jobId && !queue.unfinished(ownerId, item.jobId))
         item = { ...item, status: "failed", filename: "Generation interrupted" };
-      else if (item.jobId && finished(item.jobId)) {
+      else if (item.jobId && hasGalleryItems({ ownerId, jobId: item.jobId, status: "done" })) {
         removed.push(item);
         continue;
       }

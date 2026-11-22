@@ -25,8 +25,8 @@
   height: 0;
 }
 
-:root:not([data-phone]) .incoming,
-.toolbar[data-pinned] ~ .results .incoming {
+:root:not([data-phone]) .results,
+.toolbar[data-pinned] ~ .results {
   --gallery-pinned-height: var(--gallery-toolbar-height, 0px);
 }
 

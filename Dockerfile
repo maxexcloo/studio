@@ -30,6 +30,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/LICENSE /app/NOTICE ./
 COPY --from=build /app/backend ./backend
+COPY --from=build /app/config/profiles ./config/profiles
 COPY --from=build /app/shared ./shared
 COPY --from=build /app/worker/sources.json ./worker/sources.json
 COPY --from=docker.io/mwader/static-ffmpeg:9.0.2 /ffmpeg /usr/local/bin/ffmpeg
