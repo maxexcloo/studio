@@ -100,6 +100,7 @@ const theme = z
   })
   .describe(`One of ${themeIds().join(", ")}.`);
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
+const outputCount = (jobs) => jobs.reduce((total, job) => total + (job.images || 1), 0);
 const setTitle = z.string().trim().min(1).max(80);
 // Kept short in the schema: gallery/records.js storedResultSet trims what it stores.
 const cardContext = z.object({ name: z.string(), description: z.string().optional() });
@@ -208,8 +209,11 @@ export function registerGenerateTools({
       ahead,
     } = await media.finishTimes(owner, [submission], { signal });
     const left = endsAt === null ? 0 : Math.max(0, endsAt - Date.now());
+    const accepted = outputCount(submission.jobs);
+    const resultCount = `${accepted} ${profile.kind || "image"}${accepted === 1 ? "" : "s"}`;
     const structured = {
       status: submission.status,
+      accepted,
       profile: {
         id: profile.id,
         label,
@@ -251,8 +255,8 @@ export function registerGenerateTools({
     ].join(" · ");
     const message =
       submission.status === "queued"
-        ? `Queued on ${label}${readyIn(left, ahead)}. ${ignoredNote(submission)}${note}${await waiting(profile)}Share the links and end the turn. Call result only if asked. Never poll or resubmit. ${followUp}`
-        : `${submission.error} ${ignoredNote(submission)}${note}Share the links; never resubmit.`;
+        ? `Queued on ${label}${readyIn(left, ahead)}. ${ignoredNote(submission)}${note}${await waiting(profile)}Studio accepted ${resultCount} in this batch. Share the links and end the turn. Call result only if asked. Never poll or resubmit. ${followUp}`
+        : `${submission.error} ${ignoredNote(submission)}${note}Studio accepted ${resultCount} in this batch. Share the links; never resubmit.`;
     return {
       content: [{ type: "text", text: `${message}\n\n${pending}` }, ...extra],
       structuredContent: {
@@ -414,8 +418,8 @@ export function registerGenerateTools({
           : part;
         if (queued.error) break;
       }
-      if (prompts.length > size)
-        queued.ignored = `${queued.ignored ? `${queued.ignored} ` : ""}Queued ${prompts.length * count} images in batches of up to ${size * count}.`;
+      if (prompts.length > size && !queued.error)
+        queued.ignored = `${queued.ignored ? `${queued.ignored} ` : ""}Queued ${outputCount(queued.jobs)} images in batches of up to ${size * count}.`;
       return { queued, guide: fresh ? compactGuide(profile.prompting) : "" };
     } catch (error) {
       // A refused submission delivered no guide, so the next attempt carries it.

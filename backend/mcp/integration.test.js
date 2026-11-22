@@ -5396,6 +5396,7 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
     seed: 10,
   });
   assert.match(texts(split), /Queued 12 images in batches of up to 8\./);
+  assert.equal(split.structuredContent.accepted, 12);
   const batches = f.submitted.slice(4);
   assert.deepEqual(
     batches.map((body) => [body.prompt, body.resultSet.index, body.seed]),
