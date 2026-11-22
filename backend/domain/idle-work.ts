@@ -225,6 +225,10 @@ export function createIdleWork<Item extends IdleItem>(options: {
 
   /** Runs `tick` in the background; `settled` waits for every such run. */
   function spawn() {
+    if (selecting) {
+      wakeAfterSelection = true;
+      return;
+    }
     const run: Promise<unknown> = tracked(options.name, tick)
       .catch(() => undefined)
       .finally(() => pending.delete(run));
@@ -232,10 +236,17 @@ export function createIdleWork<Item extends IdleItem>(options: {
   }
 
   let selecting = false;
+  let wakeAfterSelection = false;
   async function tick(): Promise<IdleTick> {
     if (selecting) return "busy";
     selecting = true;
-    const claim = await select().finally(() => (selecting = false));
+    const claim = await select().finally(() => {
+      selecting = false;
+      if (wakeAfterSelection) {
+        wakeAfterSelection = false;
+        spawn();
+      }
+    });
     if (typeof claim === "string") return claim;
     const { item, controller, all } = claim;
     if (all && inflight.size < passConcurrency) spawn();
