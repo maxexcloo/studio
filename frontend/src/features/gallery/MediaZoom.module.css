@@ -1,8 +1,7 @@
-/* The gallery dock overlays the stage; keep the zoom buttons clear of its full height. */
 .controls {
   position: absolute;
   right: calc(var(--mantine-spacing-sm) + env(safe-area-inset-right));
-  bottom: calc(var(--mantine-spacing-sm) + var(--studio-viewer-dock-height, 0px));
+  bottom: var(--mantine-spacing-sm);
   z-index: 3;
   padding: 2px;
   border: 1px solid var(--studio-glass-border);

@@ -114,7 +114,7 @@ export function StatusAction() {
     .filter(Boolean)
     .join(" · ");
   const overall = progress && (
-    <Stack gap={4}>
+    <Stack gap={2}>
       <Text size="xs" c="dimmed">
         {progressLabel}
       </Text>
@@ -186,11 +186,13 @@ export function StatusAction() {
             aria-labelledby=""
             className={classes.dropdown}
           >
-            <Group justify="space-between" wrap="nowrap" mih={28}>
-              <Text fw={500}>{heading}</Text>
-              <QueueActions />
-            </Group>
-            {overall}
+            <Stack gap={2}>
+              <Group justify="space-between" wrap="nowrap" mih={28}>
+                <Text fw={500}>{heading}</Text>
+                <QueueActions />
+              </Group>
+              {overall}
+            </Stack>
             <div className={classes.list}>
               <Queue downloads={downloads} />
             </div>
@@ -213,7 +215,7 @@ export function StatusAction() {
       >
         <Drawer.Overlay />
         <Drawer.Content {...swipe}>
-          <Drawer.Header>
+          <Drawer.Header pb={overall ? "xs" : undefined}>
             <Drawer.Title aria-label={title}>{heading}</Drawer.Title>
             {/* The queue's actions sit beside Close, as on desktop beside the title. */}
             <Group gap="xs" wrap="nowrap">

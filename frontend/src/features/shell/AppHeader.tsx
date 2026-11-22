@@ -140,7 +140,7 @@ export function AppHeader({ mode }: { mode: string }) {
       maw={appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined}
     >
       <FinishedAway />
-      <Group gap="xs" wrap="nowrap" className={classes.bar}>
+      <Group gap={phone ? 4 : "sm"} wrap="nowrap">
         <Link to="/images" replace={mode === "/images"} className={classes.home}>
           <StudioLogo order={phone ? 3 : 2} />
         </Link>

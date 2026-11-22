@@ -265,11 +265,11 @@ recur across features.
   fill the viewport, keep the current image visible until the next loads,
   stop navigation at the first and last item, and on closing reveal and focus
   the current tile.
-- The gallery viewer opens with its header and bottom actions. A touch tap
-  cycles through those controls, those controls with thumbnails and media
-  alone without moving the media. Swipe up first reveals thumbnails, then
-  opens Details. Dream fullscreen keeps its verdicts and opens Details on
-  the first swipe up.
+- The gallery viewer fits media between its header and a separate bottom
+  dock. A touch tap cycles through actions, actions with thumbnails and
+  media alone. Hiding the dock gives its space back to the media. Swipe up
+  first reveals thumbnails, then opens Details. Dream fullscreen keeps its
+  verdicts and opens Details on the first swipe up.
 - The gallery defaults to newest first, with a tile per result. Sets and
   versions have separate thumbnail strips in the viewer. Version grouping
   has one owner in `gallery/versions.ts`. Viewing and upscale
