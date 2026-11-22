@@ -950,6 +950,146 @@ test("Motif cooldowns recognise unlabelled laundry and smoking across different 
   assert.match(state.calls[3].user, /The optional motif "smoking" has appeared/);
 });
 
+test("Dream occasionally recreates an ordinary liked image at its next supported size", async (t) => {
+  const native = {
+    ...profiles[0],
+    native: { "2k": "yes", "4k": "yes" },
+    constraints: { width: { max: 4096, step: 16 }, height: { max: 4096, step: 16 } },
+  };
+  const { dream, state, store, dreamOnce } = fixture(t, [native, ...profiles.slice(1)]);
+  const session = store.createSession("alice", "Gallery");
+  const input = {
+    kind: "image",
+    profileId: native.id,
+    prompt: "A fox on a beach",
+    negative: "fog",
+    steps: 30,
+    seed: "15",
+    count: 3,
+    loras: [{ name: "fox.safetensors", strength: 0.8 }],
+    referenceAssets: [{ assetId: "reference", slot: "image" }],
+  };
+  const source = store.enqueue(
+    "alice",
+    session.id,
+    { ...input, resultSet: { id: "chat-set", title: "A Gallery Set" } },
+    "image",
+  );
+  store.save({ ...source, status: "completed" });
+  const fullSize = store.enqueue("alice", session.id, { ...input, resolutionTier: "4K" }, "image");
+  store.save({ ...fullSize, status: "completed" });
+  const liked: DreamItem = {
+    id: "liked-result-2",
+    ownerId: "alice",
+    jobId: source.id,
+    status: "done",
+    type: "image",
+    rating: "liked",
+    width: 768,
+    height: 1024,
+    settings: { seed: "17" },
+  };
+  state.items.push({ ...liked, id: "at-native-limit", jobId: fullSize.id }, liked);
+  const nineImages = () => {
+    for (let index = 0; index < 9; index++) {
+      const image = store.enqueue(
+        "alice",
+        session.id,
+        { kind: "image" },
+        "image",
+        undefined,
+        undefined,
+        undefined,
+        {
+          priority: queuePriority.dream,
+        },
+      );
+      store.save({ ...image, status: "completed" });
+    }
+  };
+  await dream.save("alice", { enabled: true, dailyImages: 10 });
+  nineImages();
+  const rendered = await dreamOnce();
+  assert.equal(rendered?.dream?.arm, "recreate");
+  assert.equal(rendered?.parentItemId, "liked-result-2");
+  assert.deepEqual(rendered?.input, {
+    ...input,
+    clientJobId: rendered?.id,
+    count: 1,
+    seed: "17",
+    width: 1536,
+    height: 2048,
+    resolutionTier: "2K",
+    autoUpscale: null,
+  });
+  assert.equal(state.calls.length, 0);
+  assert.deepEqual(
+    store.job("alice", rendered!.id),
+    store.job("alice", String(rendered?.input.clientJobId)),
+  );
+  assert.equal(await dreamOnce(), undefined);
+  await dream.save("alice", { dailyImages: 20 });
+  nineImages();
+  const next = await dreamOnce();
+  assert.ok(next?.dream && next.dream.arm !== "recreate");
+  assert.equal(state.calls.length, 1);
+});
+
+test("A small Dream quota can recreate a liked seedless cloud image on its own aspect", async (t) => {
+  const cloud = {
+    id: "grok-image",
+    kind: "image",
+    provider: "cliproxyapi",
+    options: { resolutions: ["1k", "2k"] },
+    aspectPresets: [
+      { sizes: { "1k": { w: 1280, h: 720 }, "2k": { w: 2816, h: 1584 } } },
+      { sizes: { "1k": { w: 1024, h: 1024 }, "2k": { w: 2048, h: 2048 } } },
+    ],
+  };
+  const { dream, state, store, dreamOnce } = fixture(t, [...profiles, cloud]);
+  const prompt = "A sunlit coastline";
+  const session = store.createSession("alice");
+  const source = store.enqueue(
+    "alice",
+    session.id,
+    { kind: "image", profileId: cloud.id, prompt, resolution: "1k" },
+    "image",
+  );
+  store.save({ ...source, status: "completed" });
+  state.items.push({
+    id: "cloud-source",
+    ownerId: "alice",
+    jobId: source.id,
+    status: "done",
+    type: "image",
+    rating: "liked",
+    width: 1280,
+    height: 720,
+    settings: { seed: "Random", resolution: "1k" },
+  });
+  await dream.save("alice", { enabled: true, dailyImages: 1, imageBackend: "cloud" });
+  state.rolls = [99];
+  assert.ok((await dreamOnce())?.dream?.arm !== "recreate");
+  state.clock += 86_400_000;
+  state.rolls = [0];
+  const recreated = await dreamOnce();
+  assert.match(recreated?.resource || "", /^provider:cliproxyapi:/);
+  assert.equal(recreated?.dream?.arm, "recreate");
+  assert.equal(recreated?.parentItemId, "cloud-source");
+  assert.deepEqual(recreated?.input, {
+    clientJobId: recreated?.id,
+    count: 1,
+    kind: "image",
+    profileId: cloud.id,
+    prompt,
+    resolution: "2k",
+    width: 2816,
+    height: 1584,
+    autoUpscale: null,
+  });
+  assert.equal(state.calls.length, 1);
+});
+
 test("More Like This permits close iterations while keeping species and source identity", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
