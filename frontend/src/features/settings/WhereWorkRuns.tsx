@@ -4,7 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { defaultModelKeys, isCloudProfile } from "../../../../shared/profiles";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { useAccount } from "../auth/AccountGate";
+import { useAccount, useGroupFeature } from "../auth/AccountGate";
+import { lockedByAdministrator, useDreamSettings } from "../dream/DreamSettings";
+import { dreamQuery } from "../dream/queries";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { ProfileSelect } from "../generation/ProfilePicker";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -33,9 +35,51 @@ const kinds: { kind: WorkKind; label: string; description?: string }[] = [
   },
 ];
 
+function DreamProcessing() {
+  const { data, error } = useQuery(dreamQuery);
+  const save = useDreamSettings();
+  return (
+    <SettingGroup title="Dream">
+      {!data ? (
+        error ? (
+          <Alert color="red">{error.message}</Alert>
+        ) : (
+          <LoadingState label="Loading Dream" fill />
+        )
+      ) : (
+        (["images", "videos"] as const).map((kind) => {
+          const label = kind === "images" ? "Images" : "Videos";
+          const key = kind === "images" ? "imageBackend" : "videoBackend";
+          const locked = data.locked.includes(key);
+          return (
+            <SettingRow
+              key={key}
+              wide
+              label={label}
+              description={locked ? lockedByAdministrator : "Waits for an available model."}
+            >
+              <SegmentedControl
+                role="radiogroup"
+                aria-label={`Dream ${label}`}
+                fullWidth
+                value={data.settings[key]}
+                disabled={locked || !data.settings[kind]}
+                data={sides}
+                onChange={(value) => save.mutate({ [key]: value })}
+              />
+            </SettingRow>
+          );
+        })
+      )}
+      {save.error && <Alert color="red">{save.error.message}</Alert>}
+    </SettingGroup>
+  );
+}
+
 /** Settings › Where Work Runs: default processing and models by media kind. */
 export function WhereWorkRuns() {
   const account = useAccount().data;
+  const dream = useGroupFeature("dream");
   const { data: status, error } = useQuery(preferencesQuery);
   const profiles = useQuery(modelsQuery).data?.profiles;
   const assistant = useQuery(assistantQuery).data;
@@ -107,6 +151,7 @@ export function WhereWorkRuns() {
           {defaultRow(kind, "local")}
         </SettingGroup>
       ))}
+      {dream && <DreamProcessing />}
     </Stack>
   );
 }

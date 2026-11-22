@@ -44,8 +44,7 @@ const gibFree = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB Free`;
 
 /**
  * Each media worker on one compact line: its health dot and name, then what it runs, its state,
- * how much waits for it and its free memory. Its reason is the line's tooltip. Read-only: the
- * deployment lists the workers. It sits under the page's own Workers title, without another.
+ * how much waits for it and its free memory. Its reason is the line's tooltip.
  */
 function WorkerList({ workers }: { workers: WorkerStatus[] }) {
   return workers.length ? (
@@ -186,7 +185,8 @@ export function RuntimePanel() {
   const status = useQuery(servicesStatusQuery);
   if (status.isPending) return <LoadingState label="Loading Workers" />;
   if (status.error) return <Alert color="red">{status.error.message}</Alert>;
-  const { runtime, services: observed } = status.data;
+  const { runtime, services: observed, workers } = status.data;
+  const workerStatus = workers && <WorkerList workers={workers} />;
   // An unhealthy endpoint's reason, shown on the workloads that serve it.
   const reasons = Object.fromEntries(
     Object.values(observed)
@@ -196,13 +196,15 @@ export function RuntimePanel() {
   );
   return (
     <Stack gap="md" aria-label="Runtime">
-      {status.data.workers && <WorkerList workers={status.data.workers} />}
       {runtime.configured ? (
-        <RuntimeWorkloads reasons={reasons} />
+        <RuntimeWorkloads reasons={reasons} workerStatus={workerStatus} />
       ) : (
-        <Text size="sm" c="dimmed">
-          {runtime.reason}
-        </Text>
+        <>
+          {workerStatus}
+          <Text size="sm" c="dimmed">
+            {runtime.reason}
+          </Text>
+        </>
       )}
       {runtime.configured && (
         <>

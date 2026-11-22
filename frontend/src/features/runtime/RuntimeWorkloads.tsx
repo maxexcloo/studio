@@ -1,8 +1,10 @@
 import {
   Alert,
   Badge,
+  Box,
   Button,
   Checkbox,
+  Flex,
   Group,
   Loader,
   Menu,
@@ -11,7 +13,7 @@ import {
   Text,
 } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
   type RuntimeJob,
@@ -29,7 +31,7 @@ import { DataTable, HistoryTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { JobProgressBar, jobReason, jobStatus } from "../generation/JobProgress";
 import { useSettingsSection } from "../settings/SettingsNavigation";
@@ -308,7 +310,13 @@ function gpuPresets({ workloads, pools }: RuntimeStatus) {
 }
 
 /** Settings › Workers: which GPU deployments run, a previewed switch and restarts. */
-export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> }) {
+export function RuntimeWorkloads({
+  reasons,
+  workerStatus,
+}: {
+  reasons: Record<string, string>;
+  workerStatus?: ReactNode;
+}) {
   const client = useQueryClient();
   const phone = usePhone();
   const active = useSettingsSection() === "workers";
@@ -379,8 +387,35 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
       void refresh();
     },
   });
-  if (status.isPending) return <LoadingState label="Loading GPU Workloads" />;
-  if (status.error) return <Alert color="red">{status.error.message}</Alert>;
+  const placement = (picker?: ReactNode) =>
+    (workerStatus || picker) && (
+      <SettingGroup title="Placement">
+        <Flex
+          direction={phone ? "column" : "row"}
+          align={phone ? "stretch" : "center"}
+          justify="flex-end"
+          gap="xs"
+        >
+          {workerStatus && (
+            <Box flex={1} miw={0}>
+              {workerStatus}
+            </Box>
+          )}
+          {picker}
+        </Flex>
+      </SettingGroup>
+    );
+  if (status.isPending || status.error)
+    return (
+      <Stack gap="md">
+        {placement()}
+        {status.isPending ? (
+          <LoadingState label="Loading GPU Workloads" />
+        ) : (
+          <Alert color="red">{status.error.message}</Alert>
+        )}
+      </Stack>
+    );
   const { operation, history } = status.data;
   const workloads = status.data.workloads.map((item) => {
     const work = live.data?.workloads[item.id];
@@ -413,10 +448,12 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
         : { doing: "Stopping", verb: "stop", ids: shown.stop });
   return (
     <Stack gap="md">
-      {workloads.length > 0 && (
-        <SettingRow label="Placement" wide>
+      {placement(
+        workloads.length > 0 && (
           <Select
             aria-label="GPU Placement"
+            w={phone ? "100%" : 280}
+            flex="none"
             allowDeselect={false}
             value={individual ? "custom" : preset?.value}
             data={[...options, { value: "custom", label: "Custom" }]}
@@ -427,7 +464,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
                 setSelection(options.find((option) => option.value === value)?.target ?? null);
             }}
           />
-        </SettingRow>
+        ),
       )}
       <DataTable
         label="GPU Workloads"
@@ -548,7 +585,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
               Stop
             </Menu.Item>
             <Menu.Item
-              leftSection={<icons.retry size={16} />}
+              leftSection={stopsNow(item) ? <icons.stop size={16} /> : <icons.retry size={16} />}
               disabled={
                 item.phase !== "running" ||
                 (Boolean(operation) && !(item.radiance && operation?.stop.includes(item.id)))

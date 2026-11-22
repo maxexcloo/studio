@@ -16,11 +16,13 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  FastForward,
   Files,
   Flag,
   FolderOpen,
   GalleryHorizontalEnd,
   Gauge,
+  ImagePlus,
   ImageUp,
   ImageUpscale,
   Import,
@@ -56,8 +58,10 @@ import {
   Share,
   ShieldCheck,
   Shirt,
+  Shuffle,
   SlidersHorizontal,
   Square,
+  SquareCheck,
   TextCursorInput,
   ThumbsDown,
   ThumbsUp,
@@ -65,6 +69,7 @@ import {
   Trophy,
   Undo2,
   Upload,
+  UserRound,
   Volume2,
   VolumeX,
   WandSparkles,
@@ -77,6 +82,7 @@ const filled = (Icon: LucideIcon): LucideIcon =>
 
 /** One icon per meaning: every action, mode and recurring control takes its icon from here. */
 export const icons = {
+  account: UserRound,
   /** Adding something: a new record, such as New Character, or a reference to an empty slot. */
   add: Plus,
   animate: Play,
@@ -111,6 +117,8 @@ export const icons = {
   edit: Pencil,
   /** A link that opens another site in a new tab. */
   external: ExternalLink,
+  /** Continuing a video from its last frame. */
+  extend: FastForward,
   filter: ListFilter,
   /** Hiding a revealed secret again, such as the MCP token. */
   hide: EyeOff,
@@ -153,6 +161,7 @@ export const icons = {
   /** Running an item again (Recreate). */
   recreate: Repeat2,
   redo: Redo2,
+  reference: ImagePlus,
   /** Asking again: checking for updates, refreshing status and suggestions. */
   refresh: RefreshCw,
   rename: TextCursorInput,
@@ -169,12 +178,14 @@ export const icons = {
   rule: ShieldCheck,
   /** A scene card (Library › Scenes). */
   scene: MapPinned,
+  select: SquareCheck,
   settings: Settings,
   share: Share,
   /** A character's design sheet (Make Sheet). */
   sheet: LayoutDashboard,
   /** Revealing a hidden secret, such as the MCP token. */
   show: Eye,
+  shuffle: Shuffle,
   /** Image discovery and the gallery ranked by likeness to an image (Similar). */
   similar: ScanSearch,
   sort: ArrowDownUp,

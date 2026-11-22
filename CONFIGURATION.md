@@ -32,7 +32,9 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 `STUDIO_DEFAULT_IMAGE_PROFILE` and `STUDIO_DEFAULT_VIDEO_PROFILE` pick a fresh composer's profiles (else the first ready one).
 
-Set `STUDIO_DREAM_IMAGE_SWITCH_MINUTES` to manage the shared Dream image switch delay through deployment configuration. Otherwise administrators can change it in **Settings › Dream Policy**.
+Administrators set shared Dream delays in **Settings › Administration › Dream**. Use `STUDIO_DREAM_IMAGE_IDLE_MINUTES` and `STUDIO_DREAM_VIDEO_IDLE_MINUTES` to control the wait after each account's latest generation request. `STUDIO_DREAM_IMAGE_SWITCH_MINUTES` controls how long the shared queue must be idle before Dream changes local image models or LoRAs.
+
+Accounts choose Cloud or Local for Dream images and videos in **Settings › Where Work Runs**. Administrators can set either choice for all accounts in **Administration › Dream**.
 
 ### Radiance
 
