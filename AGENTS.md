@@ -268,7 +268,8 @@ recur across features.
   avoid autoplaying tile videos. Only the Dream Deck's top card plays its
   videos, in step, with sound on by default and the viewer's explicit mute
   choice remembered. A comparison plays audio from only the selected side.
-  Offer Play if autoplay is blocked. Release closed players and pause playback
+  Dream retries silently if sound blocks autoplay. Offer Play if playback still
+  needs a tap. Release closed players and pause playback
   when the tab hides. Heavy tools load only when opened. Paging keeps loaded
   results and offers retry on failure.
 

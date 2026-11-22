@@ -1388,7 +1388,7 @@ test("Projects shows and accepts new card proposals while the Inbox stays open",
   await expect(page.getByText("No Projects", { exact: true })).toBeVisible();
 });
 
-test("Dream plays one comparison side with the viewer's sound choice", async ({
+test("Dream autoplays silently when sound is blocked and lets the viewer choose a comparison side", async ({
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
@@ -1397,14 +1397,15 @@ test("Dream plays one comparison side with the viewer's sound choice", async ({
       "click",
       (event) => {
         const target = event.target as Element;
-        if (target.closest("button")?.textContent?.trim() === "Play") playRequested = true;
+        if (target.closest("button")?.getAttribute("aria-label") === "Unmute") playRequested = true;
       },
       true,
     );
     HTMLMediaElement.prototype.play = function () {
-      return playRequested || this.muted
-        ? Promise.resolve()
-        : Promise.reject(new DOMException("Autoplay blocked", "NotAllowedError"));
+      if (!playRequested && !this.muted)
+        return Promise.reject(new DOMException("Autoplay blocked", "NotAllowedError"));
+      this.dataset.playing = "true";
+      return Promise.resolve();
     };
   });
   await fixtures(page);
@@ -1430,12 +1431,13 @@ test("Dream plays one comparison side with the viewer's sound choice", async ({
   const playerB = pair.locator("video").last();
   await expect(pair.locator("video")).toHaveCount(2);
   await expect(page.locator("video")).toHaveCount(2);
-  await expect(playerA).toHaveJSProperty("muted", false);
+  await expect(playerA).toHaveJSProperty("muted", true);
   await expect(playerB).toHaveJSProperty("muted", true);
-  const play = pair.getByRole("button", { name: "Play", exact: true });
-  await expect(play).toBeVisible();
-  await play.click();
-  await expect(play).toBeHidden();
+  await expect(playerA).toHaveAttribute("data-playing", "true");
+  await expect(playerB).toHaveAttribute("data-playing", "true");
+  await expect(pair.getByRole("button", { name: "Play", exact: true })).toBeHidden();
+  await pair.getByRole("button", { name: "Unmute", exact: true }).click();
+  await expect(playerA).toHaveJSProperty("muted", false);
 
   await pair.getByRole("radio", { name: "Audio B", exact: true }).press("Space");
   await expect(playerA).toHaveJSProperty("muted", true);
