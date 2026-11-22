@@ -441,7 +441,9 @@ export function registerGenerateTools({
       prompts: z
         .union([promptList, promptListText.pipe(promptList)])
         .optional()
-        .describe('Use prompts: ["..."], not prompt.'),
+        .describe(
+          "One finished prompt per distinct creative result. Continue with new directions when batching.",
+        ),
       base: z
         .string()
         .trim()
@@ -480,7 +482,7 @@ export function registerGenerateTools({
       count: jobCount
         .optional()
         .describe(
-          `Per prompt, only if the user gives a number; default ${mcpGenerationCount} for one image prompt, else 1.`,
+          `Repeats each prompt with new seeds (default ${mcpGenerationCount} for one image prompt, else 1). For distinct results provide separate prompts.`,
         ),
       kind: z.enum(["image", "video"]).optional(),
       tier: tier.optional(),

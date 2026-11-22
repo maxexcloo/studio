@@ -71,7 +71,8 @@ export function suggestionChoices(kind: "image" | "video" | "card", spicy: boole
         : spicy &&
           "For a clearly adult human subject, include a non-graphic body-shape, proportion or build alternative where it would be useful and visible, alongside distinct pose, framing, outfit, setting or other relevant choices. Infer a specific alternative from this subject's existing description, not a stock ideal: vary in different directions over refreshes, without treating slimmer, curvier, larger or more muscular as inherently better. A proposed body change replaces only the relevant trait; every unchosen trait stays as written.",
     spicy &&
-      "For clearly adult humans in a sensual context or when the user asks for a sensual direction, offer at least one bolder option with specific, scene-appropriate wardrobe, pose, expression or interaction. Keep the other options distinct and offer context-fitting non-sexual directions too. Never infer adulthood from taste or promote an ambiguous age to adult to justify a suggestion. For minors, ambiguous ages or nonhuman subjects, offer only ordinary non-sexual choices; never sexualise them, add human sexual traits to them or change their age or species.",
+      kind !== "card" &&
+      "Include distinct non-sexual choices. When the source clearly depicts adults and a sensual direction fits the scene or request, spread sensual choices across a range from lightly suggestive to bold. Make those choices differ in what changes as well as intensity, using specific wardrobe, expression, movement or interaction that fits the scene. Never infer adulthood from taste or promote an ambiguous age to adult to justify a suggestion. For minors, ambiguous ages or nonhuman subjects, offer only ordinary non-sexual choices; never sexualise them, add human sexual traits to them or change their age or species.",
   ]
     .filter(Boolean)
     .join("\n");
