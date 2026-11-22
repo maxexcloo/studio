@@ -1,17 +1,15 @@
+.counted {
+  width: auto;
+  gap: 4px;
+  padding-inline: 4px;
+}
+
 .progress {
-  display: grid;
-  place-items: center;
-  min-width: 30px;
-  min-height: 24px;
-  border-radius: var(--mantine-radius-xs);
-  background-color: var(--mantine-color-default);
-  background-position: bottom;
-  background-repeat: no-repeat;
-  background-size: 100% 2px;
   color: var(--mantine-color-text);
   font-size: var(--mantine-font-size-xs);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  white-space: nowrap;
 }
 .content {
   display: flex;

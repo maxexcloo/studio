@@ -197,6 +197,10 @@ test("a request's jobs group as one set that moves and stops together", async ({
   // The set is one row: its title and progress, its jobs under it once opened.
   await expect(queue.getByText("Queue (2)", { exact: true })).toBeVisible();
   await expect(queue.getByText("1 of 4 Finished", { exact: true })).toBeVisible();
+  await expect(queue.getByRole("progressbar", { name: "Overall Queue Progress" })).toHaveAttribute(
+    "aria-valuenow",
+    "25",
+  );
   const set = queue.getByRole("button", { name: /^Fox Studies/ });
   await expect(set).toContainText("1 of 3 Done");
   await expect(set).toContainText("Queued – Krea 2 Turbo");
