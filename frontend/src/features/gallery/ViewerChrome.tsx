@@ -6,7 +6,7 @@ import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { mediaProfileName } from "./mediaLabels";
+import { mediaProfileName, mediaTitle } from "./mediaLabels";
 
 import classes from "./MediaViewer.module.css";
 
@@ -35,6 +35,7 @@ export function ViewerChrome({
   focusClose?: boolean;
 }) {
   const { profiles } = useGenerationActions();
+  const title = item && mediaTitle(item);
   const model = item && mediaProfileName(item, profiles);
   return (
     <Group
@@ -47,12 +48,17 @@ export function ViewerChrome({
       onClick={(event) => event.stopPropagation()}
     >
       <Group gap={6} wrap="nowrap" miw={0}>
-        {label}
+        {title && (
+          <Badge {...viewerBadge} title={title}>
+            {title}
+          </Badge>
+        )}
         {model && (
           <Badge {...viewerBadge} className={classes.modelBadge} title={model}>
             {model}
           </Badge>
         )}
+        {label}
       </Group>
       <Group gap={6} wrap="nowrap" className={classes.topActions}>
         {details && (

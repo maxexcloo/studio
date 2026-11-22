@@ -520,7 +520,7 @@ export function TextBox({
                   // Sending before the keyboard drops keeps the text's blur from closing first.
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={() => {
-                    if (!each.keepOpen) close();
+                    if (!inline && !each.keepOpen) close();
                     each.onSubmit();
                   }}
                 >
@@ -538,7 +538,9 @@ export function TextBox({
     <>
       {busy && spins && <VisuallyHidden role="status">{busy}</VisuallyHidden>}
       {/* AI tools remain available beside the summary before its phone editor opens. */}
-      {mobile && inline ? (
+      {mobile && inline && submit ? (
+        editor(textarea)
+      ) : mobile && inline ? (
         // In place, the text fills the surface with its tools as icons in its corner, or only while
         // it has focus in its form's action bar.
         <div
@@ -598,7 +600,7 @@ export function TextBox({
           transitionProps={{ ...modal.transitionProps, exitDuration: 0 }}
           // A column of header and body. Inline, since Paper's `display: block` has a module
           // class's specificity.
-          styles={{ content: { display: "flex", flexDirection: "column" } }}
+          styles={{ content: { display: "flex", flexDirection: "column", overflow: "clip" } }}
           classNames={{ body: classes.body }}
         >
           <Modal.Overlay />

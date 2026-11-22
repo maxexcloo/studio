@@ -48,8 +48,8 @@ async function entryFiles(entry: FileSystemEntry): Promise<File[]> {
 }
 
 /**
- * Uploads each supported image and video in turn, with its progress and then any file that failed
- * or was skipped as one notification, and imports links (`/api/gallery/import/link`). `onUploaded`
+ * Uploads each supported image and video in turn, reporting failures or skipped files, and
+ * imports links (`/api/gallery/import/link`). `onUploaded`
  * hears when at least one upload arrived.
  */
 export function useGalleryUpload(onUploaded: () => void) {
@@ -98,18 +98,8 @@ export function useGalleryUpload(onUploaded: () => void) {
       return;
     }
     setUploading(true);
-    const id = `gallery-upload-${Date.now()}`;
-    const progress = (done: number) => `Uploading ${done + 1} of ${chosen.length}…`;
-    notifications.show({
-      id,
-      loading: true,
-      autoClose: false,
-      withCloseButton: false,
-      message: progress(0),
-    });
     const failed: string[] = [];
-    for (const [index, file] of chosen.entries()) {
-      notifications.update({ id, message: progress(index) });
+    for (const file of chosen) {
       const form = new FormData();
       form.append("image", file);
       await api("/api/reference-assets/upload", { method: "POST", body: form }).catch(
@@ -126,12 +116,8 @@ export function useGalleryUpload(onUploaded: () => void) {
       .filter(Boolean)
       .join(" ");
     // The uploads show in the gallery; only what didn't arrive needs saying.
-    if (!failed.length && !skipped) notifications.hide(id);
-    else
-      notifications.update({
-        id,
-        loading: false,
-        withCloseButton: true,
+    if (failed.length || skipped)
+      notifications.show({
         color: failed.length ? "red" : undefined,
         autoClose: failed.length ? false : 4000,
         message: (

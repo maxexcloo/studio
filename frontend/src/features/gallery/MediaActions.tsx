@@ -34,13 +34,19 @@ import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
 import { useGroupFeature } from "../auth/AccountGate";
+import { useRemembered } from "../auth/useRemembered";
 import { useStartCard } from "../characters/useCardFrom";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { useStageComparison } from "../compare/variants";
 import { assistMenu, useChangeSuggestions } from "../generation/AskChange";
 import { defaultProfile, useGeneration } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
-import { takesReferences } from "../generation/payload";
+import {
+  generationCountLimit,
+  isProfile,
+  profileForBackend,
+  takesReferences,
+} from "../generation/payload";
 import { type AssistantOption, assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
@@ -380,6 +386,20 @@ export function useMediaActions(
   const [review, setReview] = useAnimateReview();
   const { menu: animateProfiles, profileId: animationProfileId } = useActionProfile("video");
   const { menu: editProfiles, profileId: selectedEdit, profiles } = useActionProfile("image");
+  const [savedCount, setRecreateCount] = useRemembered("recreate-count", 1);
+  const original = profiles?.find((profile) =>
+    item.settings?.profileId
+      ? isProfile(profile, item.settings.profileId)
+      : profile.model === item.model,
+  );
+  const recreateProfile = profileForBackend(
+    original,
+    typeof item.settings?.profileBackend === "string" ? item.settings.profileBackend : undefined,
+    Array.isArray(item.settings?.referenceAssets) && item.settings.referenceAssets.length > 0,
+    Array.isArray(item.settings?.loras) && item.settings.loras.length > 0,
+  );
+  const countLimit = generationCountLimit(recreateProfile, item.type);
+  const recreateCount = Math.min(savedCount, countLimit);
   const automaticEdit = image && automaticEditProfile(profiles || [], item);
   const editProfileId =
     selectedEdit ||
@@ -489,6 +509,23 @@ export function useMediaActions(
     assistMenu({
       settings: [
         ...(mode === "edit" ? editProfiles : []),
+        ...(mode === "recreate" && countLimit > 1
+          ? [
+              {
+                id: "recreate-count",
+                label: "Count",
+                choice: {
+                  label: "Count",
+                  value: String(recreateCount),
+                  options: Array.from({ length: countLimit }, (_, index) => {
+                    const count = String(index + 1);
+                    return { value: count, label: count };
+                  }),
+                  onChange: (value: string) => setRecreateCount(Number(value)),
+                },
+              },
+            ]
+          : []),
         ...(assistedChanges
           ? [
               {
@@ -649,7 +686,8 @@ export function useMediaActions(
                     label: "Run Again",
                     icon: Shuffle,
                     disabled: changedPrompt === "",
-                    onClick: () => run({ kind: "regenerate", prompt: changedPrompt }),
+                    onClick: () =>
+                      run({ kind: "regenerate", prompt: changedPrompt, count: recreateCount }),
                   },
                   {
                     id: "exact-repeat",

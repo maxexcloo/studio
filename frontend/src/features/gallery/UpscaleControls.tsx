@@ -1,4 +1,3 @@
-import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, ScanFace } from "lucide-react";
 
@@ -79,12 +78,7 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
   const admin = useIsAdmin();
   const faceDownload = useMutation({
     mutationFn: (id: string) => post("/api/models/downloads", { id }),
-    onSuccess: () => {
-      notifications.show({
-        message: "Downloading the face detector in Library › Downloads.",
-      });
-      void cache.invalidateQueries({ queryKey: downloadsQuery.queryKey });
-    },
+    onSuccess: () => void cache.invalidateQueries({ queryKey: downloadsQuery.queryKey }),
   });
   const download = admin && detector?.nodesInstalled ? detector.download : undefined;
   const downloadFaceDetector = download && {
