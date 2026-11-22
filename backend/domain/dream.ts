@@ -3606,7 +3606,6 @@ export function createDream(options: {
     /** A Dream job finished: its worker is free now, so the next starts without waiting a tick. */
     finished: wake,
     idleWaitForJob: (job: OwnedJob) => idleWait(job.ownerId, kindOf(job.input)),
-    imageSwitchMinutes: (ownerId: string) => read(ownerId).settings.imageSwitchMinutes,
     access: (ownerId: string) => options.access(ownerId),
     status(
       ownerId: string,
@@ -3939,7 +3938,7 @@ export function createDream(options: {
       );
       if (forced)
         throw failure(
-          `An administrator set ${forced} for every account in Settings › Generation.`,
+          `An administrator set ${forced} for every account in Settings › Dream Policy.`,
           409,
         );
       const record = read(ownerId);

@@ -142,7 +142,7 @@
   padding: 4px;
 }
 
-/* Phones expand an item's options in place, indented under it. */
+/* Each menu section's options are indented under its trigger. */
 .inline {
   padding-left: 12px;
 }

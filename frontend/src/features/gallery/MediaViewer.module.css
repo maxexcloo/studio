@@ -261,6 +261,10 @@
   padding-inline: var(--mantine-spacing-xs) 4px;
 }
 
+:where(:root:not([data-phone])) .promptRow {
+  border-bottom: 1px solid var(--studio-glass-border);
+}
+
 /* The padding sits outside the text, so a phone summary clips at a whole line. */
 .prompt {
   padding-block: 7px;

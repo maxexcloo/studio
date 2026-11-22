@@ -1,11 +1,12 @@
 import { randomBytes } from "node:crypto";
 
-import type {
-  BenchmarkModel,
-  BenchmarkRun,
-  BenchmarkStatus,
-  BenchmarkSummary,
-  RuntimePodLog,
+import {
+  type BenchmarkModel,
+  type BenchmarkRun,
+  type BenchmarkStatus,
+  type BenchmarkSummary,
+  type RuntimePodLog,
+  activeBenchmark,
 } from "../../shared/runtime.ts";
 import { RadianceClient } from "../providers/radiance.ts";
 import {
@@ -154,8 +155,10 @@ const brief = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 240);
 export class Benchmarks {
   readonly configured: boolean;
   private runs: BenchmarkRun[];
-  /** Holds the one run's place while its model is checked, before the run exists. */
+  /** Holds the batch's place while its models are checked, before the runs exist. */
   private starting = false;
+  private transition = Promise.resolve();
+  private checking?: Promise<void>;
   private polling?: NodeJS.Timeout;
   private options: {
     request: KubernetesRequest;
@@ -176,8 +179,7 @@ export class Benchmarks {
       throw new Error("STUDIO_BENCHMARK_SECRET is required with STUDIO_BENCHMARK_IMAGE.");
     this.options.store ??= memoryStore<BenchmarkRun[]>();
     this.runs = this.options.store.read() ?? [];
-    // A Job outlives a Studio restart: keep following the one that was running.
-    if (this.runs.some((run) => run.status === "running")) this.follow();
+    if (this.runs.some(activeBenchmark)) this.follow();
   }
 
   list(): BenchmarkStatus {
@@ -188,8 +190,18 @@ export class Benchmarks {
     return new Date((this.options.now ?? Date.now)()).toISOString();
   }
   private save() {
-    this.runs = this.runs.slice(0, historyLimit);
+    let past = 0;
+    this.runs = this.runs.filter((run) => activeBenchmark(run) || past++ < historyLimit);
     this.options.store!.write(this.runs);
+  }
+
+  private serialise<T>(change: () => Promise<T>) {
+    const result = this.transition.then(change);
+    this.transition = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
   }
   /** The run's Job, while its workload is still configured. */
   private jobFor(run: BenchmarkRun) {
@@ -256,72 +268,88 @@ export class Benchmarks {
     throw stopped();
   }
 
-  async start(id: string, requestedBy: string, model?: string) {
+  async start(id: string, requestedBy: string, models: string[]) {
     const workload = this.workload(id);
-    if (this.starting || this.runs.some((run) => run.status === "running"))
+    if (this.starting || this.runs.some(activeBenchmark))
       throw new RuntimeConflict("A benchmark is already running.");
     this.starting = true;
     try {
-      const available = await this.servedModels(workload);
-      const chosen = model ?? (available.length === 1 ? available[0].id : undefined);
-      if (!chosen || !available.some((entry) => entry.id === chosen))
-        throw new RuntimeRequestError("Choose an available text model.");
-      return await this.create(workload, requestedBy, chosen);
+      const available = new Set((await this.servedModels(workload)).map(({ id }) => id));
+      const selected = [...new Set(models)];
+      if (!selected.length || selected.some((model) => !available.has(model)))
+        throw new RuntimeRequestError("Choose available text models.");
+      const runs = selected.map<BenchmarkRun>((model) => ({
+        id: randomBytes(8).toString("hex"),
+        workload: workload.id,
+        label: workload.label,
+        model,
+        status: "queued",
+        requestedBy,
+      }));
+      return await this.serialise(async () => {
+        this.runs.unshift(...runs);
+        this.save();
+        const launched = await this.launch(runs[0], workload).catch((error) => {
+          this.runs = this.runs.slice(runs.length);
+          this.save();
+          throw error;
+        });
+        if (launched) this.save();
+        this.follow();
+        return runs;
+      });
     } finally {
       this.starting = false;
     }
   }
 
-  private async create(workload: Workload, requestedBy: string, model: string) {
-    const run: BenchmarkRun = {
-      // Short and lower-case: it names the Job.
-      id: randomBytes(4).toString("hex"),
-      workload: workload.id,
-      label: workload.label,
-      model,
-      status: "running",
-      requestedBy,
-      startedAt: this.now,
-    };
+  private async launch(run: BenchmarkRun, workload: Workload) {
     const job = this.jobFor(run)!;
-    const response = await this.call(
-      "POST",
-      `/apis/batch/v1/namespaces/${job.namespace}/jobs`,
-      benchmarkJob({
-        name: job.name,
-        workload,
-        model,
-        image: this.options.environment.STUDIO_BENCHMARK_IMAGE!,
-        secret: this.options.environment.STUDIO_BENCHMARK_SECRET!,
-      }),
-    );
+    const response = await this.options
+      .request(
+        "POST",
+        `/apis/batch/v1/namespaces/${job.namespace}/jobs`,
+        benchmarkJob({
+          name: job.name,
+          workload,
+          model: run.model,
+          image: this.options.environment.STUDIO_BENCHMARK_IMAGE!,
+          secret: this.options.environment.STUDIO_BENCHMARK_SECRET!,
+        }),
+      )
+      .catch(() => undefined);
+    // An uncertain reply leaves the run queued so its named Job can be recovered on the next poll.
+    if (!response || response.status >= 500 || response.status === 429) return false;
     if (response.status === 403)
       throw new RuntimeUnavailable(
         `Studio's service account may not create Jobs in ${workload.namespace}; apply its benchmark role there.`,
       );
-    if (response.status < 200 || response.status >= 300)
+    // The same Job may already exist if Studio restarted before saving its launch.
+    if (response.status !== 409 && (response.status < 200 || response.status >= 300))
       throw new RuntimeUnavailable(`Kubernetes returned HTTP ${response.status} for the Job.`);
-    this.runs.unshift(run);
-    this.save();
-    this.follow();
-    return run;
+    run.status = "running";
+    run.startedAt = this.now;
+    return true;
   }
 
-  /** Deletes the running Job and its pod, unless it has just ended; the run reads Stopped. */
-  async stop(id: string) {
-    const run = this.runs.find((item) => item.id === id);
-    if (!run) throw new RuntimeRequestError("No benchmark has that id.");
-    await this.poll();
-    if (run.status !== "running") return run;
-    const job = this.jobFor(run)!;
-    const response = await this.call(
-      "DELETE",
-      `/apis/batch/v1/namespaces/${job.namespace}/jobs/${job.name}?propagationPolicy=Background`,
-    );
-    if (response.status !== 404 && (response.status < 200 || response.status >= 300))
-      throw new RuntimeUnavailable(`Kubernetes returned HTTP ${response.status} for the Job.`);
-    this.finish(run, { status: "stopped" });
-    return run;
+  stop(id: string) {
+    return this.serialise(async () => {
+      const run = this.runs.find((item) => item.id === id);
+      if (!run) throw new RuntimeRequestError("No benchmark has that id.");
+      if (run.status === "running") await this.checkJob(run);
+      if (!activeBenchmark(run)) return run;
+      const job = this.jobFor(run);
+      if (job) {
+        const response = await this.call(
+          "DELETE",
+          `/apis/batch/v1/namespaces/${job.namespace}/jobs/${job.name}?propagationPolicy=Background`,
+        );
+        if (response.status !== 404 && (response.status < 200 || response.status >= 300))
+          throw new RuntimeUnavailable(`Kubernetes returned HTTP ${response.status} for the Job.`);
+      }
+      this.finish(run, { status: "stopped" });
+      return run;
+    });
   }
 
   private finish(run: BenchmarkRun, outcome: Partial<BenchmarkRun>) {
@@ -337,17 +365,38 @@ export class Benchmarks {
     this.polling.unref();
   }
 
-  /**
-   * Checks the running Job. When it ends, reads its summary; a failure reads as Kubernetes' reason
-   * (a deadline, or the container's OOMKilled) or else the log's last line.
-   */
-  async poll() {
-    const run = this.runs.find((item) => item.status === "running");
-    if (!run) {
-      clearInterval(this.polling);
-      this.polling = undefined;
-      return;
-    }
+  poll() {
+    return (this.checking ??= this.serialise(async () => {
+      const running = this.runs.find((run) => run.status === "running");
+      if (running) {
+        await this.checkJob(running);
+        if (running.status === "running") return;
+      }
+      const index = this.runs.findIndex((run) => run.status === "queued");
+      if (index < 0) {
+        clearInterval(this.polling);
+        this.polling = undefined;
+        return;
+      }
+      const next = this.runs[index];
+      try {
+        const workload = this.workload(next.workload);
+        if (!(await this.launch(next, workload))) return;
+      } catch (error) {
+        return this.finish(next, {
+          status: "failed",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      this.runs.splice(index, 1);
+      this.runs.unshift(next);
+      this.save();
+    }).finally(() => {
+      this.checking = undefined;
+    }));
+  }
+
+  private async checkJob(run: BenchmarkRun) {
     const job = this.jobFor(run);
     if (!job) return this.finish(run, { status: "failed", error: "Its workload is gone." });
     const { name, namespace } = job;

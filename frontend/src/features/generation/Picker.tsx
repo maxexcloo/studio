@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Badge,
   Box,
   Button,
   Combobox,
@@ -21,7 +22,7 @@ import {
   getDefaultZIndex,
   useCombobox,
 } from "@mantine/core";
-import { Check, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import {
   type CSSProperties,
   type DragEvent,
@@ -47,8 +48,7 @@ import { SearchInput } from "../../ui/SearchInput";
 import { useFlash } from "../../ui/useFlash";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
-import { FilterButton } from "../gallery/GalleryFilters";
-import { escapePanel, fittedPopup } from "./chip";
+import { chipProps, escapePanel, fittedPopup, iconChipProps } from "./chip";
 import { uploadTypes } from "./references";
 
 import classes from "./Picker.module.css";
@@ -262,6 +262,45 @@ export function ChipPopup({
         </Stack>
       </Popover.Dropdown>
     </Popover>
+  );
+}
+
+export function FilterButton({
+  label,
+  count,
+  opened,
+  onClick,
+  ref,
+}: {
+  label: string;
+  count: number;
+  opened: boolean;
+  onClick: () => void;
+  ref?: React.Ref<HTMLButtonElement>;
+}) {
+  const phone = usePhone();
+  return (
+    <Tooltip label={label} disabled={!phone || opened}>
+      <Button
+        {...(phone ? iconChipProps : chipProps)}
+        ref={ref}
+        aria-label={label}
+        aria-expanded={opened}
+        variant={count || opened ? "light" : "default"}
+        leftSection={phone ? undefined : <icons.filter size={15} />}
+        rightSection={phone ? undefined : <ChevronDown size={14} />}
+        pos="relative"
+        style={{ overflow: "visible" }}
+        onClick={onClick}
+      >
+        {phone ? <icons.filter size={16} /> : "Filter"}
+        {count > 0 && (
+          <Badge size="xs" circle variant="filled" pos="absolute" top={-4} right={-4} aria-hidden>
+            {count}
+          </Badge>
+        )}
+      </Button>
+    </Tooltip>
   );
 }
 

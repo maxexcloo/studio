@@ -103,11 +103,10 @@ export function AppearanceProvider({
         rounding: resolved.rounding,
         background: resolved.background,
         motionDuration: duration,
-        phone,
         touch,
         transparency: blurs && !opaque,
       }),
-    [resolved.colour, resolved.rounding, resolved.background, duration, phone, touch, opaque],
+    [resolved.colour, resolved.rounding, resolved.background, duration, touch, opaque],
   );
   return (
     <Context.Provider value={{ appearance: resolved, setAppearance }}>

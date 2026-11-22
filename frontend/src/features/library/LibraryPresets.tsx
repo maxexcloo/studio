@@ -93,6 +93,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
             <ToolbarAction
               label="Select"
               icon={SquareCheck}
+              iconOnly
               variant="default"
               aria-pressed={selection !== null}
               disabled={(!selection && !presets.records.length) || bulkDelete.isPending}

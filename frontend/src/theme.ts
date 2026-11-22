@@ -115,7 +115,6 @@ export function studioTheme({
   rounding,
   background,
   motionDuration,
-  phone,
   touch,
   transparency,
 }: {
@@ -123,7 +122,6 @@ export function studioTheme({
   rounding: Rounding;
   background: Background;
   motionDuration: number;
-  phone: boolean;
   /** A coarse pointer (phones and tablets): controls are touch targets and tooltips stay off. */
   touch: boolean;
   transparency: boolean;
@@ -311,20 +309,14 @@ export function studioTheme({
         defaultProps: { size: "md" },
         vars: (_theme, props) => ({ wrapper: { "--input-height": height(props.size) } }),
       }),
-      // One row height for every menu's items. Phones and touch screens expand options in place,
-      // so a menu stays within the screen and scrolls when they outgrow it (a phone held sideways).
+      // Menus scroll within the viewport when their options outgrow it.
       Menu: Menu.extend({
         defaultProps: {
           transitionProps: popupTransition,
-          ...((phone || touch) && {
-            middlewares: { ...popupMiddlewares, size: { padding: 12 } },
-          }),
+          middlewares: { ...popupMiddlewares, size: { padding: 12 } },
         },
         styles: {
-          dropdown:
-            phone || touch
-              ? { ...dropdown, overflowY: "auto", overscrollBehavior: "contain" }
-              : dropdown,
+          dropdown: { ...dropdown, overflowY: "auto", overscrollBehavior: "contain" },
           item: { minHeight: touch ? bar : 36 },
         },
       }),

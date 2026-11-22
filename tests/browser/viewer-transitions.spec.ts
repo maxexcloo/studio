@@ -361,8 +361,9 @@ test("The viewer shows a server picture's display copy, and its original once zo
   // The copy stands in at the original's size, so Actual Size is the original's pixels.
   await expect(image).toHaveAttribute("width", "4096");
   expect(originals).toEqual([]);
-  await viewer.getByRole("button", { name: "Change Image Zoom", exact: true }).click();
-  await viewer.getByRole("button", { name: "Change Image Zoom", exact: true }).click();
+  const zoom = viewer.getByRole("button", { name: "Change Image Zoom", exact: true });
+  await zoom.press("Enter");
+  await zoom.press("Enter");
   await expect(
     viewer.getByRole("button", { name: "Zoom: Actual Size", exact: true }),
   ).toBeVisible();

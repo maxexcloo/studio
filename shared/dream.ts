@@ -5,7 +5,6 @@ export const dreamDefaults = {
   dailyImages: 40,
   dailyVideos: 4,
   imageIdleMinutes: 0,
-  imageSwitchMinutes: 2,
   videoIdleMinutes: 5,
   images: true,
   videos: false,
@@ -15,6 +14,10 @@ export const dreamDefaults = {
 };
 export type DreamSettings = typeof dreamDefaults;
 export const maxDreamIdleMinutes = 120;
+export const dreamImageSwitchSetting = {
+  key: "STUDIO_DREAM_IMAGE_SWITCH_MINUTES",
+  defaultValue: 2,
+};
 export type DreamCounts = { images: number; videos: number };
 
 export function dreamLimitReached(
@@ -68,7 +71,7 @@ export function dreamCardCounts(
 }
 
 /**
- * The settings an administrator may force on every account (Settings › Generation), overriding each
+ * The settings an administrator may force on every account (Settings › Dream Policy), overriding each
  * account's own choice; unset leaves the account's choice.
  */
 export const dreamOverrideKeys = {
@@ -85,7 +88,6 @@ export function dreamSettingError(key: keyof DreamSettings, value: unknown): str
     key === "dailyImages" ||
     key === "dailyVideos" ||
     key === "imageIdleMinutes" ||
-    key === "imageSwitchMinutes" ||
     key === "videoIdleMinutes"
   ) {
     const max = key === "dailyImages" ? 500 : key === "dailyVideos" ? 100 : maxDreamIdleMinutes;
