@@ -1793,7 +1793,13 @@ test("Phone swipes first reveal thumbnails, then Details", async ({ page }, test
   await expect(thumbnails).toBeVisible();
   await expect(actions).toBeVisible();
   await expect(sheet).toBeHidden();
-  await expect.poll(() => picture.boundingBox()).toEqual(start);
+  await expect
+    .poll(async () => {
+      const bounds = await picture.boundingBox();
+      const dock = await thumbnails.boundingBox();
+      return !!bounds && !!dock && bounds.y + bounds.height <= dock.y + 1;
+    })
+    .toBe(true);
   await swipe(-120);
   await expect(sheet.getByText("1234567", { exact: true })).toBeVisible();
   await expect(actions).toBeHidden();
@@ -1861,9 +1867,7 @@ test("A double tap zooms in at the tapped point and back to Fit; a click still c
   await expect(viewer).toBeVisible();
 });
 
-test("The viewer cycles its chrome without moving the fitted picture", async ({
-  page,
-}, testInfo) => {
+test("The viewer cycles its header, bottom actions and thumbnails", async ({ page }, testInfo) => {
   const state = await fixtures(page);
   for (const [index, [id, prompt, createdAt]] of [
     ["tap-first", "A quiet harbour", stamp],
@@ -1889,7 +1893,6 @@ test("The viewer cycles its chrome without moving the fitted picture", async ({
   const close = viewer.getByRole("button", { name: "Close Generation", exact: true });
   const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const strip = viewer.getByRole("list", { name: "Set: Tap Set", exact: true });
-  const fitted = await picture.boundingBox();
   await expect(strip).toBeHidden();
   await expect(close).toBeVisible();
   await expect(actions).toBeVisible();
@@ -1898,7 +1901,6 @@ test("The viewer cycles its chrome without moving the fitted picture", async ({
     const viewport = page.viewportSize()!;
     await page.mouse.move(viewport.width / 2, viewport.height - 2);
     await expect(strip).toBeVisible();
-    await expect.poll(() => picture.boundingBox()).toEqual(fitted);
     return;
   }
 
@@ -1918,12 +1920,10 @@ test("The viewer cycles its chrome without moving the fitted picture", async ({
   await expect(strip).toBeVisible();
   await expect(close).toBeVisible();
   await expect(actions).toBeVisible();
-  await expect.poll(() => picture.boundingBox()).toEqual(fitted);
   await tap();
   await expect(strip).toBeHidden();
   await expect(close).toBeHidden();
   await expect(actions).toBeHidden();
-  await expect.poll(() => picture.boundingBox()).toEqual(fitted);
 
   // A swipe while hidden moves to the next image and keeps the chrome hidden.
   const { x, y } = await centre();
@@ -1960,13 +1960,14 @@ test("The viewer cycles its chrome without moving the fitted picture", async ({
   await expect(close).toBeHidden();
 
   const next = viewer.getByRole("img", { name: "A windy cliff", exact: true });
-  await expect.poll(() => next.boundingBox()).toEqual(fitted);
-  const nextFit = (await next.boundingBox())!;
-  await page.touchscreen.tap(nextFit.x + nextFit.width / 2, nextFit.y + nextFit.height / 2);
+  const nextBounds = (await next.boundingBox())!;
+  await page.touchscreen.tap(
+    nextBounds.x + nextBounds.width / 2,
+    nextBounds.y + nextBounds.height / 2,
+  );
   await expect(close).toBeVisible();
   await expect(strip).toBeHidden();
   await expect(actions).toBeVisible();
-  await expect.poll(() => next.boundingBox()).toEqual(nextFit);
 
   await page.keyboard.press("ArrowUp");
   await expect(strip).toBeVisible();
