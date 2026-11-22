@@ -232,10 +232,8 @@ export const ComposerDock = memo(function ComposerDock({
         }}
         style={
           {
-            // The safe area stands in for the gap rather than adding to it, so the bar sits as far
-            // from the bottom as from the sides.
-            bottom: `calc(max(var(--studio-composer-gap), env(safe-area-inset-bottom)) + ${keyboardInset}px)`,
             ...(typingInDock && {
+              "--dock-keyboard-inset": `${keyboardInset}px`,
               "--dock-room": `${window.innerHeight - dockKeyboard.top - keyboardInset}px`,
             }),
           } as CSSProperties
@@ -244,10 +242,9 @@ export const ComposerDock = memo(function ComposerDock({
         {(!opened || !expanded) && (
           <Paper
             withBorder
-            p={8}
             radius="xl"
             shadow="xl"
-            className={classes.surface}
+            className={`${classes.surface} ${classes.compactSurface}`}
             // While handing over, it leaves the accessibility tree once focus has moved on.
             aria-hidden={(opened && !compactFocused) || undefined}
             onFocus={() => setCompactFocused(true)}

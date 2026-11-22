@@ -210,3 +210,14 @@
   -webkit-backdrop-filter: var(--studio-glass-filter);
   backdrop-filter: var(--studio-glass-filter);
 }
+
+@media (display-mode: standalone) {
+  :where(:root[data-phone]) .shellHeader {
+    background: var(--mantine-color-body);
+  }
+
+  :where(:root[data-phone]) .shellHeader::before,
+  :where(:root[data-phone]) .shellHeader::after {
+    content: none;
+  }
+}

@@ -1,8 +1,10 @@
 .dock {
+  --composer-bottom: max(var(--studio-composer-gap), env(safe-area-inset-bottom));
   position: fixed;
   /* Above the header, which the open panel reaches on a short screen with the keyboard up. */
   z-index: calc(var(--mantine-z-index-app) + 1);
   left: 50%;
+  bottom: calc(var(--composer-bottom) + var(--dock-keyboard-inset, 0px));
   transform: translateX(-50%);
   width: min(var(--studio-composer-width), calc(100% - 2 * var(--studio-composer-gap)));
 }
@@ -17,6 +19,21 @@
 
 .surface:focus-within {
   border-color: var(--mantine-color-dimmed);
+}
+
+.compactSurface {
+  padding: 0.5rem;
+}
+
+@media (display-mode: standalone) {
+  :where(:root[data-phone=""]) .dock {
+    --composer-bottom: var(--studio-composer-gap);
+  }
+
+  /* The surface reaches below the safe area while its controls stay above the home indicator. */
+  :where(:root[data-phone=""]) .compactSurface {
+    padding-bottom: max(0.5rem, calc(env(safe-area-inset-bottom) - var(--studio-composer-gap)));
+  }
 }
 
 .dock[data-reference-drop] > .surface {
