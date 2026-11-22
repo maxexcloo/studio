@@ -22,6 +22,7 @@ export const viewerBadge = {
 export function ViewerChrome({
   item,
   label,
+  actions,
   close,
   closeLabel,
   details,
@@ -29,6 +30,7 @@ export function ViewerChrome({
 }: {
   item?: MediaItem;
   label?: ReactNode;
+  actions?: ReactNode;
   close: () => void;
   closeLabel: string;
   details?: { opened: boolean; phone: boolean; toggle: () => void };
@@ -64,6 +66,7 @@ export function ViewerChrome({
         {label}
       </Group>
       <Group gap={6} wrap="nowrap" className={classes.topActions}>
+        {actions}
         {details && (
           <Tooltip
             label={details.phone ? "Details" : details.opened ? "Hide Details" : "Show Details"}

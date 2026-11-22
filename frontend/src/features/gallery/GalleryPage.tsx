@@ -48,6 +48,7 @@ import {
   useSimilarStrictness,
 } from "./similarStrictness";
 import { useGallerySelection } from "./useGallerySelection";
+import { usePendingRating } from "./useMediaRating";
 import { useTryAgain } from "./useTryAgain";
 import {
   type GalleryState,
@@ -339,19 +340,27 @@ function Gallery() {
   const listed = itemId
     ? loaded.find((candidate) => viewerItemId(candidate) === itemId || candidate.id === itemId)
     : undefined;
+  const lastShown = useRef<MediaItem | null>(null);
+  const retained =
+    itemId &&
+    lastShown.current &&
+    (viewerItemId(lastShown.current) === itemId || lastShown.current.id === itemId)
+      ? lastShown.current
+      : null;
+  const pendingRating = usePendingRating(listed?.id ?? retained?.id);
+  // A dislike may remove the listing immediately. Until the write settles, keep the open item
+  // with its new rating rather than reading it back from the server before the write lands.
   const link = useQuery({
     ...viewerItemQuery(itemId),
-    enabled: Boolean(itemId && !listed && !gallery.isPending),
+    enabled: Boolean(itemId && !listed && !gallery.isPending && pendingRating === undefined),
   });
-  const lastShown = useRef<MediaItem | null>(null);
-  const selected =
-    listed ||
-    link.data?.item ||
-    (itemId && lastShown.current && viewerItemId(lastShown.current) === itemId
-      ? lastShown.current
-      : null);
-  const shown = selected && currentMedia(loaded, selected);
-  lastShown.current = selected;
+  const selected = listed || (pendingRating === undefined ? link.data?.item : retained) || retained;
+  const current = selected && currentMedia(loaded, selected);
+  const shown =
+    current && pendingRating !== undefined && pendingRating !== (current.rating ?? null)
+      ? { ...current, rating: pendingRating ?? undefined }
+      : current;
+  lastShown.current = shown;
   // The address names the shown item by its permanent number, in its own kind's gallery.
   const shownPath = shown && viewerPath(shown);
   useEffect(() => {

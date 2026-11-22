@@ -90,6 +90,7 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Combine all ten references");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await showReferenceStack(page);
   const cells = page.getByRole("group", { name: "Reference Slots", exact: true });
   await expect(cells.getByRole("button", { name: /^Slot / })).toHaveText(["1", "2", "3"]);
   const picker = await openReferenceChoices(page);

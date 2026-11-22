@@ -195,7 +195,9 @@ export const comparisonContext = (comparisons) =>
     ? `Studio comparisons: ${JSON.stringify(comparisons.map(({ id, link, winner }) => ({ id, link, winner })))}`
     : "";
 const feedbackContext = (outputs) =>
-  outputs.length ? `Recorded user feedback: ${JSON.stringify(outputs)}` : "";
+  outputs.length
+    ? `Recorded user feedback: ${JSON.stringify(outputs.map(({ caption, ...feedback }) => feedback))}`
+    : "";
 const mcpOwner = (key, user, token) =>
   crypto
     .createHmac("sha256", key)
@@ -614,6 +616,7 @@ export class McpMedia {
       // One generate call's result set ({ id, title, source }) and each prompt's own title, in order.
       result_set,
       titles = [],
+      captions = [],
       // With `write` ({ animate }), every job writes its motion prompt as its first stage (prompt-animate.js).
       write,
       loras = [],
@@ -790,6 +793,7 @@ export class McpMedia {
             // A later batch of the set (generate) continues its numbering.
             index: (result_set.first ?? 0) + position,
             ...(titles[position] ? { variation: titles[position] } : {}),
+            ...(captions[position] ? { caption: captions[position] } : {}),
           };
           try {
             // Persist the client id before dispatch, so a failed call cannot lose job ownership.
@@ -970,6 +974,7 @@ export class McpMedia {
           url: item.url,
           rating: item.rating || "unrated",
           galleryItemId: item.id,
+          caption: item.resultSet?.caption,
         });
         kind = item.type;
         profileId ||= item.settings?.profileId;
@@ -1365,18 +1370,19 @@ export class McpMedia {
     const number = this.numberOf(jobId, index);
     return number ? `#${number}` : undefined;
   }
-  outputFeedback(jobId, index, rating) {
+  outputFeedback(jobId, index, { rating, caption } = {}) {
     const number = this.numberOf(jobId, index);
     return {
       ref: (number ? `#${number}` : this.refOf(jobId)) || jobId,
       job_id: jobId,
       output_index: index,
       rating: rating || "unrated",
+      ...(caption ? { caption } : {}),
     };
   }
   feedback(jobId, job) {
     return (job.outputs || []).flatMap((item, index) =>
-      mcpOutputPath(item?.url) ? [this.outputFeedback(jobId, index, item.rating)] : [],
+      mcpOutputPath(item?.url) ? [this.outputFeedback(jobId, index, item)] : [],
     );
   }
   async job(owner, jobId, seconds = 0, { signal, credential, interval = 2000 } = {}) {
@@ -2063,7 +2069,10 @@ export class McpMedia {
       if (loras.length) settings.loras = loras.map(({ name, strength }) => ({ name, strength }));
       const recorded = this.promptRecord(jobId);
       records.push({
-        ...this.outputFeedback(jobId, index, item.rating),
+        ...this.outputFeedback(jobId, index, {
+          rating: item.rating,
+          caption: item.resultSet?.caption,
+        }),
         prompt: item.prompt,
         ...(item.negative ? { negative_prompt: item.negative } : {}),
         ...(recorded?.request && recorded.request !== item.prompt
@@ -2166,7 +2175,15 @@ export class McpMedia {
     const outputs = entries.flatMap(({ jobId, job, label, index: selected }) =>
       (job.outputs || []).flatMap((item, index) =>
         (selected === undefined || selected === index) && mcpOutputPath(item?.url)
-          ? [{ jobId, label, output_index: index, url: this.url(owner, jobId, index) }]
+          ? [
+              {
+                jobId,
+                label,
+                output_index: index,
+                url: this.url(owner, jobId, index),
+                caption: item.caption,
+              },
+            ]
           : [],
       ),
     );
@@ -2181,17 +2198,22 @@ export class McpMedia {
       .split(/\s*·\s*/)[0]
       .trim();
     const header = (caption) => [`**${caption}**`, name].filter(Boolean).join(" · ");
+    const captions = (values) =>
+      [...new Set(values.filter(Boolean))]
+        .map((caption) => `\n\n${caption.replace(/[!-/:-@[-`{-~]/g, "\\$&")}`)
+        .join("");
     if (job.kind === "video")
       return {
         outputs,
         markdown: outputs
-          .map(({ label, url }, position) =>
-            [
-              header(
-                outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label,
-              ),
-              `[View Video](${url})`,
-            ].join(" · "),
+          .map(
+            ({ label, url, caption }, position) =>
+              [
+                header(
+                  outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label,
+                ),
+                `[View Video](${url})`,
+              ].join(" · ") + captions([caption]),
           )
           .join("\n\n"),
       };
@@ -2200,8 +2222,8 @@ export class McpMedia {
         outputs,
         markdown: outputs
           .map(
-            ({ jobId, label, output_index, url }) =>
-              `${header(label)}\n[![${label}](${this.previewUrl(owner, jobId, output_index)})](${url})`,
+            ({ jobId, label, output_index, url, caption }) =>
+              `${header(label)}\n[![${label}](${this.previewUrl(owner, jobId, output_index)})](${url})${captions([caption])}`,
           )
           .join(""),
       };
@@ -2215,7 +2237,7 @@ export class McpMedia {
     );
     return {
       outputs,
-      markdown: `${header(caption)}\n[![${caption}](${sheet})](${this.allUrl(owner, scope)})`,
+      markdown: `${header(caption)}\n[![${caption}](${sheet})](${this.allUrl(owner, scope)})${captions(outputs.map(({ caption }) => caption))}`,
     };
   }
   /** A conversation's most recent results by number, each with its job status; unreadable jobs are skipped. */

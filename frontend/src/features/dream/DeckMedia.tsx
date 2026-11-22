@@ -1,7 +1,10 @@
+import { ActionIcon, Tooltip } from "@mantine/core";
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { MediaItem } from "../../types";
+import { icons } from "../../ui/icons";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
+import { useVideoSound } from "../gallery/useVideoSound";
 import { videoLifecycle } from "../gallery/videoPlayback";
 import { covers, useBoxShape } from "./mediaFit";
 
@@ -64,16 +67,16 @@ export function DeckMedia({ item, playing = false }: { item: MediaItem; playing?
  * browsers to preload frames. Each waits for the last to end so they loop together. They pause while the
  * tab is hidden.
  */
-export function useInSync(
+export function useDreamPlayback(
   root: RefObject<HTMLElement | null>,
   playing: boolean,
-  previewSide: number | undefined,
-  audioSide: string | undefined,
-  muted: boolean,
+  itemId?: string,
+  audioSide?: string,
 ) {
+  const { muted, setMuted } = useVideoSound();
   const audibleVideo = useRef<HTMLVideoElement | undefined>(undefined);
   const [autoplayMuted, setAutoplayMuted] = useState(false);
-  const [retry, setRetry] = useState<{ side: number | undefined; play: () => void }>();
+  const [retry, setRetry] = useState<{ itemId?: string; play: () => void }>();
   useLayoutEffect(() => {
     if (!playing) return;
     const videos = [...(root.current?.querySelectorAll("video") ?? [])];
@@ -86,7 +89,7 @@ export function useInSync(
     for (const video of videos) if (video !== audible) video.muted = true;
     audibleVideo.current = audible;
     if (audible) audible.muted = muted || autoplayMuted;
-  }, [root, playing, previewSide, audioSide, muted, autoplayMuted]);
+  }, [root, playing, itemId, audioSide, muted, autoplayMuted]);
   useEffect(() => {
     const videos = [...(root.current?.querySelectorAll("video") ?? [])];
     setRetry(undefined);
@@ -101,7 +104,7 @@ export function useInSync(
     function showPlay() {
       blocked = true;
       for (const video of videos) video.pause();
-      setRetry({ side: previewSide, play: () => start(playable(), !started) });
+      setRetry({ itemId, play: () => start(playable(), !started) });
     }
     function start(active: HTMLVideoElement[], restart: boolean) {
       if (document.hidden || starting || !active.length) return;
@@ -196,13 +199,27 @@ export function useInSync(
         video.pause();
       }
     };
-  }, [root, playing, previewSide]);
+  }, [root, playing, itemId]);
+  const silent = muted || autoplayMuted;
+  const label = silent ? "Unmute" : "Mute";
   return {
-    play: playing && retry?.side === previewSide ? retry?.play : undefined,
-    autoplayMuted,
-    restoreSound() {
-      if (audibleVideo.current) audibleVideo.current.muted = false;
-      setAutoplayMuted(false);
-    },
+    play: playing && retry?.itemId === itemId ? retry?.play : undefined,
+    sound: playing && (
+      <Tooltip label={label}>
+        <ActionIcon
+          variant="default"
+          aria-label={label}
+          onClick={() => {
+            if (autoplayMuted) {
+              if (audibleVideo.current) audibleVideo.current.muted = false;
+              setAutoplayMuted(false);
+            }
+            setMuted(!silent);
+          }}
+        >
+          {silent ? <icons.mute size={16} /> : <icons.sound size={16} />}
+        </ActionIcon>
+      </Tooltip>
+    ),
   };
 }

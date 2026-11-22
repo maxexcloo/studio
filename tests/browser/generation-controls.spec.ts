@@ -18,6 +18,8 @@ import {
   renamePreset,
   saveCurrent,
   serveProfiles,
+  showLoraStack,
+  showReferenceStack,
   showUploads,
   stamp,
   withSettings,
@@ -313,6 +315,7 @@ test("A saved End-only preset restores its explicit slot without creating a Star
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Arrive at the closing frame");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await showReferenceStack(page);
   await page.getByRole("button", { name: "Slot 2 · End", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Closing frame", exact: true }).click();
   await closeReferences(page);
@@ -367,6 +370,7 @@ test("LoRA presets keep their family, order, strengths and disabled entries thro
   );
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await showLoraStack(page);
   // Only this family's presets with LoRAs are listed.
   await page.getByRole("combobox", { name: "Preset Name", exact: true }).click();
   await expect(page.getByRole("option", { name: "Other Family", exact: true })).toHaveCount(0);
@@ -389,6 +393,7 @@ test("LoRA presets keep their family, order, strengths and disabled entries thro
   expect(state.presets[1].title).toBe("Other Family");
   await page.reload();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await showLoraStack(page);
   await page
     .getByRole("dialog", { name: "LoRAs", exact: true })
     .getByRole("button", { name: "Clear", exact: true })

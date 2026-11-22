@@ -59,6 +59,17 @@ import classes from "./Picker.module.css";
  * filters, selection and actions look and behave the same in both and on every breakpoint.
  */
 
+/** Start a phone picker on Add when opened with an empty stack. */
+export function usePickerChoices(opened: boolean, empty: boolean) {
+  const [wasOpened, setWasOpened] = useState(opened);
+  const [adding, setAdding] = useState(opened && empty);
+  if (opened !== wasOpened) {
+    setWasOpened(opened);
+    setAdding(opened && empty);
+  }
+  return [adding, setAdding] as const;
+}
+
 /**
  * A popup's or column's heading: its title and any `detail`, then a saved record's `name` (its
  * `SavedName`) filling the row, then any compact subtle `actions` at the end.

@@ -1,12 +1,11 @@
-import { ActionIcon, Group, Paper, SegmentedControl, Tooltip } from "@mantine/core";
+import { Group, Paper, SegmentedControl } from "@mantine/core";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import { easing } from "../../theme";
 import { useMotionDuration } from "../../ui/Appearance";
-import { icons } from "../../ui/icons";
-import { useVideoSound } from "../gallery/useVideoSound";
+import { letter } from "../compare/inputs";
 import { VideoPlayButton } from "../gallery/VideoPlayButton";
-import { useInSync } from "./DeckMedia";
+import { useDreamPlayback } from "./DeckMedia";
 
 import classes from "./DreamPage.module.css";
 
@@ -18,7 +17,7 @@ const clamp = (value: number) => Math.max(0, Math.min(1, value));
 // A flick this fast (px/ms) decides even below the distance threshold.
 const flick = 0.6;
 // A press that moves less than this is a tap.
-export const tapDistance = 6;
+const tapDistance = 6;
 // A still press this long (ms) is a hold.
 const holdTime = 500;
 
@@ -27,18 +26,16 @@ const holdTime = 500;
  * out past a third of its width in a direction `hints` names (the word showing while dragging that way); below that it
  * springs back. A tap calls `onTap` with the element pressed, and a hold or a second finger (a
  * pinch) calls `onHold` with it; its release does nothing more. Presses on controls, scrolling
- * text (`data-scrolls`) or zoomed media (`data-zoomed`) stay theirs, and a `still` card never
- * follows. Buttons and keys fly it out the same way through `fly`. Motion follows the shared
+ * text (`data-scrolls`) stay theirs. In fullscreen the viewer handles the gestures.
+ * Buttons and keys fly it out the same way through `fly`. Motion follows the shared
  * animation-speed token; with Off or reduced motion it decides without animating.
  */
 export function SwipeCard({
   children,
   depth,
   paused = false,
-  previewSide,
   video,
   view,
-  still = false,
   full = false,
   fly,
   onSwipe,
@@ -46,26 +43,23 @@ export function SwipeCard({
   onHold,
   label,
   hints,
-  pair,
+  comparisonSize,
 }: {
   children: ReactNode;
   /** 0 for the top card, 1 for the one waiting beneath it. */
   depth: number;
   paused?: boolean;
-  previewSide?: number;
   video?: boolean;
   view?: ReactNode;
-  still?: boolean;
   /** Edge to edge, filling the preview. */
   full?: boolean;
   fly?: RefObject<Fly | null>;
-  onSwipe?: (direction: Direction, target: HTMLElement) => void;
-  onTap?: (target: HTMLElement, x: number, y: number) => void;
+  onSwipe?: (direction: Direction) => boolean;
+  onTap?: (target: HTMLElement) => void;
   onHold?: (target: HTMLElement) => void;
   label: string;
   hints: Partial<Record<Direction, string>>;
-  /** Two images side by side, each answering for one side. */
-  pair?: boolean;
+  comparisonSize?: number;
 }) {
   const card = useRef<HTMLDivElement>(null);
   const duration = useMotionDuration();
@@ -85,18 +79,14 @@ export function SwipeCard({
   const holding = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(holding.current), []);
   const [audioSide, setAudioSide] = useState("0");
-  const { muted, setMuted } = useVideoSound();
   const playing = Boolean(video && !depth && !paused);
-  const chooseAudio = playing && pair && !full;
-  const { play, autoplayMuted, restoreSound } = useInSync(
+  const audioOptions = playing ? comparisonSize : undefined;
+  const { play, sound } = useDreamPlayback(
     card,
     playing,
-    previewSide,
-    chooseAudio ? audioSide : undefined,
-    muted,
+    undefined,
+    audioOptions ? audioSide : undefined,
   );
-  const silent = muted || autoplayMuted;
-  const soundLabel = silent ? "Unmute" : "Mute";
   /** Ends the press as a hold: the card settles and the release opens nothing. */
   function hold() {
     clearTimeout(holding.current);
@@ -178,7 +168,7 @@ export function SwipeCard({
       radius={full ? 0 : "lg"}
       className={classes.card}
       data-depth={depth}
-      data-pair={pair || undefined}
+      data-pair={Boolean(comparisonSize) || undefined}
       data-full={full || undefined}
       role="group"
       aria-roledescription="card"
@@ -186,7 +176,7 @@ export function SwipeCard({
       aria-hidden={depth ? true : undefined}
       inert={depth ? true : undefined}
       onPointerDown={(event) => {
-        if (depth || still || leaving.current || event.button !== 0) return;
+        if (depth || full || leaving.current || event.button !== 0) return;
         if (drag.current && drag.current.id !== event.pointerId) return hold();
         dragged.current = false;
         const pressed = event.target as HTMLElement;
@@ -237,11 +227,11 @@ export function SwipeCard({
         const current = drag.current;
         if (!current || current.id !== event.pointerId) return;
         clearTimeout(holding.current);
-        const { x, y, dx, dy, vx, vy, target } = current;
+        const { dx, dy, vx, vy, target } = current;
         if (Math.abs(dx) < tapDistance && Math.abs(dy) < tapDistance) {
           drag.current = null;
           settle();
-          return onTap?.(target, x, y);
+          return onTap?.(target);
         }
         dragged.current = true;
         const threshold = event.currentTarget.offsetWidth / 3;
@@ -253,7 +243,9 @@ export function SwipeCard({
           drag.current = null;
           return settle();
         }
-        void out(direction).then(() => onSwipe?.(direction, target));
+        const leaving = onSwipe?.(direction);
+        drag.current = null;
+        if (!leaving) settle();
       }}
       onPointerCancel={() => {
         clearTimeout(holding.current);
@@ -278,32 +270,19 @@ export function SwipeCard({
           onPointerDown={(event) => event.stopPropagation()}
         >
           {view}
-          {chooseAudio && (
+          {audioOptions && (
             <SegmentedControl
               aria-label="Comparison Audio"
               size="xs"
               value={audioSide}
               onChange={setAudioSide}
-              data={[
-                { label: "Audio A", value: "0" },
-                { label: "Audio B", value: "1" },
-              ]}
+              data={Array.from({ length: audioOptions }, (_, index) => ({
+                label: `Audio ${letter(index)}`,
+                value: String(index),
+              }))}
             />
           )}
-          {playing && (
-            <Tooltip label={soundLabel}>
-              <ActionIcon
-                variant="default"
-                aria-label={soundLabel}
-                onClick={() => {
-                  if (autoplayMuted) restoreSound();
-                  setMuted(!silent);
-                }}
-              >
-                {silent ? <icons.mute size={16} /> : <icons.sound size={16} />}
-              </ActionIcon>
-            </Tooltip>
-          )}
+          {sound}
         </Group>
       )}
       {play && <VideoPlayButton play={play} />}

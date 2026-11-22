@@ -54,6 +54,9 @@ test("Reference slots fill by tap, targeted drop and paste, and pasted files lis
 }) => {
   const state = await setup(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  if (isMobile)
+    await expect(page.getByRole("dialog", { name: "Add References", exact: true })).toBeVisible();
+  await showReferenceStack(page);
   const slots = page.getByRole("group", { name: "Reference Slots", exact: true });
   for (const name of ["Slot 1 · Start · Required", "Slot 2 · Style", "Slot 3 · End"])
     await expect(slots.getByRole("button", { name, exact: true })).toBeVisible();
@@ -224,6 +227,7 @@ test("Reference slots preserve optional End-only inputs and reuse one asset in t
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("End-only study");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await showReferenceStack(page);
   await page.getByRole("button", { name: "Slot 2 · End", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Slot Source", exact: true }).click();
   await closeReferences(page);
@@ -559,6 +563,7 @@ test("A failed gallery pick keeps the chosen phone reference slot for retry", as
   test.skip(!isMobile, "Phone reference sheet");
   await setup(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await showReferenceStack(page);
   await page.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
   const choices = page.getByRole("dialog", { name: "Add References", exact: true });
   const alpha = choices.getByRole("button", { name: "Use reference: Alpha", exact: true });

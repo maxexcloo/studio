@@ -120,7 +120,7 @@ export function GenerationForm({
   });
   const single = useDraftSubmit({ onSubmitted });
   const submit = draft.compare ? compareRun : single;
-  const submitLabel = draft.compare ? `Compare ${comparison.variants.length}` : undefined;
+  const submitLabel = draft.compare ? "Compare" : undefined;
   const submitState = useSubmitState({
     input,
     profile,
@@ -256,7 +256,7 @@ export function GenerationForm({
         />
       }
       compare={<CompareMenu />}
-      variants={draft.compare && <VariantStrip />}
+      variants={!phone && draft.compare && <VariantStrip />}
       autoFocusPrompt={autoFocusPrompt}
       focusPrompt={focusPrompt}
       fill={fill}

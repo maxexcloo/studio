@@ -14,6 +14,7 @@ import {
   maxCardName,
   maxCharacterImages,
 } from "../../shared/characters.ts";
+import { dreamPairAnswers } from "../../shared/dream.ts";
 import { terminalStatuses } from "../../shared/queue.ts";
 import { shapeName } from "../../shared/taste.ts";
 import { mcpJson, outputIndex } from "./media.js";
@@ -239,20 +240,29 @@ export function registerManageTools({
       ? { prompt: short(item.prompt || item.dream.prompt) }
       : {}),
     ...(item.dream?.pair
-      ? { pair_id: item.dream.pair.id, side: item.dream.pair.side, label: item.dream.pair.label }
+      ? {
+          pair_id: item.dream.pair.id,
+          side: item.dream.pair.side,
+          label: item.dream.pair.label,
+          ...(item.dream.pair.size && { pair_size: item.dream.pair.size }),
+        }
       : {}),
     ...(item.jobId ? { link: media.url(owner, item.jobId, item.index || 0) } : {}),
   });
   const dreamItems = (items) => {
-    media.noteNumbers(items);
-    const named = handles([...new Set(items.map((item) => item.jobId))]);
-    return items.slice(0, maxListed).map((item) => dreamItem(item, named));
+    const pairs = new Set(items.slice(0, maxListed).flatMap((item) => item.dream?.pair?.id ?? []));
+    const shown = items.filter(
+      (item, index) => index < maxListed || pairs.has(item.dream?.pair?.id),
+    );
+    media.noteNumbers(shown);
+    const named = handles([...new Set(shown.map((item) => item.jobId))]);
+    return shown.map((item) => dreamItem(item, named));
   };
   tool(
     server,
     "dream",
     "dream",
-    "The user's Dream (background images from their taste), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer to it) or variations (count new seeds) take item_id; answer takes pair_id and answer. settings sets enabled, paused, images, videos, spicy, dailyImages, dailyVideos, except those an administrator locked. discarded lists discards.",
+    "The user's Dream (background images from their taste), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer to it) or variations (count new seeds) take item_id. answer takes pair_id and an answer: a, b or c (side 0, 1 or 2); both keeps all sides, neither discards them. settings sets enabled, paused, images, videos, spicy, dailyImages, dailyVideos, except those an administrator locked. discarded lists discards.",
     {
       action: z.enum([
         "status",
@@ -266,7 +276,7 @@ export function registerManageTools({
       ]),
       item_id: z.string().trim().min(1).max(400).optional(),
       pair_id: z.string().trim().min(1).max(200).optional(),
-      answer: z.enum(["a", "b", "both", "neither"]).optional(),
+      answer: z.enum(dreamPairAnswers).optional(),
       count: z.number().int().min(1).max(8).default(4),
       // Dream's settings route checks each name and range.
       settings: z.record(z.string(), z.union([z.boolean(), z.number()])).optional(),
@@ -295,7 +305,7 @@ export function registerManageTools({
       }
       if (action === "answer") {
         if (!pair_id || !answer)
-          throw new Error("Pass pair_id and answer (a, b, both or neither).");
+          throw new Error("Pass pair_id and answer (a, b, c, both or neither).");
         const { items = [] } = await api(
           "POST",
           `/api/dream/pairs/${encodeURIComponent(pair_id)}/answer`,

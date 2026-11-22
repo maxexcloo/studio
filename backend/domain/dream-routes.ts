@@ -1,6 +1,8 @@
 import {
   dreamCardCounts,
   dreamDefaults,
+  dreamPairAnswers,
+  dreamPassReasons,
   dreamSeriesLength,
   dreamSettingError,
 } from "../../shared/dream.ts";
@@ -267,11 +269,30 @@ export function registerDreamRoutes(
     status: 200,
     payload: { deleted: dream.deleteDiscards(owner(account)) },
   }));
+  route("POST", "/api/dream/pass", (account, { body }) => {
+    const { ids, reason } = body || {};
+    if (
+      !Array.isArray(ids) ||
+      ids.length < 1 ||
+      ids.length > 3 ||
+      ids.some((id) => typeof id !== "string" || !id) ||
+      new Set(ids).size !== ids.length ||
+      !dreamPassReasons.includes(reason)
+    )
+      return { status: 400, payload: { ok: false, error: "Choose a Pass reason." } };
+    return answer(() => {
+      dream.pass(owner(account), ids, reason);
+      return { ok: true };
+    });
+  });
   route("POST", "/api/dream/pairs/:pairId/answer", (account, { params, body }) => {
     const { answer, like } = body || {};
-    if (!["a", "b", "both", "neither"].includes(answer as string))
-      return { status: 400, payload: { ok: false, error: "Answer A, B, Both or Neither." } };
-    if (like !== undefined && (typeof like !== "boolean" || (like && !["a", "b"].includes(answer))))
+    if (!dreamPairAnswers.includes(answer as PairAnswer))
+      return { status: 400, payload: { ok: false, error: "Choose a side, all sides or none." } };
+    if (
+      like !== undefined &&
+      (typeof like !== "boolean" || (like && (answer === "both" || answer === "neither")))
+    )
       return { status: 400, payload: { ok: false, error: "Choose one side to like." } };
     try {
       return {
@@ -283,18 +304,24 @@ export function registerDreamRoutes(
     }
   });
   route("POST", "/api/dream/sets/:setId/answer", (account, { body, params }) => {
-    const { ids, verdict } = body || {};
+    const { ids, verdict, likedId, overrides } = body || {};
     if (
       !Array.isArray(ids) ||
       ids.length < 2 ||
       ids.length > dreamSeriesLength ||
       ids.some((id) => typeof id !== "string") ||
       new Set(ids).size !== ids.length ||
-      (verdict !== "keep" && verdict !== "discard" && verdict !== "like")
+      (verdict !== "keep" && verdict !== "discard" && verdict !== "like") ||
+      (likedId !== undefined && (verdict !== "like" || typeof likedId !== "string" || !likedId)) ||
+      (overrides !== undefined &&
+        (!overrides ||
+          typeof overrides !== "object" ||
+          Array.isArray(overrides) ||
+          Object.values(overrides).some((choice) => choice !== "like" && choice !== "discard")))
     )
       return { status: 400, payload: { ok: false, error: "Choose a verdict for the set." } };
     return answer(() => {
-      dream.answerSet(owner(account), params.setId, ids, verdict);
+      dream.answerSet(owner(account), params.setId, ids, verdict, likedId, overrides);
       return { ok: true };
     });
   });
@@ -303,7 +330,7 @@ export function registerDreamRoutes(
     if (
       !Array.isArray(ids) ||
       !ids.length ||
-      ids.length > (setId ? dreamSeriesLength : 2) ||
+      ids.length > (setId ? dreamSeriesLength : 3) ||
       ids.some((id) => typeof id !== "string") ||
       (setId !== undefined &&
         (typeof setId !== "string" || !setId || calibration || rating !== undefined)) ||

@@ -80,16 +80,13 @@
 .caption {
   position: absolute;
   inset: auto 0 0;
-  padding: 2rem var(--mantine-spacing-sm) var(--mantine-spacing-sm);
+  padding: 2rem calc(var(--mantine-spacing-sm) + 22px) var(--mantine-spacing-sm)
+    var(--mantine-spacing-sm);
   background: linear-gradient(transparent, rgb(0 0 0 / 0.75));
   color: white;
   text-align: left;
   opacity: 0;
   transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-.caption[data-rated] {
-  padding-right: calc(var(--mantine-spacing-sm) + 22px);
 }
 
 /* A rated tile's Like or Dislike: a small mark at the right of the caption's last line. */

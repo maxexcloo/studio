@@ -9,22 +9,11 @@ import {
   getDefaultZIndex,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import {
-  type PointerEvent,
-  Suspense,
-  lazy,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
 import { ActionBarSurface, type ActionGroups, findAction, usualAction } from "../../ui/ActionBar";
-import { useMotionDuration } from "../../ui/Appearance";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closingPopup, layerAbove } from "../../ui/popupClicks";
@@ -38,7 +27,7 @@ import { mediaSource, playbackUrl } from "./mediaSource";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, type QueuedRun, useRunFamily } from "./MediaViewerDock";
 import { setMembers, setPosition } from "./resultSets";
-import { type SwipeDirection, type SwipeGesture, dragAxis, swipeDirection } from "./swipe";
+import type { SwipeDirection } from "./swipe";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { useMediaRating } from "./useMediaRating";
 import { useVideoSound } from "./useVideoSound";
@@ -46,6 +35,7 @@ import { playVideo } from "./videoPlayback";
 import { VideoPlayButton } from "./VideoPlayButton";
 import { ViewerChrome } from "./ViewerChrome";
 import { ViewerDetails } from "./ViewerDetails";
+import { Neighbour, useStrip, useTouchSwipe } from "./ViewerMediaStrip";
 
 import classes from "./MediaViewer.module.css";
 const MediaComparison = lazy(() =>
@@ -177,155 +167,6 @@ function ViewerVideo({
 }
 
 /**
- * Touch swipes over media that has no zoom of its own: running work and videos. Lifting reports
- * whether the touch was a tap: short, and barely moving.
- */
-function useTouchSwipe(swipe: SwipeGesture) {
-  const start = useRef<{
-    id: number;
-    at: number;
-    x: number;
-    y: number;
-    drag?: "x" | "y";
-  } | null>(null);
-  return {
-    onPointerDown(event: PointerEvent) {
-      start.current =
-        event.pointerType === "touch"
-          ? { id: event.pointerId, at: event.timeStamp, x: event.clientX, y: event.clientY }
-          : null;
-    },
-    onPointerMove(event: PointerEvent) {
-      const from = start.current;
-      if (from?.id !== event.pointerId) return;
-      const dx = event.clientX - from.x;
-      const dy = event.clientY - from.y;
-      from.drag ??= dragAxis(dx, dy);
-      if (from.drag) swipe.move(from.drag === "x" ? dx : 0, from.drag === "y" ? dy : 0);
-    },
-    onPointerUp(event: PointerEvent) {
-      const from = start.current;
-      start.current = null;
-      if (from?.id !== event.pointerId) return false;
-      const dx = event.clientX - from.x;
-      const dy = event.clientY - from.y;
-      const direction = swipeDirection(dx, dy);
-      if (direction || from.drag) swipe.release(direction);
-      return !direction && Math.hypot(dx, dy) < 10 && event.timeStamp - from.at < 500;
-    },
-    onPointerCancel(event: PointerEvent) {
-      if (start.current?.id !== event.pointerId) return;
-      if (start.current.drag) swipe.release();
-      start.current = null;
-    },
-  };
-}
-
-/**
- * The strip the current media sits in between its neighbours, which follows a dragging finger a
- * frame at a time without rendering. Lifting settles it onto the neighbour it was pulled towards,
- * then `swipe` moves there (true when it did); past the first or last item it resists and slides
- * back. A drag down shrinks the media towards closing, and stays as the viewer closes.
- */
-function useStrip(
-  ends: { previous: boolean; next: boolean },
-  swipe: (direction: SwipeDirection) => boolean,
-) {
-  const ref = useRef<HTMLDivElement>(null);
-  const motion = useMotionDuration();
-  const latest = useRef({ ends, swipe, motion });
-  latest.current = { ends, swipe, motion };
-  const frame = useRef(0);
-  const settling = useRef(false);
-  const landed = useRef(false);
-  const place = (transform: string, animate: boolean) => {
-    const node = ref.current;
-    if (!node) return;
-    node.style.transition = animate ? "" : "none";
-    node.style.transform = transform;
-  };
-  const gesture = useMemo<SwipeGesture>(
-    () => ({
-      move(dx, dy) {
-        if (settling.current) return;
-        cancelAnimationFrame(frame.current);
-        frame.current = requestAnimationFrame(() => {
-          const { ends } = latest.current;
-          const x = (dx < 0 ? ends.next : ends.previous) ? dx : dx / 3;
-          place(
-            dy
-              ? `translateY(${dy > 0 ? dy : dy / 3}px) scale(${1 - Math.min(Math.max(0, dy), 400) / 2000})`
-              : `translateX(${x}px)`,
-            false,
-          );
-        });
-      },
-      release(direction) {
-        cancelAnimationFrame(frame.current);
-        if (settling.current) return;
-        const { ends, swipe, motion } = latest.current;
-        const side =
-          (direction === "left" && ends.next && "next") ||
-          (direction === "right" && ends.previous && "previous");
-        const node = ref.current;
-        if (side && node) {
-          settling.current = true;
-          let timer = 0;
-          const settled = (event?: TransitionEvent) => {
-            if (event && event.target !== node) return;
-            node.removeEventListener("transitionend", settled);
-            clearTimeout(timer);
-            settling.current = false;
-            landed.current = swipe(direction!);
-            if (!landed.current) place("", true);
-          };
-          node.addEventListener("transitionend", settled);
-          // Reduced motion, or a transform that hardly moves, may end without the event.
-          timer = window.setTimeout(settled, motion + 100);
-          place(
-            `translateX(calc(${side === "next" ? "-100% - " : "100% + "}var(--mantine-spacing-md)))`,
-            true,
-          );
-          return;
-        }
-        if (direction === "down") swipe(direction);
-        else {
-          place("", true);
-          if (direction === "up") swipe(direction);
-        }
-      },
-    }),
-    [],
-  );
-  useEffect(() => () => cancelAnimationFrame(frame.current), []);
-  /** Once the neighbour it settled on is the current item, the strip returns to centre unseen. */
-  const arrived = () => {
-    if (!landed.current) return;
-    landed.current = false;
-    place("", false);
-  };
-  return { ref, gesture, arrived, settling };
-}
-
-/** A neighbour waiting beside the current media: its display copy, or a video's still. */
-function Neighbour({ item, side }: { item?: MediaItem; side: "previous" | "next" }) {
-  if (!item?.url) return null;
-  const source = mediaSource(item);
-  return (
-    <div className={classes.neighbour} data-side={side} aria-hidden>
-      <img
-        src={item.type === "video" ? source.thumbnailUrl : source.displayUrl}
-        alt=""
-        decoding="async"
-        draggable={false}
-        width={source.width}
-        height={source.height}
-      />
-    </div>
-  );
-}
-
-/**
  * Decodes the display copies (a video's still) two either side of the current one, so navigation
  * lands on a picture.
  */
@@ -349,6 +190,7 @@ function useNeighbourPrefetch(items: MediaItem[], index: number) {
       if (!image) {
         image = new window.Image();
         image.decoding = "async";
+        image.fetchPriority = "low";
         image.src = url;
         void image.decode().catch(() => {});
       }
@@ -414,6 +256,7 @@ export function MediaViewer({
   const [previewDetails, setPreviewDetails] = useState(false);
   const [sheet, setSheet] = useState(false);
   const detailsOpen = phone ? sheet : bare ? previewDetails : details;
+  const hideActions = phone && sheet;
   // A touch tap on the media hides the chrome around it, as Photos does, until the viewer closes.
   const [chromeHidden, setChromeHidden] = useState(false);
   const toggleChrome = () => {
@@ -557,9 +400,9 @@ export function MediaViewer({
     />
   );
   const toggleDetails = () => {
+    if (phone) return setSheet(true);
     setChromeHidden(false);
-    if (phone) setSheet(true);
-    else if (bare) setPreviewDetails((open) => !open);
+    if (bare) setPreviewDetails((open) => !open);
     else setDetails((open) => !open);
   };
   // Escape brings hidden chrome back before it closes the viewer.
@@ -573,8 +416,7 @@ export function MediaViewer({
     });
     if (direction === "down") close();
     else if (direction === "up") {
-      setSheet(phone);
-      if (phone) setChromeHidden(false);
+      if (phone) setSheet(true);
     } else return Boolean(move(direction === "left" ? 1 : -1));
     return false;
   }
@@ -685,7 +527,7 @@ export function MediaViewer({
             item.url
           ) {
             event.preventDefault();
-            if (!rating.isPending && !event.repeat) rating.like();
+            if (!event.repeat) rating.like();
           } else if (!actions && !bare && event.key === "Delete") {
             event.preventDefault();
             setDeleting(true);
@@ -877,7 +719,8 @@ export function MediaViewer({
                       aria-label={actions.label}
                       radius="lg"
                       className={classes.actions}
-                      display={phone && sheet ? "none" : undefined}
+                      data-actions-hidden={hideActions || undefined}
+                      inert={hideActions}
                       onClick={(event) => event.stopPropagation()}
                     >
                       <ViewerActionGroups
@@ -915,7 +758,7 @@ export function MediaViewer({
                         if (shownId.current === id) setVersion({ id, active });
                       }}
                       shortcuts={shortcutActions}
-                      hidden={phone && sheet}
+                      hidden={hideActions}
                       onApplied={() => {
                         restoreFocus.current = false;
                         close();

@@ -603,10 +603,14 @@ export async function fixtures(page: Page) {
     }
     if (comparison && method === "GET") return respond(showComparison(comparison));
     if (path === "/api/gallery/favorite" && method === "POST") {
-      gallery
-        .filter((item) => body.ids.includes(item.id))
-        .forEach((item) => (item.rating = body.rating ?? undefined));
-      return respond({ ok: true });
+      const items = gallery
+        .filter((item) => body.ids.includes(item.id) && (item.rating ?? null) !== body.rating)
+        .map((item) => {
+          const was = item.rating ?? null;
+          item.rating = body.rating ?? undefined;
+          return { ...item, was };
+        });
+      return respond({ ok: true, items });
     }
     if (path === "/api/gallery/delete" && method === "POST") {
       const removed = body.ids.filter((id: string) => gallery.some((item) => item.id === id));
@@ -1200,8 +1204,11 @@ export async function openReferenceChoices(page: Page) {
   if (!(await expanded("Choose References")))
     await page.getByRole("button", { name: "Choose References", exact: true }).click();
   const phone = await page.evaluate(() => "phone" in document.documentElement.dataset);
-  if (phone && !(await expanded("Add References")))
-    await page.getByRole("button", { name: "Add References", exact: true }).click();
+  if (phone) {
+    const add = page.getByRole("button", { name: "Add References", exact: true });
+    await expect(add).toBeAttached();
+    if ((await add.getAttribute("aria-expanded")) === "false") await add.click();
+  }
   const choices = page.getByRole("region", { name: "Reference Choices", exact: true });
   await expect(choices).toBeVisible();
   return choices;
@@ -1309,8 +1316,11 @@ export async function pickerTab(page: Page, picker: string, tab: string) {
 /** Opens the LoRA choices: the popup on desktop, or Add LoRAs over the stack on phones. */
 export async function openLoraChoices(page: Page) {
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  if (await page.evaluate(() => "phone" in document.documentElement.dataset))
-    await page.getByRole("button", { name: "Add LoRAs", exact: true }).click();
+  if (await page.evaluate(() => "phone" in document.documentElement.dataset)) {
+    const add = page.getByRole("button", { name: "Add LoRAs", exact: true });
+    await expect(add).toBeAttached();
+    if ((await add.getAttribute("aria-expanded")) === "false") await add.click();
+  }
   await expect(page.getByRole("textbox", { name: "Search LoRAs", exact: true })).toBeVisible();
 }
 
@@ -1629,7 +1639,30 @@ export async function serveDream(
       }
       return route.fulfill({ json: { project } });
     }
+    if (path === "/api/dream/pass") {
+      const passed = state.unseen.filter((item) => body.ids.includes(item.id));
+      for (const item of passed) {
+        item.dream = { ...item.dream, state: "discarded" };
+        item.rating = body.reason === "taste" ? "disliked" : undefined;
+      }
+      state.discarded.unshift(...passed);
+      state.unseen = state.unseen.filter((item) => !body.ids.includes(item.id));
+      return route.fulfill({ json: { ok: true } });
+    }
     if (/^\/api\/dream\/sets\/[^/]+\/answer$/.test(path)) {
+      const liked = body.verdict === "like" ? (body.likedId ?? body.ids[0]) : undefined;
+      for (const item of state.unseen) {
+        if (!body.ids.includes(item.id)) continue;
+        const override = body.overrides?.[item.id];
+        const discarded = (override ?? body.verdict) === "discard";
+        item.dream = { ...item.dream, state: discarded ? "discarded" : "kept" };
+        item.rating = discarded
+          ? "disliked"
+          : override === "like" || item.id === liked
+            ? "liked"
+            : undefined;
+        if (discarded) state.discarded.unshift(item);
+      }
       state.unseen = state.unseen.filter((item) => !body.ids.includes(item.id));
       return route.fulfill({ json: { ok: true } });
     }
@@ -1640,7 +1673,7 @@ export async function serveDream(
         const winner = state.unseen.find(
           (item) =>
             item.dream?.pair?.id === pairId &&
-            item.dream.pair.side === (body.answer === "b" ? 1 : 0),
+            item.dream.pair.side === ["a", "b", "c"].indexOf(body.answer),
         );
         if (winner) winner.rating = "liked";
       }

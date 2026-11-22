@@ -2,8 +2,10 @@ import { randomInt, randomUUID } from "node:crypto";
 
 import { type CardKind, type Character, suggestedCards } from "../../shared/characters.ts";
 import {
+  type DreamPassReason,
   type DreamResultSet,
   type DreamSettings,
+  type PairAnswer,
   dreamDefaults,
   dreamSeriesLength,
   dreamSet,
@@ -18,6 +20,7 @@ import {
 } from "../../shared/queue.ts";
 import type { DreamActivity } from "../../shared/taste.ts";
 import { replyTitle, titleRule } from "../../shared/titles.ts";
+import { dreamVideoSlot } from "../animate-profile.js";
 import { logger } from "../crash-log.js";
 import { tracked } from "../event-loop.js";
 import {
@@ -82,12 +85,13 @@ interface DreamSeries {
   length: number;
 }
 /**
- * One side of a Dream comparison: two results alike but for one thing (with the same seed), shown
- * together and answered with A, B, Both or Neither to the question about what varies.
+ * One variant of a Dream comparison: results with the same seed, varying one setting.
  */
 interface DreamPair {
   id: string;
-  side: 0 | 1;
+  side: 0 | 1 | 2;
+  /** Stored for three-way comparisons. Without it, the comparison has two sides. */
+  size?: 3;
   question: string;
   /** What varies: profile, lora, strength, steps, cfg or wording. */
   axis: PairAxis;
@@ -97,7 +101,7 @@ interface DreamPair {
   value: string | number;
 }
 type PairAxis = "profile" | "lora" | "strength" | "steps" | "cfg" | "wording";
-export type PairAnswer = "a" | "b" | "both" | "neither";
+export type { PairAnswer } from "../../shared/dream.ts";
 type DreamState = "unseen" | "kept" | "discarded" | "draft";
 /** Every Dream result's state: the whole pool. */
 const poolStates: DreamState[] = ["unseen", "kept", "discarded"];
@@ -136,6 +140,7 @@ type Rating = "liked" | "disliked" | null;
 interface DreamMark extends Omit<DreamOrigin, "state"> {
   state: DreamState;
   decidedAt?: string;
+  passReason?: DreamPassReason;
   comparison?: { delta: number; previousRating: Rating; liked?: true };
 }
 export type DreamItem = QueueMedia & {
@@ -344,6 +349,7 @@ const seriesShare = 2;
 const extendShare = 35;
 /** Percent of animated stills drawn from the account's likes first, the rest from Dream's keeps. */
 const likedStillShare = 70;
+const videoExploreDraw = 3;
 /**
  * Most ideas create new concepts, even when they try another profile or LoRA. A smaller share
  * continues liked work; explicit More Like This, comparisons and series keep their own rules.
@@ -425,8 +431,8 @@ const diversity = { results: 20, floor: 0.2, alike: 0.9 };
 const motifWindow = 12;
 const motifFrequency = 2;
 /**
- * Every comparison's answer rates its two images by Elo: each starts at `start` and the winner takes
- * up to `k` from the loser, Both and Neither drawing them together. A draw of seeds also takes up to
+ * A comparison's answer rates its images by Elo: each starts at `start` and a winner takes
+ * up to `k` from the other sides, Both and Neither drawing them together. A draw of seeds also takes up to
  * `winners` images rated above the start, and prefers the better rated by `weight` of likeness.
  */
 const elo = { start: 1500, k: 32, winners: 3, weight: 1000 };
@@ -455,6 +461,7 @@ const judgedLimit = 2000;
 const pairEvery = 4;
 const pairEveryJudged = 6;
 const pairJudgedAt = 30;
+const tripleEvery = 4;
 /** How often each kind of comparison is drawn, where the base offers it, in percent. */
 const pairWeights: Record<PairAxis, number> = {
   cfg: 2,
@@ -757,7 +764,14 @@ export function createDream(options: {
   videoProfile(
     ownerId: string,
     account: GenerationAccount | undefined,
-    frame: { width: number; height: number; extend?: string; backend: "local" | "cloud" },
+    frame: {
+      width: number;
+      height: number;
+      extend?: string;
+      backend: "local" | "cloud";
+      unavailable: ReadonlySet<string>;
+      alternate?: (profiles: DreamProfile[], chosen: DreamProfile) => DreamProfile | undefined;
+    },
   ): Promise<{
     profile: DreamProfile;
     size?: { width: number; height: number };
@@ -861,24 +875,61 @@ export function createDream(options: {
     options.visibleGenerations(ownerId, generationQuery(query));
   const pool = (ownerId: string, state: DreamState) =>
     options.gallery(ownerId, { dreamState: state });
+  const admittingComparisons = new Set<string>();
+  const orderedSides = (items: DreamItem[]) =>
+    items.sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side);
+  function completeComparison(items: DreamItem[]) {
+    const pair = items[0]?.dream?.pair;
+    return (
+      pair &&
+      items.length === (pair.size ?? 2) &&
+      items.every(
+        (item, side) => item.dream?.pair?.side === side && item.dream.pair.size === pair.size,
+      )
+    );
+  }
   /** Comparisons and sets are ready when the rest of their work has finished. */
   function unseen(ownerId: string) {
     const all = pool(ownerId, "unseen");
     const openSeries = all.some(dreamSet) ? read(ownerId).series?.id : undefined;
     const pendingPairs = new Set<string>();
     const pendingSets = new Set(openSeries ? [openSeries] : []);
+    const triples = new Map<string, DreamItem[]>();
     for (const item of all) {
+      const pair = item.dream?.pair;
+      if (pair?.size === 3 && item.status === "done") {
+        const members = triples.get(pair.id) ?? [];
+        members.push(item);
+        triples.set(pair.id, members);
+      }
       if (finishedItemStatuses.has(item.status || "")) continue;
-      if (item.dream?.pair) pendingPairs.add(item.dream.pair.id);
+      if (pair) pendingPairs.add(pair.id);
       const set = dreamSet(item);
       if (set) pendingSets.add(set.id);
     }
+    const incomplete = new Set(
+      [...triples]
+        .filter(([, items]) => !completeComparison(orderedSides(items)))
+        .map(([id]) => id),
+    );
+    const runningTriples = new Set(
+      incomplete.size ? store.openDreamJobs(ownerId).map((job) => job.pairId) : [],
+    );
     return all
-      .filter((item) => {
-        if (item.status !== "done") return false;
-        if (item.dream?.pair) return !pendingPairs.has(item.dream.pair.id);
+      .flatMap((item) => {
+        if (item.status !== "done") return [];
+        const pair = item.dream?.pair;
+        if (pair) {
+          if (admittingComparisons.has(pair.id)) return [];
+          // A failed or interrupted triple leaves its finished results for individual review.
+          if (incomplete.has(pair.id))
+            return runningTriples.has(pair.id)
+              ? []
+              : [{ ...item, dream: { ...item.dream!, pair: undefined } }];
+          return pair.size === 3 || !pendingPairs.has(pair.id) ? [item] : [];
+        }
         const set = dreamSet(item);
-        return !set || !pendingSets.has(set.id);
+        return !set || !pendingSets.has(set.id) ? [item] : [];
       })
       .reverse();
   }
@@ -1376,13 +1427,20 @@ export function createDream(options: {
           enabled: true as const,
         })),
     );
-  /** Rates two compared images (`elo`): `score` is 1 where `a` won, 0 where `b` won, ½ for a draw. */
-  function rate(record: DreamRecord, a: string, b: string, score: number) {
+  /** One verdict has the same Elo weight with two or three variants. */
+  function rate(record: DreamRecord, ids: string[], winner: number) {
     const ratings = (record.ratings ||= {});
-    const [ratingA, ratingB] = [ratings[a] ?? elo.start, ratings[b] ?? elo.start];
-    const change = elo.k * (score - 1 / (1 + 10 ** ((ratingB - ratingA) / 400)));
-    ratings[a] = Math.round(ratingA + change);
-    ratings[b] = Math.round(ratingB - change);
+    const previous = ids.map((id) => ratings[id] ?? elo.start);
+    for (const [index, rating] of previous.entries()) {
+      let delta = 0;
+      for (const [other, opponent] of previous.entries()) {
+        if (other === index || (winner >= 0 && winner !== index && winner !== other)) continue;
+        const score = winner < 0 ? 0.5 : Number(winner === index);
+        delta += score - 1 / (1 + 10 ** ((opponent - rating) / 400));
+      }
+      ratings[ids[index]] = Math.round(rating + (elo.k * delta) / (ids.length - 1));
+    }
+    return previous;
   }
   /**
    * The account's explore share (`exploreShare`): each side's keep rate counts from one kept of two,
@@ -1397,7 +1455,11 @@ export function createDream(options: {
       limit: window,
     });
     const rate = (explored: boolean) => {
-      const side = decided.filter((item) => item.dream!.arm!.startsWith("explore:") === explored);
+      const side = decided.filter(
+        ({ dream }) =>
+          (!dream!.passReason || dream!.passReason === "taste") &&
+          dream!.arm!.startsWith("explore:") === explored,
+      );
       return (side.filter((item) => item.dream!.state === "kept").length + 1) / (side.length + 2);
     };
     return Math.min(high, Math.max(low, (start * rate(true)) / rate(false)));
@@ -1971,7 +2033,8 @@ export function createDream(options: {
           continue;
         }
         videoMisses.delete(ownerId);
-        const refused = await video(ownerId, record, access, key);
+        const alternate = random(videoExploreDraw) === 1;
+        const refused = await video(ownerId, record, access, key, alternate);
         if (!refused) return { status: "generating" };
         reason = refused;
         continue;
@@ -1999,7 +2062,13 @@ export function createDream(options: {
         counts.images % every === every - 1 &&
         counts.images + 2 <= record.settings.dailyImages
       ) {
-        const pair = await comparison(ownerId, record, access, catalogue.profiles);
+        const pair = await comparison(
+          ownerId,
+          record,
+          access,
+          catalogue.profiles,
+          counts.images + 3 <= record.settings.dailyImages,
+        );
         if (pair) return pair;
       }
       const next = steer ? null : await seriesNext(ownerId, record, catalogue.profiles);
@@ -2208,7 +2277,13 @@ export function createDream(options: {
    * Queues a video that animates the account's best still or extends one of its videos
    * (videoSources), on its selected backend; answers why it couldn't, or "".
    */
-  async function video(ownerId: string, record: DreamRecord, access: DreamAccess, key: string) {
+  async function video(
+    ownerId: string,
+    record: DreamRecord,
+    access: DreamAccess,
+    key: string,
+    alternate: boolean,
+  ) {
     const referenceOf = ({ item, extend }: DreamVideoSource) => {
       try {
         return options.reference(access.account, String(item.id), extend ? "last" : undefined);
@@ -2216,6 +2291,7 @@ export function createDream(options: {
         return null;
       }
     };
+    let extensionRefusal = "";
     // A source deleted or hidden since it was chosen counts as used, so the next one is tried.
     for (const source of await videoSources(ownerId, record)) {
       const reference = referenceOf(source);
@@ -2223,12 +2299,21 @@ export function createDream(options: {
         markUsed(ownerId, source);
         continue;
       }
-      const refused = await animate(ownerId, record, access, source, reference, key);
-      if (refused && referenceOf(source)) return refused;
+      const refused = await animate(ownerId, record, access, source, reference, key, alternate);
+      if (refused && referenceOf(source)) {
+        if (!source.extend) return refused;
+        extensionRefusal = refused;
+        continue;
+      }
       markUsed(ownerId, source);
-      if (!refused) return "";
+      if (!refused) {
+        videoMisses.delete(ownerId);
+        return "";
+      }
     }
-    return "Dream videos animate a kept or liked image. Keep or like one first.";
+    return (
+      extensionRefusal || "Dream videos animate a kept or liked image. Keep or like one first."
+    );
   }
   /** Each account's last Dream video that found no model, and the video profiles it saw then. */
   const videoMisses = new Map<string, { reason: string; key: string; until: number }>();
@@ -2246,9 +2331,10 @@ export function createDream(options: {
     { item, extend }: DreamVideoSource,
     reference: { id: string; source?: string },
     key: string,
+    alternate: boolean,
   ) {
     const miss = (reason: string) => {
-      videoMisses.set(ownerId, { reason, key, until: now() + videoRecheckMs });
+      if (!extend) videoMisses.set(ownerId, { reason, key, until: now() + videoRecheckMs });
       return reason;
     };
     let choice: Awaited<ReturnType<typeof options.videoProfile>>;
@@ -2258,6 +2344,12 @@ export function createDream(options: {
         width: Number(item.width) || 0,
         height: Number(item.height) || 0,
         ...(extend ? { extend: String(item.settings?.profileId || "") } : {}),
+        unavailable: failingProfiles(ownerId, 1),
+        ...(alternate &&
+          !extend && {
+            alternate: (profiles, chosen) =>
+              exploreProfile(ownerId, "video", profiles, chosen)?.profile,
+          }),
       });
     } catch (error) {
       return miss((error as Error).message);
@@ -2267,13 +2359,8 @@ export function createDream(options: {
       return miss("The source video's model isn't ready.");
     if (isCloudProfile(profile) !== (record.settings.videoBackend === "cloud"))
       return miss("No video model is ready.");
-    // A failed video can take its worker down with it, so one failure sets its profile aside.
-    if (failingProfiles(ownerId, 1).has(profile.id))
-      return miss(
-        `Dream's last video on ${profile.label || profile.id} failed; it waits to try again.`,
-      );
-    const slot =
-      profile.mediaInputs?.find((input) => input.role === "start") || profile.mediaInputs?.[0];
+    const slot = dreamVideoSlot(profile);
+    if (!slot) return miss("No video model is ready for this source frame.");
     const spicy = spicyShare(record, access);
     // Written as the viewer's Animate writes it (prompt-animate.js): seeing the frame and knowing
     // the clip's length, sound and the profile's prompt format.
@@ -2301,12 +2388,12 @@ export function createDream(options: {
           {
             assetId: reference.id,
             ...(reference.source ? { source: reference.source } : {}),
-            slot: slot?.id || "start",
+            slot: slot.id,
           },
         ],
       },
       access.account,
-      { sessionId: session(ownerId, record), operation: "animate" },
+      { sessionId: session(ownerId, record), operation: "animate", parentItemId: String(item.id) },
       {
         priority: queuePriority.dream,
         dream: {
@@ -2404,7 +2491,7 @@ export function createDream(options: {
     settings?: GenerationInput;
     reword?: boolean;
   };
-  /** The ways a base can vary in one thing, each as its question and two sides. */
+  /** The ways a base can vary in one thing, with a third option where it is distinct. */
   function pairOptions(
     ownerId: string,
     base: NonNullable<Awaited<ReturnType<typeof pairBase>>>,
@@ -2421,22 +2508,28 @@ export function createDream(options: {
       settings,
       ...extra,
     });
-    const choices: { question: string; axis: PairAxis; sides: [Side, Side] }[] = [];
+    const choices: { question: string; axis: PairAxis; sides: [Side, Side]; third?: Side }[] = [];
     const others = profiles.filter((entry) => kindOf(entry) === "image" && entry.id !== profile.id);
     if (others.length) {
       const other = others[random(others.length)];
+      const firstLabels = new Set([profile.label || profile.id, other.label || other.id]);
+      const third = others.find(
+        (entry) =>
+          firstLabels.size === 2 &&
+          entry.id !== other.id &&
+          !firstLabels.has(entry.label || entry.id),
+      );
+      const modelSide = (candidate: DreamProfile): Side => ({
+        label: candidate.label || candidate.id,
+        value: candidate.id,
+        profile: candidate,
+        loras: fit(candidate, loras),
+      });
       choices.push({
         question: "Which Model?",
         axis: "profile",
-        sides: [
-          same(profile.label || profile.id, profile.id),
-          {
-            label: other.label || other.id,
-            value: other.id,
-            profile: other,
-            loras: fit(other, loras),
-          },
-        ],
+        sides: [same(profile.label || profile.id, profile.id), modelSide(other)],
+        third: third && modelSide(third),
       });
     }
     const [first] = loras;
@@ -2449,25 +2542,29 @@ export function createDream(options: {
           same(`Without ${options.loraName(first.name)}`, "none", { loras: loras.slice(1) }),
         ],
       });
-      const [changed] = fit(profile, [
-        {
-          ...first,
-          strength: roundTo(
-            first.strength >= 0.8 ? first.strength - 0.35 : first.strength + 0.35,
-            0.05,
-          ),
-        },
-      ]);
-      if (changed && changed.strength !== first.strength)
+      const delta = first.strength >= 0.8 ? -0.35 : 0.35;
+      const strengths = new Set([first.strength]);
+      const [changed, third] = [delta, -delta].flatMap((offset) => {
+        const [candidate] = fit(profile, [
+          { ...first, strength: roundTo(first.strength + offset, 0.05) },
+        ]);
+        if (!candidate || strengths.has(candidate.strength)) return [];
+        strengths.add(candidate.strength);
+        return [
+          same(`${options.loraName(candidate.name)} ${candidate.strength}`, candidate.strength, {
+            loras: [candidate, ...loras.slice(1)],
+          }),
+        ];
+      });
+      if (changed)
         choices.push({
           question: "Which LoRA Strength?",
           axis: "strength",
           sides: [
             same(`${options.loraName(first.name)} ${first.strength}`, first.strength),
-            same(`${options.loraName(changed.name)} ${changed.strength}`, changed.strength, {
-              loras: [changed, ...loras.slice(1)],
-            }),
+            changed,
           ],
+          third,
         });
     } else {
       // A liked LoRA, else one the account has not rated yet.
@@ -2516,7 +2613,7 @@ export function createDream(options: {
   }
 
   /**
-   * Queues a comparison: two results from a kept or liked image's prompt with one seed, alike
+   * Queues a comparison from a kept or liked image's prompt with one seed, alike
    * but for one thing, in random order. Null when no image can start one.
    */
   async function comparison(
@@ -2524,63 +2621,74 @@ export function createDream(options: {
     record: DreamRecord,
     access: DreamAccess,
     profiles: DreamProfile[],
+    roomForThree: boolean,
   ): Promise<{ status: DreamStatus; reason?: string } | null> {
     const base = await pairBase(ownerId, record, profiles);
     if (!base) return null;
     const choices = pairOptions(ownerId, base, profiles);
-    const { question, axis, sides } = drawn(
+    const { question, axis, sides, third } = drawn(
       choices.map((choice) => [choice, pairWeights[choice.axis]]),
     )!;
-    const ordered = random(2) ? [sides[1], sides[0]] : sides;
+    const ordered =
+      third && roomForThree && random(tripleEvery) === tripleEvery - 1
+        ? shuffled([...sides, third])
+        : random(2)
+          ? [sides[1], sides[0]]
+          : sides;
     const id = randomUUID();
     const seed = String(random(2 ** 32));
     const at = stamp();
     const jobs: string[] = [];
-    for (const [index, side] of ordered.entries()) {
-      const { profile } = side;
-      const input: GenerationInput = {
-        ...profile.defaults,
-        ...side.settings,
-        autoUpscale: null,
-        kind: "image",
-        profileId: profile.id,
-        ...(profile.model ? { model: profile.model } : {}),
-        ...(profile.workflow ? { workflow: profile.workflow } : {}),
-        count: 1,
-        seed,
-        prompt: side.reword ? "" : base.prompt,
-        ...(side.reword ? { writing: { kind: "dream", reword: base.prompt } } : {}),
-        loras: side.loras,
-        referenceAssets: [],
-      };
-      const pair: DreamPair = {
-        id,
-        side: index as 0 | 1,
-        question,
-        axis,
-        label: side.label,
-        value: side.value,
-      };
-      const result = await options.admit(
-        input,
-        access.account,
-        { sessionId: session(ownerId, record), operation: "image" },
-        {
-          priority: queuePriority.dream,
-          dream: {
-            prompt: side.reword ? "" : base.prompt,
-            why: "",
-            at,
-            pair,
-            arm: `explore:${axis}`,
+    admittingComparisons.add(id);
+    try {
+      for (const [index, side] of ordered.entries()) {
+        const { profile } = side;
+        const input: GenerationInput = {
+          ...profile.defaults,
+          ...side.settings,
+          autoUpscale: null,
+          kind: "image",
+          profileId: profile.id,
+          ...(profile.model ? { model: profile.model } : {}),
+          ...(profile.workflow ? { workflow: profile.workflow } : {}),
+          count: 1,
+          seed,
+          prompt: side.reword ? "" : base.prompt,
+          ...(side.reword ? { writing: { kind: "dream", reword: base.prompt } } : {}),
+          loras: side.loras,
+          referenceAssets: [],
+        };
+        const pair: DreamPair = {
+          id,
+          side: index as DreamPair["side"],
+          ...(ordered.length === 3 && { size: 3 }),
+          question,
+          axis,
+          label: side.label,
+          value: side.value,
+        };
+        const result = await options.admit(
+          input,
+          access.account,
+          { sessionId: session(ownerId, record), operation: "image" },
+          {
+            priority: queuePriority.dream,
+            dream: {
+              prompt: side.reword ? "" : base.prompt,
+              why: "",
+              at,
+              pair,
+              arm: `explore:${axis}`,
+            },
           },
-        },
-      );
-      if (result.status >= 400) {
-        await Promise.all(jobs.map((jobId) => options.cancel(ownerId, jobId).catch(() => {})));
-        return null;
+        );
+        if (result.status >= 400) return null;
+        jobs.push(String(result.payload.jobId));
       }
-      jobs.push(String(result.payload.jobId));
+    } finally {
+      if (jobs.length < ordered.length)
+        await Promise.all(jobs.map((jobId) => options.cancel(ownerId, jobId).catch(() => {})));
+      admittingComparisons.delete(id);
     }
     const latest = read(ownerId);
     latest.compared = [String(base.item.id), ...(latest.compared || [])].slice(0, judgedLimit);
@@ -2691,6 +2799,11 @@ export function createDream(options: {
     if (!item) throw failure("That Dream result is unavailable.", 404);
     return item;
   }
+  const pairSide = (item: DreamItem) => ({
+    jobId: item.jobId,
+    values: itemValues(item),
+    label: item.dream!.pair!.label,
+  });
   /** Discarded results, most recently discarded first. */
   const discarded = (ownerId: string) =>
     pool(ownerId, "discarded").sort((a, b) =>
@@ -2847,51 +2960,102 @@ export function createDream(options: {
       return record.visit.since || null;
     },
     unseen,
-    /** Judge the visible members together and teach taste once, using the cover. */
-    answerSet(ownerId: string, setId: string, ids: string[], verdict: "keep" | "discard" | "like") {
+    /** Pass over a result or whole comparison, retaining any feedback alongside the decision. */
+    pass(ownerId: string, ids: string[], reason: DreamPassReason) {
+      return runtimeTransaction(options.dataDir, () => {
+        const available = unseen(ownerId);
+        const first = available.find((item) => String(item.id) === ids[0]);
+        if (!first) throw failure("That Dream result is unavailable.", 409);
+        const set = dreamSet(first);
+        if (set && available.some((item) => item !== first && dreamSet(item)?.id === set.id))
+          throw failure("Choose a verdict for the set.", 409);
+        const pairId = first.dream?.pair?.id;
+        const items = pairId
+          ? orderedSides(available.filter((item) => item.dream?.pair?.id === pairId))
+          : [first];
+        if (items.length !== ids.length || items.some((item) => !ids.includes(String(item.id))))
+          throw failure("That Dream comparison has changed.", 409);
+        const decidedAt = stamp();
+        const rating = reason === "taste" ? "disliked" : undefined;
+        for (const item of items)
+          options.mark(
+            ownerId,
+            String(item.id),
+            { ...item.dream!, state: "discarded", decidedAt, passReason: reason },
+            rating,
+          );
+        if (reason === "taste")
+          options.taste.record(ownerId, [
+            items.length > 1
+              ? pairSignal(
+                  first.dream!.pair!,
+                  "neither",
+                  pairSide(items[0]),
+                  pairSide(items[1]),
+                  items[2] && pairSide(items[2]),
+                )
+              : tasteSignal("discard", first.jobId, itemValues(first)),
+          ]);
+      });
+    },
+    /** Judge a set together, with explicit choices taking precedence over the set verdict. */
+    answerSet(
+      ownerId: string,
+      setId: string,
+      ids: string[],
+      verdict: "keep" | "discard" | "like",
+      likedId?: string,
+      overrides: Record<string, "like" | "discard"> = {},
+    ) {
       return runtimeTransaction(options.dataDir, () => {
         const items = unseen(ownerId)
           .filter((item) => dreamSet(item)?.id === setId)
           .sort((a, b) => dreamSet(a)!.index - dreamSet(b)!.index);
         if (items.length !== ids.length || items.some((item) => !ids.includes(String(item.id))))
           throw failure("That Dream set has changed.", 409);
-        const [cover] = items;
+        const rated =
+          likedId === undefined ? items[0] : items.find((item) => String(item.id) === likedId);
+        const marked = new Map(Object.entries(overrides));
+        if (!rated || [...marked.keys()].some((id) => !ids.includes(id)))
+          throw failure("That Dream result isn't in the set.", 409);
         const decidedAt = stamp();
-        for (const item of items)
+        const signals = [];
+        for (const item of items) {
+          const id = String(item.id);
+          const override = marked.get(id);
+          const choice = override ?? (verdict === "like" && item !== rated ? "keep" : verdict);
           options.mark(
             ownerId,
-            String(item.id),
-            { ...item.dream!, state: verdict === "discard" ? "discarded" : "kept", decidedAt },
-            verdict === "discard"
-              ? "disliked"
-              : verdict === "like" && item === cover
-                ? "liked"
-                : undefined,
+            id,
+            { ...item.dream!, state: choice === "discard" ? "discarded" : "kept", decidedAt },
+            choice === "discard" ? "disliked" : choice === "like" ? "liked" : undefined,
           );
-        options.taste.record(ownerId, [tasteSignal(verdict, cover.jobId, itemValues(cover))]);
+          if (override) signals.push(tasteSignal(override, item.jobId, itemValues(item)));
+        }
+        // One implicit signal per set, plus each image singled out by the user.
+        const representative = marked.has(String(rated.id))
+          ? items.find((item) => !marked.has(String(item.id)))
+          : rated;
+        if (representative) {
+          const choice = verdict === "like" && representative !== rated ? "keep" : verdict;
+          signals.push(tasteSignal(choice, representative.jobId, itemValues(representative)));
+        }
+        options.taste.record(ownerId, signals);
       });
     },
-    /** Answers a comparison: A or B keeps that side, Both keeps both and Neither discards both. */
+    /** A choice keeps one side, Both keeps every side, and Neither discards them. */
     answer(ownerId: string, pairId: string, answer: PairAnswer, like = false) {
-      const sides = pool(ownerId, "unseen")
-        .filter((item) => item.dream?.pair?.id === pairId && item.status === "done")
-        .sort((a, b) => a.dream!.pair!.side - b.dream!.pair!.side);
-      if (sides.length !== 2) throw failure("That comparison is unavailable.", 404);
-      const [a, b] = sides;
-      const kept: DreamItem[] = { a: [a], b: [b], both: [a, b], neither: [] }[answer];
-      const side = (item: DreamItem) => ({
-        jobId: item.jobId,
-        values: itemValues(item),
-        label: item.dream!.pair!.label,
-      });
+      const sides = orderedSides(unseen(ownerId).filter((item) => item.dream?.pair?.id === pairId));
+      if (!completeComparison(sides)) throw failure("That comparison is unavailable.", 404);
+      const winner = ["a", "b", "c"].indexOf(answer);
+      if (winner >= sides.length) throw failure("That side is unavailable.", 400);
       return runtimeTransaction(options.dataDir, () => {
         const record = read(ownerId);
         const ids = sides.map((item) => String(item.id));
-        const previous = ids.map((id) => record.ratings?.[id] ?? elo.start);
-        rate(record, ids[0], ids[1], { a: 1, b: 0, both: 0.5, neither: 0.5 }[answer]);
+        const previous = rate(record, ids, winner);
         const decidedAt = stamp();
         const items = sides.map((item, index) => {
-          const keep = kept.includes(item);
+          const keep = index === winner || answer === "both";
           const liked = like && keep;
           const rating = keep && item.rating !== "disliked" ? item.rating : undefined;
           const dream: DreamMark = {
@@ -2910,7 +3074,19 @@ export function createDream(options: {
           if (liked) options.rate(ownerId, ids[index], "liked");
           return { ...item, dream, rating: liked ? "liked" : settled };
         });
-        options.taste.record(ownerId, [pairSignal(a.dream!.pair!, answer, side(a), side(b))], true);
+        options.taste.record(
+          ownerId,
+          [
+            pairSignal(
+              sides[0].dream!.pair!,
+              answer,
+              pairSide(sides[0]),
+              pairSide(sides[1]),
+              sides[2] && pairSide(sides[2]),
+            ),
+          ],
+          true,
+        );
         write(ownerId, record);
         return items;
       });
@@ -3065,7 +3241,7 @@ export function createDream(options: {
         options.taste.record(ownerId, signals, true);
         const record = read(ownerId);
         // A pair: one liked over the other, or both alike.
-        if (ids.length === 2) rate(record, ids[0], ids[1], liked.length === 1 ? 1 : 0.5);
+        if (ids.length === 2) rate(record, ids, liked.length === 1 ? 0 : -1);
         record.judged = [...ids, ...(record.judged || []).filter((id) => !ids.includes(id))].slice(
           0,
           judgedLimit,
@@ -3092,6 +3268,26 @@ export function createDream(options: {
       if (items.length !== ids.length) throw failure("That result is unavailable.", 404);
       if (setId && items.some((item) => dreamSet(item)?.id !== setId || !item.dream))
         throw failure("That Dream set has changed.", 409);
+      if (
+        !setId &&
+        (ids.length === 3 ||
+          items.some(
+            (item) =>
+              item.dream?.pair?.size === 3 && (item.dream.comparison || item.dream.passReason),
+          ))
+      ) {
+        const pairId = items[0]?.dream?.pair?.id;
+        if (
+          ids.length !== 3 ||
+          !pairId ||
+          !items.every(
+            (item) =>
+              item.dream?.pair?.id === pairId && (item.dream.comparison || item.dream.passReason),
+          ) ||
+          !completeComparison(orderedSides(items))
+        )
+          throw failure("Undo all three sides of the comparison together.", 409);
+      }
       if (rating !== undefined && items[0].status !== "done")
         throw failure("That result is no longer finished.", 409);
       runtimeTransaction(options.dataDir, () => {
@@ -3109,7 +3305,7 @@ export function createDream(options: {
         if (!calibration)
           for (const item of items)
             if (item.dream && item.dream.state !== "unseen") {
-              const { decidedAt: _, comparison, ...mark } = item.dream;
+              const { decidedAt: _, comparison, passReason: _passReason, ...mark } = item.dream;
               const id = String(item.id);
               if (comparison && record.ratings) {
                 const restored = (record.ratings[id] ?? elo.start) - comparison.delta;

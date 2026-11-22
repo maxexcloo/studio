@@ -47,6 +47,11 @@
   min-height: 0;
 }
 
+/* Keep the media's fitted bounds while the phone sheet covers its actions. */
+.layout [data-actions-hidden] {
+  visibility: hidden;
+}
+
 .main {
   position: relative;
   display: flex;
