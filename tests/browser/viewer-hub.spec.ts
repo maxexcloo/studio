@@ -1329,21 +1329,34 @@ test("A video's Animate template continues it from its last frame, and Edit make
     url: "/test-media/clip.mp4",
     prompt: "A rolling wave",
     model: "video.safetensors",
-    settings: { profileId: "video:test" },
+    settings: {
+      profileId: "video:test",
+      referenceAssets: [{ assetId: "missing-start", slot: "reference" }],
+    },
     width: 1024,
     height: 1024,
     createdAt: stamp,
   });
+  await page.route("**/api/reference-assets/missing-start", (route) =>
+    route.fulfill({ status: 404, json: { error: "That reference image is gone." } }),
+  );
   await page.goto("/videos");
   await page.getByRole("button", { name: "Open video: Rolling Wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await showViewerControls(viewer);
+  await viewer.getByRole("button", { name: "Recreate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Run Again", exact: true }).click();
+  await expect(
+    page.getByText(/The original reference for this video is unavailable/),
+  ).toBeVisible();
+  expect(state.jobs).toHaveLength(0);
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(
     page.getByRole("menuitem", { name: "Extend in Composer", exact: true }),
   ).toBeVisible();
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.referenceRequests.at(-1)).toEqual({ galleryItemId: "clip", frame: "last" });
   expect(state.jobs[0]).toMatchObject({
     operation: "animate",
     input: {

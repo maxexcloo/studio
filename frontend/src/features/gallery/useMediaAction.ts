@@ -206,11 +206,20 @@ export async function mediaDraft(
             );
             const asset = detail?.thumbnailUrl
               ? detail
-              : (
-                  await api<{ asset: ReferenceAsset }>(
-                    `/api/reference-assets/${encodeURIComponent(reference.assetId)}`,
-                  )
-                ).asset;
+              : await api<{ asset: ReferenceAsset }>(
+                  `/api/reference-assets/${encodeURIComponent(reference.assetId)}`,
+                ).then(
+                  ({ asset }) => asset,
+                  (error) => {
+                    if (error?.status !== 404) throw error;
+                    throw new Error(
+                      item.type === "video"
+                        ? "The original reference for this video is unavailable. In Gallery, use Animate › Extend in Composer to continue from its last frame."
+                        : "A saved reference is unavailable. To recreate this result, use its prompt in Generate with a replacement reference.",
+                      { cause: error },
+                    );
+                  },
+                );
             return {
               ...asset,
               slot: reference.slot,
