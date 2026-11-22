@@ -153,7 +153,11 @@ function ViewerVideo({
         onPointerDown={swipe.onPointerDown}
         onPointerUp={(event) => {
           if (!swipe.onPointerUp(event)) return;
-          if ((!controls || hideControls) && !refused && !closingPopup()) onTap?.();
+          const nearPlaybackControls =
+            controls &&
+            !hideControls &&
+            event.currentTarget.getBoundingClientRect().bottom - event.clientY < 44;
+          if (!nearPlaybackControls && !refused && !closingPopup()) onTap?.();
           reveal();
         }}
         onFocus={reveal}

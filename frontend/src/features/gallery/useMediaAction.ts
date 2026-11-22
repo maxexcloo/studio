@@ -214,7 +214,7 @@ export async function mediaDraft(
                     if (error?.status !== 404) throw error;
                     throw new Error(
                       item.type === "video"
-                        ? "The original reference for this video is unavailable. In Gallery, use Animate › Extend in Composer to continue from its last frame."
+                        ? "The original reference for this video is unavailable. Use Extend in Composer to continue from its last frame."
                         : "A saved reference is unavailable. To recreate this result, use its prompt in Generate with a replacement reference.",
                       { cause: error },
                     );

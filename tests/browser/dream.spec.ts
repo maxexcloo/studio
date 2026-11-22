@@ -312,6 +312,33 @@ test("Suggest can queue a library item variation at its source", async ({ page }
   });
 });
 
+test("Dream video Suggestions can stage an extension from the current clip", async ({ page }) => {
+  const state = await fixtures(page);
+  const dream = await serveDream(page, {
+    unseen: [
+      dreamItem("dream-clip", {
+        type: "video",
+        url: "/test-media/clip.mp4",
+        settings: {
+          profileId: "video:test",
+          referenceAssets: [{ assetId: "missing-start", slot: "reference" }],
+        },
+      }),
+    ],
+  });
+  await page.goto("/dream");
+  await showMedia(page, "Videos");
+  await page.getByRole("button", { name: "Suggestions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Extend in Composer", exact: true }).click();
+  await expect(page).toHaveURL(/\/videos$/);
+  await expect
+    .poll(() => state.referenceRequests.at(-1))
+    .toEqual({ galleryItemId: "dream-clip", frame: "last" });
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+  expect(state.jobs).toHaveLength(0);
+  expect(dream.requests).toHaveLength(0);
+});
+
 test("Undo steps back through Pass, Super Like and Accept", async ({ page }) => {
   await fixtures(page);
   const dream = await serveDream(page, {

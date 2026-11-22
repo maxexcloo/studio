@@ -1,5 +1,6 @@
 import { ActionIcon, Menu, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
+import { FastForward } from "lucide-react";
 import { useState } from "react";
 
 import { menuWidth } from "../../theme";
@@ -8,7 +9,7 @@ import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { useStageComparison } from "../compare/variants";
 import { useItemChange } from "../gallery/useItemChange";
-import { typedPrompt, useMediaIteration } from "../gallery/useMediaAction";
+import { typedPrompt, useMediaAction, useMediaIteration } from "../gallery/useMediaAction";
 import { useChangeSuggestions } from "../generation/AskChange";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import type { DeckCard } from "./deck";
@@ -32,6 +33,8 @@ export function DreamSuggestions({
   const compare = useMutation({ mutationFn: () => stage.again(pair!) });
   const [opened, setOpened] = useState(false);
   const iteration = useMediaIteration(item);
+  const prepare = useMediaAction(item);
+  const canExtend = item.type === "video" && item.status === "done" && Boolean(item.url);
   const change = useItemChange(item, {
     iterate: (next) => iteration.mutate(next),
     review: false,
@@ -49,9 +52,13 @@ export function DreamSuggestions({
     limit: 3,
     onPick: (request) => change.send(request, prompt),
   });
-  const loading = change.pending || iteration.isPending || compare.isPending;
+  const loading = change.pending || iteration.isPending || compare.isPending || prepare.isPending;
   const unavailable =
-    !available && !canEditPair && !canAskForMore && "Suggestions are unavailable for this result.";
+    !available &&
+    !canEditPair &&
+    !canAskForMore &&
+    !canExtend &&
+    "Suggestions are unavailable for this result.";
   const trigger = (
     <ActionIcon
       variant="default"
@@ -92,6 +99,17 @@ export function DreamSuggestions({
             {available && <Menu.Divider />}
             <Menu.Item leftSection={<icons.moreLikeThis size={16} />} onClick={onMore}>
               More Like This
+            </Menu.Item>
+          </>
+        )}
+        {canExtend && (
+          <>
+            {available && <Menu.Divider />}
+            <Menu.Item
+              leftSection={<FastForward size={16} />}
+              onClick={() => prepare.mutate({ operation: "extend" })}
+            >
+              Extend in Composer
             </Menu.Item>
           </>
         )}
