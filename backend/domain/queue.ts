@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { isDeepStrictEqual } from "node:util";
 
 import type { ResultContext } from "../../shared/characters.ts";
@@ -17,6 +18,8 @@ import { type OwnedJob, type QueuedCopy, Store, everyone, queuePriority } from "
 
 export interface JobObservation {
   status: QueueStatus;
+  /** A lost synchronous request whose worker has confirmed it is idle. */
+  restartInterrupted?: { seed?: string };
   reason?: string;
   providerJobId?: string;
   backend?: string;
@@ -179,7 +182,7 @@ const dreamModelIdleMinutes = 2;
 /** How long a worker's run may show no progress before it is given up: a video's steps take longer. */
 const stallMinutes = (job: OwnedJob) => (job.input.kind === "video" ? 30 : 10);
 
-/** Only this database's recorded IDs reach the provider adapter. Restart never resubmits accepted work. */
+/** Only this database's recorded IDs reach the provider adapter. Recoverable work keeps its run. */
 export class GenerationQueue {
   private observing = new Set<string>();
   private scheduling = new Set<string>();
@@ -313,6 +316,12 @@ export class GenerationQueue {
     for (const controller of this.writing.values()) controller.abort();
   }
 
+  async waitForSubmissions(deadline: number) {
+    while (this.submitting.size && Date.now() < deadline) await delay(25);
+    // Provider submission schedules the accepted run before returning to the queue.
+    await delay(0);
+  }
+
   /**
    * The writing stage: the prompt assistant writes the job's prompt, its streamed thinking and
    * prompt gathered into `progress`; the written prompt then becomes the input and the job queues on its
@@ -401,9 +410,9 @@ export class GenerationQueue {
       if (job.status !== "waiting" || job.reason !== reason)
         save({ ...job, status: "waiting", reason });
     };
-    const saveObservation = (latest: OwnedJob, observation: Partial<JobObservation>) => {
+    const saveObservation = (latest: OwnedJob, observation: Partial<OwnedJob>) => {
       const changed = Object.entries(observation).some(
-        ([key, value]) => !isDeepStrictEqual(latest[key as keyof JobObservation], value),
+        ([key, value]) => !isDeepStrictEqual(latest[key as keyof OwnedJob], value),
       );
       return changed ? this.store.save({ ...latest, ...observation }) : latest;
     };
@@ -454,6 +463,36 @@ export class GenerationQueue {
             }
             const latest = this.store.job(job.ownerId, job.id)!;
             if (terminalStatuses.has(latest.status)) return;
+            if (observed.restartInterrupted) {
+              if (latest.cancelRequested || latest.retried) {
+                const stopped = this.store.save({
+                  ...latest,
+                  status: latest.cancelRequested ? "cancelled" : "failed",
+                  reason: latest.cancelRequested
+                    ? "Cancelled."
+                    : observed.reason || "Interrupted by restart.",
+                  progress: undefined,
+                });
+                await this.adapter.settled?.(stopped);
+              } else {
+                const { seed } = observed.restartInterrupted;
+                const retry = this.store.save({
+                  ...latest,
+                  status: "queued",
+                  reason: "Resuming after Studio restarted.",
+                  retried: true,
+                  providerJobId: undefined,
+                  admittedAt: undefined,
+                  progress: undefined,
+                  ...(seed !== undefined && { input: { ...latest.input, seed } }),
+                });
+                this.acceptedIds.delete(retry.id);
+                this.progressSeen.delete(retry.id);
+                this.adapter.releaseAdmission?.(retry);
+                logEvent("Requeued an image interrupted by Studio restart", { job: retry.id });
+              }
+              return;
+            }
             const observation = { ...observed, reason: observed.reason || "" };
             job = { ...latest, ...observation };
             if (observed.status === "completed") {
@@ -651,7 +690,7 @@ export class GenerationQueue {
               reason: "",
               admittedAt: this.now(),
             });
-            // Persist starting before crossing the provider boundary: interrupted responses are never resubmitted.
+            // Persist starting before crossing the provider boundary so recovery can check it.
             this.positions.delete(job.id);
             this.acceptedIds.add(job.id);
             this.modelIdleSince = undefined;

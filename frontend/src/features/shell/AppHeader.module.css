@@ -76,6 +76,11 @@
 
 :where(:root[data-phone]) .header .modes .mode {
   width: 42px;
+  max-width: 100%;
+}
+
+:where(:root[data-phone]) .modes > :has(> .mode) {
+  min-width: 0;
 }
 
 :where(:root[data-phone]) .header button[data-queue-count] {
@@ -94,4 +99,19 @@
 :where(:root[data-phone]) .header:has([data-queue-count]) .modes .mode {
   flex-shrink: 1;
   width: min(42px, 9vw);
+}
+
+@media (width <= 25em) {
+  :where(:root[data-phone]) .header .modes .mode {
+    width: min(42px, 9vw);
+  }
+}
+
+@media (width < 375px) {
+  :where(:root[data-phone]) .header .modes {
+    position: relative;
+    inset: auto;
+    min-width: 0;
+    transform: none;
+  }
 }

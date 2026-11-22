@@ -308,51 +308,6 @@
   object-fit: cover;
 }
 
-/* A popup's list at a set height, scrolling inside it, such as the Presets popup's. */
-.list {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-/* Saved stacks and presets: one row each, its menu at the end. */
-.saved {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.savedRow {
-  display: flex;
-  align-items: center;
-  gap: var(--mantine-spacing-xs);
-  min-width: 0;
-  padding: 4px 4px 4px 8px;
-  border-radius: var(--mantine-radius-md);
-  transition: background-color var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-.savedRow:hover,
-.savedRow:focus-within {
-  background: var(--mantine-color-default-hover);
-}
-
-.savedRow[data-current] {
-  background: var(--mantine-primary-color-light);
-}
-
-.savedName {
-  flex: 1;
-  min-width: 0;
-  padding-block: 6px;
-  text-align: left;
-}
-
-.savedName:focus-visible {
-  outline: 2px solid var(--mantine-primary-color-filled);
-  outline-offset: 2px;
-  border-radius: var(--mantine-radius-sm);
-}
-
 /* The chip's picture keeps one size whether it shows the icon or a stack of thumbnails. */
 .chipContent {
   display: inline-flex;

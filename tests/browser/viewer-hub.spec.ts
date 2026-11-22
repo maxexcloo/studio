@@ -333,17 +333,27 @@ test("Report can inspect the displayed image before sending a reviewed fix", asy
   await expect(report.getByRole("textbox", { name: "Details", exact: true })).toHaveValue(
     "six toes",
   );
+  let refuse = true;
+  const refusal = "The worker cannot accept the replacement yet.";
+  await page.route("**/api/sessions/*/generations", (route) =>
+    refuse ? route.fulfill({ status: 409, json: { error: refusal } }) : route.fallback(),
+  );
+  await fix.click();
+  await expect(report.getByText(refusal, { exact: true })).toBeVisible();
+  expect(state.jobs).toHaveLength(1);
+  expect(state.gallery.find((item) => item.id === "hub")?.rating).toBeUndefined();
+
+  refuse = false;
   await fix.click();
   await expect(report).toBeHidden();
-  expect(asked).toEqual([
-    {
-      surface: "change",
-      jobId: "job-hub",
-      request: "Fix what is wrong, keeping everything else: Hands: six toes",
-      actions: ["edit", "recreate"],
-      itemId: "hub",
-    },
-  ]);
+  expect(asked).toHaveLength(2);
+  expect(asked.at(-1)).toEqual({
+    surface: "change",
+    jobId: "job-hub",
+    request: "Fix what is wrong, keeping everything else: Hands: six toes",
+    actions: ["edit", "recreate"],
+    itemId: "hub",
+  });
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
     operation: "refine",

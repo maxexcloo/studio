@@ -14,11 +14,13 @@ import {
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useId } from "react";
 
 import { titleCase } from "../../../../shared/titles";
 import { api, post } from "../../api";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { closeWhenTop } from "../../ui/popupClicks";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
@@ -166,6 +168,7 @@ export function LibraryImportReview({
 }) {
   const client = useQueryClient();
   const phone = usePhone();
+  const dialog = useId();
   const key = ["imports", id];
   const query = useQuery({
     queryKey: key,
@@ -242,7 +245,8 @@ export function LibraryImportReview({
   return (
     <Modal
       opened
-      onClose={onClose}
+      id={dialog}
+      onClose={closeWhenTop(dialog, onClose)}
       title={
         record?.title || record?.name || record?.input?.fileName || record?.input?.url || "Import"
       }

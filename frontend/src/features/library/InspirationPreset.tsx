@@ -1,21 +1,35 @@
 import { Alert, Button, Card, Group, Image, Stack, Text } from "@mantine/core";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { GenerationInput } from "../../types";
-import { initialInput, inputForProfile, useGeneration } from "../generation/GenerationProvider";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import {
+  type Draft,
+  defaultProfile,
+  initialInput,
+  inputForProfile,
+  useGeneration,
+} from "../generation/GenerationProvider";
 import {
   type LibraryPreset,
   compatibleSettings,
   inspirationInput,
 } from "../generation/inspiration";
 import { useOpenComposer } from "../generation/openComposer";
-import { isProfile } from "../generation/payload";
+import { generationInput, isProfile } from "../generation/payload";
+import { presetsQuery } from "../generation/PresetPicker";
+import { presetReplacesUnsaved } from "../generation/presets";
 import { ProfilePicker } from "../generation/ProfilePicker";
 
 export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
   const openComposer = useOpenComposer();
-  const { profiles, setDraft, changeKind } = useGeneration();
+  const { draft, draftForKind, models, profiles, setDraft } = useGeneration();
+  const presets = useQuery(presetsQuery).data?.presets;
   const [selection, setSelection] = useState<GenerationInput | null>(null);
+  const [replacement, setReplacement] = useState<{ draft: Draft; promptOnly: boolean } | null>(
+    null,
+  );
   const kind = preset.type || "image";
   const exact = profiles.find(
     (profile) =>
@@ -31,6 +45,41 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
     (profile) => profile.id === input.profileId && profile.kind === kind,
   );
   const fit = compatibleSettings(preset, profile);
+  const apply = (next: Draft) => {
+    setDraft(next);
+    openComposer(kind);
+  };
+  const load = (promptOnly: boolean) => {
+    const previous = draftForKind(kind);
+    const next: Draft = promptOnly
+      ? { ...previous, input: { ...previous.input, prompt: preset.prompt } }
+      : {
+          ...draft,
+          input: inspirationInput(preset, draft.input, profile),
+          references: [],
+          operation: kind === "video" ? "animate" : "image",
+          parentJobId: undefined,
+          parentItemId: undefined,
+          presetId: undefined,
+          presetTitle: undefined,
+        };
+    const saved = (value: Draft) =>
+      generationInput(
+        value.input,
+        profiles.find((profile) => profile.id === value.input.profileId),
+        value.references,
+      );
+    const preferred = defaultProfile(models.data, kind);
+    const defaults = generationInput(
+      preferred ? inputForProfile(initialInput, preferred) : { ...initialInput, kind },
+      preferred,
+      [],
+    );
+    const selected = presets?.find(({ id }) => id === previous.presetId);
+    if (presetReplacesUnsaved(saved(previous), saved(next), defaults, selected)) {
+      setReplacement({ draft: next, promptOnly });
+    } else apply(next);
+  };
   return (
     <Card withBorder>
       <Stack>
@@ -53,42 +102,28 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
           </Alert>
         )}
         <Group>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => {
-              changeKind(kind);
-              setDraft((previous) => ({
-                ...previous,
-                input: { ...previous.input, prompt: preset.prompt },
-              }));
-              openComposer(kind);
-            }}
-          >
+          <Button variant="default" size="sm" onClick={() => load(true)}>
             Use Prompt
           </Button>
-          <Button
-            size="sm"
-            disabled={!!fit.blockers.length}
-            onClick={() => {
-              if (!profile) return;
-              setDraft((previous) => ({
-                ...previous,
-                input: inspirationInput(preset, previous.input, profile),
-                references: [],
-                operation: kind === "video" ? "animate" : "image",
-                parentJobId: undefined,
-                parentItemId: undefined,
-                presetId: undefined,
-                presetTitle: undefined,
-              }));
-              openComposer(kind);
-            }}
-          >
+          <Button size="sm" disabled={!!fit.blockers.length} onClick={() => load(false)}>
             Use Settings
           </Button>
         </Group>
       </Stack>
+      <ConfirmDialog
+        opened={Boolean(replacement)}
+        title="Load Inspiration"
+        action="Replace"
+        pending={false}
+        onClose={() => setReplacement(null)}
+        onConfirm={() => {
+          if (replacement) apply(replacement.draft);
+          setReplacement(null);
+        }}
+      >
+        Replace the draft's {replacement?.promptOnly ? "prompt" : "prompt, settings and references"}{" "}
+        with {preset.name}?
+      </ConfirmDialog>
     </Card>
   );
 }

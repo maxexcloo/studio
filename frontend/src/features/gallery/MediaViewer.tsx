@@ -346,18 +346,15 @@ export function MediaViewer({
           ? `${currentIndex + 1} / ${Math.max(total ?? 0, viewable.length)}`
           : undefined;
   const iteration = useMediaIteration(item);
+  const rememberQueued = (job: string) => setQueued((runs) => [...runs, { job, from: item.id }]);
+  const closeForPrompt = () => {
+    if (phone && shownId.current === item.id && !strip.settling.current) close();
+  };
   // The run belongs to the item it started on, even once the viewer has moved on.
   function iterate(next: Iteration) {
     // A phone's prompt editor runs and returns to the gallery; desktop keeps the run in the strip.
-    const closing =
-      phone && next.kind === "prompt" && shownId.current === item.id && !strip.settling.current;
-    if (closing) close();
-    void iteration.mutateAsync(next).then(
-      (job) => {
-        setQueued((runs) => [...runs, { job, from: item.id }]);
-      },
-      () => {},
-    );
+    if (next.kind === "prompt") closeForPrompt();
+    void iteration.mutateAsync(next).then(rememberQueued, () => {});
   }
   const pending = iteration.variables;
   function move(direction: -1 | 1) {
@@ -785,6 +782,10 @@ export function MediaViewer({
                           setCompare(!compare);
                         }}
                         onDelete={() => setDeleting(true)}
+                        onReportQueued={(job) => {
+                          rememberQueued(job);
+                          closeForPrompt();
+                        }}
                         onRetried={onRetried}
                         onVersionChange={(id, active) => {
                           if (shownId.current === id) setVersion({ id, active });

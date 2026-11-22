@@ -1,5 +1,5 @@
 import { Alert, Button, Chip, Group, Modal, Stack, Text } from "@mantine/core";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { ImageInspection } from "../../../../shared/suggestions";
 import type { MediaItem } from "../../types";
@@ -9,7 +9,7 @@ import { usePhone } from "../../ui/usePhone";
 import { askChange, inspectImage } from "../taste/suggestions";
 import { mediaSource } from "./mediaSource";
 import { useItemMutation } from "./useItemMutation";
-import { type Iteration, useMediaIteration } from "./useMediaAction";
+import { type Iteration, useIterate } from "./useMediaAction";
 import { showDisliked, useRatings } from "./useMediaRating";
 
 /** Report's preset issues: its menu's choices and the dialog's chips. */
@@ -17,41 +17,49 @@ export const issues = ["Anatomy", "Artefacts", "Face", "Hands", "Text", "Wrong S
 
 /**
  * Reports what is wrong with a finished item. Studio asks the assistant for a fix, an edit of the
- * image for a local fault or a run on its seed with a fixed prompt, runs it as a new version (the
- * viewer's `iterate` joins its strip), and dislikes the original with the issue, hiding it until
- * restored. Its failure shows inline where `inlineError` says a form renders it.
+ * image for a local fault or a run on its seed with a fixed prompt. Once the replacement queues,
+ * the report dislikes the original with the issue and the viewer adds the run to its strip.
  */
 export function useReportIssue(
   item: MediaItem,
-  iterate?: (iteration: Iteration) => void,
+  onQueued?: (jobId: string) => void,
   inlineError = false,
 ) {
-  const iteration = useMediaIteration(item);
+  const iterate = useIterate();
   const ratings = useRatings();
   const video = item.type === "video";
+  const queued = useRef<{ item: string; issue: string; job: string } | null>(null);
   return useItemMutation(item.id, "report", {
     meta: { inlineError },
     mutationFn: async (issue: string) => {
-      const answer = await askChange(
-        item.jobId!,
-        `Fix what is wrong, keeping everything else: ${issue}`,
-        video ? ["recreate"] : ["edit", "recreate"],
-        undefined,
-        item.id,
-      );
-      const [change] = answer.suggestions;
-      if (!change) throw new Error(answer.reason || "The assistant couldn't suggest a fix.");
-      const next: Iteration = {
-        kind: "prompt",
-        prompt: change.prompt,
-        operation: change.action === "edit" ? "refine" : video ? "animate" : "image",
-        sameSeed: change.action === "recreate",
-      };
-      if (iterate) iterate(next);
-      else await iteration.mutateAsync(next);
+      let jobId =
+        queued.current?.item === item.id && queued.current.issue === issue
+          ? queued.current.job
+          : undefined;
+      if (!jobId) {
+        const answer = await askChange(
+          item.jobId!,
+          `Fix what is wrong, keeping everything else: ${issue}`,
+          video ? ["recreate"] : ["edit", "recreate"],
+          undefined,
+          item.id,
+        );
+        const [change] = answer.suggestions;
+        if (!change) throw new Error(answer.reason || "The assistant couldn't suggest a fix.");
+        const next: Iteration = {
+          kind: "prompt",
+          prompt: change.prompt,
+          operation: change.action === "edit" ? "refine" : video ? "animate" : "image",
+          sameSeed: change.action === "recreate",
+        };
+        jobId = await iterate(item, next);
+        queued.current = { item: item.id, issue, job: jobId };
+      }
       const was = item.rating ?? null;
       await ratings.mutateAsync({ ids: [item.id], rating: "disliked", issue });
+      queued.current = null;
       showDisliked(1, () => ratings.mutate({ ids: [item.id], rating: was }));
+      onQueued?.(jobId);
     },
   });
 }
@@ -59,15 +67,15 @@ export function useReportIssue(
 /** Report's Custom…: the issue as toggle chips and words. */
 export function ReportIssueDialog({
   item,
-  iterate,
+  onQueued,
   onClose,
 }: {
   item: MediaItem;
-  iterate?: (iteration: Iteration) => void;
+  onQueued?: (jobId: string) => void;
   onClose: () => void;
 }) {
   const phone = usePhone();
-  const fix = useReportIssue(item, iterate, true);
+  const fix = useReportIssue(item, onQueued, true);
   const [picked, setPicked] = useState<string[]>([]);
   const [details, setDetails] = useState("");
   const [finding, setFinding] = useState<ImageInspection>();

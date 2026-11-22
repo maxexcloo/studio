@@ -1,5 +1,5 @@
 import { runBackend } from "../shared/profiles.ts";
-import { withResolution } from "../shared/resolution.ts";
+import { isResolution, withResolution } from "../shared/resolution.ts";
 import { accountAccessForId } from "./account-store.js";
 import { moveTargets, onWorkerOffline, routeJob } from "./comfy/backends.js";
 import { comfyOn } from "./comfy/comfy.js";
@@ -58,6 +58,7 @@ export function createGenerationQueue({
   const { loadComfyContext, mediaModels, workerWorkloads } = catalogue;
   // This runtime owns only the IDs persisted in its own SQLite queue and gallery.
   const mediaLeases = new Map();
+  const restoringImages = new Set();
   const releaseLease = (id) => {
     mediaLeases.get(id)?.release();
     mediaLeases.delete(id);
@@ -137,8 +138,10 @@ export function createGenerationQueue({
       isRadianceWorker(workerById(backend)) ? "" : cancelPrompt(promptId, comfyOn(backend)),
     recover: async (job) => {
       if (isRadianceWorker(workerById(job.backend)) && !jobs.has(job.id)) {
-        recoverRadianceJob(job, store);
-        return;
+        const recovered = await recoverRadianceJob(job, store);
+        if (recovered?.status === "starting") restoringImages.add(job.id);
+        else restoringImages.delete(job.id);
+        return recovered;
       }
       if ((job.providerJobId || job.cancelRequested) && !jobs.has(job.id))
         jobs.set(job.id, {
@@ -301,6 +304,8 @@ export function createGenerationQueue({
         1,
       async slotWait(job, running) {
         if (!isRadianceWorker(workerById(job.backend))) return;
+        if (running.some((active) => restoringImages.has(active.id)))
+          return "Waiting for the worker to recover its interrupted image.";
         const wait = "Waiting for Radiance to finish before loading another model.";
         if (running.some((active) => modelOf(active.input) !== modelOf(job.input))) return wait;
         const models = running.map(
@@ -313,6 +318,7 @@ export function createGenerationQueue({
         if (next !== model) return wait;
       },
       settled: async (job) => {
+        restoringImages.delete(job.id);
         if (job.admittedAt !== undefined)
           logEvent("Queue job timing", {
             job: job.id,
@@ -420,15 +426,16 @@ export function createGenerationQueue({
         input.loras?.some((lora) => lora?.enabled !== false) ?? false,
       );
     else delete input.profileBackend;
-    // Every path (composer, Compare, Dream, MCP) applies an explicitly selected native tier.
-    const listed = (await mediaModels().catch(() => null))?.models?.profiles?.find(
-      (profile) => profile.id === input.profileId,
-    );
-    const sized = runProfile(listed, input.profileBackend);
-    try {
-      Object.assign(input, withResolution(input, sized));
-    } catch (error) {
-      return { status: 400, payload: { ok: false, error: error.message } };
+    if (isResolution(input.resolutionTier)) {
+      const listed = (await mediaModels().catch(() => null))?.models?.profiles?.find(
+        (profile) => profile.id === input.profileId,
+      );
+      const sized = runProfile(listed, input.profileBackend);
+      try {
+        Object.assign(input, withResolution(input, sized));
+      } catch (error) {
+        return { status: 400, payload: { ok: false, error: error.message } };
+      }
     }
     if (directCloud?.isProfile(input)) {
       try {

@@ -434,7 +434,7 @@ test("accepted observations persist changes without rewriting unchanged provider
     await queue.tick();
     assert.equal(writes, 6);
     for (const [key, value] of Object.entries(changed))
-      assert.deepEqual(store.job("alice", job.id)![key as keyof JobObservation], value);
+      assert.deepEqual(store.job("alice", job.id)![key as keyof OwnedJob], value);
     adapter.observe = async () => ({
       ...changed,
       progress: { value: 2, max: 8, phase: "sampling" },
