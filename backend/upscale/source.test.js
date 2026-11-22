@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
-import { recordedObjectInfo, startFakeComfy } from "../fixtures/fake-comfy.js";
+import { fixtureObjectInfo, startFakeComfy } from "../fixtures/fake-comfy.js";
 import { writeGalleryRows } from "../persistence/gallery-rows.ts";
 import { closeRuntimeDatabase, runtimeDatabase } from "../persistence/runtime.ts";
 import { modelFiles } from "./weights.js";
@@ -32,7 +32,7 @@ test(
       fs.ftruncateSync(fd, modelFiles[name].bytes);
       fs.closeSync(fd);
     }
-    const info = recordedObjectInfo();
+    const info = fixtureObjectInfo();
     const combo = (values) => ["COMBO", { options: values }];
     info.SeedVR2LoadDiTModel = {
       input: {
