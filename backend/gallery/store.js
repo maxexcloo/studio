@@ -272,7 +272,8 @@ export function unseenDreamReadiness(ownerId) {
     }));
 }
 
-const keyColumns = "key, value, gallery_ms, job_id, item_index, item_id";
+const positionColumns = "key, gallery_ms, job_id, item_index, item_id";
+const keyColumns = `${positionColumns}, value`;
 const rowKey = (row) => ({
   time: row.gallery_ms,
   jobId: row.job_id,
@@ -284,17 +285,17 @@ const rowKey = (row) => ({
  * The query's rows in gallery order after the order key `after`, read a batch at a time, so a walk
  * of the whole gallery never holds all of it.
  */
-function* galleryRows(query = {}, after = null) {
+function* galleryRows(query = {}, after = null, columns = keyColumns) {
   // Disliked First ranks both partitions after reading them. Each batch can use the order index.
   if (query.includeDisliked && query.unlisted === undefined) {
-    yield* galleryRows({ ...query, unlisted: false }, after);
-    yield* galleryRows({ ...query, unlisted: true }, after);
+    yield* galleryRows({ ...query, unlisted: false }, after, columns);
+    yield* galleryRows({ ...query, unlisted: true }, after, columns);
     return;
   }
   const base = where(query);
   const select = (conditions, params, limit) =>
     statement(
-      `SELECT ${keyColumns} FROM studio_gallery WHERE ${[base.sql.replace(/^WHERE /, ""), ...conditions].filter(Boolean).join(" AND ") || "1"} ORDER BY ${order} LIMIT ?`,
+      `SELECT ${columns} FROM studio_gallery WHERE ${[base.sql.replace(/^WHERE /, ""), ...conditions].filter(Boolean).join(" AND ") || "1"} ORDER BY ${order} LIMIT ?`,
     ).all(...base.params, ...params, limit);
   let from = after;
   for (;;) {
@@ -819,6 +820,15 @@ function* visibleRows(query, filter, start) {
   }
 }
 
+/** A plain sort only needs each candidate's position, rating and visibility. */
+function* sortableRows(query) {
+  const columns = `${positionColumns}, rating, status, json_extract(value, '$.createdAt') AS createdAt`;
+  for (const row of galleryRows(query, null, columns)) {
+    const item = { url: row.key, createdAt: row.createdAt, rating: row.rating, status: row.status };
+    if (hasGalleryMedia(item)) yield { row, item };
+  }
+}
+
 // Filtered and ranked lists (searches, comparisons, Find Similar) as their items' keys, so paging
 // through one walks the gallery once. Each is kept until an item moves into, out of or across it,
 // or a minute passes (picking up enrichment, such as a new caption a search would find).
@@ -832,7 +842,8 @@ function keptList(query, filter, filterKey, rank, sort) {
   const kept = name && lists.get(name);
   if (kept && kept.version === listVersion && Date.now() - kept.at <= listLifeMs) return kept;
   let entries = [];
-  for (const { row, item } of visibleRows(query, filter)) {
+  const candidates = filter || rank ? visibleRows(query, filter) : sortableRows(query);
+  for (const { row, item } of candidates) {
     const position = rowKey(row);
     if (sort === "liked" || sort === "disliked") position[sort] = item.rating === sort;
     entries.push({
