@@ -229,10 +229,13 @@ export function registerQueueRoutes(
         },
       };
     const pauses = store.pauses();
-    const jobs = listed(store, ownerId, { results: false });
+    const since = typeof query.since === "string" ? query.since : undefined;
+    const changes = since ? store.queueChanges(ownerId, since) : undefined;
+    const jobs = changes?.jobs ?? listed(store, ownerId, { results: false });
+    const rows = changes?.rows ?? jobs;
     const failedSets = new Set<string>();
     const mixedSets = new Set<string>();
-    for (const job of jobs) {
+    for (const job of rows) {
       if (!job.queueSet || job.priority === queuePriority.dream) continue;
       if (job.status === "failed") failedSets.add(job.queueSet);
       else if (job.status !== "cancelled") mixedSets.add(job.queueSet);
@@ -242,11 +245,10 @@ export function registerQueueRoutes(
       [...failedSets].filter((set) => !mixedSets.has(set)),
     );
     const listedAt = performance.now();
-    const since = typeof query.since === "string" ? query.since : undefined;
-    const order = dispatchOrder(jobs, queue);
+    const order = dispatchOrder(rows, queue);
     const payload = {
-      jobs: queued(ownerId, since ? jobs.filter((job) => job.updatedAt >= since) : jobs),
-      ...(since ? { ids: jobs.map((job) => job.id) } : {}),
+      jobs: queued(ownerId, jobs),
+      ...(changes ? { ids: rows.map((job) => job.id) } : {}),
       ...order,
       paused: { mine: pauses.has(ownerId), all: pauses.has(everyone) },
       clearableFailedSets,
@@ -259,7 +261,7 @@ export function registerQueueRoutes(
       onJsonSent(jsonSendMs: number) {
         pollProfile.requests += 1;
         if (since) pollProfile.deltaRequests += 1;
-        pollProfile.listedJobs += jobs.length;
+        pollProfile.listedJobs += rows.length;
         pollProfile.returnedJobs += payload.jobs.length;
         pollProfile.totalListMs += listMs;
         pollProfile.totalHydrateMs += hydrateMs;
