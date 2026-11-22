@@ -174,6 +174,10 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
     .fill("Use this portrait as a composition reference");
   const size = page.getByRole("button", { name: "Aspect", exact: true });
   await size.click();
+  await page
+    .getByRole("radiogroup", { name: "Resolution", exact: true })
+    .getByText("Custom")
+    .click();
   await page.getByRole("textbox", { name: "Width", exact: true }).fill("1280");
   await page.getByRole("textbox", { name: "Height", exact: true }).fill("768");
   await size.click();
@@ -527,11 +531,9 @@ test("LoRA trigger words toggle and published source links work in the gallery e
   await expect(inkbird).toBeChecked();
   await triggers.getByText("inkbird", { exact: true }).click();
   await expect(inkbird).not.toBeChecked();
-  await page.getByRole("button", { name: "Detail Slider Actions", exact: true }).click();
-  const source = page.getByRole("menuitem", { name: "View Source", exact: true });
+  const source = page.getByRole("link", { name: "View Source for Detail Slider", exact: true });
   await expect(source).toHaveAttribute("href", sourceUrl);
   await expect(source).toHaveAttribute("rel", "noopener noreferrer");
-  await page.keyboard.press("Escape");
   expect(state.jobs).toHaveLength(0);
   await closeLoras(page);
   await pressGenerate(page);
@@ -971,7 +973,20 @@ test("Image presets draw at the chosen resolution within profile constraints", a
   await resolution.locator("label").filter({ hasText: "Custom" }).click();
   await expect(width).toHaveValue("1024");
   await expect(sizes).toBeHidden();
-  await resolution.locator("label").filter({ hasText: "Presets" }).click();
+  await width.fill("1216");
+  await aspect.click();
+  const actions = page.getByRole("group", { name: "Generation Actions", exact: true });
+  await actions.getByRole("button", { name: "Clear", exact: true }).click();
+  await expect(aspect).toHaveText("Square · 1K");
+  await aspect.click();
+  await expect(resolution.getByRole("radio", { name: "Presets", exact: true })).toBeChecked();
+  await expect(sizes.getByRole("button", { name: /Square/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("Escape");
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A wide landscape");
+  await aspect.click();
   // The preset gives the shape; 1K sets its long edge, rounded to the profile's step.
   await sizes.getByRole("button", { name: "Landscape 1024 × 704", exact: true }).click();
   await expect(width).toBeHidden();

@@ -1,8 +1,19 @@
-import { Alert, Button, Group, MultiSelect, Stack, Switch, TextInput } from "@mantine/core";
+import {
+  Alert,
+  Button,
+  Group,
+  MultiSelect,
+  Select,
+  Stack,
+  Switch,
+  Text,
+  TextInput,
+} from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, type LucideIcon } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
+import { type CardKind, cardKinds } from "../../../../shared/characters";
 import { loraName } from "../../../../shared/profiles";
 import {
   type Project,
@@ -18,9 +29,12 @@ import { api } from "../../api";
 import { ClearButton } from "../../ui/ClearButton";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextToolsBar } from "../../ui/TextBox";
 import type { SheetTyping } from "../../ui/TextEntrySheet";
+import { useGroupFeature } from "../auth/AccountGate";
 import { CardForm } from "../characters/CardImages";
+import { charactersQuery, promptCardsQuery } from "../characters/queries";
 import { chipProps } from "../generation/chip";
 import { ChipSelect } from "../generation/ChipSelect";
 import { modelsQuery } from "../generation/GenerationProvider";
@@ -101,6 +115,78 @@ export const briefFields = [
 ] as const;
 export type BriefText = (typeof briefFields)[number][0];
 export const aspectLabel = (aspect: string) => (aspect.includes(":") ? aspect : titleCase(aspect));
+
+export function ProjectPins({
+  cards,
+  onChange,
+}: {
+  cards?: ProjectContent["cards"];
+  onChange?: (cards: NonNullable<ProjectContent["cards"]>) => void;
+}) {
+  const enabled = useGroupFeature("characters");
+  const lists = {
+    characters: useQuery({
+      ...charactersQuery,
+      enabled: enabled && Boolean(onChange || cards?.characters),
+    }),
+    outfits: useQuery({
+      ...promptCardsQuery("outfits"),
+      enabled: enabled && Boolean(onChange || cards?.outfits),
+    }),
+    scenes: useQuery({
+      ...promptCardsQuery("scenes"),
+      enabled: enabled && Boolean(onChange || cards?.scenes),
+    }),
+  };
+  if (!enabled || (!onChange && !cards)) return null;
+  return (
+    <SettingGroup title="Pinned Cards">
+      {onChange && (
+        <Text size="sm" c="dimmed">
+          Dream keeps pinned cards fixed and varies the open parts of the brief.
+        </Text>
+      )}
+      {(Object.keys(cardKinds) as CardKind[]).map((kind) => {
+        const label = titleCase(cardKinds[kind].name);
+        const id = cards?.[kind];
+        const list = lists[kind];
+        const current = list.data?.find((card) => card.id === id);
+        if (!onChange)
+          return id ? (
+            <SettingRow key={kind} label={label}>
+              <Text size="sm">
+                {current?.name || (list.isPending ? "Loading…" : "Unavailable")}
+              </Text>
+            </SettingRow>
+          ) : null;
+        const options = (list.data || []).map((card) => ({ value: card.id, label: card.name }));
+        if (list.isSuccess && id && !current) options.push({ value: id, label: "Unavailable" });
+        return (
+          <SettingRow key={kind} label={label} wide>
+            <Select
+              aria-label={label}
+              placeholder="Unpinned"
+              value={id || null}
+              data={options}
+              disabled={list.isPending}
+              error={list.error?.message}
+              clearable
+              searchable
+              comboboxProps={{ withinPortal: false }}
+              nothingFoundMessage="No Matches"
+              onChange={(value) => {
+                const next = { ...cards };
+                if (value) next[kind] = value;
+                else delete next[kind];
+                onChange(next);
+              }}
+            />
+          </SettingRow>
+        );
+      })}
+    </SettingGroup>
+  );
+}
 
 /** Saves a project's content, or a part of it: a new one without `id`. */
 export function useSaveProject(id?: string) {
@@ -278,7 +364,7 @@ export function ProjectForm({
     <DialogFooter pending={pending} onCancel={onClose}>
       <ClearButton
         disabled={pending}
-        onClear={() => setDraft({ ...structuredClone(blankProject), name: draft.name })}
+        onClear={() => setDraft({ ...structuredClone(blankProject), name: draft.name, cards: {} })}
       />
       <Button type="submit" loading={pending} disabled={!draft.name.trim()}>
         {action}
@@ -286,6 +372,9 @@ export function ProjectForm({
     </DialogFooter>
   );
   const alert = error && <Alert color="red">{error}</Alert>;
+  const pins = (
+    <ProjectPins cards={draft.cards} onChange={(cards) => setDraft({ ...draft, cards })} />
+  );
   return (
     <CardForm
       onSubmit={() => {
@@ -307,6 +396,7 @@ export function ProjectForm({
               {name}
             </div>
             <TextToolsBar.Provider value={toolsBar}>{fields}</TextToolsBar.Provider>
+            {!field && pins}
             {!field && alert}
           </Stack>
           <div className={classes.footer}>
@@ -329,6 +419,7 @@ export function ProjectForm({
         <>
           {name}
           {fields}
+          {pins}
           {chips}
           {alert}
           {footer}

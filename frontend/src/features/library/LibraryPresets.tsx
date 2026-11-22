@@ -1,4 +1,4 @@
-import { Alert, Button, Group, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
+import { Alert, Anchor, Button, Group, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
 import { SquareCheck } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -29,7 +29,7 @@ const savedOn = (preset: Preset) =>
   preset.savedAt ? savedDate.format(new Date(preset.savedAt)) : "";
 
 /**
- * Library › Presets: the account's presets with what each holds. Edit in Composer loads one there,
+ * Library › Presets: the account's presets with what each holds. Selecting a name loads it in Composer,
  * where Save Preset updates it; Rename and Delete act here.
  */
 export function LibraryPresets({ heading }: { heading: ReactNode }) {
@@ -166,11 +166,28 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
               header: "Name",
               main: true,
               sortValue: (preset) => preset.title,
-              cell: (preset) => (
-                <Text size="sm" fw={500} truncate>
-                  {preset.title}
-                </Text>
-              ),
+              cell: (preset) =>
+                selection ? (
+                  <Text size="sm" fw={500} truncate>
+                    {preset.title}
+                  </Text>
+                ) : (
+                  <Anchor
+                    component="button"
+                    type="button"
+                    size="sm"
+                    fw={500}
+                    truncate
+                    maw="100%"
+                    aria-label={`Edit ${preset.title} in Composer`}
+                    onClick={() => {
+                      if (loading(preset).replaces) setReplacing(preset);
+                      else edit(preset);
+                    }}
+                  >
+                    {preset.title}
+                  </Anchor>
+                ),
             },
             {
               key: "holds",
@@ -199,15 +216,6 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
               ? undefined
               : (preset) => (
                   <>
-                    <Menu.Item
-                      leftSection={<icons.edit size={16} />}
-                      onClick={() => {
-                        if (loading(preset).replaces) setReplacing(preset);
-                        else edit(preset);
-                      }}
-                    >
-                      Edit in Composer
-                    </Menu.Item>
                     <Menu.Item
                       leftSection={<icons.rename size={16} />}
                       onClick={() => {

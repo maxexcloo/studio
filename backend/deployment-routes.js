@@ -11,6 +11,7 @@ import {
   saveFlag,
   settingSource,
 } from "./deployment-settings.js";
+import { mediaDefaultProfileKeys } from "./generation-defaults.js";
 import { requireAdmin } from "./route-access.js";
 
 /**
@@ -47,8 +48,8 @@ export function registerDeploymentRoutes(
     res.json({
       ok: true,
       defaults: {
-        image: defaultFor("STUDIO_DEFAULT_IMAGE_PROFILE", models.defaults?.imageModel),
-        video: defaultFor("STUDIO_DEFAULT_VIDEO_PROFILE", models.defaults?.videoModel),
+        image: defaultFor(mediaDefaultProfileKeys.image, models.defaults?.imageModel),
+        video: defaultFor(mediaDefaultProfileKeys.video, models.defaults?.videoModel),
         text: defaultFor(defaultTextProfileKey, text),
         textModels: assistantEngine ? await textModels(assistantEngine, workloadModels()) : [],
         profiles,

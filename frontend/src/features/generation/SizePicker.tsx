@@ -19,6 +19,7 @@ import {
   grokVideoDefaultResolution,
   isResolution,
   orderedAspects,
+  profileImageSize,
   resolutionSize,
   selectedResolution,
 } from "../../../../shared/resolution";
@@ -81,15 +82,6 @@ export function SizePicker({
   // One tab per resolution the presets draw at (a single one reads Presets), then Custom's own
   // width and height where the model takes any size.
   const views: string[] = native.length ? native : choices.length ? choices : ["presets"];
-  const tabs = [
-    ...(presets.length
-      ? views.map((value) => ({
-          value,
-          label: views.length > 1 ? value.toUpperCase() : "Presets",
-        }))
-      : []),
-    ...(native.length ? [] : [{ value: "custom", label: "Custom" }]),
-  ];
   const sizeAt = (preset: Size, view: string): Size | undefined => {
     if (native.length) return (preset as (typeof presets)[number]).sizes?.[view];
     if (!isResolution(view)) return preset;
@@ -98,12 +90,32 @@ export function SizePicker({
   };
   const current = { w: input.width, h: input.height };
   const same = (a: Size | undefined, b: Size) => a?.w === b.w && a?.h === b.h;
-  // A preset of the current shape is the active one; the exact size is in the title.
-  const active = presets.find((preset) => preset.w * current.h === preset.h * current.w);
-  // The view whose preset draws the current size, explicitly or by matching it exactly.
+  const defaultSize = profileImageSize(profile, input.kind);
+  const defaultPreset = { label: "Default", w: defaultSize.width, h: defaultSize.height };
+  const defaultView =
+    profile &&
+    !native.length &&
+    !views.some((view) => presets.some((preset) => same(sizeAt(preset, view), defaultPreset)));
+  const tabs = [
+    ...(defaultView ? [{ value: "default", label: "Default" }] : []),
+    ...(presets.length
+      ? views.map((value) => ({
+          value,
+          label: views.length > 1 ? value.toUpperCase() : "Presets",
+        }))
+      : []),
+    ...(native.length ? [] : [{ value: "custom", label: "Custom" }]),
+  ];
   const matched = native.length
     ? nativeResolution
-    : tier || views.find((view) => presets.some((preset) => same(sizeAt(preset, view), current)));
+    : tier ||
+      views.find((view) => presets.some((preset) => same(sizeAt(preset, view), current))) ||
+      (defaultView && same(defaultPreset, current) ? "default" : undefined);
+  const active =
+    matched === "default"
+      ? defaultPreset
+      : (matched && presets.find((preset) => same(sizeAt(preset, matched), current))) ||
+        presets.find((preset) => preset.w * current.h === preset.h * current.w);
   const shown =
     (tier && sizeAt(current, tier)) ||
     (active && native.length && sizeAt(active, matched!)) ||
@@ -115,7 +127,7 @@ export function SizePicker({
     ? ["Reference", aspect, native.length ? nativeResolution.toUpperCase() : ""]
         .filter(Boolean)
         .join(" · ")
-    : active && matched && matched !== "presets"
+    : active && matched && matched !== "presets" && matched !== "default"
       ? `${active.label} · ${matched.toUpperCase()}`
       : active
         ? `${active.label} · ${shown.w} × ${shown.h}`
@@ -159,6 +171,8 @@ export function SizePicker({
                 setTab(value);
                 if (native.length) onChange({ resolution: value });
                 else if (isResolution(value)) onChange({ resolutionTier: value });
+                else if (value === "default")
+                  onChange({ ...defaultSize, resolutionTier: undefined });
                 // Custom starts from the size drawn now.
                 else if (value === "custom" && tier)
                   onChange({ width: shown.w, height: shown.h, resolutionTier: undefined });
@@ -195,7 +209,7 @@ export function SizePicker({
             </SimpleGrid>
           ) : (
             <Stack gap={4} role="group" aria-label="Aspect Presets">
-              {presets.map((preset) => {
+              {(view === "default" ? [defaultPreset] : presets).map((preset) => {
                 const size = sizeAt(preset, view);
                 const selected = preset === active && view === matched;
                 return (

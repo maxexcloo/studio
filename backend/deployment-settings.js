@@ -1,6 +1,7 @@
 import { dreamOverrideKeys } from "../shared/dream.ts";
 import { defaultTextProfileKey } from "./account-preferences.js";
 import { dataDir } from "./data-dir.js";
+import { mediaDefaultProfileKeys } from "./generation-defaults.js";
 import { savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 /**
@@ -89,8 +90,7 @@ export const catalogueFlags = [
 
 /** The default profiles Settings › Generation saves. */
 export const defaultProfileKeys = [
-  "STUDIO_DEFAULT_IMAGE_PROFILE",
-  "STUDIO_DEFAULT_VIDEO_PROFILE",
+  ...Object.values(mediaDefaultProfileKeys),
   defaultTextProfileKey,
 ];
 const known = new Set([

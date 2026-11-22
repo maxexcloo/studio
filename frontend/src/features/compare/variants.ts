@@ -35,7 +35,7 @@ export function draftVariants(draft: Draft): Variant[] {
   const current = { input: draft.input, references: draft.references };
   return draft.compare
     ? draft.compare.variants.map((variant, index) =>
-        index === draft.compare!.active ? current : variant,
+        index === draft.compare!.active ? { ...variant, ...current } : variant,
       )
     : [current];
 }
@@ -53,7 +53,7 @@ export function showVariant(draft: Draft, variants: Variant[], index: number): D
 /** Adds a copy of the variant being edited, then edits the copy. */
 export function addVariant(draft: Draft): Draft {
   const variants = draftVariants(draft);
-  const next = [...variants, variants[draft.compare?.active ?? 0]];
+  const next = [...variants, { input: draft.input, references: draft.references }];
   return showVariant(draft, next, next.length - 1);
 }
 

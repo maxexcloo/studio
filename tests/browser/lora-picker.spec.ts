@@ -15,7 +15,6 @@ import {
 
 test("LoRA ratings persist and order the list, search narrows the choices, and Trigger Words reach the generation", async ({
   page,
-  isMobile,
 }) => {
   const state = await fixtures(page);
   await page.route("**/api/loras/info", (route) =>
@@ -60,7 +59,7 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
     )
     .toEqual(["Soft Style", "Detail Slider"]);
   // Sorting by name sets the ratings aside.
-  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await page.getByRole("button", { name: "Sort LoRAs", exact: true }).click();
   await page.getByRole("menuitemradio", { name: "Name A–Z", exact: true }).click();
   await expect
     .poll(() =>
@@ -70,7 +69,7 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
     )
     .toEqual(["Detail Slider", "Soft Style"]);
   // Most Used leads with the LoRA the account ran most.
-  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await page.getByRole("button", { name: "Sort LoRAs", exact: true }).click();
   await expect(page.getByRole("menuitemradio")).toHaveText([
     "Most Used",
     "Least Used",
@@ -88,7 +87,7 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
     )
     .toEqual(["Soft Style", "Detail Slider"]);
   for (const sort of ["Least Used", "Disliked First"]) {
-    await page.getByRole("button", { name: "Sort", exact: true }).click();
+    await page.getByRole("button", { name: "Sort LoRAs", exact: true }).click();
     await page.getByRole("menuitemradio", { name: sort, exact: true }).click();
     await expect(
       choices.getByRole("button", { name: /^(Soft Style|Detail Slider)$/ }).first(),
@@ -121,20 +120,17 @@ test("LoRA ratings persist and order the list, search narrows the choices, and T
   await triggers.getByText("a long exact trigger, with punctuation", { exact: true }).click();
   await expect(lastTrigger).not.toBeChecked();
   const row = controls.getByRole("listitem", { name: "loras Detail Slider", exact: true });
-  const action = row.getByRole("button", { name: "Detail Slider Actions", exact: true });
-  const menu = controls.getByRole("menu", { name: "Detail Slider Actions", exact: true });
   const enabled = row.getByRole("switch", { name: "Enable Detail Slider", exact: true });
-  if (isMobile) await action.tap();
-  else await enabled.click({ button: "right" });
-  await expect(menu.getByRole("menuitem", { name: "View Source", exact: true })).toHaveAttribute(
-    "href",
-    "https://example.com/detail",
-  );
-  await page.keyboard.press("Escape");
-  await enabled.press("Shift+F10");
-  await expect(menu.getByRole("menuitemcheckbox", { name: "Enabled", exact: true })).toBeChecked();
-  await expect(menu.getByRole("menuitem", { name: "Remove", exact: true })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await expect(
+    row.getByRole("link", { name: "View Source for Detail Slider", exact: true }),
+  ).toHaveAttribute("href", "https://example.com/detail");
+  await expect(enabled).toBeChecked();
+  await enabled.click();
+  await expect(enabled).not.toBeChecked();
+  await enabled.click();
+  await expect(
+    row.getByRole("button", { name: "Remove Detail Slider", exact: true }),
+  ).toBeVisible();
   await closeLoras(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A quiet bird");
   await pressGenerate(page);
@@ -168,7 +164,7 @@ test("Escape inside the LoRA picker closes only its innermost layer", async ({
   await page.keyboard.press("Escape");
   await expect(controls).toBeVisible();
   // An open sort menu closes first.
-  const sort = controls.getByRole("button", { name: "Sort", exact: true });
+  const sort = controls.getByRole("button", { name: "Sort LoRAs", exact: true });
   await sort.click();
   await expect(sort).toHaveAttribute("aria-expanded", "true");
   await expect(controls.getByRole("menuitemradio", { name: "Name A–Z" })).toBeVisible();

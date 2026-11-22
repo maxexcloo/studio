@@ -195,12 +195,18 @@ function where(query = {}) {
     );
   if (query.prompt !== undefined) add("json_extract(value, '$.prompt') = ?", query.prompt);
   if (query.titled) add("json_extract(value, '$.title') IS NOT NULL");
-  // Two seeks, as an OR across columns would walk the whole gallery for a few recent items.
-  if (query.since)
+  if (query.since) {
+    const pending =
+      (query.status === undefined || [query.status].flat().includes("pending")) &&
+      ![query.notStatus].flat().includes("pending");
+    // Two seeks, as an OR across columns would walk the whole gallery for a few recent items.
     add(
-      "rowid IN (SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_status WHERE status = 'pending' UNION SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_created WHERE created_ms >= ?)",
+      pending
+        ? "rowid IN (SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_status WHERE status = 'pending' UNION SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_created WHERE created_ms >= ?)"
+        : "created_ms >= ?",
       Number(query.since),
     );
+  }
   if (query.before !== undefined) add("created_ms <= ?", Number(query.before));
   if (query.idPrefix)
     add("item_id >= ? AND item_id < ?", query.idPrefix, `${query.idPrefix}\uffff`);
@@ -317,18 +323,20 @@ function* galleryRows(query = {}, after = null, columns = keyColumns) {
  * record, or all of them once it is gone.
  */
 export function* eachGalleryItem(query = {}, after) {
+  const unlisted = query.unlistedFirst ? [true, false] : [false, true];
   const from =
     after &&
-    statement(`SELECT ${keyColumns}, uploaded, unlisted FROM studio_gallery WHERE key = ?`).get(
-      after,
-    );
+    statement(
+      `SELECT ${positionColumns}, uploaded, unlisted FROM studio_gallery WHERE key = ?`,
+    ).get(after);
+  const placeOf = (uploaded, hidden) => Number(uploaded) * 2 + unlisted.indexOf(Boolean(hidden));
+  const fromPlace = from ? placeOf(from.uploaded, from.unlisted) : -1;
   for (const uploaded of query.uploaded === undefined ? [false, true] : [query.uploaded])
-    for (const unlisted of query.unlisted === undefined ? [false, true] : [query.unlisted]) {
-      const place = Number(uploaded) * 2 + Number(unlisted);
-      const fromPlace = from ? from.uploaded * 2 + from.unlisted : -1;
+    for (const hidden of query.unlisted === undefined ? unlisted : [query.unlisted]) {
+      const place = placeOf(uploaded, hidden);
       if (place < fromPlace) continue;
       const rows = galleryRows(
-        { ...query, uploaded, unlisted },
+        { ...query, uploaded, unlisted: hidden },
         place === fromPlace ? rowKey(from) : null,
       );
       for (const row of rows) yield parse(row);

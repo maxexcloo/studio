@@ -5,9 +5,9 @@ import { resolutionSize } from "../shared/resolution.ts";
 import "./fixtures/sample-profiles.js";
 import { frameSize } from "./animate-profile.js";
 import { saveImportedWorkflow } from "./custom-workflows.js";
+import { profileAspectSize } from "./generation-defaults.js";
 import { createGenerationSubmission } from "./generation-routes.js";
 import { customWorkflowGraph } from "./graphs.js";
-import { mcpSize } from "./mcp/controls.js";
 import {
   inferModels,
   sizedRange,
@@ -118,7 +118,7 @@ for (const { model, family, step, size, maxWidth } of [
       assert.equal(w % step, 0);
       assert.equal(h % step, 0);
     }
-    const aspect = mcpSize(profile, { aspect: "13:6" });
+    const aspect = profileAspectSize(profile, { aspect: "13:6" });
     const tier = resolutionSize(aspect, "2K", profile);
     assert.equal(tier.width, maxWidth);
     assert.equal(tier.height % step, 0);

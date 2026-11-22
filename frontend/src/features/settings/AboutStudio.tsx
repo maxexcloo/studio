@@ -92,7 +92,7 @@ function Help() {
           />
         </SettingRow>
         <SettingRow label="Troubleshooting" description="Common errors and how to fix them.">
-          {link(`${repository}/blob/main/README.md#troubleshooting`, "Troubleshooting")}
+          {link(`${repository}/blob/main/CONFIGURATION.md#troubleshooting`, "Troubleshooting")}
         </SettingRow>
       </SettingGroup>
       {phone || (
