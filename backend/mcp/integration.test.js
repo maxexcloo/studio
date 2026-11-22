@@ -1084,7 +1084,7 @@ test("media and administrator credentials discover only their own friendly tools
   );
   assert.match(
     media.getInstructions(),
-    /search \(uploads: true, query: filename\).*reference_asset_ids.*upload_link if missing/,
+    /search with uploads: true, kind: image, and the exact filename if known\. Omit query.*reference_asset_ids.*upload_link.*wait for their upload/,
   );
   assert.doesNotMatch(media.getInstructions(), /GPU|\bapply\b/);
   assert.match(admin.getInstructions(), /get approval before apply/);
@@ -2615,7 +2615,7 @@ test("invalid uploads and unsupported waits are refused without accessing anothe
   assert.equal(empty.isError, true);
   assert.match(
     texts(empty),
-    /search with uploads: true and its filename first.*call upload_link.*pass its reference_asset_id to generate/,
+    /search with uploads: true.*Omit query.*reference_asset_ids.*upload_link.*wait for their upload/,
   );
   const speck = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#000" } })
     .png()
@@ -2978,6 +2978,15 @@ test("a chat image becomes the linked person's Upload and is refused for anyone 
   );
   // Its own chats find the filename and take that asset as a reference.
   const client = await f.client("librechat-linked");
+  const missed = await call(client, "search", {
+    uploads: true,
+    kind: "image",
+    query: "incorrect-filename.png",
+  });
+  assert.deepEqual(data(missed).results, []);
+  assert.match(texts(missed), /Omit query to check recent uploads.*use upload_link/);
+  const [recent] = data(await call(client, "search", { uploads: true, kind: "image" })).results;
+  assert.equal(recent.reference_asset_id, asset.id);
   const [match] = data(
     await call(client, "search", { uploads: true, kind: "image", query: "beach.png" }),
   ).results;
