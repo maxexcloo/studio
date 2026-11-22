@@ -1,20 +1,23 @@
-import { ActionIcon, Badge, Box, Button, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Box, Button, Modal, Radio, Stack, Text, Tooltip } from "@mantine/core";
 import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   type Dispatch,
   type ReactNode,
   type SetStateAction,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
 import { flushSync } from "react-dom";
 
+import { type DreamPassReason, dreamPassReasons } from "../../../../shared/dream";
 import { failure, post } from "../../api";
 import type { MediaItem } from "../../types";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { layerAbove } from "../../ui/popupClicks";
+import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
 import { mediaSource } from "../gallery/mediaSource";
 import { galleryKey } from "../gallery/queries";
@@ -26,19 +29,16 @@ import type { Verdict } from "./choices";
 import { type DeckCard, type PairDeckCard, cardIds, deckCards } from "./deck";
 import { DeckButtons, DeckUndo } from "./DeckButtons";
 import { DeckMedia } from "./DeckMedia";
-import {
-  CardText,
-  DreamPreview,
-  PreviewFace,
-  PreviewSides,
-  isPreviewBackdrop,
-} from "./DreamPreview";
-import { LibrarySuggest } from "./LibrarySuggest";
+import { CardText, DreamPreview } from "./DreamPreview";
+import { DreamSuggestions } from "./DreamSuggestions";
 import { PairContent } from "./PairCard";
 import {
   type DreamItem,
   type DreamMedia,
   type PairAnswer,
+  type SetOverride,
+  type SetOverrides,
+  comparisonVotes,
   dreamItemPath,
   dreamQuery,
   libraryReviewPath,
@@ -52,21 +52,30 @@ import classes from "./DreamPage.module.css";
 type SingleCard = Exclude<DeckCard, PairDeckCard>;
 /** The deck's verdicts, the ways their cards fly. */
 const directions: Record<string, Direction> = { discard: "left", keep: "right", like: "up" };
-/** A pair is answered by its direction: A left, B right, Both up and Neither down. */
-const answers: Record<Direction, PairAnswer> = {
+const comparisonSwipes: Record<Direction, PairAnswer> = {
   left: "a",
   right: "b",
   up: "both",
   down: "neither",
 };
-const answerDirections = Object.fromEntries(
-  Object.entries(answers).map(([direction, answer]) => [answer, direction]),
-) as Record<PairAnswer, Direction>;
+const answerDirections: Record<PairAnswer, Direction> = {
+  a: "left",
+  b: "right",
+  c: "right",
+  both: "up",
+  neither: "down",
+};
 const keyDirections: Record<string, Direction> = {
   ArrowLeft: "left",
   ArrowRight: "right",
   ArrowUp: "up",
   ArrowDown: "down",
+};
+const passLabels: Record<DreamPassReason, string> = {
+  taste: "Not My Taste",
+  similar: "Too Similar",
+  glitch: "Glitch",
+  skip: "Skip Feedback",
 };
 /** Warms the browser cache for a card that is not on screen yet. */
 function usePrefetch(card?: DeckCard) {
@@ -79,36 +88,44 @@ function usePrefetch(card?: DeckCard) {
   }, [card]);
 }
 
-export type Judgement =
-  | { card: SingleCard; verdict: Verdict }
-  | { card: PairDeckCard; verdict: PairAnswer; like?: true };
+export type Judgement = (
+  | { card: SingleCard; verdict: Verdict; likedId?: string; overrides?: SetOverrides }
+  | { card: PairDeckCard; verdict: PairAnswer }
+) & { passReason?: DreamPassReason };
 
 /**
  * Sends a verdict: Dream results move to the gallery or, disliked, out of sight; gallery images
  * teach, and a Like or Dislike rates them too. A card whose item has gone since it was drawn
  * just leaves the deck; other failures put it back.
  */
-export function useJudge(onFailed: (card: DeckCard) => void) {
+export function useJudge(onFailed: (card: DeckCard, judgement: Judgement) => void) {
   const client = useQueryClient();
   const openComposer = useOpenComposer();
   const { setDraft } = useGenerationActions();
   return useMutation({
     mutationFn: async (judgement: Judgement) => {
+      if (judgement.passReason && judgement.card.kind !== "library")
+        return post("/api/dream/pass", {
+          ids: cardIds(judgement.card),
+          reason: judgement.passReason,
+        });
       if (judgement.card.kind === "pair") {
         return post(pairAnswerPath(judgement.card.pairId), {
           answer: judgement.verdict,
-          ...("like" in judgement && judgement.like && { like: true }),
         });
       }
       if (judgement.card.kind === "set")
         return post(setAnswerPath(judgement.card.setId), {
           ids: cardIds(judgement.card),
           verdict: judgement.verdict,
+          ...("likedId" in judgement && judgement.likedId && { likedId: judgement.likedId }),
+          ...("overrides" in judgement &&
+            judgement.overrides && { overrides: judgement.overrides }),
         });
       const { item } = judgement.card;
       const verdict = judgement.verdict as Verdict;
       if (judgement.card.kind === "library")
-        return verdict === "keep"
+        return verdict === "keep" || (judgement.passReason && judgement.passReason !== "taste")
           ? post(libraryReviewPath(item), { reviewed: true })
           : post("/api/gallery/favorite", {
               ids: [item.id],
@@ -134,10 +151,10 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
     // A verdict and its Undo run in order.
     scope: { id: "dream-judgements" },
     meta: { inlineError: true },
-    onError: (error, { card }) => {
+    onError: (error, judgement) => {
       if (gone(error)) return;
       failure(error);
-      onFailed(card);
+      onFailed(judgement.card, judgement);
     },
     onSettled: () => refresh(client),
   });
@@ -157,9 +174,9 @@ const refresh = (client: QueryClient) =>
 function useUndo(onFailed: (judgement: Judgement) => void, onGone: (card: DeckCard) => void) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async ({ card, verdict }: Judgement) => {
+    mutationFn: async ({ card, verdict, passReason }: Judgement) => {
       if (card.kind === "library")
-        return verdict === "keep"
+        return verdict === "keep" || (passReason && passReason !== "taste")
           ? post(libraryReviewPath(card.item), { reviewed: false })
           : post("/api/gallery/favorite", {
               ids: [card.item.id],
@@ -223,8 +240,13 @@ export function DreamDeck({
   // The top card open in the preview, and a comparison's side shown there.
   const [viewing, setViewing] = useState<{ key: string; side: number } | null>(null);
   // The side a tap chose, outlined while its card leaves.
-  const [selected, setSelected] = useState<{ key: string; side: 0 | 1 }>();
-  const [picked, setPicked] = useState<{ key: string; side: 0 | 1 } | null>(null);
+  const [selected, setSelected] = useState<{ key: string; side: number }>();
+  const [picked, setPicked] = useState<{ key: string; side: number } | null>(null);
+  const [setDraft, setSetDraft] = useState<{ key: string; overrides: SetOverrides }>();
+  const [passing, setPassing] = useState<string>();
+  const [passReason, setPassReason] = useState<DreamPassReason>();
+  const passDialogId = useId();
+  const closePass = closeWhenTop(passDialogId, () => setPassing(undefined));
   /** Puts a card back on the deck, after a failed verdict or an Undo. */
   const restore = (card: DeckCard) => {
     setCurrent(card);
@@ -234,13 +256,19 @@ export function DreamDeck({
       return next;
     });
   };
-  const judge = useJudge((card) => {
+  const restoreDraft = (judgement: Judgement) => {
+    if ("overrides" in judgement && judgement.overrides)
+      setSetDraft({ key: judgement.card.key, overrides: judgement.overrides });
+  };
+  const judge = useJudge((card, judgement) => {
     setHistory((previous) => previous.filter((judgement) => judgement.card !== card));
     restore(card);
+    restoreDraft(judgement);
   });
   const takeBack = useUndo(
     (judgement) => {
       decide(judgement.card);
+      setSetDraft((draft) => (draft?.key === judgement.card.key ? undefined : draft));
       setHistory((previous) => [...previous, judgement]);
     },
     (card) => decide(card),
@@ -255,16 +283,17 @@ export function DreamDeck({
     : deckCards(items, { media, current });
   const [top] = cards;
   if (top !== current) setCurrent(top);
-  const shown =
+  const requestedSide =
     viewing?.key === top?.key
       ? (viewing?.side ?? 0)
       : selected?.key === top?.key
         ? (selected?.side ?? 0)
         : 0;
+  const shown =
+    top?.kind === "set" || top?.kind === "pair" ? Math.min(requestedSide, top.items.length - 1) : 0;
   usePrefetch(cards[2]);
   const fly = useRef<Fly | null>(null);
   const previewFly = useRef<Fly | null>(null);
-  const backdropTap = useRef(false);
   const busy = useRef(false);
 
   /** Takes the card off the deck. */
@@ -278,6 +307,11 @@ export function DreamDeck({
   }
   /** Takes the card off the deck and sends its judgement, which Undo can take back. */
   function commit(judgement: Judgement) {
+    if (judgement.card.kind === "set" && setDraft?.key === judgement.card.key) {
+      if (Object.keys(setDraft.overrides).length)
+        judgement = { ...judgement, overrides: setDraft.overrides } as Judgement;
+      setSetDraft(undefined);
+    }
     decide(judgement.card);
     judge.mutate(judgement);
     setHistory((previous) => [...previous, judgement]);
@@ -292,38 +326,48 @@ export function DreamDeck({
     if (card.kind === "dream") returnItems([card.item]);
     else if (card.kind === "pair" || card.kind === "set") returnItems(card.items);
     restore(card);
+    restoreDraft(last);
     takeBack.mutate(last);
   }
   /** Flies the top card out its way, on the deck or in the preview, then commits the verdict. */
-  async function act(choice: Verdict | PairAnswer) {
+  const isPass = (choice: Verdict | PairAnswer) =>
+    top?.kind === "pair" ? choice === "neither" : top?.kind !== "set" && choice === "discard";
+  const askPass = () => {
+    setPassReason(undefined);
+    setPassing(top?.key);
+  };
+  async function act(choice: Verdict | PairAnswer, reason?: DreamPassReason) {
     if (!top || busy.current) return;
+    if (isPass(choice) && !reason) return askPass();
     busy.current = true;
     const out = (viewing ? previewFly : fly).current;
     try {
       if (top.kind === "pair") {
-        const like = choice === "like";
-        const answer = like ? (shown ? "b" : "a") : (choice as PairAnswer);
+        const answer = choice as PairAnswer;
         if (!(answer in answerDirections)) return;
-        if (answer === "a" || answer === "b")
-          setPicked({ key: top.key, side: answer === "a" ? 0 : 1 });
-        await out?.(like ? "up" : answerDirections[answer]);
-        return commit({ card: top, verdict: answer, ...(like && { like: true }) });
+        const side = comparisonVotes.findIndex((vote) => vote === answer);
+        if (side >= top.items.length) return;
+        if (side >= 0) setPicked({ key: top.key, side });
+        await out?.(answerDirections[answer]);
+        return commit({ card: top, verdict: answer, passReason: reason });
       }
       if (!(choice in directions)) return;
+      const likedId =
+        top.kind === "set" && viewing && choice === "like" ? top.items[shown].id : undefined;
       await out?.(directions[choice]);
-      commit({ card: top, verdict: choice as Verdict });
+      commit({ card: top, verdict: choice as Verdict, likedId, passReason: reason });
     } finally {
       busy.current = false;
     }
   }
   /** What a swipe or arrow key in a direction means for the top card. */
-  const intent = (direction: Direction): Verdict | PairAnswer | null =>
-    top?.kind === "pair"
-      ? direction === "up"
-        ? "like"
-        : answers[direction]
-      : ({ left: "discard", right: "keep", up: "like", down: null } as const)[direction];
-  /** Arrow keys judge and U or Z undoes, on the deck and in its preview. */
+  const intent = (card: DeckCard, direction: Direction): Verdict | PairAnswer | null => {
+    if (card.kind !== "pair")
+      return ({ left: "discard", right: "keep", up: "like", down: null } as const)[direction];
+    if (card.items.length === 3 && (direction === "left" || direction === "right")) return null;
+    return comparisonSwipes[direction];
+  };
+  /** Arrow keys judge and U or Z undoes in the deck. */
   function respond(event: KeyboardEvent) {
     const direction = keyDirections[event.key];
     const undoKey = event.key === "u" || event.key === "z";
@@ -339,7 +383,7 @@ export function DreamDeck({
     if (target.closest("input, textarea, select, [contenteditable='true'], [role='slider']"))
       return;
     if (undoKey) return undo();
-    const choice = intent(direction);
+    const choice = top && intent(top, direction);
     if (!choice) return;
     event.preventDefault();
     void act(choice);
@@ -357,42 +401,44 @@ export function DreamDeck({
   // The preview follows the top card, opening a comparison on its first side.
   if (viewing && !top) setViewing(null);
   else if (viewing && top && viewing.key !== top.key) setViewing({ key: top.key, side: 0 });
+  else if (viewing && viewing.side !== shown) setViewing({ ...viewing, side: shown });
   const open = (card: DeckCard, side = 0) => setViewing({ key: card.key, side });
+  function toggleOverride(id: string, value: SetOverride) {
+    if (top?.kind !== "set" || busy.current) return;
+    setSetDraft((draft) => {
+      const overrides = { ...(draft?.key === top.key ? draft.overrides : undefined) };
+      if (overrides[id] === value) delete overrides[id];
+      else overrides[id] = value;
+      return { key: top.key, overrides };
+    });
+  }
   /** Opens the side of a comparison pressed, or a single card. */
   const openPressed = (card: DeckCard, target: HTMLElement) =>
     open(card, Number(target.closest<HTMLElement>("[data-side]")?.dataset.side ?? 0));
   function closePreview() {
     if (!viewing || !top) return;
-    const item = top.kind === "pair" ? top.items[viewing.side] : top.item;
+    const item = top.kind === "pair" ? top.items[shown] : top.item;
     // The preview mounts open, so Mantine has no opening to return focus from.
     flushSync(() => {
-      if (top.kind === "pair") setSelected({ key: top.key, side: viewing.side ? 1 : 0 });
+      if (top.kind === "pair") setSelected({ key: top.key, side: shown });
       setViewing(null);
     });
     document
       .querySelector<HTMLElement>(`[data-depth="0"] [data-preview-id="${CSS.escape(item.id)}"]`)
       ?.focus({ preventScroll: true });
   }
-  function tapBackdrop(target: HTMLElement, x: number, y: number) {
-    backdropTap.current = isPreviewBackdrop(target, x, y);
-  }
-  /** The deck's card, or with `full` the preview's, for the top card or the one beneath. */
-  const swipeCard = (card: DeckCard, full: boolean) => {
+  /** A card in the deck, with only its top card interactive. */
+  const swipeCard = (card: DeckCard) => {
     const isTop = card === top;
-    const playing = isTop && (full || !viewing);
-    const side = isTop && viewing ? viewing.side : 0;
-    const multi = card.kind === "pair" || card.kind === "set";
+    const playing = isTop && !viewing;
     return (
       <SwipeCard
         key={card.key}
         depth={cards.indexOf(card)}
         paused={!playing}
         video={(card.kind === "pair" ? card.items[0] : card.item).type === "video"}
-        previewSide={full && multi ? side : undefined}
-        still={full && multi}
-        full={full}
         view={
-          !full && isTop && card.kind === "set" ? (
+          isTop && card.kind === "set" ? (
             <Button
               variant="default"
               size="compact-sm"
@@ -401,7 +447,7 @@ export function DreamDeck({
             >
               View Set ({card.items.length})
             </Button>
-          ) : !full && isTop && card.kind !== "pair" ? (
+          ) : isTop && card.kind !== "pair" ? (
             <Tooltip label="View">
               <ActionIcon
                 variant="default"
@@ -414,40 +460,32 @@ export function DreamDeck({
             </Tooltip>
           ) : undefined
         }
-        fly={full ? previewFly : fly}
-        pair={card.kind === "pair"}
+        fly={fly}
+        comparisonSize={card.kind === "pair" ? card.items.length : undefined}
         label={cardLabel(card, isTop)}
         hints={
           card.kind === "pair"
-            ? full
-              ? {}
-              : { left: "A", right: "B", up: "Like", down: "Neither" }
-            : { left: "Dislike", right: "Accept", up: "Like", ...(full && { down: "Close" }) }
+            ? {
+                ...(card.items.length === 2 && { left: "A", right: "B" }),
+                up: "Accept",
+                down: "Pass",
+              }
+            : { left: card.kind === "set" ? "Deny All" : "Pass", right: "Accept", up: "Super Like" }
         }
-        onTap={full ? tapBackdrop : (target) => openPressed(card, target)}
-        onHold={full ? undefined : (target) => openPressed(card, target)}
-        onSwipe={(direction, target) => {
-          if (full && direction === "down") return closePreview();
-          if (card.kind === "pair" && direction === "up") {
-            const side = target.closest<HTMLElement>("[data-side]")?.dataset.side ?? String(shown);
-            return commit({ card, verdict: side === "1" ? "b" : "a", like: true });
+        onTap={(target) => openPressed(card, target)}
+        onHold={(target) => openPressed(card, target)}
+        onSwipe={(direction) => {
+          const choice = intent(card, direction);
+          if (!choice || card !== top || busy.current) return false;
+          if (isPass(choice)) {
+            askPass();
+            return false;
           }
-          const choice = card.kind === "pair" ? answers[direction] : intent(direction);
-          if (!choice) return;
-          commit({ card, verdict: choice } as Judgement);
+          void act(choice);
+          return true;
         }}
       >
-        {multi && full ? (
-          <PreviewSides
-            card={card}
-            side={side}
-            playing={playing}
-            setSide={(side) => open(card, side)}
-            onClose={closePreview}
-            onTap={tapBackdrop}
-            onLike={isTop ? () => void act("like") : undefined}
-          />
-        ) : card.kind === "pair" ? (
+        {card.kind === "pair" ? (
           <PairContent
             card={card}
             top={isTop}
@@ -457,8 +495,6 @@ export function DreamDeck({
             select={(side) => setSelected({ key: card.key, side })}
             view={(side) => open(card, side)}
           />
-        ) : full ? (
-          <PreviewFace item={card.item} active={playing} />
         ) : (
           <>
             <div className={classes.media}>
@@ -490,63 +526,65 @@ export function DreamDeck({
         </Box>
       </>
     );
-  const suggest =
-    top.kind === "library" &&
-    top.item.jobId &&
-    top.item.prompt?.trim() &&
-    top.item.settings?.profileId ? (
-      <LibrarySuggest key={top.item.id} item={top.item} />
-    ) : undefined;
-  const stack = (full: boolean) =>
-    cards
-      .slice(0, full ? 2 : 3)
-      .reverse()
-      .map((card) => swipeCard(card, full));
   return (
     <>
       <div className={classes.stage} aria-hidden={!!viewing} inert={!!viewing}>
-        {stack(false)}
+        {[...cards].reverse().map(swipeCard)}
       </div>
       <DeckButtons
         card={top}
         act={(choice) => void act(choice)}
         hidden={!!viewing}
         leading={undoButton}
-        trailing={viewing ? undefined : suggest}
+        trailing={viewing ? undefined : <DreamSuggestions card={top} side={shown} />}
       />
       {!phone && !touch && (
         <Text size="xs" c="dimmed" ta="center">
           {top.kind === "pair"
-            ? "← A · → B · ↑ Like · ↓ Neither · U Undo"
-            : "← Dislike · → Accept · ↑ Like · U Undo"}
+            ? `${top.items.length === 2 ? "← A · → B · " : ""}↑ Accept · ↓ Pass · U Undo`
+            : `← ${top.kind === "set" ? "Deny All" : "Pass"} · → Accept · ↑ Super Like · U Undo`}
         </Text>
       )}
       {viewing && (
         <DreamPreview
           card={top}
-          side={viewing.side}
+          side={shown}
           setSide={(side) => open(top, side)}
+          overrides={setDraft?.key === top.key ? setDraft?.overrides : undefined}
+          toggleOverride={toggleOverride}
           canUndo={history.length > 0}
           close={closePreview}
-          backdropTap={backdropTap}
+          label={cardLabel(top, true)}
+          fly={previewFly}
           act={(choice) => void act(choice)}
           undo={undo}
-          suggest={suggest}
-          onKeyDown={(event) => {
-            // A comparison's sides step with the arrows; its answers are its buttons.
-            if ((top.kind !== "pair" && top.kind !== "set") || event.key === "ArrowUp")
-              return respond(event.nativeEvent);
-            const step = ({ ArrowLeft: -1, ArrowRight: 1 } as Record<string, number>)[event.key];
-            const { altKey, ctrlKey, metaKey, shiftKey } = event;
-            if (!step || altKey || ctrlKey || metaKey || shiftKey || event.defaultPrevented) return;
-            if ((event.target as Element).closest("input, [role='slider']")) return;
-            event.preventDefault();
-            const side = viewing.side + step;
-            if (side >= 0 && side < top.items.length) open(top, side);
-          }}
-        >
-          {stack(true)}
-        </DreamPreview>
+        />
+      )}
+      {passing === top.key && (
+        <Modal id={passDialogId} opened onClose={closePass} title="Why Pass?" size="xs">
+          <Radio.Group
+            aria-label="Pass Reason"
+            value={passReason ?? ""}
+            onChange={(value) => setPassReason(value as DreamPassReason)}
+          >
+            <Stack gap="sm">
+              {dreamPassReasons.map((reason) => (
+                <Radio key={reason} value={reason} label={passLabels[reason]} />
+              ))}
+            </Stack>
+          </Radio.Group>
+          <DialogFooter onCancel={closePass}>
+            <Button
+              disabled={!passReason}
+              onClick={() => {
+                setPassing(undefined);
+                void act(top.kind === "pair" ? "neither" : "discard", passReason);
+              }}
+            >
+              Pass
+            </Button>
+          </DialogFooter>
+        </Modal>
       )}
     </>
   );

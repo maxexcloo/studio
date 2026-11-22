@@ -57,12 +57,6 @@ export function addVariant(draft: Draft): Draft {
   return showVariant(draft, next, next.length - 1);
 }
 
-export function removeVariant(draft: Draft): Draft {
-  const active = draft.compare?.active ?? 0;
-  const next = draftVariants(draft).filter((_, index) => index !== active);
-  return showVariant(draft, next, Math.min(active, next.length - 1));
-}
-
 export const canAddVariant = (draft: Draft) => draftVariants(draft).length < compareVariants.max;
 
 export const fitsComparison = (count: number) =>

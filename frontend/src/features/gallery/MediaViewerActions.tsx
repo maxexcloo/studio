@@ -91,7 +91,8 @@ export function MediaViewerActions({
       aria-label="Generation Actions"
       radius="lg"
       className={classes.actions}
-      display={hidden ? "none" : undefined}
+      data-actions-hidden={hidden || undefined}
+      inert={hidden}
       onClick={(event) => event.stopPropagation()}
     >
       {item.jobId && (

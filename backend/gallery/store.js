@@ -510,6 +510,18 @@ export function filterVisibleGallery(items, { disliked = false } = {}) {
   );
 }
 
+/** An owned Dream result available as the exact source of a new run or suggestion. */
+export function unseenDreamItem(ownerId, itemId, jobId) {
+  const item = findGalleryItem({
+    ownerId,
+    jobId,
+    ids: [itemId],
+    dreamState: "unseen",
+    status: "done",
+  });
+  return item?.url && hasGalleryMedia(item) ? item : undefined;
+}
+
 /** Reads Dream's visible seed candidates in bounded batches and checks their media asynchronously. */
 export async function visibleGenerationItems(query) {
   const visible = async (item) => {
@@ -591,6 +603,7 @@ function gallerySearchText(item) {
     item.title,
     item.resultSet?.title,
     item.resultSet?.variation,
+    item.resultSet?.caption,
     item.resultSet?.character?.name,
     item.resultSet?.context?.character?.name,
     item.resultSet?.context?.outfit?.name,

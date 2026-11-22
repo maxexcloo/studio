@@ -208,6 +208,7 @@ export function MediaTile({
   const [retry, setRetry] = useState({ source, count: 0 });
   const attempt = retry.source === source ? retry.count : 0;
   const title = mediaTitle(item);
+  const subtitle = item.resultSet?.caption || detail;
   const [entering] = useState(
     () => !finished(item) && Date.now() - Date.parse(item.createdAt || "") < 10_000,
   );
@@ -315,18 +316,14 @@ export function MediaTile({
         ) : null}
         {item.status === "done" && !upscaleShown
           ? caption !== "none" && (
-              <div
-                className={classes.caption}
-                data-pinned={caption === "pinned" || undefined}
-                data-rated={rated || undefined}
-              >
+              <div className={classes.caption} data-pinned={caption === "pinned" || undefined}>
                 {/* A pinned (phone) caption keeps to two lines in all. */}
-                <Text size="sm" fw={500} lineClamp={caption === "pinned" && detail ? 1 : 2}>
+                <Text size="sm" fw={500} lineClamp={caption === "pinned" && subtitle ? 1 : 2}>
                   {title}
                 </Text>
-                {detail && (
+                {subtitle && (
                   <Text size="xs" opacity={0.8} lineClamp={1}>
-                    {detail}
+                    {subtitle}
                   </Text>
                 )}
               </div>

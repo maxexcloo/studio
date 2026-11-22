@@ -1944,13 +1944,12 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
         await photo.dispatchEvent("touchend", { touches: [], changedTouches: [] });
       }
     }
-    const refreshed = page.waitForResponse(
-      (response) => new URL(response.url()).pathname === "/api/gallery",
-    );
+    const saved = page.waitForResponse("**/api/gallery/favorite");
     await viewer.getByRole("button", { name: "Dislike", exact: true }).focus();
     await page.keyboard.press("Space");
     await expect.poll(() => state.gallery[1].rating).toBe("disliked");
-    await refreshed;
+    await saved;
+    await expect(viewer.getByRole("button", { name: "Restore", exact: true })).toBeFocused();
     await expect(
       page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
     ).toHaveCount(0);

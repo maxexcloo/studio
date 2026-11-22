@@ -14,24 +14,7 @@ const looks: Record<string, { glyph: ReactNode; color: MantineColor }> = {
   like: { glyph: <Heart size={28} strokeWidth={2.5} />, color: "pink" },
   keep: { glyph: <Check size={30} strokeWidth={2.5} />, color: "green" },
   neither: { glyph: <X size={30} strokeWidth={2.5} />, color: "red" },
-  a: {
-    glyph: (
-      <Text fw={700} fz={28}>
-        A
-      </Text>
-    ),
-    color: "blue",
-  },
-  b: {
-    glyph: (
-      <Text fw={700} fz={28}>
-        B
-      </Text>
-    ),
-    color: "blue",
-  },
   both: { glyph: <Check size={30} strokeWidth={2.5} />, color: "green" },
-  shown: { glyph: <icons.winner size={30} strokeWidth={2.5} />, color: "blue" },
 };
 
 export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
@@ -40,6 +23,7 @@ export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: ()
       <ActionIcon
         variant="default"
         radius="xl"
+        size="md"
         aria-label="Undo"
         disabled={disabled}
         onClick={onClick}
@@ -50,71 +34,70 @@ export function DeckUndo({ disabled, onClick }: { disabled: boolean; onClick: ()
   );
 }
 
-/**
- * The deck's answers as large round buttons under the card, as dating apps have them: a single
- * card's Dislike, Like and Accept, or a comparison's Neither, A, B, Like and Both. Where one side is
- * `shown` alone, This Image answers for it in place of A and B.
- */
+/** The deck's verdicts, with its smaller Undo and Suggestions controls on either side. */
 export function DeckButtons({
   card,
   act,
   hidden,
-  shown,
+  expanded,
   leading,
   trailing,
 }: {
   card: DeckCard;
   act: (choice: Choice["choice"]) => void;
   hidden: boolean;
-  shown?: number;
+  expanded?: boolean;
   leading?: ReactNode;
   trailing?: ReactNode;
 }) {
-  const answers = dreamChoices(card)
-    .at(-1)!
-    .flatMap((answer): Choice[] => {
-      if (answer.id === "a" && shown !== undefined)
-        return [{ ...answer, id: "shown", label: "This Image", choice: shown ? "b" : "a" }];
-      if (answer.id !== "b") return [answer];
-      return [
-        ...(shown === undefined ? [answer] : []),
-        ...(card.kind === "pair" && card.pairId
-          ? [{ choice: "like" as const, id: "like", label: "Like", icon: icons.like }]
-          : []),
-      ];
-    });
+  const answers = dreamChoices(card).at(-1)!;
+  const labels: Record<string, string> = {
+    both: "Accept",
+    discard: card.kind === "set" ? "Deny All" : "Pass",
+    keep: "Accept",
+    like: "Super Like",
+    neither: "Pass",
+  };
+  const rate = expanded ? "Rate This Image & Keep Set" : "Rate Cover & Keep Set";
   return (
     <div
       role="group"
       aria-label={card.kind === "pair" ? "Comparison Answers" : "Dream Actions"}
       className={classes.buttons}
-      data-pair-deck={(card.kind === "pair" && shown === undefined) || undefined}
+      data-comparison-size={card.kind === "pair" ? card.items.length : undefined}
       aria-hidden={hidden}
       inert={hidden}
     >
       {leading}
-      {answers.map(({ choice, id, label }) => (
-        <Tooltip key={id} label={label}>
-          <ActionIcon
-            className={classes.answer}
-            variant="light"
-            color={looks[id].color}
-            radius="50%"
-            // A comparison's sides stand out from Neither and Both.
-            data-size={
-              card.kind !== "pair"
-                ? undefined
-                : id === "a" || id === "b" || id === "shown" || id === "like"
-                  ? "large"
-                  : "small"
-            }
-            aria-label={label}
-            onClick={() => act(choice)}
-          >
-            {looks[id].glyph}
-          </ActionIcon>
-        </Tooltip>
-      ))}
+      {answers.map(({ choice, id, label }) => {
+        const side = id === "a" || id === "b" || id === "c";
+        const title = labels[id] ?? label;
+        const description = id === "like" && card.kind === "set" ? rate : undefined;
+        return (
+          <Tooltip key={id} label={description ?? title}>
+            <ActionIcon
+              className={classes.answer}
+              variant="light"
+              color={side ? "blue" : looks[id].color}
+              radius="50%"
+              data-size={
+                side && card.kind === "pair" && card.items.length === 2 ? "large" : undefined
+              }
+              aria-label={title}
+              aria-description={description}
+              onClick={() => act(choice)}
+            >
+              {side ? (
+                <Text fw={700} fz={26}>
+                  {label}
+                </Text>
+              ) : (
+                looks[id].glyph
+              )}
+            </ActionIcon>
+          </Tooltip>
+        );
+      })}
       {trailing}
     </div>
   );

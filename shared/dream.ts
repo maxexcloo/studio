@@ -12,6 +12,10 @@ export const dreamDefaults = {
 };
 export type DreamSettings = typeof dreamDefaults;
 export const dreamSeriesLength = 4;
+export const dreamPassReasons = ["taste", "similar", "glitch", "skip"] as const;
+export type DreamPassReason = (typeof dreamPassReasons)[number];
+export const dreamPairAnswers = ["a", "b", "c", "both", "neither"] as const;
+export type PairAnswer = (typeof dreamPairAnswers)[number];
 
 export type DreamResultSet = { id: string; source?: string; title: string; index: number };
 

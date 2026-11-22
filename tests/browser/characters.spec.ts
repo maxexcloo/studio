@@ -559,7 +559,7 @@ test("A member sees only their cards and Presets in the Library, and a group wit
   await expect(select.or(nav)).toBeVisible();
   if (await nav.isVisible())
     await expect(nav.getByRole("link")).toHaveText(["Presets", "Characters", "Outfits", "Scenes"]);
-  else await expect(select).toHaveValue("Characters");
+  else await expect(select).toHaveText("Characters");
   await signIn(page, { id: "member", role: "user", features: { characters: false } });
   await page.goto("/library#presets");
   // A hash-only navigation keeps the previous account in memory; load the new group's grants.

@@ -34,6 +34,7 @@ import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { plural } from "../../ui/plural";
 import { TextBox } from "../../ui/TextBox";
+import { TitleSelect } from "../../ui/TitleSelect";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "../generation/chip";
 import { useGeneration } from "../generation/GenerationProvider";
@@ -56,13 +57,12 @@ import {
   draftVariants,
   fitsComparison,
   modelInputs,
-  removeVariant,
   showVariant,
   useDraftComparison,
 } from "./variants";
 
 const noChoices: string[] = [];
-const axes = ["Model", "LoRA", "LoRA Strength", "Resolution", "Seed", "Prompt"];
+const axes = ["Current Variant", "Model", "LoRA", "LoRA Strength", "Resolution", "Seed", "Prompt"];
 
 const modelName = (name: string) =>
   name
@@ -76,8 +76,8 @@ export function CompareMenu() {
   const metadata = useQuery(loraInfoQuery);
   const info = metadata.data?.loras ?? {};
   const [opened, setOpened] = useState(false);
-  const [remembered, setAxis] = useRemembered("compare-axis", "Model");
-  const axis = axes.includes(remembered) ? remembered : "Model";
+  const [remembered, setAxis] = useRemembered("compare-axis", "Current Variant");
+  const axis = !draft.compare && axes.includes(remembered) ? remembered : "Current Variant";
   const [models, setModels] = useRemembered("compare-models", noChoices);
   const [loras, setLoras] = useRemembered("compare-loras", noChoices);
   const [withoutLora, setWithoutLora] = useRemembered("compare-without-lora", true);
@@ -134,7 +134,12 @@ export function CompareMenu() {
               ? Number(seeds)
               : promptLines(text).length;
   const close = () => setOpened(false);
-  const stage = () => {
+  const add = () => {
+    if (axis === "Current Variant") {
+      setDraft(addVariant);
+      close();
+      return;
+    }
     let inputs: GenerationInput[];
     if (axis === "Model") inputs = modelInputs(input, chosen);
     else if (axis === "LoRA")
@@ -171,6 +176,7 @@ export function CompareMenu() {
       opened={opened}
       onOpenedChange={setOpened}
       width={360}
+      floating={!!draft.compare}
       target={
         <Button
           {...chipProps}
@@ -186,159 +192,155 @@ export function CompareMenu() {
         close();
       }}
       clearDisabled={!draft.compare}
-      actions={
-        draft.compare && (
-          <Button
-            size="compact-sm"
-            variant="subtle"
-            aria-label={`Remove Variant ${letter(draft.compare.active)}`}
-            onClick={() => {
-              setDraft(removeVariant);
-              close();
-            }}
-          >
-            Remove
-          </Button>
-        )
-      }
-      leading={
-        <Button
-          variant="default"
-          leftSection={<icons.duplicate size={16} />}
-          disabled={!canAddVariant(draft)}
-          // The popup names the variant it acts on, so the footer keeps to one row.
-          aria-label={
-            draft.compare ? `Duplicate Variant ${letter(draft.compare.active)}` : undefined
-          }
-          onClick={() => {
-            setDraft(addVariant);
-            close();
-          }}
-        >
-          {draft.compare ? "Duplicate" : "Add Variant"}
-        </Button>
-      }
       primary={
-        <Button disabled={!fitsComparison(count)} onClick={stage}>
-          Compare
+        <Button
+          leftSection={<icons.duplicate size={16} />}
+          disabled={axis === "Current Variant" ? !canAddVariant(draft) : !fitsComparison(count)}
+          onClick={add}
+        >
+          Add Variant
         </Button>
       }
     >
-      <Stack gap="sm">
-        <Select
-          label="What to Vary"
-          data={axes}
-          value={axis}
-          allowDeselect={false}
-          comboboxProps={{ withinPortal: false }}
-          onChange={(value) => setAxis(value!)}
-        />
-        {axis === "Model" && (
-          <MultiSelect
-            {...selection}
-            label="Models"
-            placeholder="Choose models"
-            data={modelOptions}
-            value={chosen.map((each) => each.id)}
-            onChange={setModels}
-            maxValues={compareVariants.max - 1}
-            nothingFoundMessage="No models found"
+      {!draft.compare && (
+        <Stack gap="sm">
+          <Select
+            label="What to Vary"
+            data={axes}
+            value={axis}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: false }}
+            onChange={(value) => setAxis(value!)}
           />
-        )}
-        {axis === "LoRA" && (
-          <>
+          {axis === "Model" && (
             <MultiSelect
               {...selection}
-              label="LoRAs"
-              placeholder="Choose LoRAs"
-              data={loraOptions}
-              value={selectedLoras}
-              onChange={setLoras}
-              maxValues={compareVariants.max - Number(withoutLora)}
-              nothingFoundMessage="No compatible LoRAs"
+              label="Models"
+              placeholder="Choose models"
+              data={modelOptions}
+              value={chosen.map((each) => each.id)}
+              onChange={setModels}
+              maxValues={compareVariants.max - 1}
+              nothingFoundMessage="No models found"
             />
-            <Checkbox
-              label="Include Without Selected LoRAs"
-              checked={withoutLora}
-              onChange={(event) => setWithoutLora(event.currentTarget.checked)}
-            />
-          </>
-        )}
-        {axis === "LoRA Strength" && (
-          <>
-            <Select
-              {...selection}
-              label="LoRA"
-              placeholder="Choose a LoRA"
-              data={loraOptions}
-              value={compatible.includes(loraFile) ? loraFile : null}
-              onChange={(value) => setLoraFile(value!)}
-              allowDeselect={false}
-              nothingFoundMessage="No compatible LoRAs"
-            />
-            {compatible.includes(loraFile) && (
-              <Input.Wrapper
-                label="Strengths"
-                description={`Supports ${strengthRange.min} to ${strengthRange.max}.`}
-              >
-                <Chip.Group
-                  multiple
-                  value={strengths.map(String)}
-                  onChange={(values) => setStrengths(values.map(Number).sort((a, b) => a - b))}
+          )}
+          {axis === "LoRA" && (
+            <>
+              <MultiSelect
+                {...selection}
+                label="LoRAs"
+                placeholder="Choose LoRAs"
+                data={loraOptions}
+                value={selectedLoras}
+                onChange={setLoras}
+                maxValues={compareVariants.max - Number(withoutLora)}
+                nothingFoundMessage="No compatible LoRAs"
+              />
+              <Checkbox
+                label="Include Without Selected LoRAs"
+                checked={withoutLora}
+                onChange={(event) => setWithoutLora(event.currentTarget.checked)}
+              />
+            </>
+          )}
+          {axis === "LoRA Strength" && (
+            <>
+              <Select
+                {...selection}
+                label="LoRA"
+                placeholder="Choose a LoRA"
+                data={loraOptions}
+                value={compatible.includes(loraFile) ? loraFile : null}
+                onChange={(value) => setLoraFile(value!)}
+                allowDeselect={false}
+                nothingFoundMessage="No compatible LoRAs"
+              />
+              {compatible.includes(loraFile) && (
+                <Input.Wrapper
+                  label="Strengths"
+                  description={`Supports ${strengthRange.min} to ${strengthRange.max}.`}
                 >
-                  <Group gap={6} mt={6} role="group" aria-label="Strengths">
-                    {[0, ...strengthChoices].map((strength) => (
-                      <Chip key={strength} value={String(strength)} size="xs" variant="light">
-                        {strength ? strength : "Without LoRA"}
-                      </Chip>
-                    ))}
-                  </Group>
-                </Chip.Group>
-              </Input.Wrapper>
-            )}
-          </>
-        )}
-        {axis === "Resolution" && (
-          <MultiSelect
-            label="Resolutions"
-            data={sizeOptions}
-            value={selectedSizes}
-            onChange={setSizes}
-            comboboxProps={{ withinPortal: false }}
-            nothingFoundMessage="No native resolutions available"
-          />
-        )}
-        {axis === "Seed" && (
-          <NumberInput
-            label="Seeds"
-            min={compareVariants.min}
-            max={compareVariants.max}
-            value={Number(seeds)}
-            onChange={(value) => setSeeds(String(value))}
-          />
-        )}
-        {axis === "Prompt" && (
-          <TextBox
-            label="Prompts"
-            description="One variant per line."
-            autosize
-            minRows={3}
-            maxRows={6}
-            inline
-            tools={[]}
-            value={text}
-            onChange={setPrompts}
-          />
-        )}
-        <Text size="xs" c="dimmed">
-          {axis === "Model" &&
-            profile &&
-            `Includes the current model, ${modelName(profileName(profile))}. `}
-          {plural(count, "variant")} · choose {compareVariants.min}–{compareVariants.max} to
-          compare.
-        </Text>
-      </Stack>
+                  <Chip.Group
+                    multiple
+                    value={strengths.map(String)}
+                    onChange={(values) => setStrengths(values.map(Number).sort((a, b) => a - b))}
+                  >
+                    <Group gap={6} mt={6} role="group" aria-label="Strengths">
+                      {[0, ...strengthChoices].map((strength) => (
+                        <Chip key={strength} value={String(strength)} size="xs" variant="light">
+                          {strength ? strength : "Without LoRA"}
+                        </Chip>
+                      ))}
+                    </Group>
+                  </Chip.Group>
+                </Input.Wrapper>
+              )}
+            </>
+          )}
+          {axis === "Resolution" && (
+            <MultiSelect
+              label="Resolutions"
+              data={sizeOptions}
+              value={selectedSizes}
+              onChange={setSizes}
+              comboboxProps={{ withinPortal: false }}
+              nothingFoundMessage="No native resolutions available"
+            />
+          )}
+          {axis === "Seed" && (
+            <NumberInput
+              label="Seeds"
+              min={compareVariants.min}
+              max={compareVariants.max}
+              value={Number(seeds)}
+              onChange={(value) => setSeeds(String(value))}
+            />
+          )}
+          {axis === "Prompt" && (
+            <TextBox
+              label="Prompts"
+              description="One variant per line."
+              autosize
+              minRows={3}
+              maxRows={6}
+              inline
+              tools={[]}
+              value={text}
+              onChange={setPrompts}
+            />
+          )}
+          {axis !== "Current Variant" && (
+            <Text size="xs" c="dimmed">
+              {axis === "Model" &&
+                profile &&
+                `Includes the current model, ${modelName(profileName(profile))}. `}
+              {plural(count, "variant")} · choose {compareVariants.min}–{compareVariants.max} to
+              compare.
+            </Text>
+          )}
+        </Stack>
+      )}
     </ChipPopup>
+  );
+}
+
+/** The variant picker beside Generate in the phone sheet's header. */
+export function GenerateVariantSelect() {
+  const { draft, setDraft } = useGeneration();
+  if (!draft.compare) return null;
+  return (
+    <TitleSelect
+      aria-label="Variant"
+      withinPortal={false}
+      data={draft.compare.variants.map((_, index) => ({
+        value: String(index),
+        label: `Variant ${letter(index)}`,
+      }))}
+      value={String(draft.compare.active)}
+      onChange={(value) =>
+        setDraft((previous) => showVariant(previous, draftVariants(previous), Number(value)))
+      }
+    />
   );
 }
 

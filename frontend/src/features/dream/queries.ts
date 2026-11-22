@@ -20,12 +20,15 @@ export type DreamItem = MediaItem & {
     decidedAt?: string;
     spicy?: true;
     /** One side of a comparison: alike but for what `question` asks about. */
-    pair?: { id: string; side: 0 | 1; question: string; label: string };
+    pair?: { id: string; side: 0 | 1 | 2; size?: 3; question: string; label: string };
     projectId?: string;
   };
 };
-/** A comparison's answer: side A or B, both or neither. */
-export type PairAnswer = "a" | "b" | "both" | "neither";
+/** A comparison's answer: a side, all or none. */
+export const comparisonVotes = ["a", "b", "c"] as const;
+export type PairAnswer = (typeof comparisonVotes)[number] | "both" | "neither";
+export type SetOverride = "like" | "discard";
+export type SetOverrides = Record<string, SetOverride>;
 export interface Dream {
   settings: DreamSettings;
   /** Finished results waiting for a verdict, oldest first. */
