@@ -196,7 +196,7 @@ test("The viewer fits a large image but never enlarges a small one beyond its ac
   await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBeLessThan(1);
 });
 
-test("Fit leaves room for the header and keeps its bounds when thumbnails open", async ({
+test("Gallery Fit stays between the header and dock and reclaims space when hidden", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -244,6 +244,7 @@ test("Fit leaves room for the header and keeps its bounds when thumbnails open",
         const bounds = (await picture.boundingBox())!;
         const stage = (await viewer.locator("[data-zoom-mode]").boundingBox())!;
         const heading = (await header.boundingBox())!;
+        const dock = (await actions.boundingBox())!;
         const label = (await badge.boundingBox())!;
         const dismiss = (await close.boundingBox())!;
         return {
@@ -253,12 +254,19 @@ test("Fit leaves room for the header and keeps its bounds when thumbnails open",
               ? Math.abs(bounds.width - stage.width) <= 2
               : Math.abs(bounds.height - stage.height) <= 2,
           headerClear: bounds.y >= heading.y + heading.height - 1,
+          dockClear: bounds.y + bounds.height <= dock.y + 1,
           titleFits: label.x + label.width < dismiss.x,
         };
       })
-      .toEqual({ centred: true, fitted: true, headerClear: true, titleFits: true });
-    if (index === 1) {
-      const bounds = await picture.boundingBox();
+      .toEqual({
+        centred: true,
+        fitted: true,
+        headerClear: true,
+        dockClear: true,
+        titleFits: true,
+      });
+    if (shape === "tall") {
+      const standard = (await picture.boundingBox())!;
       const thumbnails = viewer.getByRole("list", { name: "Set: Fitted", exact: true });
       const zoom = viewer.getByRole("group", { name: "Image Zoom", exact: true });
       await expect(actions).toBeVisible();
@@ -278,10 +286,31 @@ test("Fit leaves room for the header and keeps its bounds when thumbnails open",
         .poll(async () => {
           const controls = await zoom.boundingBox();
           const dock = await thumbnails.boundingBox();
-          return !!controls && !!dock && controls.y + controls.height <= dock.y;
+          const bounds = await picture.boundingBox();
+          return (
+            !!controls &&
+            !!dock &&
+            !!bounds &&
+            controls.y + controls.height <= dock.y &&
+            bounds.y + bounds.height <= dock.y + 1 &&
+            bounds.height < standard.height
+          );
         })
         .toBe(true);
-      await expect.poll(() => picture.boundingBox()).toEqual(bounds);
+      await page.keyboard.press("c");
+      await expect(header).toBeHidden();
+      await expect(actions).toBeHidden();
+      await expect(thumbnails).toBeHidden();
+      await expect
+        .poll(async () => {
+          const bounds = await picture.boundingBox();
+          return (
+            !!bounds &&
+            bounds.height > standard.height &&
+            bounds.y + bounds.height > standard.y + standard.height
+          );
+        })
+        .toBe(true);
     }
   }
 });
