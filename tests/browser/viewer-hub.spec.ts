@@ -617,11 +617,10 @@ test("Viewer prompt offers Reset once edited, without a menu, and restores its o
   await expect(field).toHaveValue("A bird at night");
 });
 
-test("The phone viewer prompt offers suggestions for review above Generate", async ({
+test("The viewer prompt offers suggestions for review beside the field and in the phone editor", async ({
   page,
   isMobile,
 }) => {
-  test.skip(!isMobile, "The viewer has a separate prompt editor on phones.");
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
       const { surface } = route.request().postDataJSON();
@@ -637,21 +636,26 @@ test("The phone viewer prompt offers suggestions for review above Generate", asy
       });
     }),
   );
-  await viewer.getByRole("textbox", { name: "Prompt", exact: true }).click();
-  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
-  const text = editor.getByRole("textbox", { name: "Prompt", exact: true });
-  await expect(editor.getByRole("button", { name: "Close Prompt", exact: true })).toBeVisible();
-  const suggest = async () => {
-    await editor.getByRole("button", { name: "AI Prompt Actions", exact: true }).click();
+  const suggest = async (surface: typeof viewer) => {
+    await surface.getByRole("button", { name: "AI Prompt Actions", exact: true }).click();
     await expandAssistantMenu(page, "Suggestions");
     await page.getByRole("menuitem", { name: "At Dusk", exact: true }).click();
-    await expect(text).toHaveValue("An amber bird at dusk");
+    await expect(surface.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+      "An amber bird at dusk",
+    );
   };
-  await suggest();
+  const prompt = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  await suggest(viewer);
   expect(state.jobs).toHaveLength(1);
-  await editor.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(text).toHaveValue("An amber bird");
-  await suggest();
+  await viewer.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(prompt).toHaveValue("An amber bird");
+  let editor = viewer;
+  if (isMobile) {
+    await prompt.click();
+    editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+    await expect(editor.getByRole("button", { name: "Close Prompt", exact: true })).toBeVisible();
+  }
+  await suggest(editor);
   await editor.getByRole("button", { name: "Generate", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.prompt).toBe("An amber bird at dusk");

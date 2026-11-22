@@ -56,8 +56,7 @@ export const TextToolsBar = createContext<HTMLElement | null>(null);
 export function TextBox({
   value,
   onChange,
-  tools: fieldTools,
-  editorTools,
+  tools,
   send,
   busy,
   popups,
@@ -76,8 +75,6 @@ export function TextBox({
   onChange: (value: string) => void;
   /** The box's tools menu; AI uses the magic icon, other tools More. */
   tools?: Action[];
-  /** Additional tools for the separate phone editor, without adding them beside the field. */
-  editorTools?: Action[];
   /** The send, and a proposal's Undo, which stay beside the text. */
   send?: ReactNode;
   /** Popups its tools open (Recent Prompts), anchored at the box's end where the ⋯ stands. */
@@ -109,7 +106,6 @@ export function TextBox({
   const mobile = usePhone();
   const phone = mobile && !inline;
   const [editing, setEditing] = useState(false);
-  const tools = editing ? (editorTools ?? fieldTools) : fieldTools;
   const ai = tools?.some((tool) => tool.id === "assistant" || tool.icon === icons.assistant);
   const focusTool = (event: MouseEvent) => {
     if (!ai || editing || document.activeElement?.tagName === "TEXTAREA") keepFocus(event);

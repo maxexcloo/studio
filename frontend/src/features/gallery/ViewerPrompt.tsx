@@ -126,7 +126,7 @@ export function ViewerPrompt({
     disabled: ask.pending,
     onPick: pick,
   });
-  const editorTools = ask.available
+  const tools = ask.available
     ? [
         {
           id: "viewer-changes",
@@ -148,7 +148,7 @@ export function ViewerPrompt({
           },
         },
       ]
-    : undefined;
+    : [];
   const submit = change
     ? {
         label: ask.previewing ? "Generate" : "Run",
@@ -217,8 +217,7 @@ export function ViewerPrompt({
         readOnly={change?.action === "upscale"}
         onChange={setPrompt}
         onKeyDown={keys}
-        tools={[]}
-        editorTools={editorTools}
+        tools={tools}
         reset={change ? prompt : original}
         send={send}
         busy={ask.pending ? "Asking for a Change…" : undefined}
