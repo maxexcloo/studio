@@ -898,6 +898,7 @@ export async function fixtures(page: Page) {
     if (path === "/api/dream")
       return respond({
         settings: dreamDefaults,
+        locked: [],
         today: { images: 0, videos: 0 },
         unseen: [],
         status: "off",

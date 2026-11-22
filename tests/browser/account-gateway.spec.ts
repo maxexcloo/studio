@@ -440,6 +440,7 @@ test("Where Work Runs shows local defaults for accounts without cloud access", a
   const where = page.getByRole("region", { name: "Settings: Where Work Runs", exact: true });
   const videos = where.getByRole("region", { name: "Videos", exact: true });
   await expect(videos.getByRole("combobox", { name: "Local Model", exact: true })).toBeVisible();
+  await expect(where.getByRole("region", { name: "Dream", exact: true })).toHaveCount(0);
   await expect(where.getByRole("radiogroup")).toHaveCount(0);
   await expect(where.getByRole("combobox", { name: "Cloud Model", exact: true })).toHaveCount(0);
 });
