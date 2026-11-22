@@ -850,6 +850,7 @@ test("Workers select local text models to benchmark and list each run's figures"
   await choose.click();
   await dialog.getByRole("option", { name: "Qwen 3.8 27B", exact: true }).click();
   await expect(benchmark).toBeEnabled();
+  await choose.press("Escape");
   await dialog.getByRole("button", { name: "Select All", exact: true }).click();
   await benchmark.click();
   await expect(dialog).toBeHidden();
