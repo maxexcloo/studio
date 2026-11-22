@@ -84,7 +84,9 @@ export function workloadQueue({
       if (pauses.has(everyone)) return Infinity;
       return Math.min(
         ...on(workload)
-          .filter((job) => !acceptedWork(job) && !pauses.has(job.ownerId))
+          .filter(
+            (job) => !acceptedWork(job) && !pauses.has(job.ownerId) && !queue.dreamModelWait(job),
+          )
           .map((job) => job.priority ?? queuePriority.manual),
       );
     },

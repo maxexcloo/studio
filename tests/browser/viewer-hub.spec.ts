@@ -1743,7 +1743,7 @@ test("Phone Details hides the viewer actions and swipes closed", async ({
   await expect.poll(() => picture.boundingBox()).toEqual(position);
 });
 
-test("Phone swipes first reveal thumbnails, then Details", async ({ page }, testInfo) => {
+test("A phone swipe up opens Details directly", async ({ page }, testInfo) => {
   test.skip(
     !testInfo.project.use.isMobile || testInfo.project.use.browserName === "webkit",
     "Touch input is dispatched through Chromium's protocol.",
@@ -1790,21 +1790,11 @@ test("Phone swipes first reveal thumbnails, then Details", async ({ page }, test
   await expect(actions).toBeVisible();
   await expect(thumbnails).toBeHidden();
   await swipe(-120);
-  await expect(thumbnails).toBeVisible();
-  await expect(actions).toBeVisible();
-  await expect(sheet).toBeHidden();
-  await expect
-    .poll(async () => {
-      const bounds = await picture.boundingBox();
-      const dock = await thumbnails.boundingBox();
-      return !!bounds && !!dock && bounds.y + bounds.height <= dock.y + 1;
-    })
-    .toBe(true);
-  await swipe(-120);
   await expect(sheet.getByText("1234567", { exact: true })).toBeVisible();
   await expect(actions).toBeHidden();
   await sheet.getByRole("button", { name: "Close Details", exact: true }).click();
   await expect(sheet).toBeHidden();
+  await expect(thumbnails).toBeHidden();
   await swipe(120);
   await expect(viewer).toBeHidden();
 });
@@ -1869,6 +1859,11 @@ test("A double tap zooms in at the tapped point and back to Fit; a click still c
 
 test("The viewer cycles its header, bottom actions and thumbnails", async ({ page }, testInfo) => {
   const state = await fixtures(page);
+  const tall =
+    "data:image/svg+xml," +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="1024"><rect width="512" height="1024" fill="#303036"/></svg>',
+    );
   for (const [index, [id, prompt, createdAt]] of [
     ["tap-first", "A quiet harbour", stamp],
     ["tap-second", "A windy cliff", "2026-01-01T00:00:00.000Z"],
@@ -1877,10 +1872,10 @@ test("The viewer cycles its header, bottom actions and thumbnails", async ({ pag
       id,
       type: "image",
       status: "done",
-      url: image,
-      thumbnailUrl: image,
+      url: index === 1 ? tall : image,
+      thumbnailUrl: index === 1 ? tall : image,
       prompt,
-      width: 1024,
+      width: index === 1 ? 512 : 1024,
       height: 1024,
       createdAt,
       resultSet: { id: "tap-set", title: "Tap Set", index },
@@ -1891,11 +1886,19 @@ test("The viewer cycles its header, bottom actions and thumbnails", async ({ pag
   const picture = viewer.getByRole("img", { name: "A quiet harbour", exact: true });
   await expect(picture).toBeVisible();
   const close = viewer.getByRole("button", { name: "Close Generation", exact: true });
+  const header = viewer.getByRole("group", { name: "Viewer Header", exact: true });
   const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const strip = viewer.getByRole("list", { name: "Set: Tap Set", exact: true });
   await expect(strip).toBeHidden();
   await expect(close).toBeVisible();
   await expect(actions).toBeVisible();
+  await expect
+    .poll(async () => {
+      const bounds = await picture.boundingBox();
+      const top = await header.boundingBox();
+      return !!bounds && !!top && bounds.y >= top.y + top.height - 1;
+    })
+    .toBe(true);
 
   if (!testInfo.project.use.isMobile) {
     const viewport = page.viewportSize()!;
@@ -1968,9 +1971,37 @@ test("The viewer cycles its header, bottom actions and thumbnails", async ({ pag
   await expect(close).toBeVisible();
   await expect(strip).toBeHidden();
   await expect(actions).toBeVisible();
+  await expect
+    .poll(async () => {
+      const bounds = await next.boundingBox();
+      const top = await header.boundingBox();
+      const bottom = await actions.boundingBox();
+      return (
+        !!bounds &&
+        !!top &&
+        !!bottom &&
+        bounds.y < top.y + top.height &&
+        bounds.y + bounds.height <= bottom.y + 1
+      );
+    })
+    .toBe(true);
 
   await page.keyboard.press("ArrowUp");
+  const details = page.getByRole("dialog", { name: "Windy Cliff", exact: true });
+  await expect(details).toBeVisible();
+  await details.getByRole("button", { name: "Close Details", exact: true }).click();
+  await expect(details).toBeHidden();
+  await expect(strip).toBeHidden();
+  const shown = (await next.boundingBox())!;
+  await page.touchscreen.tap(shown.x + shown.width / 2, shown.y + shown.height / 2);
   await expect(strip).toBeVisible();
+  await expect
+    .poll(async () => {
+      const bounds = await next.boundingBox();
+      const dock = await strip.boundingBox();
+      return !!bounds && !!dock && bounds.y + bounds.height <= dock.y + 1;
+    })
+    .toBe(true);
   await page.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
 });

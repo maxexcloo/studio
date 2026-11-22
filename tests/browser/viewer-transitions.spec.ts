@@ -196,7 +196,7 @@ test("The viewer fits a large image but never enlarges a small one beyond its ac
   await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBeLessThan(1);
 });
 
-test("Gallery Fit stays between the header and dock and reclaims space when hidden", async ({
+test("Gallery Fit clears the dock and can use the header space for tall media", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -261,7 +261,7 @@ test("Gallery Fit stays between the header and dock and reclaims space when hidd
       .toEqual({
         centred: true,
         fitted: true,
-        headerClear: true,
+        headerClear: shape !== "tall",
         dockClear: true,
         titleFits: true,
       });

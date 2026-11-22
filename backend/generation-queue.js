@@ -275,11 +275,8 @@ export function createGenerationQueue({
     store,
     {
       ...generationAdapter,
-      dreamIdleWait: (job) => {
-        const reason = dreamIdleWait?.(job);
-        if (reason) releaseLease(job.id);
-        return reason;
-      },
+      dreamIdleWait,
+      releaseAdmission: (job) => releaseLease(job.id),
       // Retries, recovered work and anything queued before the check tightened meet it here too.
       submit: (job) => {
         const refusal = minorAgeRefusal(job.input.prompt);
