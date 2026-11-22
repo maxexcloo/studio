@@ -346,10 +346,6 @@
   background: rgb(0 0 0 / 0.85);
 }
 /* The preview stage reaches from the screen edge to the verdict bar. */
-.previewContent {
-  display: flex;
-  flex-direction: column;
-}
 .previewContent.previewContent[data-full-screen] {
   padding: 0;
 }

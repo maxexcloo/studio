@@ -935,8 +935,11 @@ test("A three-way comparison fits a small phone and chooses C explicitly", async
     await expect(previewActions.getByRole("button", { name, exact: true })).toBeInViewport({
       ratio: 1,
     });
-  await expect(preview.getByRole("radio", { name: "C", exact: true })).toBeChecked();
-  await preview.getByRole("radio", { name: "A", exact: true }).press("Space");
+  const results = preview.getByRole("radiogroup", { name: "Comparison Results" });
+  await expect(results.getByText("C · Bold", { exact: true })).toBeVisible();
+  await expect(results.getByRole("radio", { name: "C · Bold", exact: true })).toBeChecked();
+  await results.getByText("A · Plain", { exact: true }).click();
+  await expect(results.getByRole("radio", { name: "A · Plain", exact: true })).toBeChecked();
   await previewActions.getByRole("button", { name: "C", exact: true }).click();
   await expect(preview).toBeHidden();
   await expect.poll(() => dream.requests[0]?.body).toEqual({ answer: "c" });
@@ -968,7 +971,7 @@ test("Comparison suggestions use the side shown in fullscreen", async ({ page })
   await page.goto("/dream");
   await page.getByRole("button", { name: "View A · Quiet", exact: true }).click();
   const preview = page.getByRole("dialog", { name: "Preview", exact: true });
-  await preview.getByRole("radio", { name: "B", exact: true }).press("Space");
+  await preview.getByRole("radio", { name: "B · Bright", exact: true }).press("Space");
   const request = page.waitForRequest(
     (req) => req.url().endsWith("/api/suggestions") && req.method() === "POST",
   );

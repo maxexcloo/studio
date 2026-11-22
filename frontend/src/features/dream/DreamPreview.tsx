@@ -26,7 +26,6 @@ import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
-import { letter } from "../compare/inputs";
 import { mediaSource } from "../gallery/mediaSource";
 import type { SwipeDirection, SwipeGesture } from "../gallery/swipe";
 import { VideoPlayButton } from "../gallery/VideoPlayButton";
@@ -276,6 +275,7 @@ export function DreamPreview({
         header: viewerClasses.header,
         body: viewerClasses.body,
       }}
+      styles={{ content: { overflow: "clip" }, body: { overflow: "clip" } }}
       onKeyDown={onKeyDown}
     >
       <div className={viewerClasses.layout}>
@@ -328,13 +328,35 @@ export function DreamPreview({
               <Group justify="center" gap="xs" wrap="nowrap" mb="xs">
                 <SegmentedControl
                   aria-label={card.kind === "pair" ? "Comparison Results" : "Set Results"}
-                  size="sm"
+                  mih={card.kind === "pair" ? "2.5rem" : undefined}
+                  miw={0}
+                  styles={
+                    card.kind === "pair"
+                      ? {
+                          control: { minWidth: 0 },
+                          label: {
+                            paddingInline: "var(--mantine-spacing-xs)",
+                            whiteSpace: "normal",
+                          },
+                          innerLabel: { minWidth: 0, overflowWrap: "anywhere" },
+                        }
+                      : undefined
+                  }
                   value={String(side)}
                   onChange={(value) => setSide(Number(value))}
-                  data={items.map((_, index) => ({
-                    value: String(index),
-                    label: card.kind === "pair" ? letter(index) : String(index + 1),
-                  }))}
+                  data={items.map((_, index) => {
+                    const label = card.kind === "pair" ? sideLabel(card, index) : undefined;
+                    return {
+                      value: String(index),
+                      label: label ? (
+                        <Text span size="sm" lh={1.1} lineClamp={2} title={label}>
+                          {label}
+                        </Text>
+                      ) : (
+                        String(index + 1)
+                      ),
+                    };
+                  })}
                 />
                 {card.kind === "set" &&
                   (
