@@ -1430,6 +1430,8 @@ export async function serveDream(
     spicyAvailable: options.spicyAvailable ?? false,
     calibration: options.calibration ?? [],
     library: options.library ?? [],
+    today: { images: 12, videos: 1 },
+    usage: undefined as import("../../shared/dream").DreamCounts | undefined,
     reviewed: new Set<string>(),
     judged: new Set<string>(),
     /** Every Dream result served, so Undo can bring one back. */
@@ -1442,7 +1444,8 @@ export async function serveDream(
     settings: state.settings,
     unseen: state.unseen,
     since: options.since ?? null,
-    today: { images: 12, videos: 1 },
+    today: state.today,
+    usage: state.usage,
     spicyAvailable: state.spicyAvailable,
     locked: options.locked ?? [],
     status: !state.settings.enabled
@@ -1572,6 +1575,13 @@ export async function serveDream(
       return route.fulfill({ json: dreamCardCounts(state.unseen, state.settings) });
     if (path === "/api/dream/settings") {
       Object.assign(state.settings, body);
+      return route.fulfill({ json: show() });
+    }
+    if (path === "/api/dream/reset-limit") {
+      state.usage = {
+        ...(state.usage ?? state.today),
+        [body.kind === "image" ? "images" : "videos"]: 0,
+      };
       return route.fulfill({ json: show() });
     }
     if (path === "/api/dream/calibration") {
