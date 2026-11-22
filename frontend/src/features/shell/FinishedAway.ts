@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { type QueueJob, terminalStatuses } from "../../../../shared/queue";
 import { queueQuery } from "../generation/Queue";
 
 const title = "Studio";
+const foregroundJob = (job: Pick<QueueJob, "dream">) => !job.dream;
 const ownJobs = ({ jobs }: { jobs: Pick<QueueJob, "dream" | "id" | "status">[] }) =>
-  jobs.filter((job) => !job.dream).map(({ id, status }) => ({ id, status }));
+  jobs.filter(foregroundJob).map(({ id, status }) => ({ id, status }));
 
 /**
  * Counts the account's own work that finishes while Studio is hidden or in the background, as
@@ -14,12 +15,14 @@ const ownJobs = ({ jobs }: { jobs: Pick<QueueJob, "dream" | "id" | "status">[] }
  * keeps the queue checked while hidden so the count can rise; Dream's background work is left out.
  */
 export function FinishedAway() {
+  const [hidden, setHidden] = useState(() => document.hidden);
   const jobs = useQuery({
     ...queueQuery,
     select: ownJobs,
     refetchIntervalInBackground: true,
     refetchInterval: (query) =>
-      document.hidden && query.state.data?.jobs.some((job) => !terminalStatuses.has(job.status))
+      hidden &&
+      query.state.data?.jobs.some((job) => foregroundJob(job) && !terminalStatuses.has(job.status))
         ? 3000
         : false,
   }).data;
@@ -40,14 +43,15 @@ export function FinishedAway() {
     void navigator.setAppBadge?.(count.current).catch(() => undefined);
   }, [jobs]);
   useEffect(() => {
-    const returned = () => {
+    const visibilityChanged = () => {
+      setHidden(document.hidden);
       if (document.hidden || !count.current) return;
       count.current = 0;
       document.title = title;
       void navigator.clearAppBadge?.().catch(() => undefined);
     };
-    document.addEventListener("visibilitychange", returned);
-    return () => document.removeEventListener("visibilitychange", returned);
+    document.addEventListener("visibilitychange", visibilityChanged);
+    return () => document.removeEventListener("visibilitychange", visibilityChanged);
   }, []);
   return null;
 }
