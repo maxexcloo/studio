@@ -228,6 +228,7 @@ import {
   modelLibraryWorker,
   noWorkerMessage,
   useWorkloadWorkers,
+  workerById,
 } from "./workers.js";
 import { flushWorkflowPreferences } from "./workflow-catalogue.js";
 import { registerWorkflowRoutes } from "./workflow-routes.js";
@@ -343,7 +344,7 @@ const recoverRunningJobs = createJobRecovery({
       galleryItems({
         status: ["pending", "failed", "cancelled"],
         since: Date.now() - 86_400_000,
-      }).filter((item) => !item.url),
+      }).filter((item) => !item.url && !isRadianceWorker(workerById(item.settings?.comfyBackend))),
     job: (id) => galleryItems({ jobId: id }),
     save: putGalleryItems,
     replace: (id, outputs) => {
