@@ -330,7 +330,6 @@ export function MediaViewer({
   const members = setMembers(related, item);
   const hasThumbnails = family.length > 1 || members.length > 1;
   function showDetails() {
-    if (bare) return;
     if (phone) setSheet(true);
     else {
       if (immersive) setChrome("standard");

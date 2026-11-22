@@ -76,11 +76,13 @@ export function useCardIdeas({
   );
   const groups = assistMenu({
     templates: [],
-    suggestions: [
-      { id: "heading", label: "Suggested", heading: true },
-      ...suggestions.options,
-      suggestions.again,
-    ],
+    suggestions: {
+      group: [
+        { id: "heading", label: "Suggested", heading: true },
+        ...suggestions.options,
+        suggestions.again,
+      ],
+    },
     last: [{ id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) }],
   });
   return {

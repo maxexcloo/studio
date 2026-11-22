@@ -21,7 +21,7 @@ test("Nested pickers consume outside presses one layer at a time", async ({ page
   const parent = page.getByRole("dialog", { name: "LoRAs", exact: true });
   const family = parent.getByRole("combobox", { name: "Family", exact: true });
   const families = parent.getByRole("listbox", { name: "Family", exact: true });
-  const sort = parent.getByRole("button", { name: "Sort", exact: true });
+  const sort = parent.getByRole("button", { name: "Sort LoRAs", exact: true });
   const videos = page.getByRole("link", { name: "Videos", exact: true });
   const press = (target: typeof videos) => (isMobile ? target.tap() : target.click());
   await press(family);

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 
+import { radianceInfo } from "./providers/radiance.ts";
 import { previewWorkflowImport } from "./workflow-catalogue.js";
 import { workflowRisks } from "./workflow-risk.js";
 
@@ -61,6 +63,29 @@ test("the import review carries them", () => {
   assert.deepEqual(preview.declared, declared);
   assert.deepEqual(
     preview.risks.map((risk) => risk.classType),
+    ["Shell"],
+  );
+});
+
+test("Profile import previews the standalone Radiance sample and checks the graph and controls", () => {
+  const file = "radiance-qwen-image.json";
+  const profile = JSON.parse(
+    fs.readFileSync(new URL(`./samples/${file}`, import.meta.url), "utf8"),
+  );
+  const model = "qwen-image-2.1-bf16";
+  profile.graph["1"].inputs.model = model;
+  const info = radianceInfo([{ id: model, state: "cold" }]);
+  const preview = previewWorkflowImport(profile, file, info);
+  assert.equal(preview.format, "studio-profile");
+  assert.ok(preview.validation.ok);
+  assert.deepEqual(preview.validation.warnings, []);
+
+  profile.studio.controls.model.input = "missing";
+  profile.graph["3"] = { class_type: "Shell", inputs: { command: "echo hello" } };
+  const invalid = previewWorkflowImport(profile, file, info);
+  assert.match(invalid.validation.issues.join(" "), /controls.model points at input "missing"/);
+  assert.deepEqual(
+    invalid.risks.map(({ classType }) => classType),
     ["Shell"],
   );
 });

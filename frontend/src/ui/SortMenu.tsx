@@ -1,23 +1,30 @@
 import { ActionIcon, Menu } from "@mantine/core";
 import { Check } from "lucide-react";
+import { Fragment } from "react";
 
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
 import { PopupTooltip } from "./PopupTooltip";
 
+export const nameSortLabels = {
+  "name-asc": "Name A–Z",
+  "name-desc": "Name Z–A",
+};
+
 export function SortMenu<Sort extends string>({
-  label = "Sort",
-  labels,
+  label,
+  groups,
   value,
   onChange,
   withinPortal = false,
 }: {
-  label?: string;
-  labels: Record<Sort, string>;
+  label: string;
+  groups: readonly Partial<Record<Sort, string>>[];
   value: Sort;
   onChange: (sort: Sort) => void;
   withinPortal?: boolean;
 }) {
+  const selected = groups.find((group) => group[value])?.[value];
   return (
     <Menu
       position="bottom-end"
@@ -25,7 +32,7 @@ export function SortMenu<Sort extends string>({
       withinPortal={withinPortal}
       checkIcon={<Check size={14} />}
     >
-      <PopupTooltip label={`Sort: ${labels[value]}`}>
+      <PopupTooltip label={selected || label}>
         <Menu.Target>
           <ActionIcon aria-label={label} variant="subtle" color="gray">
             <icons.sort size={18} />
@@ -34,11 +41,24 @@ export function SortMenu<Sort extends string>({
       </PopupTooltip>
       <Menu.Dropdown aria-label={label}>
         <Menu.RadioGroup value={value}>
-          {(Object.keys(labels) as Sort[]).map((sort) => (
-            <Menu.RadioItem key={sort} value={sort} closeMenuOnClick onClick={() => onChange(sort)}>
-              {labels[sort]}
-            </Menu.RadioItem>
-          ))}
+          {groups.map((group, index) => {
+            const choices = Object.entries(group) as [Sort, string][];
+            return (
+              <Fragment key={choices[0][0]}>
+                {index > 0 && <Menu.Divider />}
+                {choices.map(([sort, title]) => (
+                  <Menu.RadioItem
+                    key={sort}
+                    value={sort}
+                    closeMenuOnClick
+                    onClick={() => onChange(sort)}
+                  >
+                    {title}
+                  </Menu.RadioItem>
+                ))}
+              </Fragment>
+            );
+          })}
         </Menu.RadioGroup>
       </Menu.Dropdown>
     </Menu>

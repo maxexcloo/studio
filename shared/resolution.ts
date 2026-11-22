@@ -23,6 +23,23 @@ interface SizedProfile {
   native?: Partial<Record<string, string>>;
   options?: { resolutions?: string[] };
 }
+
+interface DefaultSizedProfile extends Pick<SizedProfile, "kind" | "aspectPolicy"> {
+  aspectDefault?: string;
+  aspectPresets?: { label: string; w: number; h: number }[];
+  defaults?: { width?: unknown; height?: unknown };
+}
+
+/** The workflow's configured canvas or its family's starting preset. */
+export function profileImageSize(profile?: DefaultSizedProfile, kind = profile?.kind || "image") {
+  const aspect =
+    profile?.aspectPolicy !== "fixed" && profile?.aspectDefault
+      ? profile.aspectPresets?.find((item) => item.label === profile.aspectDefault)
+      : undefined;
+  const width = Number(profile?.defaults?.width) || (kind === "video" ? 640 : 1024);
+  const height = Number(profile?.defaults?.height) || width;
+  return aspect ? { width: aspect.w, height: aspect.h } : { width, height };
+}
 interface SizedInput {
   kind?: unknown;
   width?: unknown;

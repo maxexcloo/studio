@@ -11,11 +11,12 @@ import {
 import {
   availableResolutions,
   orderedAspects,
+  profileImageSize,
+  resolutionSize,
   resolutions as resolutionTiers,
 } from "../../shared/resolution.ts";
 import { upscaleQualities } from "../../shared/upscale.ts";
 // Which generate arguments a profile lets MCP adjust; fixed controls are never advertised.
-import { referenceImageSize } from "../generation-defaults.js";
 import { strengthRange } from "../lora/policy.js";
 import { keptTriggers } from "../lora/prompts.js";
 
@@ -51,11 +52,12 @@ export function mcpControls(profile) {
   const constraints = profile.constraints || {};
   const defaults = profile.defaults || {};
   const options = profile.options || {};
+  const canvas = profileImageSize(profile);
   const controls = {};
   // Sizes are the profile's own presets, as the composer offers them, never a free width and height.
   if (!fixedRange(constraints.width) || !fixedRange(constraints.height)) {
     const presets = orderedAspects(profile.aspectPresets || []);
-    const fallback = profile.aspectDefault || presets.find((item) => item.default)?.label;
+    const fallback = presets.find(({ w, h }) => w === canvas.width && h === canvas.height)?.label;
     // A model with its own resolutions gives the size it draws at each.
     const size = (item) =>
       item.sizes
@@ -74,12 +76,18 @@ export function mcpControls(profile) {
           options.resolutions.some((value) => value.toUpperCase() === tier),
         )
       : availableResolutions(profile);
-  if (resolutions.length)
+  if (resolutions.length) {
+    const fallback = options.resolutions?.length
+      ? resolutions.find((tier) => tier === defaults.resolution?.toUpperCase())
+      : resolutions.find((tier) => {
+          const size = resolutionSize(canvas, tier, profile);
+          return size.width === canvas.width && size.height === canvas.height;
+        });
     controls.resolution = {
       options: resolutions,
-      default:
-        resolutions.find((tier) => tier === defaults.resolution?.toUpperCase()) || resolutions[0],
+      ...(fallback ? { default: fallback } : {}),
     };
+  }
   controls.count = {
     min: 1,
     max: maxJobsPerCall,
@@ -686,53 +694,6 @@ export function varyLoras(stack, infos = {}, position = 0) {
       const rounded = Math.round(target * 20) / 20;
       return { ...lora, strength: rounded >= range.min && rounded <= range.max ? rounded : target };
     });
-}
-
-const orientations = {
-  landscape: "landscape",
-  wide: "landscape",
-  horizontal: "landscape",
-  portrait: "portrait",
-  tall: "portrait",
-  vertical: "portrait",
-  square: "square",
-};
-/**
- * The width and height for an aspect ("landscape", "portrait", "square" or a ratio such as 16:9):
- * the profile's own preset for the aspect, which the run's resolution then scales. Without an
- * aspect, the profile's default preset where it has one (as the composer starts), else null so the
- * saved size applies.
- */
-export function mcpSize(profile, { aspect = profile.aspectDefault } = {}) {
-  if (!aspect) return null;
-  const defaults = profile.defaults || {};
-  const presets = (profile.aspectPresets || []).filter((item) => item.w > 0 && item.h > 0);
-  let width = Number(defaults.width) || 1024;
-  let height = Number(defaults.height) || width;
-  const key = String(aspect).trim().toLowerCase().slice(0, 20);
-  const named = presets.find((item) => item.label.toLowerCase() === key);
-  if (named) return { width: named.w, height: named.h };
-  const orientation = orientations[key];
-  const ratio = /^(\d+(?:\.\d+)?)\s*[:x×/]\s*(\d+(?:\.\d+)?)$/.exec(key);
-  if (!orientation && !(ratio && Number(ratio[1]) > 0 && Number(ratio[2]) > 0))
-    throw new Error(
-      `Choose aspect from ${[...presets.map((item) => item.label), "landscape", "portrait", "square"].join(", ")}.`,
-    );
-  const shape = (w, h) => (w > h ? "landscape" : w < h ? "portrait" : "square");
-  const wanted = orientation ? null : Number(ratio[1]) / Number(ratio[2]);
-  // The profile's own preset when one fits, in its own order; otherwise the ratio at its default pixel count.
-  const preset = orientation
-    ? presets.find((item) => shape(item.w, item.h) === orientation)
-    : presets.find((item) => Math.abs(Math.log(item.w / item.h) - Math.log(wanted)) < 0.02);
-  if (preset) ({ w: width, h: height } = preset);
-  else {
-    const [rw, rh] = orientation
-      ? { landscape: [16, 9], portrait: [9, 16], square: [1, 1] }[orientation]
-      : [wanted, 1];
-    const fitted = referenceImageSize(profile, { width: rw * 1000, height: rh * 1000 });
-    if (fitted) ({ width, height } = fitted);
-  }
-  return { width, height };
 }
 
 /**

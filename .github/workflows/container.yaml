@@ -149,12 +149,17 @@ jobs:
         if: ${{ !inputs.skip_checks }}
         run: |
           docker run --cap-drop=ALL --detach --init --name studio-smoke \
-            --publish 127.0.0.1:8787:8787 --read-only --rm \
+            --network host -e HOST=127.0.0.1 --read-only --rm \
             --security-opt=no-new-privileges \
             --tmpfs /data:uid=1000,gid=1000,mode=0700 --tmpfs /tmp studio:test
           trap 'docker logs studio-smoke; docker rm --force studio-smoke' EXIT
           for _ in $(seq 1 30); do
-            if [ "$(docker inspect --format '{{.State.Health.Status}}' studio-smoke)" = healthy ]; then exit 0; fi
+            if [ "$(docker inspect --format '{{.State.Health.Status}}' studio-smoke)" = healthy ]; then
+              curl -fsS http://127.0.0.1:8787/api/ready | jq -e '.ready' > /dev/null
+              curl -fsS http://127.0.0.1:8787/ > /dev/null
+              curl -fsS http://127.0.0.1:8787/api/gallery | jq -e '.items | type == "array"' > /dev/null
+              exit 0
+            fi
             sleep 1
           done
           exit 1

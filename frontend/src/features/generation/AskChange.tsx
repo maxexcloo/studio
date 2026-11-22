@@ -21,7 +21,7 @@ import { type Action, type ActionGroups } from "../../ui/ActionBar";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { changeSummary } from "./changeSummary";
-import { assistantQuery } from "./PromptAssistant";
+import { type AssistantOption, assistantQuery } from "./PromptAssistant";
 
 import classes from "./AskChange.module.css";
 
@@ -233,36 +233,66 @@ export function useChangeSuggestions<K extends QueryKey>({
  */
 export const assistMenu = ({
   loading,
+  expandable,
   settings = [],
-  suggestions = [],
+  suggestions,
   templates,
   custom = [],
   others = [],
   last,
 }: {
   loading?: boolean;
+  expandable?: boolean;
   settings?: Action[];
-  suggestions?: Action[];
+  suggestions?: { action?: Action; group: Action[] };
   templates: Action[];
   custom?: Action[];
   others?: ActionGroups;
   last: Action[];
-}): ActionGroups =>
-  loading
-    ? [[{ id: "loading", label: "Loading…", disabled: true }]]
+}): ActionGroups => {
+  if (loading) return [[{ id: "loading", label: "Loading…", disabled: true }]];
+  const choices = [...templates].sort((a, b) => compareNames(a.label, b.label)).concat(custom);
+  const sections: ActionGroups = expandable
+    ? [
+        [
+          ...(suggestions?.action ? [suggestions.action] : []),
+          ...(choices.length ? [{ id: "templates", label: "Templates", menu: [choices] }] : []),
+        ],
+      ]
     : [
-        settings,
-        suggestions,
-        templates.length || custom.length
-          ? [
-              { id: "templates-heading", label: "Templates", heading: true },
-              ...[...templates].sort((a, b) => compareNames(String(a.label), String(b.label))),
-              ...custom,
-            ]
+        suggestions?.group ?? [],
+        choices.length
+          ? [{ id: "templates-heading", label: "Templates", heading: true }, ...choices]
           : [],
-        ...others,
-        last,
       ];
+  return [settings, ...sections, ...others, last];
+};
+
+export function changeTemplates(
+  options: (AssistantOption & { instruction: string })[],
+  pick: (request: string) => void,
+  openCustom: () => void,
+  disabled?: boolean,
+) {
+  return {
+    templates: options.map((change): Action => ({
+      id: `change:${change.id}`,
+      label: change.label,
+      icon: icons.assistant,
+      disabled,
+      onClick: () => pick(change.instruction),
+    })),
+    custom: [
+      {
+        id: "custom",
+        label: "Custom…",
+        icon: icons.custom,
+        disabled,
+        onClick: openCustom,
+      },
+    ],
+  };
+}
 
 /** Supplies a text box's suggestions, loading once its More menu opens. */
 export function ChangeSuggestions<K extends QueryKey>({

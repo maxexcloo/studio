@@ -13,7 +13,7 @@ import { type Location, Navigate, useLocation, useNavigate } from "react-router"
 
 import type { GallerySort } from "../../../../shared/gallery-sort";
 import { terminalStatuses } from "../../../../shared/queue";
-import type { MediaItem, MediaKind } from "../../types";
+import type { MediaItem, MediaKind, QueueJob } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
@@ -168,10 +168,11 @@ function Gallery() {
   const client = useQueryClient();
   // Queue changes (new, finished or failed work) refresh the gallery at once; only active work
   // polls, for live previews; an idle gallery waits for the queue's own idle check.
-  const jobs = useQuery({
-    ...queueQuery,
-    select: (data) => {
-      const foreground = data.jobs.filter((job) => !job.dream);
+  const selectGalleryJobs = useCallback(
+    (data: { jobs: QueueJob[] }) => {
+      const foreground = data.jobs.filter(
+        (job) => !job.dream && (job.input?.kind ?? job.input?.type ?? "image") === kind,
+      );
       return {
         key: foreground.map((job) => `${job.id}:${job.status}`).join(),
         active: foreground.some((job) => !terminalStatuses.has(job.status)),
@@ -181,6 +182,11 @@ function Gallery() {
           .join(),
       };
     },
+    [kind],
+  );
+  const jobs = useQuery({
+    ...queueQuery,
+    select: selectGalleryJobs,
   }).data;
   const listing = useMemo(
     () => ({ search, kind, filters, similar, strictness, setId, chat, turn, sort }) as const,

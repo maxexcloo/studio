@@ -1,3 +1,4 @@
+import type { CardKind } from "./characters.ts";
 import type { Resolution } from "./resolution.ts";
 
 /** A project brief's free-text fields, in the order its one-line summary lists them. */
@@ -13,7 +14,7 @@ export interface ProjectBrief extends Partial<Record<(typeof briefTexts)[number]
   /** Favourite LoRA names, best first. */
   loras?: string[];
 }
-/** What every generate from an attached chat keeps to. */
+/** What project generations in Dream and attached chats keep to. */
 export interface ProjectConstraints {
   /** The only profiles it runs on, by exact id; none for any. */
   profiles: string[];
@@ -26,6 +27,8 @@ export interface ProjectContent {
   name: string;
   brief: ProjectBrief;
   constraints: ProjectConstraints;
+  /** Account-owned cards that stay fixed when Dream varies an idea. */
+  cards?: Partial<Record<CardKind, string>>;
   /** A paused project takes no turns. */
   paused?: boolean;
   /** Dream gives it twice the turns its results earn. */
@@ -39,7 +42,7 @@ export interface ProjectChange {
   by: ChangeBy;
   /** Why Dream proposed it; "" for the person's and chats' own changes. */
   why: string;
-  /** What changed: "name", brief fields, "constraints", "paused", "favoured", or "created". */
+  /** What changed: "name", brief fields, "constraints", "cards", "paused", "favoured", or "created". */
   fields: string[];
   /** Undo took it back. */
   undone?: true;

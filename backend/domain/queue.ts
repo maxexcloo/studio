@@ -2,6 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { isDeepStrictEqual } from "node:util";
 
 import type { ResultContext } from "../../shared/characters.ts";
+import { dreamDefaults } from "../../shared/dream.ts";
 import {
   type GenerationInput,
   type PromptWriting,
@@ -51,6 +52,7 @@ export interface QueueAdapter {
   saveOutputs(job: OwnedJob): Promise<JobObservation | void>;
   eligible?(job: OwnedJob): Promise<string | undefined>;
   dreamIdleWait?(job: OwnedJob): string | undefined;
+  dreamImageSwitchMinutes?(ownerId: string): number;
   /** Releases readiness resources when work arrives while admission is in flight. */
   releaseAdmission?(job: OwnedJob): void;
   settled?(job: OwnedJob): Promise<void>;
@@ -178,7 +180,7 @@ const localVideo = (job: OwnedJob) =>
   job.resource.startsWith("worker:") && job.input.kind === "video";
 const videoWaitReason = "Waiting for another video to finish.";
 const videoModelReason = "Waiting for the running video to finish before loading another model.";
-const dreamModelIdleMinutes = 2;
+const dreamVideoModelIdleMinutes = 2;
 /** How long a worker's run may show no progress before it is given up: a video's steps take longer. */
 const stallMinutes = (job: OwnedJob) => (job.input.kind === "video" ? 30 : 10);
 
@@ -276,15 +278,21 @@ export class GenerationQueue {
     if (tier(job) !== queuePriority.dream || !job.resource.startsWith("worker:")) return;
     const model = modelOf(job.input);
     if (!model) return;
-    const loaded = this.loaded.get(job.resource)?.input;
-    if (loaded && modelOf(loaded) === model && loaded.profileBackend === job.input.profileBackend)
-      return;
-    this.updateModelIdle(this.store.openJobs());
+    const video = localVideo(job);
+    const loaded = this.loaded.get(job.resource);
     if (
-      this.modelIdleSince === undefined ||
-      this.now() - this.modelIdleSince < dreamModelIdleMinutes * 60_000
+      loaded &&
+      loaded.input.profileBackend === job.input.profileBackend &&
+      (video ? modelOf(loaded.input) === model : loadKey(loaded) === loadKey(job))
     )
-      return `Dream waits for the queue to be idle for ${dreamModelIdleMinutes} minutes before loading another model.`;
+      return;
+    const minutes = video
+      ? dreamVideoModelIdleMinutes
+      : (this.adapter.dreamImageSwitchMinutes?.(job.ownerId) ?? dreamDefaults.imageSwitchMinutes);
+    if (!minutes) return;
+    this.updateModelIdle(this.store.openJobs());
+    if (this.modelIdleSince === undefined || this.now() - this.modelIdleSince < minutes * 60_000)
+      return `Dream waits for the queue to be idle for ${minutes} ${minutes === 1 ? "minute" : "minutes"} before ${video ? "loading another model" : "changing the model or LoRAs"}.`;
   }
 
   isWriting(id: string) {

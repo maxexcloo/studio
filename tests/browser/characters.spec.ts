@@ -269,9 +269,7 @@ test("Use in Composer stages Library cards in the composer, moving to a model th
   };
   await serveProfiles(page, [...profiles, keeper]);
   await page.goto("/library#characters");
-  await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
-  await expect(page.getByRole("menuitem").first()).toHaveText("Edit Character");
-  await page.getByRole("menuitem", { name: "Use in Composer", exact: true }).click();
+  await page.getByRole("button", { name: "Use Mara in Composer", exact: true }).click();
   await expect(page).toHaveURL(/\/images$/);
   await expect(
     page.getByText(
@@ -283,8 +281,7 @@ test("Use in Composer stages Library cards in the composer, moving to a model th
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
 
   await page.goto("/library#scenes");
-  await page.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Use in Composer", exact: true }).click();
+  await page.getByRole("button", { name: "Use Harbour in Composer", exact: true }).click();
   await expect(prompt).toHaveValue(withCharacter(scenePart(harbour, true), mara.description));
 });
 

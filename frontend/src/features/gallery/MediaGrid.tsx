@@ -330,8 +330,10 @@ function DateScrubber({
     layout.sections.some((section) => section.day) && layout.height > 3 * window.innerHeight;
   useEffect(() => {
     if (!long) return;
+    let frame = 0;
     let idle = 0;
     const update = () => {
+      frame = 0;
       const range = document.documentElement.scrollHeight - window.innerHeight;
       const offset = window.scrollY - (host.current ? gridTop(host.current) : 0);
       // The last day starting above the middle of the screen.
@@ -344,16 +346,23 @@ function DateScrubber({
         else high = middle - 1;
       }
       const day = sections[low].day;
-      setPosition({ fraction: range > 0 ? Math.min(window.scrollY / range, 1) : 0, day });
+      const fraction = range > 0 ? Math.min(window.scrollY / range, 1) : 0;
+      setPosition((previous) =>
+        previous.fraction === fraction && previous.day === day ? previous : { fraction, day },
+      );
+    };
+    const scroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
       setActive(true);
       window.clearTimeout(idle);
       idle = window.setTimeout(() => setActive(false), 1500);
     };
     update();
     setActive(false);
-    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("scroll", scroll, { passive: true });
     return () => {
-      window.removeEventListener("scroll", update);
+      window.removeEventListener("scroll", scroll);
+      window.cancelAnimationFrame(frame);
       window.clearTimeout(idle);
     };
   }, [long, layout, host]);

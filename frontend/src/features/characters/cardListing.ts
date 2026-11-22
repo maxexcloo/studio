@@ -1,14 +1,11 @@
 import { type Card, type CardKind, compareCardLikes } from "../../../../shared/characters";
-import { gallerySortLabels } from "../../../../shared/gallery-sort";
+import { type GallerySort, gallerySortGroups } from "../../../../shared/gallery-sort";
 import { compareNames } from "../../ui/DataTable";
+import { nameSortLabels } from "../../ui/SortMenu";
 import { useRemembered } from "../auth/useRemembered";
 
-export const cardSortLabels = {
-  ...gallerySortLabels,
-  "name-asc": "Name A–Z",
-  "name-desc": "Name Z–A",
-};
-export type CardSort = keyof typeof cardSortLabels;
+export const cardSortGroups = [...gallerySortGroups, nameSortLabels];
+export type CardSort = GallerySort | keyof typeof nameSortLabels;
 
 type CardListing = { sort?: CardSort };
 const listingsDefault: Partial<Record<CardKind, CardListing>> = {};

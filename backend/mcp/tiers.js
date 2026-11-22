@@ -227,12 +227,15 @@ const fits = (profile, references) => {
 };
 
 /**
- * The profiles Studio may use when generate names a kind and tier instead of a profile_id: without a
- * tier, the first preferred tier (Fast, Super Fast, Standard, Quality) that fits. `firstFrame`
+ * The profiles Studio may use without a profile_id: a compatible default, or the first tier
+ * (Fast, Super Fast, Standard, Quality) that fits when no tier was requested. `firstFrame`
  * (animating an image) prefers first-frame profiles. `profiles` is already limited to this account's
  * ready profiles of the kind.
  */
-export function choicePool(profiles, { kind, tier, references = 0, firstFrame = false }) {
+export function choicePool(
+  profiles,
+  { kind, tier, references = 0, firstFrame = false, defaultId },
+) {
   if (!profiles.length) throw new Error(`No ready ${kind} profile is available to this account.`);
   const usable = (tier ? profilesForTier(profiles, tier) : profiles).filter((profile) =>
     fits(profile, references),
@@ -245,7 +248,9 @@ export function choicePool(profiles, { kind, tier, references = 0, firstFrame = 
   }
   const frames = firstFrame ? usable.filter(takesFirstFrame) : [];
   const pool = frames.length ? frames : usable;
-  return tier ? pool : fastestTier(pool);
+  return tier || pool.some((profile) => profile.id === defaultId && !profile.failing)
+    ? pool
+    : fastestTier(pool);
 }
 
 /**
@@ -261,7 +266,7 @@ export function chooseProfile(profiles, { defaultId, ...options }) {
       Boolean(fallback?.family) && profile.family === fallback.family,
       !profile.uncensored,
     ].reduce((total, value) => total * 2 + Number(value), 0);
-  return choicePool(profiles, options).reduce((best, profile) =>
+  return choicePool(profiles, { ...options, defaultId }).reduce((best, profile) =>
     score(profile) > score(best) ? profile : best,
   );
 }

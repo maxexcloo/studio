@@ -26,12 +26,19 @@ import {
   withCharacter,
 } from "../../shared/characters.ts";
 import { compareVariants } from "../../shared/compare.ts";
-import { isCloudProfile, profileBackendLabels, runBackend } from "../../shared/profiles.ts";
+import {
+  isCloudProfile,
+  loraStrengthSweep,
+  profileBackendLabels,
+  runBackend,
+} from "../../shared/profiles.ts";
 import { resolutions } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { upscaleQualities } from "../../shared/upscale.ts";
 import { accessFeatures } from "../account-policy.js";
 import { maxResultCaption } from "../gallery/records.js";
+import { profileAspectSize } from "../generation-defaults.js";
+import { recommendedNegative } from "../lora/prompts.js";
 import { minorAgeRefusal } from "../minor-age.js";
 import { savedDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { promptStyleStore } from "../prompt-styles.js";
@@ -46,7 +53,7 @@ import {
   mcpControls,
   mcpGenerationCount,
   mcpLoras,
-  mcpSize,
+  prepareLoras,
 } from "./controls.js";
 import { findCard } from "./manage.js";
 import { aboutTime, assertJobCount, mcpJson, readyIn, scopeMarkdown, setItems } from "./media.js";
@@ -75,7 +82,6 @@ import {
   profileFromRequest,
   profilesForTier,
   profilesNearTier,
-  requestedTier,
   searchProfiles,
   serviceState,
   speedWordList,
@@ -413,12 +419,8 @@ export function registerGenerateTools({
     profile,
     note: `${pool.length < 2 ? "" : `Chose ${profile.label || profile.id}, the default. `}${note || ""}`,
   });
-  /**
-   * A named profile, moved to the wanted tier within its family (an exact id stays), with a note when
-   * the tier fell back. Without a wanted tier, a generate `request` with no speed word moves even an
-   * exact id to its family's fastest profile that takes as many references: Quality only when asked.
-   */
-  const namedInTier = (profiles, value, wanted, request) => {
+  /** Exact profile IDs stay fixed. A family name can resolve to an explicitly requested tier. */
+  const namedInTier = (profiles, value, wanted) => {
     // A cloud (Grok) profile only by its exact id or when the name asks for the cloud.
     const found = profileNamed(
       profiles.some((profile) => profile.id === value)
@@ -426,25 +428,6 @@ export function registerGenerateTools({
         : localUnlessAsked(profiles, { name: value }),
       value,
     );
-    if (request !== undefined && !wanted && !requestedTier(request)) {
-      const inputs = (found.mediaInputs || []).length;
-      const family = found.family
-        ? profiles.filter(
-            (item) =>
-              item.family === found.family &&
-              item.kind === found.kind &&
-              (item.mediaInputs || []).length >= inputs,
-          )
-        : [found];
-      const fastest = fastestFirst([found, ...family])[0];
-      return {
-        profile: fastest,
-        note:
-          fastest.id === found.id
-            ? ""
-            : `Ran on ${fastest.label || fastest.id}, the fast choice for ${found.label || found.id}; pass tier "quality" only when the user asks for Quality. `,
-      };
-    }
     return found.id === value
       ? { profile: found, note: "" }
       : withinFamily(profiles, found, wanted);
@@ -841,7 +824,7 @@ export function registerGenerateTools({
           ),
         );
         // The size a run without aspect draws: the family's default preset, else the profile's own.
-        const size = mcpSize(profile) || profile.defaults;
+        const size = profileAspectSize(profile);
         if (controls.aspect && size?.width && size?.height)
           defaults.size = `${size.width}×${size.height}`;
         // The backend a run with LoRAs uses, which may not be the default (runBackend).
@@ -931,7 +914,7 @@ export function registerGenerateTools({
     server,
     "generate",
     "generate",
-    `Queue images or videos, at most ${maxSplitJobs} images per call. Models: profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Leave the model, count, tier, aspect and loras out unless asked (Studio runs ${mcpGenerationCount} images, a fast model, its own size, no LoRAs). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Never make anyone sexual or nude under 18 or a teen, without adding "adult" or an age to say so.`,
+    `Queue images or videos, at most ${maxSplitJobs} images per call. Models: profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Leave model, count, tier, size and LoRAs out unless asked (Studio uses the default model and its size). Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. Never make anyone sexual or nude under 18 or a teen, without adding "adult" or an age to say so.`,
     z.strictObject({
       request: z
         .string()
@@ -961,11 +944,12 @@ export function registerGenerateTools({
           "Vary only this at one seed, one image each: values are prompts, profile_ids or strengths.",
         ),
       strengths: z
-        .array(z.number().finite())
-        .min(compareVariants.min)
-        .max(compareVariants.max)
+        .union([
+          z.literal("sweep"),
+          z.array(z.number().finite()).min(compareVariants.min).max(compareVariants.max),
+        ])
         .optional()
-        .describe("The first LoRA's."),
+        .describe('Test first LoRA. "sweep" uses Library defaults. 0 omits it.'),
       title: setTitle.optional().describe("2-5 words, Title Case."),
       titles: z
         .array(setTitle)
@@ -1175,8 +1159,8 @@ export function registerGenerateTools({
       title,
       context,
       base,
-      axis,
-      strengths,
+      axis: namedAxis,
+      strengths: strengthChoice,
       ...args
     } = constrained.args;
     const unfinished = preview ? 0 : await media.pendingOutputs(owner, signal);
@@ -1282,20 +1266,25 @@ export function registerGenerateTools({
         "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call generate again.",
       );
     const several = Boolean(profile_ids || each_profile);
+    const axis = namedAxis || (strengthChoice ? "LoRA Strength" : "");
     if (axis) {
-      const values = [strengths, profile_ids, args.prompts.length > 1].filter(Boolean).length;
+      const values = [strengthChoice, profile_ids, args.prompts.length > 1].filter(Boolean).length;
       if (values !== 1 || each_profile || shots)
         throw new Error(
           `axis varies one thing: pass ${compareVariants.min}–${compareVariants.max} prompts (or deltas with base), or one prompt with profile_ids or strengths.`,
         );
       if ((kind || "image") !== "image") throw new Error("axis compares images; leave kind out.");
-      if (strengths && !args.loras?.length)
+      if (strengthChoice && !args.loras?.length)
         throw new Error("strengths vary the first LoRA: pass it in loras.");
       if (args.prompts.length > compareVariants.max)
         throw new Error(`axis compares at most ${compareVariants.max} values.`);
       args.count = 1;
     }
-    if (args.captions && args.captions.length !== (strengths?.length ?? args.prompts.length))
+    if (
+      args.captions &&
+      strengthChoice !== "sweep" &&
+      args.captions.length !== (strengthChoice?.length ?? args.prompts.length)
+    )
       throw new Error(
         "Pass one caption per prompt or LoRA strength, with an empty string to skip one.",
       );
@@ -1332,7 +1321,7 @@ export function registerGenerateTools({
     let targets;
     if (profile_ids) {
       const profiles = await media.profiles(kind || "all", owner);
-      targets = profile_ids.map((value) => namedInTier(profiles, value, wanted, request));
+      targets = profile_ids.map((value) => namedInTier(profiles, value, wanted));
     } else if (each_profile) {
       const local = localUnlessAsked(await media.profiles(kind || "image", owner), { request });
       targets = (wanted ? profilesForTier(local, wanted) : local)
@@ -1392,12 +1381,7 @@ export function registerGenerateTools({
                   cloud,
                 }),
               )
-          : namedInTier(
-              await media.profiles(kind || "all", owner),
-              args.profile_id,
-              wanted,
-              request,
-            ),
+          : namedInTier(await media.profiles(kind || "all", owner), args.profile_id, wanted),
       ];
     }
     // A character keeps its identity only on a model that edits with references (an img2img start
@@ -1501,7 +1485,7 @@ export function registerGenerateTools({
         ? previewed.plans
         : await Promise.all(
             targets.map(async ({ profile, note }) => {
-              const sized = mcpSize(profile, aspect ? { aspect } : {});
+              const sized = profileAspectSize(profile, aspect ? { aspect } : {});
               // A character sends its first image (characterImages; the run adds its others where
               // there is room) only to a model that keeps its face: into its Identity slot, the
               // named references filling the others in order, or after them on a model that edits
@@ -1591,12 +1575,51 @@ export function registerGenerateTools({
               };
             }),
           );
+    let strengthOptions;
+    if (strengthChoice) {
+      const [{ profile, plan }] = plans;
+      const active = plan.reference_asset_ids?.length
+        ? { ...profile, ...profile.imageModes?.reference }
+        : profile;
+      const infos = await media.loraInfos(owner);
+      const [primary, ...others] = plan.loras;
+      const [target] = prepareLoras(active, infos, [primary]);
+      if (!target) throw new Error("The first LoRA cannot run on the chosen profile.");
+      const remaining = prepareLoras(active, infos, others);
+      if (remaining.some(({ name }) => name === target.name))
+        throw new Error("List the LoRA being tested only once.");
+      const values =
+        strengthChoice === "sweep" ? loraStrengthSweep(infos[target.name]) : strengthChoice;
+      if (values.length < compareVariants.min || new Set(values).size !== values.length)
+        throw new Error("Compare at least two distinct LoRA strengths.");
+      if (plan.captions && plan.captions.length !== values.length)
+        throw new Error("Pass one caption per LoRA strength, with an empty string to skip one.");
+      const takesNegative = Boolean(mcpControls(active).negative_prompt);
+      const negative =
+        plan.negative_prompt ??
+        recommendedNegative(active.prompting, {
+          cfg: plan.cfg ?? active.defaults?.cfg,
+          takesNegative,
+          stack: remaining,
+          infos,
+        });
+      strengthOptions = values.map((strength) => {
+        const loras = strength === 0 ? others : [{ ...primary, strength }, ...others];
+        if (strength !== 0) prepareLoras(active, infos, loras);
+        return {
+          label: strength === 0 ? "Without LoRA" : String(strength),
+          loras,
+          ...(takesNegative ? { negative_prompt: negative } : {}),
+          ...(profile.backend ? { profile_backend: profile.backend } : {}),
+        };
+      });
+    }
     if (preview) {
       if (previews.size >= 256) previews.delete(previews.keys().next().value);
       previews.set(previewKey, { at: Date.now(), plans });
       const lines = plans.map(
         ({ profile, plan }) =>
-          `${profile.label || profile.id}: ${[...new Set(plan.prompts)].map((prompt) => shortPrompt(prompt)).join(" | ")}`,
+          `${profile.label || profile.id}: ${[...new Set(plan.prompts)].map((prompt) => shortPrompt(prompt)).join(" | ")}${strengthOptions ? ` (LoRA: ${strengthOptions.map(({ label }) => label).join(", ")})` : ""}`,
       );
       return {
         content: [
@@ -1641,16 +1664,16 @@ export function registerGenerateTools({
       const [{ profile, note, plan }] = plans;
       const runs = several
         ? plans
-        : strengths
-          ? strengths.map((strength, index) => ({
+        : strengthOptions
+          ? strengthOptions.map(({ label, ...settings }, index) => ({
               profile,
               note,
-              label: String(strength),
+              label,
               plan: {
                 ...plan,
+                ...settings,
                 captions: plan.captions && [plan.captions[index]],
                 ...(plan.result_set ? { result_set: { ...plan.result_set, first: index } } : {}),
-                loras: plan.loras.map((lora, index) => (index ? lora : { ...lora, strength })),
               },
             }))
           : plan.prompts.map((prompt, index) => ({
@@ -1801,7 +1824,7 @@ export function registerGenerateTools({
         const required = {
           ...args,
           ...(project.constraints.aspect
-            ? mcpSize(profile, { aspect: project.constraints.aspect })
+            ? profileAspectSize(profile, { aspect: project.constraints.aspect })
             : {}),
         };
         const { targets } = projectTargets(project, [{ profile }], all, {

@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 
+import { profileImageSize } from "../../../../shared/resolution";
 import { api } from "../../api";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
 import { useRememberedKey } from "../auth/useRemembered";
@@ -47,6 +48,7 @@ export function inputForProfile(previous: GenerationInput, profile: Profile): Ge
   return {
     ...initialInput,
     ...profile.defaults,
+    ...profileImageSize(profile),
     prompt: previous.prompt,
     cardParts: previous.cardParts,
     negative: previous.negative,
@@ -94,6 +96,7 @@ export interface Draft {
 export interface Variant {
   input: GenerationInput;
   references: ReferenceAsset[];
+  label?: string;
 }
 /**
  * The draft moved to `profile` for a picked character (CharacterChoices): the profile's settings,

@@ -20,7 +20,7 @@ import {
   inputForProfile,
   useGeneration,
 } from "./GenerationProvider";
-import { generationInput, profileForBackend, referencePatch } from "./payload";
+import { generationInput, isProfile, profileForBackend, referencePatch } from "./payload";
 import { PresetPicker } from "./PresetPicker";
 import { queueQuery } from "./Queue";
 import { ReferencePicker } from "./ReferencePicker";
@@ -216,14 +216,17 @@ export function GenerationForm({
       onClear={() => {
         clearing.current = true;
         setCleared(draft);
+        const resetProfile = input.profileId
+          ? models.data?.profiles.find((candidate) => isProfile(candidate, input.profileId))
+          : preferred;
         setDraft((previous) => ({
           sessionId: previous.sessionId,
           operation: previous.input.kind === "video" ? "animate" : "image",
           references: [],
           defaultedProfileId: previous.defaultedProfileId,
           input: {
-            ...(profile
-              ? inputForProfile(initialInput, profile)
+            ...(resetProfile
+              ? inputForProfile(initialInput, resetProfile)
               : { ...initialInput, kind: previous.input.kind }),
             seed: "",
           },

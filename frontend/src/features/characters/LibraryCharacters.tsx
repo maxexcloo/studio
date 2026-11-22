@@ -8,7 +8,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SortMenu } from "../../ui/SortMenu";
 import { CardThumbnails, LibraryCard } from "./CardImages";
-import { cardSortLabels, listedCards, useCardListing } from "./cardListing";
+import { cardSortGroups, listedCards, useCardListing } from "./cardListing";
 import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import { sheetViews } from "./CharacterEditor";
@@ -43,7 +43,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
             <>
               <SortMenu
                 label="Sort Characters"
-                labels={cardSortLabels}
+                groups={cardSortGroups}
                 value={order.sort}
                 onChange={order.setSort}
                 withinPortal
@@ -73,6 +73,9 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
               key={card.id}
               name={card.name}
               images={card.references}
+              onUse={
+                !selection.active && card.references.length ? () => use.character(card) : undefined
+              }
               selection={selection.control(card)}
               menu={
                 !selection.active && (
@@ -81,7 +84,6 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                     onEdit={() => dialogs.edit(card)}
                     onSheet={() => dialogs.sheet(card)}
                     onDelete={() => dialogs.remove(card)}
-                    onUse={() => use.character(card)}
                   />
                 )
               }

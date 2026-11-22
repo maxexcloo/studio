@@ -1,7 +1,8 @@
-import { SegmentedControl, Stack } from "@mantine/core";
+import { Alert, SegmentedControl, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
-import { isCloudProfile } from "../../../../shared/profiles";
+import { defaultModelKeys, isCloudProfile } from "../../../../shared/profiles";
+import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
 import { modelsQuery } from "../generation/GenerationProvider";
@@ -11,7 +12,6 @@ import { TextModelSelect } from "../generation/TextModelSelect";
 import {
   type SidePreference,
   type WorkKind,
-  defaultModelKeys,
   preferencesQuery,
   useSavePreferences,
 } from "./accountPreferences";
@@ -36,11 +36,16 @@ const kinds: { kind: WorkKind; label: string; description?: string }[] = [
 /** Settings › Where Work Runs: default processing and models by media kind. */
 export function WhereWorkRuns() {
   const account = useAccount().data;
-  const status = useQuery(preferencesQuery).data;
+  const { data: status, error } = useQuery(preferencesQuery);
   const profiles = useQuery(modelsQuery).data?.profiles;
   const assistant = useQuery(assistantQuery).data;
   const save = useSavePreferences();
-  if (!status) return null;
+  if (!status)
+    return error ? (
+      <Alert color="red">{error.message}</Alert>
+    ) : (
+      <LoadingState fill label="Loading Work Preferences" />
+    );
   const { preferences } = status;
   const cloud =
     preferences.cloudModels && (account?.mode === "single-user" || status.grants.cloudModels);

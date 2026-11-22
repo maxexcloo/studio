@@ -56,33 +56,36 @@ export function DreamPreferences() {
       />
     </SettingRow>
   );
-  const number = (key: "dailyImages" | "dailyVideos", max: number, description: string) => (
-    <SettingRow label="Daily Amount" description={description}>
+  const number = (
+    key:
+      | "dailyImages"
+      | "dailyVideos"
+      | "imageIdleMinutes"
+      | "imageSwitchMinutes"
+      | "videoIdleMinutes",
+    label: string,
+    description: string,
+    disabled: boolean,
+    max = maxDreamIdleMinutes,
+  ) => (
+    <SettingRow label={label} description={description}>
       <NumberSetting
-        label="Daily Amount"
+        label={label}
         value={settings[key]}
         min={0}
         max={max}
-        disabled={!settings[key === "dailyImages" ? "images" : "videos"]}
+        disabled={disabled}
         onSave={(value) => save.mutate({ [key]: value })}
       />
     </SettingRow>
   );
-  const idle = (key: "imageIdleMinutes" | "videoIdleMinutes") => (
-    <SettingRow
-      label="Idle Delay"
-      description="Minutes to wait after your latest generation request. Set to 0 for no extra delay."
-    >
-      <NumberSetting
-        label="Idle Delay"
-        value={settings[key]}
-        min={0}
-        max={maxDreamIdleMinutes}
-        disabled={!settings[key === "imageIdleMinutes" ? "images" : "videos"]}
-        onSave={(value) => save.mutate({ [key]: value })}
-      />
-    </SettingRow>
-  );
+  const idle = (key: "imageIdleMinutes" | "videoIdleMinutes") =>
+    number(
+      key,
+      "Idle Delay",
+      "Minutes to wait after your latest generation request. Set to 0 for no extra delay.",
+      !settings[key === "imageIdleMinutes" ? "images" : "videos"],
+    );
   const backend = (key: "imageBackend" | "videoBackend") => (
     <SettingRow
       wide
@@ -116,13 +119,31 @@ export function DreamPreferences() {
       </SettingGroup>
       <SettingGroup title="Images">
         {toggle("images", "Enable", "Make new images.")}
-        {number("dailyImages", 500, "The most images Dream makes a day.")}
+        {number(
+          "dailyImages",
+          "Daily Amount",
+          "The most images Dream makes a day.",
+          !settings.images,
+          500,
+        )}
         {idle("imageIdleMinutes")}
+        {number(
+          "imageSwitchMinutes",
+          "Model & LoRA Switch Delay",
+          "Minutes the queue must be idle before Dream changes the local model or LoRAs. Images can reuse the loaded model and LoRAs during this wait.",
+          !settings.images || settings.imageBackend !== "local",
+        )}
         {backend("imageBackend")}
       </SettingGroup>
       <SettingGroup title="Videos">
         {toggle("videos", "Enable", "Animate kept or liked images too.")}
-        {number("dailyVideos", 100, "The most videos Dream makes a day.")}
+        {number(
+          "dailyVideos",
+          "Daily Amount",
+          "The most videos Dream makes a day.",
+          !settings.videos,
+          100,
+        )}
         {idle("videoIdleMinutes")}
         {backend("videoBackend")}
       </SettingGroup>

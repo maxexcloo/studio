@@ -1075,6 +1075,17 @@ export async function viewerChangeMenu(page: Page, action?: "Edit" | "Recreate")
   return page.getByRole("menu");
 }
 
+export async function expandAssistantMenu(
+  scope: Page | Locator,
+  label: "Suggestions" | "Templates",
+) {
+  const page = "page" in scope ? scope.page() : scope;
+  if (!(await page.locator("html[data-phone]").count())) return;
+  const section = scope.getByRole("menuitem", { name: label, exact: true });
+  await expect(section).toBeVisible();
+  if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
+}
+
 /** Returns from the shared phone text editor when a test continues on its parent surface. */
 export async function closeTextEditor(page: Page, title: string) {
   const editor = page.getByRole("dialog", { name: title, exact: true, includeHidden: true });
@@ -1102,9 +1113,10 @@ export async function showViewerThumbnails(viewer: Locator) {
   const chrome = viewer.locator("[data-viewer-chrome]");
   if (!(await chrome.count())) return;
   const stage = viewer.locator("[data-viewer-stage]");
-  if ((await chrome.getAttribute("data-viewer-chrome")) === "image") await stage.press("c");
-  if ((await chrome.getAttribute("data-viewer-chrome")) !== "full") await stage.press("c");
-  await expect(chrome).toHaveAttribute("data-viewer-chrome", "full");
+  await expect(async () => {
+    if ((await chrome.getAttribute("data-viewer-chrome")) !== "full") await stage.press("c");
+    await expect(chrome).toHaveAttribute("data-viewer-chrome", "full", { timeout: 500 });
+  }).toPass({ timeout: 5000 });
 }
 
 /**

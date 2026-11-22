@@ -75,6 +75,7 @@ export interface Profile {
   encoderSlots?: { slot: string; label: string; options: string[]; default: string }[];
   encoderBuiltIn?: boolean;
   aspectPolicy?: "manual" | "reference";
+  aspectDefault?: string;
   constraints?: Record<string, { min?: number; max?: number; step?: number; offset?: number }>;
   /** `sizes`: what a model with its own resolutions draws at each (`options.resolutions`). */
   aspectPresets?: {
@@ -194,6 +195,8 @@ export interface MediaItem {
   settings?: Record<string, unknown>;
   model?: string;
   filename?: string;
+  /** The originating chat and turn recorded when a chat requested this run. */
+  chat?: { conversationId: string; turnId?: string };
   /** The saved file's name, for downloads. */
   outputName?: string;
   /**

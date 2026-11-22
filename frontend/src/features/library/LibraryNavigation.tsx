@@ -8,25 +8,24 @@ import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 export const librarySections = {
   presets: {
     label: "Presets",
-    description:
-      "Your saved presets: a prompt, model, settings or LoRAs to start from, or any mix of them.",
+    description: "Open a saved prompt or set of generation settings in Composer.",
     icon: icons.preset,
   },
   characters: {
     label: "Characters",
-    description: "Your character cards: reference images and descriptions to reuse in Composer.",
+    description: "Reuse character descriptions and reference images.",
     icon: icons.character,
     group: "Cards",
   },
   outfits: {
     label: "Outfits",
-    description: "Your reusable outfit descriptions. Images help you recognise each card.",
+    description: "Reuse outfits across generations.",
     icon: icons.outfit,
     group: "Cards",
   },
   scenes: {
     label: "Scenes",
-    description: "Your reusable scene descriptions. Images help you recognise each card.",
+    description: "Reuse locations and settings across generations.",
     icon: icons.scene,
     group: "Cards",
   },

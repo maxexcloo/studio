@@ -428,11 +428,9 @@ export function FilterToggle({
 }
 
 /**
- * The Show filters the gallery and the reference picker share: Comparisons (images), Liked or
- * Disliked. Liked and Disliked turn Uploads off.
+ * The Show filters the gallery and reference picker share. Liked and Disliked turn Uploads off.
  */
 export function ShowToggles({
-  kind,
   value,
   onChange,
   originalsOnly = false,
@@ -452,13 +450,26 @@ export function ShowToggles({
       <Group gap={6} mt={4} role="group" aria-label="Show">
         {rate("liked", "Liked")}
         {rate("disliked", "Disliked")}
-        {kind === "image" && (
+        {galleryOrigins.map(({ value: origin, label }) => (
           <FilterToggle
-            label="Comparisons"
-            on={value.comparisons}
-            onToggle={() => onChange({ ...value, comparisons: !value.comparisons })}
+            key={origin}
+            label={label}
+            on={value.origin.includes(origin)}
+            onToggle={() =>
+              onChange({
+                ...value,
+                origin: value.origin.includes(origin)
+                  ? value.origin.filter((item) => item !== origin)
+                  : [...value.origin, origin],
+              })
+            }
           />
-        )}
+        ))}
+        <FilterToggle
+          label="Comparisons"
+          on={value.comparisons}
+          onToggle={() => onChange({ ...value, comparisons: !value.comparisons })}
+        />
         {onOriginalsOnly && (
           <FilterToggle
             label="Originals Only"
@@ -530,7 +541,7 @@ export function GalleryFilterPanel({
       comboboxProps={{ withinPortal: false }}
     />
   );
-  const choices = (key: "aspect" | "origin" | "size", label: string) => (
+  const choices = (key: "aspect" | "size", label: string) => (
     <Input.Wrapper label={label}>
       <Group gap={6} mt={4} role="group" aria-label={label}>
         {options[key].map((option) => {
@@ -588,11 +599,12 @@ export function GalleryFilterPanel({
           data={dates.map(({ value, label }) => ({ value, label }))}
         />
       </Input.Wrapper>
-      <Divider />
-      <Stack gap="md">
-        {choices("origin", "Origin")}
-        {lists.tag.length > 0 && many("tag", "Tags")}
-      </Stack>
+      {lists.tag.length > 0 && (
+        <>
+          <Divider />
+          {many("tag", "Tags")}
+        </>
+      )}
       <Divider />
       <Stack gap="md">
         {many("model", "Models")}
