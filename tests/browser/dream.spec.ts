@@ -739,7 +739,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
         .getByRole("button")
         .evaluateAll((buttons) => buttons.map((b) => b.ariaLabel)),
     )
-    .toEqual(["Undo", "Neither", "This Image", "Like", "Both"]);
+    .toEqual(["Undo", "Neither", "A", "B", "Like", "Both"]);
 
   // A side opens in the preview; closing it returns to the same comparison.
   await pair.getByRole("button", { name: "View B · 40 Steps", exact: true }).click();
@@ -1533,8 +1533,7 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
   await expect(page.getByRole("radio", { name: "Videos", exact: true })).toBeChecked();
   await showView(page, "Dream");
   await expect(pair).toBeVisible();
-  await pair.getByRole("button", { name: "Select B · Later", exact: true }).click();
-  await page.getByRole("button", { name: "This Image", exact: true }).click();
+  await page.getByRole("button", { name: "B", exact: true }).click();
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeEnabled();
   await showView(page, "History");
   await expect
@@ -1576,7 +1575,7 @@ test("new Dream generations follow the active comparison and survive Undo", asyn
   await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
   await refreshed;
   await expect(original).toBeVisible();
-  await page.getByRole("button", { name: "This Image", exact: true }).click();
+  await page.getByRole("button", { name: "A", exact: true }).click();
   await expect(current(page)).toContainText("Dream prompt latest");
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(original).toBeVisible();

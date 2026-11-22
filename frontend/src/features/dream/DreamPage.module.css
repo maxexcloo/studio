@@ -221,6 +221,14 @@
 .answer[data-size="small"] {
   --answer-size: 48px;
 }
+:where(:root[data-phone]:not([data-phone="sideways"])) .buttons[data-pair-deck] .answer {
+  --answer-size: 44px;
+}
+:where(:root[data-phone]:not([data-phone="sideways"]))
+  .buttons[data-pair-deck]
+  .answer[data-size="large"] {
+  --answer-size: clamp(44px, 14vw, 66px);
+}
 :where(:root[data-phone="sideways"]) .answer {
   --answer-size: 50px;
 }

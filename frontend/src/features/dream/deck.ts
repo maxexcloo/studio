@@ -18,10 +18,11 @@ export type DeckCard =
   | PairDeckCard;
 
 /** The finished Dream results as cards: both sides of a comparison make one pair card. */
-function dreamCards(dream: DreamItem[]): DeckCard[] {
+function dreamCards(dream: DreamItem[], limit: number): DeckCard[] {
   const cards: DeckCard[] = [];
   const paired = new Set<string>();
   for (const item of dream) {
+    if (cards.length >= limit) break;
     const pair = item.dream?.pair;
     if (pair && paired.has(pair.id)) continue;
     const other =
@@ -75,6 +76,7 @@ export function deckCards(
           String(a.createdAt || a.dream?.at || ""),
         ),
       ),
+    depth - (active ? 1 : 0),
   );
-  return (active ? [active, ...unseen] : unseen).slice(0, depth);
+  return active && depth > 0 ? [active, ...unseen] : unseen;
 }

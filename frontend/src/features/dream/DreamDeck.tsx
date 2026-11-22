@@ -490,7 +490,6 @@ export function DreamDeck({
         hidden={!!viewing}
         leading={undoButton}
         trailing={viewing ? undefined : suggest}
-        shown={top.kind === "pair" ? shown : undefined}
       />
       {!phone && !touch && (
         <Text size="xs" c="dimmed" ta="center">

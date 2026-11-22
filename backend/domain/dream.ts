@@ -2787,15 +2787,15 @@ export function createDream(options: {
      */
     unseen(ownerId: string) {
       const all = pool(ownerId, "unseen");
-      const pending = (item: DreamItem) =>
-        all.some(
-          (other) =>
-            other !== item &&
-            other.dream?.pair?.id === item.dream?.pair?.id &&
-            !finishedItemStatuses.has(other.status || ""),
-        );
+      const pending = new Set<string>();
+      for (const item of all)
+        if (item.dream?.pair && !finishedItemStatuses.has(item.status || ""))
+          pending.add(item.dream.pair.id);
       return all
-        .filter((item) => item.status === "done" && !(item.dream?.pair && pending(item)))
+        .filter(
+          (item) =>
+            item.status === "done" && (!item.dream?.pair || !pending.has(item.dream.pair.id)),
+        )
         .reverse();
     },
     /** Answers a comparison: A or B keeps that side, Both keeps both and Neither discards both. */

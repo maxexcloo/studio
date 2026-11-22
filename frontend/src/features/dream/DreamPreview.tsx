@@ -1,4 +1,4 @@
-import { Badge, Group, Modal, Text, VisuallyHidden } from "@mantine/core";
+import { Badge, Group, Modal, Stack, Text, VisuallyHidden } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import {
   type KeyboardEvent,
@@ -17,7 +17,6 @@ import { loraName } from "../../../../shared/profiles";
 import type { MediaItem } from "../../types";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
-import { mediaTitle } from "../gallery/mediaLabels";
 import { mediaSource } from "../gallery/mediaSource";
 import { dragAxis, swipeDirection } from "../gallery/swipe";
 import { ViewerChrome, viewerBadge } from "../gallery/ViewerChrome";
@@ -287,7 +286,6 @@ export function DreamPreview({
   const bottomBar = useRef<HTMLDivElement>(null);
   const picked = card.kind === "pair" ? card.items[side] : card.item;
   const item = picked as DreamItem;
-  const title = mediaTitle(item);
   return (
     <Modal
       id={id}
@@ -329,16 +327,11 @@ export function DreamPreview({
           <ViewerChrome
             item={item}
             label={
-              <>
-                {card.kind === "pair" && (
-                  <Badge {...viewerBadge} aria-live="polite">
-                    {sideLabel(card, side)}
-                  </Badge>
-                )}
-                <Badge {...viewerBadge} title={title}>
-                  {title}
+              card.kind === "pair" && (
+                <Badge {...viewerBadge} aria-live="polite">
+                  {sideLabel(card, side)}
                 </Badge>
-              </>
+              )
             }
             details={{ phone, opened: details, toggle: () => setDetails((open) => !open) }}
             close={close}
@@ -363,10 +356,18 @@ export function DreamPreview({
           close={() => setDetails(false)}
           bottomBar={bottomBar}
         >
-          {item.dream?.why && (
-            <Text size="sm" c="dimmed">
-              {item.dream.why}
-            </Text>
+          {item.dream && (
+            <Stack gap={4}>
+              <Text size="sm" fw={600}>
+                Why Dream Made This
+              </Text>
+              {card.kind === "pair" && <Text size="sm">{card.question}</Text>}
+              {item.dream.why && (
+                <Text size="sm" c="dimmed">
+                  {item.dream.why}
+                </Text>
+              )}
+            </Stack>
           )}
         </ViewerDetails>
       </div>
