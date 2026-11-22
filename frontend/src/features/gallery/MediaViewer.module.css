@@ -47,7 +47,7 @@
   min-height: 0;
 }
 
-/* Keep Dream's fitted bounds while the phone Details sheet covers its verdicts. */
+/* Keep the fitted bounds while the phone Details sheet covers the dock. */
 .layout [data-actions-hidden] {
   visibility: hidden;
 }
@@ -67,6 +67,16 @@
 
 .dockedControls {
   grid-area: 3 / 1;
+}
+
+.main[data-viewer-chrome] .dockedControls {
+  padding-top: var(--mantine-spacing-xs);
+  background: var(--studio-glass-chrome);
+  border-top: 1px solid var(--studio-glass-border);
+}
+
+.main[data-viewer-chrome] .stage.viewerStage {
+  grid-row: 2;
 }
 
 .topBar {
@@ -91,33 +101,6 @@
 /* Fit and manual zoom share the same viewport. Fill and comparison still extend under the header. */
 .viewerStage:has(.mediaStrip [data-zoom-mode]:not([data-zoom-mode="Fill"])):not(:has(.comparison)) {
   grid-row: 2;
-}
-
-.controls {
-  position: absolute;
-  inset: auto 0 0;
-  z-index: 2;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(var(--mantine-spacing-xs));
-  visibility: hidden;
-  transition:
-    opacity var(--studio-motion-exit) var(--studio-ease-exit),
-    transform var(--studio-motion-exit) var(--studio-ease-exit),
-    visibility 0s var(--studio-motion-exit);
-}
-
-.controls[data-open] {
-  opacity: 1;
-  transform: none;
-  visibility: visible;
-  transition:
-    opacity var(--studio-motion-duration) var(--studio-ease-enter),
-    transform var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-.controls[data-open] .dock > * {
-  pointer-events: auto;
 }
 
 .stage {

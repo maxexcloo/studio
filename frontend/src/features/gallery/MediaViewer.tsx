@@ -287,19 +287,6 @@ export function MediaViewer({
     // Keys reach the viewer from the start, before the dialog's own focus lands on its control.
     view?.focus({ preventScroll: true });
   }, []);
-  const measureDock = useCallback((dock: HTMLDivElement | null) => {
-    if (!dock?.parentElement) return;
-    const viewer = dock.parentElement;
-    const measure = () =>
-      viewer.style.setProperty("--studio-viewer-dock-height", `${dock.offsetHeight}px`);
-    const observer = new ResizeObserver(measure);
-    observer.observe(dock);
-    measure();
-    return () => {
-      observer.disconnect();
-      viewer.style.removeProperty("--studio-viewer-dock-height");
-    };
-  }, []);
   // An action that turns busy disables its button, so focus falls to the page (a menu's return to
   // it too); the stage takes focus back and the key that landed on the page.
   useEffect(() => {
@@ -572,7 +559,7 @@ export function MediaViewer({
         >
           <div
             className={classes.main}
-            data-docked={!quiet && !bare ? true : undefined}
+            data-docked={!bare || undefined}
             data-viewer-chrome={quiet ? chrome : undefined}
             onPointerMove={(event) => {
               if (
@@ -739,10 +726,9 @@ export function MediaViewer({
             </div>
             {!bare && (
               <div
-                ref={quiet ? measureDock : undefined}
-                className={quiet ? classes.controls : classes.dockedControls}
-                data-open={(quiet && actionsOpen) || undefined}
-                data-actions-hidden={(!quiet && sheet) || undefined}
+                className={classes.dockedControls}
+                hidden={immersive}
+                data-actions-hidden={sheet || undefined}
                 inert={!actionsOpen}
                 onClick={(event) => event.stopPropagation()}
               >
