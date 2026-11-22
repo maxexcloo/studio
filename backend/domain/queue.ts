@@ -2,7 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { isDeepStrictEqual } from "node:util";
 
 import type { ResultContext } from "../../shared/characters.ts";
-import { dreamDefaults } from "../../shared/dream.ts";
+import { dreamImageSwitchSetting } from "../../shared/dream.ts";
 import {
   type GenerationInput,
   type PromptWriting,
@@ -52,7 +52,7 @@ export interface QueueAdapter {
   saveOutputs(job: OwnedJob): Promise<JobObservation | void>;
   eligible?(job: OwnedJob): Promise<string | undefined>;
   dreamIdleWait?(job: OwnedJob): string | undefined;
-  dreamImageSwitchMinutes?(ownerId: string): number;
+  dreamImageSwitchMinutes?(): number;
   /** Releases readiness resources when work arrives while admission is in flight. */
   releaseAdmission?(job: OwnedJob): void;
   settled?(job: OwnedJob): Promise<void>;
@@ -288,7 +288,7 @@ export class GenerationQueue {
       return;
     const minutes = video
       ? dreamVideoModelIdleMinutes
-      : (this.adapter.dreamImageSwitchMinutes?.(job.ownerId) ?? dreamDefaults.imageSwitchMinutes);
+      : (this.adapter.dreamImageSwitchMinutes?.() ?? dreamImageSwitchSetting.defaultValue);
     if (!minutes) return;
     this.updateModelIdle(this.store.openJobs());
     if (this.modelIdleSince === undefined || this.now() - this.modelIdleSince < minutes * 60_000)

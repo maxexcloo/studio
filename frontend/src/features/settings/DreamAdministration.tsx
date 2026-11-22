@@ -1,7 +1,9 @@
-import { SegmentedControl } from "@mantine/core";
+import { Alert, SegmentedControl, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
-import type { DreamOverride } from "../../../../shared/dream";
+import { type DreamOverride, maxDreamIdleMinutes } from "../../../../shared/dream";
+import { LoadingState } from "../../ui/LoadingState";
+import { NumberSetting } from "../../ui/NumberSetting";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
 
@@ -16,12 +18,13 @@ const backends = [
 const backendNote =
   "Uses ready models allowed for the account; waits if this backend is unavailable. Cloud needs access to a ready cloud model.";
 
-/** Settings › Generation › Dream: the Dream settings an administrator forces on every account. */
 export function DreamAdministration() {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
-  // Settings › Generation shows it once the deployment has loaded.
-  if (!deployment.data) return null;
+  if (deployment.isPending) return <LoadingState label="Loading Dream Policy" fill />;
+  if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
+  const switchDelay = deployment.data.dream.imageSwitchMinutes;
+  const delayLabel = "Image Model & LoRA Switch Delay";
   const row = (
     name: DreamOverride,
     label: string,
@@ -49,16 +52,34 @@ export function DreamAdministration() {
     );
   };
   return (
-    <SettingGroup title="Dream">
-      {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
-      {row(
-        "spicy",
-        "Spicy",
-        "Allow explicit themes, only for accounts with Uncensored Models access.",
-        onOff,
-      )}
-      {row("imageBackend", "Images", `Where Dream's images run. ${backendNote}`, backends)}
-      {row("videoBackend", "Videos", `Where Dream's videos run. ${backendNote}`, backends)}
-    </SettingGroup>
+    <Stack gap="lg">
+      <SettingGroup title="Queue">
+        <SettingRow
+          label={delayLabel}
+          description={`Minutes the shared queue must be idle before Dream loads a different local image model or LoRA set. Dream can reuse the loaded setup during this wait.${lockedNote(switchDelay)}`}
+        >
+          <NumberSetting
+            key={switchDelay.value}
+            label={delayLabel}
+            value={switchDelay.value}
+            min={0}
+            max={maxDreamIdleMinutes}
+            disabled={switchDelay.locked}
+            onSave={(value) => save.mutate({ key: switchDelay.key, value })}
+          />
+        </SettingRow>
+      </SettingGroup>
+      <SettingGroup title="Account Overrides">
+        {row("enabled", "Enabled", "Make new media from each account's taste.", onOff)}
+        {row(
+          "spicy",
+          "Spicy",
+          "Allow explicit themes, only for accounts with Uncensored Models access.",
+          onOff,
+        )}
+        {row("imageBackend", "Images", `Where Dream's images run. ${backendNote}`, backends)}
+        {row("videoBackend", "Videos", `Where Dream's videos run. ${backendNote}`, backends)}
+      </SettingGroup>
+    </Stack>
   );
 }

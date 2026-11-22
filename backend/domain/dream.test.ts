@@ -419,7 +419,6 @@ test("Dream is off until turned on, queues one hidden job per account only while
     dailyImages: 40,
     dailyVideos: 4,
     imageIdleMinutes: 0,
-    imageSwitchMinutes: 2,
     videoIdleMinutes: 5,
     images: true,
     videos: false,
