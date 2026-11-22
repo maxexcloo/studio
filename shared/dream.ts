@@ -5,6 +5,7 @@ export const dreamDefaults = {
   dailyImages: 40,
   dailyVideos: 4,
   imageIdleMinutes: 0,
+  imageSwitchMinutes: 2,
   videoIdleMinutes: 5,
   images: true,
   videos: false,
@@ -84,6 +85,7 @@ export function dreamSettingError(key: keyof DreamSettings, value: unknown): str
     key === "dailyImages" ||
     key === "dailyVideos" ||
     key === "imageIdleMinutes" ||
+    key === "imageSwitchMinutes" ||
     key === "videoIdleMinutes"
   ) {
     const max = key === "dailyImages" ? 500 : key === "dailyVideos" ? 100 : maxDreamIdleMinutes;

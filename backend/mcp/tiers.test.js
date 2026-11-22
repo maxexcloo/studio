@@ -61,8 +61,7 @@ test("the chosen profile prefers the default, then its family, then censored pro
     { id: "kin", label: "K · Fast", family: "qwen", uncensored: true },
     { id: "default", label: "D · Quality", family: "qwen" },
   ];
-  // Without a tier, Fast leads; the default's family wins within it.
-  assert.equal(chooseProfile(profiles, { kind: "image", defaultId: "default" }).id, "kin");
+  assert.equal(chooseProfile(profiles, { kind: "image", defaultId: "default" }).id, "default");
   assert.equal(
     chooseProfile(profiles, { kind: "image", tier: "quality", defaultId: "default" }).id,
     "default",
@@ -77,7 +76,7 @@ test("the chosen profile prefers the default, then its family, then censored pro
   );
   // A failing profile is passed over while another fits.
   const failing = profiles.map((profile) =>
-    profile.id === "kin" ? { ...profile, failing: true } : profile,
+    ["kin", "default"].includes(profile.id) ? { ...profile, failing: true } : profile,
   );
   assert.equal(chooseProfile(failing, { kind: "image", defaultId: "default" }).id, "plain");
   // Super Fast falls back to Fast; a tier with neither names what is available.
@@ -96,7 +95,7 @@ test("the chosen profile prefers the default, then its family, then censored pro
   assert.throws(() => chooseProfile([], { kind: "video" }), /No ready video profile/);
 });
 
-test("animating prefers a fast first-frame profile unless a tier is given", () => {
+test("a first-frame profile takes precedence and uses the compatible default or chosen tier", () => {
   const frame = [{ id: "reference", kind: "image", label: "Optional First Frame" }];
   const reference = [{ id: "reference", kind: "image", label: "Reference Image" }];
   // Shaped like the Bento H3 catalogue: Ref2VA, FL2VA and text-only profiles across tiers.
@@ -123,7 +122,8 @@ test("animating prefers a fast first-frame profile unless a tier is given", () =
     chooseProfile(profiles, { kind: "video", references: 1, firstFrame: true, ...options }).id;
   assert.equal(animate({ defaultId: "text" }), "fl-fast");
   assert.equal(animate({ defaultId: "ref-fast" }), "fl-fast");
-  assert.equal(animate({ defaultId: "fl-quality" }), "fl-fast");
+  assert.equal(animate({ defaultId: "fl-quality" }), "fl-quality");
+  assert.equal(animate({ defaultId: "fl-quality", tier: "fast" }), "fl-fast");
   assert.equal(animate({ defaultId: "text", tier: "quality" }), "fl-quality");
   // Without a first-frame profile, any profile that takes the image still animates it.
   assert.equal(
@@ -162,14 +162,14 @@ test("cloud profiles join only when the words ask for Grok or the cloud", () => 
   );
 });
 
-test("without a tier the order is Fast, Super Fast, Standard, Quality", () => {
+test("without a tier or compatible default the order is Fast, Super Fast, Standard, Quality", () => {
   const profiles = [
     { id: "q", label: "Q · Quality" },
     { id: "s", label: "S · Standard" },
     { id: "t", label: "T · Super Fast" },
     { id: "f", label: "F · Fast" },
   ];
-  const pick = (list) => chooseProfile(list, { kind: "image", defaultId: "q" }).id;
+  const pick = (list) => chooseProfile(list, { kind: "image" }).id;
   assert.equal(pick(profiles), "f");
   assert.equal(pick(profiles.slice(0, 3)), "t");
   assert.equal(pick(profiles.slice(0, 2)), "s");

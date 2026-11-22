@@ -48,6 +48,7 @@ export function createGenerationQueue({
   cloudProvider,
   completed,
   directCloud,
+  dreamImageSwitchMinutes,
   dreamIdleWait,
   generationRoutes,
   promptStage,
@@ -278,6 +279,7 @@ export function createGenerationQueue({
     store,
     {
       ...generationAdapter,
+      dreamImageSwitchMinutes,
       dreamIdleWait,
       releaseAdmission: (job) => releaseLease(job.id),
       // Retries, recovered work and anything queued before the check tightened meet it here too.

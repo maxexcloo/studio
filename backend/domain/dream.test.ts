@@ -63,7 +63,11 @@ function fixture(t: TestContext, catalogue = profiles) {
     fs.rmSync(dataDir, { recursive: true, force: true });
   });
   const taste = createTaste({ dataDir, writer: () => null });
-  const projects = createProjects({ dataDir, now: () => state.clock });
+  const projects = createProjects({
+    cards: (ownerId) => (ownerId === "alice" ? state.cards : null),
+    dataDir,
+    now: () => state.clock,
+  });
   const state = {
     owners: ["alice", "bob"],
     overrides: {} as Partial<DreamSettings>,
@@ -415,6 +419,7 @@ test("Dream is off until turned on, queues one hidden job per account only while
     dailyImages: 40,
     dailyVideos: 4,
     imageIdleMinutes: 0,
+    imageSwitchMinutes: 2,
     videoIdleMinutes: 5,
     images: true,
     videos: false,
@@ -1793,6 +1798,87 @@ test("Discard pagination counts only the chosen media and retains owner scope", 
   assert.ok([...first.items, ...second.items].every((item) => item.ownerId === "alice"));
 });
 
+test("Dream pins account-owned cards and uses the project's model, size and LoRA constraints", async (t) => {
+  const { dream, dreamOnce, projects, state } = fixture(t, [
+    ...profiles,
+    {
+      id: "identity",
+      kind: "image",
+      mediaInputs: [{ id: "face", role: "identity" }],
+      defaults: { width: 1024, height: 1024 },
+      constraints: { width: { max: 2048 }, height: { max: 2048 } },
+    },
+  ]);
+  const card = (id: string, name: string, description: string): Character => ({
+    id,
+    name,
+    description,
+    referenceIds: [],
+    createdAt: "",
+    updatedAt: "",
+  });
+  state.cards!.characters.push({
+    ...card("ivy", "Ivy March", "a photographer with auburn curls and grey eyes"),
+    referenceIds: ["ivy-reference"],
+  });
+  state.cards!.outfits.push(card("coat", "Olive Coat", "an olive wool coat over black trousers"));
+  state.cards!.scenes.push(card("station", "Snowy Station", "inside a snowy railway station"));
+  const pins = { characters: "ivy", outfits: "coat", scenes: "station" };
+  assert.throws(() => projects.create("bob", { name: "Station", cards: pins }), /no longer exists/);
+  const project = projects.create("alice", {
+    name: "Station",
+    cards: pins,
+    constraints: { profiles: ["identity"], loras: false, aspect: "portrait", resolution: "1K" },
+  });
+  await dream.save("alice", { enabled: true });
+  state.replies = [{ prompt: "She looks for the timetable from a low camera angle." }];
+  const job = (await dreamOnce())!;
+  assert.equal(job.dream?.projectId, project.id);
+  assert.equal(job.input.profileId, "identity");
+  assert.equal(job.input.resolutionTier, "1K");
+  assert.ok(Number(job.input.width) < Number(job.input.height));
+  assert.deepEqual(job.input.loras, []);
+  assert.deepEqual(job.input.referenceAssets, [
+    { assetId: "ivy-reference", slot: "face", source: "character" },
+  ]);
+  assert.match(String(job.input.prompt), /auburn curls.*olive wool coat.*snowy railway station/);
+  assert.match(
+    state.calls.find((call) => call.system.includes("pinned card"))!.user,
+    /Pinned Character: Ivy March/,
+  );
+  assert.equal(job.dream?.cardContext?.outfit?.name, "Olive Coat");
+  projects.update("alice", project.id, { cards: {} }, "you");
+  assert.equal(projects.list("alice")[0].cards, undefined);
+  assert.deepEqual(projects.undo("alice", project.id).cards, pins);
+});
+
+test("The Inbox offers liked chat work from separate generations and attaches it on acceptance", async (t) => {
+  const { inbox, projects, generated } = fixture(t);
+  generated(
+    ...["run-a", "run-a", "run-b"].map((id, index) => ({
+      id: `result-${index}`,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      rating: "liked",
+      prompt: "A railway station in snow",
+      resultSet: { id, title: "Winter Journeys", index },
+      chat: { conversationId: "recent-chat" },
+    })),
+  );
+  await inbox.propose("alice");
+  const [proposal] = inbox.read("alice").proposals;
+  assert.equal(proposal.title, "Continue Winter Journeys");
+  assert.equal(proposal.evidence.length, 2);
+  assert.equal(inbox.drafts("alice").length, 0);
+  assert.deepEqual(projects.chats("alice"), {});
+  await inbox.accept("alice", { userId: "alice", role: "user" }, proposal.id);
+  assert.equal(projects.chats("alice")["recent-chat"].projectId, projects.list("alice")[0].id);
+  inbox.undo("alice", proposal.id);
+  assert.deepEqual(projects.chats("alice"), {});
+  assert.deepEqual(projects.list("alice"), []);
+});
+
 test("Project results and stats use the project's own finished results window", async (t) => {
   const fx = fixture(t);
   const { projects, state } = fx;
@@ -2436,6 +2522,8 @@ test("A Dream job's writing request keeps its own fields through admission", () 
   const request = dreamRequest({
     kind: "dream",
     project: "beach",
+    draft: "draft-beach",
+    pins: { scenes: "scene-beach", unknown: "ignored" },
     seed: "a red kite",
     vary: "scene",
     note: "Continuing Beach",
@@ -2457,8 +2545,10 @@ test("A Dream job's writing request keeps its own fields through admission", () 
     explore: true,
     note: "Continuing Beach",
     project: "beach",
+    draft: "draft-beach",
     seed: "a red kite",
     vary: "scene",
+    pins: { scenes: "scene-beach" },
     series: {
       id: "set-1",
       place: "a diner",

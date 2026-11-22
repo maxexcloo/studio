@@ -26,6 +26,7 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import type { CardKind } from "../../../../shared/characters";
+import { type VariationDirection, variationDirections } from "../../../../shared/suggestions";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
@@ -33,12 +34,13 @@ import { copyText } from "../../ui/clipboard";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
+import { usePhone } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
 import { useStartCard } from "../characters/useCardFrom";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { useStageComparison } from "../compare/variants";
-import { assistMenu, useChangeSuggestions } from "../generation/AskChange";
+import { assistMenu, changeTemplates, useChangeSuggestions } from "../generation/AskChange";
 import { defaultProfile, useGeneration } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import {
@@ -81,6 +83,8 @@ import {
 import { useMediaRating } from "./useMediaRating";
 import { useRecreateAction } from "./useRecreate";
 import { useTryAgain } from "./useTryAgain";
+import { VariationDialog } from "./VariationDialog";
+import { directionLabels } from "./variationDraft";
 import { type VideoEdit, useVideoEdit } from "./videoEdits";
 import { type GalleryState, galleryKind, viewerPath } from "./viewerLink";
 import type { ViewerAsk, ViewerChange, ViewerDraftActions } from "./ViewerPrompt";
@@ -256,6 +260,11 @@ interface MediaActionOptions {
   onCompare?: () => void;
   /** Opens Animate's dialog: Custom…, or any template or suggested motion under Review Prompt. */
   onAnimate: (choice: AnimateRequest) => void;
+  onVary: (
+    direction: VariationDirection | "explore",
+    prompt: string,
+    onApplied: () => void,
+  ) => void;
   onDelete: () => void;
   /** Opens Report's Custom… dialog. */
   onReport: () => void;
@@ -279,6 +288,7 @@ export function useMediaActions(
     onApplied = () => {},
     onCompare,
     onAnimate,
+    onVary,
     onDelete,
     onReport,
     onReportQueued,
@@ -287,6 +297,7 @@ export function useMediaActions(
     retryInStage = false,
   }: MediaActionOptions,
 ): ActionGroups {
+  const phone = usePhone();
   const action = useMediaAction(item, onApplied);
   const iteration = useMediaIteration(item);
   const client = useQueryClient();
@@ -304,6 +315,7 @@ export function useMediaActions(
   const cards = useCardActions(item, onApplied);
   const recreate = useRecreateAction(item, onApplied);
   const changedPrompt = draft?.changedPrompt;
+  const variationPrompt = changedPrompt ?? (typedPrompt(item) || item.prompt || "");
   // An upload has only its recorded or suggested prompt to recreate.
   const recreateAction = item.uploaded
     ? recreate
@@ -509,6 +521,7 @@ export function useMediaActions(
     setSuggestions({ id: item.id, mode, prompt: draft?.suggestionPrompt });
   const changeMenu = (mode: ViewerChange, others: ActionGroups, last: Action[]) =>
     assistMenu({
+      expandable: phone,
       settings: [
         ...(mode === "edit" ? editProfiles : []),
         ...(mode === "recreate" && countLimit > 1
@@ -541,27 +554,15 @@ export function useMediaActions(
             ]
           : []),
       ],
-      suggestions: assistedChanges ? steps.group : [],
-      templates: assistedChanges
-        ? (assistant.data?.changes ?? []).map((change) => ({
-            id: `change:${change.id}`,
-            label: change.label,
-            icon: icons.assistant,
-            disabled: draft?.pending,
-            onClick: () => pick(mode, change.instruction),
-          }))
-        : [],
-      custom: assistedChanges
-        ? [
-            {
-              id: "custom",
-              label: "Custom…",
-              icon: icons.custom,
-              disabled: draft?.pending,
-              onClick: () => custom(mode),
-            },
-          ]
-        : [],
+      suggestions: assistedChanges ? steps : undefined,
+      ...(assistedChanges
+        ? changeTemplates(
+            assistant.data?.changes ?? [],
+            (request) => pick(mode, request),
+            () => custom(mode),
+            draft?.pending,
+          )
+        : { templates: [] }),
       others,
       last,
     });
@@ -570,6 +571,30 @@ export function useMediaActions(
   // Discovery from this image, A–Z: More Like This, the gallery ranked by likeness to it
   // (GalleryPage reads `similar`), and its comparisons.
   const discovery: Action[] = [
+    ...(image && assistedChanges && variationPrompt.trim()
+      ? [
+          {
+            id: "keep-and-vary",
+            label: "Keep & Vary",
+            icon: icons.assistant,
+            menu: [
+              variationDirections.map((direction) => ({
+                id: `vary-${direction}`,
+                label: `Vary ${directionLabels[direction]}`,
+                onClick: () => onVary(direction, variationPrompt, onApplied),
+              })),
+              [
+                {
+                  id: "explore-three-directions",
+                  label: "Explore Three Directions",
+                  icon: icons.compare,
+                  onClick: () => onVary("explore", variationPrompt, onApplied),
+                },
+              ],
+            ],
+          },
+        ]
+      : []),
     ...moreLike,
     ...(image
       ? [
@@ -608,8 +633,9 @@ export function useMediaActions(
         onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
         menu: assistMenu({
           loading: optionsLoading,
+          expandable: phone,
           settings: [length, ...animateProfiles, ...reviewItems],
-          suggestions: motionsOffered ? motions.group : [],
+          suggestions: motionsOffered ? motions : undefined,
           templates: templates.filter((template) => template.id !== "custom").map(templateItem),
           custom: templates.filter((template) => template.id === "custom").map(templateItem),
           last: [
@@ -809,10 +835,17 @@ export function useMediaDialogs(
 ) {
   const [animating, setAnimating] = useState<AnimateRequest | null>(null);
   const [reporting, setReporting] = useState(false);
+  const [varying, setVarying] = useState<{
+    direction: VariationDirection | "explore";
+    prompt: string;
+    onApplied: () => void;
+  }>();
   return {
     handlers: {
       onAnimate: setAnimating,
       onReport: () => setReporting(true),
+      onVary: (direction: VariationDirection | "explore", prompt: string, onApplied: () => void) =>
+        setVarying({ direction, prompt, onApplied }),
       onReportQueued,
     },
     dialogs: (
@@ -831,6 +864,9 @@ export function useMediaDialogs(
             onQueued={onReportQueued}
             onClose={() => setReporting(false)}
           />
+        )}
+        {varying && (
+          <VariationDialog item={item} {...varying} onClose={() => setVarying(undefined)} />
         )}
       </>
     ),

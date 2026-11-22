@@ -8,7 +8,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SortMenu } from "../../ui/SortMenu";
 import { LibraryCard } from "./CardImages";
-import { cardSortLabels, listedCards, useCardListing } from "./cardListing";
+import { cardSortGroups, listedCards, useCardListing } from "./cardListing";
 import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCardDialogs";
 import { type PromptCardKind, promptCardsQuery } from "./queries";
 import { useCardFrom } from "./useCardFrom";
@@ -47,7 +47,7 @@ export function LibraryPromptCards({
             <>
               <SortMenu
                 label={`Sort ${label}`}
-                labels={cardSortLabels}
+                groups={cardSortGroups}
                 value={order.sort}
                 onChange={order.setSort}
                 withinPortal
@@ -77,6 +77,7 @@ export function LibraryPromptCards({
               key={card.id}
               name={card.name}
               images={card.references}
+              onUse={selection.active ? undefined : () => use.promptCard(kind, card)}
               selection={selection.control(card)}
               menu={
                 !selection.active && (
@@ -85,7 +86,6 @@ export function LibraryPromptCards({
                     card={card}
                     onEdit={() => dialogs.edit(card)}
                     onDelete={() => dialogs.remove(card)}
-                    onUse={() => use.promptCard(kind, card)}
                   />
                 )
               }

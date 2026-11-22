@@ -64,21 +64,18 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
   };
 }
 
-/** A card's ⋯ menu: Edit Character, Make Sheet, Use in Composer, then Delete Character. */
+/** A card's ⋯ menu: Edit Character, Make Sheet, rating and Delete Character. */
 export function CharacterMenu({
   card,
   onEdit,
   onSheet,
   onDelete,
-  onUse,
   withinPortal = true,
 }: {
   card: CharacterCard;
   onEdit: () => void;
   onSheet: () => void;
   onDelete: () => void;
-  /** Library's Use in Composer; the References sheet picks a card by its tile instead. */
-  onUse?: () => void;
   /** Off inside a popover, so choosing an item is not a press outside it. */
   withinPortal?: boolean;
 }) {
@@ -102,17 +99,6 @@ export function CharacterMenu({
                 disabled: !card.references.length || card.sheet?.status === "making",
                 onClick: onSheet,
               },
-              ...(onUse
-                ? [
-                    {
-                      id: "use",
-                      label: "Use in Composer",
-                      icon: icons.prompt,
-                      disabled: !card.references.length,
-                      onClick: onUse,
-                    },
-                  ]
-                : []),
             ],
             ...itemActionGroups([
               ...ratings,

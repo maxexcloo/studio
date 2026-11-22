@@ -39,7 +39,11 @@ import type { PromptWriter, Taste } from "./taste.ts";
 import { americanEnglish } from "./writing-standard.ts";
 
 /** A proposal as stored: its evidence by result id, and what it proposes as a key to snooze. */
-type Stored = Omit<Proposal<never>, "evidence" | "drafts"> & { key: string; evidence: string[] };
+type Stored = Omit<Proposal<never>, "evidence" | "drafts"> & {
+  key: string;
+  evidence: string[];
+  sourceChat?: string;
+};
 /** An accepted proposal, with what Undo takes back. */
 interface AcceptedRecord {
   id: string;
@@ -49,6 +53,7 @@ interface AcceptedRecord {
   undo: {
     /** A project it made, or changed (`change`, the change's id). */
     projectId?: string;
+    chat?: { id: string; at: string };
     change?: string;
     revision?: string;
     rule?: string;
@@ -440,6 +445,8 @@ export function createInbox(options: {
     new Set(record.proposals.filter((entry) => entry.kind === "project").map((entry) => entry.id));
   /** Whether a proposal still applies: its project, rule and card are as it found them. */
   function current(ownerId: string, proposal: Stored) {
+    if (proposal.sourceChat && Object.hasOwn(projects.chats(ownerId), proposal.sourceChat))
+      return false;
     if (proposal.kind === "brief" || proposal.kind === "pacing")
       return Boolean(projectOf(ownerId, proposal.projectId));
     if (proposal.kind === "rule")
@@ -471,10 +478,10 @@ export function createInbox(options: {
     );
     return {
       ...(savedCards.length ? { savedCards } : {}),
-      proposals: proposals.map(({ key: _key, evidence, ...proposal }) => ({
+      proposals: proposals.map(({ key: _key, sourceChat, evidence, ...proposal }) => ({
         ...proposal,
         evidence: evidence.flatMap((id) => (found.has(id) ? [found.get(id)!] : [])),
-        ...(proposal.kind === "project"
+        ...(proposal.kind === "project" && !sourceChat
           ? { drafts: options.dream.drafts(ownerId, proposal.id) }
           : {}),
       })),
@@ -581,6 +588,49 @@ export function createInbox(options: {
           ]
         : [],
     );
+  }
+  /** A chat earns a proposal when the account liked results from separate runs. */
+  function chatsFor(ownerId: string, liked: DreamItem[]): Stored[] {
+    const attached = projects.chats(ownerId);
+    const names = new Set(projects.list(ownerId).map((project) => lower(project.name)));
+    const chats = new Map<string, Map<string, DreamItem>>();
+    for (const item of liked) {
+      const chat = item.chat?.conversationId;
+      const run = item.resultSet?.id || item.jobId;
+      if (!chat || !run || !item.id || !item.prompt || item.rating !== "liked") continue;
+      if (Object.hasOwn(attached, chat)) continue;
+      const runs = chats.get(chat) ?? new Map<string, DreamItem>();
+      if (!runs.has(run)) runs.set(run, item);
+      chats.set(chat, runs);
+    }
+    const found: Stored[] = [];
+    for (const [sourceChat, runs] of chats) {
+      const evidence = [...runs.values()];
+      if (evidence.length < 2) continue;
+      const [first] = evidence;
+      const subject = first.resultSet?.context?.character?.name;
+      const title = clean(first.resultSet?.title || first.title, maxProjectName);
+      if (!title || names.has(lower(title)) || options.minorAge(title)) continue;
+      names.add(lower(title));
+      found.push({
+        id: randomUUID(),
+        key: `chat:${sourceChat}`,
+        kind: "project",
+        sourceChat,
+        title: `Continue ${title}`,
+        why: `You liked results from ${evidence.length} separate generations in this chat.`,
+        at: stamp(),
+        change: {
+          project: {
+            name: title,
+            brief: { subjects: clean(subject, maxProjectBrief), styles: "", avoid: "" },
+            constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
+          },
+        },
+        evidence: evidence.slice(0, evidenceShown).map((item) => String(item.id)),
+      });
+    }
+    return found.slice(0, 2);
   }
   /** What the person turned down, for the text model. */
   const declined = (record: InboxRecord) =>
@@ -786,7 +836,10 @@ export function createInbox(options: {
     if (proposal.kind === "project") {
       const project = projects.create(ownerId, projectPatch(change.project), proposal.why);
       options.dream.promote(ownerId, proposal.id, project.id);
-      return { projectId: project.id, revision: revisionOf(project) };
+      const id = proposal.sourceChat;
+      if (id) projects.attach(ownerId, id, project.id);
+      const chat = id ? { id, at: projects.chats(ownerId)[id].at } : undefined;
+      return { projectId: project.id, revision: revisionOf(project), ...(chat && { chat }) };
     }
     if (proposal.kind === "brief" || proposal.kind === "pacing") {
       const previous = projectOf(ownerId, proposal.projectId)?.previous?.change;
@@ -879,7 +932,7 @@ export function createInbox(options: {
     /** The new projects waiting in the Inbox, which Dream samples. */
     drafts: (ownerId: string) =>
       load(ownerId).proposals.flatMap((entry) =>
-        entry.kind === "project" && entry.change.project
+        entry.kind === "project" && !entry.sourceChat && entry.change.project
           ? [{ id: entry.id, project: entry.change.project }]
           : [],
       ),
@@ -894,12 +947,11 @@ export function createInbox(options: {
       // Stamped first, so a failed batch waits too.
       record.batchAt = stamp();
       record.proposals = record.proposals.filter((entry) => current(ownerId, entry));
-      offer(record, [...pacingFor(ownerId), ...rulesFor(ownerId)]);
+      const liked = options.dream.liked(ownerId, likes.from);
+      offer(record, [...chatsFor(ownerId, liked), ...pacingFor(ownerId), ...rulesFor(ownerId)]);
       save(ownerId, record);
       const cards = options.cards(ownerId);
-      let liked: DreamItem[] | undefined;
       if (cards && (account?.userId || "") === ownerId) {
-        liked = options.dream.liked(ownerId, likes.from);
         const found = namedCards(liked, cards, options.minorAge, stamp()).slice(
           0,
           namedCardsPerBatch,
@@ -942,9 +994,7 @@ export function createInbox(options: {
         save(ownerId, latest);
         return true;
       };
-      const ideas = await asked((owner, latest, writer) =>
-        ideasFor(owner, latest, writer, liked ?? options.dream.liked(owner, likes.from)),
-      );
+      const ideas = await asked((owner, latest, writer) => ideasFor(owner, latest, writer, liked));
       const briefs = await asked(editsFor);
       return ideas || briefs;
     },
@@ -983,15 +1033,18 @@ export function createInbox(options: {
       id: string,
       edited?: ProposalChange,
     ): Promise<Accepted<DreamItem>> {
-      const record = load(ownerId);
-      const proposal = find(record, id);
-      if (!current(ownerId, proposal)) throw failure("That proposal no longer applies.", 409);
-      const undo = apply(ownerId, account, proposal, changeOf(proposal, edited));
-      const latest = load(ownerId);
-      rememberAccepted(latest, proposal, undo);
-      save(ownerId, latest);
+      const { latest, title } = runtimeTransaction(options.dataDir, () => {
+        const record = load(ownerId);
+        const proposal = find(record, id);
+        if (!current(ownerId, proposal)) throw failure("That proposal no longer applies.", 409);
+        const undo = apply(ownerId, account, proposal, changeOf(proposal, edited));
+        const latest = load(ownerId);
+        rememberAccepted(latest, proposal, undo);
+        save(ownerId, latest);
+        return { latest, title: proposal.title };
+      });
       await options.dream.dropDrafts(ownerId, keep(latest));
-      return { ...read(ownerId), accepted: { id, title: proposal.title } };
+      return { ...read(ownerId), accepted: { id, title } };
     },
     dismiss: (ownerId: string, id: string, reason?: string) => dismiss(ownerId, [id], reason),
     /** Clear Inbox: dismisses every proposal. */
@@ -1002,7 +1055,7 @@ export function createInbox(options: {
         const record = load(ownerId);
         const accepted = record.accepted.find((entry) => entry.id === id);
         if (!accepted) throw failure("There is nothing to undo.", 409);
-        const { projectId, change, revision, rule, card } = accepted.undo;
+        const { projectId, change, revision, rule, card, chat } = accepted.undo;
         if (projectId && change) {
           if (projectOf(ownerId, projectId)?.previous?.change !== change)
             throw failure("A later change replaced it; undo that in the project first.", 409);
@@ -1011,7 +1064,10 @@ export function createInbox(options: {
           const project = projectOf(ownerId, projectId);
           if (!project || revisionOf(project) !== revision)
             throw failure("Undo can only remove a project unchanged since it was accepted.", 409);
-          if (Object.values(projects.chats(ownerId)).some((chat) => chat.projectId === projectId))
+          const attached = Object.entries(projects.chats(ownerId)).filter(
+            ([, entry]) => entry.projectId === projectId,
+          );
+          if (attached.some(([id, entry]) => id !== chat?.id || entry.at !== chat.at))
             throw failure("Detach the project's chats before undoing it.", 409);
           options.dream.detachProject(ownerId, projectId);
           projects.remove(ownerId, projectId);

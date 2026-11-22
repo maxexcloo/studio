@@ -794,6 +794,51 @@ test("Dream reuses a loaded model but waits for an empty queue before loading an
   assert.deepEqual(submitted, [manual.id, warm.id, interveningRequest.id, cold.id]);
 });
 
+test("Dream can reuse a loaded photo setup immediately but waits the account's switch delay for changed LoRAs", async (t) => {
+  const { store, queue, adapter, submitted, observations } = fixture();
+  t.after(() => store.close());
+  let now = 0;
+  let minutes = 3;
+  queue.now = () => now;
+  adapter.dreamImageSwitchMinutes = (ownerId) => {
+    assert.equal(ownerId, "alice");
+    return minutes;
+  };
+  const session = store.createSession("alice").id;
+  const stack = [
+    { name: "grain", strength: 0.5 },
+    { name: "lighting", strength: 1 },
+  ];
+  const enqueue = (loras: typeof stack, priority: number) =>
+    store.enqueue(
+      "alice",
+      session,
+      { kind: "image", model: "warm", loras },
+      "image",
+      undefined,
+      "worker:gpu",
+      undefined,
+      { priority },
+    );
+  const foreground = enqueue(stack, queuePriority.manual);
+  await queue.tick();
+  const changed = enqueue([{ ...stack[0], strength: 0.75 }, stack[1]], queuePriority.dream);
+  const same = enqueue([...stack].reverse(), queuePriority.dream);
+  observations.set(foreground.id, { status: "completed" });
+  await queue.tick();
+  assert.deepEqual(submitted, [foreground.id, same.id]);
+
+  observations.set(same.id, { status: "completed" });
+  await queue.tick();
+  now = 120_000;
+  await queue.tick();
+  assert.match(store.job("alice", changed.id)?.reason || "", /3 minutes.*LoRAs/);
+  assert.deepEqual(submitted, [foreground.id, same.id]);
+  minutes = 0;
+  await queue.tick();
+  assert.deepEqual(submitted, [foreground.id, same.id, changed.id]);
+});
+
 test("an idle worker takes waiting work, manual work first", async () => {
   const queue = fixture();
   const { store, observations } = queue;

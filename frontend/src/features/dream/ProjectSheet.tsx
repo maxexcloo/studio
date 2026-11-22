@@ -24,7 +24,7 @@ import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { useMediaPreview } from "../gallery/MediaPreview";
 import { ProjectStatsLine, constraintBadges } from "./ProjectCard";
-import { briefFields } from "./ProjectForm";
+import { ProjectPins, briefFields } from "./ProjectForm";
 import { ProposalList } from "./ProjectInbox";
 import { inboxQuery, projectPath, projectResultsQuery, projectsQuery } from "./queries";
 
@@ -33,6 +33,7 @@ const fieldNames: Record<string, string> = {
   ...Object.fromEntries(briefFields.map(([key, label]) => [key, label])),
   name: "Name",
   loras: "Favourite LoRAs",
+  cards: "Pinned Cards",
   constraints: "Constraints",
   paused: "Paused",
   favoured: "More Turns",
@@ -162,6 +163,7 @@ function ProjectDetail({
           )}
         </Stack>
       </SettingGroup>
+      <ProjectPins cards={project.cards} />
       <SettingGroup title="Constraints">
         <Group gap={6}>
           {badges.length ? (

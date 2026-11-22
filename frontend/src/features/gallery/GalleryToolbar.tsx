@@ -3,7 +3,7 @@ import { useHotkeys } from "@mantine/hooks";
 import { Search, SquareMinus, SquarePlus } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { type GallerySort, gallerySortLabels } from "../../../../shared/gallery-sort";
+import { type GallerySort, gallerySortGroups } from "../../../../shared/gallery-sort";
 import type { MediaKind } from "../../types";
 import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
@@ -198,7 +198,7 @@ export function GalleryToolbar({
       )}
       <SortMenu
         label="Sort Gallery"
-        labels={gallerySortLabels}
+        groups={gallerySortGroups}
         value={sort}
         onChange={onSortChange}
         withinPortal

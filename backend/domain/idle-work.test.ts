@@ -9,7 +9,7 @@ test("a walk over a large gallery gives the event loop turns, as the server answ
     for (let index = 0; index < 100; index += 1) {
       const until = performance.now() + 1;
       while (performance.now() < until);
-      yield { id: `item-${index}`, status: "done" };
+      yield { id: `item-${index}`, status: "pending" };
     }
   }
   const work = createIdleWork({
@@ -33,6 +33,34 @@ test("a walk over a large gallery gives the event loop turns, as the server answ
   const walked = work.tick().finally(() => (waiting = false));
   assert.equal(await walked, "none");
   assert.ok(turns > 3, `other work ran ${turns} times during the walk`);
+});
+
+test("overlapping wakes select from the gallery once", async () => {
+  let walks = 0;
+  const started: string[] = [];
+  const work = createIdleWork({
+    name: "Test work",
+    enabled: () => true,
+    unavailable: async () => "",
+    idle: () => true,
+    allowed: () => true,
+    items: () => {
+      walks += 1;
+      return [
+        { id: "a", status: "done" },
+        { id: "b", status: "done" },
+      ];
+    },
+    visible: () => true,
+    wanted: (item) => !started.includes(item.id),
+    run: async (item) => {
+      started.push(item.id);
+    },
+  });
+  const results = await Promise.all([work.tick(), work.tick()]);
+  assert.deepEqual(results, ["done", "busy"]);
+  assert.equal(walks, 1);
+  assert.deepEqual(started, ["a"]);
 });
 
 test("after a walk finds nothing, a gallery change reads only recent records until the next whole walk", async () => {

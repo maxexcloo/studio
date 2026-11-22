@@ -212,6 +212,8 @@ function visualWorkflowToApi(raw, info = {}) {
 }
 
 export function detectWorkflowFormat(raw) {
+  if (isObject(raw?.studio) && (isObject(raw.graph) || backendIdsOf(raw).length))
+    return "studio-profile";
   if (Array.isArray(raw?.nodes) && Array.isArray(raw?.links)) return "comfyui-visual";
   if (raw?.prompt && typeof raw.prompt === "object") return "comfyui-api-wrapper";
   if (raw && typeof raw === "object" && Object.values(raw).some((node) => node?.class_type))

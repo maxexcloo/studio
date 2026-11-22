@@ -3,7 +3,7 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { type GallerySort, gallerySortLabels } from "../../../../shared/gallery-sort";
+import { type GallerySort, gallerySortGroups } from "../../../../shared/gallery-sort";
 import type { MediaItem } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
@@ -177,7 +177,7 @@ export function GalleryChoices({
           sorting && (
             <SortMenu
               label={`Sort ${label}`}
-              labels={gallerySortLabels}
+              groups={gallerySortGroups}
               value={sorting.value}
               onChange={(value) => {
                 browser.scroll.current = 0;

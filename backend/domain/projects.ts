@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { type Card, type CardKind, cardKinds } from "../../shared/characters.ts";
 import {
   type ChangeBy,
   type Project,
@@ -25,6 +26,7 @@ export interface ProjectPatch {
   name?: string;
   brief?: Partial<ProjectContent["brief"]>;
   constraints?: Partial<ProjectContent["constraints"]>;
+  cards?: ProjectContent["cards"];
   paused?: boolean;
   favoured?: boolean;
 }
@@ -44,7 +46,7 @@ const text = (value: unknown, field: string, max: number) => {
 
 /** A patch from a request body, checked field by field; unknown fields are refused. */
 export function projectPatch(body: unknown): ProjectPatch {
-  const { name, brief, constraints, paused, favoured, ...rest } = (body || {}) as Record<
+  const { name, brief, constraints, cards, paused, favoured, ...rest } = (body || {}) as Record<
     string,
     any
   >;
@@ -111,6 +113,16 @@ export function projectPatch(body: unknown): ProjectPatch {
     }
     patch.constraints = next;
   }
+  if (cards !== undefined) {
+    if (!cards || typeof cards !== "object" || Array.isArray(cards))
+      throw failure("Choose cards to pin.", 400);
+    patch.cards = {};
+    for (const [kind, id] of Object.entries(cards)) {
+      if (!Object.hasOwn(cardKinds, kind) || typeof id !== "string" || !id || id.length > 100)
+        throw failure("Choose a saved Character, Outfit or Scene.", 400);
+      patch.cards[kind as CardKind] = id;
+    }
+  }
   return patch;
 }
 
@@ -136,9 +148,11 @@ export function stylesWithChoice(styles: string, axis: string, choice: string) {
  * in the runtime document store as `projects:<ownerId>`.
  */
 export function createProjects({
+  cards,
   dataDir,
   now = Date.now,
 }: {
+  cards?: (ownerId: string) => Record<CardKind, Card[]> | null;
   dataDir: string;
   now?: () => number;
 }) {
@@ -159,11 +173,12 @@ export function createProjects({
     if (!project) throw failure("That project no longer exists.", 404);
     return project;
   };
-  const content = ({ name, brief, constraints, paused, favoured }: ProjectContent) =>
+  const content = ({ name, brief, constraints, cards, paused, favoured }: ProjectContent) =>
     structuredClone({
       name,
       brief,
       constraints,
+      ...(cards && Object.keys(cards).length ? { cards } : {}),
       ...(paused ? { paused } : {}),
       ...(favoured ? { favoured } : {}),
     }) as ProjectContent;
@@ -172,6 +187,7 @@ export function createProjects({
       name: patch.name ?? base.name,
       brief: { ...base.brief, ...patch.brief },
       constraints: { ...base.constraints, ...patch.constraints },
+      cards: patch.cards ?? base.cards,
       paused: patch.paused ?? base.paused,
       favoured: patch.favoured ?? base.favoured,
     });
@@ -184,17 +200,29 @@ export function createProjects({
       ...briefKeys.filter(
         (key) => !same(before.brief[key as "styles"], after.brief[key as "styles"]),
       ),
-      ...(["constraints", "paused", "favoured"] as const).filter(
+      ...(["constraints", "cards", "paused", "favoured"] as const).filter(
         (key) => !same(before[key], after[key]),
       ),
     ];
   };
   /** Replaces a project's content, dropping flags the new content leaves unset. */
   const assign = (project: Project, next: ProjectContent) => {
+    delete project.cards;
     delete project.paused;
     delete project.favoured;
     Object.assign(project, next);
   };
+  function checkCards(ownerId: string, patch: ProjectPatch, previous?: ProjectContent["cards"]) {
+    if (!patch.cards) return;
+    const changed = (Object.keys(cardKinds) as CardKind[]).filter(
+      (kind) => patch.cards?.[kind] && patch.cards[kind] !== previous?.[kind],
+    );
+    if (!changed.length) return;
+    const owned = cards?.(ownerId);
+    for (const kind of changed)
+      if (!owned?.[kind].some((card) => card.id === patch.cards?.[kind]))
+        throw failure(`That ${cardKinds[kind].name} no longer exists in your Library.`, 400);
+  }
   /** A chat's attached project, or null; a missing project detaches it. */
   const attached = (record: ProjectsRecord, chat: string) => {
     const projectId = record.chats[chat]?.projectId;
@@ -215,6 +243,7 @@ export function createProjects({
     /** Makes a project; one Dream proposed notes why. */
     create(ownerId: string, patch: ProjectPatch, why = "") {
       if (!patch.name) throw failure("Name the project.", 400);
+      checkCards(ownerId, patch);
       const record = read(ownerId);
       if (record.projects.length >= maxProjects)
         throw failure(`Keep to ${maxProjects} projects; delete one first.`, 409);
@@ -248,6 +277,7 @@ export function createProjects({
       const record = read(ownerId);
       const project = find(record, id);
       const before = content(project);
+      checkCards(ownerId, patch, before.cards);
       const after = merged(project, patch);
       const fields = changed(before, after);
       if (!fields.length) return project;

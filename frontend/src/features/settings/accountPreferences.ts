@@ -1,6 +1,7 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { Appearance } from "../../../../shared/appearance";
+import { defaultModelKeys } from "../../../../shared/profiles";
 import { api } from "../../api";
 import { accountQuery, useAccount } from "../auth/AccountGate";
 import { galleryKey } from "../gallery/queries";
@@ -10,12 +11,6 @@ import { modelsQuery } from "../generation/GenerationProvider";
 export type SidePreference = "cloud" | "local";
 /** The kinds of work whose side and default models the account chooses. */
 export type WorkKind = "images" | "text" | "videos";
-/** Each kind's default model per side, by its preference key (backend/account-preferences.js). */
-export const defaultModelKeys = {
-  images: { cloud: "imageCloud", local: "imageLocal" },
-  text: { cloud: "textCloud", local: "textLocal" },
-  videos: { cloud: "videoCloud", local: "videoLocal" },
-} as const;
 type DefaultModelKey = (typeof defaultModelKeys)[WorkKind][SidePreference];
 /** Which unfinished work the gallery shows: none, work in progress, or queued work too. */
 export type GalleryWorkPreference = "none" | "running" | "queued";

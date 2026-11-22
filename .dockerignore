@@ -13,5 +13,6 @@ data
 node_modules
 private
 renovate.json5
+screenshots/
 test-results
 tests

@@ -9,7 +9,7 @@ import { compareNames } from "../../ui/DataTable";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { ChipOption, ChipSelect, type ChipSelectProps } from "./ChipSelect";
-import { inputForProfile, modelsQuery, useGeneration } from "./GenerationProvider";
+import { defaultProfile, inputForProfile, modelsQuery, useGeneration } from "./GenerationProvider";
 import { modelFamilyLabel } from "./modelFamily";
 import { backendLabel, isProfile, profileName } from "./payload";
 
@@ -162,7 +162,9 @@ export function ProfilePicker({
   const input = value || context.input;
   const workers = context.models.data?.workers;
   const available = context.profiles.filter((profile) => profile.kind === input.kind);
-  const selected = available.find((profile) => isProfile(profile, input.profileId));
+  const selected = input.profileId
+    ? available.find((profile) => isProfile(profile, input.profileId))
+    : defaultProfile(context.models.data, input.kind);
   const selectedLabel = selected && profileLabel(selected, available);
   const readiness = selected && profileReadiness(selected, workers);
   // A combined profile's run uses the input's backend (a rerun keeps the one that ran), else the

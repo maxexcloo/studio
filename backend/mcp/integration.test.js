@@ -332,6 +332,7 @@ async function fixture(
               profileId: body.profileId,
               steps: body.steps,
               ...(body.resolution ? { resolution: body.resolution } : {}),
+              ...(body.resolutionTier ? { resolutionTier: body.resolutionTier } : {}),
               cfg: body.cfg,
               sampler: body.sampler || "",
               scheduler: body.scheduler || "",
@@ -1032,7 +1033,7 @@ test("media and administrator credentials discover only their own friendly tools
   assert.match(media.getInstructions(), /Studio runs them exactly as written/);
   assert.match(
     media.getInstructions(),
-    /"N sets of K" is N distinct prompts with count K in one call; asked for variety, vary framing, angle, pose, outfit and setting/,
+    /"N sets of K" is N distinct prompts with count K in one call; for creative variety keep requested identity and references fixed/,
   );
   // A chat keeps the user's own description, and LoRAs run only when asked.
   assert.match(
@@ -4122,8 +4123,8 @@ test("Generate with kind and tier needs no Models call, picks the default profil
   assert.equal(
     data(await call(client, "generate", { kind: "image", prompts: ["An egg"], count: 1 })).profile
       .id,
-    "qwen-fast",
-    "no tier prefers Fast in the default family",
+    "qwen-quality",
+    "an omitted tier keeps the configured profile",
   );
   assert.equal(
     data(
@@ -4883,7 +4884,7 @@ test("while local workers are Offline or Stopped, generate runs in the cloud whe
   assert.doesNotMatch(texts(image), /Cloud/, "no cloud image profile to offer");
   assert.deepEqual(
     f.submitted.map((body) => body.profileId),
-    ["cloud-video-fast", "fl-fast", imageProfile.id],
+    ["cloud-video", "fl-fast", imageProfile.id],
   );
   assert.match(
     data(await call(client, "models", { kind: "video" })).services_note,
@@ -5091,7 +5092,7 @@ test("video stays local while the worker is up, and a plain request never reache
   });
   assert.equal(
     data(await call(full, "generate", { kind: "video", prompts: ["A wave"], count: 1 })).profile.id,
-    "fl-fast",
+    videoProfile.id,
   );
   // Browser video preferences do not send a plain MCP request to the cloud.
   await f.profiles(videoCatalogue(), { preferences: { videos: "cloud" } });
@@ -5142,7 +5143,7 @@ test("video stays local while the worker is up, and a plain request never reache
   assert.match(texts(nowhere), /Local video isn't running and cloud video isn't available/);
   assert.deepEqual(
     f.submitted.map((body) => body.profileId),
-    ["fl-fast", videoProfile.id, "fl-fast", imageProfile.id, "fl-fast", imageProfile.id],
+    [videoProfile.id, videoProfile.id, "fl-fast", imageProfile.id, "fl-fast", imageProfile.id],
   );
 });
 
@@ -5759,6 +5760,22 @@ test("aspect picks the profile's own preset and resolution its long edge", async
   assert.equal(f.submitted.at(-1).tiledDecode, true);
   assert.equal(f.submitted.at(-1).autoUpscale, null);
   assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
+  const original = await call(client, "generate", {
+    prompts: ["An egg on a shelf"],
+    aspect: "9:16",
+    resolution: "2K",
+    cfg: 0,
+    count: 1,
+  }).then(data);
+  finish(f);
+  await call(client, "reuse", {
+    job_id: jobId(original),
+    prompt: "An egg on a blue shelf",
+  }).then(data);
+  assert.deepEqual(
+    [f.submitted.at(-1).width, f.submitted.at(-1).height, f.submitted.at(-1).resolutionTier],
+    [1152, 2048, "2K"],
+  );
   const submitted = f.submitted.length;
   // Free dimensions are not arguments: use the profile's aspect and resolution presets.
   const freeSize = await call(client, "generate", {
@@ -5809,7 +5826,7 @@ test("aspect picks the profile's own preset and resolution its long edge", async
   );
 });
 
-test("a vague generate runs two images on its family's fastest profile at the default preset, without LoRAs", async (t) => {
+test("ordinary MCP generation follows the configured default and keeps exact profile selection", async (t) => {
   const f = await fixture(t);
   const presets = [
     { label: "1:1", w: 1024, h: 1024, default: true },
@@ -5830,20 +5847,11 @@ test("a vague generate runs two images on its family's fastest profile at the de
     const { profileId, count, loras, width, height } = f.submitted.at(-1);
     return { profileId, count, loras, size: [width, height] };
   };
-  const vague = { profileId: fast.id, count: 2, loras: [], size: [1024, 1024] };
+  const vague = { profileId: quality.id, count: 2, loras: [], size: [1024, 1024] };
   assert.deepEqual(await run({}), vague);
-  // A Quality id the chat chose itself runs Fast unless the request asks for quality, and says so.
   assert.deepEqual(await run({ profile_id: quality.id }), vague);
-  assert.match(
-    texts(
-      await call(client, "generate", {
-        prompts: ["A fox"],
-        request: "a fox",
-        profile_id: quality.id,
-      }),
-    ),
-    /Ran on Flux · Fast, the fast choice for Flux · Quality; pass tier "quality" only when the user asks for Quality/,
-  );
+  assert.equal((await run({ profile_id: fast.id })).profileId, fast.id);
+  assert.equal((await run({ tier: "fast" })).profileId, fast.id);
   assert.equal(
     (await run({ profile_id: quality.id, request: "a fox, best quality" })).profileId,
     quality.id,
@@ -8116,6 +8124,33 @@ test("axis varies one thing at one seed, one image each, as a lettered side-by-s
   const shown = await call(client, "result", { job_id: sweep.sets[1].jobs[0].ref });
   assert.equal(data(shown).outputs[0].caption, "Strong effect");
   assert.match(texts(shown), /\n\nStrong effect$/);
+  const recipe = {
+    profile_id: imageProfile.id,
+    prompts: ["A cat beside a lamp"],
+    loras: [{ name: "fixture-effect" }, { name: "fixture-unknown", strength: 0.6 }],
+    strengths: "sweep",
+    seed: 0,
+  };
+  const preview = await call(client, "generate", { ...recipe, preview: true });
+  assert.match(texts(preview), /LoRA: Without LoRA, /);
+  assert.equal(f.submitted.length, 0);
+  const invalid = await call(client, "generate", { ...recipe, strengths: [0, 0.8, 8] });
+  assert.equal(invalid.isError, true);
+  assert.match(texts(invalid), /supports strength 0.2 to 1.2/);
+  assert.equal(f.submitted.length, 0);
+  const controlled = await call(client, "generate", recipe);
+  assert.match(texts(controlled), /varying LoRA Strength/);
+  const tested = f.submitted.splice(0);
+  assert.deepEqual(
+    tested.map((body) => [
+      body.prompt,
+      body.seed,
+      body.count,
+      body.loras.find(({ name }) => name === "fixture-effect.safetensors")?.strength ?? 0,
+      body.loras.find(({ name }) => name === "fixture-unknown.safetensors")?.strength,
+    ]),
+    [0, 0.6, 0.8, 1].map((strength) => [recipe.prompts[0], "0", 1, strength, 0.6]),
+  );
   const other = { ...imageProfile, id: "fixture-image-other", label: "Other" };
   await f.profiles([imageProfile, other]);
   const models = await call(client, "generate", {

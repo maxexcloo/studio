@@ -126,9 +126,11 @@ export function variantLabels(
   const differing = facets.filter(differs);
   return variants.map(
     (variant, index) =>
+      variant.label ||
       differing
         .map((facet) => facet(variant, index))
         .join(" · ")
-        .slice(0, 80) || `Variant ${letter(index)}`,
+        .slice(0, 80) ||
+      `Variant ${letter(index)}`,
   );
 }

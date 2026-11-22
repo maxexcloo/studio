@@ -91,7 +91,7 @@ test("a renamed fine-tune runs at its family's usual settings: Turbo or Distille
 });
 
 test("custom MiniMax H3 profiles use the family's starting aspect", async () => {
-  const { profileImageSize } = await import("../generation-defaults.js");
+  const { profileImageSize } = await import("../../shared/resolution.ts");
   const workflows = path.join(scratch, "data", "workflows");
   fs.mkdirSync(workflows, { recursive: true });
   const file = path.join(workflows, "h3-aspect.json");

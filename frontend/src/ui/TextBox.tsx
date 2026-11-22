@@ -515,23 +515,35 @@ export function TextBox({
             {submit?.map((each, index) => {
               const primary = index === submit.length - 1;
               const Glyph = each.icon ?? ArrowUp;
+              const send = () => {
+                if (!inline && !each.keepOpen) close();
+                each.onSubmit();
+              };
+              if (!primary)
+                return (
+                  <Tooltip key={each.label} label={each.label}>
+                    <ActionIcon
+                      aria-label={each.label}
+                      variant="subtle"
+                      color="gray"
+                      disabled={each.disabled}
+                      onPointerDown={(event) => event.preventDefault()}
+                      onClick={send}
+                    >
+                      <Glyph size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                );
               return (
                 <Button
                   key={each.label}
                   aria-label={each.label}
-                  className={primary ? undefined : classes.secondarySend}
-                  variant={primary ? "filled" : "light"}
                   radius="xl"
-                  size={primary ? undefined : "compact-xs"}
-                  leftSection={primary ? undefined : <Glyph size={16} />}
-                  rightSection={primary ? <Glyph size={16} /> : undefined}
+                  rightSection={<Glyph size={16} />}
                   disabled={each.disabled}
                   // Sending before the keyboard drops keeps the text's blur from closing first.
                   onPointerDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    if (!inline && !each.keepOpen) close();
-                    each.onSubmit();
-                  }}
+                  onClick={send}
                 >
                   {each.label}
                 </Button>

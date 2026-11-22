@@ -39,7 +39,11 @@ export function NumberSetting({
       disabled={disabled}
       onChange={setDraft}
       onBlur={commit}
-      onKeyDown={(event) => event.key === "Enter" && commit()}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        event.currentTarget.blur();
+      }}
     />
   );
 }

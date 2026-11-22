@@ -282,8 +282,12 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       ? (source && recordBelongsToAccount(source, account) && similar(source, strictness)) ||
         (() => undefined)
       : null;
-    // `comparisons` keeps results that are in one of the account's comparisons.
-    const inComparison = query.comparisons === "1" ? compared(account?.userId || "") : null;
+    // Dream pairs and saved comparison records, including comparisons made from gallery picks.
+    const savedComparison = query.comparisons === "1" ? compared?.(account?.userId || "") : null;
+    const inComparison =
+      query.comparisons === "1"
+        ? (item) => Boolean(item.dream?.pair?.id || savedComparison?.(item))
+        : null;
     // `chat` keeps one MCP conversation's results and `turn` one turn of it (an MCP result link).
     const scope = storedChatRecord({ conversationId: query.chat, turnId: query.turn });
     const chat = scope?.conversationId;

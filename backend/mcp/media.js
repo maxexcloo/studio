@@ -17,6 +17,7 @@ import { accessFeatures } from "../account-policy.js";
 import { animateProfile, frameSize } from "../animate-profile.js";
 import { step } from "../event-loop.js";
 import { topCaptionTags } from "../gallery/filters.js";
+import { profileAspectSize } from "../generation-defaults.js";
 import { compatibleLoras } from "../lora/policy.js";
 import { recommendedNegative } from "../lora/prompts.js";
 import { mcpLinkKey, mcpOwnership } from "../persistence/mcp-ownership.ts";
@@ -28,7 +29,6 @@ import {
   maxJobsPerCall,
   mcpControls,
   mcpGenerationCount,
-  mcpSize,
   prepareLoras,
   resolveLoraName,
   varyLoras,
@@ -483,8 +483,8 @@ export class McpMedia {
       };
       if (profiles.some(usable)) profiles = profiles.filter(usable);
     }
-    const options = { kind, tier, references };
-    const profile = chooseProfile(profiles, { ...options, defaultId });
+    const options = { kind, tier, references, defaultId };
+    const profile = chooseProfile(profiles, options);
     // The default's note holds for any pick on its side.
     const note = isCloudProfile(profile) === cloudDefault ? models.defaultNotes?.[kind] : "";
     return {
@@ -716,6 +716,7 @@ export class McpMedia {
         : 1;
     const body = {
       ...profile.defaults,
+      ...profileAspectSize(profile),
       // Smart upscale only when the call asked for it, never from a profile default.
       autoUpscale: null,
       ...controls,
@@ -737,7 +738,7 @@ export class McpMedia {
       referenceAssets: placed,
     };
     // A video's length comes only from Reuse's length (videoLength).
-    for (const key of ["width", "height", "steps", "duration", "frames"])
+    for (const key of ["width", "height", "steps", "duration", "frames", "fps"])
       if (args[key] !== undefined) body[key] = args[key];
     // A profile framed by its reference draws at the primary reference's proportions, as the
     // composer does, unless that reference only guides (reference_role "reference").
@@ -750,9 +751,9 @@ export class McpMedia {
       const id = placed.find((item) => item.slot === primary?.id)?.assetId;
       if (id) Object.assign(body, await this.referenceFrame(owner, profile, id));
     }
-    if (profile.kind === "image" && profile.options?.resolutions?.length && resolution) {
+    if (profile.options?.resolutions?.length && resolution) {
       const native = profile.options.resolutions.find(
-        (value) => value.toUpperCase() === resolution,
+        (value) => value.toUpperCase() === resolution.toUpperCase(),
       );
       if (!native)
         throw new Error(
@@ -1739,9 +1740,8 @@ export class McpMedia {
     // A saved run keeps its backend's controls and limits as well as its backend id.
     const backend = settings.profileBackend;
     const selected = this.profileForBackend(base, backend);
-    const references = (settings.referenceAssets || [])
-      .map((asset) => asset?.assetId)
-      .filter(Boolean);
+    const savedReferences = (settings.referenceAssets || []).filter((asset) => asset?.assetId);
+    const references = savedReferences.map(({ assetId }) => assetId);
     const profile = references.length
       ? { ...selected, ...selected.imageModes?.reference }
       : selected;
@@ -1751,19 +1751,30 @@ export class McpMedia {
       ...(backend && base.backend ? { profile_backend: backend } : {}),
       prompts: [prompt || item.prompt],
       count,
-      ...(references.length ? { reference_asset_ids: references } : {}),
+      ...(references.length
+        ? {
+            reference_asset_ids: references,
+            reference_slots: savedReferences.map(({ slot }) => slot),
+          }
+        : {}),
     };
     if (settings.referenceRole && controls.reference_role)
       args.reference_role = settings.referenceRole;
-    const strengths = (settings.referenceAssets || [])
-      .filter((asset) => asset?.assetId)
-      .map((asset) => (Number.isFinite(asset.strength) ? asset.strength : null));
+    const strengths = savedReferences.map(({ strength }) =>
+      Number.isFinite(strength) ? strength : null,
+    );
     if (controls.reference_strengths && strengths.some((value) => value !== null))
       args.reference_strengths = strengths;
-    // Only what this run changed from the profile's defaults, and only what MCP may adjust.
+    if (controls.aspect && item.width > 0 && item.height > 0) {
+      args.width = item.width;
+      args.height = item.height;
+    }
+    if (item.type === "video") {
+      if (settings.duration > 0) args.duration = settings.duration;
+      if (settings.frames > 0) args.frames = settings.frames;
+      if (settings.fps > 0) args.fps = settings.fps;
+    }
     const recorded = {
-      width: item.width,
-      height: item.height,
       steps: settings.steps,
       cfg: settings.cfg,
       denoise: settings.denoise,
@@ -1776,15 +1787,17 @@ export class McpMedia {
         controls[key] &&
         value !== undefined &&
         value !== "" &&
-        value !== 0 &&
+        (key !== "steps" || value > 0) &&
         value !== profile.defaults?.[key]
       )
         args[key] = value;
     // Provider-native sizes are separate from the output's recorded dimensions.
-    const resolution = settings.resolution?.toUpperCase();
-    if (profile.options?.resolutions?.length && controls.resolution?.options.includes(resolution))
-      args.resolution = resolution;
-    if (item.negative && controls.negative_prompt) args.negative_prompt = item.negative;
+    if (profile.options?.resolutions?.includes(settings.resolution))
+      args.resolution = settings.resolution;
+    else if (controls.resolution?.options.includes(settings.resolutionTier))
+      args.resolution = settings.resolutionTier;
+    if (typeof item.negative === "string" && controls.negative_prompt)
+      args.negative_prompt = item.negative;
     const saved = controls.loras
       ? (settings.loras || [])
           .filter((lora) => lora?.enabled !== false && profile.options?.loras?.includes(lora.name))
@@ -1823,7 +1836,7 @@ export class McpMedia {
       references.length ? { ...profile, ...profile.imageModes?.reference } : profile,
     );
     if (controls.aspect && item.width > 0 && item.height > 0)
-      Object.assign(args, mcpSize(profile, { aspect: `${item.width}:${item.height}` }));
+      Object.assign(args, profileAspectSize(profile, { aspect: `${item.width}:${item.height}` }));
     return { profile, args };
   }
   /**

@@ -280,6 +280,8 @@ export async function mediaDraft(
         profileBackend,
         // A reused prompt is the person's now; how the assistant wrote it stays with its result.
         writing: undefined,
+        chat: undefined,
+        resultSet: undefined,
       },
     },
   };

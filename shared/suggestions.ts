@@ -3,9 +3,11 @@ export interface PromptIdea {
   label: string;
   prompt: string;
 }
-/** A viewer next step also names the change in words. */
-export interface NextStep extends PromptIdea {
+/** A suggestion names a change. Studio writes the new prompt when the person chooses it. */
+export interface NextStep {
+  label: string;
   request: string;
+  prompt?: string;
 }
 /** The number of distinct ideas requested for a generated suggestion picker. */
 export const maxSuggestions = 6;
@@ -15,7 +17,10 @@ export type ChangeAction = (typeof changeActions)[number];
 /** A change asked for in plain words: the action the text model chose, with its prompt. */
 export interface Change extends NextStep {
   action: ChangeAction;
+  prompt: string;
 }
+export const variationDirections = ["scene", "outfit", "style"] as const;
+export type VariationDirection = (typeof variationDirections)[number];
 /** `POST /api/suggestions`: none, with the reason, where the account or the text model can't. */
 export type Suggestions<T = PromptIdea> =
   | { suggestions: T[]; reason?: undefined }

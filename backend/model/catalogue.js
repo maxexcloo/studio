@@ -16,6 +16,7 @@ import { logWarning } from "../crash-log.js";
 import { customWorkflowsRevision } from "../custom-workflows.js";
 import { step } from "../event-loop.js";
 import { families } from "../family-catalogue.js";
+import { mediaDefaultProfileKeys } from "../generation-defaults.js";
 import { uncensoredLoraNames } from "../lora/info.js";
 import { RadianceClient, radianceInfo } from "../providers/radiance.ts";
 import { parkedWorkers } from "../runtime/services.ts";
@@ -43,11 +44,10 @@ import { inferModels, offlineModelResult, profileWithBackendOptions } from "./mo
 const none = {};
 const inferredModels = new WeakMap();
 function inferred(info = none, stats = none, { configuredOnly = false } = {}) {
-  const { STUDIO_DEFAULT_IMAGE_PROFILE, STUDIO_DEFAULT_VIDEO_PROFILE } = process.env;
   const revision = [
     customWorkflowsRevision(),
-    STUDIO_DEFAULT_IMAGE_PROFILE,
-    STUDIO_DEFAULT_VIDEO_PROFILE,
+    process.env[mediaDefaultProfileKeys.image],
+    process.env[mediaDefaultProfileKeys.video],
   ].join("|");
   const entries = inferredModels.get(info) || new Map();
   inferredModels.set(info, entries);

@@ -264,6 +264,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
       const workflow = JSON.parse(await file.text());
       const result = await post<{
         preview: {
+          format: string;
           graph: unknown;
           detected: Record<string, unknown>;
           declared?: Record<string, unknown>;
@@ -271,11 +272,15 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           risks?: { reason: string; detail?: string }[];
         };
       }>("/api/workflows/import/preview", { workflow, filename: file.name });
-      const { graph, detected, declared, validation, risks } = result.preview;
+      const { format, graph, detected, declared, validation, risks } = result.preview;
       const { nodes: _nodes, guessed: _guessed, ...detectedMetadata } = detected;
       const metadata = { ...declared, ...detectedMetadata };
       return {
-        text: JSON.stringify({ studio: metadata, graph }, null, 2),
+        text: JSON.stringify(
+          format === "studio-profile" ? workflow : { studio: metadata, graph },
+          null,
+          2,
+        ),
         hash: "",
         warnings: [
           ...(validation?.issues || []),

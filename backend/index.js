@@ -763,10 +763,11 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
     void imageSearch.completed(items);
     void faceCheck.completed(items);
     void characterSheets.completed(items);
-    nextSteps.prioritiseRecent();
+    nextSteps.prioritiseRecent(items);
     if (items.some((item) => item.dream)) dream.finished();
   },
   directCloud,
+  dreamImageSwitchMinutes: (ownerId) => dream.imageSwitchMinutes(ownerId),
   dreamIdleWait: (job) => dream.idleWaitForJob(job),
   generationRoutes,
   promptStage,
@@ -930,7 +931,7 @@ registerSuggestionRoutes(app, {
 });
 // Dream (domain/dream.ts): idle-time results from each account's taste and resolved settings.
 // It only queues work; it never places GPU workloads.
-const projects = createProjects({ dataDir });
+const projects = createProjects({ cards: accountCards, dataDir });
 const dream = createDream({
   dataDir,
   overrides: dreamOverrides,
@@ -1164,7 +1165,8 @@ async function smallImage(item, upscaled = false) {
   return { mime: "image/jpeg", data: data.toString("base64") };
 }
 // The gallery as idle work walks it (domain/idle-work.ts).
-const idleItems = (since, after) => eachGalleryItem({ since }, after && galleryKey(after));
+const idleItems = (since, after) =>
+  eachGalleryItem({ since, status: "done" }, after && galleryKey(after));
 // Gallery captions (domain/captions.ts) let search match what an image shows.
 const runtimeLoad = (name) => () => readRuntimeDocument(dataDir, name) ?? null;
 const captioner = createCaptioner({
@@ -1289,7 +1291,16 @@ const nextSteps = createNextStepWork({
   suggestions,
   idle: galleryIdle,
   allowed: promptWriterOwner,
-  items: (since, after) => idleItems(Math.max(since ?? 0, Date.now() - 24 * 60 * 60_000), after),
+  items: (since, after) =>
+    eachGalleryItem(
+      {
+        since: Math.max(since ?? 0, Date.now() - 24 * 60 * 60_000),
+        status: "done",
+        uploaded: false,
+        unlistedFirst: true,
+      },
+      after && galleryKey(after),
+    ),
   changes: galleryChangeCount,
   visible: (item) =>
     item.dream?.state === "unseen"

@@ -9,6 +9,7 @@ import {
   workflowOptionIssues,
 } from "../custom-workflows.js";
 import { families } from "../family-catalogue.js";
+import { mediaDefaultProfileKeys } from "../generation-defaults.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
 import { workflowLoraBase } from "../lora/radiance.js";
 import {
@@ -634,8 +635,8 @@ export function inferModels(
     schedulers,
     loras,
     defaults: {
-      imageModel: firstReady(imageProfiles, process.env.STUDIO_DEFAULT_IMAGE_PROFILE),
-      videoModel: firstReady(videoProfiles, process.env.STUDIO_DEFAULT_VIDEO_PROFILE),
+      imageModel: firstReady(imageProfiles, process.env[mediaDefaultProfileKeys.image]),
+      videoModel: firstReady(videoProfiles, process.env[mediaDefaultProfileKeys.video]),
     },
     capabilities: {
       image: imageProfiles.length > 0,
