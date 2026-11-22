@@ -1,22 +1,25 @@
-import { Badge, Loader, Menu, Stack, Text } from "@mantine/core";
+import { Badge, Button, Group, Loader, Menu, MultiSelect, Stack, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import type { BenchmarkModel, BenchmarkRun, BenchmarkStatus } from "../../../../shared/runtime";
+import {
+  type BenchmarkModel,
+  type BenchmarkRun,
+  type BenchmarkStatus,
+  activeBenchmark,
+} from "../../../../shared/runtime";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SettingGroup } from "../../ui/SettingRows";
-import { ChipOption, ChipSelect } from "../generation/ChipSelect";
 import { LogDialog, PodLog, useRequester } from "./RuntimeLogs";
 
 export const benchmarksQuery = queryOptions({
   queryKey: ["runtime-benchmarks"],
   queryFn: () => api<BenchmarkStatus>("/api/runtime/benchmarks"),
-  refetchInterval: (query) =>
-    query.state.data?.runs.some((run) => run.status === "running") ? 10000 : false,
+  refetchInterval: (query) => (query.state.data?.runs.some(activeBenchmark) ? 10000 : false),
 });
 
 const benchmarkModelsQuery = (workload: string) =>
@@ -31,14 +34,20 @@ const benchmarkModelsQuery = (workload: string) =>
 
 const shortDateTime = dateFormat({ dateStyle: "short", timeStyle: "short" });
 const statusColour = (status: BenchmarkRun["status"]) =>
-  ({ running: "blue", completed: "green", failed: "red", stopped: "gray" })[status];
+  ({ queued: "gray", running: "blue", completed: "green", failed: "red", stopped: "gray" })[status];
 const statusLabel = (status: BenchmarkRun["status"]) =>
-  ({ running: "Running", completed: "Completed", failed: "Failed", stopped: "Stopped" })[status];
+  ({
+    queued: "Queued",
+    running: "Running",
+    completed: "Completed",
+    failed: "Failed",
+    stopped: "Stopped",
+  })[status];
 const rate = (value: number | null | undefined, digits = 0) =>
   value == null ? "—" : `${value.toFixed(digits)} tok/s`;
 const thousands = (tokens: number) => `${Math.round(tokens / 1000)}K`;
 
-/** Confirms benchmarking one running local text model, then starts it. */
+/** Choose which text models to benchmark on the selected workload. */
 export function BenchmarkDialog({
   workload,
   onClose,
@@ -48,55 +57,71 @@ export function BenchmarkDialog({
 }) {
   const client = useQueryClient();
   const inventory = useQuery(benchmarkModelsQuery(workload?.id ?? ""));
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>();
   const models = inventory.data?.models ?? [];
-  const model =
-    models.find(({ id }) => id === selected) ?? (models.length === 1 ? models[0] : undefined);
+  const ids = models.map(({ id }) => id);
+  const chosen = selected?.filter((id) => ids.includes(id)) ?? (ids.length === 1 ? ids : []);
   const start = useMutation({
-    mutationFn: (choice: { workload: string; model: string }) =>
-      post<BenchmarkRun>("/api/runtime/benchmarks", choice),
+    mutationFn: (choice: { workload: string; models: string[] }) =>
+      post<BenchmarkRun[]>("/api/runtime/benchmarks", choice),
     meta: { inlineError: true },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: benchmarksQuery.queryKey });
-      setSelected(null);
+      setSelected(undefined);
       onClose();
     },
   });
+  const unavailable = inventory.isFetching || !models.length || start.isPending;
   return (
     <ConfirmDialog
       opened={Boolean(workload)}
       title={`Benchmark ${workload?.label ?? ""}`}
       action="Benchmark"
       pending={start.isPending}
-      disabled={inventory.isFetching || !model}
+      disabled={inventory.isFetching || !chosen.length}
       error={start.error?.message || inventory.error?.message}
       onConfirm={() => {
-        if (workload && model) start.mutate({ workload: workload.id, model: model.id });
+        if (workload && chosen.length) start.mutate({ workload: workload.id, models: chosen });
       }}
       onClose={() => {
         start.reset();
-        setSelected(null);
+        setSelected(undefined);
         onClose();
       }}
     >
       <Stack gap="sm">
         <Text size="sm">
-          BetterBench measures decode, prompt processing and concurrent throughput. Loading the
-          selected model may delay other work, and activity on the worker affects the results.
+          BetterBench measures decode, prompt processing and concurrent throughput. Models run one
+          at a time. Loading them may delay other work, and concurrent activity affects results.
         </Text>
-        <ChipSelect
-          field
-          name="Text Model"
-          label={model?.label ?? (inventory.isFetching ? "Loading Models" : "Choose Model")}
-          data={models.map(({ id, label }) => ({ value: id, label }))}
-          value={model?.id ?? ""}
-          onChange={setSelected}
-          renderOption={({ option, checked }) => (
-            <ChipOption label={option.label} checked={checked} />
+        <Group align="flex-end" wrap="nowrap">
+          <MultiSelect
+            label="Text Models"
+            placeholder={
+              chosen.length ? undefined : inventory.isFetching ? "Loading Models" : "Choose Models"
+            }
+            data={models.map(({ id, label }) => ({ value: id, label }))}
+            value={chosen}
+            onChange={setSelected}
+            searchable
+            nothingFoundMessage="No Matches"
+            clearable
+            clearButtonProps={{ "aria-label": "Clear Models" }}
+            disabled={unavailable}
+            comboboxProps={{ withinPortal: false }}
+            flex={1}
+            miw={0}
+          />
+          {models.length > 1 && (
+            <Button
+              variant="default"
+              disabled={unavailable || chosen.length === models.length}
+              onClick={() => setSelected(ids)}
+            >
+              Select All
+            </Button>
           )}
-          disabled={!models.length || inventory.isFetching || start.isPending}
-          withinPortal={false}
-        />
+        </Group>
         {inventory.isSuccess && !models.length && <Text size="sm">No text models available.</Text>}
       </Stack>
     </ConfirmDialog>
@@ -130,29 +155,33 @@ export function BenchmarkResults() {
         rowKey={(run) => run.id}
         rowName={(run) => run.label}
         empty="No Benchmarks"
-        rowActions={(run) => (
-          <>
-            <Menu.Item leftSection={<icons.log size={16} />} onClick={() => setLogId(run.id)}>
-              View Logs
-            </Menu.Item>
-            {run.status === "running" && (
-              <Menu.Item
-                color="red"
-                leftSection={<icons.stop size={16} />}
-                onClick={() => setStopping(run.id)}
-              >
-                Stop
-              </Menu.Item>
-            )}
-          </>
-        )}
+        rowActions={(run) =>
+          (run.startedAt || activeBenchmark(run)) && (
+            <>
+              {run.startedAt && (
+                <Menu.Item leftSection={<icons.log size={16} />} onClick={() => setLogId(run.id)}>
+                  View Logs
+                </Menu.Item>
+              )}
+              {activeBenchmark(run) && (
+                <Menu.Item
+                  color="red"
+                  leftSection={<icons.stop size={16} />}
+                  onClick={() => setStopping(run.id)}
+                >
+                  Stop
+                </Menu.Item>
+              )}
+            </>
+          )
+        }
         columns={[
           {
             key: "time",
             header: "Time",
             cell: (run) => (
               <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-                {shortDateTime.format(new Date(run.startedAt))}
+                {run.startedAt ? shortDateTime.format(new Date(run.startedAt)) : "—"}
               </Text>
             ),
           },

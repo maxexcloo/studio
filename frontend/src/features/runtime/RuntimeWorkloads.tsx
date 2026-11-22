@@ -13,14 +13,15 @@ import {
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import type {
-  RuntimeJob,
-  RuntimeOperation,
-  RuntimePreview,
-  RuntimeQueueCancel,
-  RuntimeQueueStatus,
-  RuntimeStatus,
-  WorkloadPhase,
+import {
+  type RuntimeJob,
+  type RuntimeOperation,
+  type RuntimePreview,
+  type RuntimeQueueCancel,
+  type RuntimeQueueStatus,
+  type RuntimeStatus,
+  type WorkloadPhase,
+  activeBenchmark,
 } from "../../../../shared/runtime";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
@@ -323,7 +324,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   const [workloadLogId, setWorkloadLogId] = useState("");
   const [benchmarkId, setBenchmarkId] = useState("");
   const benchmarks = useQuery(benchmarksQuery).data;
-  const benchmarking = benchmarks?.runs.some((run) => run.status === "running");
+  const benchmarking = benchmarks?.runs.some(activeBenchmark);
   const refresh = () =>
     Promise.all(
       [runtimeStatusQuery, runtimeQueueQuery].map(({ queryKey }) =>

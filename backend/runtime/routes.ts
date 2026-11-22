@@ -96,10 +96,10 @@ export function createRuntimeRouter(
   router.post(
     "/benchmarks",
     handle((request) => {
-      const model = request.body?.model;
-      if (model !== undefined && typeof model !== "string")
-        throw new RuntimeRequestError("Choose an available text model.");
-      return benchmarks.start(String(request.body?.workload ?? ""), requestedBy(request), model);
+      const models = request.body?.models;
+      if (!Array.isArray(models) || models.some((model) => typeof model !== "string"))
+        throw new RuntimeRequestError("Choose available text models.");
+      return benchmarks.start(String(request.body?.workload ?? ""), requestedBy(request), models);
     }, 202),
   );
   router.get(
