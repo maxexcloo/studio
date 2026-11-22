@@ -215,7 +215,6 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
   const askForChange = async (mode: "Edit" | "Recreate", request?: string, profile?: string) => {
     await viewerChangeMenu(page, mode);
     if (profile) await editProfile(profile);
-    await expandAssistantMenu(page, "Templates");
     await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
     const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
     if (request) await custom.getByRole("textbox", { name: "Change", exact: true }).fill(request);
@@ -526,7 +525,6 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   });
   const { state } = await seed(page);
   await viewerAction(page, "Animate");
-  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   await expect(page.getByRole("menu", { name: "Animate", exact: true })).toBeHidden();
   const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });

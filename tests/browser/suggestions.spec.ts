@@ -139,11 +139,12 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   await page.keyboard.press("Escape");
   await expect(viewerChangeButton(page)).toBeFocused();
   await viewerChangeMenu(page);
-  await expandAssistantMenu(menu, "Suggestions");
-  // Refresh reads Loading… while they load, with no placeholder row.
+  // The top-level Refresh reads Loading… while the suggestions load.
   const thinking = menu.getByRole("menuitem", { name: "Loading…", exact: true });
   await expect(thinking).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Refresh", exact: true })).toHaveCount(0);
+  await expect(menu.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
+  await expandAssistantMenu(menu, "Suggestions");
   release[0]();
   await expect(menu.getByRole("menuitem", { name: steps[0].label, exact: true })).toBeVisible();
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
@@ -163,7 +164,6 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
     itemId: "hub",
   });
   // Custom… asks for the change in a box of its own, leaving the prompt as it was.
-  await expandAssistantMenu(menu, "Templates");
   await menu.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   await expect(page.getByRole("menu")).toHaveCount(0);
   const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
@@ -211,7 +211,6 @@ test("Custom Animation suggests what could happen from the image, filling the in
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   await viewerAction(page, "Animate");
-  await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });
   const menu = phone
@@ -272,6 +271,8 @@ test("The prompt offers Library's fixed changes with the image's suggestions", a
     "Review Prompt",
     "Suggestions",
     "Templates",
+    "Custom…",
+    "Refresh",
     "Run Again",
     "Run Again, Same Seed",
     "Compare in Composer",
@@ -314,6 +315,8 @@ test("Animate offers motions written for the image, then its templates and Custo
   await viewerAction(page, "Animate");
   const menu = page.getByRole("menu");
   await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Custom…", exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Refresh", exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Living Photo", exact: true })).toBeHidden();
   await expandAssistantMenu(menu, "Templates");
   const templateRows = menu.getByRole("group", { name: "Templates", exact: true });
@@ -322,15 +325,11 @@ test("Animate offers motions written for the image, then its templates and Custo
     "Cinematic Camera",
     "Dialogue",
     "Living Photo",
-    "Custom…",
   ]);
   await expandAssistantMenu(menu, "Suggestions");
   await expect(templateRows).toBeHidden();
   const ideaRows = menu.getByRole("group", { name: "Suggestions", exact: true });
-  await expect(ideaRows.getByRole("menuitem")).toHaveText([
-    ...motion.map((idea) => idea.label).sort(),
-    "Refresh",
-  ]);
+  await expect(ideaRows.getByRole("menuitem")).toHaveText(motion.map((idea) => idea.label).sort());
   await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.writing).toMatchObject({

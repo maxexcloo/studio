@@ -1,21 +1,16 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
-  Camera,
   Check,
-  Flame,
   ImageDown,
   ListChecks,
   Loader,
   type LucideIcon,
-  MessagesSquare,
   Repeat,
   Rewind,
   Snail,
   TextQuote,
   Waves,
-  Wind,
-  Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -102,16 +97,6 @@ function withoutLoneOption(action: Action): Action {
     loading: action.loading || option.loading,
   };
 }
-
-// Seeded templates have their own icons; others share Animate's.
-const templateIcons: Record<string, LucideIcon> = {
-  cinematic: Camera,
-  living: Wind,
-  action: Zap,
-  dialogue: MessagesSquare,
-  spicy: Flame,
-  custom: icons.custom,
-};
 
 /** A failed item's Retry; the new pending tile replaces it (`onRetried` gets the new job). */
 function useRetryAction(
@@ -435,7 +420,7 @@ export function useMediaActions(
   const templateItem = (template: AssistantOption): Action => ({
     id: `animate-${template.id}`,
     label: `${template.label}${template.id === "custom" ? "…" : ""}`,
-    icon: templateIcons[template.id] ?? icons.animate,
+    icon: template.id === "custom" ? icons.custom : undefined,
     disabled: animateDisabled,
     onClick:
       template.id === "custom" || review

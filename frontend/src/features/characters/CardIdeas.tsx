@@ -69,7 +69,6 @@ export function useCardIdeas({
     options.map((idea): Action => ({
       id: `idea:${idea}`,
       label: idea,
-      icon: icons.assistant,
       onClick: () => pick(idea),
     })),
     { onClick: () => again.mutate(undefined) },
@@ -80,12 +79,11 @@ export function useCardIdeas({
       label: `Suggest ${noun}`,
       icon: icons.assistant,
       menu: [
+        [{ id: "heading", label: "Suggested", heading: true }, ...suggestions.options],
         [
-          { id: "heading", label: "Suggested", heading: true },
-          ...suggestions.options,
+          { id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) },
           suggestions.again,
         ],
-        [{ id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) }],
       ],
       onOpen: () => setRequested(true),
     } satisfies Action,

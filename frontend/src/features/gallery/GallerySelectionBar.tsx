@@ -213,7 +213,6 @@ export function GallerySelectionBar({
             .map((template) => ({
               id: `animate-${template.id}`,
               label: template.label,
-              icon: icons.animate,
               disabled: animate.isPending || length.loading,
               onClick: () => animate.mutate({ theme: template.id, profileId }),
             })),

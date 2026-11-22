@@ -143,7 +143,9 @@ recur across features.
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
   The context menu shows AI and Share options in unlabelled sections.
   Mouse context menus open options in side submenus. Action bars and touch
-  context menus expand options in place. Assistant menus share `assistMenu`.
+  context menus expand options in place. Assistant menus share `assistMenu`:
+  Suggestions and Templates carry icons and list text-only options, with
+  Custom… and Refresh at the top level.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
   phone media item bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and
