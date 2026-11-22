@@ -724,6 +724,41 @@ test("A set and the shown result's versions have separate strips", async ({ page
   await expect(versions.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
 
+test("Lineage compares the exact source and opens the exact set", async ({ page }) => {
+  const resultSet = { id: "heron-set", title: "Bird Studies", index: 0 };
+  await seed(
+    page,
+    {
+      parentItemId: "parent",
+      resultSet,
+      settings: { seed: 25, loras: [{ name: "Detail.safetensors", strength: 0.8 }] },
+    },
+    async (_page, state) => {
+      state.gallery.push({
+        ...state.gallery[0],
+        id: "parent",
+        parentItemId: undefined,
+        resultSet: { ...resultSet, id: "different-set" },
+        settings: { seed: 0, loras: [{ name: "Detail.safetensors", strength: 0.4 }] },
+        prompt: "A grey heron",
+      });
+    },
+  );
+  await page.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Grey Heron", exact: true })).toHaveAttribute(
+    "href",
+    "/images/parent",
+  );
+  await expect(page.getByText("Seed: 0 → 25", { exact: true })).toBeVisible();
+  await expect(page.getByText("Detail: 0.4 → 0.8", { exact: true })).toBeVisible();
+  await expect(page.getByText("Prompt changed", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Bird Studies", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Remove Set: Bird Studies Filter" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open image: Grey Heron", exact: true }),
+  ).toHaveCount(0);
+});
+
 test("A version keeps its strip once the runs have left the queue, and runs from it record it", async ({
   page,
 }) => {

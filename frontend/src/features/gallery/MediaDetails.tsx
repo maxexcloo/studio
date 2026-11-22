@@ -104,6 +104,85 @@ interface Details {
   timing: Row[];
 }
 
+const enabledLoras = (settings: MediaItem["settings"]) =>
+  Array.isArray(settings?.loras)
+    ? settings.loras.filter((lora) => lora?.name && lora.enabled !== false)
+    : undefined;
+
+function actualSeed(value: unknown) {
+  const seed = typeof value === "number" || typeof value === "string" ? String(value).trim() : "";
+  return /^\d+$/.test(seed) ? seed.replace(/^0+(?=\d)/, "") : "";
+}
+
+function lineageChanges(
+  parent: MediaItem,
+  item: MediaItem,
+  profiles: Profile[],
+  loraTitle: (file: string) => string,
+) {
+  if (parent.status !== "done" || item.status !== "done") return [];
+  const changes: string[] = [];
+  const before = parent.settings;
+  const after = item.settings;
+  const recordedChange = (a: unknown, b: unknown) =>
+    typeof a === "string" && a !== "" && typeof b === "string" && b !== "" && a !== b;
+  const modelChanged =
+    recordedChange(parent.model, item.model) || recordedChange(before?.modelName, after?.modelName);
+  if (modelChanged || recordedChange(before?.profileId, after?.profileId)) {
+    const label = modelChanged ? "Model" : "Profile";
+    const from = mediaProfileName(parent, profiles);
+    const to = mediaProfileName(item, profiles);
+    changes.push(from && to && from !== to ? `${label}: ${from} → ${to}` : `${label} changed`);
+  }
+  if (recordedChange(before?.profileBackend, after?.profileBackend)) {
+    const from = backendLabel(String(before?.profileBackend));
+    const to = backendLabel(String(after?.profileBackend));
+    changes.push(`Backend: ${from} → ${to}`);
+  }
+  const oldSeed = actualSeed(before?.seed);
+  const newSeed = actualSeed(after?.seed);
+  if (oldSeed && newSeed && oldSeed !== newSeed) changes.push(`Seed: ${oldSeed} → ${newSeed}`);
+  const oldLoras = enabledLoras(before);
+  const newLoras = enabledLoras(after);
+  if (oldLoras && newLoras) {
+    const strengths = (loras: typeof oldLoras) =>
+      new Map(loras.map(({ name, strength }) => [String(name), Number(strength)]));
+    const previous = strengths(oldLoras);
+    const current = strengths(newLoras);
+    for (const name of new Set([...previous.keys(), ...current.keys()])) {
+      const oldStrength = previous.get(name);
+      const newStrength = current.get(name);
+      if (oldStrength === undefined) changes.push(`Added ${loraTitle(name)}`);
+      else if (newStrength === undefined) changes.push(`Removed ${loraTitle(name)}`);
+      else if (
+        Number.isFinite(oldStrength) &&
+        Number.isFinite(newStrength) &&
+        oldStrength !== newStrength
+      )
+        changes.push(`${loraTitle(name)}: ${oldStrength} → ${newStrength}`);
+    }
+  }
+  if (
+    typeof parent.prompt === "string" &&
+    typeof item.prompt === "string" &&
+    parent.prompt.trim() !== item.prompt.trim()
+  )
+    changes.push("Prompt changed");
+  const references = (settings: MediaItem["settings"]) =>
+    Array.isArray(settings?.referenceAssets)
+      ? JSON.stringify(
+          settings.referenceAssets
+            .filter((reference) => reference?.assetId)
+            .map(({ slot, assetId, strength }) => [slot, assetId, strength]),
+        )
+      : undefined;
+  const oldReferences = references(before);
+  const newReferences = references(after);
+  if (oldReferences !== undefined && newReferences !== undefined && oldReferences !== newReferences)
+    changes.push("References changed");
+  return changes;
+}
+
 /** The curated generation record shared by Details and Copy Settings; empty values are left out. */
 function generationDetails(
   item: MediaItem,
@@ -149,12 +228,10 @@ function generationDetails(
   });
   return {
     profile: mediaProfileName(item, profiles),
-    loras: (Array.isArray(settings.loras) ? settings.loras : [])
-      .filter((lora) => lora?.name && lora.enabled !== false)
-      .map((lora) => ({
-        name: loraTitle(String(lora.name)),
-        strength: Number(lora.strength ?? 1).toFixed(2),
-      })),
+    loras: (enabledLoras(settings) || []).map((lora) => ({
+      name: loraTitle(String(lora.name)),
+      strength: Number(lora.strength ?? 1).toFixed(2),
+    })),
     references,
     unused: settings.maskSkipped
       ? ["Mask: nothing in it was painted, so this ran as an edit of the whole picture."]
@@ -183,7 +260,7 @@ function generationDetails(
       ["Rebalance", titleCase(String(settings.rebalance || ""))],
       ["Denoise", !video && staged.length ? settings.denoise : ""],
       ["Inpaint", inpaint?.strength ?? ""],
-      ["Seed", settings.seed],
+      ["Seed", settings.seed === 0 ? "0" : settings.seed],
       ["Count", !video && Number(settings.count) > 1 ? settings.count : ""],
       ["Resolution", settings.resolution || settings.resolutionTier],
       ["Quality", titleCase(String(settings.quality || ""))],
@@ -220,14 +297,14 @@ function generationDetails(
   };
 }
 
-function useGenerationDetails(item: MediaItem, size?: number | null) {
+function useGenerationDetails(item: MediaItem, size?: number | null, source?: MediaItem) {
   const { profiles } = useGenerationActions();
   const info = useQuery(loraInfoQuery);
-  return generationDetails(item, {
-    profiles,
-    size,
-    loraTitle: (file) => info.data?.loras[file]?.title || fileStem(file),
-  });
+  const loraTitle = (file: string) => info.data?.loras[file]?.title || fileStem(file);
+  return {
+    ...generationDetails(item, { profiles, size, loraTitle }),
+    changes: source ? lineageChanges(source, item, profiles, loraTitle) : [],
+  };
 }
 
 const referenceText = ({ role, strength }: RanReference) =>
@@ -689,13 +766,28 @@ export function MediaDetails({
   const source = related.source ?? parent.data?.item;
   const url = item.status === "done" ? mediaSource(item).url : "";
   const size = useMediaSize(url);
-  const details = useGenerationDetails(item, url && size.isPending ? null : size.data);
-  const context = item.resultSet?.context;
+  const details = useGenerationDetails(item, url && size.isPending ? null : size.data, source);
+  const set = item.resultSet;
+  const context = set?.context;
   const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
   // Where it came from, what it is part of and what was made from it, A–Z.
   const lineage = (
     [
-      ["From", source && <RelatedLinks key="from" items={[source]} open={open} />],
+      [
+        "From",
+        source && (
+          <Stack gap={4} key="from">
+            <RelatedLinks items={[source]} open={open} />
+            {details.changes.length > 0 && (
+              <Text component="ul" size="xs" c="dimmed" m={0} ps="md">
+                {details.changes.map((change) => (
+                  <li key={change}>{change}</li>
+                ))}
+              </Text>
+            )}
+          </Stack>
+        ),
+      ],
       [
         "Source",
         item.source && (
@@ -709,10 +801,21 @@ export function MediaDetails({
         comparison ? "Comparison" : "Set",
         comparison ? (
           <Anchor key="set" component={Link} to={`/compare/${comparison}`} size="sm">
-            {item.resultSet?.title || "Open Comparison"}
+            {set?.title || "Open Comparison"}
           </Anchor>
         ) : (
-          item.resultSet?.title
+          set?.id &&
+          set.title && (
+            <Anchor
+              key="set"
+              component={Link}
+              to={galleryPath(item.type)}
+              state={{ set: set.id } satisfies GalleryState}
+              size="sm"
+            >
+              {set.title}
+            </Anchor>
+          )
         ),
       ],
       [

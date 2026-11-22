@@ -230,7 +230,7 @@ export function generationSettings(body) {
           scheduler: body.scheduler || "",
         }
       : {}),
-    seed: body.seed || "Random",
+    seed: body.seed === 0 ? 0 : body.seed || "Random",
     ...(body.seedRandom ? { seedRandom: true } : {}),
     // An imported workflow's model is the workflow; this is the file it loaded.
     ...(body.modelName && String(body.model || "").startsWith("custom:")
@@ -275,7 +275,7 @@ export function generationSettings(body) {
           ...keptTriggers(item.triggers),
         }))
     : [];
-  if (loras.length) settings.loras = loras;
+  settings.loras = loras;
   if (body.kind === "image") {
     settings.count = Number(body.count || 1);
     if (hasReferenceImage(body) && !isRadianceWorker(workerById(body.comfyBackend)))
