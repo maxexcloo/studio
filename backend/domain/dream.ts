@@ -646,13 +646,13 @@ const motionInstruction = (spicy: boolean) =>
 const kindOf = (value: { kind?: unknown; type?: unknown }): Kind =>
   value.kind === "video" || value.type === "video" ? "video" : "image";
 const normalised = (prompt: string) => prompt.toLowerCase().replace(/\s+/g, " ").trim();
+const phraseWords = (text: string) =>
+  normalised(text.normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " "));
 
 /** Keep evidence only where the finished prompt names and describes the subject. */
 function quotedCards(value: unknown, prompt: string) {
   if (!value || typeof value !== "object") return;
-  const words = (text: string) =>
-    normalised(text.normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " "));
-  const source = ` ${words(prompt)} `;
+  const source = ` ${phraseWords(prompt)} `;
   const context: ResultContext = {};
   for (const { name: kind } of Object.values(cardKinds)) {
     const offered = (value as Record<string, unknown>)[kind];
@@ -660,8 +660,8 @@ function quotedCards(value: unknown, prompt: string) {
     const card = offered as Record<string, unknown>;
     const name = clean(card.name, maxCardName + 1);
     const description = clean(card.description, maxCardDescription + 1);
-    const label = words(name);
-    const detail = words(description);
+    const label = phraseWords(name);
+    const detail = phraseWords(description);
     if (
       label &&
       detail.split(" ").length >= 3 &&
@@ -676,18 +676,60 @@ function quotedCards(value: unknown, prompt: string) {
   return Object.keys(context).length ? context : undefined;
 }
 
-function ideaMotifs(value: unknown) {
-  return Array.isArray(value)
-    ? [...new Set(value.map((motif) => normalised(clean(motif, 48))).filter(Boolean))].slice(0, 5)
+const motifAliases = [
+  [
+    "laundry",
+    /\b(?:laundry|laundromats?|launderettes?|washing machines?|clotheslines?|wash(?:ing|es) clothes)\b/i,
+  ],
+  [
+    "smoking",
+    /\b(?:smoking|cigarettes?|cigars?|ashtrays?|tobacco pipes?|smok(?:e[sd]?|ing) (?:an? |the )?(?:joint|hookah))\b/i,
+  ],
+] as const;
+
+function promptMotifs(prompt: string) {
+  return motifAliases.filter(([, pattern]) => pattern.test(prompt)).map(([motif]) => motif);
+}
+
+function ideaMotifs(value: unknown, prompt = "") {
+  const labels = Array.isArray(value)
+    ? value
+        .slice(0, 5)
+        .map((motif) => phraseWords(clean(motif, 48)))
+        .filter(Boolean)
     : [];
+  return [
+    ...new Set([
+      ...promptMotifs(prompt),
+      ...labels.map((label) => promptMotifs(label)[0] ?? label),
+    ]),
+  ].slice(0, 5);
 }
 
 function recurringMotifs(history: string[][]) {
   const counts = new Map<string, number>();
-  for (const idea of history.slice(0, motifWindow))
-    for (const motif of idea) counts.set(motif, (counts.get(motif) || 0) + 1);
+  for (const idea of history)
+    for (const motif of ideaMotifs(idea)) counts.set(motif, (counts.get(motif) || 0) + 1);
   return [...counts].filter(([, count]) => count >= motifFrequency).map(([motif]) => motif);
 }
+
+function cooledMotifs({ motifs = [], recent }: DreamRecord, fixed = "") {
+  const required = new Set<string>(promptMotifs(fixed));
+  const words = ` ${phraseWords(fixed)} `;
+  return [
+    ...new Set([
+      ...recurringMotifs(motifs.slice(0, motifWindow)),
+      ...recurringMotifs(recent.map(promptMotifs)),
+    ]),
+  ].filter((motif) => !required.has(motif) && !words.includes(` ${motif} `));
+}
+
+function repeatedMotif(prompt: string, cooling: string[], motifs: string[] = promptMotifs(prompt)) {
+  if (!cooling.length) return;
+  const words = ` ${phraseWords(prompt)} `;
+  return cooling.find((motif) => motifs.includes(motif) || words.includes(` ${motif} `));
+}
+
 const clean = (value: unknown, limit: number) =>
   String(typeof value === "string" ? value : "")
     .replace(/\s+/g, " ")
@@ -1465,6 +1507,7 @@ export function createDream(options: {
     });
     if (strong.length < 3) return null;
     const recent = cooled(ownerId, record);
+    const motifs = cooledMotifs(record, options.taste.read(ownerId).rules.join("\n"));
     for (const item of strong) {
       if (repeats(item, recent)) continue;
       const group = [item];
@@ -1475,7 +1518,7 @@ export function createDream(options: {
       }
       if (group.length < 3) continue;
       const seed = seedOf(ownerId, item, profiles);
-      if (seed) return seed;
+      if (seed && !repeatedMotif(seed.prompt, motifs)) return seed;
     }
     return null;
   }
@@ -1747,7 +1790,8 @@ export function createDream(options: {
       : [];
     // Rechecked here: the account may have lost Uncensored Models since the job was queued.
     const spicy = (job.input.writing as DreamWriting).spicy && access.uncensored;
-    const { recent, subjects = [], anchors = [], motifs = [] } = read(ownerId);
+    const record = read(ownerId);
+    const { recent, subjects = [], anchors = [] } = record;
     // The learnt summary is a look: only More Like This follows it, so other ideas don't converge.
     // Rules are limits the person set, kept by every idea; a reword only rephrases a kept one.
     const { summary, rules } = options.taste.read(ownerId);
@@ -1772,10 +1816,11 @@ export function createDream(options: {
     let messages: { role: "system" | "user"; content: string }[];
     const noveltyPrompts = [...recent];
     const newConcept = media === "image" && !like && !seed && !series && !reword;
-    const fixed = normalised([...brief.map(([, value]) => value), ...rules].join("\n"));
-    const cooling = newConcept
-      ? recurringMotifs(motifs).filter((motif) => !fixed.includes(motif))
-      : [];
+    const fixed = [
+      ...brief.filter(([label]) => label !== "Avoid").map(([, value]) => value),
+      ...rules,
+    ].join("\n");
+    const cooling = newConcept ? cooledMotifs(record, fixed) : [];
     const conceptReply = `Reply with JSON only: {${replyShape}, "motifs": ["short labels for optional settings, props, actions and styles"]}.`;
     let drawnAnchors: string[] = [];
     // A series' results so far, so this one is a new moment.
@@ -1975,7 +2020,7 @@ export function createDream(options: {
       messages[0].content +=
         '\nAfter writing the prompt, you may add a "cardContext" object to the JSON with "character", "outfit" and "scene" entries only for named subjects. Each entry has "name" and "description", both exact phrases from the prompt. Use a person\'s proper name and lasting looks, a named outfit and its garments, or a named place and its surroundings. Leave out any entry without both phrases. Keep the prompt as written.';
     /** Why a reply can't be used, or "" when it can. */
-    const problem = (prompt: string, title: string, motifs: string[]) => {
+    const problem = (prompt: string, title: string, motifs: string[], cooling: string[]) => {
       if (!prompt) return "Your reply had no usable prompt.";
       const minor = options.minorAge(prompt);
       if (minor)
@@ -1988,7 +2033,7 @@ export function createDream(options: {
         return normalised(prompt) === normalised(reword || seed || like!)
           ? "You repeated the prompt."
           : "";
-      const repeat = motifs.find((motif) => cooling.includes(motif));
+      const repeat = repeatedMotif(prompt, cooling, motifs);
       if (repeat) return `The optional motif "${repeat}" has appeared in several recent ideas.`;
       // Compared as remembered: shortened, as each recent prompt is.
       const head = clean(prompt, recentPromptCharacters);
@@ -2028,11 +2073,16 @@ export function createDream(options: {
       }
       const prompt = clean(reply.prompt, maxPromptCharacters);
       const title = replyTitle(reply.title);
-      const chosenMotifs = newConcept ? ideaMotifs(reply.motifs) : [];
-      const wrong = problem(prompt, title, chosenMotifs);
+      const chosenMotifs = newConcept ? ideaMotifs(reply.motifs, prompt) : [];
+      const latest = !reword && !series ? read(ownerId) : undefined;
+      const wrong = problem(
+        prompt,
+        title,
+        chosenMotifs,
+        newConcept && latest ? cooledMotifs(latest, fixed) : [],
+      );
       if (!wrong) {
-        if (!reword && !series) {
-          const latest = read(ownerId);
+        if (latest) {
           if (drawnAnchors.length)
             latest.anchors = [
               ...drawnAnchors,
@@ -2587,10 +2637,12 @@ export function createDream(options: {
   async function pairBase(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const used = new Set(record.compared);
     const recent = cooled(ownerId, record);
+    const motifs = cooledMotifs(record, options.taste.read(ownerId).rules.join("\n"));
     const [base] = (await drawSeeds(ownerId, record, profiles)).filter(
-      ({ item, input }) =>
+      ({ item, input, prompt }) =>
         !used.has(String(item.id)) &&
         !repeats(item, recent) &&
+        !repeatedMotif(prompt, motifs) &&
         !(Array.isArray(input.referenceAssets) && input.referenceAssets.length),
     );
     return base ?? null;

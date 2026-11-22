@@ -11,7 +11,12 @@ import express from "express";
 import type { CardKind, Character, ResultContext } from "../../shared/characters.ts";
 import { type DreamSettings, dreamDefaults } from "../../shared/dream.ts";
 import { dreamVideoProfile } from "../animate-profile.js";
-import { closeRuntimeDatabase, openDatabase, readRuntimeDocument } from "../persistence/runtime.ts";
+import {
+  closeRuntimeDatabase,
+  openDatabase,
+  readRuntimeDocument,
+  writeRuntimeDocument,
+} from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import { registerDreamRoutes } from "./dream-routes.ts";
 import {
@@ -878,7 +883,6 @@ test("Fresh concepts cool down repeated optional motifs across otherwise differe
     { prompt: "A photographer frames a paper lantern from a ferry", motifs: ["paper lantern"] },
     {
       prompt: "She sketches an owl on a paper lantern among pine trees",
-      motifs: ["paper lantern"],
     },
     { prompt: "A diver watches a seal circle a kelp forest", motifs: ["kelp forest"] },
   ];
@@ -894,6 +898,39 @@ test("Fresh concepts cool down repeated optional motifs across otherwise differe
     /Recently repeated optional motifs to leave out this time: paper lantern/,
   );
   assert.match(state.calls[3].user, /The optional motif "paper lantern" has appeared/);
+});
+
+test("Motif cooldowns recognise unlabelled laundry and smoking across different scenes", async (t) => {
+  const { dataDir, dream, state, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  writeRuntimeDocument(dataDir, "dream:alice", {
+    ...dream.read("alice"),
+    recent: [
+      "Two masked detectives meet after hours in a closed laundromat. A cigarette burns.",
+      "A sailor holding a cigar watches the wind tangle shirts on a mountain clothesline.",
+    ],
+  });
+  const first = "A diver watches a seal circle a kelp forest";
+  const second = "An astronomer watches a snowstorm from a stone observatory";
+  state.replies = [
+    {
+      prompt: "A childproof washing machine hums in the corner of a spaceship",
+      motifs: ["spaceship"],
+    },
+    { prompt: first },
+    { prompt: "A glass ashtray sits on the bank counter beneath a security monitor" },
+    { prompt: second },
+  ];
+  for (const prompt of [first, second]) {
+    state.rolls = [99];
+    assert.equal((await dreamOnce())?.input.prompt, prompt);
+  }
+  assert.match(
+    state.calls[0].user,
+    /Recently repeated optional motifs to leave out this time: laundry, smoking/,
+  );
+  assert.match(state.calls[1].user, /The optional motif "laundry" has appeared/);
+  assert.match(state.calls[3].user, /The optional motif "smoking" has appeared/);
 });
 
 test("More Like This permits close iterations while keeping species and source identity", async (t) => {
