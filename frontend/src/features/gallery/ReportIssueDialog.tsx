@@ -113,7 +113,7 @@ export function ReportIssueDialog({
                     (finding?.status === "issue"
                       ? finding.issue
                       : finding?.status === "clear"
-                        ? "The model didn’t find a clear visual issue."
+                        ? "The model found no clear visual issue."
                         : finding?.reason)}
                 </Text>
               )}
