@@ -5,7 +5,7 @@ import { embedUpscale, faceDetailSource, normalizeQuality, upscaleStatus } from 
 
 /**
  * An explicitly requested Smart upscale as part of a run. The upscale goes
- * into the run's own ComfyUI graph (upscale.js embedUpscale), so a run and its
+ * into the run's own ComfyUI graph, so a run and its
  * upscale are one job: nothing queued behind it starts in between, and its
  * tile shows one picture, never an original and an upscale to flip between.
  */

@@ -727,7 +727,7 @@ const checkpointDownloads = {
   ],
 };
 
-// The Impact Pack's face detector for Face Detail (upscale.js), in Subpack's `ultralytics_bbox`
+// The Impact Pack's face detector for Face Detail, in Subpack's `ultralytics_bbox`
 // folder (models/ultralytics/bbox). Ultralytics loads only pickled `.pt` weights, so the worker
 // accepts that one type in this one folder; the pinned hash is what makes it the reviewed file.
 const detectorDownloads = {
