@@ -1,15 +1,11 @@
-import "./fixtures/sample-profiles.js";
+import "../fixtures/sample-profiles.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const {
-  faceDetailSource,
-  modelFiles,
-  noteWorkerUpscale,
-  upscaleGraph,
-  upscalePlan,
-  upscaleStatus,
-} = await import("./upscale.js");
+import { modelFiles } from "./weights.js";
+
+const { faceDetailSource, noteWorkerUpscale, upscaleGraph, upscalePlan, upscaleStatus } =
+  await import("./graph.js");
 
 // Shaped like the real /object_info: V3 combos, and offload_device is an optional input.
 const combo = (values) => ["COMBO", { options: values }];
@@ -121,9 +117,11 @@ test("the graph uses the machine's own device and skips block swap without an of
 });
 
 test("the terminal install clones the worker's pinned pack and installs its requirements", async () => {
-  const { packInstallPlan } = await import("./node-install.js");
-  const { nodePack } = await import("./node-packs.js");
-  const { default: sources } = await import("../worker/sources.json", { with: { type: "json" } });
+  const { packInstallPlan } = await import("../node-install.js");
+  const { nodePack } = await import("../node-packs.js");
+  const { default: sources } = await import("../../worker/sources.json", {
+    with: { type: "json" },
+  });
   const { revision } = sources.find(({ path }) => path.endsWith("/ComfyUI-SeedVR2_VideoUpscaler"));
   assert.equal(
     packInstallPlan(nodePack("seedvr2")).commands[0].command,

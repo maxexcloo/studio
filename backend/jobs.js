@@ -19,7 +19,6 @@ import {
 import { warmNewOutputs } from "./media-warmup.js";
 import { nextProgress } from "./progress-phase.js";
 import { runRadianceJob } from "./radiance-jobs.js";
-import { missedUpscaleState, pairRunOutputs, runUpscaleState } from "./run-upscale.js";
 import {
   generationEstimate,
   generationWarm,
@@ -27,8 +26,9 @@ import {
   recordUpscale,
   upscaleEstimate,
 } from "./timings.js";
-import { upscaleLeftMs, upscaleWork } from "./upscale-timing.js";
-import { noteWorkerUpscale } from "./upscale.js";
+import { missedUpscaleState, pairRunOutputs, runUpscaleState } from "./upscale/combined-run.js";
+import { noteWorkerUpscale } from "./upscale/graph.js";
+import { upscaleLeftMs, upscaleWork } from "./upscale/timing.js";
 import { defaultWorkerId, isRadianceWorker, workerById } from "./workers.js";
 import { markWorkflowUsed } from "./workflow-catalogue.js";
 
@@ -155,7 +155,7 @@ const runTimings = new Map();
  * How long is left of a job, or null when there is nothing honest to say: a
  * generation by its live steps and learned estimate, plus its Smart upscale
  * when it has one; an upscale by what SeedVR2 has taken here before
- * (upscale-timing.js). Once the upscale is running, its own clock is all that is left.
+ * (upscale/timing.js). Once the upscale is running, its own clock is all that is left.
  */
 function leftMsFor(timing, now = Date.now()) {
   const up = timing.upscale || null;
@@ -500,7 +500,7 @@ function showReconnecting(id, run, on) {
 /**
  * Runs a generation on its worker, `body.comfyBackend`.
  * `prepare` may put more into the run's graph before ComfyUI gets it: Smart
- * upscale (run-upscale.js) returns the graph with its upscale and which save
+ * upscale (upscale/combined-run.js) returns the graph with its upscale and which save
  * node each upscale belongs to, or `{ skipped }` saying why there is none.
  */
 async function runJob(id, body, { prepare = null, store } = {}) {
@@ -522,7 +522,7 @@ async function runJob(id, body, { prepare = null, store } = {}) {
     const pairs = embed?.pairs || [];
     timing.timer = new RunTimer(prompt, { endNodes: pairs.map((pair) => pair.base) });
     if (embed) {
-      // Its upscale is part of the run's time: learned from every SeedVR2 upscale here (upscale-timing.js).
+      // Its upscale is part of the run's time: learned from every SeedVR2 upscale here (upscale/timing.js).
       const work = upscaleWork({
         width: embed.plan?.estimatedWidth,
         height: embed.plan?.estimatedHeight,

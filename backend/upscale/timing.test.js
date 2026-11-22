@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { addUpscale, estimateUpscale, upscaleLeftMs, upscaleWork } from "./upscale-timing.js";
+import { addUpscale, estimateUpscale, upscaleLeftMs, upscaleWork } from "./timing.js";
 
 const sample = (history, work, ms, extra = {}) =>
   addUpscale(history, { quality: "balanced", model: "seedvr2_7b.safetensors", work, ms, ...extra });

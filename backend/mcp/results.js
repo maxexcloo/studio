@@ -2,15 +2,8 @@
 import { z } from "zod";
 
 import { maxJobsPerCall, maxSplitJobs } from "./controls.js";
-import {
-  comparisonContext,
-  maxUploadBase64,
-  maxUploadMegabytes,
-  mcpJson,
-  mcpOutputPath,
-  readyIn,
-  uploadLinkMinutes,
-} from "./media.js";
+import { comparisonContext, mcpJson, mcpOutputPath, readyIn } from "./media.js";
+import { maxUploadBase64, maxUploadMegabytes, uploadLinkMinutes } from "./reference-uploads.js";
 
 // The status and result tools wait briefly at most: a chat waiting on a tool blocks its turn.
 const wait = z.number().int().min(0).max(20).default(0);
@@ -473,7 +466,7 @@ export function registerResultTools({
       filename: z.string().default("reference.png"),
     },
     async ({ content_base64, filename }) =>
-      mcpJson(await media.upload(owner, content_base64, filename)),
+      mcpJson(await media.uploads.fromBase64(owner, content_base64, filename)),
   );
   tool(
     server,
@@ -482,7 +475,7 @@ export function registerResultTools({
     "One-time image upload link and reference_asset_id. Search uploads first for chat attachments.",
     {},
     async () => {
-      const { url, expires, reference } = media.uploadUrl(owner);
+      const { url, expires, reference } = media.uploads.link(owner);
       return {
         content: [
           {
