@@ -30,6 +30,7 @@ function fixture(
   const calls: Message[][] = [];
   const models: string[] = [];
   const pictures: unknown[] = [];
+  const renditions: (boolean | undefined)[] = [];
   let clock = 0;
   const model: TasteWriter<ReturnType<typeof userContent>> = {
     settings: () => ({}),
@@ -88,8 +89,9 @@ function fixture(
               key.startsWith(`${owner}:`) && value.jobId === jobId && value.id === itemId,
           )?.[1]
         : items[`${owner}:${jobId}`],
-    image: async (item) => {
+    image: async (item, upscaled) => {
       pictures.push(item);
+      renditions.push(upscaled);
       return options.image ? { mime: "image/jpeg", data: "AAAA" } : null;
     },
     save: (item, nextSteps) => Object.assign(item, { nextSteps }),
@@ -113,6 +115,7 @@ function fixture(
     calls,
     models,
     pictures,
+    renditions,
     items,
     suggestions,
     advance: (ms: number) => (clock += ms),
@@ -163,9 +166,9 @@ async function serve(t: TestContext, suggestions: ReturnType<typeof fixture>["su
     server.closeAllConnections();
     server.close();
   });
-  return async (user: string, body: unknown) => {
+  return async (user: string, body: unknown, path = "") => {
     const response = await fetch(
-      `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/suggestions`,
+      `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/suggestions${path}`,
       {
         method: "POST",
         headers: { "content-type": "application/json", "x-user": user },
@@ -875,4 +878,36 @@ test("the route serves only the caller's own results and rejects unusable reques
   assert.equal((await request("bob", change)).status, 404);
   assert.equal((await request("alice", { ...change, request: " " })).status, 400);
   assert.equal((await request("alice", { ...change, actions: ["teleport"] })).status, 400);
+});
+
+test("Report Issue inspects only the selected owned image and distinguishes clear from unavailable", async (t) => {
+  let reply = '{"issue":"Duplicated railing on the foreground boat"}';
+  const { suggestions, calls, pictures, renditions, items, models } = fixture({
+    image: true,
+    picked: "user-vision",
+    reply: () => reply,
+  });
+  const request = await serve(t, suggestions);
+  const image = { jobId: "job-a", itemId: "result-a", upscaled: true };
+  assert.equal((await request("bob", image, "/inspect")).status, 404);
+  assert.equal((await request("alice", { ...image, itemId: "sibling" }, "/inspect")).status, 404);
+  assert.equal(calls.length, 0);
+  assert.deepEqual((await request("alice", image, "/inspect")).body, {
+    status: "issue",
+    issue: "Duplicated railing on the foreground boat",
+  });
+  assert.deepEqual(pictures, [items["alice:job-a"]]);
+  assert.deepEqual(renditions, [true]);
+  assert.deepEqual(models, ["user-vision"]);
+  assert.equal(calls[0][1].images, 1);
+  assert.match(calls[0][1].content, /A harbour at dawn/);
+  assert.equal(items["alice:job-a"].nextSteps, undefined);
+
+  reply = '{"issue":""}';
+  assert.deepEqual(await suggestions.inspect("alice", image), { status: "clear" });
+  reply = "invalid reply";
+  assert.equal((await suggestions.inspect("alice", image)).status, "unavailable");
+  const noVision = fixture();
+  assert.equal((await noVision.suggestions.inspect("alice", image)).status, "unavailable");
+  assert.equal(noVision.calls.length, 0);
 });

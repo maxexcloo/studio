@@ -308,16 +308,30 @@ test("Report's reasons fix the image as a new version and dislike the original",
   await expect.poll(() => state.gallery.find((item) => item.id === "hub")?.rating).toBe("disliked");
 });
 
-test("Report's Custom… fixes what its chips and words name", async ({ page }) => {
+test("Report can inspect the displayed image before sending a reviewed fix", async ({ page }) => {
   const asked: any[] = [];
   const { state } = await seedFix(page, asked);
+  const inspected: unknown[] = [];
+  await page.route("**/api/suggestions/inspect", (route) => {
+    inspected.push(route.request().postDataJSON());
+    return route.fulfill({ json: { status: "issue", issue: "six toes" } });
+  });
   await viewerAction(page, "Report", "Custom…");
   const report = page.getByRole("dialog", { name: "Report Issue", exact: true });
   const fix = report.getByRole("button", { name: "Fix & Recreate", exact: true });
   await expect(fix).toBeDisabled();
   await report.getByText("Hands", { exact: true }).click();
   await expect(report.getByRole("checkbox", { name: "Hands", exact: true })).toBeChecked();
-  await report.getByRole("textbox", { name: "Details", exact: true }).fill("six toes");
+  await report.getByRole("button", { name: "Inspect Image", exact: true }).click();
+  await expect(report.getByRole("status")).toHaveText("six toes");
+  expect(inspected).toEqual([{ jobId: "job-hub", itemId: "hub", upscaled: false }]);
+  expect(state.jobs).toHaveLength(1);
+  expect(state.gallery.find((item) => item.id === "hub")?.rating).toBeUndefined();
+  await expect(fix).toBeEnabled();
+  await report.getByRole("button", { name: "Add to Details", exact: true }).click();
+  await expect(report.getByRole("textbox", { name: "Details", exact: true })).toHaveValue(
+    "six toes",
+  );
   await fix.click();
   await expect(report).toBeHidden();
   expect(asked).toEqual([

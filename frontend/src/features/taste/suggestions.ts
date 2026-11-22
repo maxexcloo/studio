@@ -3,6 +3,7 @@ import { queryOptions } from "@tanstack/react-query";
 import type {
   Change,
   ChangeAction,
+  ImageInspection,
   NextStep,
   PromptIdea,
   Suggestions,
@@ -96,6 +97,9 @@ export const askChange = (
     itemId,
     profileId,
   });
+
+export const inspectImage = (jobId: string, itemId: string, upscaled: boolean) =>
+  post<ImageInspection>("/api/suggestions/inspect", { jobId, itemId, upscaled });
 
 /** The same for the composer's draft prompt, which has no result yet. */
 export const askDraftChange = (

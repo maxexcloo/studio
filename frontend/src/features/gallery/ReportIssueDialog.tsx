@@ -1,11 +1,13 @@
-import { Alert, Button, Chip, Group, Modal, Stack } from "@mantine/core";
+import { Alert, Button, Chip, Group, Modal, Stack, Text } from "@mantine/core";
 import { useState } from "react";
 
+import type { ImageInspection } from "../../../../shared/suggestions";
 import type { MediaItem } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { askChange } from "../taste/suggestions";
+import { askChange, inspectImage } from "../taste/suggestions";
+import { mediaSource } from "./mediaSource";
 import { useItemMutation } from "./useItemMutation";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { showDisliked, useRatings } from "./useMediaRating";
@@ -68,6 +70,12 @@ export function ReportIssueDialog({
   const fix = useReportIssue(item, iterate, true);
   const [picked, setPicked] = useState<string[]>([]);
   const [details, setDetails] = useState("");
+  const [finding, setFinding] = useState<ImageInspection>();
+  const upscaled = mediaSource(item).upscaled;
+  const inspect = useItemMutation(item.id, `inspect:${upscaled}`, {
+    meta: { inlineError: true },
+    mutationFn: () => inspectImage(item.jobId!, item.id, upscaled),
+  });
   const issue = [picked.join(", "), details.trim()].filter(Boolean).join(": ");
   return (
     <Modal opened onClose={onClose} title="Report Issue" size="sm" fullScreen={phone}>
@@ -88,6 +96,41 @@ export function ReportIssueDialog({
               ))}
             </Group>
           </Chip.Group>
+          {item.type === "image" && item.jobId && (
+            <Stack gap="xs" align="start">
+              <Button
+                variant="default"
+                size="compact-sm"
+                loading={inspect.isPending}
+                disabled={fix.isPending}
+                onClick={() => inspect.mutate(undefined, { onSuccess: setFinding })}
+              >
+                Inspect Image
+              </Button>
+              {!inspect.isPending && (inspect.error || finding) && (
+                <Text size="sm" role="status">
+                  {inspect.error?.message ||
+                    (finding?.status === "issue"
+                      ? finding.issue
+                      : finding?.status === "clear"
+                        ? "The model didn’t find a clear visual issue."
+                        : finding?.reason)}
+                </Text>
+              )}
+              {!inspect.isPending && !inspect.error && finding?.status === "issue" && (
+                <Button
+                  variant="subtle"
+                  size="compact-sm"
+                  disabled={details.includes(finding.issue)}
+                  onClick={() =>
+                    setDetails((value) => [value.trim(), finding.issue].filter(Boolean).join("\n"))
+                  }
+                >
+                  Add to Details
+                </Button>
+              )}
+            </Stack>
+          )}
           <TextBox
             label="Details"
             placeholder="What's wrong, like “six fingers on the left hand”"
