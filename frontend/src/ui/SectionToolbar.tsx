@@ -45,18 +45,19 @@ export function SectionHeader({ heading, children }: { heading: ReactNode; child
 export function ToolbarAction({
   label,
   icon: Icon,
+  iconOnly,
   href,
   rightSection,
   variant,
   ...props
-}: { label: string; icon: LucideIcon; href?: string } & Omit<
+}: { label: string; icon: LucideIcon; iconOnly?: boolean; href?: string } & Omit<
   ComponentPropsWithRef<typeof Button<"button">>,
   "children"
 >) {
   const phone = usePhone();
   const renderLink =
     href && ((props: ComponentPropsWithRef<"a">) => <a {...props} href={href} download />);
-  if (phone)
+  if (phone || iconOnly)
     return (
       <Tooltip label={label}>
         <ActionIcon

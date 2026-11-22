@@ -12,6 +12,7 @@ import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { runtimeQueueQuery, runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { AboutStudio } from "./AboutStudio";
 import { GroupsAdmin, UsersAdmin } from "./AccountAdmin";
+import { DreamAdministration } from "./DreamAdministration";
 import { GenerationSettings } from "./GenerationSettings";
 import { MaintenanceSettings } from "./MaintenanceSettings";
 import { OwnAccount } from "./OwnAccount";
@@ -97,6 +98,7 @@ export function SettingsPage() {
           preferences: <Preferences />,
           "where-work-runs": <WhereWorkRuns />,
           dream: <DreamPreferences />,
+          "dream-policy": <DreamAdministration />,
           generation: <GenerationSettings />,
           groups: (heading) => <GroupsAdmin heading={heading} />,
           maintenance: <MaintenanceSettings onOpenUnfinished={unfinished.open} />,

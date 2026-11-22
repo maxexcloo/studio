@@ -1,4 +1,4 @@
-import { dreamOverrideKeys } from "../shared/dream.ts";
+import { dreamImageSwitchSetting, dreamOverrideKeys } from "../shared/dream.ts";
 import { defaultTextProfileKey } from "./account-preferences.js";
 import { dataDir } from "./data-dir.js";
 import { mediaDefaultProfileKeys } from "./generation-defaults.js";
@@ -95,6 +95,7 @@ export const defaultProfileKeys = [
 ];
 const known = new Set([
   ...defaultProfileKeys,
+  dreamImageSwitchSetting.key,
   ...Object.values(dreamOverrideKeys),
   ...catalogueFlags.map((item) => item.key),
 ]);
@@ -164,13 +165,20 @@ export function dreamOverrides() {
   );
 }
 
-/** Each override with its source; `null` leaves the setting to each account. */
-export function describeDreamOverrides() {
+export function dreamImageSwitchMinutes() {
+  return Number(process.env[dreamImageSwitchSetting.key] || dreamImageSwitchSetting.defaultValue);
+}
+
+export function describeDreamPolicy() {
   const overrides = dreamOverrides();
-  return Object.fromEntries(
-    Object.entries(dreamOverrideKeys).map(([name, key]) => [
-      name,
-      { key, value: overrides[name] ?? null, ...settingSource(key) },
-    ]),
-  );
+  const { key } = dreamImageSwitchSetting;
+  return {
+    ...Object.fromEntries(
+      Object.entries(dreamOverrideKeys).map(([name, key]) => [
+        name,
+        { key, value: overrides[name] ?? null, ...settingSource(key) },
+      ]),
+    ),
+    imageSwitchMinutes: { key, value: dreamImageSwitchMinutes(), ...settingSource(key) },
+  };
 }

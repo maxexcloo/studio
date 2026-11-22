@@ -63,7 +63,7 @@ import { logEvent, logWarning } from "./crash-log.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { appVersion, dataDir } from "./data-dir.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
-import { dreamOverrides, flagEnabled } from "./deployment-settings.js";
+import { dreamImageSwitchMinutes, dreamOverrides, flagEnabled } from "./deployment-settings.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
@@ -767,7 +767,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
     if (items.some((item) => item.dream)) dream.finished();
   },
   directCloud,
-  dreamImageSwitchMinutes: (ownerId) => dream.imageSwitchMinutes(ownerId),
+  dreamImageSwitchMinutes,
   dreamIdleWait: (job) => dream.idleWaitForJob(job),
   generationRoutes,
   promptStage,

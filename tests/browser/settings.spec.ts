@@ -1,14 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  dreamOverridesFixture,
-  fixtures,
-  image,
-  openTheme,
-  section,
-  signIn,
-  stamp,
-} from "./fixtures";
+import { dreamPolicyFixture, fixtures, image, openTheme, section, signIn, stamp } from "./fixtures";
 
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({
   page,
@@ -34,6 +26,7 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Dream",
     "Preferences",
     "Where Work Runs",
+    "Dream Policy",
     "Generation",
     "Groups",
     "Maintenance",
@@ -734,7 +727,7 @@ test("Workers keep a stopped workload quiet and stop a running change on request
   expect(cancelled).toEqual(["/api/runtime/operations/stuck/cancel"]);
 });
 
-test("Workers benchmark a running local text model and list each run's figures", async ({
+test("Workers select local text models to benchmark and list each run's figures", async ({
   page,
 }, testInfo) => {
   await fixtures(page);
@@ -806,15 +799,15 @@ test("Workers benchmark a running local text model and list each run's figures",
     if (route.request().method() === "POST") {
       const choice = route.request().postDataJSON();
       started.push(choice);
-      const run = {
+      const batch = choice.models.map((model: string, index: number) => ({
         ...earlier,
-        model: choice.model,
-        id: "next",
-        status: "running",
+        model,
+        id: index === 0 ? "next" : `waiting-${index}`,
+        status: index === 0 ? "running" : "queued",
         summary: undefined,
-      };
-      runs = [run, ...runs];
-      return route.fulfill({ status: 202, json: run });
+      }));
+      runs = [...batch, ...runs];
+      return route.fulfill({ status: 202, json: batch });
     }
     return route.fulfill({ json: { configured: true, runs } });
   });
@@ -853,13 +846,19 @@ test("Workers benchmark a running local text model and list each run's figures",
   const dialog = page.getByRole("dialog", { name: "Benchmark Gemma", exact: true });
   const benchmark = dialog.getByRole("button", { name: "Benchmark", exact: true });
   await expect(benchmark).toBeDisabled();
-  await dialog.getByRole("combobox", { name: "Text Model", exact: true }).click();
+  const choose = dialog.getByRole("combobox", { name: "Text Models", exact: true });
+  await choose.click();
   await dialog.getByRole("option", { name: "Qwen 3.8 27B", exact: true }).click();
+  await expect(benchmark).toBeEnabled();
+  await choose.press("Escape");
+  await expect(choose).toHaveAttribute("aria-expanded", "false");
+  await dialog.getByRole("button", { name: "Select All", exact: true }).click();
   await benchmark.click();
   await expect(dialog).toBeHidden();
-  expect(started).toEqual([{ workload: "gemma", model: "qwen3.8-27b" }]);
+  expect(started).toEqual([{ workload: "gemma", models: ["gemma-4-31b", "qwen3.8-27b"] }]);
   await expect(results.getByRole("row", { name: "Gemma" }).first()).toContainText("Running");
-  await expect(results.getByRole("row", { name: "Gemma" }).first()).toContainText("qwen3.8-27b");
+  await expect(results.getByRole("row", { name: "Gemma" }).nth(1)).toContainText("Queued");
+  await expect(results.getByRole("row", { name: "Gemma" }).nth(1)).toContainText("qwen3.8-27b");
   // One benchmark at a time.
   await expect(await menu("Gemma")).toBeDisabled();
   await closeMenu();
@@ -946,7 +945,7 @@ test("Settings › Maintenance switches follow at once and settle back after a f
           textModels: [],
           profiles: [],
         },
-        dream: dreamOverridesFixture(),
+        dream: dreamPolicyFixture(),
         catalogue: [
           {
             key: "STUDIO_GALLERY_CAPTIONS",
@@ -973,12 +972,15 @@ test("Settings › Maintenance switches follow at once and settle back after a f
   await expect(toggle).toBeChecked();
 });
 
-test("Settings › Generation forces a Dream setting on every account and hands it back to each account", async ({
+test("Dream Policy saves a shared queue delay and can hand an override back to each account", async ({
   page,
 }) => {
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
-  await page.goto("/settings#generation");
+  await page.goto("/settings#dream-policy");
+  const delay = page.getByRole("textbox", { name: "Image Model & LoRA Switch Delay", exact: true });
+  await delay.fill("8");
+  await delay.press("Enter");
   const images = page.getByRole("radiogroup", { name: "Dream Images", exact: true });
   const spicy = page.getByRole("radiogroup", { name: "Dream Spicy" });
   const choice = (group: typeof images, name: string) =>
@@ -988,6 +990,7 @@ test("Settings › Generation forces a Dream setting on every account and hands 
   await spicy.getByText("Off", { exact: true }).click();
   await expect(choice(images, "Cloud")).toBeChecked();
   await page.reload();
+  await expect(delay).toHaveValue("8");
   await expect(choice(images, "Cloud")).toBeChecked();
   await expect(choice(spicy, "Off")).toBeChecked();
   await expect(

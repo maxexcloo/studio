@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { dreamImageSwitchSetting } from "../shared/dream.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-deployment-settings-"));
@@ -81,11 +82,11 @@ test("Dream overrides force only what is set, off included, and deployment locks
   settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_SPICY", "0");
   settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_IMAGE_BACKEND", "cloud");
   assert.deepEqual(settings.dreamOverrides(), { spicy: false, imageBackend: "cloud" });
-  assert.equal(settings.describeDreamOverrides().imageBackend.source, "studio");
-  assert.equal(settings.describeDreamOverrides().enabled.value, null);
+  assert.equal(settings.describeDreamPolicy().imageBackend.source, "studio");
+  assert.equal(settings.describeDreamPolicy().enabled.value, null);
   process.env.STUDIO_DREAM_OVERRIDE_ENABLED = "1";
   try {
-    assert.equal(settings.describeDreamOverrides().enabled.locked, true);
+    assert.equal(settings.describeDreamPolicy().enabled.locked, true);
     assert.equal(settings.dreamOverrides().enabled, true);
     assert.throws(() => settings.saveDeploymentSetting("STUDIO_DREAM_OVERRIDE_ENABLED", "0"), {
       status: 409,
@@ -176,6 +177,22 @@ test("Generation administration validates and applies Dream overrides and the de
       value: null,
     });
     assert.equal(cleared.body.dream.videoBackend.value, null);
+
+    const switchKey = dreamImageSwitchSetting.key;
+    assert.equal(read.body.dream.imageSwitchMinutes.value, dreamImageSwitchSetting.defaultValue);
+    assert.equal(
+      (await request("POST", { key: switchKey, value: 0 }, { role: "user" })).statusCode,
+      403,
+    );
+    assert.equal((await request("POST", { key: switchKey, value: -1 })).statusCode, 400);
+    assert.equal(
+      (await request("POST", { key: switchKey, value: 0 })).body.dream.imageSwitchMinutes.value,
+      0,
+    );
+    assert.equal(settings.dreamImageSwitchMinutes(), 0);
+    assert.equal(readRuntimeDocument(temporary, "settings")[switchKey], "0");
+    await request("POST", { key: switchKey, value: dreamImageSwitchSetting.defaultValue });
+    assert.equal(readRuntimeDocument(temporary, "settings")[switchKey], undefined);
 
     const key = "STUDIO_DEFAULT_TEXT_PROFILE";
     assert.deepEqual((await request("GET")).body.defaults.textModels, [

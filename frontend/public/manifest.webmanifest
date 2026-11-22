@@ -1,7 +1,7 @@
 {
   "name": "Studio",
   "short_name": "Studio",
-  "description": "An image and video studio for ComfyUI.",
+  "description": "An image and video generation workspace.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

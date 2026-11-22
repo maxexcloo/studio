@@ -11,9 +11,8 @@ import { SearchInput } from "../../ui/SearchInput";
 import { SortMenu } from "../../ui/SortMenu";
 import { usePhone } from "../../ui/usePhone";
 import { iconChipProps } from "../generation/chip";
-import { ChipPopup } from "../generation/Picker";
+import { ChipPopup, FilterButton } from "../generation/Picker";
 import {
-  FilterButton,
   type FilterChip,
   FilterChips,
   FilterToggle,

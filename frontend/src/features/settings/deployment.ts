@@ -20,8 +20,9 @@ export interface Deployment {
     profiles: { id: string; label: string; kind: string; ready: boolean }[];
   };
   catalogue: Flag[];
-  /** Settings › Generation › Dream: each override, `null` where each account chooses. */
-  dream: { [K in DreamOverride]: Source & { key: string; value: DreamSettings[K] | null } };
+  dream: { [K in DreamOverride]: Source & { key: string; value: DreamSettings[K] | null } } & {
+    imageSwitchMinutes: Source & { key: string; value: number };
+  };
 }
 /** Values an administrator saves for everyone from Settings. */
 export const deploymentQuery = queryOptions({

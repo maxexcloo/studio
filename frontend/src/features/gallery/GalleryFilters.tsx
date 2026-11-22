@@ -1,5 +1,4 @@
 import {
-  Badge,
   Button,
   Divider,
   Group,
@@ -347,45 +346,6 @@ function ChoiceChip({
         <X size={14} />
       </Button>
     </Button.Group>
-  );
-}
-
-export function FilterButton({
-  label,
-  count,
-  opened,
-  onClick,
-  ref,
-}: {
-  label: string;
-  count: number;
-  opened: boolean;
-  onClick: () => void;
-  ref?: React.Ref<HTMLButtonElement>;
-}) {
-  const phone = usePhone();
-  return (
-    <Tooltip label={label} disabled={!phone || opened}>
-      <Button
-        {...(phone ? iconChipProps : chipProps)}
-        ref={ref}
-        aria-label={label}
-        aria-expanded={opened}
-        variant={count || opened ? "light" : "default"}
-        leftSection={phone ? undefined : <icons.filter size={15} />}
-        rightSection={phone ? undefined : <ChevronDown size={14} />}
-        pos="relative"
-        style={{ overflow: "visible" }}
-        onClick={onClick}
-      >
-        {phone ? <icons.filter size={16} /> : "Filter"}
-        {count > 0 && (
-          <Badge size="xs" circle variant="filled" pos="absolute" top={-4} right={-4} aria-hidden>
-            {count}
-          </Badge>
-        )}
-      </Button>
-    </Tooltip>
   );
 }
 

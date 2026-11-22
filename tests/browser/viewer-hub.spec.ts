@@ -177,10 +177,7 @@ test("A video's prompt field runs its edited prompt again as a video", async ({ 
   expect(state.jobs.at(-1)!.input.kind ?? "video").toBe("video");
 });
 
-test("Edit and Recreate share Custom and review each operation separately", async ({
-  page,
-  isMobile,
-}) => {
+test("Edit and Recreate share Custom and review each operation separately", async ({ page }) => {
   const asked: any[] = [];
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
@@ -208,8 +205,7 @@ test("Edit and Recreate share Custom and review each operation separately", asyn
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
   const editProfile = async (name: string) => {
     const profileMenu = page.getByRole("menuitem", { name: "Profile", exact: true });
-    if (isMobile) await profileMenu.click();
-    else await profileMenu.hover();
+    await profileMenu.click();
     const choice = page.getByRole("menuitemradio", { name, exact: true });
     await choice.click();
     await expect(choice).toBeHidden();
@@ -532,6 +528,7 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
   await viewerAction(page, "Animate");
   await expandAssistantMenu(page, "Templates");
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
+  await expect(page.getByRole("menu", { name: "Animate", exact: true })).toBeHidden();
   const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });
   const summary = dialog.getByRole("textbox", { name: "Instruction", exact: true });
   const phone = testInfo.project.use.isMobile;
@@ -561,17 +558,18 @@ test("Custom Animation keeps text tools and submission in its phone editor and c
     await expect(field).toHaveValue("The bird unfolds its wings.");
   }
   await more.click();
-  await expect(page.getByRole("menu").getByText("Suggestions", { exact: true })).toBeVisible();
+  const tools = page.getByRole("menu", { name: "AI Instruction Actions", exact: true });
+  await expect(tools.getByText("Suggestions", { exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
   await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(tools).toBeHidden();
   await expect(surface).toBeVisible();
   await expect(dialog).toBeVisible();
   await more.click();
   // Dismissing the tools by a press on the field leaves the editor and its parent intact.
   await field.click();
-  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(tools).toBeHidden();
   await expect(surface).toBeVisible();
   if (phone) {
     await field.press("Escape");
@@ -1363,10 +1361,7 @@ async function offline(page: Page) {
   );
 }
 
-test("Animate can pick a compatible profile over the saved default route", async ({
-  page,
-  isMobile,
-}) => {
+test("Animate can pick a compatible profile over the saved default route", async ({ page }) => {
   const { state, viewer } = await seed(page, {}, async (page, fixture) => {
     fixture.preferences.preferences.videos = "cloud";
     await serveProfiles(page, [...profiles, grok]);
@@ -1387,8 +1382,7 @@ test("Animate can pick a compatible profile over the saved default route", async
   });
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   const profileMenu = page.getByRole("menuitem", { name: "Profile", exact: true });
-  if (isMobile) await profileMenu.click();
-  else await profileMenu.hover();
+  await profileMenu.click();
   await expect(page.getByRole("menuitemradio", { name: "Automatic", exact: true })).toBeChecked();
   const localProfile = page.getByRole("menuitemradio", { name: "Motion Quality", exact: true });
   await localProfile.click();
@@ -1907,7 +1901,7 @@ test("A phone swipe up opens Details directly", async ({ page }, testInfo) => {
   await expect(viewer).toBeHidden();
 });
 
-test("A double tap zooms in at the tapped point and back to Fit; a click still cycles", async ({
+test("A double click or tap zooms; a single click cycles the viewer controls", async ({
   page,
 }, testInfo) => {
   const { viewer } = await seed(page);
@@ -1921,9 +1915,19 @@ test("A double tap zooms in at the tapped point and back to Fit; a click still c
   const x = box.x + box.width * 0.3;
   const y = box.y + box.height * 0.3;
   if (!testInfo.project.use.isMobile) {
-    // A mouse double-click is two clicks, each cycling the zoom.
+    const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
+    const prompt = actions.getByRole("textbox", { name: "Prompt", exact: true });
+    await prompt.click();
+    await expect(prompt).toBeFocused();
+    await page.mouse.click(x, y);
+    await expect(prompt).not.toBeFocused();
+    await expect(actions).toBeHidden();
+    await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
     await picture.dblclick();
-    await expect(zoom).toHaveAttribute("data-zoom-mode", "Actual Size");
+    await expect(zoom).toHaveAttribute("data-zoom-mode", "Custom");
+    await expect(actions).toBeHidden();
+    await picture.dblclick();
+    await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
     return;
   }
   const webkit = testInfo.project.use.browserName === "webkit";
@@ -2306,7 +2310,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     .toBeGreaterThan(fitScale);
   await page.keyboard.press("Digit0");
   await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
-  await dialog.getByRole("img", { name: "Viewer Study", exact: true }).click();
+  await dialog.getByRole("button", { name: "Zoom: Fit", exact: true }).click();
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Zoom: Fill", exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Zoom: Fill", exact: true }).click();

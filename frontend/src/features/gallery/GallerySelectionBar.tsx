@@ -201,7 +201,6 @@ export function GallerySelectionBar({
       itemAction("animate", {
         loading: animate.isPending,
         menu: assistMenu({
-          expandable: phone,
           settings: [length, ...profiles],
           templates: templates
             .filter((template) => template.id !== "custom")

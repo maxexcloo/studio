@@ -29,7 +29,7 @@ import { menuWidth } from "../theme";
 import { icons } from "./icons";
 import { PopupTooltip } from "./PopupTooltip";
 import { useVisibleRect } from "./useKeyboard";
-import { usePhone, useTouch } from "./usePhone";
+import { usePhone } from "./usePhone";
 
 import classes from "./ActionBar.module.css";
 
@@ -62,8 +62,8 @@ export interface Action {
   /** The menu stays open for actions that finish in place. */
   keepOpen?: boolean;
   /**
-   * Its options: a click opens them (a submenu in menus, expanded in place on touch screens), and the
-   * first is its usual action, so a control with options has no click of its own.
+   * Its options: a click opens them, expanding in place in menus. The first is its usual action,
+   * so a control with options has no click of its own.
    */
   menu?: ActionGroups;
   /** A setting between a few values (Cloud or Local), a segmented control in menus. */
@@ -145,10 +145,7 @@ const itemLabel = ({ label, description }: Action, describedBy: string) =>
 const described = ({ label, description }: Action, describedBy: string) =>
   description ? { "aria-label": label, "aria-describedby": describedBy } : {};
 
-/**
- * The groups as Menu items; render inside a `Menu.Dropdown`. Options open as a submenu, or on
- * phones and touch screens expand in place under their item, never as a second floating layer.
- */
+/** The groups as Menu items, with options expanded under their item. Render inside a Menu.Dropdown. */
 export function ActionMenuItems({
   groups,
   onSelected,
@@ -156,9 +153,6 @@ export function ActionMenuItems({
   groups: ActionGroups;
   onSelected?: () => void;
 }) {
-  const phone = usePhone();
-  const touch = useTouch();
-  const inline = phone || touch;
   const [expanded, setExpanded] = useState<string | null>(null);
   const selectionTrigger = useRef<HTMLButtonElement>(null);
   const closeSelection = () => {
@@ -202,7 +196,7 @@ export function ActionMenuItems({
               />
             </div>
           );
-        if (action.menu && inline) {
+        if (action.menu) {
           const open = expanded === id;
           return (
             <Fragment key={id}>
@@ -231,48 +225,6 @@ export function ActionMenuItems({
                 </div>
               </Collapse>
             </Fragment>
-          );
-        }
-        if (action.menu) {
-          // A scrolling dropdown would clip further submenus, which Mantine mounts inside it.
-          const leaf = !action.menu.flat().some((option) => option.menu);
-          return (
-            <Menu.Sub
-              key={id}
-              position="right-start"
-              opened={radioMenu ? expanded === id : undefined}
-              onChange={radioMenu ? (next) => setExpanded(next ? id : null) : undefined}
-              middlewares={
-                leaf
-                  ? {
-                      shift: { crossAxis: true, padding: 12 },
-                      size: { padding: 12 },
-                    }
-                  : undefined
-              }
-            >
-              <Menu.Sub.Target>
-                <Menu.Sub.Item
-                  ref={radioMenu ? selectionTrigger : undefined}
-                  color={color}
-                  leftSection={Icon && <Icon size={16} />}
-                  disabled={disabled}
-                  {...described(action, describedBy)}
-                >
-                  {itemLabel(action, describedBy)}
-                </Menu.Sub.Item>
-              </Menu.Sub.Target>
-              <Menu.Sub.Dropdown
-                w={menuWidth}
-                style={leaf ? { overflowY: "auto", overscrollBehavior: "contain" } : undefined}
-              >
-                {note(action)}
-                <ActionMenuItems
-                  groups={action.menu}
-                  onSelected={radioMenu ? closeSelection : undefined}
-                />
-              </Menu.Sub.Dropdown>
-            </Menu.Sub>
           );
         }
         return (

@@ -1,10 +1,15 @@
-import { dreamOverrideKeys, dreamSettingError } from "../shared/dream.ts";
+import {
+  dreamImageSwitchSetting,
+  dreamOverrideKeys,
+  dreamSettingError,
+  maxDreamIdleMinutes,
+} from "../shared/dream.ts";
 import { defaultTextProfileKey } from "./account-preferences.js";
 import { deploymentTextModel, textModels } from "./assistant-routes.js";
 import {
   catalogueFlags,
   defaultProfileKeys,
-  describeDreamOverrides,
+  describeDreamPolicy,
   describeFlag,
   isCatalogueFlag,
   saveDeploymentSetting,
@@ -55,7 +60,7 @@ export function registerDeploymentRoutes(
         profiles,
       },
       catalogue: catalogueFlags.map(describeFlag),
-      dream: describeDreamOverrides(),
+      dream: describeDreamPolicy(),
     });
   });
 
@@ -63,13 +68,23 @@ export function registerDeploymentRoutes(
     if (!requireAdmin(req, res)) return;
     const key = String(req.body?.key || "");
     const value = req.body?.value;
+    if (key === dreamImageSwitchSetting.key) {
+      if (!Number.isInteger(value) || value < 0 || value > maxDreamIdleMinutes)
+        return res.status(400).json({
+          ok: false,
+          error: `Set the delay to a whole number from 0 to ${maxDreamIdleMinutes}.`,
+        });
+      saveDeploymentSetting(key, value === dreamImageSwitchSetting.defaultValue ? "" : value);
+      res.json({ ok: true, dream: describeDreamPolicy() });
+      return;
+    }
     const dreamKey = Object.keys(dreamOverrideKeys).find((name) => dreamOverrideKeys[name] === key);
     if (dreamKey) {
       // null leaves the setting to each account.
       const error = value === null ? "" : dreamSettingError(dreamKey, value);
       if (error) return res.status(400).json({ ok: false, error });
       saveDeploymentSetting(key, typeof value === "boolean" ? (value ? "1" : "0") : value);
-      res.json({ ok: true, dream: describeDreamOverrides() });
+      res.json({ ok: true, dream: describeDreamPolicy() });
       return;
     }
     if (isCatalogueFlag(key)) {

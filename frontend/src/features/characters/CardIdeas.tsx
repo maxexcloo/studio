@@ -10,7 +10,7 @@ import { type Action, ActionMenuItems } from "../../ui/ActionBar";
 import { compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
-import { UndoButton, assistMenu, suggested } from "../generation/AskChange";
+import { UndoButton, suggested } from "../generation/AskChange";
 import { CustomDialog } from "../generation/CustomDialog";
 
 type Field = "name" | "description";
@@ -74,23 +74,19 @@ export function useCardIdeas({
     })),
     { onClick: () => again.mutate(undefined) },
   );
-  const groups = assistMenu({
-    templates: [],
-    suggestions: {
-      group: [
-        { id: "heading", label: "Suggested", heading: true },
-        ...suggestions.options,
-        suggestions.again,
-      ],
-    },
-    last: [{ id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) }],
-  });
   return {
     action: {
       id: "card-ideas",
       label: `Suggest ${noun}`,
       icon: icons.assistant,
-      menu: groups,
+      menu: [
+        [
+          { id: "heading", label: "Suggested", heading: true },
+          ...suggestions.options,
+          suggestions.again,
+        ],
+        [{ id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) }],
+      ],
       onOpen: () => setRequested(true),
     } satisfies Action,
     loading,
