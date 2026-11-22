@@ -29,6 +29,9 @@
 }
 
 .scrubber[data-indexed] {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 5px 100%;
   cursor: pointer;
   opacity: 0.6;
   pointer-events: auto;
@@ -37,13 +40,6 @@
 
 .scrubber[data-indexed][data-active] {
   opacity: 1;
-}
-
-.scrubber[data-indexed]::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 50%;
-  border-left: 1px solid var(--mantine-color-default-border);
 }
 
 .endpoint {
@@ -102,6 +98,7 @@
   box-shadow: var(--mantine-shadow-sm);
   font-size: var(--mantine-font-size-sm);
   font-weight: 600;
+  pointer-events: none;
   white-space: nowrap;
 }
 /* Date jumps clear the sticky header and any pinned gallery controls. */
