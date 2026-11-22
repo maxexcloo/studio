@@ -204,7 +204,7 @@ export function ViewerPrompt({
         minRows={1}
         maxRows={4}
         className={change ? `${classes.prompt} ${proposedClass}` : classes.prompt}
-        description={
+        below={
           change && (
             <ProposalLabel
               proposal={change}

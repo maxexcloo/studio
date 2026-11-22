@@ -6,3 +6,14 @@
   background: var(--proposed-tint);
   box-shadow: 0 0 0 4px var(--proposed-tint);
 }
+
+.change {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mantine-spacing-xs);
+  overflow-wrap: anywhere;
+}
+
+.change > :first-child {
+  flex-shrink: 0;
+}

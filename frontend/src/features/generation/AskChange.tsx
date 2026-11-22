@@ -8,7 +8,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
-import { type PointerEvent, type ReactNode, useState } from "react";
+import { type PointerEvent, type ReactNode, useMemo, useState } from "react";
 
 import {
   type Change,
@@ -295,8 +295,7 @@ export function ChangeSuggestions<K extends QueryKey>({
 }
 
 /**
- * The proposed action's name, over the field it fills, so nothing beside the text can hide it, and
- * what it changes: the words it changed in `before`, the text it replaced, or else its label.
+ * The proposed action and the words it changes, below the prompt it fills.
  */
 export function ProposalLabel({
   proposal,
@@ -308,14 +307,17 @@ export function ProposalLabel({
   /** Names an action differently where it means something else, such as the composer's Recreate. */
   labels?: Partial<Record<ChangeAction, string>>;
 }) {
-  const changed =
-    (proposal.action !== "upscale" && changeSummary(before, proposal.prompt)) || proposal.label;
+  const { action, label, prompt } = proposal;
+  const changed = useMemo(
+    () => (action !== "upscale" && changeSummary(before, prompt, 160)) || label,
+    [action, before, label, prompt],
+  );
   return (
-    <Text component="span" size="xs" truncate display="block">
-      <Badge component="span" size="xs" mr={6} aria-label="Proposed Action">
-        {labels?.[proposal.action] ?? actionLabels[proposal.action]}
+    <Text component="span" size="xs" className={classes.change}>
+      <Badge component="span" size="xs" aria-label="Proposed Action">
+        {labels?.[action] ?? actionLabels[action]}
       </Badge>
-      {changed}
+      <span>{changed}</span>
     </Text>
   );
 }
