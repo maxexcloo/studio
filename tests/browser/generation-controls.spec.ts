@@ -174,10 +174,6 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
     .fill("Use this portrait as a composition reference");
   const size = page.getByRole("button", { name: "Aspect", exact: true });
   await size.click();
-  await page
-    .getByRole("radiogroup", { name: "Resolution", exact: true })
-    .getByText("Custom")
-    .click();
   await page.getByRole("textbox", { name: "Width", exact: true }).fill("1280");
   await page.getByRole("textbox", { name: "Height", exact: true }).fill("768");
   await size.click();

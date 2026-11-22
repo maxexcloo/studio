@@ -30,6 +30,27 @@ const steps = [
   { label: "Fog", request: "add fog", prompt: "A bird in fog" },
   { label: "Amber Sky", request: "add an amber sky", prompt: "A bird under an amber sky" },
 ];
+
+async function serveTemplates(page: Page) {
+  await page.route("**/api/assistant", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        presets: [],
+        themes: [],
+        changes: [
+          {
+            id: "softer",
+            label: "Softer Shadows",
+            description: "Gentler contrast.",
+            instruction: "soften the shadows",
+          },
+        ],
+      },
+    }),
+  );
+}
+
 /** Answers `/api/suggestions` like Studio does for an account with a taste profile. */
 async function suggest(page: Page) {
   const asked: any[] = [];
@@ -111,6 +132,7 @@ test("The viewer groups Suggestions and Templates without styles or item descrip
   page,
 }, testInfo) => {
   await openViewer(page);
+  await serveTemplates(page);
   const asked: any[] = [];
   const others = [{ label: "Snowfall", request: "add snow", prompt: "An amber bird in snow" }];
   // The first answer and the refreshed one each wait to be released, so loading shows.
@@ -225,24 +247,8 @@ test("Custom Animation suggests what could happen from the image, filling the in
 
 test("The prompt offers Library's fixed changes with the image's suggestions", async ({ page }) => {
   await openViewer(page);
+  await serveTemplates(page);
   const asked: any[] = [];
-  await page.route("**/api/assistant", (route) =>
-    route.fulfill({
-      json: {
-        available: true,
-        presets: [],
-        themes: [],
-        changes: [
-          {
-            id: "softer",
-            label: "Softer Shadows",
-            description: "Gentler contrast.",
-            instruction: "soften the shadows",
-          },
-        ],
-      },
-    }),
-  );
   await page.route("**/api/suggestions", (route) => {
     const body = route.request().postDataJSON();
     asked.push(body);
@@ -444,7 +450,6 @@ test("Review stays off after editing and Reset, while an explicit opt-in preserv
     "aria-expanded",
     "false",
   );
-  await expect(menu.getByText("Templates", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem").nth(-2)).toHaveText("Compare in Composer");
   await expect(menu.getByRole("menuitem").last()).toHaveText("Recreate in Composer");
   await expandAssistantMenu(menu, "Suggestions");

@@ -79,11 +79,12 @@ export function useCardIdeas({
       label: `Suggest ${noun}`,
       icon: icons.assistant,
       menu: [
-        [{ id: "heading", label: "Suggested", heading: true }, ...suggestions.options],
         [
-          { id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) },
+          { id: "heading", label: "Suggested", heading: true },
+          ...suggestions.options,
           suggestions.again,
         ],
+        [{ id: "custom", label: "Custom…", icon: icons.custom, onClick: () => setCustom(true) }],
       ],
       onOpen: () => setRequested(true),
     } satisfies Action,
