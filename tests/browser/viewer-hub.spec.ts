@@ -1115,11 +1115,11 @@ test("An Animate run stays with the image it started on while the viewer moves b
       writing: { kind: "animate", theme: "living", source: bird },
     },
   });
-  await showViewerThumbnails(viewer);
   const versions = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(versions).toHaveCount(0);
   await move(fox, bird);
   await expect(animate).not.toHaveAttribute("data-loading");
+  await showViewerThumbnails(viewer);
   await expect(versions.getByRole("listitem")).toHaveCount(2);
 });
 

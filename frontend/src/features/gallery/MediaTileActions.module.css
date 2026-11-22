@@ -12,7 +12,7 @@
   box-shadow: var(--mantine-shadow-xs);
 }
 
-.more {
+.actions:not([data-face-check]) .more {
   margin-inline-start: auto;
 }
 

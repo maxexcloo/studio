@@ -341,15 +341,10 @@ export function MediaTile({
           <RatingIcon size={14} fill="currentColor" />
         </div>
       )}
-      {!selecting && (
-        <div className={classes.badges}>
-          {item.identity?.drifted && (
-            // Face Check found someone else, or the character twice; Details says which.
-            <div className={classes.drift} role="img" aria-label="Face Check: Face Differs">
-              <icons.character size={12} />
-              Face
-            </div>
-          )}
+      {!selecting && item.identity?.drifted && (
+        <div className={classes.drift} role="img" aria-label="Face Check: Face Differs">
+          <icons.character size={12} />
+          Face
         </div>
       )}
       {!selecting && actions}

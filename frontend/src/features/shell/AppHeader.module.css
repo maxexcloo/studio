@@ -20,6 +20,7 @@
 .indicator {
   border-radius: var(--mantine-radius-xl);
   background: var(--mantine-primary-color-light);
+  pointer-events: none;
 }
 .mode {
   position: relative;
@@ -83,7 +84,8 @@
 }
 
 :where(:root[data-phone]) .header:has([data-queue-count]) .modes {
-  position: static;
+  position: relative;
+  inset: auto;
   flex-shrink: 1;
   min-width: 0;
   transform: none;

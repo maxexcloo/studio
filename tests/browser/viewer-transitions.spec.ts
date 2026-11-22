@@ -260,10 +260,27 @@ test("Fit leaves room for the header and keeps its bounds when thumbnails open",
     if (index === 1) {
       const bounds = await picture.boundingBox();
       const thumbnails = viewer.getByRole("list", { name: "Set: Fitted", exact: true });
+      const zoom = viewer.getByRole("group", { name: "Image Zoom", exact: true });
       await expect(actions).toBeVisible();
       await expect(thumbnails).toBeHidden();
+      await page.keyboard.press("Digit0");
+      await expect
+        .poll(async () => {
+          const controls = await zoom.boundingBox();
+          const dock = await actions.boundingBox();
+          return !!controls && !!dock && controls.y + controls.height <= dock.y;
+        })
+        .toBe(true);
       await showViewerThumbnails(viewer);
       await expect(thumbnails).toBeVisible();
+      await page.keyboard.press("Digit0");
+      await expect
+        .poll(async () => {
+          const controls = await zoom.boundingBox();
+          const dock = await thumbnails.boundingBox();
+          return !!controls && !!dock && controls.y + controls.height <= dock.y;
+        })
+        .toBe(true);
       await expect.poll(() => picture.boundingBox()).toEqual(bounds);
     }
   }

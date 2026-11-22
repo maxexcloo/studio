@@ -758,6 +758,19 @@ test("Liking an expanded Dream Set rates the shown member and keeps the set", as
   await expect(set).toContainText("Dream prompt cover");
   await set.getByRole("button", { name: "View Set (3)", exact: true }).click();
   const preview = page.getByRole("dialog");
+  await expect(
+    preview.getByRole("button", { name: "Change Image Zoom", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Digit0");
+  await expect
+    .poll(async () => {
+      const controls = await preview
+        .getByRole("group", { name: "Image Zoom", exact: true })
+        .boundingBox();
+      const picker = await preview.locator('[aria-label="Set Results"]').boundingBox();
+      return !!controls && !!picker && controls.y + controls.height <= picker.y;
+    })
+    .toBe(true);
   const third = preview.getByRole("radio", { name: "3", exact: true });
   await third.press("Space");
   await preview.getByRole("button", { name: "Deny This Image", exact: true }).click();
