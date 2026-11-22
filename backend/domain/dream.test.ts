@@ -77,7 +77,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     >,
     slots: 1,
     prompts: 0,
-    replies: [] as { prompt: string; title?: string }[],
+    replies: [] as { prompt: string; title?: string; motifs?: string[] }[],
     calls: [] as { model: string; system: string; user: string }[],
     logs: [] as string[],
     loras: {} as Record<string, DreamLoraLibrary>,
@@ -294,6 +294,7 @@ function fixture(t: TestContext, catalogue = profiles) {
         prompt: String(job.input.prompt),
         createdAt: new Date(state.clock).toISOString(),
         settings: { profileId: input.profileId },
+        resultSet: input.resultSet as DreamItem["resultSet"],
         ...(job.dream ? { dream: { state: "unseen" as const, ...job.dream } } : {}),
       });
       return result;
@@ -801,6 +802,32 @@ test("Fresh concept retries reject liked prompt copies and show the rejected con
   assert.match(state.calls[1].user, /too close to a recent or liked prompt/);
   assert.match(state.calls[1].user, /do not paraphrase the rejected idea/);
   assert.deepEqual(dream.read("alice").subjects, ["Coral Orchestra"]);
+});
+
+test("Fresh concepts cool down repeated optional motifs across otherwise different prompts", async (t) => {
+  const { dream, state, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  state.replies = [
+    { prompt: "An elephant lifts a paper lantern beside a fountain", motifs: ["Paper Lantern"] },
+    { prompt: "A photographer frames a paper lantern from a ferry", motifs: ["paper lantern"] },
+    {
+      prompt: "She sketches an owl on a paper lantern among pine trees",
+      motifs: ["paper lantern"],
+    },
+    { prompt: "A diver watches a seal circle a kelp forest", motifs: ["kelp forest"] },
+  ];
+  for (let index = 0; index < 2; index++) {
+    state.rolls = [99];
+    assert.ok(await dreamOnce());
+  }
+  state.rolls = [99];
+  const accepted = await dreamOnce();
+  assert.equal(accepted?.input.prompt, "A diver watches a seal circle a kelp forest");
+  assert.match(
+    state.calls[2].user,
+    /Recently repeated optional motifs to leave out this time: paper lantern/,
+  );
+  assert.match(state.calls[3].user, /The optional motif "paper lantern" has appeared/);
 });
 
 test("More Like This permits close iterations while keeping species and source identity", async (t) => {
@@ -1995,6 +2022,7 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
   // More Like This keeps the result and steers the next ideas toward it, the only idea that
   // follows the learnt look; every idea keeps the person's rules.
   taste.edit("alice", { likes: ["lighthouses"], rules: ["no visible text"] });
+  await dreamOnce();
   const [next] = dream.unseen("alice");
   assert.equal((await request(`/${next.id}/more`, {})).status, 200);
   const steered = (await dreamOnce())!;
@@ -2325,7 +2353,8 @@ test("Brief edits, pacing and rules wait in the Inbox; Accept changes a project 
 });
 
 test("A series follows a liked image's character, visiting liked scene cards first", async (t) => {
-  const { dream, state, store, dreamOnce } = fixture(t);
+  const fx = fixture(t);
+  const { dream, state, store, dreamOnce, taste } = fx;
   const scene = {
     createdAt: new Date(state.clock).toISOString(),
     updatedAt: new Date(state.clock).toISOString(),
@@ -2365,7 +2394,10 @@ test("A series follows a liked image's character, visiting liked scene cards fir
   });
   await dream.save("alice", { enabled: true });
   const jobs = [];
-  for (let index = 0; index < 4; index++) jobs.push((await dreamOnce())!);
+  for (let index = 0; index < 4; index++) {
+    jobs.push((await dreamOnce())!);
+    assert.equal(dream.unseen("alice").length, index === 3 ? 4 : 0);
+  }
   const sets = jobs.map(
     (job) => job.input.resultSet as { id: string; title: string; index: number },
   );
@@ -2400,6 +2432,35 @@ test("A series follows a liked image's character, visiting liked scene cards fir
     store.job("alice", jobs[0].id)!.dream!.why,
     /^Mara · Night Out \(1 of 4\): Pier, Dusk/,
   );
+  const request = await serve(t, fx);
+  const setId = sets[0].id;
+  const ids = jobs.map((job) => `${job.id}-0`);
+  assert.equal((await request("/count")).body.images, 1);
+  const verdict = { ids, verdict: "like" };
+  assert.equal((await request(`/sets/${setId}/answer`, verdict, "POST", "bob")).status, 409);
+  assert.equal(
+    (await request(`/sets/${setId}/answer`, { ...verdict, ids: ids.slice(0, 2) })).status,
+    409,
+  );
+  assert.equal((await request(`/sets/${setId}/answer`, verdict)).status, 200);
+  assert.equal(dream.unseen("alice").length, 0);
+  const members = () => ids.map((id) => state.items.find((item) => item.id === id)!);
+  assert.deepEqual(
+    members().map((item) => item.dream?.state),
+    Array(4).fill("kept"),
+  );
+  assert.deepEqual(
+    members().map((item) => item.rating),
+    ["liked", undefined, undefined, undefined],
+  );
+  assert.deepEqual(
+    taste.read("alice").signals.map(({ kind }) => kind),
+    ["like"],
+  );
+  assert.equal((await request("/undo", { ids, setId })).status, 200);
+  assert.equal((await request("/count")).body.images, 1);
+  assert.ok(members().every((item) => item.dream?.state === "unseen" && !item.rating));
+  assert.deepEqual(taste.read("alice").signals, []);
   // The series is done; with a share's roll against it the next idea is an ordinary one.
   state.rolls = [99];
   const after = await dreamOnce();

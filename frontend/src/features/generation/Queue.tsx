@@ -5,6 +5,7 @@ import {
   Button,
   Collapse,
   Group,
+  Progress,
   Stack,
   Text,
   Image as Thumbnail,
@@ -666,8 +667,10 @@ function QueueSetRow({
                       {reason}
                     </Text>
                   )}
-                  <JobProgressBar job={lead} />
                 </>
+              )}
+              {unfinished.length > 0 && (
+                <Progress aria-hidden value={(100 * (done + failed.length)) / total} size="xs" />
               )}
             </Stack>
             <ChevronDown

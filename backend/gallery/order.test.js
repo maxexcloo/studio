@@ -23,19 +23,19 @@ const item = (id, createdAt, extra = {}) => ({
 const ids = (items) => items.map((item) => item.id);
 const sorted = (items) => items.slice().sort(compareGalleryItems);
 
-test("explicit Civitai imports stay newest first even without source prompts", () => {
+test("imports stay newest first even without source prompts", () => {
   const imported = item("civitai:42", "2026-01-03", { prompt: "", civitai: { imageId: "42" } });
   const items = [
     item("generation", "2026-01-02"),
     imported,
     item("scan", "2026-01-04", { prompt: "" }),
   ];
-  assert.deepEqual(ids(sorted(items)), ["civitai:42", "generation", "scan"]);
+  assert.deepEqual(ids(sorted(items)), ["scan", "civitai:42", "generation"]);
   setGallery(items);
-  assert.equal(pageGallery({ limit: 1 }).items[0].id, "civitai:42");
+  assert.equal(pageGallery({ limit: 1 }).items[0].id, "scan");
 });
 
-test("server pages and client merges put blank imports last, newest first within both buckets", () => {
+test("results with and without prompts page in chronological order", () => {
   const items = [
     item("import-old", "2026-01-01", { prompt: "" }),
     item("generation", "2026-01-02"),
@@ -43,7 +43,7 @@ test("server pages and client merges put blank imports last, newest first within
     item("pending", "2026-01-03", { status: "pending", prompt: "" }),
     item("failed", "2026-01-04", { status: "failed", prompt: "" }),
   ];
-  const expected = ["failed", "pending", "generation", "history-import", "import-old"];
+  const expected = ["history-import", "failed", "pending", "generation", "import-old"];
   assert.deepEqual(ids(sorted(items)), expected);
   setGallery(items);
   const collected = [];
@@ -56,12 +56,12 @@ test("server pages and client merges put blank imports last, newest first within
   assert.deepEqual(ids(collected), expected);
 });
 
-test("a removed cursor continues through the bucket boundary and descending id ties", () => {
+test("a removed cursor continues through descending id ties and undated results", () => {
   const items = [
     item("z", "2026-01-01"),
     item("m", "2026-01-01"),
     item("a", "2026-01-01"),
-    item("import", "2026-12-01", { prompt: "" }),
+    item("import", undefined, { prompt: "" }),
   ];
   setGallery(items);
   const cursor = pageGallery({ limit: 2 }).nextCursor;
@@ -69,7 +69,7 @@ test("a removed cursor continues through the bucket boundary and descending id t
   assert.deepEqual(ids(pageGallery({ cursor, limit: 2 }).items), ["a", "import"]);
 });
 
-test("age and rating sorts order all pages before slicing, keeping result sets together", () => {
+test("age and rating sorts order individual results before slicing", () => {
   const resultSet = { id: "set" };
   setGallery([
     item("old", "2026-01-01", { status: "failed" }),
@@ -80,8 +80,8 @@ test("age and rating sorts order all pages before slicing, keeping result sets t
     item("dream", "2026-01-06", { rating: "disliked", dream: { state: "pending" } }),
   ]);
   for (const [sort, expected] of [
-    ["oldest", ["old", "set-peer", "liked", "new"]],
-    ["liked", ["set-peer", "liked", "new", "old"]],
+    ["oldest", ["old", "liked", "set-peer", "new"]],
+    ["liked", ["liked", "new", "set-peer", "old"]],
     ["disliked", ["disliked", "new", "set-peer", "liked", "old"]],
   ]) {
     const collected = [];
@@ -140,9 +140,9 @@ test("valid dates precede missing and invalid dates, retaining batch indices and
     "batch-1",
     "epoch",
     "older",
+    "blank-dated",
     "undated",
     "invalid",
-    "blank-dated",
     "blank-invalid",
   ];
   assert.deepEqual(ids(sorted(items)), expected);
@@ -165,7 +165,7 @@ test("a ranked page (Find Similar) orders by score, leaves out the unscored and 
   assert.deepEqual(ids(pageGallery({ rank, limit: 2, cursor: first.nextCursor }).items), ["a"]);
 });
 
-test("a result set's results page together, newest first, where its newest result sorts", () => {
+test("members of a result set interleave with other results by time", () => {
   const set = (index) => ({ resultSet: { id: "set", title: "Variety Test", index } });
   setGallery([
     item("newest", "2026-01-05"),
@@ -182,10 +182,15 @@ test("a result set's results page together, newest first, where its newest resul
     collected.push(...page.items);
     cursor = page.nextCursor;
   } while (cursor);
-  assert.deepEqual(ids(collected), ["newest", "set-2", "set-0", "set-1", "between", "oldest"]);
+  assert.deepEqual(ids(collected), ["newest", "set-2", "between", "set-0", "set-1", "oldest"]);
+  assert.deepEqual(ids(pageGallery({ query: { setId: "set" } }).items), [
+    "set-2",
+    "set-0",
+    "set-1",
+  ]);
 });
 
-test("paging inside a set carries on through it when a newer result moves the set", () => {
+test("paging carries on when the last shown set member is removed and a new one arrives", () => {
   const set = (index, createdAt) =>
     item(`set-${index}`, createdAt, { resultSet: { id: "moving", title: "Moving", index } });
   setGallery([
@@ -197,8 +202,7 @@ test("paging inside a set carries on through it when a newer result moves the se
   ]);
   const first = pageGallery({ limit: 2 });
   assert.deepEqual(ids(first.items), ["newest", "set-0"]);
-  // A result added to the set since sorts first, so the set now stands at the top, before the page.
-  setGallery([...galleryItems(), set(3, "2026-02-06")]);
+  setGallery([...galleryItems().filter((item) => item.id !== "set-0"), set(3, "2026-02-06")]);
   const rest = [];
   let cursor = first.nextCursor;
   while (cursor) {
@@ -209,7 +213,7 @@ test("paging inside a set carries on through it when a newer result moves the se
   assert.deepEqual(ids(rest), ["set-1", "set-2", "oldest"]);
 });
 
-test("each owner pages through only its own items, sets kept together", () => {
+test("each owner pages through only its own items", () => {
   const owned = (ownerId, id, createdAt, set) =>
     item(`${ownerId}-${id}`, createdAt, {
       ownerId,
@@ -235,7 +239,7 @@ test("each owner pages through only its own items, sets kept together", () => {
     } while (cursor);
     assert.deepEqual(
       ids(seen),
-      ["a", "s1", "s0", "b", "c"].map((id) => `${ownerId}-${id}`),
+      ["a", "s1", "b", "s0", "c"].map((id) => `${ownerId}-${id}`),
     );
   }
 });

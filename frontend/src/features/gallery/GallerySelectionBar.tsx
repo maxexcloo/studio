@@ -6,7 +6,7 @@ import { useNavigate } from "react-router";
 
 import { failure, post } from "../../api";
 import { menuWidth } from "../../theme";
-import { ActionBarGroups, ActionMenuItems } from "../../ui/ActionBar";
+import { ActionBarGroups, ActionMenuItems, useActionMenuBounds } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
@@ -48,6 +48,7 @@ export function GallerySelectionBar({
   onMenuClose: () => void;
 }) {
   const phone = usePhone();
+  const menuBounds = useActionMenuBounds(menu !== null);
   const [confirm, setConfirm] = useState(false);
   const cancel = useQueueAction();
   const [busy, setBusy] = useState<"retry" | "stop" | null>(null);
@@ -87,7 +88,6 @@ export function GallerySelectionBar({
   const ratings = useRatings();
   const uploads = ready.filter((item) => item.uploaded);
   const recreate = useRecreateMany();
-  // A set or run is animated or upscaled as a whole (Runs' Select Set).
   const finishedImages = ready.filter((item) => item.type === "image" && !item.uploaded);
   const upscale = useUpscaleMany(finishedImages);
   const iterate = useIterate();
@@ -421,6 +421,7 @@ export function GallerySelectionBar({
         </div>
       </div>
       <Menu
+        {...menuBounds}
         opened={menu !== null}
         onChange={(opened) => !opened && onMenuClose()}
         width={menuWidth}

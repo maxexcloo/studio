@@ -34,15 +34,6 @@
   box-shadow: var(--mantine-shadow-md);
 }
 
-/* A block flex row, so the icon centres on the text rather than the label's baseline. */
-.viewLabel {
-  gap: 6px;
-}
-
-.viewLabel > svg {
-  flex: none;
-}
-
 /* The toolbar and any selection bar under it, sticky on desktop, and on phones while a search,
    filter or selection applies. */
 .toolbar {

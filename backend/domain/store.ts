@@ -470,14 +470,22 @@ export class Store {
   queueJobs(ownerId: string, { results = true } = {}): OwnedJob[] {
     return this.db
       .prepare(
-        `SELECT ${results ? "record" : "json_remove(record, '$.items', '$.outputs') AS record"} FROM studio_queue WHERE owner_id = ? AND (
-          status IN (${placeholders(openStatuses)})
-          OR (status = 'failed' AND json_extract(record, '$.cleared') IS NULL)
-          OR rowid IN (SELECT rowid FROM studio_queue WHERE owner_id = ? AND status IN (${placeholders(terminalStatuses)})
-            ORDER BY created_at DESC, rowid DESC LIMIT ?)
+        `SELECT ${results ? "record" : "json_remove(record, '$.items', '$.outputs') AS record"}
+        FROM studio_queue WHERE rowid IN (
+          SELECT rowid FROM studio_queue INDEXED BY studio_queue_status
+            WHERE status IN (${placeholders(openStatuses)}) AND owner_id = ?
+          UNION ALL
+          SELECT rowid FROM studio_queue INDEXED BY studio_queue_status
+            WHERE status = 'failed' AND owner_id = ? AND json_extract(record, '$.cleared') IS NULL
+          UNION ALL
+          SELECT rowid FROM (
+            SELECT rowid FROM studio_queue INDEXED BY studio_queue_owner
+              WHERE owner_id = ? AND status IN (${placeholders(terminalStatuses)})
+              ORDER BY created_at DESC, rowid DESC LIMIT ?
+          )
         ) ORDER BY created_at, rowid`,
       )
-      .all(ownerId, ...openStatuses, ownerId, ...terminalStatuses, listedFinishedJobs)
+      .all(...openStatuses, ownerId, ownerId, ownerId, ...terminalStatuses, listedFinishedJobs)
       .map((row) => JSON.parse(row.record as string));
   }
 

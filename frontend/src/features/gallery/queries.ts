@@ -4,7 +4,6 @@ import type { GallerySort } from "../../../../shared/gallery-sort";
 import { api } from "../../api";
 import type { MediaItem, MediaKind } from "../../types";
 import { type GalleryFilterValues, appendGalleryFilters } from "./GalleryFilters";
-import { galleryItemQuery } from "./MediaDetails";
 import { isResultNumber } from "./viewerLink";
 
 /** Every gallery listing's key starts with this, so invalidating it refreshes them all. */
@@ -71,6 +70,14 @@ export const galleryQuery = (listing: GalleryListing) =>
     initialPageParam: "",
     queryFn: ({ pageParam, signal }) => galleryPage(listing, pageParam, signal),
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
+  });
+
+/** One gallery item in full: gallery pages leave out its prompt's thinking, which Details reads here. */
+export const galleryItemQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["gallery-item", id],
+    queryFn: () => api<{ item: MediaItem }>(`/api/gallery/items/${encodeURIComponent(id)}`),
+    retry: false,
   });
 
 /** Resolves an account's result number without changing the media-ID API used by Details. */

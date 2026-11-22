@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Box, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Box, Button, Text, Tooltip } from "@mantine/core";
 import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   type Dispatch,
@@ -43,6 +43,7 @@ import {
   dreamQuery,
   libraryReviewPath,
   pairAnswerPath,
+  setAnswerPath,
 } from "./queries";
 import { type Direction, type Fly, SwipeCard } from "./SwipeCard";
 
@@ -99,6 +100,11 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
           ...("like" in judgement && judgement.like && { like: true }),
         });
       }
+      if (judgement.card.kind === "set")
+        return post(setAnswerPath(judgement.card.setId), {
+          ids: cardIds(judgement.card),
+          verdict: judgement.verdict,
+        });
       const { item } = judgement.card;
       const verdict = judgement.verdict as Verdict;
       if (judgement.card.kind === "library")
@@ -161,7 +167,8 @@ function useUndo(onFailed: (judgement: Judgement) => void, onGone: (card: DeckCa
             });
       await post("/api/dream/undo", {
         ids: cardIds(card),
-        ...(card.kind !== "pair" && verdict === "like" && { rating: card.item.rating ?? null }),
+        ...(card.kind === "set" && { setId: card.setId }),
+        ...(card.kind === "dream" && verdict === "like" && { rating: card.item.rating ?? null }),
       });
     },
     scope: { id: "dream-judgements" },
@@ -180,7 +187,11 @@ const cardLabel = (card: DeckCard, top: boolean) =>
     ? top
       ? card.question
       : "Next Comparison"
-    : `${top ? "Current" : "Next"} ${card.kind === "dream" ? "Dream" : card.item.type === "video" ? "Gallery Video" : "Gallery Image"}`;
+    : card.kind === "set"
+      ? top
+        ? card.title
+        : "Next Set"
+      : `${top ? "Current" : "Next"} ${card.kind === "dream" ? "Dream" : card.item.type === "video" ? "Gallery Video" : "Gallery Image"}`;
 
 /** The unseen deck and its preview; tapping media opens it, buttons, keys and swipes judge it. */
 export function DreamDeck({
@@ -279,7 +290,7 @@ export function DreamDeck({
     setPicked(null);
     const { card } = last;
     if (card.kind === "dream") returnItems([card.item]);
-    else if (card.kind === "pair") returnItems(card.items);
+    else if (card.kind === "pair" || card.kind === "set") returnItems(card.items);
     restore(card);
     takeBack.mutate(last);
   }
@@ -370,18 +381,27 @@ export function DreamDeck({
     const isTop = card === top;
     const playing = isTop && (full || !viewing);
     const side = isTop && viewing ? viewing.side : 0;
+    const multi = card.kind === "pair" || card.kind === "set";
     return (
       <SwipeCard
         key={card.key}
         depth={cards.indexOf(card)}
         paused={!playing}
         video={(card.kind === "pair" ? card.items[0] : card.item).type === "video"}
-        previewSide={full && card.kind === "pair" ? side : undefined}
-        // A comparison's preview swipes between its sides, and answers with its buttons.
-        still={full && card.kind === "pair"}
+        previewSide={full && multi ? side : undefined}
+        still={full && multi}
         full={full}
         view={
-          !full && isTop && card.kind !== "pair" ? (
+          !full && isTop && card.kind === "set" ? (
+            <Button
+              variant="default"
+              size="compact-sm"
+              data-preview-id={card.item.id}
+              onClick={() => open(card)}
+            >
+              View Set ({card.items.length})
+            </Button>
+          ) : !full && isTop && card.kind !== "pair" ? (
             <Tooltip label="View">
               <ActionIcon
                 variant="default"
@@ -417,28 +437,26 @@ export function DreamDeck({
           commit({ card, verdict: choice } as Judgement);
         }}
       >
-        {card.kind === "pair" ? (
-          full ? (
-            <PreviewSides
-              card={card}
-              side={side}
-              playing={playing}
-              setSide={(side) => open(card, side)}
-              onClose={closePreview}
-              onTap={tapBackdrop}
-              onLike={isTop ? () => void act("like") : undefined}
-            />
-          ) : (
-            <PairContent
-              card={card}
-              top={isTop}
-              playing={playing}
-              picked={picked?.key === card.key ? picked.side : undefined}
-              shown={isTop ? shown : undefined}
-              select={(side) => setSelected({ key: card.key, side })}
-              view={(side) => open(card, side)}
-            />
-          )
+        {multi && full ? (
+          <PreviewSides
+            card={card}
+            side={side}
+            playing={playing}
+            setSide={(side) => open(card, side)}
+            onClose={closePreview}
+            onTap={tapBackdrop}
+            onLike={isTop ? () => void act("like") : undefined}
+          />
+        ) : card.kind === "pair" ? (
+          <PairContent
+            card={card}
+            top={isTop}
+            playing={playing}
+            picked={picked?.key === card.key ? picked.side : undefined}
+            shown={isTop ? shown : undefined}
+            select={(side) => setSelected({ key: card.key, side })}
+            view={(side) => open(card, side)}
+          />
         ) : full ? (
           <PreviewFace item={card.item} active={playing} />
         ) : (
@@ -451,7 +469,12 @@ export function DreamDeck({
                 </Badge>
               )}
             </div>
-            <CardText item={card.item} dreamt={card.kind === "dream"} full={sideways} />
+            <CardText
+              item={card.item}
+              dreamt={card.kind !== "library"}
+              title={card.kind === "set" ? card.title : undefined}
+              full={sideways}
+            />
           </>
         )}
       </SwipeCard>
@@ -490,7 +513,6 @@ export function DreamDeck({
         hidden={!!viewing}
         leading={undoButton}
         trailing={viewing ? undefined : suggest}
-        shown={top.kind === "pair" ? shown : undefined}
       />
       {!phone && !touch && (
         <Text size="xs" c="dimmed" ta="center">
@@ -503,6 +525,7 @@ export function DreamDeck({
         <DreamPreview
           card={top}
           side={viewing.side}
+          setSide={(side) => open(top, side)}
           canUndo={history.length > 0}
           close={closePreview}
           backdropTap={backdropTap}
@@ -511,11 +534,12 @@ export function DreamDeck({
           suggest={suggest}
           onKeyDown={(event) => {
             // A comparison's sides step with the arrows; its answers are its buttons.
-            if (top.kind !== "pair" || event.key === "ArrowUp") return respond(event.nativeEvent);
+            if ((top.kind !== "pair" && top.kind !== "set") || event.key === "ArrowUp")
+              return respond(event.nativeEvent);
             const step = ({ ArrowLeft: -1, ArrowRight: 1 } as Record<string, number>)[event.key];
             const { altKey, ctrlKey, metaKey, shiftKey } = event;
             if (!step || altKey || ctrlKey || metaKey || shiftKey || event.defaultPrevented) return;
-            if ((event.target as Element).closest("[role='slider']")) return;
+            if ((event.target as Element).closest("input, [role='slider']")) return;
             event.preventDefault();
             const side = viewing.side + step;
             if (side >= 0 && side < top.items.length) open(top, side);

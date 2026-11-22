@@ -17,6 +17,7 @@ import {
   dreamProject,
   dreamState,
   galleryKey,
+  galleryOrder as order,
   summaryFields,
 } from "../persistence/gallery-rows.ts";
 import {
@@ -27,7 +28,7 @@ import {
 } from "../persistence/runtime.ts";
 import { loadSharp } from "../sharp-loader.js";
 import { galleryFiltersTest } from "./filters.js";
-import { compareGalleryItems, compareGalleryUnits } from "./order.js";
+import { compareGalleryKeys } from "./order.js";
 import {
   generationSettings,
   outputsFrom,
@@ -41,7 +42,7 @@ import {
 /*
  * The gallery is one `studio_gallery` row per item (persistence/gallery-rows.ts), read and written
  * in place: queries filter and order on the indexed columns derived from each row, and this module
- * adds what SQL can't see (files on disk, delete markers, result-set grouping, searches).
+ * adds what SQL can't see (files on disk, delete markers, searches).
  */
 let statements = { db: null, prepared: new Map() };
 function statement(sql) {
@@ -106,7 +107,6 @@ const parse = (row) => withLive(JSON.parse(row.value));
 
 /* ----------------------------------------------------------------- Queries */
 
-const order = "bucket, gallery_ms DESC, job_id DESC, item_index, item_id DESC";
 const list = (values) => JSON.stringify([...values].map(String));
 
 /**
@@ -195,8 +195,7 @@ function where(query = {}) {
       "rowid IN (SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_status WHERE status = 'pending' UNION SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_created WHERE created_ms >= ?)",
       Number(query.since),
     );
-  // Naming both buckets lets the order index seek the time range rather than compute each row's.
-  if (query.before !== undefined) add("bucket IN (0, 1) AND created_ms <= ?", Number(query.before));
+  if (query.before !== undefined) add("created_ms <= ?", Number(query.before));
   if (query.idPrefix)
     add("item_id >= ? AND item_id < ?", query.idPrefix, `${query.idPrefix}\uffff`);
   if (query.ids) add("item_id IN (SELECT value FROM json_each(?))", list(query.ids));
@@ -248,9 +247,8 @@ export function galleryItems(query = {}, { ordered = true } = {}) {
     .map(parse);
 }
 
-const keyColumns = "key, value, bucket, gallery_ms, job_id, item_index, item_id";
+const keyColumns = "key, value, gallery_ms, job_id, item_index, item_id";
 const rowKey = (row) => ({
-  bucket: row.bucket,
   time: row.gallery_ms,
   jobId: row.job_id,
   index: row.item_index,
@@ -730,31 +728,22 @@ export function setLibraryReviewed(ownerId, id, reviewed) {
 
 /* ---------------------------------------------------------------- Paging */
 
-/** A cursor: the order key of the row a page ended at; mid-set, the set and its last item shown. */
-const cursorFor = (key, set) =>
-  `v2|${encodeURIComponent(JSON.stringify(set ? { ...key, ...set } : key))}`;
+const cursorFor = (key) => `v3|${encodeURIComponent(JSON.stringify(key))}`;
 
 function readCursor(cursor) {
-  if (!String(cursor).startsWith("v2|")) return null;
+  if (!String(cursor).startsWith("v3|")) return null;
   try {
-    const {
-      set = "",
-      after = "",
-      ...key
-    } = JSON.parse(decodeURIComponent(String(cursor).slice(3)));
-    return { key, set: String(set), after: String(after) };
+    return JSON.parse(decodeURIComponent(String(cursor).slice(3)));
   } catch {
     return null;
   }
 }
 
 /**
- * The rows after `key` in gallery order, as conditions to read in turn: the rest of the key's own
- * bucket and time, the rest of its bucket, then later buckets. Each is a range the order index
- * seeks to, so a deep page costs no more than the first.
+ * The rows after `key` in gallery order: the rest of the key's time, older rows, then undated ones.
+ * Each is a range the order index seeks to.
  */
 function afterKey(key) {
-  const bucket = Number(key.bucket) || 0;
   const time = key.time ?? null;
   const descending = (column, value) =>
     value === null
@@ -773,56 +762,22 @@ function afterKey(key) {
   }
   return [
     {
-      sql: ["bucket = ?", time === null ? "gallery_ms IS NULL" : "gallery_ms = ?", tie],
-      params: [bucket, ...(time === null ? [] : [time]), ...tieParams],
+      sql: [time === null ? "gallery_ms IS NULL" : "gallery_ms = ?", tie],
+      params: [...(time === null ? [] : [time]), ...tieParams],
     },
     ...(time === null
       ? []
       : [
-          { sql: ["bucket = ?", "gallery_ms < ?"], params: [bucket, time] },
-          { sql: ["bucket = ?", "gallery_ms IS NULL"], params: [bucket] },
+          { sql: ["gallery_ms < ?"], params: [time] },
+          { sql: ["gallery_ms IS NULL"], params: [] },
         ]),
-    { sql: ["bucket > ?"], params: [bucket] },
   ];
 }
 
-/** A result set's visible items the query matches, in gallery order. */
-function setItems(query, id) {
-  // By the set's index: without statistics SQLite prefers the order index, walking the whole
-  // gallery for every set.
-  const { sql, params } = where({ ...query, setId: id });
-  return statement(`SELECT value FROM studio_gallery INDEXED BY studio_gallery_set ${sql}`)
-    .all(...params)
-    .map(parse)
-    .filter(hasGalleryMedia)
-    .sort(compareGalleryItems);
-}
-
-/**
- * The visible items of a query after `start` (an order key), in gallery order with each MCP result
- * set's results together where its newest result sorts: each step is `{ key, set, items }`, the
- * order key of the row it stands at, its set and what shows there. Sets group before `filter`, so a
- * search keeps a set where the whole set would stand; `skipSet` names one already shown.
- */
-function* galleryUnits(query, filter, start = null, skipSet = "") {
-  const sets = new Map();
+function* visibleRows(query, filter, start) {
   for (const row of galleryRows(query, start)) {
     const item = parse(row);
-    if (!hasGalleryMedia(item)) continue;
-    const set = item.resultSet?.id;
-    if (set) {
-      if (set === skipSet) continue;
-      if (!sets.has(set)) {
-        const members = setItems(query, set);
-        sets.set(set, {
-          anchor: members[0] && galleryKey(members[0]),
-          items: filter ? members.filter(filter) : members,
-        });
-      }
-      const found = sets.get(set);
-      if (found.anchor === row.key && found.items.length)
-        yield { key: rowKey(row), set, items: found.items };
-    } else if (!filter || filter(item)) yield { key: rowKey(row), set: "", items: [item] };
+    if (hasGalleryMedia(item) && (!filter || filter(item))) yield { row, item };
   }
 }
 
@@ -833,28 +788,28 @@ const lists = new Map();
 const keptLists = 5;
 const listLifeMs = 60_000;
 
-/** The list `filter` (and `rank`) make of the query: `{ entries: [{ key, unit }], positions }`. */
+/** The list `filter` (and `rank`) make of the query, with an order key for each item. */
 function keptList(query, filter, filterKey, rank, sort) {
   const name = filterKey && JSON.stringify([query, filterKey, Boolean(rank), sort]);
   const kept = name && lists.get(name);
   if (kept && kept.version === listVersion && Date.now() - kept.at <= listLifeMs) return kept;
   let entries = [];
-  for (const unit of galleryUnits(query, filter)) {
-    if (sort === "liked" || sort === "disliked")
-      unit.key[sort] = unit.items.some((item) => item.rating === sort);
-    for (const item of unit.items)
-      entries.push({
-        key: galleryKey(item),
-        unit: unit.key,
-        failed: item.status === "failed",
-        ...(rank && { score: rank(item) }),
-      });
+  for (const { row, item } of visibleRows(query, filter)) {
+    const position = rowKey(row);
+    if (sort === "liked" || sort === "disliked") position[sort] = item.rating === sort;
+    entries.push({
+      key: row.key,
+      position,
+      failed: item.status === "failed",
+      ...(rank && { score: rank(item) }),
+    });
   }
   if (rank)
     entries = entries
       .filter((entry) => entry.score !== undefined)
       .sort((a, b) => b.score - a.score);
-  else if (sort !== "newest") entries.sort((a, b) => compareGalleryUnits(a.unit, b.unit, sort));
+  else if (sort !== "newest")
+    entries.sort((a, b) => compareGalleryKeys(a.position, b.position, sort));
   const list = {
     version: listVersion,
     at: Date.now(),
@@ -884,20 +839,20 @@ function listPage(list, cursor, limit, ranked, sort) {
   let start = 0;
   if (ranked) start = Number(/^r\|(\d+)$/.exec(cursor)?.[1] || 0);
   else if (cursor) {
-    const [, key = "", unit = "null"] = String(cursor).split("|").map(decodeURIComponent);
+    const [, key = "", position = "null"] = String(cursor).split("|").map(decodeURIComponent);
     const at = list.positions.get(key);
     if (at !== undefined) start = at + 1;
     else {
       // Its item has left the list: carry on after where it stood.
       const after = (() => {
         try {
-          return JSON.parse(unit);
+          return JSON.parse(position);
         } catch {
           return null;
         }
       })();
       const found = after
-        ? list.entries.findIndex((entry) => compareGalleryUnits(entry.unit, after, sort) > 0)
+        ? list.entries.findIndex((entry) => compareGalleryKeys(entry.position, after, sort) > 0)
         : -1;
       start = found < 0 ? list.entries.length : found;
     }
@@ -910,25 +865,8 @@ function listPage(list, cursor, limit, ranked, sort) {
       ? ""
       : ranked
         ? `r|${end}`
-        : `k|${encodeURIComponent(last.key)}|${encodeURIComponent(JSON.stringify(last.unit))}`;
+        : `k|${encodeURIComponent(last.key)}|${encodeURIComponent(JSON.stringify(last.position))}`;
   return { items: listedItems(slice), nextCursor };
-}
-
-/** Failed rows are sparse. A failed set member still sorts at the whole set's anchor. */
-function failedGalleryItems(query) {
-  const items = galleryItems({ ...query, status: "failed" }, { ordered: false }).filter(
-    hasGalleryMedia,
-  );
-  const anchors = new Map();
-  for (const item of items) {
-    const set = item.resultSet?.id;
-    if (set && !anchors.has(set)) anchors.set(set, setItems(query, set)[0]);
-  }
-  return items.sort(
-    (a, b) =>
-      compareGalleryItems(anchors.get(a.resultSet?.id) || a, anchors.get(b.resultSet?.id) || b) ||
-      compareGalleryItems(a, b),
-  );
 }
 
 /**
@@ -968,8 +906,8 @@ export function pageGallery({
     const items = list
       ? listedItems(failed ? list.entries.filter((entry) => entry.failed) : list.entries)
       : failed
-        ? failedGalleryItems(sql)
-        : Array.from(galleryUnits(sql, null)).flatMap(({ items }) => items);
+        ? galleryItems({ ...sql, status: "failed" }).filter(hasGalleryMedia)
+        : Array.from(visibleRows(sql), ({ item }) => item);
     return {
       items,
       nextCursor: "",
@@ -987,34 +925,16 @@ export function pageGallery({
       totalApprox: list.entries.length,
     };
   }
-  const from = cursor ? readCursor(cursor) : null;
   const items = [];
   let nextCursor = "";
   let previous = null;
-  // The rest of a set the last page stopped inside, even if a newer result has moved the set.
-  const rest = from?.set
-    ? (() => {
-        const members = setItems(sql, from.set);
-        const at = members.findIndex((item) => galleryKey(item) === from.after);
-        return at < 0 ? [] : members.slice(at + 1);
-      })()
-    : [];
-  const units = (function* () {
-    if (rest.length) yield { key: from.key, set: from.set, items: rest };
-    yield* galleryUnits(sql, null, from?.key, from?.set);
-  })();
-  for (const unit of units) {
+  for (const { row, item } of visibleRows(sql, null, readCursor(cursor))) {
     if (items.length === safeLimit) {
-      nextCursor = cursorFor(previous);
+      nextCursor = cursorFor(rowKey(previous));
       break;
     }
-    const taken = unit.items.slice(0, safeLimit - items.length);
-    items.push(...taken);
-    if (taken.length < unit.items.length) {
-      nextCursor = cursorFor(unit.key, { set: unit.set, after: galleryKey(taken.at(-1)) });
-      break;
-    }
-    previous = unit.key;
+    items.push(item);
+    previous = row;
   }
   return {
     items,

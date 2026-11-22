@@ -17,6 +17,13 @@ import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 /** Whether `profile` is the one a recorded id names. */
 export const isProfile = (profile: Profile, id: unknown) => profile.id === id;
 
+/** The shared Count limit for a run that can produce variations. */
+export function generationCountLimit(profile: Profile | undefined, kind: GenerationInput["kind"]) {
+  return (profile?.capabilities.variations ?? kind === "image")
+    ? Math.min(profile?.constraints?.count?.max ?? 8, 8)
+    : 1;
+}
+
 /** Whether a run on `profile` takes a negative prompt. */
 export const usesNegative = (profile?: Profile) =>
   Boolean(profile && profile.capabilities.negativePrompt !== false);

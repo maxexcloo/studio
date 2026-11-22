@@ -300,9 +300,13 @@ test("Improve Prompt lists its styles alphabetically with descriptions and Custo
   await expect(menu.getByText("A person in focus.", { exact: true })).toHaveCount(0);
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
-  await expect(dialog.getByRole("textbox", { name: "Change", exact: true })).toBeVisible();
+  const request = dialog.getByRole("textbox", { name: "Change", exact: true });
+  await expect(request).toBeVisible();
+  if (phone) await expect(request).not.toBeFocused();
   await expect(dialog.getByRole("button", { name: "Improve Prompt", exact: true })).toBeDisabled();
-  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await dialog
+    .getByRole("button", { name: phone ? "Close Custom Improvement" : "Cancel", exact: true })
+    .click();
   await expect(dialog).toBeHidden();
 });
 

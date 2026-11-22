@@ -48,7 +48,6 @@ export const createMcpTables = `CREATE TABLE IF NOT EXISTS studio_mcp_jobs (job_
 export interface Offer {
   comparison: string;
   jobs: string[];
-  picked?: string;
 }
 
 /**

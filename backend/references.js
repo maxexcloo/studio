@@ -259,6 +259,8 @@ async function fileHead(file, length = 16) {
   }
 }
 
+const savingUploads = new Map();
+
 /**
  * An uploaded image, or MP4 or WebM video, as a gallery item (uploads.js), with the `source` it was
  * imported from, if any; the same bytes from the same owner return the first copy. The content is
@@ -291,52 +293,67 @@ async function saveUploadContent(
   if (buffer) digest.update(buffer);
   else for await (const chunk of fs.createReadStream(temporary)) digest.update(chunk);
   const hash = digest.digest("hex");
-  const stored = (item) => {
-    const media = mediaParams(item.url);
-    return Boolean(media && mediaFile(media.filename, media.subfolder));
-  };
-  const existing = galleryItems({ ownerId, uploaded: true }).find(
-    (item) => item.hash === hash && stored(item),
+  // The chat watcher and the request using that attachment can arrive together.
+  const key = JSON.stringify([ownerId, hash]);
+  while (savingUploads.has(key)) await savingUploads.get(key);
+  let release;
+  savingUploads.set(
+    key,
+    new Promise((resolve) => {
+      release = resolve;
+    }),
   );
-  if (existing) return { item: existing, asset: uploadAsset(existing), added: false };
-  const id = crypto.randomUUID();
-  const subfolder = mediaSubfolder(ownerId);
-  const filename = `${id}.${mimeExtension(inspected.mime)}`;
-  const file = mediaPath(filename, subfolder);
-  if (!file) throw new Error("This upload's name cannot be stored.");
-  if (buffer) await writeBytesFileAsync(file, buffer, { mode: 0o600 });
-  else {
-    await fs.promises.mkdir(path.dirname(file), { recursive: true });
-    await fs.promises.rename(temporary, file);
-  }
-  if (video) {
-    const clip = await probeVideo(file);
-    if (!clip) {
-      await fs.promises.rm(file, { force: true });
-      throw new Error("That video can't be read.");
+  try {
+    const stored = (item) => {
+      const media = mediaParams(item.url);
+      return Boolean(media && mediaFile(media.filename, media.subfolder));
+    };
+    const existing = galleryItems({ ownerId, uploaded: true }).find(
+      (item) => item.hash === hash && stored(item),
+    );
+    if (existing) return { item: existing, asset: uploadAsset(existing), added: false };
+    const id = crypto.randomUUID();
+    const subfolder = mediaSubfolder(ownerId);
+    const filename = `${id}.${mimeExtension(inspected.mime)}`;
+    const file = mediaPath(filename, subfolder);
+    if (!file) throw new Error("This upload's name cannot be stored.");
+    if (buffer) await writeBytesFileAsync(file, buffer, { mode: 0o600 });
+    else {
+      await fs.promises.mkdir(path.dirname(file), { recursive: true });
+      await fs.promises.rename(temporary, file);
     }
-    Object.assign(inspected, {
-      width: clip.width,
-      height: clip.height,
-      durationMs: clip.durationMs,
+    if (video) {
+      const clip = await probeVideo(file);
+      if (!clip) {
+        await fs.promises.rm(file, { force: true });
+        throw new Error("That video can't be read.");
+      }
+      Object.assign(inspected, {
+        width: clip.width,
+        height: clip.height,
+        durationMs: clip.durationMs,
+      });
+    }
+    const item = uploadedGalleryItem({
+      id,
+      ownerId,
+      name: safeName(name),
+      ...inspected,
+      size,
+      hash,
+      createdAt: createdAt || new Date().toISOString(),
+      filename,
+      subfolder,
+      source,
+      prompt,
+      model,
     });
+    addGalleryItems([item]);
+    return { item, asset: uploadAsset(item), added: true };
+  } finally {
+    savingUploads.delete(key);
+    release();
   }
-  const item = uploadedGalleryItem({
-    id,
-    ownerId,
-    name: safeName(name),
-    ...inspected,
-    size,
-    hash,
-    createdAt: createdAt || new Date().toISOString(),
-    filename,
-    subfolder,
-    source,
-    prompt,
-    model,
-  });
-  addGalleryItems([item]);
-  return { item, asset: uploadAsset(item), added: true };
 }
 
 /** An upload as a reference: a video by its first frame, as reference slots take images. */

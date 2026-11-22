@@ -43,7 +43,7 @@ function anchorAt(x: number, y: number, columns: number, scale: number): ZoomAnc
 }
 
 /**
- * Grid and Runs share one column count: two on phones, four on a phone held sideways, three or five
+ * The gallery uses two columns on phones, four on a phone held sideways, three or five
  * wider, until zoomed. Each account remembers its zoom, separately for each of these.
  */
 export function useGalleryColumns() {
@@ -79,7 +79,7 @@ export function useGalleryColumns() {
 }
 
 /**
- * Grid and Runs share one column count and the measured width of their host. Pinching on phones
+ * The grid uses one column count and the measured width of its host. Pinching on phones
  * and Ctrl/Cmd+scroll (a trackpad pinch included) on desktop step between column counts. After a
  * zoom, `anchor` puts the tile under the fingers or pointer back where it was: the view passes
  * where a tile now sits (`start` and `size`, in window scroll coordinates).

@@ -8,7 +8,6 @@ import {
   image,
   openReferenceChoices,
   selectionAction,
-  selectionMenuItem,
   serveRetries,
   showOnly,
   stamp,
@@ -614,59 +613,7 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
   }
 });
 
-test("Runs fan a stacked run out in place and open it to flip through", async ({
-  page,
-}, testInfo) => {
-  const state = await fixtures(page);
-  state.gallery.push(
-    ...results(3).map((item, index) => ({
-      ...item,
-      id: `run-${index}`,
-      jobId: "run-job",
-      prompt: `Bird study ${index}`,
-      ...(index === 2 ? { parentItemId: "browse-0", derived: true } : {}),
-    })),
-    ...results(1),
-  );
-  await page.goto("/images");
-  // The view is a Filter choice; the popup closes like any other.
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByText("Runs", { exact: true }).click();
-  await page.keyboard.press("Escape");
-  const stack = page.getByRole("button", { name: "Run: Bird Study 0, 3 Images", exact: true });
-  await stack.click();
-  await expect(stack).toHaveAttribute("aria-expanded", "true");
-  const run = page.getByRole("region", { name: "Run: Bird Study 0", exact: true });
-  await expect(run.getByRole("button", { name: /^Open image: Bird Study/ })).toHaveCount(3);
-  await run.getByRole("button", { name: "Open image: Bird Study 2", exact: true }).click();
-  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  // A run's result flips through that run alone, as Open All does from its first.
-  await expect(currentResult(viewer)).toHaveText(/^\d \/ 3$/);
-  if (!testInfo.project.use.isMobile) {
-    // Following a source is a separate history step. Back returns to the run's own neighbours.
-    await viewer
-      .getByRole("complementary", { name: "Generation Details", exact: true })
-      .getByRole("link", { name: "Browse Result 0", exact: true })
-      .click();
-    await expect(page).toHaveURL(/\/images\/browse-0$/);
-    await page.goBack();
-    await expect(page).toHaveURL(/\/images\/run-2$/);
-    await expect(currentResult(viewer)).toHaveText(/^\d \/ 3$/);
-  }
-  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
-  await run.getByRole("button", { name: "Open All", exact: true }).click();
-  await expect(viewer.getByRole("img", { name: "Bird study 0", exact: true })).toBeVisible();
-  await expect(currentResult(viewer)).toHaveText("1 / 3");
-  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
-  await run.getByRole("button", { name: "Close Run", exact: true }).click();
-  await expect(run).toBeHidden();
-  await expect(stack).toHaveAttribute("aria-expanded", "false");
-  await page.reload();
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await expect(page.getByRole("radio", { name: "Runs" })).toBeChecked();
-});
-
-test("An MCP result set is one titled run whose viewer announces each result and jumps along its strip", async ({
+test("MCP set results appear individually and the viewer can jump along the set strip", async ({
   page,
 }) => {
   const place = (title: string, index: number) => `${title} · ${index} / 3`;
@@ -697,28 +644,17 @@ test("An MCP result set is one titled run whose viewer announces each result and
   await expect(
     page.getByRole("button", { name: `Open image: ${untitled}`, exact: true }),
   ).toBeVisible();
-  // Runs stacks the set under its title, newest first.
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByText("Runs", { exact: true }).click();
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Run: Variety Test, 3 Images", exact: true }).click();
-  const run = page.getByRole("region", { name: "Run: Variety Test", exact: true });
-  const tiles = run.getByRole("button", { name: /^Open image: / });
-  await expect(tiles).toHaveCount(3);
+  const tiles = page.getByRole("button", { name: /^Open image: / });
   expect(await tiles.evaluateAll((all) => all.map((tile) => tile.ariaLabel))).toEqual([
     "Open image: Bear Hug",
     `Open image: ${untitled}`,
     "Open image: Fox Wizard",
+    "Open image: Browse Result 0",
   ]);
-  // The viewer announces the result's place while navigating the set's strip.
+  await page.getByRole("button", { name: "Open image: Bear Hug", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const current = currentResult(viewer);
-  // WebKit can drop a tap while the run's tiles are still fanning out.
-  await expect(async () => {
-    if (!(await viewer.isVisible()))
-      await run.getByRole("button", { name: "Open All", exact: true }).click();
-    await expect(current).toHaveText(place("Bear Hug", 1), { timeout: 1000 });
-  }).toPass();
+  await expect(current).toHaveText(place("Bear Hug", 1));
   const strip = viewer.getByRole("list", { name: "Set: Variety Test", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(3);
   await strip.getByRole("listitem", { name: "Show Fox Wizard (3 of 3)", exact: true }).click();
@@ -728,40 +664,6 @@ test("An MCP result set is one titled run whose viewer announces each result and
   ).toBeVisible();
   await strip.getByRole("listitem", { name: `Show ${untitled} (2 of 3)`, exact: true }).click();
   await expect(current).toHaveText(place(untitled, 2));
-});
-
-test("Select Set picks a set's results to upscale together", async ({ page }) => {
-  const state = await fixtures(page);
-  state.gallery.push(
-    ...["Bear Hug", "Owl Librarian", "Fox Wizard"].map((variation, position) => ({
-      ...results(1)[0],
-      id: `set-${2 - position}`,
-      jobId: `set-job-${2 - position}`,
-      prompt: `Set prompt ${2 - position}`,
-      createdAt: `2026-10-23T00:00:0${3 - position}.000Z`,
-      resultSet: { id: "set-a", title: "Variety Test", index: 2 - position, variation },
-    })),
-    ...results(1),
-  );
-  const upscales: any[] = [];
-  await page.route("**/api/upscale", (route) => {
-    upscales.push(route.request().postDataJSON());
-    return route.fulfill({ json: { ok: true } });
-  });
-  await page.goto("/images");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByText("Runs", { exact: true }).click();
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Run: Variety Test, 3 Images", exact: true }).click();
-  const run = page.getByRole("region", { name: "Run: Variety Test", exact: true });
-  await run.getByRole("button", { name: "Select Set", exact: true }).click();
-  await expect(
-    page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
-  ).toHaveText("3 Selected");
-  await (await selectionMenuItem(page, "Upscale", "Upscale")).click();
-  await expect
-    .poll(() => upscales.map((body) => body.galleryItemId).sort())
-    .toEqual(["set-0", "set-1", "set-2"]);
 });
 
 test("Running tiles show progress with Stop and Retry replaces a failed tile", async ({ page }) => {
@@ -845,9 +747,7 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
   expect(tiles.indexOf("retried")).toBeGreaterThan(tiles.indexOf("newest"));
 });
 
-test("One notification shows at a time: a second dislike replaces the first, with its own Undo", async ({
-  page,
-}) => {
+test("A second dislike replaces the first Undo and restores only its result", async ({ page }) => {
   const state = await fixtures(page);
   state.gallery.push(...results(2));
   await page.goto("/images");
@@ -858,13 +758,12 @@ test("One notification shows at a time: a second dislike replaces the first, wit
       .click();
     await selectionAction(page, "Dislike").click();
     await expect.poll(() => state.gallery[index].rating).toBe("disliked");
-    // The selection ends as the dislike's notification shows.
     await expect(page.getByRole("button", { name: "Select Items", exact: true })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
   }
-  const banner = page.getByRole("alert").filter({ hasText: "Disliked" });
+  const banner = page.getByRole("status").filter({ hasText: "Disliked" });
   await expect(banner).toHaveCount(1);
   await banner.getByRole("button", { name: "Undo", exact: true }).click();
   await expect.poll(() => state.gallery[1].rating).toBeUndefined();
@@ -1084,19 +983,13 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   await showOnly(page, "Liked");
   await showOnly(page, "Uploads");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  // The view (Grid or Runs) leads the popup.
-  await expect(page.getByRole("radiogroup", { name: "Gallery View", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Originals Only", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
   await expect(page.getByRole("button", { name: "Comparisons", exact: true })).toHaveAttribute(
     "aria-pressed",
     "false",
   );
   await page.keyboard.press("Escape");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
-  await expect(status).toHaveAttribute("aria-description", "Generating");
+  await expect(status).toHaveAttribute("aria-description", /^Generating/);
   await status.click();
   const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   await expect(queue.getByText("waiting-job", { exact: true })).toBeVisible();
@@ -2157,7 +2050,7 @@ test("Completing every held pending output refreshes one head page without walki
   await expect(viewer).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Status", exact: true })).toHaveAttribute(
     "aria-description",
-    "Generating",
+    /^Generating/,
   );
   const previousReads = cursors.length;
   state.jobs[0].status = "completed";
@@ -2212,12 +2105,12 @@ test("The final job completing during pagination defers one head refresh until t
   });
   await page.goto("/images/browse-59");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
-  await expect(status).toHaveAttribute("aria-description", "Generating");
+  await expect(status).toHaveAttribute("aria-description", /^Generating/);
   await expect.poll(() => paging).toBe(true);
   const previousReads = cursors.length;
   try {
     state.jobs[0].status = "completed";
-    await expect(status).not.toHaveAttribute("aria-description", "Generating");
+    await expect(status).not.toHaveAttribute("aria-description", /^Generating/);
     expect(cursors.length).toBe(previousReads);
   } finally {
     release();
@@ -2237,48 +2130,42 @@ test("The final job completing during pagination defers one head refresh until t
   expect(cursors.filter(Boolean)).toEqual(["older"]);
 });
 
-for (const view of ["Grid", "Runs"] as const)
-  for (const captions of [false, true])
-    test(`Phone ${view} holds open item menus with captions ${captions ? "shown" : "hidden"}`, async ({
-      page,
-    }, testInfo) => {
-      test.skip(!testInfo.project.use.isMobile, "Phone touch menus");
-      const state = await fixtures(page);
-      state.preferences.preferences.tileCaptions = captions;
-      state.gallery.push(...results(2));
-      await page.goto("/images");
-      await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-      await page.getByText(view, { exact: true }).click();
-      await page.keyboard.press("Escape");
-      const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
-      const second = page.getByRole("button", { name: "Open image: Browse Result 1", exact: true });
-      await touch(first, "touchstart");
-      await touch(first, "touchmove", 140);
-      await touch(first, "touchend", 140);
-      await touch(second, "touchstart");
-      const menu = page.getByRole("menu");
-      await expect(menu).toBeVisible();
-      await touch(second, "touchend");
-      // Native contextmenu after the hold must not open a second surface.
-      expect(
-        await second.evaluate(
-          (node) =>
-            !node.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })),
-        ),
-      ).toBe(true);
-      await second.dispatchEvent("click");
-      await expect(menu).toHaveCount(1);
-      await expect(menu).toBeVisible();
-      await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
-      await expect(
-        page.getByRole("group", { name: "Gallery Selection", exact: true }),
-      ).toBeHidden();
-      await page.keyboard.press("Escape");
-      await expect(menu).toBeHidden();
-      await first.click();
-      await expect(
-        page
-          .getByRole("dialog", { name: "Generation", exact: true })
-          .getByRole("img", { name: "Browse Result 0", exact: true }),
-      ).toBeVisible();
-    });
+for (const captions of [false, true])
+  test(`Phone gallery holds open item menus with captions ${captions ? "shown" : "hidden"}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(!testInfo.project.use.isMobile, "Phone touch menus");
+    const state = await fixtures(page);
+    state.preferences.preferences.tileCaptions = captions;
+    state.gallery.push(...results(2));
+    await page.goto("/images");
+    const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
+    const second = page.getByRole("button", { name: "Open image: Browse Result 1", exact: true });
+    await touch(first, "touchstart");
+    await touch(first, "touchmove", 140);
+    await touch(first, "touchend", 140);
+    await touch(second, "touchstart");
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    await touch(second, "touchend");
+    // Native contextmenu after the hold must not open a second surface.
+    expect(
+      await second.evaluate(
+        (node) =>
+          !node.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })),
+      ),
+    ).toBe(true);
+    await second.dispatchEvent("click");
+    await expect(menu).toHaveCount(1);
+    await expect(menu).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
+    await expect(page.getByRole("group", { name: "Gallery Selection", exact: true })).toBeHidden();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await first.click();
+    await expect(
+      page
+        .getByRole("dialog", { name: "Generation", exact: true })
+        .getByRole("img", { name: "Browse Result 0", exact: true }),
+    ).toBeVisible();
+  });

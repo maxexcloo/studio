@@ -117,7 +117,7 @@ export function useTypingIn<T>(active: boolean, ownerOf: (field: Element) => T |
  * While a phone types in a centred dialog or chip sheet, fit that dialog above the keyboard.
  * The full-screen text editor follows the viewport itself.
  */
-export function useDialogKeyboard() {
+export function DialogKeyboard() {
   const owner = useTypingIn(usePhone(), (field) => {
     const dialog = field.closest(".mantine-Modal-content");
     return dialog?.matches(":not([data-full-screen]), [data-chip-popup]")
@@ -134,4 +134,5 @@ export function useDialogKeyboard() {
       owner.style.removeProperty("bottom");
     };
   }, [owner, keyboard.top, keyboard.inset]);
+  return null;
 }

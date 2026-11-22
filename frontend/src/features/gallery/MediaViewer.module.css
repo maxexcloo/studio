@@ -259,12 +259,6 @@
   transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
-/* A set result's versions stand smaller in its place, apart from the set's other results. */
-.variation[data-version] {
-  width: 40px;
-  height: 40px;
-}
-
 .variationProgress {
   position: absolute;
   inset: auto 0 0;
@@ -361,8 +355,17 @@
 
 /* Phones show the media edge to edge, filling the space above the strip and controls. */
 :where(:root[data-phone]) .dock {
-  padding-inline: var(--mantine-spacing-sm);
+  padding: 0;
 }
+
+:where(:root[data-phone]) .dock > .actions {
+  width: 100%;
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+  padding-inline: max(4px, env(safe-area-inset-left)) max(4px, env(safe-area-inset-right));
+  padding-bottom: calc(4px + env(safe-area-inset-bottom));
+}
+
 /* A phone held sideways keeps the full height for the media: the strip, prompt and actions stand
    beside it, at a portrait phone's width, below the top bar's buttons. */
 :where(:root[data-phone="sideways"]) .main {
@@ -371,8 +374,10 @@
 :where(:root[data-phone="sideways"]) .dock {
   justify-content: flex-end;
   width: min(24rem, 45%);
-  padding-inline: 0 calc(var(--mantine-spacing-sm) + env(safe-area-inset-right));
-  padding-bottom: calc(var(--mantine-spacing-sm) + env(safe-area-inset-bottom));
+}
+
+:where(:root[data-phone="sideways"]) .dock > .actions {
+  padding-inline-start: 4px;
 }
 
 .modelBadge {
