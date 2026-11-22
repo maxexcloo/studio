@@ -201,6 +201,7 @@ export function DreamPreview({
   act,
   askPass,
   undo,
+  quickRating,
 }: {
   card: DeckCard;
   side: number;
@@ -214,6 +215,7 @@ export function DreamPreview({
   act: (choice: Choice["choice"]) => void;
   askPass: () => void;
   undo: () => void;
+  quickRating?: boolean;
 }) {
   const id = useId();
   const closeIfTop = closeWhenTop(id, close);
@@ -388,12 +390,17 @@ export function DreamPreview({
             )}
             <DeckButtons
               card={card}
+              quickRating={quickRating}
               act={act}
               askPass={askPass}
               hidden={false}
               expanded
               singleImageComparison={card.kind === "pair" && item.type === "image"}
-              trailing={<DreamSuggestions card={card} side={side} onMore={() => act("more")} />}
+              trailing={
+                quickRating ? undefined : (
+                  <DreamSuggestions card={card} side={side} onMore={() => act("more")} />
+                )
+              }
               leading={<DeckUndo disabled={!canUndo} onClick={undo} />}
             />
           </div>

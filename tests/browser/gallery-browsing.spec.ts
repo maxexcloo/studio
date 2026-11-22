@@ -308,7 +308,10 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
     ...results(3).map((item, index) => ({
       ...item,
       ...(index < 2
-        ? { chat: { conversationId: "chat-a", turnId: index ? "turn-2" : "turn-1" } }
+        ? {
+            chat: { conversationId: "chat-a", turnId: index ? "turn-2" : "turn-1" },
+            resultSet: { id: `set-${index}`, title: "Lighting", index: 0 },
+          }
         : {}),
     })),
   );
@@ -321,6 +324,14 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
     prompt: "Chat Video",
     chat: { conversationId: "chat-a", turnId: "turn-2" },
   });
+  await page.route("**/api/gallery/chat-sets?**", (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    const sets = [
+      { id: "set-0", title: "Lighting", count: 1, notes: "Window light", at: null },
+      { id: "set-1", title: "Lighting", count: 1, notes: "Hard flash", at: null },
+    ];
+    return route.fulfill({ json: { sets: query.has("turn") ? sets.slice(0, 1) : sets } });
+  });
   await page.goto("/images?chat=chat-a&turn=turn-1");
   await expect(tile(0)).toBeVisible();
   await expect(tile(1)).toHaveCount(0);
@@ -331,6 +342,15 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
     .click();
   await page.keyboard.press("Escape");
   await expect(tile(1)).toBeVisible();
+  await expect(tile(2)).toHaveCount(0);
+  const chatSets = page.getByRole("button", { name: "Chat Sets", exact: true });
+  await chatSets.click();
+  await page.getByRole("option").filter({ hasText: "Hard flash" }).click();
+  await expect(tile(1)).toBeVisible();
+  await expect(tile(0)).toHaveCount(0);
+  await chatSets.click();
+  await page.getByRole("option", { name: "All Sets", exact: true }).click();
+  await expect(tile(0)).toBeVisible();
   await expect(tile(2)).toHaveCount(0);
   await tile(0).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
@@ -364,6 +384,7 @@ test("An MCP result link shows its turn, then the whole chat, then every result"
   await page.getByRole("button", { name: "Remove This Chat Filter", exact: true }).click();
   await expect(page).toHaveURL(/\/images$/);
   await expect(tile(2)).toBeVisible();
+  await expect(chatSets).toHaveCount(0);
 });
 
 test("Ctrl+scroll zooms the grid around the tile under the pointer and is remembered", async ({
@@ -396,6 +417,34 @@ test("Ctrl+scroll zooms the grid around the tile under the pointer and is rememb
   await page.reload();
   await expect.poll(async () => (await tile(0).boundingBox())?.width).toBeCloseTo(zoomed, 0);
   await expect(page.getByRole("slider", { name: "Tile Size" })).toBeVisible();
+});
+
+test("Pinching the phone gallery enlarges the tiles", async ({ page, isMobile, browserName }) => {
+  test.skip(!isMobile || browserName !== "chromium", "Requires Chromium touch input");
+  const state = await fixtures(page);
+  state.gallery.push(...results(80));
+  await page.goto("/images");
+  const tile = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
+  await expect(tile).toBeInViewport();
+  const { x, y, width, height } = (await tile.boundingBox())!;
+  const centre = { x: x + width / 2, y: y + height / 2 };
+  const points = (distance: number) => [
+    { x: centre.x - distance, y: centre.y },
+    { x: centre.x + distance, y: centre.y },
+  ];
+  const touch = await page.context().newCDPSession(page);
+  try {
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: points(10).slice(0, 1),
+    });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: points(10) });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: points(30) });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  } finally {
+    await touch.detach();
+  }
+  await expect.poll(async () => (await tile.boundingBox())?.width).toBeGreaterThan(width);
 });
 
 test("Closing a navigated viewer reveals and focuses its current virtualised gallery tile", async ({

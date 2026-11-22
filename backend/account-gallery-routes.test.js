@@ -99,6 +99,38 @@ test("Gallery reads repair only the requested account's pending work", async (t)
   assert.equal(status("other-account"), "failed");
 });
 
+test("Gallery cleanup shares a job lookup across its pending outputs", () => {
+  const pending = (ownerId, index) => ({
+    ...item(ownerId, "shared-job"),
+    id: `${ownerId}-${index}`,
+    url: "",
+    index,
+    status: "pending",
+  });
+  setGallery([pending("account-a", 0), pending("account-a", 1), pending("account-b", 0)]);
+  let running = true;
+  const checked = [];
+  const queue = {
+    unfinished(ownerId, id) {
+      checked.push([ownerId, id]);
+      return running && ownerId === "account-a";
+    },
+  };
+  galleryStore.cleanupGalleryState(queue);
+  assert.deepEqual(checked.sort(), [
+    ["account-a", "shared-job"],
+    ["account-b", "shared-job"],
+  ]);
+  const status = (id) => galleryStore.galleryItem(id).status;
+  assert.equal(status("account-a-0"), "pending");
+  assert.equal(status("account-a-1"), "pending");
+  assert.equal(status("account-b-0"), "failed");
+  running = false;
+  galleryStore.cleanupGalleryState(queue);
+  assert.equal(status("account-a-0"), "failed");
+  assert.equal(status("account-a-1"), "failed");
+});
+
 test("Gallery Comparisons includes saved comparisons and kept Dream pairs, without sets or batches", async () => {
   const own = (id, fields) => ({ ...item("account-a", id), ...fields });
   const pair = { state: "kept", pair: { id: "dream-comparison" } };

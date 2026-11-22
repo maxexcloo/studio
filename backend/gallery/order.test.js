@@ -8,7 +8,7 @@ import { compareGalleryItems } from "./order.js";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-order-"));
 process.env.STUDIO_DATA_DIR = scratch;
-const { galleryItems, pageGallery } = await import("./store.js");
+const { galleryChatSets, galleryItems, pageGallery } = await import("./store.js");
 const { setGallery } = await import("../fixtures/gallery.js");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
@@ -67,6 +67,38 @@ test("a removed cursor continues through descending id ties and undated results"
   const cursor = pageGallery({ limit: 2 }).nextCursor;
   setGallery(items.filter((item) => item.id !== "m"));
   assert.deepEqual(ids(pageGallery({ cursor, limit: 2 }).items), ["a", "import"]);
+});
+
+test("finished arrivals and unrated results keep their chronological order through rating", () => {
+  setGallery([
+    item("old", "2026-01-01"),
+    item("rated", "2026-01-02", { rating: "liked" }),
+    item("later", "2026-01-03"),
+    item("latest", "2026-01-04"),
+    item("pending", "2026-01-05", { status: "pending" }),
+    item("disliked", "2026-01-03T03:00:00Z", { rating: "disliked" }),
+  ]);
+  const arrivals = pageGallery({
+    limit: 1,
+    query: { status: "done", since: Date.parse("2026-01-02") },
+  });
+  assert.deepEqual(ids(arrivals.items), ["latest"]);
+  const review = { limit: 1, query: { status: "done", unrated: true } };
+  const first = pageGallery(review);
+  assert.deepEqual(ids(first.items), ["latest"]);
+  const allRatings = { limit: 2, includeDisliked: true, query: { status: "done" } };
+  const all = pageGallery(allRatings);
+  assert.deepEqual(ids(all.items), ["latest", "disliked"]);
+  assert.deepEqual(ids(pageGallery({ ...allRatings, cursor: all.nextCursor }).items), [
+    "later",
+    "rated",
+  ]);
+  setGallery([
+    item("old", "2026-01-01"),
+    item("later", "2026-01-03"),
+    item("latest", "2026-01-04", { rating: "liked" }),
+  ]);
+  assert.deepEqual(ids(pageGallery({ ...review, cursor: first.nextCursor }).items), ["later"]);
 });
 
 test("age and rating sorts order individual results before slicing", () => {
@@ -188,6 +220,50 @@ test("members of a result set interleave with other results by time", () => {
     "set-0",
     "set-1",
   ]);
+});
+
+test("chat sets separate identically titled runs within the owner's conversation and turn", () => {
+  const image = (id, date, setId, turnId, extra = {}) =>
+    item(id, date, {
+      ownerId: "alice",
+      chat: { conversationId: "chat", turnId },
+      resultSet: { id: setId, title: "Lighting", caption: "Caption", context: { notes: "Notes" } },
+      ...extra,
+    });
+  setGallery([
+    image("first-a", "2026-01-01", "first", "turn-1"),
+    image("first-b", "2026-01-03", "first", "turn-1"),
+    image("second", "2026-01-04", "second", "turn-1", {
+      resultSet: { id: "second", title: "Lighting", caption: "Another Caption" },
+    }),
+    image("third", "2026-01-02", "third", "turn-2"),
+    image("failed", "2026-01-06", "failed", "turn-1", { status: "failed" }),
+    image("unlisted", "2026-01-06", "unlisted", "turn-1", { rating: "disliked" }),
+    image("video", "2026-01-06", "video", "turn-1", { type: "video" }),
+    image("private", "2026-01-06", "private", "turn-1", { ownerId: "bob" }),
+  ]);
+  const conversationId = "chat";
+  const sets = galleryChatSets("alice", "image", { conversationId, turnId: "turn-1" });
+  assert.deepEqual(
+    sets.map((set) => ({ ...set })),
+    [
+      {
+        id: "second",
+        title: "Lighting",
+        count: 1,
+        at: Date.parse("2026-01-04"),
+        notes: "Another Caption",
+      },
+      { id: "first", title: "Lighting", count: 2, at: Date.parse("2026-01-03"), notes: "Notes" },
+    ],
+  );
+  assert.deepEqual(ids(galleryChatSets("alice", "image", { conversationId })), [
+    "second",
+    "first",
+    "third",
+  ]);
+  assert.deepEqual(ids(galleryChatSets("alice", "video", { conversationId })), ["video"]);
+  assert.deepEqual(ids(galleryChatSets("bob", "image", { conversationId })), ["private"]);
 });
 
 test("paging carries on when the last shown set member is removed and a new one arrives", () => {

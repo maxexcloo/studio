@@ -8,7 +8,16 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { type Location, Navigate, useLocation, useNavigate } from "react-router";
 
 import type { GallerySort } from "../../../../shared/gallery-sort";
@@ -25,6 +34,7 @@ import { useGenerationActions } from "../generation/GenerationProvider";
 import type { OpenComposerState } from "../generation/openComposer";
 import { queueQuery } from "../generation/Queue";
 import { preferencesQuery } from "../settings/accountPreferences";
+import { ChatSetPicker } from "./ChatSetPicker";
 import { ShowToggles, emptyGalleryFilters } from "./GalleryFilters";
 import { GalleryImport, droppedFiles, useGalleryUpload } from "./GalleryImport";
 import { GallerySelectionBar } from "./GallerySelectionBar";
@@ -37,8 +47,10 @@ import { MediaViewer } from "./MediaViewer";
 import { MorePages } from "./MorePages";
 import {
   type GalleryDate,
+  type GalleryListing,
   type GalleryPageParam,
   type GalleryResultsPage,
+  galleryArrivalsQuery,
   galleryKey,
   galleryListingKey,
   galleryPage,
@@ -52,6 +64,7 @@ import {
   similarStrictnessOptions,
   useSimilarStrictness,
 } from "./similarStrictness";
+import { useGalleryDeparture } from "./useGalleryDeparture";
 import { useGallerySelection } from "./useGallerySelection";
 import { usePendingRating } from "./useMediaRating";
 import { useTryAgain } from "./useTryAgain";
@@ -67,6 +80,9 @@ import {
 import classes from "./GalleryPage.module.css";
 
 type PageState = GalleryState & OpenComposerState & { compose?: boolean; viewer?: boolean };
+const GalleryReview = lazy(() =>
+  import("./GalleryReview").then(({ GalleryReview }) => ({ default: GalleryReview })),
+);
 
 /**
  * Links already shared (in chats too) carried the viewer's item and the gallery's state as query
@@ -106,6 +122,7 @@ function Gallery() {
   const location = useLocation();
   const routerNavigate = useNavigate();
   const kind = galleryKind(location.pathname) || "image";
+  const { leftAt, acknowledged, acknowledge } = useGalleryDeparture(kind);
   const base = galleryPath(kind);
   const state = location.state as PageState | null;
   const { changeKind, profiles } = useGenerationActions();
@@ -118,6 +135,8 @@ function Gallery() {
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const [sort, setSort] = useRemembered<GallerySort>("gallery-sort", "newest");
   const [focusItem, setFocusItem] = useState<string | null>(null);
+  const [review, setReview] = useState<GalleryListing>();
+  if (review && review.kind !== kind) setReview(undefined);
   // A caption tag in Details links here with `q`: it becomes the search and closes the viewer.
   const linkedQuery = state?.q;
   // The viewer's item (`/images/<id>`): opening one adds a history entry, so Back closes it, and
@@ -198,6 +217,11 @@ function Gallery() {
     [search, kind, filters, similar, strictness, setId, chat, turn, sort],
   );
   const scope = useMemo(() => JSON.stringify(galleryListingKey(listing)), [listing]);
+  const arrivals =
+    useQuery({
+      ...galleryArrivalsQuery(listing, leftAt),
+      enabled: !!leftAt && !acknowledged && !itemId && !similar,
+    }).data && !acknowledged;
   const byDay = !similar && sort !== "liked" && sort !== "disliked";
   const [jump, setJump] = useState<{ scope: string; date: GalleryDate }>();
   if (jump && jump.scope !== scope) setJump(undefined);
@@ -215,6 +239,7 @@ function Gallery() {
   const listingKey = listingQuery.queryKey;
   const gallery = useInfiniteQuery({
     ...listingQuery,
+    enabled: !review,
     // Search and filter changes keep the current results until the new ones arrive; switching
     // between Images and Videos never shows the other mode's results.
     placeholderData: (previous, query) => (query?.queryKey[2] === kind ? previous : undefined),
@@ -302,7 +327,7 @@ function Gallery() {
   const pendingFirst = useRef<typeof listingKey | null>(null);
   const refreshFirst = useCallback(() => {
     // A date jump can skip thousands of items. Never bridge from the newest page to that window.
-    if (historical) return;
+    if (historical || review) return;
     if (
       client.isFetching({ queryKey: listingKey, exact: true }) ||
       client.isFetching({ queryKey: refreshKey, exact: true })
@@ -315,7 +340,7 @@ function Gallery() {
       if (sort === "newest") void readFirst({ cancelRefetch: false });
       else void client.invalidateQueries({ queryKey: listingKey, exact: true });
     }
-  }, [client, historical, listingKey, readFirst, refreshKey, sort]);
+  }, [client, historical, listingKey, readFirst, refreshKey, review, sort]);
   useEffect(
     () => () => {
       pendingFirst.current = null;
@@ -338,12 +363,12 @@ function Gallery() {
   ]);
   // Pending tiles need polling for live previews only while the listing can show them.
   useEffect(() => {
-    if (!showWork || !jobs?.active) return;
+    if (review || !showWork || !jobs?.active) return;
     const timer = setInterval(() => {
       if (!document.hidden) void refreshFirst();
     }, 3000);
     return () => clearInterval(timer);
-  }, [showWork, jobs?.active, refreshFirst]);
+  }, [review, showWork, jobs?.active, refreshFirst]);
   useEffect(
     () =>
       focusManager.subscribe((focused) => {
@@ -663,6 +688,24 @@ function Gallery() {
             window.scrollTo({ top: 0 });
           }}
           count={gallery.data?.pages.at(-1)?.totalApprox}
+          chipTools={
+            chat && (
+              <ChatSetPicker
+                kind={kind}
+                chat={chat}
+                turn={turn}
+                setId={setId}
+                onChange={(id) => {
+                  if ((id || "") === setId) return;
+                  void routerNavigate(base, {
+                    replace: true,
+                    state: { ...latest.current.state, set: id } satisfies PageState,
+                  });
+                  window.scrollTo({ top: 0 });
+                }}
+              />
+            )
+          }
           extraChips={[
             ...(similar
               ? [
@@ -683,7 +726,7 @@ function Gallery() {
               ? [
                   {
                     key: "set",
-                    label: `Set: ${loaded[0]?.resultSet?.title || "Results"}`,
+                    label: `Set: ${loaded[0]?.resultSet?.id === setId ? loaded[0].resultSet.title || "Results" : "Results"}`,
                     remove: () => dropState("set"),
                   },
                 ]
@@ -712,6 +755,7 @@ function Gallery() {
                                 replace: true,
                                 state: {
                                   ...location.state,
+                                  set: undefined,
                                   show: value === "chat" ? "chat" : undefined,
                                 } satisfies PageState,
                               }),
@@ -725,6 +769,18 @@ function Gallery() {
           toggles={<ShowToggles kind={kind} value={filters} onChange={setFilters} />}
           actions={
             <>
+              {!filters.uploads && !selection.selecting && !!loaded.length && (
+                <Tooltip label="Review Gallery">
+                  <Button
+                    {...(phone ? iconChipProps : chipProps)}
+                    aria-label="Review Gallery"
+                    leftSection={phone ? undefined : <icons.review size={15} />}
+                    onClick={() => setReview(listing)}
+                  >
+                    {phone ? <icons.review size={16} /> : "Review"}
+                  </Button>
+                </Tooltip>
+              )}
               <GalleryImport upload={upload} />
               {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
               <Tooltip label="Select Items" disabled={!phone}>
@@ -768,7 +824,7 @@ function Gallery() {
         </Alert>
       ) : loaded.length ? (
         <div className={classes.results} data-stale={gallery.isPlaceholderData || undefined}>
-          {!historical && incoming > 0 && (
+          {(arrivals || (!historical && incoming > 0)) && (
             <div className={classes.incoming}>
               <Button
                 variant="default"
@@ -776,11 +832,20 @@ function Gallery() {
                 radius="xl"
                 leftSection={<ArrowUp size={14} />}
                 onClick={() => {
+                  if (arrivals) {
+                    acknowledge();
+                    setJump(undefined);
+                    setSort("newest");
+                  }
                   window.scrollTo({ top: 0 });
-                  refreshFirst();
+                  if (sort === "newest" && !historical) refreshFirst();
                 }}
               >
-                {incoming === 1 ? "1 New Result" : `${incoming} New Results`}
+                {arrivals
+                  ? "Jump to New Results"
+                  : incoming === 1
+                    ? "1 New Result"
+                    : `${incoming} New Results`}
               </Button>
             </div>
           )}
@@ -789,7 +854,7 @@ function Gallery() {
               direction="previous"
               listing={gallery}
               results={resultsKey}
-              paused={!!itemId || gallery.isPlaceholderData}
+              paused={!!itemId || !!review || gallery.isPlaceholderData}
             />
           )}
           <MediaGrid
@@ -846,7 +911,11 @@ function Gallery() {
           </Stack>
         </Alert>
       )}
-      <MorePages listing={gallery} results={JSON.stringify(listingKey)} paused={!!itemId} />
+      <MorePages
+        listing={gallery}
+        results={JSON.stringify(listingKey)}
+        paused={!!itemId || !!review}
+      />
       {!selection.selecting && (
         <ComposerDock
           compose={!!state?.compose}
@@ -882,6 +951,11 @@ function Gallery() {
           }}
           close={closeViewer}
         />
+      )}
+      {review && (
+        <Suspense fallback={<LoadingState label="Loading Review" />}>
+          <GalleryReview listing={review} leftAt={leftAt} close={() => setReview(undefined)} />
+        </Suspense>
       )}
     </Stack>
   );
