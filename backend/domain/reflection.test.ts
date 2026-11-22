@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { type ReflectionItem, daysOf, samenessOf } from "./reflection.ts";
+import { type ReflectionItem, createReflection, daysOf, samenessOf } from "./reflection.ts";
 
 const images = (count: number, look: (index: number) => string) =>
   Array.from({ length: count }, (_, index) => ({ id: `${index}`, title: look(index) }));
@@ -74,4 +74,24 @@ test("days count each model's results, likes and dislikes in the person's time z
       ["2026-11-17", "kromafine-fp8", 1, 0, 0],
     ],
   );
+});
+
+test("a convergence check reads only recent generations and shares its result with reflection", () => {
+  const reads: [string, unknown][] = [];
+  const reflection = createReflection({
+    gallery: (ownerId, query) => {
+      reads.push([ownerId, query.limit]);
+      return images(30, () => "one look");
+    },
+    likeness,
+  });
+
+  assert.equal(reflection.converging("alice"), true);
+  assert.deepEqual(reads, [["alice", 80]]);
+  assert.equal(reflection.read("alice", "UTC").sameness.made.converging, true);
+  assert.deepEqual(reads, [
+    ["alice", 80],
+    ["alice", 80],
+    ["alice", 5000],
+  ]);
 });

@@ -259,6 +259,7 @@ interface MediaActionOptions {
   onDelete: () => void;
   /** Opens Report's Custom… dialog. */
   onReport: () => void;
+  onReportQueued?: (jobId: string) => void;
   onRetried?: (jobId: string) => void;
   onVersionChange?: (id: string, active: boolean) => void;
   retryInStage?: boolean;
@@ -280,6 +281,7 @@ export function useMediaActions(
     onAnimate,
     onDelete,
     onReport,
+    onReportQueued,
     onRetried,
     onVersionChange,
     retryInStage = false,
@@ -333,7 +335,7 @@ export function useMediaActions(
   const location = useLocation();
   const navigate = useNavigate();
   const rating = useMediaRating(item);
-  const report = useReportIssue(item, iterate);
+  const report = useReportIssue(item, onReportQueued);
   const ready = item.status === "done" && Boolean(item.url);
   const gif = ready ? videoGif(item) : null;
   const image = ready && item.type === "image";
@@ -800,13 +802,18 @@ export function useMediaActions(
  * Animate's and Report's dialogs for an item's actions: spread the handlers into its
  * options and render `dialogs` where they outlive a closing menu.
  */
-export function useMediaDialogs(item: MediaItem, iterate?: (iteration: Iteration) => void) {
+export function useMediaDialogs(
+  item: MediaItem,
+  iterate?: (iteration: Iteration) => void,
+  onReportQueued?: (jobId: string) => void,
+) {
   const [animating, setAnimating] = useState<AnimateRequest | null>(null);
   const [reporting, setReporting] = useState(false);
   return {
     handlers: {
       onAnimate: setAnimating,
       onReport: () => setReporting(true),
+      onReportQueued,
     },
     dialogs: (
       <>
@@ -819,7 +826,11 @@ export function useMediaDialogs(item: MediaItem, iterate?: (iteration: Iteration
           />
         )}
         {reporting && (
-          <ReportIssueDialog item={item} iterate={iterate} onClose={() => setReporting(false)} />
+          <ReportIssueDialog
+            item={item}
+            onQueued={onReportQueued}
+            onClose={() => setReporting(false)}
+          />
         )}
       </>
     ),

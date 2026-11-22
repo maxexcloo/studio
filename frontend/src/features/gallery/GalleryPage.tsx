@@ -223,6 +223,14 @@ function Gallery() {
         first.items.push(...edge.items);
       }
       if (signal.aborted) return first;
+      const cancelled = new Set(
+        client
+          .getQueryData(queueQuery.queryKey)
+          ?.jobs.flatMap((job) => (job.status === "cancelled" ? [job.id] : [])),
+      );
+      const wasCancelled = (item: MediaItem) =>
+        item.status === "pending" && !!item.jobId && cancelled.has(item.jobId);
+      if (cancelled.size) first.items = first.items.filter((item) => !wasCancelled(item));
       // The gallery holds new arrivals while scrolled down. An open viewer can navigate to them.
       const fresh = first.items.findIndex((item) => known.has(mediaIdentity(item)));
       const top = document.querySelector("[data-gallery-view]")?.getBoundingClientRect().top;
@@ -239,6 +247,7 @@ function Gallery() {
         );
         const keep = (item: MediaItem) =>
           !slots.has(mediaIdentity(item)) &&
+          !wasCancelled(item) &&
           !(item.status === "pending" && item.jobId && completed.has(item.jobId));
         return {
           ...data,

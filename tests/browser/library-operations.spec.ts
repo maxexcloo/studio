@@ -806,6 +806,22 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
 
 test("Library shows import grades and what each imported image is missing", async ({ page }) => {
   await fixtures(page);
+  await page.route("**/api/library/imports/import-1", (route) =>
+    route.fulfill({
+      json: {
+        import: {
+          id: "import-1",
+          name: "Watercolour Inspiration",
+          state: "ready",
+          audit: "ready",
+          preset: {
+            prompt: "Amber bird study",
+            settings: { profileId: profiles[0].id, steps: 24 },
+          },
+        },
+      },
+    }),
+  );
   await page.route("**/api/presets", (route) =>
     route.fulfill({
       json: {
@@ -830,13 +846,29 @@ test("Library shows import grades and what each imported image is missing", asyn
       },
     }),
   );
-  await page.goto("/images");
-  await openNav(page, "Library");
-  await section(page, "Library", "Imports");
+  await create(page);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An unsaved owl");
+  await page.goto("/library#imports");
   await expect(page.getByText("Watercolour Inspiration", { exact: true })).toBeVisible();
   await expect(
     page.getByText("watercolour.safetensors: Not downloaded yet", { exact: true }),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Actions for Watercolour Inspiration", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Review", exact: true }).click();
+  const review = page.getByRole("dialog", { name: "Watercolour Inspiration", exact: true });
+  const confirm = page.getByRole("dialog", { name: "Load Inspiration", exact: true });
+  await review.getByRole("button", { name: "Use Prompt", exact: true }).click();
+  await expect(confirm).toBeVisible();
+  await confirm.press("Escape");
+  await expect(confirm).toBeHidden();
+  await expect(review).toBeVisible();
+  await review.getByRole("button", { name: "Use Settings", exact: true }).click();
+  await confirm.getByRole("button", { name: "Replace", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Amber bird study",
+  );
 });
 
 test("Library › Presets lists what each preset holds, renames with unique names, edits in the composer and deletes after asking", async ({

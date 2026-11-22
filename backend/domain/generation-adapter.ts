@@ -20,7 +20,7 @@ interface GenerationAdapterOptions {
   accountForOwner(ownerId: string): RecordValue | null;
   durableSave?(job: OwnedJob): Promise<unknown>;
   cancelPrompt(job: { promptId: string; backend?: string }): Promise<unknown>;
-  recover?(job: OwnedJob): Promise<unknown>;
+  recover?(job: OwnedJob): Promise<JobObservation | void>;
   eligible?(job: OwnedJob): Promise<string | undefined>;
   settled?(job: OwnedJob): Promise<void>;
 }
@@ -78,8 +78,7 @@ export function createGenerationQueueAdapter(options: GenerationAdapterOptions):
     async observe(job) {
       let result = observation(job);
       if (!result && options.recover) {
-        await options.recover(job);
-        result = observation(job);
+        result = (await options.recover(job)) ?? observation(job);
       }
       return result;
     },
