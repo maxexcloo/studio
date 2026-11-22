@@ -148,6 +148,15 @@ test("The same tile menu opens by context click and More, with keyboard navigati
     "Report",
     "Delete",
   ]);
+  const vary = page.getByRole("menuitem", { name: "Keep & Vary", exact: true });
+  await vary.hover();
+  await expect(vary).toHaveAttribute("aria-haspopup", "menu");
+  await expect(page.getByRole("menu")).toHaveCount(2);
+  await expect(
+    page.getByRole("menuitem", { name: "Explore Three Directions", exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+  await page.mouse.move(0, 0);
+  await expect(page.getByRole("menu")).toHaveCount(1);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
   // The pointer leaves the tile, so hover opens no submenu under it.
@@ -160,7 +169,14 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("menuitem", { name: "Select", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Animate", exact: true })).toBeFocused();
+  const animate = page.getByRole("menuitem", { name: "Animate", exact: true });
+  await expect(animate).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("menu")).toHaveCount(2);
+  await expect(page.getByRole("menu").last().locator(":focus")).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("menu")).toHaveCount(1);
+  await expect(animate).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(more).toBeFocused();
 });
@@ -193,11 +209,16 @@ test("Phones without captions hide More and open the tile menu by holding or the
 for (const operation of ["Edit", "Animate"] as const) {
   test(`Tile ${operation} stages its owned result as a reference without submitting`, async ({
     page,
+    isMobile,
   }) => {
     const state = await galleryFixture(page);
     await tileMenu(page);
-    await page.getByRole("menuitem", { name: operation, exact: true }).click();
-    // Phones slide the options open in place, clipping them until the slide ends.
+    const action = page.getByRole("menuitem", { name: operation, exact: true });
+    if (isMobile) {
+      await action.click();
+      await expect(action).toHaveAttribute("aria-expanded", "true");
+      await expect(page.getByRole("menu")).toHaveCount(1);
+    } else await action.hover();
     const compose = page.getByRole("menuitem", { name: `${operation} in Composer`, exact: true });
     await expect(compose).toBeInViewport({ ratio: 1 });
     await compose.click();

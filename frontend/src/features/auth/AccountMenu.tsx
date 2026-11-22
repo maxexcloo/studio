@@ -1,10 +1,11 @@
 import { Menu } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, UserRound } from "lucide-react";
+import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import { post } from "../../api";
+import { icons } from "../../ui/icons";
 import { ownAccountQuery, useAccount } from "./AccountGate";
 
 /** The account heading and Account, then workspace links and the final Sign Out action. */
@@ -29,7 +30,7 @@ export function AccountMenuContent({ children }: { children?: ReactNode }) {
         component={Link}
         to="/settings#account"
         state={{ backgroundLocation: location }}
-        leftSection={<UserRound size={16} />}
+        leftSection={<icons.account size={16} />}
       >
         Account
       </Menu.Item>

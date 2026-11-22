@@ -44,7 +44,7 @@ function DreamProcessing() {
         error ? (
           <Alert color="red">{error.message}</Alert>
         ) : (
-          <LoadingState label="Loading Dream" />
+          <LoadingState label="Loading Dream" fill />
         )
       ) : (
         (["images", "videos"] as const).map((kind) => {

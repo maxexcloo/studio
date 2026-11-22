@@ -7,7 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { ArrowUp, SquareCheck } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type Location, Navigate, useLocation, useNavigate } from "react-router";
 
@@ -15,8 +15,9 @@ import type { GallerySort } from "../../../../shared/gallery-sort";
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem, MediaKind, QueueJob } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { usePhone } from "../../ui/usePhone";
+import { usePhone, useTouch } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { ComposerDock } from "../generation/ComposerDock";
@@ -112,6 +113,8 @@ function Gallery() {
     changeKind(kind);
   }, [kind, changeKind]);
   const phone = usePhone();
+  const touch = useTouch();
+  const submenus = !phone && !touch;
   const preferences = useQuery(preferencesQuery).data?.preferences;
   const captions = preferences?.tileCaptions ?? false;
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
@@ -560,9 +563,10 @@ function Gallery() {
         onOpenedChange={onOpenedChange}
         onSelect={() => selection.toggle([item])}
         hideMore={hideMore}
+        submenus={submenus}
       />
     ),
-    [hideMore, selection],
+    [hideMore, selection, submenus],
   );
   const openSelectionMenu = useCallback((x: number, y: number) => setMenu({ x, y }), []);
   const tryAgainItem = useCallback(
@@ -595,6 +599,7 @@ function Gallery() {
       selection={{ ...selection, end: doneSelecting }}
       tryAgain={tryAgain}
       menu={menu}
+      submenus={submenus}
       onMenuClose={() => setMenu(null)}
     />
   );
@@ -732,11 +737,11 @@ function Gallery() {
                   ref={selectionButton}
                   aria-label="Select Items"
                   aria-pressed={selection.selecting}
-                  leftSection={phone ? undefined : <SquareCheck size={15} />}
+                  leftSection={phone ? undefined : <icons.select size={15} />}
                   disabled={!loaded.length && !selection.selecting}
                   onClick={selection.selecting ? doneSelecting : selection.start}
                 >
-                  {phone ? <SquareCheck size={16} /> : "Select"}
+                  {phone ? <icons.select size={16} /> : "Select"}
                 </Button>
               </Tooltip>
             </>

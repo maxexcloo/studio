@@ -142,7 +142,8 @@ recur across features.
   menus, the viewer and the selection bar. `MediaActions.tsx` owns their availability and
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
   The context menu shows AI and Share options in unlabelled sections.
-  Other submenus match in bar and menu, and assistant menus share `assistMenu`.
+  Mouse context menus open options in side submenus. Action bars and touch
+  context menus expand options in place. Assistant menus share `assistMenu`.
   Desktop bars name Retry, Stop and the menus and show the rest as icons;
   phone media item bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and

@@ -1,6 +1,15 @@
 import { expect, test } from "@playwright/test";
 
-import { dreamPolicyFixture, fixtures, image, openTheme, section, signIn, stamp } from "./fixtures";
+import {
+  dreamPolicyFixture,
+  fixtures,
+  image,
+  openTheme,
+  section,
+  serveDream,
+  signIn,
+  stamp,
+} from "./fixtures";
 
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({
   page,
@@ -26,7 +35,7 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Dream",
     "Preferences",
     "Where Work Runs",
-    "Dream Policy",
+    "Dream",
     "Generation",
     "Groups",
     "Maintenance",
@@ -280,6 +289,7 @@ test("An administrator turns LoRAs and Uncensored off for itself in Settings ›
 
 test("Where Work Runs saves each group’s processing and default models", async ({ page }) => {
   const state = await fixtures(page);
+  const dream = await serveDream(page, { enabled: true });
   await signIn(page, { id: "member", role: "user" });
   state.preferences.grants.cloudModels = true;
   state.preferences.preferences.videos = "local";
@@ -335,6 +345,9 @@ test("Where Work Runs saves each group’s processing and default models", async
   await expect.poll(() => state.preferences.preferences.videos).toBe("cloud");
   await choose("Videos", "Local");
   await expect.poll(() => state.preferences.preferences.videos).toBe("local");
+  const dreamImages = group("Dream").getByRole("radiogroup", { name: "Dream Images" });
+  await dreamImages.getByText("Cloud", { exact: true }).click();
+  await expect.poll(() => dream.settings.imageBackend).toBe("cloud");
 });
 
 test("Finish Liked Images in Settings › Preferences saves its switch, quality and face detail", async ({
@@ -457,6 +470,15 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
     route.fulfill({
       json: {
         services: {},
+        workers: [
+          {
+            id: "image",
+            label: "Image Worker",
+            capabilities: ["image"],
+            state: "healthy",
+            queued: 0,
+          },
+        ],
         runtime: {
           configured: true,
           reason:
@@ -542,7 +564,11 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   const history = page.getByRole("region", { name: "History", exact: true });
   await expect(history).toBeVisible();
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
-  const placement = page.getByRole("combobox", { name: "GPU Placement", exact: true });
+  const controls = page.getByRole("region", { name: "Placement", exact: true });
+  await expect(controls.getByRole("list", { name: "Workers", exact: true })).toContainText(
+    "Image Worker · Images · Idle",
+  );
+  const placement = controls.getByRole("combobox", { name: "GPU Placement", exact: true });
   await expect(placement).toHaveValue("ComfyUI · 2 GPUs");
   await placement.click();
   await expect(page.getByRole("option", { name: "ComfyUI · 1 GPU", exact: true })).toBeVisible();
@@ -846,13 +872,11 @@ test("Workers select local text models to benchmark and list each run's figures"
   const dialog = page.getByRole("dialog", { name: "Benchmark Gemma", exact: true });
   const benchmark = dialog.getByRole("button", { name: "Benchmark", exact: true });
   await expect(benchmark).toBeDisabled();
-  const choose = dialog.getByRole("combobox", { name: "Text Models", exact: true });
-  await choose.click();
-  await dialog.getByRole("option", { name: "Qwen 3.8 27B", exact: true }).click();
+  const models = dialog.getByRole("group", { name: "Text Models", exact: true });
+  await models.getByRole("checkbox", { name: "Qwen 3.8 27B", exact: true }).check();
   await expect(benchmark).toBeEnabled();
-  await choose.press("Escape");
-  await expect(choose).toHaveAttribute("aria-expanded", "false");
-  await dialog.getByRole("button", { name: "Select All", exact: true }).click();
+  await dialog.getByRole("checkbox", { name: "Select All", exact: true }).check();
+  await expect(models.getByRole("checkbox").first()).toBeChecked();
   await benchmark.click();
   await expect(dialog).toBeHidden();
   expect(started).toEqual([{ workload: "gemma", models: ["gemma-4-31b", "qwen3.8-27b"] }]);
@@ -972,7 +996,7 @@ test("Settings › Maintenance switches follow at once and settle back after a f
   await expect(toggle).toBeChecked();
 });
 
-test("Dream Policy saves a shared queue delay and can hand an override back to each account", async ({
+test("Administration Dream saves shared queue delays and hands an override back to each account", async ({
   page,
 }) => {
   await fixtures(page);
@@ -981,6 +1005,9 @@ test("Dream Policy saves a shared queue delay and can hand an override back to e
   const delay = page.getByRole("textbox", { name: "Image Model & LoRA Switch Delay", exact: true });
   await delay.fill("8");
   await delay.press("Enter");
+  const idle = page.getByRole("textbox", { name: "Video Idle Delay", exact: true });
+  await idle.fill("12");
+  await idle.press("Enter");
   const images = page.getByRole("radiogroup", { name: "Dream Images", exact: true });
   const spicy = page.getByRole("radiogroup", { name: "Dream Spicy" });
   const choice = (group: typeof images, name: string) =>
@@ -991,6 +1018,7 @@ test("Dream Policy saves a shared queue delay and can hand an override back to e
   await expect(choice(images, "Cloud")).toBeChecked();
   await page.reload();
   await expect(delay).toHaveValue("8");
+  await expect(idle).toHaveValue("12");
   await expect(choice(images, "Cloud")).toBeChecked();
   await expect(choice(spicy, "Off")).toBeChecked();
   await expect(
