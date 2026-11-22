@@ -271,7 +271,7 @@ test("A delayed Retry finishes on its source after navigating to another image",
     const picture = viewer.getByRole("img", { name: neighbour.prompt, exact: true });
     await expect(picture).toBeVisible();
     await expect(retry).toHaveCount(0);
-    await viewer.getByRole("button", { name: "Like", exact: true }).click();
+    await viewerAction(page, "Like");
     const unlike = viewer.getByRole("button", { name: "Unlike", exact: true });
     await expect(unlike).toHaveAttribute("aria-pressed", "true");
     await expect(unlike).toBeEnabled();

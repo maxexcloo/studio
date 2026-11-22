@@ -1589,10 +1589,9 @@ test("Details fold only a long caption, keep its tags in sight and copy the prom
     },
   });
   let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
-  if (testInfo.project.use.isMobile) {
-    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  if (testInfo.project.use.isMobile)
     details = page.getByRole("dialog", { name: "my favourite bird", exact: true });
-  }
   await expect(details.getByText("my favourite bird", { exact: true })).toBeVisible();
   // The title's line holds when and how big; Output carries no result number.
   await expect(
@@ -1630,9 +1629,9 @@ test("The gallery viewer opens without desktop Details", async ({ page }, testIn
   test.skip(Boolean(testInfo.project.use.isMobile), "Phones show details in a sheet.");
   const { viewer } = await seed(page);
   const details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
-  await expect(details.getByText("1234567", { exact: true })).toBeVisible();
-  await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
   await expect(details).toBeHidden();
+  await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await expect(details.getByText("1234567", { exact: true })).toBeVisible();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
   await expect(
@@ -1732,17 +1731,16 @@ test("Phone swipes first reveal controls, then Details", async ({ page }, testIn
 test("A double tap zooms in at the tapped point and back to Fit; a click still cycles", async ({
   page,
 }, testInfo) => {
-  const { viewer } = await seed(page);
+  const { viewer } = await seed(page, {}, undefined, true);
   const picture = viewer.getByRole("img", { name: "An amber bird", exact: true });
   const zoom = viewer.locator("[data-zoom-mode]");
+  await expect(picture).toBeVisible();
   await expect
     .poll(async () => Number(await zoom.getAttribute("data-zoom-scale")))
     .toBeGreaterThan(0);
-  let { x, y } = await aim();
-  async function aim() {
-    const box = (await picture.boundingBox())!;
-    return { x: box.x + box.width * 0.3, y: box.y + box.height * 0.3 };
-  }
+  const box = (await picture.boundingBox())!;
+  const x = box.x + box.width * 0.3;
+  const y = box.y + box.height * 0.3;
   if (!testInfo.project.use.isMobile) {
     // A mouse double-click is two clicks, each cycling the zoom.
     await picture.dblclick();
@@ -1763,25 +1761,19 @@ test("A double tap zooms in at the tapped point and back to Fit; a click still c
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   }
   const fitScale = Number(await zoom.getAttribute("data-zoom-scale"));
-  // A single tap leaves the zoom and the viewer as they are.
+  // A tap reveals controls without zooming or moving the fitted image.
+  const fitted = await picture.boundingBox();
+  const revealed = viewer.getByRole("button", { name: "Hide Controls", exact: true });
+  await expect(viewer.getByRole("button", { name: "Show Controls", exact: true })).toBeVisible();
   await tap();
-  await page.waitForTimeout(400);
+  await expect(revealed).toBeVisible();
   await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
-  await expect(viewer).toBeVisible();
-  // It hid the chrome, so the picture glides to the middle of the screen; aim once it has.
-  await expect(page.locator("[data-chrome-hidden]")).toHaveCount(1);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => document.getAnimations().filter((motion) => motion instanceof CSSTransition).length,
-      ),
-    )
-    .toBe(0);
-  ({ x, y } = await aim());
+  await expect.poll(() => picture.boundingBox()).toEqual(fitted);
   await tap();
   await page.waitForTimeout(100);
   await tap();
   await expect(zoom).toHaveAttribute("data-zoom-mode", "Custom");
+  await expect(revealed).toBeVisible();
   await expect
     .poll(async () => Number(await zoom.getAttribute("data-zoom-scale")))
     .toBeCloseTo(fitScale * 2.5);
@@ -2013,13 +2005,16 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       "Dislike",
       "Delete",
     ].map((name) => bar.getByRole("button", { name, exact: true }));
-    const tops = await Promise.all(
-      row.map(async (control) => {
-        const box = (await control.boundingBox())!;
-        return box.y + box.height / 2;
-      }),
-    );
-    expect(new Set(tops.map(Math.round)).size).toBe(1);
+    await expect
+      .poll(async () => {
+        const boxes = await Promise.all(row.map((control) => control.boundingBox()));
+        const bounds = boxes.filter((box) => box !== null);
+        if (bounds.length !== row.length) return 0;
+        const bottom = Math.min(...bounds.map(({ y, height }) => y + height));
+        const top = Math.max(...bounds.map(({ y }) => y));
+        return bottom - top;
+      })
+      .toBeGreaterThan(0);
     for (const name of ["Animate", "Edit"]) {
       await expect(bar.getByRole("button", { name, exact: true })).toHaveText("");
       await viewerAction(page, name);
@@ -2089,9 +2084,9 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   ).toBeVisible();
   await dialog.getByRole("button", { name: "Zoom: Actual Size", exact: true }).click();
   await expect(dialog.getByRole("button", { name: "Zoom: Fit", exact: true })).toBeVisible();
-  // Desktop details are open beside the image; phones open them as a sheet.
+  // Details opens beside the image on desktop and in a sheet on phones.
+  await dialog.getByRole("button", { name: "Generation Details", exact: true }).click();
   if (testInfo.project.use.isMobile) {
-    await dialog.getByRole("button", { name: "Generation Details", exact: true }).click();
     const sheet = page.getByRole("dialog", { name: "Viewer Study", exact: true });
     await expect(sheet.getByText("Prompt", { exact: true })).toBeVisible();
     // The sheet counts as visible before it slides up; a press then would miss Close as it moves.

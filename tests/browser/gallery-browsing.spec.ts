@@ -1947,6 +1947,7 @@ for (const navigation of ["arrows", "keyboard", "swipe"] as const)
         await photo.dispatchEvent("touchend", { touches: [], changedTouches: [] });
       }
     }
+    await showViewerControls(viewer);
     const saved = page.waitForResponse("**/api/gallery/favorite");
     await viewer.getByRole("button", { name: "Dislike", exact: true }).focus();
     await page.keyboard.press("Space");
@@ -1993,6 +1994,7 @@ test("Closing a disliked item focuses its next visible gallery neighbour", async
   await page.goto("/images/browse-1");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(viewer.getByRole("img", { name: "Browse Result 1", exact: true })).toBeVisible();
+  await showViewerControls(viewer);
   await viewer.getByRole("button", { name: "Dislike", exact: true }).focus();
   await page.keyboard.press("Space");
   await expect.poll(() => state.gallery[1].rating).toBe("disliked");

@@ -527,7 +527,7 @@ test("Use as Character starts a card from a gallery image in Library › Charact
 
 test("A result's chat character offers Create Character in Details, starting the card with its name, description and image", async ({
   page,
-}, testInfo) => {
+}) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "ivo",
@@ -554,8 +554,7 @@ test("A result's chat character offers Create Character in Details, starting the
   await page
     .getByRole("button", { name: "Open image: Tall Smith at the Forge", exact: true })
     .click();
-  if (testInfo.project.use.isMobile)
-    await page.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await page.getByRole("button", { name: "Generation Details", exact: true }).click();
   await expect(page.getByRole("link", { name: "Ivo", exact: true })).toHaveAttribute(
     "href",
     "/images",

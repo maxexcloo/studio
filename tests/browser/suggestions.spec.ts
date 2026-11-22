@@ -302,8 +302,10 @@ test("Animate offers motions written for the image, then its templates and Custo
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Amber Bird", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await showViewerControls(viewer);
   // Motions are asked for only once the menu opens.
-  await expect(page.getByRole("button", { name: "Animate", exact: true })).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Animate", exact: true })).toBeVisible();
   expect(asked).toEqual([]);
   await viewerAction(page, "Animate");
   const menu = page.getByRole("menu");
