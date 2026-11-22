@@ -380,10 +380,6 @@
   padding-inline-start: 4px;
 }
 
-.modelBadge {
-  flex-shrink: 2;
-}
-
 .topActions {
   flex-shrink: 0;
 }

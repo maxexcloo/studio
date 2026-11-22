@@ -1,7 +1,7 @@
 .progress {
-  position: absolute;
-  inset-inline: 4px;
-  bottom: 4px;
+  inset: 0;
+  margin: auto;
+  pointer-events: none;
 }
 .content {
   display: flex;

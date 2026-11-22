@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Group, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Paper, Text, Tooltip } from "@mantine/core";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -44,19 +44,22 @@ export function ViewerChrome({
       role="group"
       aria-label="Viewer Header"
       justify="space-between"
+      align="flex-start"
       wrap="nowrap"
       onClick={(event) => event.stopPropagation()}
     >
       <Group gap={6} wrap="nowrap" miw={0}>
         {title && (
-          <Badge {...viewerBadge} title={title}>
-            {title}
-          </Badge>
-        )}
-        {model && (
-          <Badge {...viewerBadge} className={classes.modelBadge} title={model}>
-            {model}
-          </Badge>
+          <Paper withBorder radius="md" px="sm" py={4} miw={0}>
+            <Text size="sm" fw={500} truncate title={title}>
+              {title}
+            </Text>
+            {model && (
+              <Text size="xs" c="dimmed" truncate title={model}>
+                {model}
+              </Text>
+            )}
+          </Paper>
         )}
         {label}
       </Group>
