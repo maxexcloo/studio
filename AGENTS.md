@@ -165,8 +165,10 @@ recur across features.
   gestures, top chrome, media controls and Details surface. Verdicts in
   fullscreen use the buttons. Passing moves on without a rating. Holding Pass
   opens the reason picker.
-  Not My Taste records a dislike. Comparisons offer Pass, the lettered choices
-  and Accept. A three-way comparison picks its winner through A, B or C.
+  Not My Taste records a dislike. Comparisons in the deck and fullscreen video
+  offer Pass, the lettered choices and Accept. Fullscreen image comparisons
+  offer the single-image verdicts. Accept keeps the image shown and Super Like
+  also rates it.
   On a set, Deny All dislikes every member. Super Like keeps the set and rates
   the image shown, or the cover when the set is closed. An explicit Like
   or Deny on a member overrides the set verdict for that member.

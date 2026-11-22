@@ -2058,6 +2058,10 @@ test("Three-way Dream comparisons settle together, teach one choice and fall bac
   );
   assert.equal(items[2].rating, "liked");
   assert.deepEqual(
+    items.map((item) => item.dream?.superLiked),
+    [undefined, undefined, true],
+  );
+  assert.deepEqual(
     items.map((item) => item.dream?.comparison?.delta),
     [-8, -8, 16],
   );
@@ -2075,6 +2079,7 @@ test("Three-way Dream comparisons settle together, teach one choice and fall bac
   assert.equal((await request("/undo", { ids: [items[2].id] })).status, 409);
   assert.equal((await request("/undo", { ids: items.map((item) => item.id) })).status, 200);
   assert.ok(items.every((item) => item.dream?.state === "unseen" && !item.rating));
+  assert.ok(items.every((item) => !item.dream?.superLiked));
   assert.deepEqual(dream.read("alice").ratings, {});
   assert.equal(taste.read("alice").signals.length, 0);
 

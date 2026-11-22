@@ -3320,6 +3320,7 @@ export function createDream(options: {
             ...item.dream!,
             state: keep ? "kept" : "discarded",
             decidedAt,
+            ...(liked && index === winner && { superLiked: true as const }),
             comparison: {
               delta: record.ratings![ids[index]] - previous[index],
               previousRating:

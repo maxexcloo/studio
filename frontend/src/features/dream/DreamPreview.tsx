@@ -392,6 +392,7 @@ export function DreamPreview({
               askPass={askPass}
               hidden={false}
               expanded
+              singleImageComparison={card.kind === "pair" && item.type === "image"}
               trailing={<DreamSuggestions card={card} side={side} onMore={() => act("more")} />}
               leading={<DeckUndo disabled={!canUndo} onClick={undo} />}
             />
