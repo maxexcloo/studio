@@ -1,6 +1,5 @@
 // Native port of the Studio MCP media service.
 import crypto from "node:crypto";
-import path from "node:path";
 
 import sharp from "sharp";
 
@@ -34,6 +33,7 @@ import {
   varyLoras,
   videoLength,
 } from "./controls.js";
+import { McpReferenceUploads } from "./reference-uploads.js";
 import { choicePool, chooseProfile } from "./tiers.js";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
@@ -92,18 +92,6 @@ const outputPattern = /^\s*(result\s*|r\s*)?#?\s*(\d{1,9})\s*([a-j])\s*$/i;
 // and that item's image by letter ("set 3 2c").
 const setPattern =
   /^\s*set\s*#?\s*(\d{1,7})(?:\s*[:/.,-]?\s*(?:(\d{1,3})\s*([a-j])?|([a-z]{1,2})))?\s*$/i;
-const attachedImageHint =
-  "For an image attached in chat, search with uploads: true and its filename first. If it's missing, call upload_link and pass its reference_asset_id to generate once uploaded.";
-// An upload link (UploadLink) takes one image within this time.
-export const uploadLinkMinutes = 15;
-// The reference an upload link hands out before its image arrives (uploadUrl), which referenceId resolves.
-const uploadReferencePattern = /^upload-link:[A-Za-z0-9_-]{16}$/;
-const uploadLinkMs = uploadLinkMinutes * 60 * 1000;
-// The largest reference image Upload and the upload link take, and the base64 text it makes.
-export const maxUploadMegabytes = 20;
-const maxUploadBytes = maxUploadMegabytes * 1_000_000;
-export const maxUploadBase64 = maxUploadBytes * 1.4;
-const tooLarge = `Reference images must be at most ${maxUploadMegabytes} MB.`;
 // Short result links: ten random base62 characters (about 59 bits), mapped server-side to an owner and output.
 const shortAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 const shortPattern = /^([A-Za-z0-9]{10})(\.jpg)?$/;
@@ -276,8 +264,7 @@ export class McpMedia {
     this.cloudVideoFailures = cloudVideoFailures;
     // Each account owner's credential (multi-user-auth.js mcpAccount): `{ token }` or `{ internal: true }`.
     this.credentials = new Map();
-    // Open upload links (uploadUrl): nonce → expiry time.
-    this.uploadLinks = new Map();
+    this.uploads = new McpReferenceUploads(this);
     this.stopping = new AbortController();
     this.profileRequests = new Map();
     this.enqueuePhase = Promise.resolve();
@@ -1504,56 +1491,6 @@ export class McpMedia {
       throw new Error("Invalid result link.");
     }
   }
-  /**
-   * A one-time upload page's link (UploadLink) for the owner and the reference its image becomes:
-   * sealed like a result link, it takes one image within uploadLinkMs. Open links are held in
-   * memory only, so a restart ends them.
-   */
-  uploadUrl(owner) {
-    const now = Date.now();
-    for (const [nonce, expires] of this.uploadLinks)
-      if (expires <= now) this.uploadLinks.delete(nonce);
-    const nonce = crypto.randomBytes(16).toString("base64url");
-    const expires = now + uploadLinkMs;
-    this.uploadLinks.set(nonce, expires);
-    const reference = `upload-link:${crypto.randomBytes(12).toString("base64url")}`;
-    const token = this.seal("u2", { audience: this.publicUrl, owner, nonce, expires, reference });
-    return { url: `${this.publicUrl}/mcp/results/upload/${token}`, expires, reference };
-  }
-  /** An open upload link's claims, or a throw once it is used, expired, altered or for another studio. */
-  uploadClaims(token) {
-    const parts = String(token || "").split(".");
-    if (parts[0] !== "u2") throw new Error("Invalid upload link.");
-    const claims = this.unseal(parts);
-    if (
-      claims.audience !== this.publicUrl ||
-      !(claims.expires > Date.now()) ||
-      this.uploadLinks.get(claims.nonce) !== claims.expires
-    )
-      throw new Error("Invalid upload link.");
-    return claims;
-  }
-  /** Saves the page's image as the link owner's upload and closes the link; a failed save leaves it open. */
-  async uploadByLink(claims, file, credential) {
-    if (!this.uploadLinks.delete(claims.nonce)) throw new Error("Invalid upload link.");
-    try {
-      const { asset } = await this.store(claims.owner, file.buffer, file.name, { credential });
-      this.rows.setUpload(claims.reference, asset.id);
-      return asset;
-    } catch (error) {
-      if (claims.expires > Date.now()) this.uploadLinks.set(claims.nonce, claims.expires);
-      throw error;
-    }
-  }
-  /** A reference_asset_id, with an upload link's reference resolved to the asset its image became. */
-  referenceId(id) {
-    if (!uploadReferencePattern.test(id)) return id;
-    const asset = this.rows.upload(id);
-    if (asset) return asset;
-    throw new Error(
-      "The user hasn't uploaded the image through its upload link yet. Ask them to, then call again; if the link has expired, call upload_link for a new one.",
-    );
-  }
   /** A new short link id, ten random base62 characters. */
   newLinkId() {
     let id;
@@ -1877,7 +1814,7 @@ export class McpMedia {
       ({ width, height } = await sharp(output.content, {
         limitInputPixels: 80000000,
       }).metadata());
-      ({ asset: frame } = await this.upload(
+      ({ asset: frame } = await this.uploads.fromBase64(
         owner,
         output.content.toString("base64"),
         `first-frame.${output.mime.split("/")[1]}`,
@@ -2009,55 +1946,6 @@ export class McpMedia {
     );
     const { width, height } = await sharp(content, { limitInputPixels: 80000000 }).metadata();
     return (width > 0 && height > 0 && frameSize(profile, width, height)) || {};
-  }
-  async upload(owner, base64, filename = "reference.png") {
-    if (base64.length > maxUploadBase64) throw new Error(tooLarge);
-    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64))
-      throw new Error(`That isn't a base64 PNG, JPEG or WebP image. ${attachedImageHint}`);
-    return this.store(owner, Buffer.from(base64, "base64"), filename, {
-      advice: ` For a Studio result, call reuse with mode reference and its ref. ${attachedImageHint}`,
-    });
-  }
-  /**
-   * Saves an image as the owner's Studio upload through the studio's own upload route, so the
-   * owner's tools take its reference. A HEIC photo becomes a JPEG when sharp can read it.
-   */
-  async store(owner, content, filename, { credential, advice = "" } = {}) {
-    if (content.length > maxUploadBytes) throw new Error(tooLarge);
-    let metadata = {};
-    try {
-      if (content.length)
-        metadata = await sharp(content, { limitInputPixels: 80000000 }).metadata();
-    } catch {
-      /* Not an image. */
-    }
-    if (metadata.format === "heif")
-      try {
-        content = await sharp(content, { limitInputPixels: 80000000 })
-          .rotate()
-          .jpeg({ quality: 92 })
-          .toBuffer();
-        metadata = await sharp(content).metadata();
-        filename = `${path.basename(filename).replace(/\.[a-z0-9]+$/i, "")}.jpg`;
-      } catch {
-        throw new Error("Studio can't read this HEIC photo. Choose a PNG, JPEG or WebP image.");
-      }
-    if (!["png", "jpeg", "webp"].includes(metadata.format))
-      throw new Error(`That isn't a PNG, JPEG or WebP image.${advice}`);
-    // A chat model without the image's bytes tends to send a made-up few-pixel image, which a model's encoder rejects.
-    if (Math.min(metadata.width, metadata.height) < 32)
-      throw new Error(`This image is only a few pixels, so it is not the real picture.${advice}`);
-    const upload = {
-      buffer: content,
-      name: path.basename(filename),
-      mime: `image/${metadata.format}`,
-    };
-    const result = await this.request("POST", "/api/reference-assets/upload", { upload }, owner, {
-      credential,
-    });
-    if (!result.asset?.id) throw new Error("Studio could not accept this reference image.");
-    this.adopt(owner, "", { assets: [result.asset.id] });
-    return result;
   }
   /**
    * These jobs as last read, each waited for together until `seconds` from now unless Studio

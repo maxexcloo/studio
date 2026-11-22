@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { withCatalogueSources } from "../catalogue-downloads.js";
 import { closeRuntimeDatabase, readRuntimeDocument } from "../persistence/runtime.ts";
-import { modelFiles } from "../upscale.js";
+import { modelFiles } from "../upscale/weights.js";
 import { civitaiAvailability } from "./availability.js";
 import { createCatalogueStore } from "./catalogue.js";
 import { civitaiUpdate, createUpdateChecker, hfUpdate, publicUpdate } from "./updates.js";

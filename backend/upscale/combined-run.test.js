@@ -6,10 +6,10 @@ import test from "node:test";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-run-upscale-"));
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-const { modelFiles } = await import("./upscale.js");
-const { dropsAutoUpscale, pairRunOutputs, planRunUpscale } = await import("./run-upscale.js");
-const { nextProgress } = await import("./progress-phase.js");
-const { RunTimer } = await import("./generation-timing.js");
+const { modelFiles } = await import("./weights.js");
+const { dropsAutoUpscale, pairRunOutputs, planRunUpscale } = await import("./combined-run.js");
+const { nextProgress } = await import("../progress-phase.js");
+const { RunTimer } = await import("../generation-timing.js");
 
 const combo = (values) => ["COMBO", { options: values }];
 const info = {
