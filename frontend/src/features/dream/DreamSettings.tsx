@@ -1,14 +1,13 @@
-import { Alert, SegmentedControl, Switch, Text } from "@mantine/core";
+import { Alert, Switch, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { maxDreamIdleMinutes } from "../../../../shared/dream";
 import { api } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
 import { NumberSetting } from "../../ui/NumberSetting";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { type Dream, type DreamSettings, dreamCountQuery, dreamQuery } from "./queries";
 
-/** Notes a setting an administrator forces on every account (Settings › Dream Policy). */
+/** Notes a setting an administrator forces on every account. */
 export const lockedByAdministrator = "Set by an administrator.";
 
 /** Saves part of the Dream settings and shows the result at once. */
@@ -57,11 +56,11 @@ export function DreamPreferences() {
     </SettingRow>
   );
   const number = (
-    key: "dailyImages" | "dailyVideos" | "imageIdleMinutes" | "videoIdleMinutes",
+    key: "dailyImages" | "dailyVideos",
     label: string,
     description: string,
     disabled: boolean,
-    max = maxDreamIdleMinutes,
+    max: number,
   ) => (
     <SettingRow label={label} description={description}>
       <NumberSetting
@@ -71,33 +70,6 @@ export function DreamPreferences() {
         max={max}
         disabled={disabled}
         onSave={(value) => save.mutate({ [key]: value })}
-      />
-    </SettingRow>
-  );
-  const idle = (key: "imageIdleMinutes" | "videoIdleMinutes") =>
-    number(
-      key,
-      "Idle Delay",
-      "Minutes to wait after your latest generation request. Set to 0 for no extra delay.",
-      !settings[key === "imageIdleMinutes" ? "images" : "videos"],
-    );
-  const backend = (key: "imageBackend" | "videoBackend") => (
-    <SettingRow
-      wide
-      label="Processing"
-      description={`Uses ready models allowed for your account. Waits if unavailable.${note(key)}`}
-    >
-      <SegmentedControl
-        role="radiogroup"
-        aria-label="Processing"
-        fullWidth
-        value={settings[key]}
-        disabled={locked(key) || !settings[key === "imageBackend" ? "images" : "videos"]}
-        data={[
-          { value: "cloud", label: "Cloud" },
-          { value: "local", label: "Local" },
-        ]}
-        onChange={(value) => save.mutate({ [key]: value })}
       />
     </SettingRow>
   );
@@ -121,8 +93,6 @@ export function DreamPreferences() {
           !settings.images,
           500,
         )}
-        {idle("imageIdleMinutes")}
-        {backend("imageBackend")}
       </SettingGroup>
       <SettingGroup title="Videos">
         {toggle("videos", "Enable", "Animate kept or liked images too.")}
@@ -133,8 +103,6 @@ export function DreamPreferences() {
           !settings.videos,
           100,
         )}
-        {idle("videoIdleMinutes")}
-        {backend("videoBackend")}
       </SettingGroup>
       {save.error && (
         <Alert color="red" title="Couldn't Save Dream Settings">

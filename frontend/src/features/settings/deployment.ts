@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import type { DreamOverride, DreamSettings } from "../../../../shared/dream";
+import type { DreamOverride, DreamSettings, DreamTiming } from "../../../../shared/dream";
 import { api, post } from "../../api";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -21,7 +21,7 @@ export interface Deployment {
   };
   catalogue: Flag[];
   dream: { [K in DreamOverride]: Source & { key: string; value: DreamSettings[K] | null } } & {
-    imageSwitchMinutes: Source & { key: string; value: number };
+    [K in DreamTiming]: Source & { key: string; value: number };
   };
 }
 /** Values an administrator saves for everyone from Settings. */
