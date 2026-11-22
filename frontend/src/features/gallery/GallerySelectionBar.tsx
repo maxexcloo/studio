@@ -87,7 +87,6 @@ export function GallerySelectionBar({
   const ratings = useRatings();
   const uploads = ready.filter((item) => item.uploaded);
   const recreate = useRecreateMany();
-  // A set or run is animated or upscaled as a whole (Runs' Select Set).
   const finishedImages = ready.filter((item) => item.type === "image" && !item.uploaded);
   const upscale = useUpscaleMany(finishedImages);
   const iterate = useIterate();

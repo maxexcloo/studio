@@ -259,7 +259,9 @@ recur across features.
   fill the viewport, keep the current image visible until the next loads,
   stop navigation at the first and last item, and on closing reveal and focus
   the current tile.
-- Version grouping has one owner in `gallery/versions.ts`. Viewing and upscale
+- The gallery defaults to newest first, with a tile per result. Sets and
+  versions have separate thumbnail strips in the viewer. Version grouping
+  has one owner in `gallery/versions.ts`. Viewing and upscale
   comparison share `MediaZoom`. Display, thumbnails, sharing and downloads
   respect the saved original/upscale choice through `mediaSource`.
 - Reserve media dimensions, virtualise large galleries, lazy-load images and

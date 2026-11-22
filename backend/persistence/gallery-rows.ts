@@ -22,9 +22,7 @@ export const dreamPair = field("dream.pair");
 export const dreamProject = field("dream.projectId");
 
 /**
- * Columns derived from each row's JSON, so queries filter and order the gallery in SQL. `created_ms`
- * is Date.parse's time (null when unreadable) and `bucket` is order.js's galleryBucket: JS `trim`
- * strips every whitespace character, so the SQL one names them.
+ * Columns derived from each row's JSON, so queries filter and order the gallery in SQL.
  */
 const galleryColumns: [string, string][] = [
   ["item_id", field("id")],
@@ -46,10 +44,6 @@ const galleryColumns: [string, string][] = [
     "gallery_ms",
     `CAST(round(unixepoch(coalesce(${field("galleryAt")}, ${field("createdAt")}), 'subsec') * 1000) AS INTEGER)`,
   ],
-  [
-    "bucket",
-    `CASE WHEN ${field("status")} IS 'done' AND ${field("civitai.imageId")} IS NULL AND trim(coalesce(${field("prompt")}, ''), char(9, 10, 11, 12, 13, 32, 160, 5760, 8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199, 8200, 8201, 8202, 8232, 8233, 8239, 8287, 12288, 65279)) = '' THEN 1 ELSE 0 END`,
-  ],
 ];
 
 /**
@@ -65,17 +59,17 @@ export const summaryFields = {
   thumbnailUrl: field("thumbnailUrl"),
 };
 
-// The gallery's order, then the columns pages filter on, so a page's count reads only the index.
-const galleryOrder =
-  "uploaded, unlisted, bucket, gallery_ms DESC, job_id DESC, item_index, item_id DESC, status, type, rating";
+export const galleryOrder = "gallery_ms DESC, job_id DESC, item_index, item_id DESC";
+// Includes the columns pages filter on, so a page's count reads only the index.
+const galleryOrderIndex = `uploaded, unlisted, ${galleryOrder}, status, type, rating`;
 
 /** The indexes over `galleryColumns`: gallery order with and without an owner, jobs, ids, sets,
  * states, Dream states (with arms and comparison sides, so Dream's counts read the index alone),
  * an owner's prompts (a repeated prompt's title), times (recent work) and runs (profile health,
  * read from the index alone). */
 const galleryIndexes: [string, string][] = [
-  ["studio_gallery_order", galleryOrder],
-  ["studio_gallery_owner_order", `owner_id, ${galleryOrder}`],
+  ["studio_gallery_order", galleryOrderIndex],
+  ["studio_gallery_owner_order", `owner_id, ${galleryOrderIndex}`],
   ["studio_gallery_owner_rating", "owner_id, rating, unlisted, uploaded, type, status, job_id"],
   ["studio_gallery_job", "job_id"],
   ["studio_gallery_item", "item_id"],

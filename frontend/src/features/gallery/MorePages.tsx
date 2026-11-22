@@ -54,7 +54,7 @@ export function MorePages({
   if (!hasNextPage) return null;
   return (
     <Center ref={trigger} mih={44}>
-      {failed ? (
+      {failed || isFetchNextPageError ? (
         <Stack gap={4} align="center">
           <Text size="sm" c="dimmed">
             More results couldn't be loaded.
