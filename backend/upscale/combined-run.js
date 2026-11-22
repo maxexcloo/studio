@@ -1,7 +1,7 @@
-import { normalizeComfyError } from "./comfy/comfy.js";
-import { generationSettings, outputsFrom } from "./gallery/records.js";
-import { saveIntoStudioFolder } from "./graphs.js";
-import { embedUpscale, faceDetailSource, normalizeQuality, upscaleStatus } from "./upscale.js";
+import { normalizeComfyError } from "../comfy/comfy.js";
+import { generationSettings, outputsFrom } from "../gallery/records.js";
+import { saveIntoStudioFolder } from "../graphs.js";
+import { embedUpscale, faceDetailSource, normalizeQuality, upscaleStatus } from "./graph.js";
 
 /**
  * An explicitly requested Smart upscale as part of a run. The upscale goes

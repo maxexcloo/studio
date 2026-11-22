@@ -5,7 +5,7 @@
 import { families } from "./family-catalogue.js";
 import { encoderKinds, vaeKinds } from "./model/components.js";
 import { existingCopy } from "./model/downloads.js";
-import { modelFiles } from "./upscale.js";
+import { modelFiles } from "./upscale/weights.js";
 
 // The commit each repository's files are fetched at, so a download is always the file its
 // `sha256` names. When a file changes upstream, the Library's update check offers it as an Update

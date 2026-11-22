@@ -10,22 +10,23 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
-import { recordedObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
-import { writeGalleryRows } from "./persistence/gallery-rows.ts";
-import { closeRuntimeDatabase, runtimeDatabase } from "./persistence/runtime.ts";
+import { recordedObjectInfo, startFakeComfy } from "../fixtures/fake-comfy.js";
+import { writeGalleryRows } from "../persistence/gallery-rows.ts";
+import { closeRuntimeDatabase, runtimeDatabase } from "../persistence/runtime.ts";
+import { modelFiles } from "./weights.js";
 
 // Real native routes and staging, with PNG bytes behind a stand-in ComfyUI.
 test(
   "upscale probes owned sources and resumes the accepted prompt after restart",
   { timeout: 30000 },
   async () => {
-    const here = path.dirname(fileURLToPath(import.meta.url));
+    const here = fileURLToPath(new URL("..", import.meta.url));
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-upscale-source-"));
     const dataDir = path.join(temporary, "data");
     const modelDir = path.join(temporary, "models");
     fs.mkdirSync(dataDir);
     fs.mkdirSync(modelDir);
-    const { modelFiles, upscalePlan } = await import("./upscale.js");
+    const { upscalePlan } = await import("./graph.js");
     for (const name of ["seedvr2_ema_3b_fp8_e4m3fn.safetensors", "ema_vae_fp16.safetensors"]) {
       const fd = fs.openSync(path.join(modelDir, name), "w");
       fs.ftruncateSync(fd, modelFiles[name].bytes);

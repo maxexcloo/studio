@@ -1,18 +1,18 @@
-import { upscaleQualities } from "../shared/upscale.ts";
-import { recordBelongsToAccount, recordsForRequest } from "./account-ownership.js";
-import { isDefaultBackend, routeJob } from "./comfy/backends.js";
-import { getCustomWorkflow } from "./custom-workflows.js";
-import { directRoute } from "./domain/direct-route.ts";
-import { galleryItems, galleryRevisionValue, updateGalleryJob } from "./gallery/store.js";
-import { referenceAssetForAccount, stageReferenceAssetsForAccount } from "./references.js";
-import { findUpscaleTarget, prepareUpscale, toggleUpscaleView } from "./upscale-jobs.js";
+import { upscaleQualities } from "../../shared/upscale.ts";
+import { recordBelongsToAccount, recordsForRequest } from "../account-ownership.js";
+import { isDefaultBackend, routeJob } from "../comfy/backends.js";
+import { getCustomWorkflow } from "../custom-workflows.js";
+import { directRoute } from "../domain/direct-route.ts";
+import { galleryItems, galleryRevisionValue, updateGalleryJob } from "../gallery/store.js";
+import { referenceAssetForAccount, stageReferenceAssetsForAccount } from "../references.js";
+import { noWorkerMessage, workerById } from "../workers.js";
 import {
   normalizeQuality,
   uploadUpscaleVideoSource,
   upscaleStatus,
   upscaleTargets,
-} from "./upscale.js";
-import { noWorkerMessage, workerById } from "./workers.js";
+} from "./graph.js";
+import { findUpscaleTarget, prepareUpscale, toggleUpscaleView } from "./jobs.js";
 
 /**
  * Smart upscale: its status, queuing an upscale of a gallery item and switching the view between
