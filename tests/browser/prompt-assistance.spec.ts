@@ -1,9 +1,11 @@
 import { type Page, expect, test } from "@playwright/test";
 
 import {
+  backToActionMenu,
   closeLoras,
   closePresets,
   create,
+  expandAssistantMenu,
   finishTyping,
   fixtures,
   loadSaved,
@@ -19,6 +21,7 @@ import {
 // A single style is named Improve Prompt too.
 async function assist(page: Page, action: string) {
   const menu = await promptMenu(page, "Prompt");
+  if (action === "Improve Prompt") await expandAssistantMenu(menu, "Templates");
   await menu.getByRole("menuitem", { name: action, exact: true }).click();
 }
 
@@ -260,7 +263,7 @@ test("Prompt assistance finishes before a generation is submitted", async ({ pag
   expect(state.jobs[0].input.prompt).toBe("A cinematic amber bird");
 });
 
-test("Improve Prompt lists its styles alphabetically with descriptions and Custom… last, which asks what to change", async ({
+test("Improve Prompt groups its styles in Templates and opens Custom… directly", async ({
   page,
 }) => {
   await fixtures(page);
@@ -289,15 +292,19 @@ test("Improve Prompt lists its styles alphabetically with descriptions and Custo
     await expect(tools.getByRole("button", { name: "Clear", exact: true })).toBeVisible();
   }
   await expect(menu.getByRole("menuitem")).toHaveText([
-    "Candid",
-    "Enhance",
-    "Portrait",
+    "Suggestions",
+    "Templates",
     "Custom…",
+    "Refresh",
     "Write Negative",
     "Recent Prompts",
   ]);
+  await expandAssistantMenu(menu, "Templates");
+  const templates = menu.getByRole("group", { name: "Templates", exact: true });
+  await expect(templates.getByRole("menuitem")).toHaveText(["Candid", "Enhance", "Portrait"]);
   // Styles show their names alone.
   await expect(menu.getByText("A person in focus.", { exact: true })).toHaveCount(0);
+  await backToActionMenu(menu);
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
   const request = dialog.getByRole("textbox", { name: "Change", exact: true });

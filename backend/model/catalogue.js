@@ -445,7 +445,16 @@ export function withPreferredDefaults(models, preferences) {
         ? `No cloud ${kind} model is available, so this runs locally.`
         : `No local ${kind} model is running, so this runs in the cloud.`;
   }
-  return { ...models, defaults, defaultNotes };
+  const { imageAspect, imageResolution } = preferences;
+  const profiles =
+    imageAspect || imageResolution
+      ? models.profiles?.map((profile) =>
+          profile.kind === "image"
+            ? { ...profile, imageSizePreference: { imageAspect, imageResolution } }
+            : profile,
+        )
+      : models.profiles;
+  return { ...models, ...(profiles && { profiles }), defaults, defaultNotes };
 }
 
 export function modelsForAccount(models, req) {

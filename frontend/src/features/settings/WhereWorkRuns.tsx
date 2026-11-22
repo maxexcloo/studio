@@ -24,9 +24,10 @@ const sides: { value: SidePreference; label: string }[] = [
   { value: "cloud", label: "Cloud" },
   { value: "local", label: "Local" },
 ];
-const kinds: { kind: WorkKind; label: string; description?: string }[] = [
+const kinds: { kind: WorkKind | "dream"; label: string; description?: string }[] = [
   { kind: "images", label: "Images" },
   { kind: "videos", label: "Videos", description: "Applies to video generation and Animate." },
+  { kind: "dream", label: "Dream" },
   {
     kind: "text",
     label: "Text",
@@ -35,11 +36,11 @@ const kinds: { kind: WorkKind; label: string; description?: string }[] = [
   },
 ];
 
-function DreamProcessing() {
+function DreamProcessing({ label }: { label: string }) {
   const { data, error } = useQuery(dreamQuery);
   const save = useDreamSettings();
   return (
-    <SettingGroup title="Dream">
+    <SettingGroup title={label}>
       {!data ? (
         error ? (
           <Alert color="red">{error.message}</Alert>
@@ -131,27 +132,30 @@ export function WhereWorkRuns() {
   };
   return (
     <Stack gap="lg">
-      {kinds.map(({ kind, label, description }) => (
-        <SettingGroup key={kind} title={label}>
-          {cloud && (
-            <SettingRow wide label="Run On" description={description}>
-              <SegmentedControl
-                aria-label="Run On"
-                fullWidth
-                data={sides}
-                value={
-                  preferences[kind] ||
-                  (kind === "text" ? assistant?.defaultTextSide || "cloud" : "local")
-                }
-                onChange={(side) => save.mutate({ [kind]: side as SidePreference })}
-              />
-            </SettingRow>
-          )}
-          {cloud && defaultRow(kind, "cloud")}
-          {defaultRow(kind, "local")}
-        </SettingGroup>
-      ))}
-      {dream && cloud && <DreamProcessing />}
+      {kinds.map(({ kind, label, description }) =>
+        kind === "dream" ? (
+          dream && cloud && <DreamProcessing key={kind} label={label} />
+        ) : (
+          <SettingGroup key={kind} title={label}>
+            {cloud && (
+              <SettingRow wide label="Run On" description={description}>
+                <SegmentedControl
+                  aria-label="Run On"
+                  fullWidth
+                  data={sides}
+                  value={
+                    preferences[kind] ||
+                    (kind === "text" ? assistant?.defaultTextSide || "cloud" : "local")
+                  }
+                  onChange={(side) => save.mutate({ [kind]: side as SidePreference })}
+                />
+              </SettingRow>
+            )}
+            {cloud && defaultRow(kind, "cloud")}
+            {defaultRow(kind, "local")}
+          </SettingGroup>
+        ),
+      )}
     </Stack>
   );
 }

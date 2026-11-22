@@ -8,7 +8,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
-import { type PointerEvent, type ReactNode, useState } from "react";
+import { type PointerEvent, type ReactNode, useMemo, useState } from "react";
 
 import {
   type Change,
@@ -170,9 +170,7 @@ export function suggested(
 }
 
 /**
- * Suggestions: short changes that fit the image or draft (`query`), asked for as soon as one is
- * picked, as an action whose options are the changes, then Refresh to ask for different ones
- * (`fresh`) in their place. They load once `enabled` and stay cached per item or prompt.
+ * Changes that fit the image or draft, loaded once enabled and cached per item or prompt.
  */
 export function useChangeSuggestions<K extends QueryKey>({
   query,
@@ -209,21 +207,18 @@ export function useChangeSuggestions<K extends QueryKey>({
     { disabled, onClick: () => refresh.mutate() },
     steps.error?.message || steps.data?.reason,
   );
-  const action: Action = {
+  const action = {
     id: "suggestions",
     label: "Suggestions",
     icon: icons.assistant,
     disabled,
-    menu: [options, [again]],
-  };
-  return { action, loading };
+    menu: [options],
+  } satisfies Action;
+  return { action, refresh: again };
 }
 
 /**
- * An assistant menu (Animate, Edit, AI): its settings, the suggestions written for this
- * item with Refresh, Library's templates with Custom… last, then any other
- * actions, then its own run. While what decides its options is `loading`, one row stands in for
- * them all.
+ * An assistant menu's settings, Suggestions and Templates, then their actions and the run.
  */
 export const assistMenu = ({
   loading,
@@ -236,19 +231,26 @@ export const assistMenu = ({
 }: {
   loading?: boolean;
   settings?: Action[];
-  suggestions?: { action: Action };
+  suggestions?: { action: Action; refresh: Action };
   templates: Action[];
   custom?: Action[];
   others?: ActionGroups;
   last: Action[];
 }): ActionGroups => {
   if (loading) return [[{ id: "loading", label: "Loading…", disabled: true }]];
-  const choices = [...templates].sort((a, b) => compareNames(a.label, b.label)).concat(custom);
+  const choices = [...templates].sort((a, b) => compareNames(a.label, b.label));
   const sections: Action[] = [
     ...(suggestions ? [suggestions.action] : []),
-    ...(choices.length ? [{ id: "templates", label: "Templates", menu: [choices] }] : []),
+    ...(choices.length
+      ? [{ id: "templates", label: "Templates", icon: icons.templates, menu: [choices] }]
+      : []),
   ];
-  return [settings, sections, ...others, last];
+  return [
+    settings,
+    [...sections, ...custom, ...(suggestions ? [suggestions.refresh] : [])],
+    ...others,
+    last,
+  ];
 };
 
 export function changeTemplates(
@@ -261,7 +263,6 @@ export function changeTemplates(
     templates: options.map((change): Action => ({
       id: `change:${change.id}`,
       label: change.label,
-      icon: icons.assistant,
       disabled,
       onClick: () => pick(change.instruction),
     })),
@@ -285,13 +286,16 @@ export function ChangeSuggestions<K extends QueryKey>({
   children: (action: Action) => ReactNode;
 }) {
   const [requested, setRequested] = useState(false);
-  const { action } = useChangeSuggestions({ ...props, enabled: requested });
-  return children({ ...action, onOpen: () => setRequested(true) });
+  const { action, refresh } = useChangeSuggestions({ ...props, enabled: requested });
+  return children({
+    ...action,
+    menu: [...action.menu, [refresh]],
+    onOpen: () => setRequested(true),
+  });
 }
 
 /**
- * The proposed action's name, over the field it fills, so nothing beside the text can hide it, and
- * what it changes: the words it changed in `before`, the text it replaced, or else its label.
+ * The proposed action and the words it changes, below the prompt it fills.
  */
 export function ProposalLabel({
   proposal,
@@ -303,14 +307,17 @@ export function ProposalLabel({
   /** Names an action differently where it means something else, such as the composer's Recreate. */
   labels?: Partial<Record<ChangeAction, string>>;
 }) {
-  const changed =
-    (proposal.action !== "upscale" && changeSummary(before, proposal.prompt)) || proposal.label;
+  const { action, label, prompt } = proposal;
+  const changed = useMemo(
+    () => (action !== "upscale" && changeSummary(before, prompt, 160)) || label,
+    [action, before, label, prompt],
+  );
   return (
-    <Text component="span" size="xs" truncate display="block">
-      <Badge component="span" size="xs" mr={6} aria-label="Proposed Action">
-        {labels?.[proposal.action] ?? actionLabels[proposal.action]}
+    <Text component="span" size="xs" className={classes.change}>
+      <Badge component="span" size="xs" aria-label="Proposed Action">
+        {labels?.[action] ?? actionLabels[action]}
       </Badge>
-      {changed}
+      <span>{changed}</span>
     </Text>
   );
 }

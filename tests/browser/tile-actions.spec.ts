@@ -177,6 +177,12 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await page.keyboard.press("ArrowLeft");
   await expect(page.getByRole("menu")).toHaveCount(1);
   await expect(animate).toBeFocused();
+  await animate.press("Enter");
+  await expect(page.getByRole("menu")).toHaveCount(2);
+  await expect(page.getByRole("menu").last().locator(":focus")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(1);
+  await expect(animate).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(more).toBeFocused();
 });
@@ -216,7 +222,7 @@ for (const operation of ["Edit", "Animate"] as const) {
     const action = page.getByRole("menuitem", { name: operation, exact: true });
     if (isMobile) {
       await action.click();
-      await expect(action).toHaveAttribute("aria-expanded", "true");
+      await expect(page.getByRole("menuitem", { name: "Back", exact: true })).toBeVisible();
       await expect(page.getByRole("menu")).toHaveCount(1);
     } else await action.hover();
     const compose = page.getByRole("menuitem", { name: `${operation} in Composer`, exact: true });
@@ -455,7 +461,7 @@ for (const surface of ["tile", "viewer"]) {
   });
 }
 
-test("On a phone held sideways, the tile menu fits the screen and expands options in place", async ({
+test("On a phone held sideways, the tile menu fits the screen and returns from options", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Touch screens only");
@@ -470,8 +476,12 @@ test("On a phone held sideways, the tile menu fits the screen and expands option
     return box.y + box.height;
   };
   await expect.poll(bottom).toBeLessThanOrEqual(390);
-  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  const recreate = page.getByRole("menuitem", { name: "Recreate", exact: true });
+  await recreate.click();
   await expect(page.getByRole("group", { name: "Recreate", exact: true })).toBeVisible();
+  await expect(recreate).toHaveCount(0);
+  await menu.getByRole("menuitem", { name: "Back", exact: true }).click();
+  await expect(recreate).toBeFocused();
   // Delete, last, is reachable by scrolling inside the menu.
   const remove = page.getByRole("menuitem", { name: "Delete", exact: true });
   await remove.scrollIntoViewIfNeeded();

@@ -22,6 +22,10 @@
   min-height: 0;
 }
 
+.header {
+  touch-action: none;
+}
+
 .sheet:has([data-typing]) .header {
   display: none;
 }

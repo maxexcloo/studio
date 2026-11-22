@@ -24,10 +24,11 @@ interface SizedProfile {
   options?: { resolutions?: string[] };
 }
 
-interface DefaultSizedProfile extends Pick<SizedProfile, "kind" | "aspectPolicy"> {
+interface DefaultSizedProfile extends SizedProfile {
   aspectDefault?: string;
   aspectPresets?: { label: string; w: number; h: number }[];
-  defaults?: { width?: unknown; height?: unknown };
+  defaults?: { width?: unknown; height?: unknown; resolution?: unknown; resolutionTier?: unknown };
+  imageSizePreference?: ImageSizePreference;
 }
 
 /** The workflow's configured canvas or its family's starting preset. */
@@ -111,8 +112,12 @@ export function resolutionSize(
   };
 }
 
-const aspectOrder = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"];
-export const grokVideoAspects = [...aspectOrder, "21:9", "5:2"];
+export const imageAspects = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16"] as const;
+export type ImageSizePreference = {
+  imageAspect?: (typeof imageAspects)[number] | null;
+  imageResolution?: Resolution | null;
+};
+export const grokVideoAspects = [...imageAspects, "21:9", "5:2"];
 export const grokVideoDefaultResolution = "720p";
 export const grokPinnedResolutions = ["480p", grokVideoDefaultResolution];
 
@@ -129,14 +134,65 @@ export function grokVideoAspect(width: number, height: number) {
 /** Aspect presets as every size control lists them: the standard ratios in order, then the rest. */
 export function orderedAspects<T extends { label: string }>(presets: T[]) {
   const rank = (preset: T) => {
-    const index = aspectOrder.indexOf(preset.label);
-    return index < 0 ? aspectOrder.length : index;
+    const index = imageAspects.findIndex((aspect) => aspect === preset.label);
+    return index < 0 ? imageAspects.length : index;
   };
   return [...presets].sort((a, b) => rank(a) - rank(b));
 }
 
 export const isResolution = (value: unknown): value is Resolution =>
   resolutions.includes(value as Resolution);
+
+/** A fresh image draft opens on a supported aspect and resolution for its profile. */
+export function profileStartingSize(profile: DefaultSizedProfile): {
+  width: number;
+  height: number;
+  resolution?: string;
+  resolutionTier?: Resolution;
+} {
+  const canvas = profileImageSize(profile);
+  const { aspectPresets: presets, imageSizePreference: preference } = profile;
+  if (profile.kind !== "image" || !presets?.length || profile.aspectPolicy === "fixed")
+    return canvas;
+  const native = profile.options?.resolutions;
+  const pixelSize =
+    adjustable(profile.constraints?.width) && adjustable(profile.constraints?.height);
+  if (!native?.length && !pixelSize) return canvas;
+  const aspect = preference?.imageAspect;
+  const [ratioWidth, ratioHeight] = aspect?.split(":").map(Number) ?? [];
+  const preferred =
+    aspect &&
+    (presets.find(({ label }) => label === aspect) ||
+      presets.find(({ w, h }) => w * ratioHeight === h * ratioWidth));
+  const exact = presets.find(({ w, h }) => w === canvas.width && h === canvas.height);
+  const distance = ({ w, h }: (typeof presets)[number]) =>
+    Math.abs(Math.log(w / h) - Math.log(canvas.width / canvas.height));
+  const preset =
+    preferred ||
+    exact ||
+    presets.reduce((closest, option) => (distance(option) < distance(closest) ? option : closest));
+  const size = { width: preset.w, height: preset.h };
+  const preferredTier = preference?.imageResolution;
+  if (native?.length) {
+    const resolution =
+      native.find((value) => value.toUpperCase() === preferredTier) ??
+      native.find((value) => value === profile.defaults?.resolution) ??
+      native[0];
+    return { ...size, resolution };
+  }
+  const tiers = availableResolutions(profile, size);
+  if (!tiers.length) return size;
+  const configuredTier = profile.defaults?.resolutionTier;
+  const longEdge = Math.max(canvas.width, canvas.height);
+  const distanceFromTier = (tier: Resolution) => Math.abs(Math.log(longEdges[tier] / longEdge));
+  const resolutionTier =
+    tiers.find((tier) => tier === preferredTier) ||
+    tiers.find((tier) => tier === configuredTier) ||
+    tiers.reduce((closest, tier) =>
+      distanceFromTier(tier) < distanceFromTier(closest) ? tier : closest,
+    );
+  return { ...size, resolutionTier };
+}
 
 /** Apply an explicit native tier; requests without a tier retain their pixel dimensions. */
 export function withResolution<T extends SizedInput>(input: T, profile?: SizedProfile): T {

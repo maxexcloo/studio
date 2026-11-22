@@ -1401,18 +1401,21 @@ test("Gallery Dates jumps past unloaded pages and scrolls either way from the ch
   await page.goto("/images");
   const scrubber = page.getByRole("scrollbar", { name: "Gallery Dates" });
   await expect(scrubber).toHaveAttribute("data-indexed", "true");
+  // Scrolling reveals the date control on touch screens too.
+  await page.evaluate(() => window.scrollBy(0, 1));
+  await expect(scrubber).toHaveAttribute("data-active", "true");
   const track = (await scrubber.boundingBox())!;
   const x = track.x + track.width / 2;
   await page.mouse.move(x, track.y + track.height / 8);
   await page.mouse.down();
   await page.mouse.move(x, track.y + (track.height * 5) / 8);
-  await expect(scrubber).toHaveAttribute("aria-valuetext", dayHeading(days[2]));
+  await expect(scrubber).toHaveAttribute("aria-valuetext", `${dayHeading(days[2])} · 60 results`);
   expect(requests).not.toContain("seek-2");
   await page.mouse.up();
   await expect.poll(() => requests.includes("seek-2")).toBe(true);
   expect(requests).not.toContain("walk-to-1");
   await expect(page.getByRole("heading", { name: dayHeading(days[2]) })).toBeInViewport();
-  await expect(scrubber).toHaveAttribute("aria-valuetext", dayHeading(days[2]));
+  await expect(scrubber).toHaveAttribute("aria-valuetext", `${dayHeading(days[2])} · 60 results`);
   await expect.poll(() => requests.includes("before-2")).toBe(true);
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 120" }),
@@ -1420,7 +1423,7 @@ test("Gallery Dates jumps past unloaded pages and scrolls either way from the ch
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect.poll(() => requests.includes("seek-3")).toBe(true);
   await scrubber.press("End");
-  await expect(scrubber).toHaveAttribute("aria-valuetext", dayHeading(days[3]));
+  await expect(scrubber).toHaveAttribute("aria-valuetext", `${dayHeading(days[3])} · 60 results`);
 
   await (await toolbarSearch(page)).fill("Browse Result 0");
   await expect.poll(() => searchedDates).toBe(true);

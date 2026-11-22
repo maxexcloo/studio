@@ -1,3 +1,8 @@
+:root[data-phone] {
+  --studio-overlay-rise: 8px;
+  --studio-overlay-scale: 1;
+}
+
 /* Disabled controls keep their normal look at 40% opacity, instead of Mantine's grey fill. */
 .button:where(:disabled, [data-disabled]):not([data-loading]) {
   opacity: 0.4;
@@ -136,12 +141,13 @@
   }
 }
 
-/* Studio's darker zinc palette leaves Mantine's segmented track (dark-8) black and its indicator
-   (dark-5) darker than a raised glass surface, so the choice read as a hole beside its label.
-   Tints of white sit a step above whatever surface holds them. */
-:where([data-mantine-color-scheme="dark"]) .segmented {
-  --sc-color: rgb(255 255 255 / 0.12);
-  background-color: rgb(255 255 255 / 0.05);
+[data-mantine-color-scheme="light"] .segmented {
+  background-color: color-mix(in srgb, var(--mantine-color-body), black 11%);
+}
+
+[data-mantine-color-scheme="dark"] .segmented {
+  --sc-color: color-mix(in srgb, var(--mantine-color-body), white 31%);
+  background-color: color-mix(in srgb, var(--mantine-color-body), white 13%);
 }
 
 /* A banner keeps its message, its action and Close on one centred line. Only a coloured one (a
@@ -209,4 +215,15 @@
   background: var(--studio-glass-chrome);
   -webkit-backdrop-filter: var(--studio-glass-filter);
   backdrop-filter: var(--studio-glass-filter);
+}
+
+@media (display-mode: standalone) {
+  :where(:root[data-phone]) .shellHeader {
+    background: var(--mantine-color-body);
+  }
+
+  :where(:root[data-phone]) .shellHeader::before,
+  :where(:root[data-phone]) .shellHeader::after {
+    content: none;
+  }
 }

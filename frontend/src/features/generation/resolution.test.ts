@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   availableResolutions,
+  profileStartingSize,
   resolutionApplies,
   selectedResolution,
   withResolution,
@@ -95,6 +96,44 @@ const listedProfile: Profile = {
   defaults: { width: 2048, height: 2048 },
   capabilities: {},
 };
+
+test("new image drafts select a supported preset for their profile and account defaults", () => {
+  const portrait: Profile = {
+    ...listedProfile,
+    defaults: { width: 864, height: 1152 },
+    aspectPresets: [
+      { label: "Square", w: 992, h: 992 },
+      { label: "3:4", w: 864, h: 1152 },
+    ],
+  };
+  const configured = profileStartingSize(portrait);
+  assert.deepEqual(configured, { width: 864, height: 1152, resolutionTier: "1K" });
+  const square = profileStartingSize({
+    ...portrait,
+    imageSizePreference: { imageAspect: "1:1", imageResolution: "1K" },
+  });
+  assert.deepEqual(withResolution({ kind: "image", ...square }, portrait), {
+    kind: "image",
+    width: 1024,
+    height: 1024,
+    resolutionTier: "1K",
+  });
+  const unavailable = profileStartingSize({
+    ...portrait,
+    imageSizePreference: { imageAspect: "16:9", imageResolution: "4K" },
+  });
+  assert.deepEqual(unavailable, configured);
+  const native = profileStartingSize({
+    ...portrait,
+    options: { resolutions: ["1k", "2k"] },
+    imageSizePreference: { imageAspect: "1:1", imageResolution: "2K" },
+  });
+  assert.deepEqual(native, { width: 992, height: 992, resolution: "2k" });
+  assert.deepEqual(profileStartingSize({ ...portrait, kind: "video" }), {
+    width: 864,
+    height: 1152,
+  });
+});
 
 const draft: GenerationInput = {
   ...input,

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem, QueueJob } from "../../types";
+import { useMotionDuration } from "../../ui/Appearance";
 import { JobProgressBar, jobReason, jobStatus } from "../generation/JobProgress";
 import { mediaTitle } from "./mediaLabels";
 import { derivation, knownResults, versionGroups, versionSources, versionTree } from "./versions";
@@ -206,6 +207,7 @@ function ResultStrip({
 }) {
   // The shown result stays centred in the strip as the viewer moves, scrolling only the strip:
   // at once on opening, smoothly after unless motion is reduced.
+  const motion = useMotionDuration();
   const viewport = useRef<HTMLDivElement>(null);
   const placed = useRef(false);
   const active = useMemo(
@@ -219,13 +221,13 @@ function ResultStrip({
     const element = viewport.current;
     const shown = element?.querySelector<HTMLElement>("[data-current]");
     if (!element || !shown) return;
-    const still = !placed.current || matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const still = !placed.current || !motion;
     placed.current = true;
     element.scrollTo({
       left: shown.offsetLeft - (element.clientWidth - shown.offsetWidth) / 2,
       behavior: still ? "instant" : "smooth",
     });
-  }, [current.id]);
+  }, [current.id, motion]);
   return (
     <ScrollArea
       className={classes.strip}

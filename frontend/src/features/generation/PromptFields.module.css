@@ -1,16 +1,9 @@
-.input,
-:is(.area[data-split], .negative) .input {
+.input {
   font-size: 1rem;
   line-height: 1.55;
   padding-block: var(--mantine-spacing-xs);
   padding-inline-start: var(--mantine-spacing-xs);
   padding-inline-end: max(var(--mantine-spacing-xs), var(--input-padding-inline-end, 0px));
-}
-
-.area[data-split],
-.negative {
-  border: 1px solid var(--mantine-color-default-border);
-  border-radius: var(--mantine-radius-md);
 }
 
 /* The phone sheet's prompt (its text box, tools and suggestions) and negative prompt share the room

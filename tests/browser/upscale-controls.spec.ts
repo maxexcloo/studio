@@ -172,52 +172,49 @@ test("Upscale quality, 2K/4K size and face detail reach one submission while pen
   }
 });
 
-test("Offline workers offer Check Again and unavailable upscale models explain why", async ({
-  page,
-}) => {
+test("A new upscale is offered after the worker and its models are ready", async ({ page }) => {
   const state = await fixtures(page);
   state.gallery.push({ ...source });
-  let offline = true;
-  const submitted: unknown[] = [];
+  let worker: "offline" | "missing models" | "ready" = "offline";
+  const submitted: UpscaleRequest[] = [];
   await page.route("**/api/upscale/status*", (route) =>
-    offline
+    worker === "offline"
       ? route.fulfill({ status: 503, json: { error: "The selected upscale worker is offline." } })
       : route.fulfill({
           json: {
             ...upscaleCapabilities,
-            quality: "balanced",
-            ready: false,
-            missingModels: ["dit"],
-            faceDetail: {
-              nodesInstalled: false,
-              missingNodes: ["FaceDetailer"],
-              detectors: [],
-              samModels: [],
-            },
+            ready: worker === "ready",
+            missingModels: worker === "ready" ? [] : ["dit"],
           },
         }),
   );
   await page.route("**/api/upscale", (route) => {
     submitted.push(route.request().postDataJSON());
-    return route.fulfill({ status: 503, json: { error: "Unavailable" } });
+    return route.fulfill({ json: { ok: true, jobId: "upscale", revision: 1, plan: {} } });
   });
-  await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
+  const open = async () => {
+    await page.goto("/images");
+    const status = page.waitForResponse((response) =>
+      response.url().includes("/api/upscale/status?"),
+    );
+    await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
+    await status;
+  };
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const upscale = viewer.getByRole("button", { name: "Upscale", exact: true });
+  await open();
+  await expect(upscale).toHaveCount(0);
+  worker = "missing models";
+  await open();
+  await expect(upscale).toHaveCount(0);
+  worker = "ready";
+  await open();
   await viewerAction(page, "Upscale");
-  // An offline worker adds no note; Check Again takes the run's place.
-  const menu = page.getByRole("menu").last();
-  await expect(page.getByRole("menuitem", { name: "Check Again", exact: true })).toBeVisible();
-  await expect(menu).not.toContainText("offline");
-  await expect(page.getByRole("menuitem", { name: "Upscale", exact: true })).toHaveCount(0);
-  offline = false;
-  await page.getByRole("menuitem", { name: "Check Again", exact: true }).click();
-  await expect(menu).toContainText("This worker has no upscale models.");
-  await expect(page.getByRole("menuitem", { name: "Face Detail", exact: true })).toBeDisabled();
-  await expect(page.getByRole("menuitem", { name: "Upscale", exact: true }).last()).toBeDisabled();
-  expect(submitted).toHaveLength(0);
+  await page.getByRole("menuitem", { name: "Upscale", exact: true }).click();
+  await expect.poll(() => submitted.map(({ galleryItemId }) => galleryItemId)).toEqual([source.id]);
 });
 
-test("A running upscale stops from its tile and the viewer, keeping the original marked cancelled", async ({
+test("A running upscale can stop while its worker is offline and keeps the original", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -244,6 +241,9 @@ test("A running upscale stops from its tile and the viewer, keeping the original
     });
   }
   const cancelled: string[] = [];
+  await page.route("**/api/upscale/status*", (route) =>
+    route.fulfill({ status: 503, json: { error: "The selected upscale worker is offline." } }),
+  );
   await page.route("**/api/queue/*/cancel", (route) => {
     const jobId = new URL(route.request().url()).pathname.split("/")[3];
     cancelled.push(jobId);
@@ -265,13 +265,6 @@ test("A running upscale stops from its tile and the viewer, keeping the original
   await viewerAction(page, "Upscaling…", "Stop Upscale");
   await expect.poll(() => cancelled).toEqual(["upscale-job-1", "upscale-job-2"]);
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  // Upscale can run again, and Details says the last one was cancelled.
-  const upscale = viewer.getByRole("button", { name: "Upscale", exact: true });
-  await upscale.click();
-  await expect(page.getByRole("menuitem", { name: "Stop Upscale", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("menuitem", { name: "Upscale", exact: true })).toBeEnabled();
-  await upscale.click();
-  await expect(page.getByRole("menu")).toHaveCount(0);
   await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
   await expect(page.getByText("Cancelled", { exact: true })).toBeVisible();
 });

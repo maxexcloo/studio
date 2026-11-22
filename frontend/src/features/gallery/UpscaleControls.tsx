@@ -1,4 +1,10 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Eye, ScanFace } from "lucide-react";
 
 import { titleCase } from "../../../../shared/titles";
@@ -16,16 +22,18 @@ import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
+import { modelsQuery } from "../generation/GenerationProvider";
 import { queueQuery } from "../generation/Queue";
 import { downloadsQuery } from "../library/queries";
 import { itemAction } from "./itemActions";
 import { galleryKey } from "./queries";
 import { useItemMutation } from "./useItemMutation";
 
-const statusQuery = (quality: UpscaleQuality) => ({
-  queryKey: ["upscale-status", quality],
-  queryFn: () => api<UpscaleStatus>(`/api/upscale/status?quality=${quality}`),
-});
+export const upscaleStatusQuery = (quality: UpscaleQuality) =>
+  queryOptions({
+    queryKey: ["upscale-status", quality],
+    queryFn: () => api<UpscaleStatus>(`/api/upscale/status?quality=${quality}`),
+  });
 
 export const upscaling = (item: MediaItem) =>
   ["queued", "running"].includes(item.upscale?.status || "");
@@ -51,13 +59,25 @@ type UpscaleTarget = NonNullable<UpscaleRequest["target"]>;
  * until chosen, and only a size the worker offers) and Face Detail (off until chosen, and only where
  * the worker can run it). `status` says whether the worker can run it at that quality.
  */
-export function useQuickUpscale(item: MediaItem, enabled: boolean) {
+function useQuickUpscale(item: MediaItem, enabled: boolean) {
   const [quality, setQuality] = useRemembered<UpscaleQuality>("upscale-quality", "balanced");
   const [size, setSize] = useRemembered<UpscaleTarget>("upscale-size", 0);
   const [face, setFace] = useRemembered<boolean>("upscale-face-detail", false);
   const cache = useQueryClient();
+  const availability = useQuery({
+    ...modelsQuery,
+    enabled,
+    select: (models) => models.backends?.upscale.available,
+  });
+  const workerAvailable = enabled && availability.data !== false;
   // The menu keeps its settings in place while another quality's status loads.
-  const status = useQuery({ ...statusQuery(quality), enabled, placeholderData: keepPreviousData });
+  const status = useQuery({
+    ...upscaleStatusQuery(quality),
+    enabled: workerAvailable,
+    placeholderData: keepPreviousData,
+  });
+  const available = workerAvailable && status.isSuccess && status.data.ready;
+  const canQueue = available && !status.isPlaceholderData && !status.isFetching;
   const target = status.data?.targets.includes(size as Exclude<UpscaleTarget, 0>) ? size : 0;
   const queue = useItemMutation(item.id, "upscale", {
     mutationFn: (request: Omit<UpscaleRequest, "galleryItemId">) =>
@@ -89,6 +109,8 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
   return {
     queue,
     status,
+    available,
+    canQueue,
     quality,
     setQuality,
     target,
@@ -132,7 +154,12 @@ export function useUpscaleMany(items: MediaItem[]) {
         [galleryKey, queueQuery.queryKey].map((queryKey) => cache.invalidateQueries({ queryKey })),
       ),
   });
-  return { ...mutation, settings: upscaleSettings(quick, true) };
+  return {
+    ...mutation,
+    available: quick.available,
+    canQueue: quick.canQueue,
+    settings: upscaleSettings(quick, true),
+  };
 }
 /** Upscale's remembered settings as menu options: Quality, Size and Face Detail (images). */
 function upscaleSettings(quick: ReturnType<typeof useQuickUpscale>, image: boolean): Action[] {
@@ -199,9 +226,7 @@ function upscaleSettings(quick: ReturnType<typeof useQuickUpscale>, image: boole
   ];
 }
 /**
- * The media actions' Upscale: Show Upscale and Compare Upscale once there is one, its remembered
- * settings, then the run, or Stop Upscale while one is queued or running, or Check Again while the
- * worker is offline. Why a running worker can't upscale shows above them.
+ * Saved versions and queued work have controls even while the worker is unavailable.
  */
 export function useUpscaleAction(
   item: MediaItem,
@@ -232,23 +257,15 @@ export function useUpscaleAction(
   const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);
   const quick = useQuickUpscale(item, ready);
   const stop = useStopUpscale(item);
-  const { data: status, error } = quick.status;
-  // An offline worker is routine (placed by hand), so only a running one that can't upscale says why.
-  const unavailable =
-    status && !status.ready
-      ? status.nodesInstalled
-        ? "This worker has no upscale models."
-        : `The worker is missing ${status.missingNodes.join(", ")}.`
-      : undefined;
   return (
     ready &&
+    (upscaled || stop || quick.available || quick.queue.isPending) &&
     itemAction("upscale", {
       // With an upscale, switching between it and the original comes first, its usual click.
       label: upscaling(item) ? "Upscaling…" : "Upscale",
       pressed: upscaled && Boolean(item.upscaleActive),
       loading: quick.queue.isPending && !upscaled,
       disabled: version.isPending,
-      note: unavailable,
       menu: [
         upscaled
           ? [
@@ -273,34 +290,29 @@ export function useUpscaleAction(
                 : []),
             ]
           : [],
-        upscaleSettings(quick, image),
-        [
-          stop
-            ? {
+        quick.available ? upscaleSettings(quick, image) : [],
+        stop
+          ? [
+              {
                 id: "stop-upscale",
                 label: "Stop Upscale",
                 icon: icons.stop,
                 disabled: stop.isPending,
                 loading: stop.isPending,
                 onClick: stop.stop,
-              }
-            : error
-              ? {
-                  id: "upscale-check",
-                  label: "Check Again",
-                  icon: icons.refresh,
-                  disabled: quick.status.isFetching,
-                  keepOpen: true,
-                  onClick: () => void quick.status.refetch(),
-                }
-              : {
+              },
+            ]
+          : quick.available
+            ? [
+                {
                   id: upscaled ? "upscale-again" : "upscale-run",
                   label: upscaled ? "Upscale Again" : "Upscale",
                   icon: upscaled ? icons.retry : icons.upscale,
-                  disabled: quick.queue.isPending || (status && !status.ready),
+                  disabled: quick.queue.isPending || !quick.canQueue,
                   onClick: quick.run,
                 },
-        ],
+              ]
+            : [],
       ],
     })
   );

@@ -115,7 +115,9 @@ export function AnimateDialog({
               data-autofocus
               value={instruction}
               onChange={setInstruction}
-              tools={offered ? [ideas.action] : []}
+              tools={
+                offered ? [{ ...ideas.action, menu: [...ideas.action.menu, [ideas.refresh]] }] : []
+              }
               submit={[
                 {
                   label: review ? "Write Prompt" : "Animate",

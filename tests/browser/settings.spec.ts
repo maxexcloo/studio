@@ -311,6 +311,10 @@ test("Where Work Runs saves each group’s processing and default models", async
   await section(page, "Settings", "Where Work Runs");
   const where = page.getByRole("region", { name: "Settings: Where Work Runs", exact: true });
   const group = (kind: string) => where.getByRole("region", { name: kind, exact: true });
+  const workGroups = where.getByRole("region", { name: /^(Images|Videos|Dream|Text)$/ });
+  await expect
+    .poll(() => workGroups.evaluateAll((groups) => groups.map((group) => group.ariaLabel)))
+    .toEqual(["Images", "Videos", "Dream", "Text"]);
   const textCloud = group("Text").getByRole("combobox", { name: "Cloud Model", exact: true });
   await expect(textCloud).toHaveText("Studio's Default");
   await textCloud.click();
