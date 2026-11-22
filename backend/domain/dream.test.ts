@@ -950,13 +950,28 @@ test("Motif cooldowns recognise unlabelled laundry and smoking across different 
   assert.match(state.calls[3].user, /The optional motif "smoking" has appeared/);
 });
 
-test("Dream occasionally recreates an ordinary liked image at its next supported size", async (t) => {
+test("Dream rotates a liked Gallery image through size, model and LoRA recreations once each", async (t) => {
+  const mediaInputs = [{ id: "image", role: "reference" }];
   const native = {
     ...profiles[0],
+    mediaInputs,
     native: { "2k": "yes", "4k": "yes" },
     constraints: { width: { max: 4096, step: 16 }, height: { max: 4096, step: 16 } },
   };
-  const { dream, state, store, dreamOnce } = fixture(t, [native, ...profiles.slice(1)]);
+  const alternate = {
+    ...profiles[1],
+    id: "alternate",
+    mediaInputs,
+    defaults: { steps: 12 },
+    options: { loras: ["fox.safetensors"] },
+  };
+  const { dream, state, store, dreamOnce } = fixture(t, [
+    native,
+    ...profiles.slice(1),
+    { ...profiles[1], id: "without-source-lora", mediaInputs },
+    alternate,
+  ]);
+  state.loras.alice = { ratings: { "ink.safetensors": "liked", "film.safetensors": "disliked" } };
   const session = store.createSession("alice", "Gallery");
   const input = {
     kind: "image",
@@ -1007,7 +1022,7 @@ test("Dream occasionally recreates an ordinary liked image at its next supported
       store.save({ ...image, status: "completed" });
     }
   };
-  await dream.save("alice", { enabled: true, dailyImages: 10 });
+  await dream.save("alice", { enabled: true, dailyImages: 40 });
   nineImages();
   const rendered = await dreamOnce();
   assert.equal(rendered?.dream?.arm, "recreate");
@@ -1027,12 +1042,32 @@ test("Dream occasionally recreates an ordinary liked image at its next supported
     store.job("alice", rendered!.id),
     store.job("alice", String(rendered?.input.clientJobId)),
   );
-  assert.equal(await dreamOnce(), undefined);
-  await dream.save("alice", { dailyImages: 20 });
+  state.items.find((item) => item.id === "at-native-limit")!.rating = undefined;
+  nineImages();
+  const model = await dreamOnce();
+  assert.equal(model?.parentItemId, liked.id);
+  assert.equal(model?.input.profileId, alternate.id);
+  assert.equal(model?.input.steps, 12);
+  assert.deepEqual(model?.input.referenceAssets, input.referenceAssets);
+  assert.deepEqual(model?.input.loras, input.loras);
+  assert.deepEqual([model?.input.prompt, model?.input.seed], [input.prompt, "17"]);
+  assert.deepEqual([model?.input.width, model?.input.height], [768, 1024]);
+  nineImages();
+  const lora = await dreamOnce();
+  assert.equal(lora?.parentItemId, liked.id);
+  assert.equal(lora?.input.profileId, native.id);
+  assert.deepEqual(lora?.input.loras, [
+    ...input.loras,
+    { name: "ink.safetensors", strength: 1, enabled: true },
+  ]);
+  assert.deepEqual(lora?.input.referenceAssets, input.referenceAssets);
+  assert.deepEqual([lora?.input.prompt, lora?.input.seed], [input.prompt, "17"]);
+  assert.equal(state.calls.length, 0);
   nineImages();
   const next = await dreamOnce();
   assert.ok(next?.dream && next.dream.arm !== "recreate");
   assert.equal(state.calls.length, 1);
+  assert.equal(await dreamOnce(), undefined);
 });
 
 test("A small Dream quota can recreate a liked seedless cloud image on its own aspect", async (t) => {

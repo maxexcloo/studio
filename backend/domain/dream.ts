@@ -34,6 +34,7 @@ import {
   isResolution,
   resolutionSize,
   resolutions,
+  snapDimension,
 } from "../../shared/resolution.ts";
 import type { DreamActivity } from "../../shared/taste.ts";
 import { replyTitle, titleRule } from "../../shared/titles.ts";
@@ -45,6 +46,7 @@ import {
   runtimeTransaction,
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
+import { validateReferenceSlots } from "../validation.js";
 import { resolveImageMode, runProfile } from "../workflow-modes.js";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import { logFailure } from "./log-failure.ts";
@@ -203,6 +205,7 @@ export interface DreamProfile extends NonNullable<Parameters<typeof availableRes
   editReferences?: boolean;
   /** The LoRA files this profile can load. */
   options?: { loras?: string[]; resolutions?: string[] };
+  backend?: string;
   backendOptions?: { id: string; profile?: DreamProfile; ready?: boolean }[];
   aspectPresets?: { sizes?: Record<string, { w: number; h: number }> }[];
 }
@@ -444,6 +447,7 @@ const avoidDislikes = 8;
  */
 const seedSample = 9;
 const recreateEvery = 10;
+const recreationAxes = ["size", "profile", "lora"] as const;
 const ownSeedEvery = 4;
 /** Recent automatic variants block their source concepts from being picked again. */
 const recentSeeds = 30;
@@ -1576,18 +1580,17 @@ export function createDream(options: {
         .filter((key) => input[key] !== undefined && input[key] !== "")
         .map((key) => [key, input[key]]),
     );
+  const requestedLoras = (input: GenerationInput): DreamLora[] =>
+    (Array.isArray(input.loras) ? input.loras : [])
+      .filter((lora) => lora && lora.enabled !== false && lora.name)
+      .map((lora) => ({
+        name: String(lora.name),
+        strength: Number(lora.strength ?? 1),
+        enabled: true,
+      }));
   /** The enabled LoRAs of a seed's input that the profile can still load. */
   const lorasOf = (profile: DreamProfile, input: GenerationInput) =>
-    fit(
-      profile,
-      (Array.isArray(input.loras) ? input.loras : [])
-        .filter((lora) => lora && lora.enabled !== false && lora.name)
-        .map((lora) => ({
-          name: String(lora.name),
-          strength: Number(lora.strength ?? 1),
-          enabled: true as const,
-        })),
-    );
+    fit(profile, requestedLoras(input));
   /** One verdict has the same Elo weight with two or three variants. */
   function rate(record: DreamRecord, ids: string[], winner: number) {
     const ratings = (record.ratings ||= {});
@@ -2300,6 +2303,8 @@ export function createDream(options: {
       }
       const limit = record.settings.dailyImages;
       const lastSmallSlot = limit < recreateEvery && counts.usage.images === limit - 1;
+      const dayOffset =
+        limit < recreateEvery * recreationAxes.length ? Math.floor(now() / 86_400_000) : 0;
       if (!steer && (lastSmallSlot || counts.usage.images % recreateEvery === recreateEvery - 1)) {
         if (
           await recreate(
@@ -2308,6 +2313,7 @@ export function createDream(options: {
             access,
             catalogue.profiles,
             lastSmallSlot ? (limit * 100) / recreateEvery : 100,
+            Math.floor(counts.usage.images / recreateEvery) + dayOffset,
           )
         )
           return { status: "generating" };
@@ -2502,13 +2508,141 @@ export function createDream(options: {
     return { status: "unavailable", reason, imagesDone };
   }
 
+  const fittingStack = (profile: DreamProfile, stack: DreamLora[]) => {
+    const fitted = fit(profile, stack);
+    return (
+      fitted.length === stack.length &&
+      stack.every(
+        (lora, index) =>
+          fitted[index].name === lora.name && fitted[index].strength === lora.strength,
+      )
+    );
+  };
+
+  function recreatedModel(
+    source: DreamProfile,
+    profiles: DreamProfile[],
+    input: GenerationInput,
+    stack: DreamLora[],
+    { width, height }: { width: number; height: number },
+  ) {
+    if (input.inpaint) return;
+    const refs = Array.isArray(input.referenceAssets) ? input.referenceAssets : [];
+    for (const listed of shuffled(profiles)) {
+      if (listed.id === source.id) continue;
+      const backend = input.profileBackend ?? listed.backend;
+      const pinned = listed.backendOptions?.find(
+        (entry) => entry.id === backend && entry.profile && entry.ready !== false,
+      );
+      if (listed.backendOptions?.length && !pinned) continue;
+      const profile: DreamProfile = pinned?.profile ?? listed;
+      try {
+        validateReferenceSlots(refs, profile);
+      } catch {
+        continue;
+      }
+      if (
+        refs.some(
+          ({ slot }) =>
+            profile.mediaInputs?.find((entry) => entry.id === slot)?.role !==
+            source.mediaInputs?.find((entry) => entry.id === slot)?.role,
+        )
+      )
+        continue;
+      if (
+        refs.length &&
+        profile.aspectPolicy === "reference" &&
+        input.referenceRole !== "reference"
+      )
+        continue;
+      if (!fittingStack(profile, stack)) continue;
+      const cloud = isCloudProfile(listed);
+      const resolution = profile.options?.resolutions?.find((tier) =>
+        profile.aspectPresets?.some(
+          ({ sizes }) => sizes?.[tier]?.w === width && sizes[tier].h === height,
+        ),
+      );
+      if (
+        cloud
+          ? !resolution
+          : snapDimension(width, profile.constraints?.width) !== width ||
+            snapDimension(height, profile.constraints?.height) !== height
+      )
+        continue;
+      const defaults = resolveImageMode(profile, input).defaults ?? profile.defaults;
+      return {
+        input: {
+          ...defaults,
+          profileId: profile.id,
+          model: profile.model,
+          workflow: profile.workflow,
+          profileBackend: pinned?.id,
+          ...(cloud && { resolution }),
+          referenceAssets: input.referenceAssets,
+          referenceRole: input.referenceRole,
+          loras: input.loras,
+          ...(typeof input.negative === "string" && { negative: input.negative }),
+          width,
+          height,
+        },
+        why: `Recreated a liked image with ${profile.label || profile.id}`,
+      };
+    }
+  }
+
+  function recreatedLora(
+    ownerId: string,
+    profile: DreamProfile,
+    stack: DreamLora[],
+    input: GenerationInput,
+  ) {
+    const library = options.loraLibrary(ownerId);
+    if (!library || input.inpaint) return;
+    if (!fittingStack(profile, stack)) return;
+    const available = [...libraryLoras(ownerId, profile), ...libraryLoras(ownerId, profile, true)];
+    const added = available.find(
+      (lora) =>
+        !stack.some((existing) => existing.name === lora.name) &&
+        fittingStack(profile, [...stack, lora]),
+    );
+    if (added)
+      return {
+        input: { ...input, loras: [...(Array.isArray(input.loras) ? input.loras : []), added] },
+        why: `Recreated a liked image with ${options.loraName(added.name)}`,
+      };
+    for (const [index, lora] of stack.entries()) {
+      if (library.ratings[lora.name] === "disliked") continue;
+      const strength = roundTo(
+        lora.strength >= 0.8 ? lora.strength - 0.2 : lora.strength + 0.2,
+        0.05,
+      );
+      const changed = stack.map((entry, at) => (at === index ? { ...entry, strength } : entry));
+      if (strength !== lora.strength && fittingStack(profile, changed)) {
+        const original = Array.isArray(input.loras) ? input.loras : [];
+        const target = original.findIndex(
+          (entry) => entry?.name === lora.name && entry.enabled !== false,
+        );
+        return {
+          input: {
+            ...input,
+            loras: original.map((entry, at) => (at === target ? { ...entry, strength } : entry)),
+          },
+          why: `Recreated a liked image with ${options.loraName(lora.name)} at ${strength}`,
+        };
+      }
+    }
+  }
+
   async function recreate(
     ownerId: string,
     record: DreamRecord,
     access: DreamAccess,
     profiles: DreamProfile[],
     probability: number,
+    turn: number,
   ) {
+    const axisStart = turn % recreationAxes.length;
+    const axes = [...recreationAxes.slice(axisStart), ...recreationAxes.slice(0, axisStart)];
     const ready = profiles.filter((profile) => kindOf(profile) === "image");
     if (!ready.length) return false;
     const liked = await readyGenerations(ownerId, {
@@ -2519,12 +2653,12 @@ export function createDream(options: {
       promptedProfiles: ready.map(({ id }) => id),
       sample: seedSample,
     });
+    const candidates = [];
     for (const item of liked) {
       if (!item.id || item.dream?.arm === "recreate") continue;
-      const id = `dream-recreate-${createHash("sha256")
+      const idBase = `dream-recreate-${createHash("sha256")
         .update(JSON.stringify([ownerId, item.id]))
         .digest("hex")}`;
-      if (store.job(ownerId, id)) continue;
       const source = seedOf(ownerId, item, ready);
       const saved = item.settings || {};
       const seed = saved.seed;
@@ -2550,52 +2684,93 @@ export function createDream(options: {
       const currentModel =
         resolveImageMode(profile, sizing).defaults?.model ?? profile.defaults?.model;
       if (savedModel && currentModel && savedModel !== currentModel) continue;
-      const target = largerImageSize(
-        profile,
-        { ...sizing, ...saved, referenceAssets, referenceRole },
-        { width, height },
-      );
-      if (!target) continue;
-      if (probability < 100 && !chance(probability)) return false;
-      probability = 100;
       const {
         chat: _chat,
         resultSet: _set,
-        resolutionTier: _tier,
+        resolutionTier: sourceTier,
         variationCount: _variations,
         writing: _writing,
         galleryAt: _galleryAt,
         ...input
       } = sizing;
-      const prompt = typeof saved.typedPrompt === "string" ? saved.typedPrompt : source.prompt;
-      const { label, ...size } = target;
-      const result = await options.admit(
-        {
-          ...input,
-          ...settingsOf(saved),
-          profileBackend,
-          ...size,
-          autoUpscale: null,
-          clientJobId: id,
-          count: 1,
-          ...(Array.isArray(saved.loras) ? { loras: saved.loras } : {}),
-          ...(typeof item.negative === "string" ? { negative: item.negative } : {}),
-          prompt,
-          seed: hasSeed ? seed : undefined,
-        },
-        access.account,
-        { sessionId: session(ownerId, record), operation: "image", parentItemId: item.id },
-        {
-          priority: queuePriority.dream,
-          dream: {
-            arm: "recreate",
-            at: stamp(),
-            prompt,
-            why: `Recreated a liked image at ${label}`,
-          },
-        },
+      const prompt =
+        typeof saved.typedPrompt === "string" ? saved.typedPrompt : String(source.input.prompt);
+      const base = {
+        ...input,
+        ...settingsOf(saved),
+        profileBackend,
+        width,
+        height,
+        ...(Array.isArray(saved.loras) ? { loras: saved.loras } : {}),
+        ...(typeof item.negative === "string" ? { negative: item.negative } : {}),
+      };
+      const size = { width, height };
+      const target = largerImageSize(
+        profile,
+        { ...sizing, ...saved, referenceAssets, referenceRole },
+        size,
       );
-      if (result.status < 400) return true;
+      candidates.push({
+        idBase,
+        itemId: item.id,
+        base,
+        profile,
+        prompt,
+        seed: hasSeed ? seed : undefined,
+        size,
+        target,
+        stack: requestedLoras(base),
+        resolutionTier: saved.resolutionTier ?? sourceTier,
+      });
+    }
+    for (const axis of axes) {
+      for (const {
+        idBase,
+        itemId,
+        base,
+        profile,
+        prompt,
+        seed,
+        size,
+        target,
+        stack,
+        resolutionTier,
+      } of candidates) {
+        const id = axis === "size" ? idBase : `${idBase}-${axis}`;
+        if (store.job(ownerId, id)) continue;
+        let variant;
+        if (axis === "profile") variant = recreatedModel(profile, ready, base, stack, size);
+        else if (axis === "lora")
+          variant = recreatedLora(ownerId, profile, stack, { ...base, resolutionTier });
+        else if (target) {
+          const { label, ...resolution } = target;
+          variant = {
+            input: { ...base, ...resolution },
+            why: `Recreated a liked image at ${label}`,
+          };
+        }
+        if (!variant) continue;
+        if (probability < 100 && !chance(probability)) return false;
+        probability = 100;
+        const result = await options.admit(
+          {
+            ...variant.input,
+            autoUpscale: null,
+            clientJobId: id,
+            count: 1,
+            kind: "image",
+            prompt,
+            seed,
+          },
+          access.account,
+          { sessionId: session(ownerId, record), operation: "image", parentItemId: itemId },
+          {
+            priority: queuePriority.dream,
+            dream: { arm: "recreate", at: stamp(), prompt, why: variant.why },
+          },
+        );
+        if (result.status < 400) return true;
+      }
     }
     return false;
   }
