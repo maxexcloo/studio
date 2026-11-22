@@ -92,9 +92,8 @@ const outputPattern = /^\s*(result\s*|r\s*)?#?\s*(\d{1,9})\s*([a-j])\s*$/i;
 // and that item's image by letter ("set 3 2c").
 const setPattern =
   /^\s*set\s*#?\s*(\d{1,7})(?:\s*[:/.,-]?\s*(?:(\d{1,3})\s*([a-j])?|([a-z]{1,2})))?\s*$/i;
-// Chat hosts such as LibreChat cannot hand an attached file to a tool.
 const attachedImageHint =
-  "LibreChat can't pass attached files to tools: call upload_link, ask the user to upload the image there, then pass its reference_asset_id to generate.";
+  "For an image attached in chat, search with uploads: true and its filename first. If it's missing, call upload_link and pass its reference_asset_id to generate once uploaded.";
 // An upload link (UploadLink) takes one image within this time.
 export const uploadLinkMinutes = 15;
 // The reference an upload link hands out before its image arrives (uploadUrl), which referenceId resolves.

@@ -360,13 +360,11 @@ async function fixture(
             : [])),
     });
   });
-  app.post("/api/reference-assets/upload", async (req, res) => {
-    for await (const _chunk of req) {
-      /* Consume the multipart body. */
-    }
+  app.post("/api/reference-assets/upload", (req, res) => {
+    const filename = req.body.upload.name;
     const asset = {
       id: deduplicateUploads ? "fixture-shared-asset" : `fixture-asset-${assets.size + 1}`,
-      name: "reference.png",
+      name: filename,
       source: "upload",
       mime: "image/png",
       url: "/fixture-reference.png",
@@ -380,7 +378,7 @@ async function fixture(
       uploaded: true,
       status: "done",
       type: "image",
-      filename: "reference.png",
+      filename,
     });
     res.json({ asset });
   });
@@ -1074,6 +1072,10 @@ test("media and administrator credentials discover only their own friendly tools
   assert.match(
     media.getInstructions(),
     /Name sets for the chat topic\/title; reuse unless the user renames/,
+  );
+  assert.match(
+    media.getInstructions(),
+    /search \(uploads: true, query: filename\).*reference_asset_ids.*upload_link if missing/,
   );
   assert.doesNotMatch(media.getInstructions(), /GPU|\bapply\b/);
   assert.match(admin.getInstructions(), /get approval before apply/);
@@ -2569,7 +2571,10 @@ test("invalid uploads and unsupported waits are refused without accessing anothe
   // A chat host that can't pass the attachment sends nothing; the refusal says what to do instead.
   const empty = await call(client, "upload", { content_base64: "" });
   assert.equal(empty.isError, true);
-  assert.match(texts(empty), /call upload_link.*pass its reference_asset_id to generate/);
+  assert.match(
+    texts(empty),
+    /search with uploads: true and its filename first.*call upload_link.*pass its reference_asset_id to generate/,
+  );
   const speck = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#000" } })
     .png()
     .toBuffer();
@@ -2929,9 +2934,13 @@ test("a chat image becomes the linked person's Upload and is refused for anyone 
     f.requests.findLast((request) => request.path === "/reference-assets/upload").account,
     linked.userId,
   );
-  // Its own chats take it as a reference straight away.
+  // Its own chats find the filename and take that asset as a reference.
   const client = await f.client("librechat-linked");
-  await generate(client, { reference_asset_ids: [asset.id] });
+  const [match] = data(
+    await call(client, "search", { uploads: true, kind: "image", query: "beach.png" }),
+  ).results;
+  assert.equal(match.reference_asset_id, asset.id);
+  await generate(client, { reference_asset_ids: [match.reference_asset_id] });
   assert.equal(f.submitted.at(-1).referenceAssets[0].assetId, asset.id);
 });
 
@@ -3495,6 +3504,25 @@ test("a conversation keeps its LoRAs off and count where a later generate leaves
   );
   await ask(await conversation("conversation-b"), {});
   assert.equal(f.submitted.at(-1).count, 1);
+});
+
+test("a chat picks a profile that takes its photo when the remembered profile can't", async (t) => {
+  const f = await fixture(t);
+  const textOnly = { ...imageProfile, id: "text-only", label: "Text Only", mediaInputs: [] };
+  await f.profiles([textOnly, imageProfile], { defaults: { image: textOnly.id } });
+  const client = await chat(t, f, "alice", "conversation-a");
+  await generate(client, { profile_id: textOnly.id });
+  const { asset } = data(await call(client, "upload", { content_base64: png.toString("base64") }));
+
+  data(
+    await call(client, "generate", {
+      prompts: ["A portrait in a garden"],
+      count: 1,
+      reference_asset_ids: [asset.id],
+    }),
+  );
+  assert.equal(f.submitted.at(-1).profileId, imageProfile.id);
+  assert.deepEqual(f.submitted.at(-1).referenceAssets, [{ slot: "reference", assetId: asset.id }]);
 });
 
 test("a client without a conversation header gets its MCP session's own results; the header still wins", async (t) => {

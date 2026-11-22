@@ -978,9 +978,7 @@ export function registerGenerateTools({
         .array(z.string().min(1))
         .max(16)
         .optional()
-        .describe(
-          `Ids from uploads or reuse mode reference, or a result's number or letter; models gives references.max.`,
-        ),
+        .describe("Ids from search uploads or reuse reference, or a result number or letter."),
       reference_role: z.enum(["edit", "reference"]).optional(),
       // In reference_asset_ids order, where models lists the profile's reference_strengths.
       reference_strengths: z.array(z.number().finite().nullable()).max(16).optional(),
@@ -1335,8 +1333,18 @@ export function registerGenerateTools({
       let keptModel = null;
       if (args.profile_id === undefined && !fits && keptId && !input.tier && !card)
         try {
-          keptModel = namedInTier(await media.profiles(kind || "all", owner), keptId);
-          remembered.kept.push(keptModel.profile.label || keptId);
+          const candidate = namedInTier(await media.profiles(kind || "all", owner), keptId);
+          const profile = media.runProfile(candidate.profile, {
+            references: references > 0,
+            loras: Boolean(args.loras?.length),
+          });
+          const { max, required } = referenceCount(
+            references ? { ...profile, ...profile.imageModes?.reference } : profile,
+          );
+          if (references >= required && references <= max) {
+            keptModel = candidate;
+            remembered.kept.push(candidate.profile.label || keptId);
+          }
         } catch {
           // Gone or no longer granted: Studio picks as usual.
         }
