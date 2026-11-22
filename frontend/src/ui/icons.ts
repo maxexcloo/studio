@@ -6,9 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleCheck,
-  CirclePause,
-  CirclePlay,
-  CircleStop,
   ClipboardPaste,
   Columns2,
   ContactRound,
@@ -39,6 +36,7 @@ import {
   Maximize2,
   MessageCircle,
   Moon,
+  Pause,
   PenLine,
   Pencil,
   Play,
@@ -58,6 +56,7 @@ import {
   ShieldCheck,
   Shirt,
   SlidersHorizontal,
+  Square,
   TextCursorInput,
   ThumbsDown,
   ThumbsUp,
@@ -134,7 +133,7 @@ export const icons = {
   pacing: Activity,
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
-  pause: CirclePause,
+  pause: Pause,
   /** A saved preset: the Presets chip and Library › Presets. */
   preset: Bookmark,
   /** Seeing a choice full screen before choosing it. */
@@ -156,7 +155,7 @@ export const icons = {
   /** Returning a text to where it started, such as the viewer's prompt. */
   reset: RotateCcw,
   /** Starting or resuming work, beside Pause or Stop. */
-  resume: CirclePlay,
+  resume: Play,
   retry: RotateCw,
   /** Showing a written prompt for editing before it runs (Review Prompt). */
   review: ScanText,
@@ -174,8 +173,7 @@ export const icons = {
   similar: ScanSearch,
   sort: ArrowDownUp,
   sound: Volume2,
-  /** Stopping work: a stop sign rather than a bare square, which reads as a checkbox. */
-  stop: CircleStop,
+  stop: Square,
   undo: Undo2,
   unfinished: ListRestart,
   upload: Upload,

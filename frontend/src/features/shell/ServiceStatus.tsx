@@ -5,7 +5,7 @@ import {
   FocusTrap,
   Group,
   Popover,
-  Progress,
+  RingProgress,
   Text,
   Tooltip,
   UnstyledButton,
@@ -124,15 +124,24 @@ export function StatusAction() {
       color={generating || held ? "gray" : summary.colour}
       onClick={() => setOpened(!opened)}
     >
-      {held ? <icons.pause size={19} /> : <Activity size={19} />}
       {progress && (
-        <Progress
+        <RingProgress
           aria-hidden
           className={classes.progress}
-          value={(100 * progress.finished) / progress.total}
-          size={3}
+          pos="absolute"
+          size={30}
+          thickness={2}
+          roundCaps
+          rootColor="var(--mantine-color-default-border)"
+          sections={[
+            {
+              value: (100 * progress.finished) / progress.total,
+              color: "var(--mantine-primary-color-filled)",
+            },
+          ]}
         />
       )}
+      {held ? <icons.pause size={16} /> : <Activity size={19} />}
     </ActionIcon>
   );
   // Administrators open Settings › Workers from the summary; it stays read-only for others.
