@@ -849,7 +849,7 @@ export class Store {
 export function publicJob({
   ownerId: _ownerId,
   resource: _resource,
-  cancelRequested: _cancelRequested,
+  cancelRequested,
   cleared: _cleared,
   replacementJobId: _replacementJobId,
   memoryRecovery: _memoryRecovery,
@@ -862,5 +862,12 @@ export function publicJob({
   ...job
 }: OwnedJob): QueueJob {
   // Its idempotency key would make a run reusing this input return this job instead of queuing.
-  return { ...job, input, ...(priority === queuePriority.dream ? { dream: true } : {}) };
+  return {
+    ...job,
+    input,
+    ...(cancelRequested && activeStatuses.has(job.status) && job.status !== "saving"
+      ? { cancelling: true }
+      : {}),
+    ...(priority === queuePriority.dream ? { dream: true } : {}),
+  };
 }

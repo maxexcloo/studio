@@ -57,7 +57,11 @@ function TileStatus({
   // A multi-output run shows one Cancel, on its first unfinished placeholder.
   const owner = job?.items.find((entry) => !finished(entry));
   const cancellable =
-    active && job && !terminalStatuses.has(job.status) && (!owner || owner.id === item.id);
+    active &&
+    job &&
+    !job.cancelling &&
+    !terminalStatuses.has(job.status) &&
+    (!owner || owner.id === item.id);
   const retryable = failed && job?.status === "failed" && onTryAgain;
   return (
     <>

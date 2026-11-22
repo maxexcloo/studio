@@ -270,6 +270,40 @@ test("a request's jobs group as one set that moves and stops together", async ({
   await expect(stopAll).toBeVisible();
 });
 
+test("a video stays visible as stopping while its provider confirms", async ({ page }) => {
+  const state = await fixtures(page);
+  const video = {
+    id: "stopping-video",
+    operation: "animate",
+    status: "running",
+    input: { kind: "video", prompt: "A lighthouse in fog" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  };
+  state.jobs.push(video);
+  const confirmed = Promise.withResolvers<void>();
+  await page.route("**/api/queue/stopping-video/cancel", async (route) => {
+    Object.assign(video, { cancelling: true });
+    await confirmed.promise;
+    video.status = "cancelled";
+    return route.fulfill({ json: { job: video } });
+  });
+  await page.goto("/videos");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Queue", exact: true });
+  await queue.getByRole("button", { name: "Stop", exact: true }).click();
+  try {
+    await expect(queue.getByRole("button", { name: "Stopping", exact: true })).toBeDisabled();
+    await expect(queue.getByText("A lighthouse in fog", { exact: true })).toBeVisible();
+    expect(video.status).toBe("running");
+  } finally {
+    confirmed.resolve();
+  }
+  await expect(queue.getByRole("button", { name: "Stopping", exact: true })).toHaveCount(0);
+});
+
 test("a request of several prompts lists each prompt once, its split runs stopping together", async ({
   page,
 }) => {

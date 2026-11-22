@@ -42,7 +42,7 @@ function percentage({ progress, status, cancelling }: JobState) {
 export function jobStatus(job: JobState, queueLabel?: { model?: string }) {
   const { progress, queuePosition, status } = job;
   const base =
-    (job.cancelling && "Cancelling") ||
+    (job.cancelling && "Stopping") ||
     (job.operation === "upscale" && status === "running" && "Upscaling") ||
     (queueLabel && status === "waiting" && "Waiting") ||
     statusLabels[status];
@@ -76,7 +76,14 @@ export function jobStatus(job: JobState, queueLabel?: { model?: string }) {
 }
 
 export function jobReason(job: JobState) {
-  return job.reason || (["queued", "waiting"].includes(job.status) ? "Waiting to start." : "");
+  return (
+    job.reason ||
+    (job.cancelling
+      ? "Waiting for the provider to confirm."
+      : ["queued", "waiting"].includes(job.status)
+        ? "Waiting to start."
+        : "")
+  );
 }
 
 export function JobProgressBar({ job, className }: { job: JobState; className?: string }) {

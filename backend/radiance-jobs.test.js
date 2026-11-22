@@ -251,6 +251,7 @@ test("a recorded video reconnects by exact ID and is deleted only after durable 
         now += 1000;
         calls.push(["read", videoId]);
         if (jobs.get(id).progress) phases.push(jobs.get(id).progress);
+        if (calls.length === 4) jobs.set(id, { ...jobs.get(id), status: "cancelling" });
         const sample = [
           { status: "queued" },
           { status: "in_progress", steps_done: 2, steps_total: 10, progress: 18 },
@@ -262,6 +263,7 @@ test("a recorded video reconnects by exact ID and is deleted only after durable 
       },
       videoContent: async (videoId) => {
         phases.push(jobs.get(id).progress);
+        assert.match(jobs.get(id).error, /Radiance is finishing accepted work/);
         calls.push(["content", videoId]);
         return new Uint8Array([1, 2, 3]);
       },
@@ -285,7 +287,7 @@ test("a recorded video reconnects by exact ID and is deleted only after durable 
       ["Waiting for Execution", 0, 0, false],
       ["Generating", 2, 10, true],
       ["Generating", 4, 10, true],
-      ["Decoding", 92, 100, false],
+      ["Finishing accepted work", 92, 100, false],
       ["Saving", 0, 0, false],
     ],
   );
