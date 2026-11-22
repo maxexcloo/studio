@@ -75,7 +75,7 @@ export function useDeletePresets() {
         }
       }
       if (failures)
-        throw new Error(`Couldn’t restore ${failures} ${failures === 1 ? "preset" : "presets"}.`);
+        throw new Error(`Couldn't restore ${failures} ${failures === 1 ? "preset" : "presets"}.`);
     },
     onSettled: () => client.invalidateQueries({ queryKey: presetsQuery.queryKey }),
   });

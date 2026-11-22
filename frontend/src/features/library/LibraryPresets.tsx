@@ -127,7 +127,7 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
       )}
       {failed.length > 0 && (
         <Alert color="red" role="alert">
-          Couldn’t delete {failed.length} {failed.length === 1 ? "preset" : "presets"}.
+          Couldn't delete {failed.length} {failed.length === 1 ? "preset" : "presets"}.
         </Alert>
       )}
       {presets.error ? (

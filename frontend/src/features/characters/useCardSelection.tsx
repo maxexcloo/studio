@@ -89,7 +89,7 @@ export function useCardSelection(
           : changes[0]?.rating === "delete"
             ? "delete"
             : "rate";
-        setFailure(`Couldn’t ${action} ${names}${more}.`);
+        setFailure(`Couldn't ${action} ${names}${more}.`);
       }
       void client.invalidateQueries({ queryKey });
     },
