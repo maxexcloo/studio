@@ -103,6 +103,7 @@ export function DeckButtons({
   askPass,
   hidden,
   expanded,
+  singleImageComparison = false,
   leading,
   trailing,
 }: {
@@ -111,10 +112,12 @@ export function DeckButtons({
   askPass: () => void;
   hidden: boolean;
   expanded?: boolean;
+  singleImageComparison?: boolean;
   leading?: ReactNode;
   trailing?: ReactNode;
 }) {
-  const answers = dreamChoices(card).at(-1)!;
+  const comparison = card.kind === "pair" && !singleImageComparison;
+  const answers = dreamChoices(card, singleImageComparison).at(-1)!;
   const labels: Record<string, string> = {
     both: "Accept",
     discard: card.kind === "set" ? "Deny All" : "Pass",
@@ -127,9 +130,9 @@ export function DeckButtons({
   return (
     <div
       role="group"
-      aria-label={card.kind === "pair" ? "Comparison Answers" : "Dream Actions"}
+      aria-label={comparison ? "Comparison Answers" : "Dream Actions"}
       className={classes.buttons}
-      data-comparison-size={card.kind === "pair" ? card.items.length : undefined}
+      data-comparison-size={comparison ? card.items.length : undefined}
       aria-hidden={hidden}
       inert={hidden}
     >

@@ -117,6 +117,7 @@ export function useJudge(onFailed: (card: DeckCard, judgement: Judgement) => voi
       if (judgement.card.kind === "pair") {
         return post(pairAnswerPath(judgement.card.pairId), {
           answer: judgement.verdict,
+          ...(judgement.superLike && { like: true }),
         });
       }
       if (judgement.card.kind === "set")
@@ -337,7 +338,7 @@ export function DreamDeck({
   }
   /** Flies the top card out its way, on the deck or in the preview, then commits the verdict. */
   const isPass = (choice: Verdict | PairAnswer) =>
-    top?.kind === "pair" ? choice === "neither" : top?.kind !== "set" && choice === "discard";
+    choice === "neither" || (top?.kind !== "set" && choice === "discard");
   const askPass = () => {
     if (!top || busy.current) return;
     setPassReason(passReasons[0]);
@@ -350,13 +351,23 @@ export function DreamDeck({
     const out = (viewing ? previewFly : fly).current;
     try {
       if (top.kind === "pair") {
-        const answer = choice as PairAnswer;
+        const selected = choice === "like" || choice === "keep";
+        const answer = selected
+          ? comparisonVotes[shown]
+          : choice === "discard"
+            ? "neither"
+            : (choice as PairAnswer);
         if (!(answer in answerDirections)) return;
         const side = comparisonVotes.findIndex((vote) => vote === answer);
         if (side >= top.items.length) return;
         if (side >= 0) setPicked({ key: top.key, side });
-        await out?.(answerDirections[answer]);
-        return commit({ card: top, verdict: answer, passReason });
+        await out?.(directions[choice] ?? answerDirections[answer]);
+        return commit({
+          card: top,
+          verdict: answer,
+          passReason,
+          ...(choice === "like" && { superLike: true }),
+        });
       }
       if (!(choice in directions)) return;
       const likedId =

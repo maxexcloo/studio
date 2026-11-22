@@ -27,8 +27,8 @@ export interface Choice {
  * and rates it Liked, and Accept keeps it unrated. Edit, Animate, Variations and More Like This
  * need a Dream image.
  */
-export function dreamChoices(card: DeckCard): Choice[][] {
-  if (card.kind === "pair")
+export function dreamChoices(card: DeckCard, singleImageComparison = false): Choice[][] {
+  if (card.kind === "pair" && !singleImageComparison)
     return [
       [
         { choice: "neither", id: "neither", label: "Neither", icon: X },
