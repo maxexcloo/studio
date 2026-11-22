@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
-import { recordedObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
+import { fixtureObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
 
 test(
   "ten declared references survive durable HTTP admission and reach every Comfy graph binding",
@@ -27,7 +27,7 @@ test(
       path.join(directory, "workflows", `${raw.studio.id}.json`),
       JSON.stringify(raw),
     );
-    const info = recordedObjectInfo();
+    const info = fixtureObjectInfo();
     for (const graph of [
       raw.graph,
       ...Object.values(raw.studio.imageModes || {})

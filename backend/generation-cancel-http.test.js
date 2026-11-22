@@ -11,14 +11,14 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
-import { recordedObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
+import { fixtureObjectInfo, startFakeComfy } from "./fixtures/fake-comfy.js";
 import { clusterDns, fakeKubernetes, serviceUrl } from "./fixtures/fake-kubernetes.ts";
 import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 
 async function cancellationFixture(t, lostAcknowledgement = false) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-generation-cancel-"));
   writeTestWorkflows(path.join(directory, "runtime"));
-  const info = recordedObjectInfo();
+  const info = fixtureObjectInfo();
   info.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
   const png = await sharp({ create: { width: 64, height: 64, channels: 3, background: "white" } })
     .png()
