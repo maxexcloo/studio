@@ -1,5 +1,5 @@
 /**
- * Studio is the only writer of live profiles. The sample profiles in `backend/samples/` seed a
+ * Studio is the only writer of live profiles. The sample profiles in `config/profiles/` seed a
  * data folder that has never held one (a new install or local development); once Studio holds
  * any profile, or has held one, nothing is copied again.
  */
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { logger } from "../crash-log.js";
 
-export const samplesDirectory = fileURLToPath(new URL("../samples", import.meta.url));
+export const samplesDirectory = fileURLToPath(new URL("../../config/profiles/", import.meta.url));
 
 const profileFiles = (dir) => {
   try {

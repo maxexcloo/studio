@@ -42,7 +42,7 @@ const accountRoute = (id) => `/api/accounts/users/${encodeURIComponent(id)}`;
 before(async () => {
   // An uncensored profile in the data folder, as Library › Profiles lists it.
   const sample = JSON.parse(
-    fs.readFileSync(new URL("./samples/sdxl-base-refiner.json", import.meta.url), "utf8"),
+    fs.readFileSync(new URL("../config/profiles/sdxl-base-refiner.json", import.meta.url), "utf8"),
   );
   sample.studio = { ...sample.studio, id: "spicy", name: "Spicy", uncensored: true };
   fs.mkdirSync(path.join(directory, "workflows"));

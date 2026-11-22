@@ -133,7 +133,9 @@ test("omitted settings take the profile's defaults, not ComfyUI's node defaults"
 
 test("submission fills a missing negative from the guide and preserves the caller's text", () => {
   const raw = JSON.parse(
-    fs.readFileSync(new URL("./samples/flux2-real-dream-image-edit.json", import.meta.url)),
+    fs.readFileSync(
+      new URL("../config/profiles/flux2-real-dream-image-edit.json", import.meta.url),
+    ),
   );
   raw.studio.id = "guided-negative";
   raw.studio.capabilities.cfg = true;
@@ -160,7 +162,9 @@ test("submission fills a missing negative from the guide and preserves the calle
 
 test("an unavailable LoRA inventory refuses an enabled stack instead of dropping it", () => {
   const raw = JSON.parse(
-    fs.readFileSync(new URL("./samples/flux2-real-dream-image-edit.json", import.meta.url)),
+    fs.readFileSync(
+      new URL("../config/profiles/flux2-real-dream-image-edit.json", import.meta.url),
+    ),
   );
   raw.studio.id = "stack-inventory";
   raw.studio.capabilities.lora = true;
