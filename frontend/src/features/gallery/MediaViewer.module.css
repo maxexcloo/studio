@@ -71,6 +71,9 @@
 
 .main[data-viewer-chrome] .dockedControls {
   padding-top: var(--mantine-spacing-xs);
+}
+
+:where(:root[data-phone]) .main[data-viewer-chrome] .dockedControls {
   background: var(--studio-glass-chrome);
   border-top: 1px solid var(--studio-glass-border);
 }
