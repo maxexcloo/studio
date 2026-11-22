@@ -149,7 +149,7 @@ const steps = [
 ];
 
 const stopped =
-  "Needs Studio stopped: run migrate-runtime against the data folder (README.md, Data & Migrations).";
+  "Needs Studio stopped: run migrate-runtime against the data folder (CONFIGURATION.md, Data & Migrations).";
 
 /**
  * Each step's plan, or with `apply` its result. `online`
