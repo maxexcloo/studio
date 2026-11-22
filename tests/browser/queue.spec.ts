@@ -192,6 +192,13 @@ test("a request's jobs group as one set that moves and stops together", async ({
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAccessibleDescription("Generating · 1 of 4 Finished");
   await expect(status.getByText("1/4", { exact: true })).toBeVisible();
+  const modes = page.getByRole("navigation", { name: "Creative Modes", exact: true });
+  await expect
+    .poll(async () => {
+      const [button, nav] = await Promise.all([status.boundingBox(), modes.boundingBox()]);
+      return Boolean(button && nav && button.x + button.width <= nav.x);
+    })
+    .toBe(true);
   await status.click();
   const queue = page.getByRole("dialog", { name: "Queue", exact: true });
   // The set is one row: its title and progress, its jobs under it once opened.

@@ -76,3 +76,20 @@
 :where(:root[data-phone]) .header .modes .mode {
   width: 42px;
 }
+
+:where(:root[data-phone]) .header button[data-queue-count] {
+  width: auto;
+  padding-inline: 3px;
+}
+
+:where(:root[data-phone]) .header:has([data-queue-count]) .modes {
+  position: static;
+  flex-shrink: 1;
+  min-width: 0;
+  transform: none;
+}
+
+:where(:root[data-phone]) .header:has([data-queue-count]) .modes .mode {
+  flex-shrink: 1;
+  width: min(42px, 9vw);
+}
