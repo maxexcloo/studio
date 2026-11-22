@@ -11,12 +11,12 @@ import {
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown } from "lucide-react";
 import { Fragment, type SetStateAction, useEffect, useId, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
-import { dreamCardCounts } from "../../../../shared/dream";
+import { dreamCardCounts, dreamLimitReached } from "../../../../shared/dream";
 import { post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
@@ -129,6 +129,14 @@ export function DreamPage() {
   const client = useQueryClient();
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
+  const resetLimit = useMutation({
+    mutationFn: (kind: DreamMedia) => post<Dream>("/api/dream/reset-limit", { kind }),
+    onSuccess: async (data) => {
+      await client.cancelQueries({ queryKey: dreamQuery.queryKey, exact: true });
+      client.setQueryData(dreamQuery.queryKey, data);
+    },
+    onError: () => void client.invalidateQueries({ queryKey: dreamQuery.queryKey, exact: true }),
+  });
   const params = useParams();
   const param = params.projectId ? "projects" : params.view;
   const [view, label] = views.find(([name]) => name === param) ?? views[0];
@@ -147,6 +155,8 @@ export function DreamPage() {
       .catch(() => undefined);
   }, [client, reviewing]);
   const data = dream.data;
+  const capped =
+    view === "dream" && data && dreamLimitReached(data.settings, data.usage ?? data.today, media);
   const deckUnseen = data?.settings.enabled
     ? [
         ...data.unseen,
@@ -250,6 +260,21 @@ export function DreamPage() {
           )}
         </Group>
       </Group>
+      {capped && (
+        <Group justify="center" gap="xs">
+          <Text size="xs" c="dimmed">
+            Daily {media} limit reached
+          </Text>
+          <Button
+            size="compact-sm"
+            variant="default"
+            loading={resetLimit.isPending}
+            onClick={() => resetLimit.mutate(media)}
+          >
+            Reset Limit
+          </Button>
+        </Group>
+      )}
       {view === "discarded" ? (
         <DiscardedDreams key={media} media={media} />
       ) : view === "history" ? (

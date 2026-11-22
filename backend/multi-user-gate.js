@@ -68,7 +68,7 @@ const ordinaryRoutes = [
   ],
   [
     "POST",
-    /^\/api\/(comparisons(\/run|\/variants)?|taste\/refresh|suggestions|dream\/(calibration|visit)|dream\/inbox\/(clear|[\w-]+\/(accept|dismiss|undo))|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
+    /^\/api\/(comparisons(\/run|\/variants)?|taste\/refresh|suggestions(\/inspect)?|dream\/(calibration|reset-limit|visit)|dream\/inbox\/(clear|[\w-]+\/(accept|dismiss|undo))|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/(taste|dream\/discarded)$/],

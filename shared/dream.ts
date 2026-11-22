@@ -11,6 +11,20 @@ export const dreamDefaults = {
   videoBackend: "local" as "local" | "cloud",
 };
 export type DreamSettings = typeof dreamDefaults;
+export type DreamCounts = { images: number; videos: number };
+
+export function dreamLimitReached(
+  settings: DreamSettings,
+  usage: DreamCounts,
+  kind: "image" | "video",
+) {
+  const [enabled, limit, used] =
+    kind === "image"
+      ? [settings.images, settings.dailyImages, usage.images]
+      : [settings.videos, settings.dailyVideos, usage.videos];
+  return settings.enabled && enabled && limit > 0 && used >= limit;
+}
+
 export const dreamSeriesLength = 4;
 export const dreamPassReasons = ["taste", "similar", "glitch", "skip"] as const;
 export type DreamPassReason = (typeof dreamPassReasons)[number];

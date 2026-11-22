@@ -944,6 +944,46 @@ async function serve(
   };
 }
 
+test("Reset Limit grants a fresh quota only to the capped Dream kind and owner", async (t) => {
+  const fx = fixture(t);
+  const { dream, dreamOnce, store, state } = fx;
+  t.mock.timers.enable({ apis: ["Date"], now: state.clock });
+  const request = await serve(t, fx);
+  await dream.save("alice", { enabled: true, dailyImages: 1, videos: true, dailyVideos: 1 });
+  assert.equal((await request("/reset-limit", { kind: "image" })).status, 409);
+  const oldImage = (await dreamOnce())!;
+  assert.equal(oldImage.input.kind, "image");
+  dream.keep("alice", String(dream.unseen("alice")[0].id));
+  assert.equal((await dreamOnce())?.input.kind, "video");
+  assert.equal((await request("")).body.status, "capped");
+  assert.equal((await request("/reset-limit", { kind: "image" }, "POST", "bob")).status, 409);
+  const saved = store.jobs("alice");
+  const reset = await request("/reset-limit", { kind: "image" });
+  assert.equal(reset.status, 200);
+  assert.deepEqual(reset.body.today, { images: 1, videos: 1 });
+  assert.deepEqual(reset.body.usage, { images: 0, videos: 1 });
+  assert.deepEqual(store.jobs("alice"), saved);
+  assert.equal(reset.body.unseen.length, 1);
+  assert.equal(reset.body.settings.dailyImages, 1);
+  assert.equal((await request("/reset-limit", { kind: "image" })).status, 409);
+
+  const newImage = (await dreamOnce())!;
+  assert.equal(newImage.input.kind, "image");
+  assert.equal(newImage.createdAt, oldImage.createdAt);
+  assert.equal(await dreamOnce(), undefined);
+  const capped = await request("");
+  assert.equal(capped.body.status, "capped");
+  assert.deepEqual(capped.body.today, { images: 2, videos: 1 });
+  assert.deepEqual(capped.body.usage, { images: 1, videos: 1 });
+  store.save({ ...store.job("alice", oldImage.id)!, status: "cancelled" });
+  assert.equal(await dreamOnce(), undefined);
+  assert.equal((await request("/reset-limit", { kind: "image" })).status, 200);
+  state.clock += 86_400_000;
+  const tomorrow = await request("");
+  assert.deepEqual(tomorrow.body.today, { images: 0, videos: 0 });
+  assert.equal((await request("/reset-limit", { kind: "image" })).status, 409);
+});
+
 test("Dream history exposes only the owner's retained Dream activity and available result links", async (t) => {
   const fx = fixture(t);
   fx.taste.record("alice", [

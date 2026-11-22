@@ -457,7 +457,7 @@ export class Store {
   dreamJobsSince(ownerId: string, since: string) {
     return this.db
       .prepare(
-        `SELECT created_at AS createdAt, status, profile_id AS profileId,
+        `SELECT id, created_at AS createdAt, status, profile_id AS profileId,
           json_extract(record, '$.dream.at') AS dreamAt,
           json_extract(record, '$.input.kind') AS kind,
           json_extract(record, '$.input.type') AS type,
@@ -469,6 +469,7 @@ export class Store {
         ORDER BY created_at, rowid`,
       )
       .all(ownerId, since) as {
+      id: string;
       createdAt: string;
       status: string;
       profileId: string | null;
