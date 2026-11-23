@@ -55,7 +55,6 @@ export function TextBox({
   onChange,
   tools,
   menuLabel,
-  copyBefore,
   send,
   busy,
   popups,
@@ -75,8 +74,6 @@ export function TextBox({
   /** The box's tools menu; AI uses the magic icon, other tools More. */
   tools?: Action[];
   menuLabel?: string;
-  /** Also offers Copy in the menu before this tool. */
-  copyBefore?: string;
   /** The send, which stays beside the text. */
   send?: ReactNode;
   /** Popups its tools open (Recent Prompts), anchored at the box's end where the ⋯ stands. */
@@ -236,9 +233,7 @@ export function TextBox({
       const [first = [], ...rest] = groups;
       return [[{ id: tool.id, label: tool.label, heading: true }, ...first], ...rest];
     }),
-    (tools ?? [])
-      .filter((action) => !action.menu)
-      .flatMap((action) => (action.id === copyBefore ? [copy, action] : [action])),
+    (tools ?? []).filter((action) => !action.menu),
   ];
   // Without tools a desktop box has no menu, and a busy tool spins its Reset instead.
   const menuless = !mobile && tools?.length === 0;
@@ -260,7 +255,7 @@ export function TextBox({
     menuOpened,
     groups.some((group) => group.some(({ menu }) => menu)),
   );
-  const menu = tools && tools.length > 0 && (
+  const toolsMenu = tools && tools.length > 0 && (
     <Menu
       // In place at rest, the button stands at the text's top, so the menu drops from it.
       position={mobile && inline && !inBar ? "bottom-end" : "top-end"}
@@ -337,6 +332,36 @@ export function TextBox({
       </PopupTooltip>
       <Menu.Dropdown>{menuOpened && <ActionMenuItems groups={groups} />}</Menu.Dropdown>
     </Menu>
+  );
+  // An AI tool with a single option runs it at once; it becomes a menu while there is more, such
+  // as a proposal's Undo. Options loaded as the menu opens (Suggestions) keep the menu.
+  const options = groups.flat().filter((option) => !option.heading);
+  const [only] = options;
+  const direct =
+    ai &&
+    options.length === 1 &&
+    only.onClick &&
+    !only.menu &&
+    !only.choice &&
+    !tools?.some((tool) => tool.onOpen);
+  const menu = direct ? (
+    <Tooltip label={busy || only.label}>
+      <ActionIcon
+        ref={more}
+        onMouseDown={focusTool}
+        variant="subtle"
+        color="gray"
+        aria-label={only.label}
+        aria-busy={Boolean(busy) || undefined}
+        aria-description={busy}
+        disabled={only.disabled}
+        onClick={only.onClick}
+      >
+        {busy ? <Loader size={16} /> : <icons.assistant size={18} />}
+      </ActionIcon>
+    </Tooltip>
+  ) : (
+    toolsMenu
   );
   const barEdit = (action: Action) => (
     <Tooltip key={action.id} label={action.label}>

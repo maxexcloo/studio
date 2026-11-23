@@ -51,7 +51,7 @@ let sourceType = "image";
 let videoBytes;
 const app = express();
 app.use(express.json());
-registerPresetRoutes(app, {
+const presets = registerPresetRoutes(app, {
   models: async () => ({ profiles: [], loras: [] }),
   imageRequest: async () =>
     new Response(
@@ -108,10 +108,9 @@ test.after(async () => {
 });
 
 test("the import, save, offline reuse and deletion routes retain the recipe", async () => {
-  const imported = await api("/api/presets/import", { url: "https://civitai.com/images/42" });
-  assert.equal(imported.status, 200);
-  assert.equal(imported.body.preset.settings.seed, "0");
-  assert.equal(imported.body.preset.galleryItemId, "civitai:42");
+  const imported = await presets.importImage("https://civitai.com/images/42");
+  assert.equal(imported.settings.seed, "0");
+  assert.equal(imported.galleryItemId, "civitai:42");
   const item = galleryRows().find((item) => item.id === "civitai:42");
   assert.equal(item.prompt, "a landscape");
   assert.equal(item.settings.seed, "0");
@@ -121,8 +120,6 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
     { name: "style.safetensors", strength: 0.6, enabled: true },
   ]);
   assert.equal(item.civitai.resources[0].versionId, 17);
-  assert.equal(queued.length, 1);
-  assert.equal(queued[0].file, "style.safetensors");
   const media = await fetch(base + item.url);
   assert.equal(media.status, 200);
   const full = Buffer.from(await media.arrayBuffer());
@@ -137,16 +134,16 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   const reference = await references.bytesForReferenceAccount(undefined, asset.id);
   assert.deepEqual(reference.buffer, full);
 
-  assert.equal(imported.body.preset.resources[0].status, "missing");
-  assert.equal(imported.body.preset.resources[0].spec, undefined);
+  assert.equal(imported.resources[0].status, "missing");
+  assert.equal(imported.resources[0].spec, undefined);
   const saved = await api("/api/presets", { id: "42", name: "My Landscape" });
   assert.equal(saved.body.preset.name, "My Landscape");
   online = false;
   const list = await api("/api/presets");
   assert.equal(list.body.presets.find((item) => item.id === "42").name, "My Landscape");
-  const resolved = await api("/api/presets/resolve", { id: "42" });
-  assert.equal(resolved.body.preset.prompt, "a landscape");
-  assert.equal(resolved.body.preset.resources[0].weight, 0.6);
+  const resolved = await presets.resolvePreset("42");
+  assert.equal(resolved.prompt, "a landscape");
+  assert.equal(resolved.resources[0].weight, 0.6);
   online = true;
   sourcePrompt = "updated source landscape";
   store.addGalleryItems([
@@ -155,9 +152,8 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
       createdAt: "2025-01-01T00:00:00Z",
     },
   ]);
-  const reimported = await api("/api/presets/import", { url: "https://civitai.red/images/42" });
-  assert.equal(reimported.status, 200);
-  assert.equal(reimported.body.preset.prompt, sourcePrompt);
+  const reimported = await presets.importImage("https://civitai.red/images/42");
+  assert.equal(reimported.prompt, sourcePrompt);
   const current = galleryRows().find((item) => item.id === "civitai:42");
   assert.ok(Date.parse(current.createdAt) > Date.parse("2025-01-01T00:00:00Z"));
   assert.equal(
@@ -170,7 +166,7 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   setGallery(galleryRows().filter((item) => item.id !== current.id));
   assert.equal((await fetch(base + "/api/presets/42/media")).status, 404);
   assert.equal((await fetch(base + "/api/presets/42/thumbnail")).status, 404);
-  assert.equal((await api("/api/presets/resolve", { id: "42" })).status, 400);
+  await assert.rejects(presets.resolvePreset("42"), /That saved image is gone/);
   store.addGalleryItems([current]);
   await api("/api/presets/42", null, "DELETE");
   assert.equal(fs.existsSync(store.importedImageFile(current)), false);
@@ -210,9 +206,8 @@ test("video imports save originals, serve byte ranges and generate thumbnails", 
   sourceType = "video";
   online = true;
   try {
-    const result = await api("/api/presets/import", { url: "https://civitai.red/images/42" });
-    assert.equal(result.status, 200);
-    assert.equal(result.body.preset.type, "video");
+    const result = await presets.importImage("https://civitai.red/images/42");
+    assert.equal(result.type, "video");
     const item = galleryRows().find((item) => item.id === "civitai:42");
     assert.equal(item.type, "video");
     assert.equal(item.width, 64);
@@ -251,18 +246,15 @@ test("saved recipes migrate into gallery images without a duplicate recipe store
   await api("/api/presets/43", null, "DELETE");
 });
 
-test("failed image downloads leave no gallery record or model download", async () => {
+test("failed image downloads leave no gallery record", async () => {
   online = true;
   validImage = false;
-  const before = queued.length;
   try {
-    const result = await api("/api/presets/import", { url: "https://civitai.com/images/42" });
-    assert.equal(result.status, 400);
+    await assert.rejects(presets.importImage("https://civitai.com/images/42"));
     assert.equal(
       galleryRows().some((item) => item.id === "civitai:42"),
       false,
     );
-    assert.equal(queued.length, before);
   } finally {
     validImage = true;
   }
@@ -275,13 +267,7 @@ test("write routes refuse unsigned remote devices", async () => {
   assert.equal(response.status, 403);
 });
 
-test("browser-supplied downloads and paths cannot bypass preview resolution", async () => {
-  const response = await api("/api/library/downloads", {
-    id: "unknown",
-    url: "http://127.0.0.1/secret",
-    folder: "../",
-  });
-  assert.equal(response.status, 400);
+test("thumbnails refuse an id that is not a Civitai image", async () => {
   const thumbnail = await fetch(base + "/api/presets/not-an-id/thumbnail");
   assert.equal(thumbnail.status, 400);
 });

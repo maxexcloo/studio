@@ -217,47 +217,6 @@ export function registerDreamRoutes(
   route("POST", "/api/dream/inbox/:proposalId/undo", (account, { params }) =>
     inboxAnswer(() => inbox.undo(owner(account), params.proposalId)),
   );
-  route("GET", "/api/dream/calibration", (account, { query }) => {
-    const limit = Math.max(
-      1,
-      Math.min(24, Number.parseInt(String(query?.limit || "12"), 10) || 12),
-    );
-    return {
-      status: 200,
-      payload: {
-        items: dream.calibration(
-          owner(account),
-          limit,
-          query?.media === "video" ? "video" : "image",
-        ),
-      },
-    };
-  });
-  route("POST", "/api/dream/calibration", (account, { body }) => {
-    const { liked = [], passed = [], rating } = body || {};
-    const ids = [liked, passed].flat();
-    if (
-      !Array.isArray(liked) ||
-      !Array.isArray(passed) ||
-      !ids.length ||
-      ids.length > 2 ||
-      ids.some((id) => typeof id !== "string") ||
-      new Set(ids).size < ids.length ||
-      (rating !== undefined &&
-        (ids.length !== 1 ||
-          (rating === "liked" ? !liked.length : rating !== "disliked" || !passed.length)))
-    )
-      return {
-        status: 400,
-        payload: { ok: false, error: "Like or pass one image, or answer a pair." },
-      };
-    try {
-      dream.calibrate(owner(account), { liked, passed, rating });
-      return { status: 200, payload: { ok: true } };
-    } catch (error) {
-      return refuse(error);
-    }
-  });
   route("GET", "/api/dream/discarded", (account, { query }) => {
     const all = dream
       .discarded(owner(account))
@@ -334,21 +293,19 @@ export function registerDreamRoutes(
     });
   });
   route("POST", "/api/dream/undo", (account, { body }) => {
-    const { ids, calibration, rating, setId } = body || {};
+    const { ids, rating, setId } = body || {};
     if (
       !Array.isArray(ids) ||
       !ids.length ||
       ids.length > (setId ? dreamSeriesLength : 3) ||
       ids.some((id) => typeof id !== "string") ||
-      (setId !== undefined &&
-        (typeof setId !== "string" || !setId || calibration || rating !== undefined)) ||
-      (calibration !== undefined && typeof calibration !== "boolean") ||
+      (setId !== undefined && (typeof setId !== "string" || !setId || rating !== undefined)) ||
       (rating !== undefined &&
         (ids.length !== 1 || (rating !== "liked" && rating !== "disliked" && rating !== null)))
     )
       return { status: 400, payload: { ok: false, error: "Undo a result, comparison or set." } };
     try {
-      dream.undo(owner(account), ids, { calibration, rating, setId });
+      dream.undo(owner(account), ids, { rating, setId });
       return { status: 200, payload: { ok: true } };
     } catch (error) {
       return refuse(error);

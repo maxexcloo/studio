@@ -4,7 +4,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 import { civitaiFetch, civitaiJson, limitedBody } from "./civitai/access.js";
-import { importCivitaiImage, matchResources, versionResource } from "./civitai/import.js";
+import { importCivitaiImage, matchResources } from "./civitai/import.js";
 import { downloadPresetImage, presetFromGallery, refreshImportedItem } from "./civitai/library.js";
 import { dataDir } from "./data-dir.js";
 import {
@@ -15,24 +15,16 @@ import {
   visibleGallery,
 } from "./gallery/store.js";
 import { writeBytesFileAsync } from "./json-store.js";
-import {
-  libraryDownload,
-  libraryDownloadAccess,
-  libraryDownloads,
-  resolveModelLink,
-  startLibraryDownload,
-} from "./library/downloads.js";
+import { libraryDownloadAccess, startLibraryDownload } from "./library/downloads.js";
 import { presetGrade } from "./library/grade.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { requireLocal } from "./route-access.js";
 import { getFileVideoPoster, getFileVideoPreview, sendVideoPreview } from "./video-previews.js";
-import { refreshWorkerModels } from "./worker-models.js";
 
 const previewsDir = path.join(dataDir, "preset-previews");
 let presets = readRuntimeDocument(dataDir, "presets");
 if (!Array.isArray(presets)) presets = [];
-const imported = new Map();
 
 function summary(preset) {
   const { previewUrl, ...rest } = preset;
@@ -130,27 +122,6 @@ export function registerPresetRoutes(
         presets: await Promise.all(list.map((item) => matched(item, catalogue, { verify: false }))),
         downloads: libraryDownloadAccess(),
       });
-    }),
-  );
-  app.post(
-    "/api/presets/import",
-    route(async (req, res) => {
-      const source = await importCivitaiImage(req.body?.url, { json });
-      const preset = await downloadPresetImage(
-        { ...source, savedAt: new Date().toISOString() },
-        { models, imageRequest, download },
-      );
-      forgetLegacy(preset.id);
-      if (imported.size > 50) imported.delete(imported.keys().next().value);
-      res.json({ ok: true, preset: await matched(preset) });
-    }, true),
-  );
-  app.post(
-    "/api/presets/resolve",
-    route(async (req, res) => {
-      const preset = lookup(String(req.body?.id || ""));
-      if (!preset) throw new Error("Import or select an image first.");
-      res.json({ ok: true, preset: await matched(preset) });
     }),
   );
   app.post(
@@ -263,40 +234,6 @@ export function registerPresetRoutes(
         .toBuffer();
       res.type("webp").send(buffer);
     }),
-  );
-  app.get(
-    "/api/library/downloads",
-    route(async (_req, res) => {
-      await refreshWorkerModels();
-      res.json({ ok: true, downloads: libraryDownloads(), access: libraryDownloadAccess() });
-    }),
-  );
-  app.post(
-    "/api/library/downloads/preview",
-    route(async (req, res) => {
-      const spec = await resolveModelLink(req.body?.url, req.body?.folder, { json });
-      const { url, sha256, ...file } = spec;
-      imported.set(`download:${spec.id}`, spec);
-      if (imported.size > 50) imported.delete(imported.keys().next().value);
-      res.json({ ok: true, file });
-    }, true),
-  );
-  app.post(
-    "/api/library/downloads",
-    route(async (req, res) => {
-      let spec;
-      if (req.body?.versionId) {
-        const versionId = Number(req.body.versionId);
-        if (!Number.isSafeInteger(versionId) || versionId < 1)
-          throw new Error("Choose a valid model version.");
-        spec = versionResource(await json(`model-versions/${versionId}`)).spec;
-      } else {
-        const id = String(req.body?.id || "");
-        spec = imported.get(`download:${id}`) || libraryDownload(id);
-      }
-      if (!spec) throw new Error("Preview a supported model before downloading it.");
-      res.json({ ok: true, download: await startLibraryDownload(spec) });
-    }, true),
   );
   // The Library's Import page (library/routes.js): a saved image without its files queued, which
   // Download Missing does in one tap, and a saved image matched again.

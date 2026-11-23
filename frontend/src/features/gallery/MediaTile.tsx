@@ -1,7 +1,7 @@
 import { Button, Checkbox, Loader, Paper, Stack, Text, UnstyledButton } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlert } from "lucide-react";
-import { type CSSProperties, type KeyboardEvent, type ReactNode, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useState } from "react";
 
 import { finishedItemStatuses, terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem } from "../../types";
@@ -182,7 +182,6 @@ export function MediaTile({
   className,
   style,
   onOpen,
-  onTap,
   onMenu,
   onSelectionMenu,
   onTryAgain,
@@ -204,7 +203,6 @@ export function MediaTile({
   className?: string;
   style?: CSSProperties;
   onOpen: () => void;
-  onTap?: (button: HTMLButtonElement) => void;
   onMenu?: () => void;
   onSelectionMenu?: (x: number, y: number) => void;
   onTryAgain?: (item: MediaItem) => void;
@@ -214,7 +212,6 @@ export function MediaTile({
 }) {
   // Touch holds use Studio's menu or selection instead of a native drag lift.
   const touch = useTouch();
-  const tapped = useRef(false);
   // Its Stop takes the caption's place at the foot of the tile.
   const upscaleShown = item.status === "done" && upscaling(item) && !selecting;
   const media = mediaSource(item);
@@ -275,9 +272,6 @@ export function MediaTile({
         aria-label={label || `${selecting ? "Select" : "Open"} ${item.type}: ${title}`}
         aria-pressed={selecting ? selected : undefined}
         draggable={item.status === "done" && !touch}
-        onPointerDown={(event) => {
-          tapped.current = event.pointerType === "touch";
-        }}
         onKeyDown={(event) => {
           if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
             const rect = event.currentTarget.getBoundingClientRect();
@@ -299,10 +293,6 @@ export function MediaTile({
             return;
           }
           if (select?.click([item], event)) return;
-          if (onTap && tapped.current && event.detail > 0) {
-            onTap(event.currentTarget);
-            return;
-          }
           event.currentTarget.focus({ preventScroll: true });
           onOpen();
         }}

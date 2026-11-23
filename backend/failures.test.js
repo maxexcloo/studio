@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-import { describeFailure, failureTitles, troubleshootingAnchor } from "./failures.js";
+import { describeFailure, failureTitles } from "./failures.js";
 
 test("configuration documents every generation failure headline", () => {
   const doc = fs.readFileSync(new URL("../CONFIGURATION.md", import.meta.url), "utf8");
@@ -12,26 +12,6 @@ test("configuration documents every generation failure headline", () => {
     .map((line) => line.replace(/^#+\s*/, ""));
   for (const title of failureTitles)
     assert.ok(headings.includes(title), `CONFIGURATION.md has no "#### ${title}"`);
-  assert.equal(
-    describeFailure({ message: "CUDA error: out of memory" }).help,
-    "the-gpu-ran-out-of-memory",
-  );
-  assert.equal(
-    describeFailure({
-      message: "Error while deserializing header: header is too large",
-      nodeType: "VAELoader",
-    }).help,
-    "a-model-file-is-damaged-or-incomplete",
-  );
-  assert.equal(
-    describeFailure({ message: "saved nothing", noOutput: true }).help,
-    "no-image-was-saved",
-  );
-  assert.equal(describeFailure({ message: "RuntimeError: odd" }).help, "generation-failed");
-  // Links inside the document point at headings that exist.
-  const anchors = new Set(headings.map(troubleshootingAnchor));
-  for (const [, anchor] of doc.matchAll(/\]\(#([^)]+)\)/g))
-    assert.ok(anchors.has(anchor), `#${anchor} has no heading`);
 });
 
 test("a damaged safetensors file gets a plain title and hint, with the raw text kept", () => {
@@ -150,5 +130,4 @@ test("a Radiance LoRA refusal shows its own sentence, not a generic failure", ()
     failure.summary,
     "loras: none of the adapters' modules is a module of this model (zimage_style.safetensors on krea2)",
   );
-  assert.equal(failure.help, "a-lora-doesnt-fit-this-model");
 });

@@ -167,14 +167,3 @@ export async function startLibraryDownload(spec) {
   loraCatalogue().rememberDownload(spec);
   return startDownload(spec);
 }
-
-export function libraryDownloads() {
-  const state = downloadState();
-  const local = [state.active, ...state.queued, ...state.recent, ...(state.paused || [])].filter(
-    (item) => item && libraryDownload(item.id),
-  );
-  // Keep one current state per resource, including when a failed file is retried.
-  const entries = new Map();
-  for (const item of [...local].reverse()) entries.set(item.id, item);
-  return [...entries.values()].slice(-64).map(({ url, sha256, ...item }) => item);
-}

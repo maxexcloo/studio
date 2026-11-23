@@ -79,15 +79,6 @@ export const failureTitles = [
   genericTitle,
 ];
 
-/** The GitHub Markdown heading anchor for a failure headline. */
-export function troubleshootingAnchor(title = "") {
-  return String(title)
-    .trim()
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
-    .replace(/\s/g, "-");
-}
-
 /** Which part a loader node reads, so a broken file can be named by what it is. */
 const parts = [
   [/^VAELoader/i, "VAE"],
@@ -154,7 +145,6 @@ export function describeFailure({
   if (noOutput) {
     return {
       title: noOutputTitle,
-      help: troubleshootingAnchor(noOutputTitle),
       summary: raw,
       hint: "The run ended without an image to show. The workflow may end in a preview node instead of Save Image, or ComfyUI skipped a step. Run it once in ComfyUI to see what it does.",
       nodeType: "",
@@ -180,8 +170,6 @@ export function describeFailure({
       : damaged && part
         ? `The ${part} file is damaged`
         : match?.title || genericTitle,
-    // "The VAE file is damaged" is explained under the general damaged-file heading.
-    help: troubleshootingAnchor(learned ? learnedTitle : match?.title || genericTitle),
     summary:
       learned ||
       (damaged

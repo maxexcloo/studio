@@ -1639,89 +1639,6 @@ test("Three independent likes, in the gallery or Super Likes, seed a concept and
   assert.doesNotMatch(String((await dreamOnce())?.dream?.arm), /^continue:/);
 });
 
-test("Calibration comparisons rate gallery images without seeding automatic variants", async (t) => {
-  const { dream, state, store, dreamOnce } = fixture(t);
-  await dream.save("alice", { enabled: true });
-  const old = new Date(state.clock - 2 * 86_400_000).toISOString();
-  for (const id of ["win", "lose", "same"]) {
-    const input = { kind: "image", prompt: `prompt ${id}`, profileId: "flux" };
-    const session = store.createSession("alice", "Gallery").id;
-    const job = store.enqueue("alice", session, input, "image", undefined, "worker:image", id);
-    store.save({ ...job, status: "completed" });
-    state.items.push({
-      id,
-      jobId: job.id,
-      ownerId: "alice",
-      type: "image",
-      status: "done",
-      createdAt: old,
-      // The winner is also a liked Dream result; its note names the comparison.
-      ...(id === "win" ? { dream: { state: "kept" as const, prompt: "", why: "", at: "" } } : {}),
-    });
-  }
-  dream.calibrate("alice", { liked: ["win"], passed: ["lose"] });
-  assert.deepEqual(dream.read("alice").ratings, { win: 1516, lose: 1484 });
-  // Both (or Neither) draws the two together; a single verdict rates nothing.
-  dream.calibrate("alice", { liked: ["lose", "same"], passed: [] });
-  dream.calibrate("alice", { passed: ["same"], liked: [] });
-  assert.deepEqual(dream.read("alice").ratings, { win: 1516, lose: 1485, same: 1499 });
-  const job = await dreamOnce();
-  assert.doesNotMatch(String(job?.dream?.arm), /^continue:/);
-});
-
-test("While Dream is off, gallery comparisons still rate images and queue nothing", async (t) => {
-  const { dream, state, dreamJobs, generated } = fixture(t);
-  const createdAt = new Date(state.clock - 2 * 86_400_000).toISOString();
-  generated(
-    ...["a", "b"].map((id) => ({
-      id,
-      jobId: `job-${id}`,
-      ownerId: "alice",
-      type: "image",
-      status: "done",
-      createdAt,
-    })),
-  );
-  assert.equal(dream.read("alice").settings.enabled, false);
-  assert.deepEqual(
-    dream
-      .calibration("alice", 12)
-      .map((item) => item.id)
-      .sort(),
-    ["a", "b"],
-  );
-  dream.calibrate("alice", { liked: ["a"], passed: ["b"] });
-  assert.deepEqual(dream.read("alice").ratings, { a: 1516, b: 1484 });
-  await dream.tick();
-  assert.deepEqual(dreamJobs("alice"), []);
-});
-
-test("Dream-off video comparisons rate videos without queueing work", async (t) => {
-  const { dream, state, dreamJobs, generated } = fixture(t);
-  const createdAt = new Date(state.clock - 2 * 86_400_000).toISOString();
-  generated(
-    ...["a", "b"].map((id) => ({
-      id,
-      jobId: `job-${id}`,
-      ownerId: "alice",
-      type: "video",
-      status: "done",
-      createdAt,
-    })),
-  );
-  assert.deepEqual(
-    dream
-      .calibration("alice", 12, "video")
-      .map((item) => item.id)
-      .sort(),
-    ["a", "b"],
-  );
-  dream.calibrate("alice", { liked: ["a"], passed: ["b"] });
-  assert.deepEqual(dream.read("alice").ratings, { a: 1516, b: 1484 });
-  await dream.tick();
-  assert.deepEqual(dreamJobs("alice"), []);
-});
-
 test("Fresh concepts dominate even when verdicts adapt the share", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
@@ -1986,120 +1903,27 @@ test("Project results and stats use the project's own finished results window", 
   );
 });
 
-test("Undo returns judged results and gallery images and takes back what they taught", async (t) => {
+test("Undo returns judged results and takes back what they taught", async (t) => {
   const fx = fixture(t);
-  const { dream, state, taste, dreamOnce, generated } = fx;
+  const { dream, state, taste, dreamOnce } = fx;
   await dream.save("alice", { enabled: true });
   await dreamOnce();
   await dreamOnce();
-  const old = new Date(state.clock - 2 * 86_400_000).toISOString();
-  generated({
-    id: "gallery",
-    jobId: "job-gallery",
-    ownerId: "alice",
-    type: "image",
-    status: "done",
-    createdAt: old,
-  });
   const request = await serve(t, fx);
   const [one, two] = (await request("")).body.unseen.map((item: DreamItem) => String(item.id));
   await request(`/${encodeURIComponent(one)}/keep`, {});
   await request(`/${encodeURIComponent(two)}/discard`, {});
-  await request("/calibration", { liked: ["gallery"] });
-  assert.equal(taste.read("alice").signals.length, 3);
+  assert.equal(taste.read("alice").signals.length, 2);
 
   assert.equal((await request("/undo", { ids: [one] }, "POST", "bob")).status, 404);
   assert.equal((await request("/undo", { ids: [] })).status, 400);
-  for (const ids of [["gallery"], [two], [one]])
-    assert.equal((await request("/undo", { ids })).status, 200);
+  for (const ids of [[two], [one]]) assert.equal((await request("/undo", { ids })).status, 200);
   assert.deepEqual(
     (await request("")).body.unseen.map((item: DreamItem) => item.id).sort(),
     [one, two].sort(),
   );
   assert.equal(state.items.find((item) => item.id === two)?.rating, undefined);
   assert.deepEqual(taste.read("alice").signals, []);
-  assert.deepEqual(dream.read("alice").judged, []);
-});
-
-test("Calibration offers the account's older Studio generations, unjudged first, and only teaches the taste profile", async (t) => {
-  const fx = fixture(t);
-  const { state, taste, generated } = fx;
-  const old = new Date(state.clock - 2 * 86_400_000).toISOString();
-  const image = (id: string, extra: Partial<DreamItem> = {}): DreamItem => ({
-    id,
-    jobId: `job-${id}`,
-    ownerId: "alice",
-    type: "image",
-    status: "done",
-    prompt: `prompt ${id}`,
-    createdAt: old,
-    settings: { profileId: "flux" },
-    ...extra,
-  });
-  generated(
-    image("a"),
-    image("b"),
-    image("c"),
-    image("new", { createdAt: new Date(state.clock).toISOString() }),
-    image("clip", { type: "video" }),
-    image("unseen", { dream: { prompt: "p", why: "", at: old, state: "unseen" } }),
-    image("bobs", { ownerId: "bob" }),
-    image("disliked", { rating: "disliked" }),
-  );
-  // Not Studio generations of this account: an upload or import without a job here, and a record
-  // attributed to alice whose job another account ran.
-  state.items.push(
-    image("upload", { jobId: "imported" }),
-    image("borrowed", { jobId: "job-bobs" }),
-  );
-  const request = await serve(t, fx);
-  const offered = async () =>
-    (await request("/calibration?limit=10")).body.items.map((item: DreamItem) => item.id).sort();
-  assert.deepEqual(await offered(), ["a", "b", "c"]);
-
-  assert.equal((await request("/calibration", { liked: ["a", "b"], passed: ["c"] })).status, 400);
-  assert.equal((await request("/calibration", {})).status, 400);
-  assert.equal((await request("/calibration", { liked: ["a"], passed: ["a"] })).status, 400);
-  for (const id of ["bobs", "upload", "borrowed", "disliked"])
-    assert.equal((await request("/calibration", { liked: [id] })).status, 404);
-  assert.equal((await request("/calibration", { liked: ["new"] })).status, 404);
-  assert.equal((await request("/calibration", { liked: ["a"], passed: ["b"] })).status, 200);
-  assert.equal((await request("/calibration", { passed: ["c"] })).status, 200);
-  assert.deepEqual(
-    taste.read("alice").signals.map((signal) => [signal.kind, signal.jobId, signal.prompt]),
-    [
-      ["calibrate-pass", "job-c", "prompt c"],
-      ["calibrate-pass", "job-b", "prompt b"],
-      ["calibrate-like", "job-a", "prompt a"],
-    ],
-  );
-  assert.deepEqual(
-    (await request("/calibration?media=video&limit=10")).body.items.map(
-      (item: DreamItem) => item.id,
-    ),
-    ["clip"],
-  );
-  assert.equal((await request("/calibration", { liked: ["clip"], passed: ["a"] })).status, 400);
-  assert.equal((await request("/calibration", { liked: ["clip"] })).status, 200);
-  assert.equal(taste.read("alice").signals[0].media, "video");
-  assert.deepEqual(
-    (await request("/history?media=video")).body.items.map(
-      (item: { item: { media: string } }) => item.item.media,
-    ),
-    ["video"],
-  );
-  assert.ok(
-    (await request("/history?media=image")).body.items.every(
-      (item: { item: { media: string } }) => item.item.media === "image",
-    ),
-  );
-  // Judged images come after unjudged ones; nothing in the gallery changed.
-  generated(image("d"));
-  assert.equal((await request("/calibration?limit=1")).body.items[0].id, "d");
-  assert.deepEqual(
-    state.items.filter((item) => item.dream).map((item) => [item.id, item.dream?.state]),
-    [["unseen", "unseen"]],
-  );
 });
 
 test("Dream counts match the deck while off, paired, and after a verdict or Undo", async (t) => {
@@ -2147,52 +1971,6 @@ test("Dream counts match the deck while off, paired, and after a verdict or Undo
   assert.deepEqual(await count(), { unseen: 0, images: 0, videos: 0, active: false });
   assert.equal((await request("/undo", { ids: ["video-0", "video-1"] })).status, 200);
   assert.deepEqual(await count(), { unseen: 1, images: 0, videos: 1, active: false });
-});
-
-test("Deck calibration and its rating are saved or undone together", async (t) => {
-  const fx = fixture(t);
-  const { dream, generated, state, taste } = fx;
-  const at = new Date(state.clock - 2 * 86_400_000).toISOString();
-  generated({
-    id: "gallery",
-    jobId: "job-gallery",
-    ownerId: "alice",
-    type: "image",
-    status: "done",
-    createdAt: at,
-    dream: { prompt: "A gull", why: "", at, state: "kept" },
-  });
-  const request = await serve(t, fx);
-  const item = state.items.find((entry) => entry.id === "gallery")!;
-  state.ratingRefused = true;
-  assert.notEqual(
-    (await request("/calibration", { passed: ["gallery"], rating: "disliked" })).status,
-    200,
-  );
-  assert.equal(dream.read("alice").judged?.length ?? 0, 0);
-  assert.equal(taste.read("alice").signals.length, 0);
-  assert.equal(item.rating, undefined);
-
-  state.ratingRefused = false;
-  assert.equal(
-    (await request("/calibration", { passed: ["gallery"], rating: "disliked" })).status,
-    200,
-  );
-  assert.deepEqual(dream.read("alice").judged, ["gallery"]);
-  assert.equal(item.rating, "disliked");
-  state.ratingRefused = true;
-  const undo = { ids: ["gallery"], calibration: true, rating: null };
-  assert.notEqual((await request("/undo", undo)).status, 200);
-  assert.deepEqual(dream.read("alice").judged, ["gallery"]);
-  assert.equal(taste.read("alice").signals.length, 1);
-  assert.equal(item.rating, "disliked");
-
-  state.ratingRefused = false;
-  assert.equal((await request("/undo", undo)).status, 200);
-  assert.deepEqual(dream.read("alice").judged, []);
-  assert.equal(taste.read("alice").signals.length, 0);
-  assert.equal(item.rating, undefined);
-  assert.equal(item.dream?.state, "kept");
 });
 
 test("Dream loads a LoRA drawn by taste and like, at its learnt strength, and explores untried ones", async (t) => {

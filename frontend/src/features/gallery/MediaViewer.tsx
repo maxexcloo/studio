@@ -88,6 +88,7 @@ function nearControl(event: React.MouseEvent<HTMLElement>) {
   });
 }
 
+const textField = 'input:not([type="radio"]),textarea,[contenteditable="true"]';
 // One key runs a viewer action, as its bar would (Settings › Studio lists them).
 const viewerShortcuts: Record<string, string> = {
   e: "edit-image",
@@ -435,6 +436,12 @@ export function MediaViewer({
       close={() => setSheet(false)}
     />
   );
+  // Escape closes the docked Details first, as the layer over the media, then the viewer.
+  function dismiss() {
+    if (phone || !details) return close();
+    setDetails(false);
+    stage.current?.focus({ preventScroll: true });
+  }
   const toggleDetails = () => {
     if (phone) setSheet(true);
     else setDetails((open) => !open);
@@ -497,12 +504,10 @@ export function MediaViewer({
             !deleting &&
             !layerAbove(stage.current, event) &&
             event.currentTarget.contains(target) &&
-            !target.closest(
-              'input:not([type="radio"]),textarea,select,[aria-haspopup][aria-expanded="true"]',
-            )
+            !target.closest(`${textField},select,[aria-haspopup][aria-expanded="true"]`)
           ) {
             event.preventDefault();
-            close();
+            dismiss();
           }
         }}
         onKeyDown={(event) => {
@@ -516,7 +521,10 @@ export function MediaViewer({
             return;
           if (event.key === "Escape" && !event.nativeEvent.isComposing) {
             event.preventDefault();
-            close();
+            // The first Escape leaves a text box, keeping its edit; the next one dismisses.
+            if ((event.target as Element).closest(textField))
+              stage.current?.focus({ preventScroll: true });
+            else dismiss();
             return;
           }
           if (
