@@ -190,13 +190,25 @@ export function usePromptHistory({
       target={<span />}
       onClear={() => edit.mutate({ action: "clear" })}
       clearDisabled={!history.data?.prompts.some((entry) => !entry.liked)}
+      actions={
+        <Switch
+          // Remounts once loaded so the saved state appears without the thumb sliding.
+          key={keep.history.data ? "loaded" : "loading"}
+          size="sm"
+          label="Keep"
+          aria-label="Keep Recent Prompts"
+          checked={keep.history.data?.enabled ?? false}
+          disabled={!keep.history.data}
+          onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
+        />
+      }
       leading={
         <Button
           variant="default"
           disabled={!value.trim() || currentLiked}
           onClick={() => like(value, true)}
         >
-          Like Current Prompt
+          Like Current
         </Button>
       }
     >
@@ -218,14 +230,6 @@ export function usePromptHistory({
             }
           }}
         >
-          <Switch
-            // Remounts once loaded so the saved state appears without the thumb sliding.
-            key={keep.history.data ? "loaded" : "loading"}
-            label="Keep Recent Prompts"
-            checked={keep.history.data?.enabled ?? false}
-            disabled={!keep.history.data}
-            onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
-          />
           <Combobox.EventsTarget>
             <SearchInput
               aria-label="Search Prompt History"
