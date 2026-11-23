@@ -836,6 +836,7 @@ test("Taste shows keep rates by model and tag kind, and pins or removes values i
     .poll(() => dream.requests.at(-1)?.body)
     .toEqual({ preferences: { tags: ["red dress", "golden light"] } });
   await expect(row("Colours", "golden light")).toContainText("Favourite");
+  await expect(page.getByRole("menu")).toBeHidden();
   await row("Models", "Image Quality")
     .getByRole("button", { name: "Actions for Image Quality", exact: true })
     .click();
