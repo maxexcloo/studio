@@ -586,6 +586,19 @@ export function MediaViewer({
       >
         <div
           className={classes.layout}
+          // A press anywhere but the prompt leaves it, keeping its edit: the zoom library cancels
+          // mouse down to pan, and touch and WebKit presses on a button leave focus in the text.
+          onPointerDown={(event) => {
+            const target = event.target as Element;
+            if (
+              event.button === 0 &&
+              document.activeElement?.closest(`.${classes.promptRow}`) &&
+              event.currentTarget.contains(target) &&
+              !target.closest(`.${classes.promptRow}`) &&
+              !layerAbove(event.currentTarget)
+            )
+              stage.current?.focus({ preventScroll: true });
+          }}
           onClickCapture={(event) => {
             if (!gestureClick.current) return;
             event.preventDefault();
@@ -621,16 +634,6 @@ export function MediaViewer({
               className={`${classes.stage} ${classes.viewerStage}`}
               data-viewer-stage
               tabIndex={-1}
-              onPointerDown={(event) => {
-                // The zoom library cancels mouse down to pan, so the prompt won't blur on its own.
-                if (
-                  !phone &&
-                  event.button === 0 &&
-                  document.activeElement?.closest(`.${classes.promptRow}`) &&
-                  !layerAbove(event.currentTarget)
-                )
-                  event.currentTarget.focus({ preventScroll: true });
-              }}
             >
               {showTogether ? (
                 // Each side opens alone; the current one, whose details show, is outlined.
