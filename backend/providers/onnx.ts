@@ -95,6 +95,9 @@ export function createModelFiles({
   };
 }
 
+// One run at a time across every runner, as each takes half the cores.
+let turn: Promise<unknown> = Promise.resolve();
+
 /**
  * Runs ONNX models in one worker thread (providers/onnx-worker.ts), off the event loop. A worker
  * left idle for ten minutes ends, returning its loaded models' memory; the next run starts another.
@@ -131,18 +134,23 @@ export function createOnnxRunner(name: string) {
     worker.on("exit", (code) => fail(new Error(`The ${name} worker exited (${code}).`)));
     return started;
   }
+  function send(request: Omit<InferRequest, "id">) {
+    clearTimeout(idle);
+    const id = (callCount += 1);
+    current ||= startWorker();
+    const { worker, calls } = current;
+    const result = new Promise<Record<string, Float32Array>>((resolve, reject) =>
+      calls.set(id, { resolve, reject }),
+    );
+    worker.ref();
+    worker.postMessage({ id, ...request }, [request.data.buffer as ArrayBuffer]);
+    return result;
+  }
   return {
     /** The named `outputs` of `model` for one input tensor. */
     run(request: Omit<InferRequest, "id">) {
-      clearTimeout(idle);
-      const id = (callCount += 1);
-      current ||= startWorker();
-      const { worker, calls } = current;
-      const result = new Promise<Record<string, Float32Array>>((resolve, reject) =>
-        calls.set(id, { resolve, reject }),
-      );
-      worker.ref();
-      worker.postMessage({ id, ...request }, [request.data.buffer as ArrayBuffer]);
+      const result = turn.then(() => send(request));
+      turn = result.catch(() => undefined);
       return result;
     },
   };
