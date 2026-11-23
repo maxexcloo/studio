@@ -8,8 +8,8 @@
  * references the old file any more (no profile, no saved preset), the old file is removed
  * through the worker model API; otherwise it stays, and the update says what still uses it.
  *
- * Paid and early-access versions are never downloaded: they show with the reason and the newest
- * free version, when there is one, to update to instead.
+ * Early-access versions aren't offered. Paid versions are never downloaded: they show with the
+ * reason and the newest free version, when there is one, to update to instead.
  *
  * State lives in the `library-updates` document in studio.sqlite:
  *   {checkedAt, byEntry: {key: {state: available|current|error, latest?, freeAlternative?, note, checkedAt}},
@@ -71,7 +71,11 @@ export function civitaiUpdate(entry, model, { familiesOf = () => [], now = Date.
         ? publishedAt(item) > publishedAt(installed)
         : index < at) &&
       shareFamily(families, familiesOf(item.baseModel || "")) &&
-      (families.length || !item.baseModel || item.baseModel === installed.baseModel),
+      (families.length || !item.baseModel || item.baseModel === installed.baseModel) &&
+      // Early-access releases aren't offered until anyone can download them.
+      civitaiAvailability({ ...item, modelId: model.id, model: shell }, filesOf(item)[0] || {}, {
+        now,
+      }).reason !== "early-access",
   );
   const describe = (version, file) => {
     const full = { ...version, modelId: model.id, model: shell };
