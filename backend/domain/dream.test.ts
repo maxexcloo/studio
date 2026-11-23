@@ -790,6 +790,28 @@ test("Dream draws a ready profile by its taste, explores concepts alongside prof
   assert.match(state.calls.at(-1)!.system, /Explore a fresh idea within their taste/);
 });
 
+test("Dream favours the set model they keep over one they pass", async (t) => {
+  const { dream, taste, dreamOnce, generated } = fixture(t);
+  taste.edit("alice", { models: ["flux", "qwen"] });
+  for (const [index, profileId, state] of [
+    [0, "flux", "discarded"],
+    [1, "flux", "discarded"],
+    [2, "flux", "discarded"],
+    [3, "qwen", "kept"],
+  ] as const)
+    generated({
+      id: `judged-${index}`,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      prompt: `judged ${index}`,
+      settings: { profileId },
+      dream: { prompt: `judged ${index}`, why: "", at: "", state, passReason: "skip" },
+    });
+  await dream.save("alice", { enabled: true });
+  assert.equal((await dreamOnce())?.input.profileId, "qwen");
+});
+
 test("Dream draws from the models and tags a person set over those it learnt", async (t) => {
   const { dream, state, taste, dreamOnce } = fixture(t);
   taste.record("alice", [tasteSignal("like", "a", { profileId: "qwen", tags: ["fox"] })]);

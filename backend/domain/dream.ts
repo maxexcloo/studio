@@ -513,6 +513,8 @@ const avoidDislikes = 8;
 /** The writer sees this many recent subjects, and this many recent prompts cut to this length. */
 const writerSubjects = 30;
 const writerPrompts = { count: 10, characters: 200 };
+/** Profiles and LoRAs weigh by their keep rate over this many of the latest judged Dream images. */
+const judgedRates = 200;
 /** Dream revisits a concept only once it is liked more than twice. */
 const featuredLikes = 3;
 /**
@@ -982,9 +984,33 @@ export function createDream(options: {
   }
   /**
    * What a profile (`profile:<id>`) or LoRA (`lora:<name>`) weighs after its share of Dream's
-   * latest images within a day (`diversity`).
+   * latest images within a day (`diversity`), times its keep rate among the latest judged ones: a
+   * pass for any reason but likeness counts weakly against it, as a keep counts for it.
    */
   function spread(ownerId: string) {
+    const judged = new Map<string, { kept: number; total: number }>();
+    for (const item of options.gallery(ownerId, {
+      dreamState: ["kept", "discarded"],
+      type: "image",
+      limit: judgedRates,
+    })) {
+      if (item.dream?.passReason === "similar") continue;
+      const loras = Array.isArray(item.settings?.loras) ? item.settings.loras : [];
+      for (const key of [
+        `profile:${item.settings?.profileId}`,
+        ...loras.map((lora) => `lora:${(lora as { name?: string })?.name}`),
+      ]) {
+        const entry = judged.get(key) ?? { kept: 0, total: 0 };
+        entry.total++;
+        if (item.dream?.state === "kept") entry.kept++;
+        judged.set(key, entry);
+      }
+    }
+    // Laplace's rule: an untried profile or LoRA starts at one half.
+    const keepRate = (key: string) => {
+      const { kept, total } = judged.get(key) ?? { kept: 0, total: 0 };
+      return (kept + 1) / (total + 2);
+    };
     const jobs = store
       .dreamJobsSince(ownerId, new Date(now() - 86_400_000).toISOString())
       .filter((job) => kindOf(job) === "image")
@@ -999,7 +1025,8 @@ export function createDream(options: {
         used.set(key, (used.get(key) || 0) + 1);
     }
     return (key: string) =>
-      Math.max(diversity.floor, 1 - (used.get(key) || 0) / Math.max(jobs.length, 1));
+      Math.max(diversity.floor, 1 - (used.get(key) || 0) / Math.max(jobs.length, 1)) *
+      keepRate(key);
   }
   /**
    * Profiles whose last `streak` Dream jobs within `failWindowMs` all failed on their worker, so
