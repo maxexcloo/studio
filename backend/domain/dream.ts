@@ -179,7 +179,6 @@ type DreamQuery = {
   status?: string;
   conversationIds?: string[];
   ids?: string[];
-  notIds?: string[];
   ownGeneration?: boolean;
   promptedProfiles?: string[];
   dreamDraft?: string;
@@ -384,8 +383,6 @@ interface DreamRecord {
   subjects?: string[];
   /** Optional motifs from recent fresh concepts, one entry per concept. */
   motifs?: string[][];
-  /** Gallery images judged in calibration, newest first, so unjudged ones come first. */
-  judged?: string[];
   /** Gallery images comparisons started from, newest first, so each is varied once. */
   compared?: string[];
   /** More Like This: the next few ideas stay close to this result. */
@@ -548,8 +545,6 @@ const recentDays = 30;
 /** Dream sets a profile aside once its last three Dream jobs within six hours all failed. */
 const failStreak = 3;
 const failWindowMs = 6 * 3_600_000;
-/** Calibration shows gallery images at least this old, so it doesn't repeat what was just made. */
-const calibrationAgeMs = 86_400_000;
 const judgedLimit = 2000;
 /**
  * Every fourth image of the day is a comparison, when a kept or liked image can start one, and
@@ -2204,8 +2199,7 @@ export function createDream(options: {
     const writer = options.writer;
     if (!writer)
       return { status: "unavailable", reason: "The prompt assistant is not configured." };
-    const judged =
-      (record.judged?.length || 0) + options.count(ownerId, { dreamState: ["kept", "discarded"] });
+    const judged = options.count(ownerId, { dreamState: ["kept", "discarded"] });
     const every = judged >= pairJudgedAt ? pairEveryJudged : pairEvery;
     const allowUncensored = record.settings.uncensored && access.uncensored;
     let checkText = !allowUncensored;
@@ -3444,16 +3438,6 @@ export function createDream(options: {
     if (ids.length) options.remove(ownerId, ids);
     return ids.length;
   }
-  /** The owner's finished gallery images that are old enough to calibrate with. */
-  const calibrationPool = (ownerId: string, query: DreamQuery) =>
-    generations(ownerId, {
-      type: "image",
-      status: "done",
-      uploaded: false,
-      unlisted: false,
-      before: now() - calibrationAgeMs,
-      ...query,
-    });
   function shuffled<T>(items: T[]) {
     const list = [...items];
     for (let index = list.length - 1; index > 0; index--) {
@@ -3912,69 +3896,15 @@ export function createDream(options: {
       wake();
       return record.settings;
     },
-    /** Random older gallery images to judge without the GPU, those not judged yet first. */
-    calibration(ownerId: string, limit: number, media: "image" | "video" = "image") {
-      const judged = read(ownerId).judged || [];
-      // Twice as many as asked for, as hidden or missing media drops some.
-      const sample = (query: DreamQuery) =>
-        shuffled(calibrationPool(ownerId, { ...query, type: media, sample: limit * 2 }));
-      const fresh = sample({ notIds: judged });
-      return [...fresh, ...(fresh.length < limit ? sample({ ids: judged }) : [])].slice(0, limit);
-    },
     /**
-     * Teaches the taste profile which older images the person likes or passes over (a this-or-that
-     * pair is one of each, or both alike, and rates them against each other). A single-card
-     * rating applies alongside its judgement.
-     */
-    calibrate(
-      ownerId: string,
-      { liked, passed, rating }: { liked: string[]; passed: string[]; rating?: Rating },
-    ) {
-      const pool = new Map(
-        calibrationPool(ownerId, { type: undefined, ids: [...liked, ...passed] }).map((item) => [
-          String(item.id),
-          item,
-        ]),
-      );
-      const media = [...pool.values()].map((item) => item.type);
-      if (media.some((type) => type !== "image" && type !== "video") || new Set(media).size > 1)
-        throw failure("Compare two images or two videos.", 400);
-      const signal = (kind: "calibrate-like" | "calibrate-pass") => (id: string) => {
-        const item = pool.get(id);
-        if (!item) throw failure("That gallery image is unavailable.", 404);
-        return tasteSignal(kind, item.jobId, itemValues(item));
-      };
-      const signals = [
-        ...liked.map(signal("calibrate-like")),
-        ...passed.map(signal("calibrate-pass")),
-      ];
-      const ids = [...liked, ...passed];
-      runtimeTransaction(options.dataDir, () => {
-        options.taste.record(ownerId, signals, true);
-        const record = read(ownerId);
-        // A pair: one liked over the other, or both alike.
-        if (ids.length === 2) rate(record, ids, liked.length === 1 ? 0 : -1);
-        record.judged = [...ids, ...(record.judged || []).filter((id) => !ids.includes(id))].slice(
-          0,
-          judgedLimit,
-        );
-        write(ownerId, record);
-        if (rating !== undefined) options.rate(ownerId, ids[0], rating);
-      });
-    },
-    /**
-     * The Deck's Undo: Dream results go back to unseen and unrated, gallery images back to
-     * unjudged, and the taste profile forgets what the judgement taught. Any gallery rating
-     * given with the judgement is restored in the same write.
+     * The Deck's Undo: Dream results go back to unseen and unrated, and the taste profile forgets
+     * what the judgement taught. Any gallery rating given with the judgement is restored in the
+     * same write.
      */
     undo(
       ownerId: string,
       ids: string[],
-      {
-        calibration = false,
-        rating,
-        setId,
-      }: { calibration?: boolean; rating?: Rating; setId?: string } = {},
+      { rating, setId }: { rating?: Rating; setId?: string } = {},
     ) {
       const items = options.items(ownerId, ids);
       if (items.length !== ids.length) throw failure("That result is unavailable.", 404);
@@ -4004,45 +3934,35 @@ export function createDream(options: {
         throw failure("That result is no longer finished.", 409);
       runtimeTransaction(options.dataDir, () => {
         const record = read(ownerId);
-        if (!calibration && record.steer?.itemId && ids.includes(record.steer.itemId))
-          delete record.steer;
-        const signals = options.taste.read(ownerId).signals;
+        if (record.steer?.itemId && ids.includes(record.steer.itemId)) delete record.steer;
         const jobIds = items.flatMap((item) => (item.jobId ? [String(item.jobId)] : []));
-        const starts = items.flatMap((item) =>
-          !calibration && item.dream
-            ? item.dream.decidedAt || []
-            : signals.find(
-                (signal) => signal.jobId === item.jobId && signal.kind.startsWith("calibrate-"),
-              )?.at || [],
-        );
+        const starts = items.flatMap((item) => item.dream?.decidedAt || []);
         if (rating !== undefined) options.rate(ownerId, ids[0], rating);
-        if (!calibration)
-          for (const item of items)
-            if (item.dream && item.dream.state !== "unseen") {
-              const {
-                decidedAt: _,
-                comparison,
-                passReason: _passReason,
-                superLiked: _superLiked,
-                ...mark
-              } = item.dream;
-              const id = String(item.id);
-              if (comparison && record.ratings) {
-                const restored = (record.ratings[id] ?? elo.start) - comparison.delta;
-                if (restored === elo.start) delete record.ratings[id];
-                else record.ratings[id] = restored;
-              }
-              if (comparison?.liked && item.rating === "liked")
-                options.rate(ownerId, id, comparison.previousRating);
-              options.mark(
-                ownerId,
-                id,
-                { ...mark, state: "unseen" },
-                comparison?.previousRating ?? undefined,
-              );
+        for (const item of items)
+          if (item.dream && item.dream.state !== "unseen") {
+            const {
+              decidedAt: _,
+              comparison,
+              passReason: _passReason,
+              superLiked: _superLiked,
+              ...mark
+            } = item.dream;
+            const id = String(item.id);
+            if (comparison && record.ratings) {
+              const restored = (record.ratings[id] ?? elo.start) - comparison.delta;
+              if (restored === elo.start) delete record.ratings[id];
+              else record.ratings[id] = restored;
             }
+            if (comparison?.liked && item.rating === "liked")
+              options.rate(ownerId, id, comparison.previousRating);
+            options.mark(
+              ownerId,
+              id,
+              { ...mark, state: "unseen" },
+              comparison?.previousRating ?? undefined,
+            );
+          }
         if (starts.length) options.taste.takeBack(ownerId, jobIds, starts.sort()[0]);
-        record.judged = (record.judged || []).filter((id) => !ids.includes(id));
         write(ownerId, record);
       });
     },
