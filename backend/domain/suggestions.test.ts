@@ -690,7 +690,7 @@ test("turning explicit wording on or off writes an image's kept next steps and c
 
 test("background work saves exact result changes and separate image motion ideas", async () => {
   let vision = true;
-  const { calls, suggestions } = fixture({ image: () => vision });
+  const { calls, pictures, suggestions } = fixture({ image: () => vision });
   const items = [
     { id: "a", jobId: "job-a", ownerId: "alice", type: "image", status: "done", prompt: "A" },
     { id: "b", jobId: "job-b", ownerId: "alice", type: "image", status: "done", prompt: "B" },
@@ -713,6 +713,8 @@ test("background work saves exact result changes and separate image motion ideas
   assert.match(calls[0][0].content, /what the attached image shows/);
   assert.equal((items[0] as { nextSteps?: { steps: unknown[] } }).nextSteps?.steps.length, 2);
   assert.match(calls[1][0].content, /becomes a short video/);
+  assert.equal(calls[1][1].images, 1);
+  assert.deepEqual(pictures, [items[0]], "both menus share the decoded picture");
   assert.equal((items[0] as { motionIdeas?: { steps: unknown[] } }).motionIdeas?.steps.length, 3);
   vision = false;
   clock += 10_000;

@@ -54,6 +54,7 @@ export function TextBox({
   value,
   onChange,
   tools,
+  copyBefore,
   send,
   busy,
   popups,
@@ -72,6 +73,8 @@ export function TextBox({
   onChange: (value: string) => void;
   /** The box's tools menu; AI uses the magic icon, other tools More. */
   tools?: Action[];
+  /** Also offers Copy in the menu before this tool. */
+  copyBefore?: string;
   /** The send, and a proposal's Undo, which stay beside the text. */
   send?: ReactNode;
   /** Popups its tools open (Recent Prompts), anchored at the box's end where the ⋯ stands. */
@@ -139,19 +142,17 @@ export function TextBox({
         },
       };
   const copier = useCopy();
+  const copy: Action = {
+    id: "copy",
+    label: copier.copied ? "Copied" : "Copy",
+    icon: copier.copied ? Check : icons.copy,
+    disabled: !value,
+    onClick: () => copier.copy(value, title),
+  };
   // Phones show Copy and Clear above the keyboard; desktop boxes leave them to the browser, keeping
   // only Reset and its Undo, beside the text while they can act.
   const edits: Action[] = tools
-    ? [
-        {
-          id: "copy",
-          label: copier.copied ? "Copied" : "Copy",
-          icon: copier.copied ? Check : icons.copy,
-          disabled: !value,
-          onClick: () => copier.copy(value, title),
-        },
-        ...(reset === undefined || value !== reset || cleared ? [clear] : []),
-      ]
+    ? [copy, ...(reset === undefined || value !== reset || cleared ? [clear] : [])]
     : [];
   const edit = !mobile && reset !== undefined && !clear.disabled ? clear : undefined;
   const editButton = (action: Action) => (
@@ -230,11 +231,14 @@ export function TextBox({
         .map((group) =>
           group.map((option) => ({ ...option, disabled: option.disabled || tool.disabled })),
         );
-      if (groups.some((group) => group.some((option) => option.heading))) return groups;
+      if (tool.heading === false || groups.some((group) => group.some((option) => option.heading)))
+        return groups;
       const [first = [], ...rest] = groups;
       return [[{ id: tool.id, label: tool.label, heading: true }, ...first], ...rest];
     }),
-    (tools ?? []).filter((action) => !action.menu),
+    (tools ?? [])
+      .filter((action) => !action.menu)
+      .flatMap((action) => (action.id === copyBefore ? [copy, action] : [action])),
   ];
   // Without tools a desktop box has no menu, and a busy tool spins its Reset instead.
   const menuless = !mobile && tools?.length === 0;

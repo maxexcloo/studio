@@ -91,6 +91,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     >,
     slots: 1,
     prompts: 0,
+    writingRefusal: "",
     replies: [] as {
       prompt: string;
       title?: string;
@@ -124,7 +125,10 @@ function fixture(t: TestContext, catalogue = profiles) {
     issues: [] as Issue[],
   };
   const writer = {
-    model: async () => "writer",
+    model: async () => {
+      if (state.writingRefusal) throw new Error(state.writingRefusal);
+      return "writer";
+    },
     chat: async ({
       model,
       messages,
@@ -634,7 +638,6 @@ test("Dream applies shared delays to the owner's manual and MCP generation reque
   advance(5 * 60_000 - 1);
   done("bob", queuePriority.manual);
   done("alice", queuePriority.manual, "upscale");
-  done("alice", queuePriority.finishing);
   done("alice", queuePriority.dream);
   await dream.tick();
   assert.equal(live("alice").length, 0);
@@ -3396,6 +3399,62 @@ test("administrator overrides win over account choices, which they leave saved, 
   assert.equal((await request("/settings", { imageBackend: "auto" }, "PUT")).status, 400);
   assert.equal((await request("/settings", { imageBackend: "local" }, "PUT")).status, 409);
   assert.deepEqual((await request("")).body.locked, ["imageBackend"]);
+});
+
+test("Dream's content setting limits image and video model choices and waiting work", async (t) => {
+  const unrestrictedVideo = { ...profiles[2], id: "wan-unrestricted", uncensored: true };
+  const { dream, state, dreamOnce, generated } = fixture(t, [
+    {
+      ...profiles[0],
+      backendOptions: [
+        { id: "radiance", profile: profiles[0] },
+        { id: "comfyui", profile: { ...profiles[0], uncensored: true } },
+      ],
+    },
+    ...profiles.slice(1),
+    unrestrictedVideo,
+  ]);
+  state.access.alice!.uncensored = true;
+  state.video = unrestrictedVideo.id;
+  state.idleMinutes.video = 0;
+  await dream.save("alice", { enabled: true });
+
+  state.writingRefusal = "No text model is available for Dream's content setting.";
+  assert.equal(await dreamOnce(), undefined);
+  assert.match(dream.status("alice").reason!, /No text model is available/);
+  state.writingRefusal = "";
+  assert.equal((await dreamOnce())?.input.profileId, "qwen");
+  assert.equal(dream.text("alice").censoredOnly, true);
+  await dream.save("alice", { spicy: true });
+  assert.equal(dream.text("alice").censoredOnly, undefined);
+  const unrestrictedImage = (await dreamOnce())!;
+  assert.equal(unrestrictedImage.input.profileId, "flux");
+
+  await dream.save("alice", { images: false, videos: true });
+  for (const id of ["first-still", "second-still"])
+    generated({
+      id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      rating: "liked",
+      prompt: `still ${id}`,
+    });
+  const video = (await dreamOnce())!;
+  assert.equal(video.input.profileId, unrestrictedVideo.id);
+  assert.equal(await dream.queuedProfileIssue(video), undefined);
+
+  await dream.save("alice", { spicy: false });
+  for (const job of [unrestrictedImage, video])
+    assert.match((await dream.queuedProfileIssue(job))!, /does not allow the selected model/);
+  assert.equal(
+    await dream.queuedProfileIssue({
+      ...unrestrictedImage,
+      input: { ...unrestrictedImage.input, profileBackend: "radiance" },
+    }),
+    undefined,
+  );
+  assert.equal((await dreamOnce())?.input.profileId, "wan");
 });
 
 test("Dream routes images to the selected allowed backend and never substitutes a local model for Cloud", async (t) => {

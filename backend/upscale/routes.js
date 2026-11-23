@@ -16,10 +16,9 @@ import { findUpscaleTarget, prepareUpscale, toggleUpscaleView } from "./jobs.js"
 
 /**
  * Smart upscale: its status, queuing an upscale of a gallery item and switching the view between
- * the upscale and the original. Answers `queueUpscale` and `upscaleReady` for Finish Liked
- * Images (domain/finishing.ts), which `finishing` is told of each queued job.
+ * the upscale and the original.
  */
-export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue, store }) {
+export function registerUpscaleRoutes(app, { loadComfyContext, queue, store }) {
   /**
    * Upscaling runs on a worker with Upscale (workers.js): the routes below are given
    * its id, so its node list, uploads and the job itself all go there.
@@ -88,15 +87,11 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
 
   /**
    * Queues a smart upscale of one of the account's gallery items on a worker with Upscale, answering
-   * `{ status, payload }` as the route sends it. `origin` sets the queue tier (Finish Liked Images).
+   * `{ status, payload }` as the route sends it.
    */
-  async function queueUpscale(account, request, origin) {
-    const worker = routeJob("upscale");
+  async function queueUpscale(account, request) {
+    const worker = routeJob("upscale")?.id;
     if (!worker) return noUpscaleWorker();
-    return queueUpscaleOnWorker(worker.id, account, request, origin);
-  }
-
-  async function queueUpscaleOnWorker(worker, account, request, origin) {
     const target = request.target === undefined ? 0 : Number(request.target);
     if (target !== 0 && !upscaleTargets.includes(target)) {
       return {
@@ -242,14 +237,12 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
           operation: "upscale",
           parentJobId: parent?.id,
           resource: `worker:${worker}`,
-          origin,
         },
       ],
     );
     updateGalleryJob(item.id, {
       upscale: { ...item.upscale, status: "queued", jobId: queued.id, progress: null, error: "" },
     });
-    finishing.admitted(queued);
     void queue.tick();
     return {
       status: 200,
@@ -273,19 +266,4 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
       revision: galleryRevisionValue(),
     });
   });
-
-  /** Whether a worker can run a smart upscale at this quality now, or the reason it cannot. */
-  async function upscaleReady(quality) {
-    const worker = routeJob("upscale");
-    if (!worker) return { reason: noWorkerMessage("upscale") };
-    const { info, failure } = await upscaleInfo(worker.id);
-    if (failure) return { reason: failure.payload.error };
-    const status = upscaleStatus(info, quality);
-    if (!status.ready) return { reason: upscaleUnready(status) };
-    return {
-      faceDetail: status.faceDetail.nodesInstalled && status.faceDetail.detectors.length > 0,
-    };
-  }
-
-  return { queueUpscale, upscaleReady };
 }

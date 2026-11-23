@@ -75,18 +75,53 @@ export function useDraftChange({
 }
 export type DraftChange = ReturnType<typeof useDraftChange>;
 
+export function useGenerationPromptAssistant({
+  ask,
+  ...options
+}: Omit<Parameters<typeof usePromptAssistant>[0], "change"> & { ask?: DraftChange }) {
+  const { input } = options;
+  const prompt = (ask?.typed?.prompt ?? input.prompt).trim();
+  return usePromptAssistant({
+    ...options,
+    change: ask?.available
+      ? {
+          send: ask.sendRequest,
+          pending: ask.pending,
+          suggestions: (pick, render) => (
+            <ChangeSuggestions
+              query={draftStepsQuery(input.kind, prompt)}
+              fresh={() => askDraftSteps(input.kind, prompt, true)}
+              disabled={!prompt || ask.pending}
+              onPick={pick}
+            >
+              {render}
+            </ChangeSuggestions>
+          ),
+        }
+      : undefined,
+  });
+}
+
+export function CompactPromptFields({
+  assistantScope,
+  ...props
+}: Omit<Parameters<typeof PromptFields>[0], "assistant" | "compact" | "negative"> & {
+  profile?: Profile;
+  assistantScope: string;
+}) {
+  const assistant = useGenerationPromptAssistant({ ...props, scopeKey: assistantScope });
+  return <PromptFields {...props} compact negative={false} assistant={assistant} />;
+}
+
 /**
- * The composer's prompt and negative prompt with their history and assistant, and the assistant's
- * suggestions below; Compare uses the same fields.
+ * The composer's prompt and negative prompt with their history and assistant.
  */
 export function PromptFields({
   input,
-  profile,
   references,
   onChange,
-  assistantScope,
+  assistant,
   negative,
-  onNegativeWritten,
   textareaRef,
   autoFocus = false,
   compact = false,
@@ -95,13 +130,11 @@ export function PromptFields({
   ask,
 }: {
   input: GenerationInput;
-  profile?: Profile;
   references: ReferenceAsset[];
   onChange: (patch: Partial<GenerationInput>) => void;
-  assistantScope: string;
+  assistant: ReturnType<typeof usePromptAssistant>;
   /** Shows the negative prompt, for profiles that use one. */
   negative: boolean;
-  onNegativeWritten?: () => void;
   textareaRef?: Ref<HTMLTextAreaElement>;
   /** Lets the surrounding focus trap start in the prompt. */
   autoFocus?: boolean;
@@ -125,30 +158,6 @@ export function PromptFields({
     enabled: false,
     disabled: ask?.pending,
     onPick: (request) => ask?.sendRequest(request),
-  });
-  const assistant = usePromptAssistant({
-    scopeKey: assistantScope,
-    input,
-    profile,
-    references,
-    onChange,
-    onNegativeWritten,
-    change: ask?.available
-      ? {
-          send: ask.sendRequest,
-          pending: ask.pending,
-          suggestions: (pick, render) => (
-            <ChangeSuggestions
-              query={steps}
-              fresh={() => askDraftSteps(input.kind, base.trim(), true)}
-              disabled={!base.trim() || ask.pending}
-              onPick={pick}
-            >
-              {render}
-            </ChangeSuggestions>
-          ),
-        }
-      : undefined,
   });
   const history = usePromptHistory({
     kind: "positive",
@@ -178,6 +187,7 @@ export function PromptFields({
       ? {
           id: "assistant",
           label: "Improve Prompt",
+          heading: false,
           icon: icons.assistant,
           disabled: ask?.pending,
           menu: assistMenu({
@@ -195,6 +205,7 @@ export function PromptFields({
         <TextBox
           ref={textareaRef}
           tools={[assistantTool, history.action].filter((tool) => !!tool)}
+          copyBefore={history.action.id}
           send={proposal ? <UndoButton onClick={ask.undo} /> : offerIdeas && ideas.undo}
           busy={assistant.working}
           popups={history.popup}
@@ -222,15 +233,10 @@ export function PromptFields({
             }
           }}
           below={
-            (proposal || ideas.label || assistant.suggestions) && (
-              <>
-                {proposal ? (
-                  <ProposalLabel proposal={proposal} before={base} labels={draftLabels} />
-                ) : (
-                  ideas.label
-                )}
-                {assistant.suggestions}
-              </>
+            proposal ? (
+              <ProposalLabel proposal={proposal} before={base} labels={draftLabels} />
+            ) : (
+              ideas.label
             )
           }
         />

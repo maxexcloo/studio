@@ -765,6 +765,7 @@ function Gallery() {
           toggles={<ShowToggles kind={kind} value={filters} onChange={setFilters} />}
           actions={
             <>
+              <GalleryImport upload={upload} />
               {!filters.uploads && !selection.selecting && !!loaded.length && (
                 <Tooltip label="Review Gallery">
                   <Button
@@ -777,7 +778,6 @@ function Gallery() {
                   </Button>
                 </Tooltip>
               )}
-              <GalleryImport upload={upload} />
               {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
               <Tooltip label="Select Items" disabled={!phone}>
                 <Button

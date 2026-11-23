@@ -160,6 +160,7 @@ export interface PromptWriter {
   cloud?: string;
   local?: string;
   uncensored: boolean;
+  censoredOnly?: true;
 }
 
 /** The assistant gateway's chat (assistant.js), which returns its reply without reasoning. */

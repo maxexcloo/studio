@@ -29,11 +29,7 @@ const flag = (key, label, description, defaultOn = true) => ({
   defaultOn,
 });
 
-/**
- * Settings › Maintenance switches. Background AI (A–Z) covers every model call Studio makes on its
- * own; what a person asks for (Improve, Ask for a Change, Animate) is never switched
- * off here. Run While Busy sits with the gallery passes.
- */
+/** Settings › Maintenance switches for gallery work, prompt assistance and taste. */
 export const catalogueFlags = [
   flag(
     "STUDIO_FACE_CHECK",
@@ -48,7 +44,7 @@ export const catalogueFlags = [
   flag(
     "STUDIO_GALLERY_CAPTIONS",
     "Gallery Captions",
-    "While Studio is idle, the assistant model describes finished images so gallery search finds what they show. Needs a model that reads images.",
+    "When Studio has time, the assistant model captions and tags new images for gallery search. Needs a model that reads images.",
   ),
   flag(
     "STUDIO_GALLERY_TITLES",
@@ -63,7 +59,7 @@ export const catalogueFlags = [
   flag(
     "STUDIO_NEXT_STEPS",
     "Next Steps",
-    "The assistant model writes the Suggestions menu's changes for finished images (ahead of time while Studio is idle, and as one opens) and for the composer's draft.",
+    "The assistant model prepares suggestions for finished images and videos while Studio is idle. It can also write them when a menu opens or for a draft.",
   ),
   flag(
     "STUDIO_PROMPT_IDEAS",

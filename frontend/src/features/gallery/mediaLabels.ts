@@ -26,7 +26,7 @@ export function mediaTimestamp(item: Pick<MediaItem, "createdAt" | "galleryAt">,
     date.toDateString() === now.toDateString()
       ? "Today"
       : (date.getFullYear() === now.getFullYear() ? shortDate : otherYear).format(date);
-  return { value, label: `${day}, ${timeOnly.format(date)}` };
+  return { value, label: `${timeOnly.format(date)}, ${day}` };
 }
 
 const modelFile = (value: unknown) =>

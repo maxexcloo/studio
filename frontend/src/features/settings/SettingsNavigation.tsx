@@ -18,19 +18,20 @@ const settingSections = {
   },
   dream: {
     label: "Dream",
-    description: "What Dream makes for you and where it runs.",
+    description: "Choose which media Dream makes and its daily limits.",
     icon: icons.dream,
     group: "Personal",
   },
   preferences: {
     label: "Preferences",
-    description: "Gallery, model access and prompt history preferences.",
+    description: "Gallery display, exports and prompt history.",
     icon: icons.settings,
     group: "Personal",
   },
   "where-work-runs": {
     label: "Where Work Runs",
-    description: "Choose default models and where images, videos and text run.",
+    description:
+      "Choose where work runs, which models are available to you and how new drafts start.",
     icon: Route,
     group: "Personal",
   },
@@ -43,7 +44,7 @@ const settingSections = {
   },
   generation: {
     label: "Generation",
-    description: "Default profiles and failed items across all accounts.",
+    description: "Set Studio-wide model defaults and clear failed items for other accounts.",
     icon: Boxes,
     admin: true,
     group: "Administration",
@@ -57,7 +58,7 @@ const settingSections = {
   },
   maintenance: {
     label: "Maintenance",
-    description: "Background AI, gallery maintenance and unfinished items.",
+    description: "Manage automatic gallery tasks, run bulk passes and configure prompt assistance.",
     icon: Wrench,
     admin: true,
     group: "Administration",
@@ -71,7 +72,7 @@ const settingSections = {
   },
   workers: {
     label: "Workers",
-    description: "Text, image and video services and their current status.",
+    description: "Manage worker placement, service health and unfinished jobs.",
     icon: Server,
     admin: true,
     group: "Administration",

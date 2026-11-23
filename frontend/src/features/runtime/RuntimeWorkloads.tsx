@@ -16,7 +16,6 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { type ReactNode, useState } from "react";
 
 import {
-  type RuntimeJob,
   type RuntimeOperation,
   type RuntimePreview,
   type RuntimeQueueCancel,
@@ -33,7 +32,6 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
-import { JobProgressBar, jobReason, jobStatus } from "../generation/JobProgress";
 import { useSettingsSection } from "../settings/SettingsNavigation";
 import { BenchmarkDialog, benchmarksQuery } from "./Benchmarks";
 import { LogDialog, LogText, PodLog, logTime, useRequester } from "./RuntimeLogs";
@@ -133,26 +131,6 @@ function changePhase(
 }
 
 const shortDateTime = dateFormat({ dateStyle: "short", timeStyle: "short" });
-
-function WorkloadJob({ job }: { job: RuntimeJob }) {
-  const reason = jobReason(job);
-  return (
-    <Stack gap={2} py={2}>
-      <Text size="xs" lineClamp={1} title={job.title}>
-        {job.title}
-      </Text>
-      <Text size="xs" c="dimmed" title={shortDateTime.format(new Date(job.since))}>
-        {jobStatus(job)}
-      </Text>
-      {reason && (
-        <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
-          {reason}
-        </Text>
-      )}
-      <JobProgressBar job={job} />
-    </Stack>
-  );
-}
 
 /** A change's steps as timestamped lines, then how it ended once it has. */
 function logText(entry: RuntimeOperation) {
@@ -389,21 +367,21 @@ export function RuntimeWorkloads({
   });
   const placement = (picker?: ReactNode) =>
     (workerStatus || picker) && (
-      <SettingGroup title="Placement">
-        <Flex
-          direction={phone ? "column" : "row"}
-          align={phone ? "stretch" : "center"}
-          justify="flex-end"
-          gap="xs"
-        >
-          {workerStatus && (
-            <Box flex={1} miw={0}>
-              {workerStatus}
-            </Box>
-          )}
-          {picker}
-        </Flex>
-      </SettingGroup>
+      <Flex
+        component="section"
+        aria-label="Placement"
+        direction={phone ? "column" : "row"}
+        align={phone ? "stretch" : "center"}
+        justify="flex-end"
+        gap="xs"
+      >
+        {workerStatus && (
+          <Box flex={1} miw={0}>
+            {workerStatus}
+          </Box>
+        )}
+        {picker}
+      </Flex>
     );
   if (status.isPending || status.error)
     return (
@@ -510,10 +488,7 @@ export function RuntimeWorkloads({
                 short ||
                 item.reason ||
                 // A stopped workload isn't failing, whatever its shared endpoint says.
-                (item.phase !== "parked" && reasons[item.id]) ||
-                (!item.jobs?.length &&
-                  item.acceptedOperations > 0 &&
-                  `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`);
+                (item.phase !== "parked" && reasons[item.id]);
               return (
                 <>
                   <Text size="sm" fw={500}>
@@ -528,14 +503,6 @@ export function RuntimeWorkloads({
                       {note}
                     </Text>
                   )}
-                  {item.queued ? (
-                    <Text size="xs" c="dimmed">
-                      {item.queued} Queued
-                    </Text>
-                  ) : null}
-                  {item.jobs?.map((job) => (
-                    <WorkloadJob key={job.id} job={job} />
-                  ))}
                 </>
               );
             },

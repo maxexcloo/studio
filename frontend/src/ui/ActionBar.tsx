@@ -288,7 +288,7 @@ function MenuRows({
               </div>
             </Fragment>
           );
-        if (action.menu) {
+        if (action.menu && !action.loading) {
           const open = expanded === id;
           const trigger = {
             color,
@@ -397,6 +397,7 @@ function MenuRows({
                 : (props) => <button {...props} role="menuitemradio" />
             }
             aria-checked={selected ?? checked}
+            aria-busy={action.loading || undefined}
             {...described(action, describedBy)}
             disabled={disabled}
             closeMenuOnClick={!action.keepOpen}

@@ -1101,7 +1101,7 @@ export async function expandAssistantMenu(
 ) {
   await backToActionMenu(scope);
   const section = scope.getByRole("menuitem", { name: label, exact: true });
-  await expect(section).toBeVisible();
+  await expect(section).toBeEnabled();
   if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
 }
 

@@ -14,7 +14,7 @@ import { useMediaRating } from "./useMediaRating";
 
 import classes from "./MediaTileActions.module.css";
 
-/** Like, Download and More over a gallery tile; the More menu doubles as its context menu. */
+/** Quick ratings and a context menu over a gallery tile. */
 export function MediaTileActions({
   item,
   opened,
@@ -33,48 +33,42 @@ export function MediaTileActions({
   const menuBounds = useActionMenuBounds(opened);
   const { handlers, dialogs } = useMediaDialogs(item);
   const rating = useMediaRating(item);
-  const liked = item.rating === "liked";
   const transfer = useMediaTransfer(item, opened);
   const name = mediaTitle(item);
   return (
     <>
       <Group
         className={classes.actions}
-        data-face-check={item.identity?.drifted || undefined}
         data-opened={opened || undefined}
         gap={4}
         justify="flex-end"
+        align="flex-start"
         wrap="nowrap"
         role="group"
         aria-label={`Actions for ${name}`}
       >
         {item.status === "done" && (
-          <Tooltip label={ratingLabel("like", liked)}>
-            <ActionIcon
-              className={`${classes.control} ${classes.like}`}
-              aria-label={`${ratingLabel("like", liked)} ${name}`}
-              aria-pressed={liked}
-              variant="default"
-              size={28}
-              onClick={rating.like}
-            >
-              <icons.like size={16} fill={liked ? "currentColor" : "none"} />
-            </ActionIcon>
-          </Tooltip>
-        )}
-        {item.status === "done" && item.url && (
-          <Tooltip label="Download">
-            <ActionIcon
-              component="a"
-              {...transfer.download}
-              className={`${classes.control} ${classes.download}`}
-              aria-label={`Download ${name}`}
-              variant="default"
-              size={28}
-            >
-              <icons.download size={16} />
-            </ActionIcon>
-          </Tooltip>
+          <Group className={classes.ratings} data-tile-ratings gap={4} wrap="nowrap">
+            {(["like", "dislike"] as const).map((id) => {
+              const pressed = item.rating === (id === "like" ? "liked" : "disliked");
+              const Icon = icons[id];
+              const label = ratingLabel(id, pressed);
+              return (
+                <Tooltip key={id} label={label}>
+                  <ActionIcon
+                    className={classes.control}
+                    aria-label={`${label} ${name}`}
+                    aria-pressed={pressed}
+                    variant="default"
+                    size={28}
+                    onClick={rating[id]}
+                  >
+                    <Icon size={16} fill={pressed ? "currentColor" : "none"} />
+                  </ActionIcon>
+                </Tooltip>
+              );
+            })}
+          </Group>
         )}
         <Menu
           {...menuBounds}

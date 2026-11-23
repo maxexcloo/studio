@@ -1,7 +1,8 @@
-import { Alert, SegmentedControl, Stack } from "@mantine/core";
+import { Alert, SegmentedControl, Select, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 
 import { defaultModelKeys, isCloudProfile } from "../../../../shared/profiles";
+import { imageAspects, resolutions } from "../../../../shared/resolution";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useAccount, useGroupFeature } from "../auth/AccountGate";
@@ -35,6 +36,19 @@ const kinds: { kind: WorkKind | "dream"; label: string; description?: string }[]
       "Applies to writing and captions, including Dream. Local shares a GPU with images.",
   },
 ];
+
+const modelChoices = [
+  {
+    key: "loras",
+    label: "LoRAs",
+    description: "Offer the LoRAs you have access to, including in Dream.",
+  },
+  {
+    key: "uncensoredModels",
+    label: "Uncensored",
+    description: "Offer uncensored models and themes, and allow explicit prompt ideas.",
+  },
+] as const;
 
 function DreamProcessing({ label }: { label: string }) {
   const { data, error } = useQuery(dreamQuery);
@@ -77,7 +91,7 @@ function DreamProcessing({ label }: { label: string }) {
   );
 }
 
-/** Settings › Where Work Runs: default processing and models by media kind. */
+/** Personal processing, model and image defaults. */
 export function WhereWorkRuns() {
   const account = useAccount().data;
   const dream = useGroupFeature("dream");
@@ -153,8 +167,63 @@ export function WhereWorkRuns() {
             )}
             {cloud && defaultRow(kind, "cloud")}
             {defaultRow(kind, "local")}
+            {kind === "images" && (
+              <>
+                <SettingRow
+                  wide
+                  label="Default Aspect"
+                  description="The starting shape for image drafts when the model supports it."
+                >
+                  <Select
+                    aria-label="Default Aspect"
+                    placeholder="Profile Default"
+                    data={[...imageAspects]}
+                    value={preferences.imageAspect ?? null}
+                    clearable
+                    onChange={(choice) =>
+                      save.mutate({
+                        imageAspect: imageAspects.find((value) => value === choice) ?? null,
+                      })
+                    }
+                  />
+                </SettingRow>
+                <SettingRow
+                  wide
+                  label="Default Resolution"
+                  description="The starting resolution for image drafts when the model supports it."
+                >
+                  <Select
+                    aria-label="Default Resolution"
+                    placeholder="Profile Default"
+                    data={[...resolutions]}
+                    value={preferences.imageResolution ?? null}
+                    clearable
+                    onChange={(choice) =>
+                      save.mutate({
+                        imageResolution: resolutions.find((value) => value === choice) ?? null,
+                      })
+                    }
+                  />
+                </SettingRow>
+              </>
+            )}
           </SettingGroup>
         ),
+      )}
+      {modelChoices.some(({ key }) => status.grants[key]) && (
+        <SettingGroup title="Model Access">
+          {modelChoices
+            .filter(({ key }) => status.grants[key])
+            .map(({ key, label, description }) => (
+              <SettingRow key={key} label={label} description={description}>
+                <Switch
+                  aria-label={label}
+                  checked={preferences[key]}
+                  onChange={(event) => save.mutate({ [key]: event.currentTarget.checked })}
+                />
+              </SettingRow>
+            ))}
+        </SettingGroup>
       )}
     </Stack>
   );

@@ -1,10 +1,9 @@
 .actions {
   position: absolute;
-  inset: var(--mantine-spacing-xs) var(--mantine-spacing-xs) auto;
+  inset: var(--mantine-spacing-xs);
   pointer-events: none;
 }
 
-/* Small, so the media stays in view; the tile's caption marks its rating. */
 .control {
   pointer-events: auto;
   opacity: 0;
@@ -12,8 +11,10 @@
   box-shadow: var(--mantine-shadow-xs);
 }
 
-.actions:not([data-face-check]) .more {
-  margin-inline-start: auto;
+.ratings {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-end: 0;
 }
 
 .more[data-hidden] {
@@ -22,7 +23,8 @@
 
 *:hover > .actions .control,
 *:focus-within > .actions .control,
-.actions[data-opened] .control {
+.actions[data-opened] .control,
+.control[aria-pressed="true"] {
   opacity: 1;
 }
 
@@ -32,14 +34,6 @@
   }
 }
 
-:where(:root[data-phone]) .download,
-:where(:root[data-phone]) .like {
-  display: none;
-}
-
-@container (max-width: 13rem) {
-  .download,
-  .like {
-    display: none;
-  }
+:where(:root[data-phone]) .ratings .control {
+  opacity: 1;
 }

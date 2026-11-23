@@ -15,8 +15,8 @@ import {
 } from "../../shared/queue.ts";
 import type { DreamOrigin } from "./dream.ts";
 
-/** Queue tiers on one resource, lower first; finishing upscales and then Dream run below MCP. */
-export const queuePriority = { manual: 0, mcp: 1, finishing: 2, dream: 3 } as const;
+/** Persisted queue tiers on one resource, lower first. */
+export const queuePriority = { manual: 0, mcp: 1, dream: 3 } as const;
 /**
  * Where a job was admitted from: its tier, for an MCP call the set it was enqueued with, for a
  * Dream job its prompt and note, which its gallery items carry until the person keeps them, and

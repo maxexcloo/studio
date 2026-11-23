@@ -196,7 +196,10 @@ test("The viewer fits a large image but never enlarges a small one beyond its ac
   await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBeLessThan(1);
 });
 
-test("Gallery Fit keeps both wide and tall media between the header and dock", async ({ page }) => {
+test("Gallery Fit keeps both wide and tall media between the header and dock", async ({
+  page,
+  isMobile,
+}) => {
   const state = await fixtures(page);
   for (const [shape, width, height, model] of [
     ["wide", 2048, 768, "Wide Rendering Profile"],
@@ -268,7 +271,8 @@ test("Gallery Fit keeps both wide and tall media between the header and dock", a
       const thumbnails = viewer.getByRole("list", { name: "Set: Fitted", exact: true });
       const zoom = viewer.getByRole("group", { name: "Image Zoom", exact: true });
       await expect(actions).toBeVisible();
-      await expect(thumbnails).toBeHidden();
+      if (isMobile) await expect(thumbnails).toBeHidden();
+      else await expect(thumbnails).toBeVisible();
       await page.keyboard.press("Digit0");
       await expect
         .poll(async () => {
@@ -291,10 +295,11 @@ test("Gallery Fit keeps both wide and tall media between the header and dock", a
             !!bounds &&
             controls.y + controls.height <= dock.y &&
             bounds.y + bounds.height <= dock.y + 1 &&
-            bounds.height < standard.height
+            (isMobile ? bounds.height < standard.height : bounds.height === standard.height)
           );
         })
         .toBe(true);
+      if (!isMobile) continue;
       await page.keyboard.press("c");
       await expect(header).toBeHidden();
       await expect(actions).toBeHidden();

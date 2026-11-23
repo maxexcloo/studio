@@ -84,7 +84,7 @@ test("The viewer resolves an older result’s checkpoint to its profile name", a
   await expect(header.getByText("Krea 2 Turbo", { exact: true })).toBeVisible();
   const timestamp = header.locator("time");
   await expect(timestamp).toHaveAttribute("datetime", stamp);
-  await expect(timestamp).toHaveText(/^Today, (?:[01]\d|2[0-3]):[0-5]\d$/);
+  await expect(timestamp).toHaveText(/^(?:[01]\d|2[0-3]):[0-5]\d, Today$/);
 });
 
 /** Recreate › Run Again: queues the same settings with a new seed, without the composer. */
@@ -874,10 +874,9 @@ test("Details shows the source, exact set, original chat and applied reference",
     },
   );
   await page.getByRole("button", { name: "Generation Details", exact: true }).click();
-  await expect(page.getByRole("link", { name: "Grey Heron", exact: true })).toHaveAttribute(
-    "href",
-    "/images/parent",
-  );
+  const source = page.getByRole("link", { name: "Grey Heron", exact: true });
+  await expect(source).toHaveAttribute("href", "/images/parent");
+  await expect(source.locator("img")).toHaveAttribute("src", image);
   await expect(page.getByText("Seed: 0 → 25", { exact: true })).toBeVisible();
   await expect(page.getByText("Detail: 0.4 → 0.8", { exact: true })).toBeVisible();
   await expect(page.getByText("Prompt changed", { exact: true })).toBeVisible();
@@ -1837,7 +1836,7 @@ test("Details keep the caption, run notes and source ahead of model and prompts"
     details = page.getByRole("dialog", { name: "my favourite bird", exact: true });
   await expect(details.getByText("my favourite bird", { exact: true })).toBeVisible();
   // The title's line holds when and how big; Output carries no result number.
-  await expect(details.getByText(/^23 Oct(?: 2026)?, \d{2}:\d{2} · 1024 × 1024$/)).toBeVisible();
+  await expect(details.getByText(/^\d{2}:\d{2}, 23 Oct(?: 2026)? · 1024 × 1024$/)).toBeVisible();
   await expect(details.getByRole("cell", { name: "#866", exact: true })).toHaveCount(0);
   // A long caption folds with Expand on its last line and folds again on Collapse; its tags stay
   // in sight.
@@ -1990,7 +1989,7 @@ test("A phone swipe up opens Details directly", async ({ page }, testInfo) => {
   await expect(viewer).toBeHidden();
 });
 
-test("A double click or tap zooms; a single click cycles the viewer controls", async ({
+test("A double click or tap zooms while desktop keeps the viewer controls visible", async ({
   page,
 }, testInfo) => {
   const { viewer } = await seed(page, {}, async (_page, state) => {
@@ -2020,7 +2019,7 @@ test("A double click or tap zooms; a single click cycles the viewer controls", a
     const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
     const strip = viewer.getByRole("list", { name: "Gallery Results", exact: true });
     const prompt = actions.getByRole("textbox", { name: "Prompt", exact: true });
-    await expect(strip).toBeHidden();
+    await expect(strip).toBeVisible();
     await prompt.click();
     await expect(prompt).toBeFocused();
     await page.mouse.click(x, y);
@@ -2031,18 +2030,17 @@ test("A double click or tap zooms; a single click cycles the viewer controls", a
     );
     await expect(actions).toBeVisible();
     await picture.click();
-    await expect(actions).toBeHidden();
-    await expect(strip).toBeHidden();
+    await expect(actions).toBeVisible();
+    await expect(strip).toBeVisible();
     await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
     await picture.dblclick();
     await expect(zoom).toHaveAttribute("data-zoom-mode", "Custom");
-    await expect(actions).toBeHidden();
+    await expect(actions).toBeVisible();
     await picture.dblclick();
     await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
     await picture.click();
     await expect(actions.getByRole("button", { name: "Generate", exact: true })).toBeVisible();
-    await expect(strip).toBeHidden();
-    await picture.click();
+    await expect(strip).toBeVisible();
     await strip.getByRole("listitem", { name: "Show Blue Bird" }).click();
     await expect(viewer.getByRole("img", { name: "A blue bird", exact: true })).toBeVisible();
     return;
@@ -2118,7 +2116,8 @@ test("The viewer cycles its header, bottom actions and thumbnails", async ({ pag
   const header = viewer.getByRole("group", { name: "Viewer Header", exact: true });
   const actions = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const strip = viewer.getByRole("list", { name: "Set: Tap Set", exact: true });
-  await expect(strip).toBeHidden();
+  if (testInfo.project.use.isMobile) await expect(strip).toBeHidden();
+  else await expect(strip).toBeVisible();
   await expect(close).toBeVisible();
   await expect(actions).toBeVisible();
   await expect
@@ -2129,12 +2128,7 @@ test("The viewer cycles its header, bottom actions and thumbnails", async ({ pag
     })
     .toBe(true);
 
-  if (!testInfo.project.use.isMobile) {
-    const viewport = page.viewportSize()!;
-    await page.mouse.move(viewport.width / 2, viewport.height - 2);
-    await expect(strip).toBeVisible();
-    return;
-  }
+  if (!testInfo.project.use.isMobile) return;
 
   const webkit = testInfo.project.use.browserName === "webkit";
   const touch = webkit ? undefined : await page.context().newCDPSession(page);

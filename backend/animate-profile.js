@@ -148,10 +148,12 @@ export function dreamVideoSlot(profile) {
 
 /** Dream prefers the best available tier on its selected side and extends on the source profile. */
 export function dreamVideoProfile(profiles, options) {
-  const { backend, extend, unavailable, alternate, width, height, ...placement } = options;
+  const { backend, extend, unavailable, alternate, width, height, allowUncensored, ...placement } =
+    options;
   const pool = profiles.filter(
     (profile) =>
       profile.kind === "video" &&
+      (allowUncensored !== false || !uncensoredDreamProfile(profile)) &&
       isCloudProfile(profile) === (backend === "cloud") &&
       profile.ready !== false &&
       !["offline", "parked"].includes(profile.availability) &&
@@ -188,3 +190,10 @@ export function dreamVideoProfile(profiles, options) {
 }
 const withSize = (choice, width, height) =>
   width > 0 && height > 0 ? { ...choice, size: frameSize(choice.profile, width, height) } : choice;
+
+/** An unpinned run may pick any of the combined profile's backends. */
+export function uncensoredDreamProfile(profile) {
+  return Boolean(
+    profile.uncensored || profile.backendOptions?.some(({ profile }) => profile?.uncensored),
+  );
+}

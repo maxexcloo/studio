@@ -184,11 +184,11 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   }
   await finishTyping(page);
   const negativeMenu = await promptMenu(page, "Negative Prompt");
-  await expandAssistantMenu(negativeMenu, "Suggestions");
   await expect(
-    negativeMenu.getByRole("group", { name: "Suggestions", exact: true }).getByText("Loading…"),
-  ).toBeVisible();
+    negativeMenu.getByRole("menuitem", { name: "Suggestions", exact: true }),
+  ).toBeDisabled();
   releaseNegative();
+  await expandAssistantMenu(negativeMenu, "Suggestions");
   const suggestion = negativeMenu.getByRole("menuitem", { name: "poor quality", exact: true });
   await expect(suggestion).toBeVisible();
   await expect(negative).toHaveValue("");
@@ -204,15 +204,15 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await undoAssistance(page, "Negative prompt written");
   await expect(negative).toHaveValue("");
   await expect(prompt).toHaveValue("My later direction in warm light");
-  await assist(page, "Suggest LoRAs");
+  await finishTyping(page);
+  await openLoraChoices(page);
+  await page.getByRole("button", { name: "Suggest LoRAs", exact: true }).click();
   await page.getByRole("button", { name: "Apply Detail Slider", exact: true }).click();
   // The backend adds trigger words when it runs; the prompt stays as written.
   await expect(
     page.getByRole("button", { name: "Apply Detail Slider", exact: true }),
   ).toBeDisabled();
   await expect(prompt).toHaveValue("My later direction in warm light");
-  await finishTyping(page);
-  await openLoraChoices(page);
   await page.getByRole("button", { name: "Soft Style", exact: true }).click();
   await closeLoras(page);
   await undoAssistance(page, "LoRA applied");
@@ -299,7 +299,6 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A bird in snow");
   const menu = await promptMenu(page, "Prompt");
-  await expect(menu.getByText("Improve Prompt", { exact: true })).toBeVisible();
   const phone = await page.getByRole("group", { name: "Prompt Tools", exact: true }).isVisible();
   if (phone) {
     const tools = page.getByRole("group", { name: "Prompt Tools", exact: true });
@@ -312,6 +311,7 @@ test("Improve Prompt groups its styles in Templates and opens Custom… directly
     "Custom…",
     "Refresh",
     "Write Negative",
+    "Copy",
     "Recent Prompts",
   ]);
   await expandAssistantMenu(menu, "Templates");

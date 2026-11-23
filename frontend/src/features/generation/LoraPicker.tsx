@@ -15,7 +15,7 @@ import {
 } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { ratingSortLabels } from "../../../../shared/gallery-sort";
 import {
@@ -144,7 +144,20 @@ interface LoraPickerProps {
   /** Where the desktop popup opens: above the composer's rail by default. */
   position?: PopoverProps["position"];
 }
-export function LoraPicker({ value, onChange, picker, position = "top-end" }: LoraPickerProps) {
+export interface LoraSuggestions {
+  disabled?: boolean;
+  loading: boolean;
+  onClick: () => void;
+  list: ReactNode;
+}
+
+export function LoraPicker({
+  value,
+  onChange,
+  picker,
+  position = "top-end",
+  suggestions,
+}: LoraPickerProps & { suggestions?: LoraSuggestions }) {
   const context = useGeneration();
   const input = value || context.input;
   const phone = usePhone();
@@ -184,6 +197,17 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
   );
   const choices = <LoraChoices value={value} onChange={onChange} picker={picker} />;
   const stack = <LoraStack value={value} onChange={onChange} picker={picker} />;
+  const suggestLabel = "Suggest LoRAs";
+  const suggestProps = suggestions && {
+    disabled: suggestions.disabled,
+    loading: suggestions.loading,
+    onClick: suggestions.onClick,
+  };
+  const suggest = suggestProps && (
+    <Button variant="default" {...suggestProps}>
+      {suggestLabel}
+    </Button>
+  );
   if (phone)
     return (
       <ChipPopup
@@ -196,26 +220,38 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
         name={<StackPreset value={value} onChange={onChange} picker={picker} />}
         {...clear}
         leading={
-          <ChipPopup
-            title="Add LoRAs"
-            width="100%"
-            opened={picker.opened && adding}
-            onOpenedChange={setAdding}
-            target={
-              <Button
-                variant="default"
-                aria-label="Add LoRAs"
-                aria-expanded={picker.opened && adding}
-                onClick={() => setAdding(true)}
-              >
-                Add
-              </Button>
-            }
-          >
-            {choices}
-          </ChipPopup>
+          <Group gap="xs" wrap="nowrap">
+            {!adding && suggestProps && (
+              <Tooltip label={suggestLabel}>
+                <ActionIcon variant="default" aria-label={suggestLabel} {...suggestProps}>
+                  <icons.assistant size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+            <ChipPopup
+              title="Add LoRAs"
+              width="100%"
+              opened={picker.opened && adding}
+              onOpenedChange={setAdding}
+              target={
+                <Button
+                  variant="default"
+                  aria-label="Add LoRAs"
+                  aria-expanded={picker.opened && adding}
+                  onClick={() => setAdding(true)}
+                >
+                  Add
+                </Button>
+              }
+              leading={suggest}
+            >
+              {suggestions?.list}
+              {choices}
+            </ChipPopup>
+          </Group>
         }
       >
+        {!adding && suggestions?.list}
         {stack}
       </ChipPopup>
     );
@@ -228,8 +264,10 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
       onOpenedChange={picker.setOpened}
       target={trigger}
       aside={stack}
+      leading={suggest}
       {...clear}
     >
+      {suggestions?.list}
       {choices}
     </ChipPopup>
   );

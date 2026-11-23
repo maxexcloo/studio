@@ -681,7 +681,7 @@ test("manual requests run before queued MCP work, FIFO within each tier", async 
   }
 });
 
-test("direct and finishing work admitted after a waiting Dream job run first; Dream still runs", async () => {
+test("direct and MCP work admitted after a waiting Dream job run first; Dream still runs", async () => {
   const queue = fixture();
   const { store } = queue;
   try {
@@ -697,10 +697,10 @@ test("direct and finishing work admitted after a waiting Dream job run first; Dr
         origin,
       ).id;
     const dream = enqueue("alice", { priority: queuePriority.dream });
-    const finishing = enqueue("carol", { priority: queuePriority.finishing });
+    const chat = enqueue("carol", { priority: queuePriority.mcp });
     const direct = enqueue("bob");
     await drain(queue);
-    assert.deepEqual(queue.submitted, [direct, finishing, dream]);
+    assert.deepEqual(queue.submitted, [direct, chat, dream]);
     assert.equal(store.job("alice", dream)?.status, "completed");
   } finally {
     store.close();
