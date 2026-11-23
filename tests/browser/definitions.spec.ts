@@ -474,7 +474,9 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
   }
 });
 
-test("Prompt Styles sort by name, and can be filtered and edited", async ({ page }) => {
+test("Prompt Styles sort by enabled, type and name, and can be filtered and edited", async ({
+  page,
+}) => {
   await fixtures(page);
   const style = (id: string, kind: string, label: string, extra = {}) => ({
     id,
@@ -508,9 +510,9 @@ test("Prompt Styles sort by name, and can be filtered and edited", async ({ page
   await section(page, "Library", "Prompt Styles");
   const table = page.getByRole("table", { name: "Prompt Styles", exact: true });
   const names = table.getByRole("button", { name: /^Edit / });
-  await expect(names).toHaveText(["Bold Uncensored", "Candid", "Cinematic Camera"]);
+  await expect(names).toHaveText(["Cinematic Camera", "Bold Uncensored", "Candid"]);
   await table.getByRole("columnheader", { name: "Name", exact: true }).getByRole("button").click();
-  await expect(names).toHaveText(["Cinematic Camera", "Candid", "Bold Uncensored"]);
+  await expect(names).toHaveText(["Bold Uncensored", "Candid", "Cinematic Camera"]);
   await page.getByRole("button", { name: "Filter Prompt Styles", exact: true }).click();
   const type = page.getByRole("radiogroup", { name: "Type", exact: true });
   await type.getByText("Improve Prompt", { exact: true }).click();

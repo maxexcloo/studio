@@ -16,7 +16,7 @@ import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable, TableRecord } from "../../ui/DataTable";
+import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import {
   FilterChoices,
@@ -74,6 +74,7 @@ const kinds: { value: Kind; label: string }[] = [
   { value: "change", label: "Edit & Recreate" },
   { value: "improve", label: "Improve Prompt" },
 ];
+const kindLabel = (kind: Kind) => kinds.find((entry) => entry.value === kind)!.label;
 
 function StyleEditor({
   style,
@@ -260,15 +261,56 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
       ) : (
         <DataTable
           label="Prompt Styles"
-          rows={styles.filter((style) => !kind || style.kind === kind)}
+          // Sorted by type and name first, so the stable Enabled sort keeps that order within it.
+          rows={styles
+            .filter((style) => !kind || style.kind === kind)
+            .sort(
+              (a, b) =>
+                compareNames(kindLabel(a.kind), kindLabel(b.kind)) ||
+                compareNames(a.label, b.label),
+            )}
           rowKey={(style) => `${style.kind}:${style.id}`}
           rowName={(style) => style.label}
           loading={list.isPending && "Loading Prompt Styles"}
           query={query}
           searchText={(style) => [style.label, style.description, style.instruction]}
           empty="No Prompt Styles"
-          initialSort={{ key: "name", descending: false }}
+          initialSort={{ key: "enabled", descending: false }}
           columns={[
+            {
+              key: "enabled",
+              header: "Enabled",
+              sortValue: (style) => Number(!style.enabled),
+              width: 96,
+              cell: (style) => (
+                <Switch
+                  aria-label={`Enable ${style.label}`}
+                  // Phones fold the switch under the name, away from its column's heading.
+                  label={phone ? "Enabled" : undefined}
+                  checked={style.enabled}
+                  onChange={(event) =>
+                    apply.mutate(
+                      styles.map((entry) =>
+                        entry === style
+                          ? { ...entry, enabled: event.currentTarget.checked }
+                          : entry,
+                      ),
+                    )
+                  }
+                />
+              ),
+            },
+            {
+              key: "kind",
+              header: "Type",
+              sortValue: (style) => kindLabel(style.kind),
+              // The main column takes the free width, so the type keeps its line instead.
+              cell: (style) => (
+                <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
+                  {kindLabel(style.kind)}
+                </Text>
+              ),
+            },
             {
               key: "name",
               header: "Name",
@@ -289,39 +331,6 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
                   detail={style.description}
                   openLabel={`Edit ${style.label}`}
                   onOpen={() => setEditing({ style, kind: style.kind })}
-                />
-              ),
-            },
-            {
-              key: "kind",
-              header: "Type",
-              sortValue: (style) => kinds.find((kind) => kind.value === style.kind)?.label,
-              // The main column takes the free width, so the type keeps its line instead.
-              cell: (style) => (
-                <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
-                  {kinds.find((kind) => kind.value === style.kind)!.label}
-                </Text>
-              ),
-            },
-            {
-              key: "enabled",
-              header: "Enabled",
-              width: 96,
-              cell: (style) => (
-                <Switch
-                  aria-label={`Enable ${style.label}`}
-                  // Phones fold the switch under the name, away from its column's heading.
-                  label={phone ? "Enabled" : undefined}
-                  checked={style.enabled}
-                  onChange={(event) =>
-                    apply.mutate(
-                      styles.map((entry) =>
-                        entry === style
-                          ? { ...entry, enabled: event.currentTarget.checked }
-                          : entry,
-                      ),
-                    )
-                  }
                 />
               ),
             },

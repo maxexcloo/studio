@@ -4,7 +4,7 @@ import { type ReactNode, useState } from "react";
 
 import { api } from "../../api";
 import { DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable, TableRecord } from "../../ui/DataTable";
+import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { FilterChoices, SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { TextBox } from "../../ui/TextBox";
@@ -128,6 +128,7 @@ export function PromptInstructions({
     ({ suggestions }) => Boolean(suggestions) === (section === "suggestionInstructions"),
   );
   const areas = [...new Set(instructions.map(({ area }) => area))].sort();
+  const phone = usePhone();
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
@@ -137,7 +138,7 @@ export function PromptInstructions({
           onQueryChange={setQuery}
           filters={
             <FilterChoices
-              label="Area"
+              label="Type"
               data={areas.map((value) => ({ value, label: value }))}
               value={area}
               onChange={setArea}
@@ -152,15 +153,28 @@ export function PromptInstructions({
       ) : (
         <DataTable
           label={label}
-          rows={instructions.filter((instruction) => !area || instruction.area === area)}
+          // Sorted by name first, so the stable type sort leaves each type in name order.
+          rows={instructions
+            .filter((instruction) => !area || instruction.area === area)
+            .sort((a, b) => compareNames(a.label, b.label))}
           rowKey={({ id }) => id}
           rowName={({ label }) => label}
           loading={list.isPending && `Loading ${label}`}
           query={query}
           searchText={({ label, area, text }) => [label, area, text]}
           empty={`No ${label}`}
-          initialSort={{ key: "name", descending: false }}
+          initialSort={{ key: "type", descending: false }}
           columns={[
+            {
+              key: "type",
+              header: "Type",
+              sortValue: ({ area }) => area,
+              cell: ({ area }) => (
+                <Text size={phone ? "xs" : "sm"} c={phone ? "dimmed" : undefined}>
+                  {area}
+                </Text>
+              ),
+            },
             {
               key: "name",
               header: "Name",
@@ -169,7 +183,6 @@ export function PromptInstructions({
               cell: (instruction) => (
                 <TableRecord
                   name={instruction.label}
-                  detail={instruction.area}
                   openLabel={`Edit ${instruction.label}`}
                   onOpen={() => setEditing(instruction)}
                 />
