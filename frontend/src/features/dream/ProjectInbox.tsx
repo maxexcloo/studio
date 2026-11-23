@@ -17,7 +17,7 @@ import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
-import { cardKinds, maxCardDescription, maxCardName } from "../../../../shared/characters";
+import { cardKinds, maxCardName } from "../../../../shared/characters";
 import {
   type Accepted,
   type Inbox,
@@ -35,7 +35,7 @@ import { closeWhenTop } from "../../ui/popupClicks";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { CardDialog, CardForm, CardThumbnails } from "../characters/CardImages";
+import { CardDescription, CardDialog, CardForm, CardThumbnails } from "../characters/CardImages";
 import { useMediaPreview } from "../gallery/MediaPreview";
 import { tasteQuery } from "../taste/TasteProfile";
 import { type BriefText, ProjectForm, briefFields } from "./ProjectForm";
@@ -223,11 +223,10 @@ function ProposalEditor({
               setChange({ ...change, card: { ...card, name: event.currentTarget.value } })
             }
           />
-          <TextBox
-            label="Description"
-            autosize
-            minRows={3}
-            maxLength={maxCardDescription}
+          <CardDescription
+            kind={card.kind}
+            name={card.name}
+            images={[]}
             value={card.description}
             onChange={(description) => setChange({ ...change, card: { ...card, description } })}
           />

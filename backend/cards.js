@@ -34,14 +34,38 @@ export function listCards(kind, ownerId = "") {
 const save = (kind, ownerId, cards) =>
   writeRuntimeDocument(dataDir, document(kind, ownerId), { [kind]: cards });
 
-/** Saves `change(card)` of the account's character `id` and returns it; undefined when it's gone. */
-export function updateCharacter(ownerId, id, change) {
-  const characters = listCards("characters", ownerId);
-  const index = characters.findIndex((character) => character.id === id);
+/** Saves `change(card)` of the account's `kind` card `id` and returns it; undefined when it's gone. */
+export function updateCard(kind, ownerId, id, change) {
+  const cards = listCards(kind, ownerId);
+  const index = cards.findIndex((card) => card.id === id);
   if (index < 0) return undefined;
-  const character = change(characters[index]);
-  save("characters", ownerId, characters.with(index, character));
-  return character;
+  const card = change(cards[index]);
+  save(kind, ownerId, cards.with(index, card));
+  return card;
+}
+
+/** The account's card waiting on the comparison `comparisonId` (Generate References), with its kind. */
+export function cardOf(ownerId, comparisonId) {
+  for (const kind of Object.keys(cardKinds)) {
+    const card = listCards(kind, ownerId).find((each) => each.candidates === comparisonId);
+    if (card) return { kind, card };
+  }
+}
+
+/**
+ * Adds the pick `itemId` of a card's Generate References comparison to its images: after them
+ * where there is room, in place of a one-image card's image.
+ */
+export function addPickedReference(ownerId, comparisonId, itemId) {
+  const found = cardOf(ownerId, comparisonId);
+  if (!found || found.card.referenceIds.includes(itemId)) return;
+  const { max } = cardKinds[found.kind].images;
+  if (max > 1 && found.card.referenceIds.length >= max) return;
+  updateCard(found.kind, ownerId, found.card.id, (current) => ({
+    ...current,
+    referenceIds: max > 1 ? [...current.referenceIds, itemId] : [itemId],
+    updatedAt: new Date().toISOString(),
+  }));
 }
 
 const assetOf = (account, id) => {
@@ -104,7 +128,7 @@ export function shownCard(account, character) {
   };
 }
 
-class CardError extends Error {
+export class CardError extends Error {
   status = 400;
 }
 
@@ -128,9 +152,9 @@ function cleanTraits(body) {
 
 /**
  * The fields a request may set on a `kind` card, checked; images must be references the account
- * owns. A character waiting on its portrait (`pending`) may have none yet.
+ * owns. A character waiting on its portrait or candidates (`pending`) may have none yet.
  */
-function cleanCard(kind, account, body, pending = false) {
+export function cleanCard(kind, account, body, pending = false) {
   const { name: noun, images } = cardKinds[kind];
   const name = String(body?.name || "").trim();
   const description = String(body?.description || "").trim();
@@ -155,26 +179,56 @@ function cleanCard(kind, account, body, pending = false) {
   return { name, description, ...traits, referenceIds: ids };
 }
 
+/** Refuses a new `kind` card where the account keeps as many as it may. */
+export function checkRoom(kind, ownerId) {
+  if (listCards(kind, ownerId).length >= maxCards)
+    throw new CardError(`An account can keep ${maxCards} ${kind}.`);
+}
+
 /**
  * Saves a new `kind` card for the account from `fields` and returns it; a CardError answers 400. A
  * new character may wait on a portrait job of the account's (`portrait: { jobId, sheet }`), which
- * becomes its first image (character-sheets.js).
+ * becomes its first image (character-sheets.js), or on the comparison `candidates` whose pick
+ * becomes one (card-references.js).
  */
-export function createCard(account, kind, fields) {
+export function createCard(account, kind, fields, candidates = "") {
   const ownerId = account?.userId || "";
-  const cards = listCards(kind, ownerId);
-  if (cards.length >= maxCards) throw new CardError(`An account can keep ${maxCards} ${kind}.`);
+  checkRoom(kind, ownerId);
   const jobId = kind === "characters" ? String(fields?.portrait?.jobId || "") : "";
   if (jobId && !/^[\w-]{1,100}$/.test(jobId)) throw new CardError("That portrait job is unknown.");
   const now = new Date().toISOString();
   const card = {
     id: `${cardKinds[kind].prefix}-${crypto.randomUUID()}`,
-    ...cleanCard(kind, account, fields, Boolean(jobId)),
+    ...cleanCard(kind, account, fields, Boolean(jobId || candidates)),
     ...(jobId ? { portrait: { jobId, ...(fields.portrait.sheet ? { sheet: true } : {}) } } : {}),
+    ...(candidates ? { candidates } : {}),
     createdAt: now,
     updatedAt: now,
   };
-  save(kind, ownerId, [...cards, card]);
+  save(kind, ownerId, [...listCards(kind, ownerId), card]);
+  return card;
+}
+
+/**
+ * Saves `fields` over the account's `kind` card `id` and returns it, undefined when it's gone; with
+ * `candidates`, the card waits on that comparison (card-references.js).
+ */
+export function editCard(account, kind, id, fields, candidates = "") {
+  const ownerId = account?.userId || "";
+  const cards = listCards(kind, ownerId);
+  const index = cards.findIndex((card) => card.id === id);
+  if (index < 0) return undefined;
+  // A character's story is replaced by what is sent, and images end a portrait's wait.
+  const { age: _age, ...kept } = cards[index];
+  for (const key of characterTraits) delete kept[key];
+  if (fields?.referenceIds?.length) delete kept.portrait;
+  if (candidates) kept.candidates = candidates;
+  const card = {
+    ...kept,
+    ...cleanCard(kind, account, fields, Boolean(kept.portrait || kept.candidates)),
+    updatedAt: new Date().toISOString(),
+  };
+  save(kind, ownerId, cards.with(index, card));
   return card;
 }
 
@@ -230,21 +284,9 @@ export function registerCardRoutes(app) {
       reply(201, account, createCard(account, kind, body)),
     );
 
-    route("PUT", `/api/${kind}/:id`, (account, ownerId, { params, body }) => {
-      const cards = listCards(kind, ownerId);
-      const index = cards.findIndex((card) => card.id === params.id);
-      if (index < 0) return missing;
-      // A character's story is replaced by what is sent, and images end a portrait's wait.
-      const { age: _age, ...kept } = cards[index];
-      for (const key of characterTraits) delete kept[key];
-      if (body?.referenceIds?.length) delete kept.portrait;
-      const card = {
-        ...kept,
-        ...cleanCard(kind, account, body, Boolean(kept.portrait)),
-        updatedAt: new Date().toISOString(),
-      };
-      save(kind, ownerId, cards.with(index, card));
-      return reply(200, account, card);
+    route("PUT", `/api/${kind}/:id`, (account, _ownerId, { params, body }) => {
+      const card = editCard(account, kind, params.id, body);
+      return card ? reply(200, account, card) : missing;
     });
 
     route("PATCH", `/api/${kind}/:id`, (account, ownerId, { params, body }) => {
