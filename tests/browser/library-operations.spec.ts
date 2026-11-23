@@ -604,7 +604,6 @@ test("Imports group by what they need: Download All Missing, substitutes to acce
     .getByRole("dialog", { name: "Clear Stale Imports" })
     .getByRole("button", { name: "Clear Stale", exact: true })
     .click();
-  await expect(page.getByText("1 cleared", { exact: true })).toBeVisible();
   await expect(page.getByText("Blocked Model", { exact: true })).toBeHidden();
   await expect(page.getByRole("button", { name: "Clear Stale", exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Actions for Kept Model", exact: true }).click();

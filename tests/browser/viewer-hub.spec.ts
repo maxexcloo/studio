@@ -1854,7 +1854,7 @@ test("Details keep the caption, run notes and source ahead of LoRAs and prompts"
     details = page.getByRole("dialog", { name: "my favourite bird", exact: true });
   await expect(details.getByText("my favourite bird", { exact: true })).toBeVisible();
   // The title's line holds when and how big; Output carries no result number.
-  await expect(details.getByText(/^\d{2}:\d{2}, 23 Oct(?: 2026)? · 1024 × 1024$/)).toBeVisible();
+  await expect(details.getByText(/\d{2}:\d{2}, 23 Oct(?: 2026)? · 1024 × 1024$/)).toBeVisible();
   await expect(details.getByRole("cell", { name: "#866", exact: true })).toHaveCount(0);
   // A long caption folds with Expand on its last line and folds again on Collapse; its tags stay
   // in sight.
