@@ -130,6 +130,8 @@ function headline(text) {
  * given, is the plain version shown instead of its first line. `fix` names
  * the one-click way out the viewer offers (memory, redownload, rescan, node,
  * retry), and `missingNode` the class a missing-node error is about.
+ * `permanent` marks a failure running it again won't change: a known problem
+ * with its files, parts or nodes, not a dropped connection or a full GPU.
  */
 export function describeFailure({
   message = "",
@@ -180,6 +182,7 @@ export function describeFailure({
       "ComfyUI execution failed",
     hint: learned ? "" : match?.hint || "",
     fix: learned ? "rescan" : match?.fix || "",
+    permanent: Boolean(learned || (match && !["memory", "retry"].includes(match.fix))),
     ...(match?.fix === "node" && missingNodeIn(raw) ? { missingNode: missingNodeIn(raw) } : {}),
     nodeType: String(nodeType || ""),
     nodeId: String(nodeId || ""),

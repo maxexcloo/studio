@@ -289,7 +289,9 @@ export function createGenerationQueue({
         const refusal =
           minorAgeRefusal(job.input.prompt) ||
           (job.dream && (await dream().queuedProfileIssue(job)));
-        return refusal ? { status: "failed", reason: refusal } : generationAdapter.submit(job);
+        return refusal
+          ? { status: "failed", reason: refusal, permanent: true }
+          : generationAdapter.submit(job);
       },
       // A local generation may move to another idle worker that runs it until it starts.
       alternatives: (job) => {
@@ -345,6 +347,11 @@ export function createGenerationQueue({
             reason: String(job.reason || "").slice(0, 200),
           });
         await generationAdapter.settled(job);
+        // Dream writes new ideas, so its work that failed for good leaves the queue; its record stays.
+        if (job.status === "failed" && job.dream && job.permanent) {
+          store.save({ ...store.job(job.ownerId, job.id), cleared: true });
+          logEvent("Dropped a Dream job that failed for good", { job: job.id });
+        }
         if (job.status !== "completed") return;
         // Its results keep the result it was made from, once the run has left the queue too, and
         // whether Face Check's redo made them (domain/face-redo.ts).
@@ -365,7 +372,7 @@ export function createGenerationQueue({
       (async (job, stream) => {
         const written = await promptStage(job, stream);
         const refusal = minorAgeRefusal(written?.prompt);
-        if (refusal) throw new Error(refusal);
+        if (refusal) throw Object.assign(new Error(refusal), { permanent: true });
         return written;
       }),
   );

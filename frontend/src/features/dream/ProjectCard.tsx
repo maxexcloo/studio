@@ -7,21 +7,24 @@ import {
   Paper,
   Progress,
   Stack,
+  Switch,
   Text,
   UnstyledButton,
 } from "@mantine/core";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 
 import type { Project, ProjectStats } from "../../../../shared/projects";
+import { api } from "../../api";
 import { menuWidth } from "../../theme";
 import { icons } from "../../ui/icons";
 import { Thumbnail } from "./DiscardedDreams";
-import { aspectLabel, briefFields, useSaveProject } from "./ProjectForm";
-import type { DreamItem } from "./queries";
+import { aspectLabel, briefFields } from "./ProjectForm";
+import { type DreamItem, projectPath, projectsQuery } from "./queries";
 
 const resultsShown = 8;
 
-/** A project's results so far, as chips, and its share of Dream's turns, or Paused. */
+/** A project's results so far, as chips, and its share of Dream's turns, or Disabled. */
 export function ProjectStatsLine({
   project,
   stats,
@@ -42,7 +45,7 @@ export function ProjectStatsLine({
     <Stack gap={6}>
       {(chips.length > 0 || project.paused) && (
         <Group gap={6}>
-          {project.paused && <Badge color="yellow">Paused</Badge>}
+          {project.paused && <Badge color="yellow">Disabled</Badge>}
           {chips.map((chip) => (
             <Badge key={chip} color="gray">
               {chip}
@@ -64,6 +67,40 @@ export function ProjectStatsLine({
   );
 }
 
+/**
+ * Whether Dream draws ideas from a project, switched at once; the reply, or a refetch after a
+ * failure, settles it. A disabled project keeps its brief, results and chats.
+ */
+export function ProjectEnabled({ project }: { project: Project }) {
+  const client = useQueryClient();
+  const save = useMutation({
+    mutationFn: (paused: boolean) =>
+      api<{ project: Project }>(projectPath(project), {
+        method: "PUT",
+        body: JSON.stringify({ paused }),
+      }),
+    onMutate: (paused) =>
+      client.setQueryData(
+        projectsQuery.queryKey,
+        (data) =>
+          data && {
+            ...data,
+            projects: data.projects.map((entry) =>
+              entry.id === project.id ? { ...entry, paused } : entry,
+            ),
+          },
+      ),
+    onSettled: () => client.invalidateQueries({ queryKey: projectsQuery.queryKey }),
+  });
+  return (
+    <Switch
+      aria-label={`Enable ${project.name}`}
+      checked={!project.paused}
+      onChange={(event) => save.mutate(!event.currentTarget.checked)}
+    />
+  );
+}
+
 /** A project's constraints as badges: profiles, No LoRAs, aspect and resolution. */
 export function constraintBadges(project: Project, profileLabel: (id: string) => string) {
   const { constraints } = project;
@@ -77,7 +114,7 @@ export function constraintBadges(project: Project, profileLabel: (id: string) =>
 
 /**
  * A project in Dream › Projects: its brief in a line, a strip of its newest results, how they fare
- * and its share of turns, with Edit, Pause and Delete in its ⋯ menu. Its name opens it; while it
+ * and its share of turns, with its Enabled switch and Edit and Delete in its ⋯ menu. Its name opens it; while it
  * has results waiting for a verdict (`unseen`, newest first), the strip shows those, each opening
  * the viewer (`onView`), and otherwise opens it too. `fresh` counts those new since the last visit.
  */
@@ -101,7 +138,6 @@ export function ProjectCard({
   onDelete: () => void;
 }) {
   const navigate = useNavigate();
-  const pause = useSaveProject(project.id);
   const open = () =>
     navigate(`/dream/projects/${encodeURIComponent(project.id)}`, {
       state: { fromProjects: true },
@@ -128,30 +164,29 @@ export function ProjectCard({
               </Badge>
             )}
           </Group>
-          <Menu position="bottom-end" width={menuWidth}>
-            <Menu.Target>
-              <ActionIcon variant="subtle" color="gray" aria-label={`Actions for ${project.name}`}>
-                <icons.more size={16} />
-              </ActionIcon>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item leftSection={<icons.edit size={16} />} onClick={onEdit}>
-                Edit
-              </Menu.Item>
-              <Menu.Item
-                leftSection={
-                  project.paused ? <icons.resume size={16} /> : <icons.pause size={16} />
-                }
-                onClick={() => pause.mutate({ paused: !project.paused })}
-              >
-                {project.paused ? "Resume" : "Pause"}
-              </Menu.Item>
-              <Menu.Divider />
-              <Menu.Item color="red" leftSection={<icons.delete size={16} />} onClick={onDelete}>
-                Delete
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+          <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+            <ProjectEnabled project={project} />
+            <Menu position="bottom-end" width={menuWidth}>
+              <Menu.Target>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label={`Actions for ${project.name}`}
+                >
+                  <icons.more size={16} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item leftSection={<icons.edit size={16} />} onClick={onEdit}>
+                  Edit
+                </Menu.Item>
+                <Menu.Divider />
+                <Menu.Item color="red" leftSection={<icons.delete size={16} />} onClick={onDelete}>
+                  Delete
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
         </Group>
         {summary && (
           <Text size="sm" c="dimmed" lineClamp={2}>

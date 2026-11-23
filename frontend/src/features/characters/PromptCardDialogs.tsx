@@ -8,7 +8,7 @@ import { ActionMenuItems } from "../../ui/ActionBar";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { itemAction, itemActionGroups } from "../gallery/itemActions";
-import { CardDialog, CardFields, CardForm } from "./CardImages";
+import { CardDialog, CardFields, CardForm, useReferenceAction } from "./CardImages";
 import {
   type PromptCard,
   type PromptCardKind,
@@ -119,19 +119,15 @@ function PromptCardForm({
   const [description, setDescription] = useState(card?.description || named?.description || "");
   const [images, setImages] = useState<ReferenceAsset[]>(card?.references || references || []);
   const save = useSavePromptCard(kind, card?.id);
+  const fields = () => ({
+    name: name.trim(),
+    description: description.trim(),
+    referenceIds: images.map((asset) => asset.id),
+  });
+  const generate = useReferenceAction(kind, card?.id, fields, onClose);
+  const error = save.error || generate.error;
   return (
-    <CardForm
-      onSubmit={() =>
-        save.mutate(
-          {
-            name: name.trim(),
-            description: description.trim(),
-            referenceIds: images.map((asset) => asset.id),
-          },
-          { onSuccess: onClose },
-        )
-      }
-    >
+    <CardForm onSubmit={() => save.mutate(fields(), { onSuccess: onClose })}>
       <CardFields
         kind={kind}
         name={name}
@@ -145,8 +141,8 @@ function PromptCardForm({
         images={images}
         onImages={setImages}
       />
-      {save.error && <Alert color="red">{save.error.message}</Alert>}
-      <DialogFooter pending={save.isPending} onCancel={onClose}>
+      {error && <Alert color="red">{error.message}</Alert>}
+      <DialogFooter pending={save.isPending} onCancel={onClose} leading={generate.button}>
         <Button
           type="submit"
           loading={save.isPending}
