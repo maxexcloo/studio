@@ -9,6 +9,7 @@ import {
   loraCompatibility,
   loraDefaultStrength,
   loraName,
+  loraRejection,
   loraStrengthChoices,
   loraStrengthIssue,
   loraStrengthRange,
@@ -62,6 +63,22 @@ test("Boogu verified base and turbo targets leave unverified edit variants avail
   assert.equal(loraCompatibility(info, edit), "unknown");
   assert.equal(optionalLoraPolicyIssue({ name: "effect", strength: 1 }, info, edit), "");
   assert.equal(loraCompatibility(undefined, edit), "unknown");
+});
+
+test("Radiance runs a LoRA of its family on an unlisted base and refuses one of unknown family", () => {
+  const radiance = {
+    family: "flux3",
+    loraAdapter: "radiance-tags-v1",
+    loraBase: { model: "flux-3-image-klein-bf16", family: "flux3", accepts: true },
+  };
+  const listed = {
+    families: ["flux3"],
+    compatibility: { baseModels: ["flux-3-image-klein-iq8r"], unlisted: "unknown" },
+  };
+  assert.equal(loraCompatibility(listed, radiance), "unknown");
+  assert.equal(loraRejection(listed, radiance), "");
+  assert.equal(loraRejection({ families: [] }, radiance), "unknown");
+  assert.equal(loraRejection({ families: [] }, { ...radiance, loraAdapter: undefined }), "");
 });
 
 test("exact profile and model allowlists are combined, with missing context marked unknown", () => {

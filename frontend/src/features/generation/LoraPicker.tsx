@@ -444,7 +444,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
         const reason =
           unavailableFor(profile, metadata[file]) ||
           (rejection === "unknown"
-            ? "Unverified on Radiance"
+            ? "Unknown family: set it in Library › LoRAs"
             : rejection === "other"
               ? "Doesn't fit this model"
               : "");
