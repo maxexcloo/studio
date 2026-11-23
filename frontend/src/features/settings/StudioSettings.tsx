@@ -17,24 +17,24 @@ import {
 } from "./deployment";
 import { GalleryPass } from "./GalleryPass";
 
-/** Background features with a catch-up pass over the gallery, which shares their row. */
-const passes: Record<
-  string,
-  Omit<ComponentProps<typeof GalleryPass>, "label" | "description" | "children">
-> = {
+/** Background features with a catch-up pass over the gallery, each a row in Catch Up. */
+const passes: Record<string, Omit<ComponentProps<typeof GalleryPass>, "label">> = {
   STUDIO_FACE_CHECK: {
     route: "/api/gallery/faces",
+    description: "Check existing gallery images for faces.",
     remaining: "to check",
     progressLabel: "Face Check Progress",
   },
   STUDIO_GALLERY_CAPTIONS: {
     route: "/api/gallery/captions",
+    description: "Caption existing gallery images.",
     remaining: "to caption",
     progressLabel: "Caption Progress",
     scopeLabel: "Images to Caption",
   },
   STUDIO_IMAGE_SEARCH: {
     route: "/api/gallery/embeddings",
+    description: "Index existing gallery images for search.",
     remaining: "to index",
     progressLabel: "Index Progress",
   },
@@ -70,27 +70,25 @@ export function StudioSettings() {
       </SettingRow>
     );
   };
-  const flagRow = (flag: Flag) => {
-    const toggle = (
+  const flagRow = (flag: Flag) => (
+    <SettingRow
+      key={flag.key}
+      label={flag.label}
+      description={`${flag.description}${lockedNote(flag)}`}
+    >
       <Switch
         aria-label={flag.label}
         checked={flag.value}
         disabled={flag.locked}
         onChange={(event) => save.mutate({ key: flag.key, value: event.currentTarget.checked })}
       />
-    );
-    const description = `${flag.description}${lockedNote(flag)}`;
-    const pass = passes[flag.key];
-    return pass ? (
-      <GalleryPass key={flag.key} {...pass} label={flag.label} description={description}>
-        {toggle}
-      </GalleryPass>
-    ) : (
-      <SettingRow key={flag.key} label={flag.label} description={description}>
-        {toggle}
-      </SettingRow>
-    );
-  };
+    </SettingRow>
+  );
+  const passRows = catalogue.flatMap((flag) =>
+    passes[flag.key]
+      ? [<GalleryPass key={flag.key} {...passes[flag.key]} label={flag.label} />]
+      : [],
+  );
   return (
     <Stack gap="lg">
       <SettingGroup title="Defaults">
@@ -118,6 +116,7 @@ export function StudioSettings() {
         </SettingRow>
       </SettingGroup>
       <SettingGroup title="Background AI">{catalogue.map(flagRow)}</SettingGroup>
+      {passRows.length > 0 && <SettingGroup title="Catch Up">{passRows}</SettingGroup>}
       <SettingGroup title="Danger Zone" danger>
         <DeleteFailedItems />
       </SettingGroup>

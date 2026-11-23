@@ -116,7 +116,7 @@ test("Gallery Captions in Settings › Studio catches up, shows its progress and
     return route.fulfill({ json: status });
   });
   await page.goto("/settings#studio");
-  const row = page.getByRole("region", { name: "Background AI", exact: true });
+  const row = page.getByRole("region", { name: "Catch Up", exact: true });
   await expect(row.getByText("Ready · 9,000 to caption", { exact: true })).toBeVisible();
   await row.getByRole("combobox", { name: "Images to Caption", exact: true }).click();
   await page.getByRole("option", { name: "Missing (7,000)", exact: true }).click();
