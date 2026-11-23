@@ -273,10 +273,6 @@
   line-height: 1.45;
 }
 
-:where(:root:not([data-phone])) .prompt textarea {
-  transition: height var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
 .variation {
   position: relative;
   display: grid;
