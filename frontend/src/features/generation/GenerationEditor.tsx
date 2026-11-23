@@ -9,7 +9,7 @@ import {
 } from "@mantine/core";
 import { useIsMutating } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
-import { type ReactNode, Suspense, lazy, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, Suspense, lazy, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { maxLoras, slotCapacity } from "../../../../shared/profiles";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
@@ -19,7 +19,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { TextToolsBar } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { GenerationInputControls } from "./GenerationInputControls";
-import { type Draft, defaultProfile, useGeneration } from "./GenerationProvider";
+import { type Draft, defaultProfile, useDraft, useGeneration } from "./GenerationProvider";
 import { useLoraPicker } from "./LoraPicker";
 import {
   primaryReference,
@@ -214,12 +214,14 @@ export function GenerationEditor({
   /** Offers taste-led prompt ideas in the prompt's AI menu while the prompt is empty. */
   ideas?: boolean;
 }) {
-  const profile = profileForBackend(
-    listedProfile,
-    input.profileBackend,
-    Boolean(references.length || input.referenceAssets.length),
+  const anyReferences = Boolean(references.length || input.referenceAssets.length);
+  const profile = useMemo(
+    () => profileForBackend(listedProfile, input.profileBackend, anyReferences),
+    [listedProfile, input.profileBackend, anyReferences],
   );
   const { models, profiles } = useGeneration();
+  // The chips take the draft as typing leaves it, so they keep still while the prompt changes.
+  const settled = useDraft().input;
   const [maskOpen, setMaskOpen] = useState(false);
   const lastMask = useRef<{ assetId?: string; mask?: string }>(undefined);
   const [referenceOpen, setReferenceOpen] = useState(false);
@@ -257,7 +259,6 @@ export function GenerationEditor({
     if (!placedCaret.current) element.setSelectionRange(element.value.length, element.value.length);
     placedCaret.current = true;
   }, [focusPrompt, models.isPending]);
-  if (models.isPending) return <LoadingState label="Loading Profiles" />;
   const details = referenceDetails(references, input, profile);
   const primary = primaryReference(details, profile);
   const referenceProfile = profileForBackend(listedProfile, input.profileBackend, true);
@@ -265,38 +266,60 @@ export function GenerationEditor({
   const inpaint = input.inpaint as
     | { assetId?: string; mask?: string; strength?: number; feather?: number }
     | undefined;
-  const referencePicker = (
-    <ReferencePicker
-      opened={referenceOpen}
-      browser={referenceBrowser}
-      onOpenedChange={setReferenceOpen}
-      profile={profile}
-      input={input}
-      onInputChange={onChange}
-      value={references}
-      onChange={onReferencesChange}
-      prompt={{ value: String(input.prompt || ""), onChange: (prompt) => onChange({ prompt }) }}
-      onCharacterProfile={onCharacterProfile}
-    />
+  const referencePicker = useMemo(
+    () => (
+      <ReferencePicker
+        opened={referenceOpen}
+        browser={referenceBrowser}
+        onOpenedChange={setReferenceOpen}
+        profile={profile}
+        input={settled}
+        onInputChange={onChange}
+        value={references}
+        onChange={onReferencesChange}
+        onCharacterProfile={onCharacterProfile}
+      />
+    ),
+    [
+      referenceOpen,
+      referenceBrowser,
+      profile,
+      settled,
+      onChange,
+      references,
+      onReferencesChange,
+      onCharacterProfile,
+    ],
   );
-  const settings = { opened: settingsOpen, onOpenedChange: setSettingsOpen };
+  const settings = useMemo(
+    () => ({ opened: settingsOpen, onOpenedChange: setSettingsOpen }),
+    [settingsOpen],
+  );
+  const inpaints = !!profile?.capabilities?.inpaint;
+  const painted = !!input.inpaint;
+  const paintable = !!primary;
+  const mask = useMemo(
+    () =>
+      inpaints
+        ? {
+            painted,
+            painting: maskOpen,
+            // Paint stays in place, disabled until there is a first reference to paint on.
+            disabled: !paintable,
+            onPaint: () => setMaskOpen(true),
+          }
+        : undefined,
+    [inpaints, painted, maskOpen, paintable],
+  );
+  if (models.isPending) return <LoadingState label="Loading Profiles" />;
   // Choosing Edit or Reference drops the mask; Paint on the same image brings it back to edit.
   if (inpaint?.mask) lastMask.current = inpaint;
-  const mask = profile?.capabilities?.inpaint
-    ? {
-        painted: !!input.inpaint,
-        painting: maskOpen,
-        // Paint stays in place, disabled until there is a first reference to paint on.
-        disabled: !primary,
-        onPaint: () => setMaskOpen(true),
-      }
-    : undefined;
   const editing = inpaint ?? lastMask.current;
   const inputs = (
     <GenerationInputControls
       loraPicker={loraPicker}
       loraSuggestions={assistant.loraSuggestions}
-      input={input}
+      input={settled}
       profile={profile}
       onChange={onChange}
       references={supportsReferences || details.length ? referencePicker : undefined}
