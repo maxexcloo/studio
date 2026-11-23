@@ -246,7 +246,10 @@ export const assistMenu = ({
   custom = [],
   others = [],
   last,
+  ideasFirst,
 }: {
+  /** Lists Suggestions' options in place even beside Templates (an empty prompt's ideas). */
+  ideasFirst?: boolean;
   loading?: boolean;
   settings?: Action[];
   suggestions?: { action: Action; refresh: Action };
@@ -260,6 +263,8 @@ export const assistMenu = ({
   const tail = [...custom, ...(suggestions ? [suggestions.refresh] : [])];
   if (suggestions && choices.length) {
     const nested = { id: "templates", label: "Templates", icon: icons.templates, menu: [choices] };
+    if (ideasFirst)
+      return [settings, suggestionItems(suggestions.action), [nested, ...tail], ...others, last];
     return [settings, [suggestions.action, nested, ...tail], ...others, last];
   }
   const inline = suggestions ? suggestionItems(suggestions.action) : choices;

@@ -221,6 +221,7 @@ export function PromptFields({
           onOpen: suggestions?.load,
           menu: assistMenu({
             suggestions,
+            ideasFirst: Boolean(ideas.suggestions),
             templates: assistant.templates ?? [],
             custom: assistant.custom,
             others: [assistant.more ?? []],

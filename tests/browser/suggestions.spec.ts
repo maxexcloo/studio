@@ -113,8 +113,9 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   const dock = page.locator("[data-composer-dock]");
   const compactMenu = await promptMenu(dock, "Prompt");
   await expect(compactMenu.getByRole("menuitem", { name: "Templates", exact: true })).toBeVisible();
+  // An empty prompt's ideas sit in the menu itself, beside the Templates submenu.
   await expect(
-    compactMenu.getByRole("menuitem", { name: "Suggestions", exact: true }),
+    compactMenu.getByRole("menuitem", { name: ideas[0].label, exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(compactMenu).toBeHidden();
@@ -131,19 +132,15 @@ test("The composer groups ideas and draft suggestions in its compact and expande
     { surface: "composer", kind: "image", profileId: "image:test", fresh: false },
   ]);
   let menu = await promptMenu(page, "Prompt");
-  await expandAssistantMenu(menu, "Suggestions");
-  const suggestions = menu.getByRole("group", { name: "Suggestions", exact: true });
   const sorted = ideas.map((idea) => idea.label).sort((a, b) => a.localeCompare(b));
-  await expect(suggestions.getByRole("menuitem").first()).toHaveText(sorted[0]);
+  await expect(menu.getByRole("menuitem").first()).toHaveText(sorted[0]);
   for (const idea of sorted)
     await expect(menu.getByRole("menuitem", { name: idea, exact: true })).toBeVisible();
   expect(asked).toEqual([
     { surface: "composer", kind: "image", profileId: "image:test", fresh: false },
   ]);
-  await backToActionMenu(menu);
   await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
   await expect.poll(() => asked.at(-1)?.fresh).toBe(true);
-  await expandAssistantMenu(menu, "Suggestions");
   await menu.getByRole("menuitem", { name: ideas[1].label, exact: true }).click();
   await expect(prompt).toHaveValue(ideas[1].prompt);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
@@ -151,6 +148,7 @@ test("The composer groups ideas and draft suggestions in its compact and expande
   await prompt.fill("A fox");
   menu = await promptMenu(page, "Prompt");
   await expandAssistantMenu(menu, "Suggestions");
+  const suggestions = menu.getByRole("group", { name: "Suggestions", exact: true });
   await expect(
     suggestions.getByRole("menuitem", { name: steps[0].label, exact: true }),
   ).toBeVisible();
@@ -403,9 +401,7 @@ test("Suggestions show why Studio has none, and no ideas show", async ({ page })
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   const ideas = await promptMenu(page, "Prompt");
   await expect(ideas.getByRole("menuitem", { name: "Recent Prompts", exact: true })).toBeVisible();
-  const ideaSuggestions = ideas.getByRole("menuitem", { name: "Suggestions", exact: true });
-  await expect(ideaSuggestions).toHaveAccessibleDescription(reason);
-  await expect(ideaSuggestions).toBeDisabled();
+  await expect(ideas.getByRole("menuitem", { name: reason, exact: true })).toBeDisabled();
 });
 
 test("Review stays off after editing and Reset, while an explicit opt-in preserves the current prompt for Undo", async ({
