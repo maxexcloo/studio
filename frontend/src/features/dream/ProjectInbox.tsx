@@ -326,7 +326,7 @@ function ProposalCard({
       alt: `${proposal.title} ${index + 1}`,
     }));
   return (
-    <Paper withBorder p="md" radius="lg" component="article" aria-label={proposal.title}>
+    <Paper withBorder p="md" radius="md" component="article" aria-label={proposal.title}>
       <Stack gap="xs">
         <Group gap="xs" wrap="nowrap" align="flex-start">
           <Icon

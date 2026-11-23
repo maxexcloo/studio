@@ -6,6 +6,7 @@ import {
   Button,
   type CSSProperties,
   type CSSVariablesResolver,
+  Card,
   Checkbox,
   CloseButton,
   Collapse,
@@ -276,6 +277,8 @@ export function studioTheme({
         }),
         vars: (_theme, props) => ({ root: { "--button-height": height(props.size) } }),
       }),
+      // Content cards share one corner, as the panels around them do.
+      Card: Card.extend({ defaultProps: { radius: "md" } }),
       Checkbox: Checkbox.extend({ styles: { input: controlMotion, icon: controlMotion } }),
       // Close buttons of dialogs, drawers and sheets are touch targets on touch screens.
       CloseButton: CloseButton.extend({

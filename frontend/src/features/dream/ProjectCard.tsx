@@ -113,7 +113,7 @@ export function ProjectCard({
   const badges = constraintBadges(project, profileLabel);
   const results = (stats?.results || []).slice(0, resultsShown);
   return (
-    <Paper withBorder p="md" radius="lg" component="section" aria-label={project.name}>
+    <Paper withBorder p="md" radius="md" component="section" aria-label={project.name}>
       <Stack gap="xs">
         <Group justify="space-between" wrap="nowrap" gap="xs">
           <Group gap="xs" wrap="nowrap" miw={0}>
