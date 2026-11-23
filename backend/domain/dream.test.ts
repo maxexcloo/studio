@@ -654,7 +654,23 @@ test("A finished Dream job starts the next at once, without waiting for the next
   dream.start();
   t.after(() => dream.stop());
   finish("alice", live("alice")[0].id);
-  dream.finished();
+  dream.wake();
+  for (let turn = 0; turn < 100 && !live("alice").length; turn++)
+    await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(live("alice").length, 1);
+});
+
+test("A verdict that leaves the deck low starts Dream's next work without waiting for the next tick", async (t) => {
+  const fx = fixture(t);
+  const { dream, live, finish } = fx;
+  const request = await serve(t, fx);
+  await dream.save("alice", { enabled: true });
+  await dream.tick();
+  finish("alice", live("alice")[0].id);
+  dream.start();
+  t.after(() => dream.stop());
+  const [card] = dream.unseen("alice");
+  assert.equal((await request(`/${card.id}/keep`, {})).status, 200);
   for (let turn = 0; turn < 100 && !live("alice").length; turn++)
     await new Promise((resolve) => setImmediate(resolve));
   assert.equal(live("alice").length, 1);

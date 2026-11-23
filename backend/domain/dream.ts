@@ -3565,8 +3565,8 @@ export function createDream(options: {
     get started() {
       return Boolean(timer);
     },
-    /** A Dream job finished: its worker is free now, so the next starts without waiting a tick. */
-    finished: wake,
+    /** Ticks now: a Dream job finished, freeing its worker, or the deck runs low (dream-routes.ts). */
+    wake,
     idleWaitForJob: (job: OwnedJob) => idleWait(job.ownerId, kindOf(job.input)),
     access: (ownerId: string) => options.access(ownerId),
     status(

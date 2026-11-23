@@ -754,7 +754,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
     void imageSearch.completed(items);
     void faceCheck.completed(items);
     void characterSheets.completed(items);
-    if (items.some((item) => item.dream)) dream.finished();
+    if (items.some((item) => item.dream)) dream.wake();
   },
   directCloud,
   dream: () => dream,
