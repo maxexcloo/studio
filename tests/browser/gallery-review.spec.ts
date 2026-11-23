@@ -101,6 +101,7 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
   const asked: string[] = [];
   await page.route("**/api/suggestions", (route) => {
     const body = route.request().postDataJSON();
+    if (body.surface === "composer") return route.fallback();
     if (body.surface === "change")
       return route.fulfill({ json: { suggestions: [], reason: "No matching change" } });
     asked.push(body.itemId);
