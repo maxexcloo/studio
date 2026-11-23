@@ -3,7 +3,11 @@ import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import type { GallerySort } from "../../../../shared/gallery-sort";
 import { api } from "../../api";
 import type { MediaItem, MediaKind } from "../../types";
-import { type GalleryFilterValues, appendGalleryFilters } from "./GalleryFilters";
+import {
+  type GalleryFilterValues,
+  appendGalleryFilters,
+  emptyGalleryFilters,
+} from "./GalleryFilters";
 import { isResultNumber } from "./viewerLink";
 
 /** Every gallery listing's key starts with this, so invalidating it refreshes them all. */
@@ -149,6 +153,31 @@ export const galleryArrivalsQuery = (listing: GalleryListing, leftAt: number) =>
     },
     staleTime: Infinity,
     refetchOnWindowFocus: false,
+  });
+
+/** How many results the gallery, Uploads and Review (unrated) each hold, for the view menu. */
+export const galleryViewCountsQuery = (kind: MediaKind) =>
+  queryOptions({
+    queryKey: [...galleryKey, "view-counts", kind],
+    queryFn: async ({ signal }) => {
+      const count = async (uploads: boolean, unrated?: boolean) => {
+        const params = galleryParams({
+          search: "",
+          kind,
+          filters: { ...emptyGalleryFilters, uploads },
+        });
+        params.set("limit", "1");
+        if (unrated) params.set("unrated", "1");
+        return (await api<GalleryResultsPage>(`/api/gallery?${params}`, { signal })).totalApprox;
+      };
+      const [gallery, uploads, review] = await Promise.all([
+        count(false),
+        count(true),
+        count(false, true),
+      ]);
+      return { gallery, uploads, review };
+    },
+    staleTime: 30_000,
   });
 
 export const galleryReviewQuery = (

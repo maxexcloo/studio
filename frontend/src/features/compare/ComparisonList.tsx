@@ -12,6 +12,7 @@ import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout"
 import { comparisonTitle, comparisonsQuery } from "./queries";
 
 import toolbarClasses from "../../ui/PageToolbar.module.css";
+import galleryClasses from "../gallery/GalleryPage.module.css";
 
 /**
  * The gallery's Comparisons view: a card per comparison or kept Dream comparison, newest first,
@@ -43,7 +44,7 @@ export function ComparisonList({ view }: { view: ReactNode }) {
     undefined,
   );
   return (
-    <Stack gap="sm">
+    <Stack gap="sm" className={galleryClasses.page}>
       <VisuallyHidden component="h1">Comparisons</VisuallyHidden>
       <div className={toolbarClasses.band}>
         <Group gap="xs" mih={44} wrap="nowrap">

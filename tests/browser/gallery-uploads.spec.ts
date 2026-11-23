@@ -43,6 +43,10 @@ test("Import uploads many files or a folder, lists each failure and shows the ne
     "Uploads",
   );
   await expect(page.locator("[data-media-id]")).toHaveCount(2);
+  // The view menu counts what each view holds.
+  await page.getByRole("button", { name: "Gallery View", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Uploads", exact: true })).toContainText("2");
+  await page.keyboard.press("Escape");
 
   // A folder uploads what it holds that Studio takes, and says what it skipped.
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "studio-upload-folder-"));
