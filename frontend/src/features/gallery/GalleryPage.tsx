@@ -732,7 +732,7 @@ function Gallery() {
           key={kind}
           listing={{ ...listing, search: query, filters: { ...listing.filters, uploads: false } }}
           leftAt={leftAt}
-          back={closeReview}
+          close={closeReview}
           view={view}
         />
       </Suspense>
