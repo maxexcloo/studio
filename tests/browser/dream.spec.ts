@@ -1791,7 +1791,7 @@ test("Dream keeps Images and Videos separate through deck, preview, history and 
     page.getByRole("button", { name: "View Dream prompt discard-image", exact: true }),
   ).toBeHidden();
   await page.reload();
-  await expect(page.getByRole("radio", { name: /^Videos \(\d+\)$/ })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "Videos", exact: true })).toBeChecked();
   await showView(page, "Dream");
   await expect(pair).toBeVisible();
   await page.getByRole("button", { name: "B", exact: true }).click();

@@ -710,6 +710,7 @@ test("Liked narrows the reference choices, and Uploads leaves the Show filters o
   await expect(choice("Alpha")).toBeVisible();
   await showUploads(page);
   await picker.getByRole("button", { name: "Filter Uploads", exact: true }).click();
-  await expect(filters).toBeVisible();
-  await expect(filters.getByRole("group", { name: "Show", exact: true })).toHaveCount(0);
+  const uploadFilters = page.getByRole("dialog", { name: "Filter Uploads", exact: true });
+  await expect(uploadFilters).toBeVisible();
+  await expect(uploadFilters.getByRole("group", { name: "Show", exact: true })).toHaveCount(0);
 });

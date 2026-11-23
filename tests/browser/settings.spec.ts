@@ -35,7 +35,7 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Dream",
     "Preferences",
     "Where Work Runs",
-    "Dream",
+    "Dream Defaults",
     "Groups",
     "Studio",
     "Users",
