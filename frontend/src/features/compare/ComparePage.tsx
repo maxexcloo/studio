@@ -31,7 +31,7 @@ import { galleryKey } from "../gallery/queries";
 import { useGalleryColumns, useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
 import { type GalleryState, galleryViewPath } from "../gallery/viewerLink";
-import { type Comparison, comparisonQuery, comparisonTitle } from "./queries";
+import { type Comparison, comparisonQuery, comparisonTitle, comparisonsQuery } from "./queries";
 import { useStageComparison } from "./variants";
 
 import classes from "./ComparePage.module.css";
@@ -70,9 +70,12 @@ export function ComparePage() {
     },
     onSettled: () =>
       Promise.all(
-        [["comparison", id], galleryKey, ["gallery-filters"]].map((queryKey) =>
-          client.invalidateQueries({ queryKey }),
-        ),
+        [
+          comparisonQuery(id).queryKey,
+          comparisonsQuery.queryKey,
+          galleryKey,
+          ["gallery-filters"],
+        ].map((queryKey) => client.invalidateQueries({ queryKey })),
       ),
   });
   const use = useMutation({ mutationFn: (item: MediaItem) => stage.useThis(item) });

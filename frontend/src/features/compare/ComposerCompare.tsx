@@ -356,22 +356,25 @@ function VariantOverview({ labels }: { labels: string[] }) {
           <Text size="sm" flex={1}>
             {label}
           </Text>
-          <Button
-            size="compact-sm"
-            variant="subtle"
-            aria-label={`Remove Variant ${letter(index)}`}
-            onClick={(event) => {
-              // Rows are keyed by position, so only the last row's button goes; focus stays in the popup.
-              if (index === labels.length - 1)
-                event.currentTarget
-                  .closest("li")
-                  ?.previousElementSibling?.querySelector("button")
-                  ?.focus();
-              setDraft((draft) => removeVariant(draft, index));
-            }}
-          >
-            Remove
-          </Button>
+          {/* Fewer than the minimum ends the comparison, so Clear does that. */}
+          {labels.length > compareVariants.min && (
+            <Button
+              size="compact-sm"
+              variant="subtle"
+              aria-label={`Remove Variant ${letter(index)}`}
+              onClick={(event) => {
+                // Rows are keyed by position, so only the last row's button goes; focus stays in the popup.
+                if (index === labels.length - 1)
+                  event.currentTarget
+                    .closest("li")
+                    ?.previousElementSibling?.querySelector("button")
+                    ?.focus();
+                setDraft((draft) => removeVariant(draft, index));
+              }}
+            >
+              Remove
+            </Button>
+          )}
         </Group>
       ))}
     </Stack>
