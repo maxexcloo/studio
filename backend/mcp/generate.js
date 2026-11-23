@@ -1569,6 +1569,10 @@ export function registerGenerateTools({
         throw new Error('only, add and swap are for a set ref ("set 3"). Call reuse again.');
       const found = await resolveOutput(job_id, signal);
       const id = found.jobId;
+      if (found.index !== undefined && chosenIndex > 0 && found.index !== chosenIndex)
+        throw new Error(
+          `${job_id} already names one image; leave output_index out, or name the result's job with the image you want.`,
+        );
       const output_index = found.index ?? chosenIndex ?? 0;
       // A reference is the result's image as it is, so other arguments change nothing; they are
       // named back rather than refused, and the chat carries on to generate.
