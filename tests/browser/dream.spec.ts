@@ -773,6 +773,7 @@ test("Dream navigation orders its views and History shows retained activity and 
     "Taste",
     "Discards",
     "History",
+    "This Week",
   ]);
   await page.getByRole("menuitem", { name: "History", exact: true }).click();
   await expect(page).toHaveURL(/\/dream\/history$/);
@@ -1057,6 +1058,54 @@ test("Comparison suggestions use the side shown in fullscreen", async ({ page })
     itemId: "Bright",
   });
   expect(dream.requests).toEqual([]);
+});
+
+test("This Week shows the best kept results, what worked, what was passed and what comes next", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const kept = (id: string) =>
+    dreamItem(id, { dream: { prompt: "p", why: "", at: stamp, state: "kept" } });
+  await serveDream(page, {
+    week: {
+      kept: 2,
+      passed: 3,
+      top: [kept("best"), kept("next")],
+      best: {
+        models: [{ name: "Flux 2", kept: 2, passed: 1 }],
+        loras: [],
+        themes: [{ name: "forest", kept: 2, passed: 0 }],
+      },
+      passedThemes: [{ name: "city", kept: 0, passed: 2 }],
+      reasons: [
+        { reason: "taste", count: 2 },
+        { reason: "glitch", count: 1 },
+      ],
+      next: {
+        models: ["Flux 2"],
+        loras: [],
+        themes: ["forest"],
+        projects: ["Moss"],
+        explore: 0.95,
+      },
+    },
+  });
+  await page.goto("/dream");
+  await showView(page, "This Week");
+  await expect(page).toHaveURL(/\/dream\/week$/);
+  await expect(page.getByText("2 results kept and 3 passed in the last seven days.")).toBeVisible();
+  // The deck's Images and Videos stay with the deck.
+  await expect(page.getByRole("radio", { name: /^Images/ })).toHaveCount(0);
+  const best = page.getByRole("table", { name: "Worked Best" });
+  await expect(best.getByText("Flux 2", { exact: true })).toBeVisible();
+  await expect(best.getByText("67% (2 of 3)", { exact: true })).toBeVisible();
+  await expect(page.getByText("Not My Taste (2), Glitch (1)", { exact: true })).toBeVisible();
+  await expect(page.getByText("Themes: city (2)", { exact: true })).toBeVisible();
+  await expect(page.getByText("Projects: Moss", { exact: true })).toBeVisible();
+  await expect(page.getByText("Explores 95% of new ideas", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "View Dream prompt best", exact: true }).click();
+  const viewer = page.getByRole("dialog");
+  await expect(viewer.getByRole("img", { name: "Dream prompt best" })).toBeVisible();
 });
 
 test("Discarded Dream results can be viewed and accepted after all, or deleted all at once", async ({

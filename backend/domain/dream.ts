@@ -3471,6 +3471,7 @@ export function createDream(options: {
     read,
     /** The settings an administrator forces, which accounts can't change. */
     locked: () => Object.keys(options.overrides?.() ?? {}) as (keyof DreamSettings)[],
+    exploring,
     history(ownerId: string): DreamActivity[] {
       const labels = {
         "calibrate-like": "Chose Gallery Image",

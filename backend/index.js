@@ -70,6 +70,7 @@ import { dreamOverrides, dreamTimingMinutes, flagEnabled } from "./deployment-se
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
+import { createDreamDigest } from "./domain/dream-digest.ts";
 import { registerDreamRoutes } from "./domain/dream-routes.ts";
 import { createDream } from "./domain/dream.ts";
 import { createEnricher } from "./domain/enrich.ts";
@@ -1142,6 +1143,15 @@ registerDreamRoutes(app, {
   dream,
   projects,
   inbox,
+  digest: createDreamDigest({
+    decided: (ownerId, since) =>
+      galleryItems({ ownerId, dreamState: ["kept", "discarded"], dreamDecidedSince: since }),
+    taste: (ownerId) => taste.read(ownerId),
+    projects: (ownerId) => projects.list(ownerId),
+    exploring: (ownerId) => dream.exploring(ownerId),
+    profiles: async () => (await mediaModels(false)).models.profiles || [],
+    loraName: (name) => loraName(name, catalogueLoraInfo(name)),
+  }),
   listed: (items) => resultNumbers.numbered(items).map(listedRecord),
 });
 // Dream yields to idle background work, so review and captions can run before it reaches its caps.

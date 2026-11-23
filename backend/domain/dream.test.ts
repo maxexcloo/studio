@@ -1285,7 +1285,14 @@ async function serve(
     Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]), role: "user" } });
     next();
   });
-  registerDreamRoutes(app as never, { dream, projects, inbox, listed: (items) => items });
+  registerDreamRoutes(app as never, {
+    dream,
+    projects,
+    inbox,
+    // dream-digest.test.ts serves This Week.
+    digest: () => Promise.reject(new Error("Not served here.")),
+    listed: (items) => items,
+  });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => {
