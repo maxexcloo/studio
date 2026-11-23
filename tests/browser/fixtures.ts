@@ -443,6 +443,7 @@ export async function fixtures(page: Page) {
             endpoints: [{ id: "text", label: "Text Worker", state: "healthy", reason: "Ready" }],
           },
         },
+        cloud: [{ label: "Grok", used: 40, reason: "Weekly usage." }],
         workers: [
           {
             id: "primary",

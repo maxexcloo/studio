@@ -236,7 +236,7 @@ test("Gallery Fit keeps both wide and tall media between the header and dock", a
     if (index === 2) await page.keyboard.press("ArrowRight");
     const picture = viewer.getByRole("img", { name: `A ${shape} scene`, exact: true });
     const position = header.getByRole("status", { name: "Current Result", exact: true });
-    const badge = header.getByText(model, { exact: true });
+    const badge = header.getByText(new RegExp(`^${model}( · |$)`));
     await expect(picture).toBeVisible();
     await expect(position).toHaveText(new RegExp(`${index} / 2$`));
     await expect(badge).toBeVisible();
