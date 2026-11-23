@@ -85,6 +85,8 @@ function fixture(t: TestContext, catalogue = profiles) {
       ]),
     ) as Record<string, DreamAccess | null>,
     onlineCalls: [] as { kind: string; backend: string }[],
+    /** Whether cloud work holds back near its usage limit. */
+    cloudHeld: false,
     online: { cloud: true, text: true, image: true, video: true } as Record<
       string,
       boolean | "parked"
@@ -234,6 +236,7 @@ function fixture(t: TestContext, catalogue = profiles) {
         media: reach(state.online[backend === "cloud" ? "cloud" : kind]),
       };
     },
+    cloudHeld: async () => state.cloudHeld,
     slots: () => state.slots,
     text: () => ({ side: "cloud", uncensored: false }),
     writer,
@@ -3361,6 +3364,19 @@ test("Dream routes images to the selected allowed backend and never substitutes 
   denied.state.access.alice = null;
   const request = await serve(t, denied);
   assert.equal((await request("/settings", { imageBackend: "local" }, "PUT")).status, 403);
+});
+
+test("Near the cloud's usage limit Dream's Cloud runs locally, keeping the account's choice", async (t) => {
+  const cloud = { id: "custom:cloud-image", provider: "cliproxyapi", kind: "image" };
+  const fx = fixture(t, [...profiles, cloud]);
+  await fx.dream.save("alice", { enabled: true, imageBackend: "cloud" });
+  fx.state.cloudHeld = true;
+  const local = await fx.dreamOnce();
+  assert.notEqual(local?.input.profileId, cloud.id);
+  assert.equal(fx.dream.read("alice").settings.imageBackend, "cloud");
+  fx.state.cloudHeld = false;
+  fx.dream.keep("alice", String(fx.dream.unseen("alice")[0].id));
+  assert.equal((await fx.dreamOnce())?.input.profileId, cloud.id);
 });
 
 test("Dream sets aside a profile whose last three jobs failed until the failures age out", async (t) => {

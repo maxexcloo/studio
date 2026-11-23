@@ -210,26 +210,31 @@ export function ServiceHealthSummary() {
       {cloud && (
         <SummaryLine
           label="Cloud Providers"
-          detail={cloud
+          detail={`${cloud
             .map(
               (usage) =>
                 `${usage.label} · ${usage.used === undefined ? "Unknown" : `${Math.round(usage.used)}% Used`}`,
             )
-            .join(", ")}
+            .join(", ")}${status.data?.cloudHeld ? " · Local Only" : ""}`}
           colour={
             cloud.some((usage) => usage.used === undefined)
               ? healthColour("unknown")
               : cloud.some((usage) => usage.used! >= 100)
                 ? healthColour("offline")
-                : healthColour("healthy")
+                : status.data?.cloudHeld
+                  ? healthColour("waiting")
+                  : healthColour("healthy")
           }
-          reason={cloud
-            .map((usage) =>
+          reason={[
+            ...cloud.map((usage) =>
               usage.resetsAt
                 ? `${usage.reason} Resets ${new Date(usage.resetsAt).toLocaleString()}.`
                 : usage.reason,
-            )
-            .join(" ")}
+            ),
+            ...(status.data?.cloudHeld
+              ? ["Near the limit, Dream and chats run new work on local models."]
+              : []),
+          ].join(" ")}
         />
       )}
       {status.data && !available.length && <EmptyState fill>No Services</EmptyState>}
