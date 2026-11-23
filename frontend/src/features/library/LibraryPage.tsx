@@ -23,6 +23,7 @@ import { LibraryImports } from "./LibraryImports";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 import { LibraryPresets } from "./LibraryPresets";
 import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
+import { PromptInstructions } from "./PromptInstructions";
 import { PromptStyles } from "./PromptStyles";
 import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
 
@@ -180,6 +181,7 @@ export function LibraryPage() {
           loras: catalogueSection("loras"),
           presets: (heading) => <LibraryPresets heading={heading} />,
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
+          promptInstructions: (heading) => <PromptInstructions heading={heading} />,
           promptStyles: (heading) => <PromptStyles heading={heading} />,
           files: catalogueSection("files"),
         }}

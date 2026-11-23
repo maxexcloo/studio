@@ -19,6 +19,7 @@ const { userWorkflowsDir } = await import("../custom-workflows.js");
 const { profileStore, guideStore, createProfileStore } = await import("./store.js");
 const editor = await import("./editor.js");
 const { registerProfileRoutes } = await import("./routes.js");
+const { promptInstruction } = await import("../prompt-instructions.js");
 const { buildExport } = await import("./export.js");
 const { mcpAdminRouteAllowed } = await import("../multi-user-auth.js");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -98,6 +99,42 @@ async function serve(t) {
   };
   return { call, changed };
 }
+
+test("Library prompt edits reach the writer immediately and preserve history and context", async (t) => {
+  const { call } = await serve(t);
+  const path = "/api/profiles/prompt-instructions";
+  const listing = await call("GET", path);
+  assert.equal(listing.status, 200);
+  assert.ok(listing.body.instructions.some(({ id }) => id === "summarise-taste"));
+  const title = listing.body.instructions.find(({ id }) => id === "gallery-title");
+  assert.equal(title.version, null);
+
+  const edit = `${path}/${title.id}`;
+  assert.equal(
+    (await call("PUT", edit, { text: "A title without the required field.", baseHash: title.hash }))
+      .status,
+    400,
+  );
+  const text = "Name the visible subject and action. Reply with only {{titleRule}}.";
+  const saved = await call("PUT", edit, { text, baseHash: title.hash });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.version, 1);
+  assert.equal(
+    promptInstruction(title.id, { titleRule: "one title, including the literal {{titleRule}}" }),
+    "Name the visible subject and action. Reply with only one title, including the literal {{titleRule}}.",
+  );
+  assert.equal(
+    (await call("PUT", edit, { text: title.initial, baseHash: title.hash })).status,
+    409,
+  );
+  const reset = await call("PUT", edit, { text: title.initial, baseHash: saved.body.hash });
+  assert.equal(reset.body.version, 2);
+  const { body } = await call("GET", `${edit}/history`);
+  assert.deepEqual(
+    body.versions.map((version) => version.text),
+    [title.initial, text],
+  );
+});
 
 test("versions list, show, revert as a new version and approve an AI draft", async (t) => {
   const { call, changed } = await serve(t);
