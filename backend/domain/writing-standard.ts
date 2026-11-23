@@ -12,7 +12,7 @@ export const precedence =
 
 /** Every writer, prompts and captions alike, names things as people say them. */
 export const plainWords =
-  "Use plain, everyday words, not euphemisms, clinical or archaic terms (bike seat, not saddle).";
+  "Use everyday words, not euphemisms or clinical or archaic ones (bike seat, not saddle).";
 
 /** Generation models read and voice American English; other spellings read and sound wrong to them. */
 export const americanEnglish = `Use American English spelling for English prompt text (color, gray, center). Keep quoted text and any requested language exactly as given. ${plainWords}`;
