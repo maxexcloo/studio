@@ -169,7 +169,7 @@ export function ChipSelect({
             <Text
               span
               inherit
-              c={clearable && !value ? "dimmed" : undefined}
+              c={clearable && !value ? "var(--input-placeholder-color)" : undefined}
               className={classes.fieldLabel}
             >
               {label}

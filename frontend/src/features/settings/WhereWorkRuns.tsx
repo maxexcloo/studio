@@ -192,9 +192,12 @@ export function WhereWorkRuns() {
                       value: String(index + 1),
                       label: `${index + 1} Image${index ? "s" : ""}`,
                     }))}
-                    value={String(preferences.imageCount ?? 1)}
-                    allowDeselect={false}
-                    onChange={(choice) => save.mutate({ imageCount: Number(choice) })}
+                    placeholder="1 Image"
+                    value={preferences.imageCount ? String(preferences.imageCount) : null}
+                    clearable
+                    onChange={(choice) =>
+                      save.mutate({ imageCount: choice ? Number(choice) : null })
+                    }
                   />
                 </SettingRow>
                 <SettingRow
