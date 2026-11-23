@@ -15,7 +15,7 @@ import { api, post } from "../../api";
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
 import type { GalleryFilterValues } from "../gallery/GalleryFilters";
 import { galleryKey, galleryQuery } from "../gallery/queries";
-import { useGeneration } from "./GenerationProvider";
+import { useDraft, useGeneration } from "./GenerationProvider";
 import {
   type SlotLayout,
   addReference,
@@ -148,7 +148,8 @@ export function useReferenceList({
   profile?: Profile;
   input?: GenerationInput;
 } = {}) {
-  const { form, setDraft, profile: draftProfile, input: draftInput } = useGeneration();
+  const { getDraft, setDraft, profile: draftProfile } = useGeneration();
+  const draftInput = useDraft().input;
   // References belong to the backend a run with them uses.
   const profile = profileForBackend(
     selectedProfile || draftProfile,
@@ -158,7 +159,7 @@ export function useReferenceList({
   const own = useRef<ReferenceAsset[]>([]);
   if (value) own.current = value;
   function get() {
-    const draft = form.getValues();
+    const draft = getDraft();
     return orderedReferences(
       onChange
         ? referenceDetails(own.current, input || draft.input, profile)

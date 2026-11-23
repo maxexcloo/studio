@@ -18,7 +18,7 @@ import { useStartCard } from "../characters/useCardFrom";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { useStageComparison } from "../compare/variants";
 import { assistMenu, changeTemplates, useChangeSuggestions } from "../generation/AskChange";
-import { defaultProfile, useGeneration } from "../generation/GenerationProvider";
+import { defaultProfile, useDraft, useGeneration } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import {
   generationCountLimit,
@@ -158,7 +158,8 @@ function useSaveFrame(item: MediaItem): Action {
  * the frame showing in the viewer, or its last frame from elsewhere.
  */
 function useReferenceAction(item: MediaItem, onApplied: () => void): Action | null {
-  const { profile, profiles, models, input, selectProfile } = useGeneration();
+  const { profile, profiles, models, selectProfile } = useGeneration();
+  const { input } = useDraft();
   const reference = useGalleryReference(item.id);
   const location = useLocation();
   const openComposer = useOpenComposer();
