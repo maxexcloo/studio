@@ -1046,7 +1046,7 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   const phone = test.info().project.use.isMobile;
   await expect(await toolbarSearch(page)).toHaveValue(phone ? "" : "birds");
   await search.press("Escape");
-  // Liked and Uploads are toolbar toggles, one at a time.
+  // Liked applies in Gallery, while Uploads is its own view.
   await showOnly(page, "Liked");
   await showOnly(page, "Uploads");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
@@ -1141,7 +1141,7 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
 });
 
-test("Uploads stay out of the gallery until its Uploads filter is on", async ({ page }) => {
+test("Uploads stay out of the main gallery until the Uploads view is opened", async ({ page }) => {
   const state = await fixtures(page);
   const item = { type: "image", status: "done", url: image, thumbnailUrl: image, createdAt: stamp };
   state.gallery.push(
@@ -1651,7 +1651,7 @@ test("Desktop gallery controls stay available while scrolling and rating changes
   await page.goto("/images");
   const filter = page.getByRole("button", { name: "Gallery Filters", exact: true });
   await expect(filter).toHaveAttribute("aria-expanded", "false");
-  // Disliked is a filter in the panel, leaving the toolbar Liked and Uploads.
+  // Disliked is a filter in the panel, while Liked stays in the toolbar.
   await expect(page.getByRole("button", { name: "Disliked", exact: true })).toHaveCount(0);
   // The toolbar's Liked, not the Filters popup's while it fades out.
   const liked = page.getByRole("button", { name: "Liked", exact: true }).first();
@@ -1811,9 +1811,8 @@ test("Incoming results wait behind New Results while scrolled, keeping loaded pa
     "aria-pressed",
     "false",
   );
-  await expect(page.getByRole("button", { name: "Uploads", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "false",
+  await expect(page.getByRole("button", { name: "Gallery View", exact: true })).toHaveText(
+    "Gallery",
   );
   await expect(page.getByRole("button", { name: "Gallery Filters", exact: true })).toHaveAttribute(
     "aria-expanded",

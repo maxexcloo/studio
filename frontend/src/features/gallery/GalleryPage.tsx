@@ -18,7 +18,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Link, type Location, Navigate, useLocation, useNavigate } from "react-router";
+import { type Location, Navigate, useLocation, useNavigate } from "react-router";
 
 import type { GallerySort } from "../../../../shared/gallery-sort";
 import { terminalStatuses } from "../../../../shared/queue";
@@ -27,6 +27,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
+import { ViewMenu } from "../../ui/ViewMenu";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { ComposerDock } from "../generation/ComposerDock";
@@ -87,6 +88,7 @@ type PageState = GalleryState &
     reviewQuery?: string;
     viewer?: boolean;
   };
+type GalleryView = "gallery" | "uploads" | "review";
 const GalleryReview = lazy(() =>
   import("./GalleryReview").then(({ GalleryReview }) => ({ default: GalleryReview })),
 );
@@ -534,7 +536,7 @@ function Gallery() {
   });
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || Boolean(similar);
-  // Liked or Uploads alone: its pressed toggle in the toolbar already undoes it.
+  // Liked or Uploads alone already has its own control in the toolbar.
   const toggledOnly =
     !search &&
     !similar &&
@@ -644,7 +646,7 @@ function Gallery() {
   );
   const page = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
-  const reviewLink = useRef<HTMLAnchorElement>(null);
+  const viewButton = useRef<HTMLButtonElement>(null);
   const reviewScroll = useRef<{ key: string; top: number } | null>(null);
   useLayoutEffect(() => {
     const host = page.current;
@@ -667,27 +669,64 @@ function Gallery() {
     reviewScroll.current = null;
     const frame = requestAnimationFrame(() => {
       window.scrollTo({ top: previous.top, behavior: "instant" });
-      reviewLink.current?.focus({ preventScroll: true });
+      viewButton.current?.focus({ preventScroll: true });
     });
     return () => cancelAnimationFrame(frame);
   }, [location.key, review]);
-  if (review) {
-    const back = () => {
-      const entry = window.history.state?.key;
-      // An action that stages work in the composer can navigate while leaving Review.
-      setTimeout(() => {
-        if (window.history.state?.key !== entry) return;
-        if (state?.reviewFrom) void routerNavigate(-1);
-        else void routerNavigate(base, { replace: true });
+  const closeReview = () => {
+    const entry = window.history.state?.key;
+    // An action that stages work in the composer can navigate while leaving Review.
+    setTimeout(() => {
+      if (window.history.state?.key !== entry) return;
+      if (state?.reviewFrom) void routerNavigate(-1);
+      else void routerNavigate(base, { replace: true });
+    });
+  };
+  function showView(next: GalleryView) {
+    if (next === "review") {
+      if (review) return;
+      reviewScroll.current = { key: location.key, top: window.scrollY };
+      void routerNavigate(galleryReviewPath(kind), {
+        state: {
+          chat,
+          set: setId,
+          show: state?.show,
+          similar,
+          turn: chatTurn,
+          reviewFrom: location.key,
+          reviewQuery: query,
+        } satisfies PageState,
       });
-    };
+      return;
+    }
+    const uploads = next === "uploads";
+    if (uploads !== filters.uploads) setFilters({ ...filters, uploads, rating: "" });
+    if (review) closeReview();
+  }
+  const view = (
+    <ViewMenu<GalleryView>
+      label="Gallery View"
+      ref={viewButton}
+      value={review ? "review" : filters.uploads ? "uploads" : "gallery"}
+      groups={[
+        [
+          { value: "gallery", label: "Gallery" },
+          { value: "uploads", label: "Uploads" },
+        ],
+        [{ value: "review", label: "Review", disabled: selection.selecting }],
+      ]}
+      onChange={showView}
+    />
+  );
+  if (review) {
     return (
       <Suspense fallback={<LoadingState fill label="Loading Review" />}>
         <GalleryReview
           key={kind}
-          listing={{ ...listing, search: query }}
+          listing={{ ...listing, search: query, filters: { ...listing.filters, uploads: false } }}
           leftAt={leftAt}
-          back={back}
+          back={closeReview}
+          view={view}
         />
       </Suspense>
     );
@@ -732,6 +771,7 @@ function Gallery() {
         }
       >
         <GalleryToolbar
+          view={view}
           query={query}
           onQueryChange={setQuery}
           kind={kind}
@@ -826,34 +866,6 @@ function Gallery() {
           actions={
             <>
               <GalleryImport upload={upload} />
-              {!filters.uploads && !selection.selecting && !!loaded.length && (
-                <Tooltip label="Review">
-                  <Button
-                    {...(phone ? iconChipProps : chipProps)}
-                    component={Link}
-                    ref={reviewLink}
-                    to={galleryReviewPath(kind)}
-                    state={
-                      {
-                        chat,
-                        set: setId,
-                        show: state?.show,
-                        similar,
-                        turn: chatTurn,
-                        reviewFrom: location.key,
-                        reviewQuery: query,
-                      } satisfies PageState
-                    }
-                    aria-label="Review"
-                    leftSection={phone ? undefined : <icons.review size={15} />}
-                    onClick={() => {
-                      reviewScroll.current = { key: location.key, top: window.scrollY };
-                    }}
-                  >
-                    {phone ? <icons.review size={16} /> : "Review"}
-                  </Button>
-                </Tooltip>
-              )}
               {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
               <Tooltip label="Select Items" disabled={!phone}>
                 <Button

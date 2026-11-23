@@ -420,8 +420,8 @@ test("Projects show what is new in each since the last visit, and the viewer jud
   const dream = await serveDream(page, {
     since: "2026-10-22T00:00:00.000Z",
     projects: [
-      { id: "beach", name: "Beach", brief, constraints },
       { id: "city", name: "City", brief, constraints },
+      { id: "beach", name: "Beach", brief, constraints },
     ],
     unseen: [
       result("shore", "beach", "2026-10-23T00:00:00.000Z"),
@@ -438,9 +438,12 @@ test("Projects show what is new in each since the last visit, and the viewer jud
   await showView(page, "Projects");
   await expect(
     page
-      .getByRole("region", { name: "Projects", exact: true })
+      .getByRole("group", { name: "Dream Toolbar", exact: true })
       .getByRole("button", { name: "New Project", exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole("region", { name: /^(Beach|City)$/ }).first()).toHaveAccessibleName(
+    "Beach",
+  );
   const beach = page.getByRole("region", { name: "Beach", exact: true });
   await expect(beach.getByText("2 New", { exact: true })).toBeVisible();
   // Newest first.
@@ -696,7 +699,10 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   await expect(profile.getByText("Detail Slider 0.8", { exact: true })).toBeVisible();
   await expect(profile.getByText("Portrait 2:3; Landscape 16:9", { exact: true })).toBeVisible();
   await expect(profile.getByText("fox; snow", { exact: true })).toBeVisible();
-  await profile.getByRole("button", { name: "Edit", exact: true }).click();
+  const editTaste = page
+    .getByRole("group", { name: "Dream Toolbar", exact: true })
+    .getByRole("button", { name: "Edit", exact: true });
+  await editTaste.click();
   const editor = page.getByRole("dialog", { name: "Edit Taste", exact: true });
   await editor.getByRole("combobox", { name: "Likes", exact: true }).press("Backspace");
   const summary = editor.getByRole("textbox", { name: "Summary", exact: true });
@@ -732,7 +738,7 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   await expect(
     profile.getByText("Quiet coastal scenes with lighthouses.", { exact: true }),
   ).toBeVisible();
-  await profile.getByRole("button", { name: "Edit", exact: true }).click();
+  await editTaste.click();
   await editor.getByRole("button", { name: "Use Learnt Summary", exact: true }).click();
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ preferences: { note: null } });

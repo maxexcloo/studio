@@ -1212,14 +1212,23 @@ export async function withSettings(page: Page, steps: () => Promise<void>) {
   await closePopup(page, "Settings");
 }
 
-/** Shows the gallery's Liked or Uploads alone with its toolbar toggle, or All with neither. */
-export async function showOnly(page: Page, choice: "All" | "Liked" | "Uploads") {
-  const toggle = (name: string) => page.getByRole("button", { name, exact: true });
-  for (const name of ["Liked", "Uploads"]) {
-    const on = (await toggle(name).getAttribute("aria-pressed")) === "true";
-    if (on !== (name === choice)) await toggle(name).click();
-    await expect(toggle(name)).toHaveAttribute("aria-pressed", String(name === choice));
+/** Opens one of the gallery's views from its toolbar. */
+export async function showGalleryView(page: Page, choice: "Gallery" | "Uploads" | "Review") {
+  const view = page.getByRole("button", { name: "Gallery View", exact: true });
+  if ((await view.innerText()) !== choice) {
+    await view.click();
+    await page.getByRole("menuitem", { name: choice, exact: true }).click();
   }
+  await expect(view).toHaveText(choice);
+}
+
+/** Shows Liked, Uploads or the unfiltered Gallery. */
+export async function showOnly(page: Page, choice: "All" | "Liked" | "Uploads") {
+  await showGalleryView(page, choice === "Uploads" ? "Uploads" : "Gallery");
+  const liked = page.getByRole("button", { name: "Liked", exact: true });
+  const on = (await liked.getAttribute("aria-pressed")) === "true";
+  if (on !== (choice === "Liked")) await liked.click();
+  await expect(liked).toHaveAttribute("aria-pressed", String(choice === "Liked"));
 }
 
 /** Shows the reference picker's Uploads tab, which lists uploaded images. */

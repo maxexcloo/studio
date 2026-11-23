@@ -39,9 +39,8 @@ test("Import uploads many files or a folder, lists each failure and shows the ne
   ).toBeVisible();
   expect(sent).toEqual(["one.png", "broken.png", "two.png"]);
   // The gallery turns to Uploads to show them.
-  await expect(page.getByRole("button", { name: "Uploads", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
+  await expect(page.getByRole("button", { name: "Gallery View", exact: true })).toHaveText(
+    "Uploads",
   );
   await expect(page.locator("[data-media-id]")).toHaveCount(2);
 
@@ -162,9 +161,8 @@ test("An ordinary account imports a Reddit post From URL with retry and partial 
   await expect(link).toHaveValue(url);
   await dialog.getByRole("button", { name: "Import", exact: true }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole("button", { name: "Uploads", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
+  await expect(page.getByRole("button", { name: "Gallery View", exact: true })).toHaveText(
+    "Uploads",
   );
   await expect(page.locator('[data-media-id="reddit-bird"]')).toBeVisible();
   await expect(

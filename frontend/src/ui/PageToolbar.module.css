@@ -1,0 +1,15 @@
+.band {
+  z-index: 5;
+  flex-shrink: 0;
+  margin: calc(-1 * var(--app-shell-padding)) calc(-1 * var(--app-shell-padding)) 0;
+  padding: var(--mantine-spacing-xs) var(--app-shell-padding);
+  background: var(--studio-glass-chrome);
+  backdrop-filter: var(--studio-glass-filter);
+  -webkit-backdrop-filter: var(--studio-glass-filter);
+  border-bottom: 1px solid var(--studio-glass-border);
+}
+
+:root[data-phone] .band {
+  padding-inline: max(var(--app-shell-padding), env(safe-area-inset-left))
+    max(var(--app-shell-padding), env(safe-area-inset-right));
+}

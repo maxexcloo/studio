@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { fixtures, image, stamp, toolbarSearch } from "./fixtures";
+import { fixtures, image, showGalleryView, stamp, toolbarSearch } from "./fixtures";
 
 const result = (id: string, title: string, createdAt = stamp) => ({
   id,
@@ -54,7 +54,7 @@ test("Returning to Gallery offers a jump only after an image arrives while away"
   await jump.click();
   await expect(page.getByRole("button", { name: "Open image: New Bird" })).toBeInViewport();
   await expect(jump).toBeHidden();
-  await page.getByRole("link", { name: "Review", exact: true }).click();
+  await showGalleryView(page, "Review");
   await expect(page).toHaveURL(/\/images\/review$/);
   const deck = page.getByRole("region", { name: "Review", exact: true });
   await deck.getByRole("button", { name: "Review Filters" }).click();
@@ -80,9 +80,8 @@ test("Gallery review rates matching results with arrows and Undo and returns to 
   await page.goto("/images");
   const search = await toolbarSearch(page);
   await search.fill("Bird");
-  const review = page.getByRole("link", { name: "Review", exact: true });
   await expect(page.getByRole("button", { name: "Open image: Summer Harbour" })).toBeHidden();
-  await review.click();
+  await showGalleryView(page, "Review");
   const deck = page.getByRole("region", { name: "Review", exact: true });
   await expect(deck.getByText("Bird in Snow", { exact: true })).toBeVisible();
   await page.keyboard.press("ArrowRight");
@@ -133,7 +132,7 @@ test("Gallery Review offers suggestions for the current result", async ({ page }
     });
   });
   await page.goto("/images");
-  await page.getByRole("link", { name: "Review", exact: true }).click();
+  await showGalleryView(page, "Review");
   const deck = page.getByRole("region", { name: "Review", exact: true });
   await deck.getByRole("button", { name: "Suggestions", exact: true }).click();
   const menu = page.getByRole("menu").first();
