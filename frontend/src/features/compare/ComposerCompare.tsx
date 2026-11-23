@@ -361,7 +361,15 @@ function VariantOverview({ labels }: { labels: string[] }) {
             size="compact-sm"
             variant="subtle"
             aria-label={`Remove Variant ${letter(index)}`}
-            onClick={() => setDraft((draft) => removeVariant(draft, index))}
+            onClick={(event) => {
+              // Rows are keyed by position, so only the last row's button goes; focus stays in the popup.
+              if (index === labels.length - 1)
+                event.currentTarget
+                  .closest("li")
+                  ?.previousElementSibling?.querySelector("button")
+                  ?.focus();
+              setDraft((draft) => removeVariant(draft, index));
+            }}
           >
             Remove
           </Button>
