@@ -112,7 +112,7 @@ export function TextBox({
   const [menuOpened, setMenuOpened] = useState(false);
   const openedFrom = useRef<Element | null>(null);
   // The editor fits the room above the keyboard; closing, it fills the screen as the keyboard drops.
-  const viewport = useVisibleRect(editing);
+  const viewport = useVisibleRect(editing, false);
   const closing = useRef(false);
   const editorViewport = editing ? viewport : undefined;
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
