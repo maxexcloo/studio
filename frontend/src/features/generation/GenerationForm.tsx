@@ -9,7 +9,6 @@ import { post } from "../../api";
 import type { MediaKind, QueueJob, ReferenceAsset } from "../../types";
 import { CompareMenu } from "../compare/ComposerCompare";
 import { useCompareRun, useDraftComparison } from "../compare/variants";
-import { galleryKey } from "../gallery/queries";
 import { GenerationEditor, blockedProps, submitShortcut, useSubmitState } from "./GenerationEditor";
 import {
   defaultProfile,
@@ -67,7 +66,7 @@ function useDraftSubmit({
       return jobId;
     },
     // The pending tile, or the header's queue where the gallery holds it back, is the
-    // confirmation: refresh the gallery now instead of waiting for its poll.
+    // confirmation: the gallery reads its first page as soon as the queue changes.
     onSuccess: (jobId) => {
       // A default that gave way to the other side from the account's preference says so.
       const note =
@@ -75,7 +74,6 @@ function useDraftSubmit({
         draft.defaultedProfileId === profile.id &&
         models.data?.defaultNotes?.[profile.kind];
       if (note) notifications.show({ message: note });
-      void client.invalidateQueries({ queryKey: galleryKey });
       void client.invalidateQueries({ queryKey: queueQuery.queryKey });
       onSubmitted?.(jobId);
     },

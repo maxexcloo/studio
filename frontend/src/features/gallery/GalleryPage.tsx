@@ -258,8 +258,10 @@ function Gallery() {
     // Search and filter changes keep the current results until the new ones arrive; switching
     // between Images and Videos never shows the other mode's results.
     placeholderData: (previous, query) => (query?.queryKey[2] === kind ? previous : undefined),
-    // Returning to the tab reads only the first page (below), not every loaded page.
+    // A refetch rereads every loaded page in turn. Returning to the tab or the listing, and queue
+    // changes, read only the first page (below).
     refetchOnWindowFocus: false,
+    staleTime: Infinity,
   });
   // The tiles only need one page. Let it arrive before requesting summaries of the listing.
   const listingReady =
@@ -371,6 +373,8 @@ function Gallery() {
     },
     [listingKey],
   );
+  // Cached results show at once, then their first page is read again.
+  useEffect(() => refreshFirst(), [listingKey]);
   // A return or final completion during a read still needs a fresh head once that read settles.
   useEffect(() => {
     if (!gallery.isFetching && !refresh.isFetching && pendingFirst.current === listingKey)
@@ -385,14 +389,15 @@ function Gallery() {
     refresh.errorUpdatedAt,
     refreshFirst,
   ]);
-  // Pending tiles need polling for live previews only while the listing can show them.
+  // Pending tiles need polling for live previews only while the listing can show them. Other
+  // sorts would reread every loaded page, so their tiles change only as the queue does.
   useEffect(() => {
-    if (review || !showWork || !jobs?.active) return;
+    if (review || !showWork || !jobs?.active || sort !== "newest") return;
     const timer = setInterval(() => {
       if (!document.hidden) void refreshFirst();
     }, 3000);
     return () => clearInterval(timer);
-  }, [review, showWork, jobs?.active, refreshFirst]);
+  }, [review, showWork, jobs?.active, refreshFirst, sort]);
   useEffect(
     () =>
       focusManager.subscribe((focused) => {
