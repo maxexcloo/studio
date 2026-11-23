@@ -67,7 +67,6 @@ function ItemSuggestions({
     fresh: () => askNextSteps(item.jobId!, true, undefined, item.id),
     enabled: opened && available,
     disabled: change.pending || iteration.isPending,
-    limit: 3,
     onPick: send,
   });
   const more: Action[] = [

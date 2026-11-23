@@ -93,7 +93,7 @@ const cacheLimit = 500;
 const suggestionRevision = 2;
 const motionRevision = 3;
 /** Ideas avoid this many of the latest shown in the same menu. */
-const shownIdeas = 9;
+const shownIdeas = maxSuggestions;
 const maxIdea = 160;
 const maxRequest = 500;
 const directionRequests: Record<VariationDirection, string> = {
@@ -144,8 +144,11 @@ const stepAreas = [
   "expression",
   "outfit",
   "action",
+  "interaction",
   "setting",
+  "weather or season",
   "lighting",
+  "color palette",
   "framing",
   "style",
 ] as const;
@@ -175,6 +178,8 @@ const motionAngles = [
   "a change of expression",
   "a reveal",
   "the sound",
+  "a foreground detail moving",
+  "a background element moving",
 ];
 /** `count` different angles in random order. */
 function angles(list: readonly string[], count: number) {
