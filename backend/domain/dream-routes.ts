@@ -11,6 +11,9 @@ import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
 import type { InboxStore } from "./inbox.ts";
 import { type Projects, projectPatch } from "./projects.ts";
 
+/** Fewer cards than this waiting in the deck start Dream's next work at once. */
+const restockBelow = 6;
+
 /** The caller's own Dream: settings, the unseen pool, verdicts, discards, projects and the Inbox. */
 export function registerDreamRoutes(
   app: object,
@@ -53,11 +56,23 @@ export function registerDreamRoutes(
       ...dream.status(ownerId, daily),
     };
   };
-  /** A Dream route, for an account with Dream only. */
+  /**
+   * A Dream route, for an account with Dream only. A change (mostly a verdict or a visit) that
+   * leaves the deck nearly empty starts Dream's next work now rather than at its next tick.
+   */
   const route = (method: string, path: string, run: RouteRun) =>
-    directRoute(app, method, path, (account, input) =>
-      dream.access(owner(account)) ? run(account, input) : refused,
-    );
+    directRoute(app, method, path, async (account, input) => {
+      const ownerId = owner(account);
+      if (!dream.access(ownerId)) return refused;
+      const answer = await run(account, input);
+      if (
+        method === "POST" &&
+        answer.status < 400 &&
+        dream.unseenCount(ownerId).unseen < restockBelow
+      )
+        dream.wake();
+      return answer;
+    });
   route("GET", "/api/dream", (account) => ({ status: 200, payload: show(owner(account)) }));
   route("GET", "/api/dream/history", (account, { query }) => ({
     status: 200,
