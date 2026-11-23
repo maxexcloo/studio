@@ -2862,6 +2862,61 @@ test("Independent matching named results save a card with Undo, while weaker evi
   assert.equal(inbox.read("alice").savedCards, undefined);
 });
 
+test("A saved card stays gone once deleted, its images under another name wait, and a bare dismissal teaches", async (t) => {
+  const { state, generated, inbox } = fixture(t);
+  const account = state.access.alice!.account!;
+  const liked = (id: string, outfit?: string) => ({
+    id,
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    prompt: `By the ferry ${id}`,
+    rating: "liked",
+    jobId: `job-${id}`,
+    ...(outfit && {
+      resultSet: {
+        id: `set-${id}`,
+        title: "Ferryside",
+        index: 0,
+        context: { outfit: { name: outfit, description: "Green boiled wool" } },
+      },
+    }),
+  });
+  generated(
+    liked("1", "Green Wool Coat"),
+    liked("2", "Green Wool Coat"),
+    ...["3", "4", "5", "6"].map((id) => liked(id)),
+  );
+  state.online.text = true;
+  const mara = [
+    { kind: "character", name: "Mara", description: "red hair", results: [3, 4] },
+    { kind: "character", name: "Her Mara", description: "red-haired woman", results: [4, 5] },
+  ];
+  state.ideas = {
+    projects: [],
+    cards: [{ kind: "outfit", name: "Wool Coat", description: "green", results: [1, 2] }, ...mara],
+  };
+  await inbox.propose("alice", account);
+  assert.deepEqual(
+    state.cards!.outfits.map(({ name }) => name),
+    ["Green Wool Coat"],
+  );
+  const [proposal] = inbox.read("alice").proposals;
+  assert.deepEqual(
+    inbox.read("alice").proposals.map(({ title }) => title),
+    ["Mara"],
+  );
+  await inbox.dismiss("alice", proposal.id);
+  state.cards!.outfits = [];
+  state.ideas = { projects: [], cards: mara };
+  state.clock += 6 * 3_600_000;
+  await inbox.propose("alice", account);
+  assert.deepEqual(state.cards!.outfits, []);
+  assert.deepEqual(inbox.read("alice").proposals, []);
+  const asked = state.calls.filter((call) => call.system.startsWith("You find")).at(-1)!;
+  assert.match(asked.user, /turned these down.*\n- Mara$/m);
+});
+
 test("Dream keeps card evidence quoted from its prompts and learns from two kept runs", async (t) => {
   const { dream, state, dreamOnce, inbox } = fixture(t);
   const outfit = { name: "Green Wool Coat", description: "heavy wool with three brass toggles" };
