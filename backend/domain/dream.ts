@@ -917,27 +917,25 @@ export function createDream(options: {
   }
   /** Comparisons and sets are ready when the rest of their work has finished. */
   function readyUnseen<T extends DreamReadiness>(ownerId: string, all: T[], openSeries?: string) {
-    const pendingPairs = new Set<string>();
     const pendingSets = new Set(openSeries ? [openSeries] : []);
-    const triples = new Map<string, T[]>();
+    const finished = new Map<string, T[]>();
     for (const item of all) {
       const pair = item.dream?.pair;
-      if (pair?.size === 3 && item.status === "done") {
-        const members = triples.get(pair.id) ?? [];
+      if (pair && item.status === "done") {
+        const members = finished.get(pair.id) ?? [];
         members.push(item);
-        triples.set(pair.id, members);
+        finished.set(pair.id, members);
       }
       if (finishedItemStatuses.has(item.status || "")) continue;
-      if (pair) pendingPairs.add(pair.id);
       const set = dreamSet(item);
       if (set) pendingSets.add(set.id);
     }
     const incomplete = new Set(
-      [...triples]
+      [...finished]
         .filter(([, items]) => !completeComparison(orderedSides(items)))
         .map(([id]) => id),
     );
-    const runningTriples = new Set(
+    const running = new Set(
       incomplete.size ? store.openDreamJobs(ownerId).map((job) => job.pairId) : [],
     );
     return all.flatMap((item) => {
@@ -945,21 +943,27 @@ export function createDream(options: {
       const pair = item.dream?.pair;
       if (pair) {
         if (admittingComparisons.has(pair.id)) return [];
-        // A failed or interrupted triple leaves its finished results for individual review.
+        // A failed or interrupted comparison leaves its finished results for individual review.
         if (incomplete.has(pair.id))
-          return runningTriples.has(pair.id)
+          return running.has(pair.id)
             ? []
             : [{ ...item, dream: { ...item.dream!, pair: undefined } }];
-        return pair.size === 3 || !pendingPairs.has(pair.id) ? [item] : [];
+        return [item];
       }
       const set = dreamSet(item);
       return !set || !pendingSets.has(set.id) ? [item] : [];
     });
   }
+  /** The series Dream is still adding to, whose results wait until it ends; none once images stop. */
+  const openSeries = ({ series, settings }: DreamRecord) =>
+    settings.enabled && settings.images && settings.dailyImages > 0 ? series?.id : undefined;
   function unseen(ownerId: string) {
     const all = pool(ownerId, "unseen");
-    const openSeries = all.some(dreamSet) ? read(ownerId).series?.id : undefined;
-    return readyUnseen(ownerId, all, openSeries).reverse();
+    return readyUnseen(
+      ownerId,
+      all,
+      all.some(dreamSet) ? openSeries(read(ownerId)) : undefined,
+    ).reverse();
   }
   let considering: { ownerId: string; latest?: DreamItem[] } | undefined;
   /** Dream's latest image results, leaving out comparisons and series, which are alike by design. */
@@ -3586,9 +3590,10 @@ export function createDream(options: {
     },
     unseen,
     unseenCount(ownerId: string) {
-      const { settings, series } = read(ownerId);
+      const record = read(ownerId);
+      const { settings } = record;
       const items = settings.enabled
-        ? readyUnseen(ownerId, options.unseenReadiness(ownerId), series?.id)
+        ? readyUnseen(ownerId, options.unseenReadiness(ownerId), openSeries(record))
         : [];
       return dreamCardCounts(items, settings);
     },
@@ -3608,8 +3613,9 @@ export function createDream(options: {
           (set && items.some((other) => other !== item && dreamSet(other)?.id === set.id))
         )
           throw failure("Choose a verdict for the whole card.", 409);
+        // As saved: an unfinished comparison's side shows without its pair, which it keeps.
         const mark: DreamMark = {
-          ...item.dream!,
+          ...find(ownerId, itemId).dream!,
           state: "kept",
           decidedAt: stamp(),
           superLiked: true,
@@ -3640,7 +3646,12 @@ export function createDream(options: {
           options.mark(
             ownerId,
             String(item.id),
-            { ...item.dream!, state: "discarded", decidedAt, passReason: reason },
+            {
+              ...find(ownerId, String(item.id)).dream!,
+              state: "discarded",
+              decidedAt,
+              passReason: reason,
+            },
             rating,
           );
         if (reason === "taste")

@@ -2437,6 +2437,9 @@ test("Three-way Dream comparisons settle together, teach one choice and fall bac
   assert.ok(surviving.every((item) => !item.dream?.pair));
   assert.equal((await request(answer, { answer: "a" })).status, 404);
   assert.equal(taste.read("alice").signals.length, 0);
+  // A surviving side takes a single verdict and keeps its comparison record.
+  dream.superLike("alice", String(surviving[0].id));
+  assert.equal(items.find(({ id }) => id === surviving[0].id)!.dream?.pair?.size, 3);
 });
 
 test("Every fourth image compares one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
