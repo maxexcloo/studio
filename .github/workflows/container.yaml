@@ -29,7 +29,8 @@ concurrency:
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
-  PUBLISH: ${{ github.ref == 'refs/heads/main' }}
+  # Fork pull requests cannot write packages.
+  PUBLISH: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
 
 jobs:
   check:
@@ -38,10 +39,22 @@ jobs:
     timeout-minutes: 10
     outputs:
       browser-image: ${{ steps.browser-image.outputs.image }}
+      tree: ${{ steps.tree.outputs.tree }}
+      verified: ${{ steps.tree.outputs.verified }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      # A pull request run that passed every check tagged its image with the tree it tested, so main
+      # releases that tree's image without rebuilding or retesting it.
+      - name: Find Verified Image
+        id: tree
+        run: |
+          tree="$(git rev-parse 'HEAD^{tree}')"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" != pull_request ] && docker buildx imagetools inspect "$IMAGE_NAME:tree-$tree" > /dev/null 2>&1; then
+            echo "verified=$IMAGE_NAME:tree-$tree" >> "$GITHUB_OUTPUT"
+          fi
       - name: Set Up Shared Tools & Tasks
         uses: maxexcloo/dotfiles/.github/actions/mise@main
         with:
@@ -64,11 +77,11 @@ jobs:
           path: dist
           retention-days: 1
 
-  # Pull requests run the browser suite too; on main it and the image build run side by side, and
-  # both gate ordinary releases. Manual urgent releases may explicitly skip checks.
+  # The browser suite and the image build run side by side, and both gate ordinary releases. Manual
+  # urgent releases may explicitly skip checks.
   browser:
     name: Browser
-    if: ${{ !inputs.skip_checks }}
+    if: ${{ !inputs.skip_checks && !needs.check.outputs.verified }}
     needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -105,13 +118,16 @@ jobs:
           path: test-results
           retention-days: 7
 
-  # Publishes the sha-<commit> candidate; Release tags it after Browser or an explicit urgent skip.
+  # Publishes the sha-<commit> candidate; Verified or Release tags it after Browser or an explicit
+  # urgent skip.
   image:
     name: Image
     needs: check
-    if: github.event_name != 'pull_request'
+    if: ${{ !needs.check.outputs.verified }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
     permissions:
       contents: read
       packages: write
@@ -130,10 +146,8 @@ jobs:
         id: metadata
         uses: docker/metadata-action@v6
         with:
-          flavor: latest=false
           images: ${{ env.IMAGE_NAME }}
           labels: org.opencontainers.image.licenses=AGPL-3.0-only
-          tags: type=sha,format=long,enable={{is_default_branch}}
       - name: Build Image For Verification
         uses: docker/build-push-action@v7
         with:
@@ -172,6 +186,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
       - name: Publish Verified Image
+        id: publish
         if: env.PUBLISH == 'true'
         uses: docker/build-push-action@v7
         with:
@@ -184,14 +199,38 @@ jobs:
           provenance: mode=max
           push: true
           sbom: true
-          tags: ${{ steps.metadata.outputs.tags }}
+          tags: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+
+  verified:
+    name: Verified
+    needs: [browser, check, image]
+    if: github.event_name == 'pull_request' && needs.image.outputs.digest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      packages: write
+    steps:
+      - name: Log In to GHCR
+        uses: docker/login-action@v4
+        with:
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+      - name: Tag Tested Tree
+        env:
+          DIGEST: ${{ needs.image.outputs.digest }}
+          TREE: ${{ needs.check.outputs.tree }}
+        run: docker buildx imagetools create --tag "$IMAGE_NAME:tree-$TREE" "$IMAGE_NAME@$DIGEST"
 
   release:
     name: Release
-    needs: [browser, image]
-    if: ${{ always() && github.ref == 'refs/heads/main' && needs.image.result == 'success' && (needs.browser.result == 'success' || inputs.skip_checks) }}
+    needs: [browser, check, image]
+    if: ${{ always() && github.ref == 'refs/heads/main' && needs.check.result == 'success' && (needs.check.outputs.verified || (needs.image.result == 'success' && (needs.browser.result == 'success' || inputs.skip_checks))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      worker: ${{ steps.tag.outputs.worker }}
     # Serialises version numbering. A newer pending release replaces an older one, which it includes.
     concurrency:
       cancel-in-progress: false
@@ -229,6 +268,7 @@ jobs:
         id: tag
         if: steps.version.outputs.version
         env:
+          CANDIDATE: ${{ needs.check.outputs.verified || format('{0}:sha-{1}', env.IMAGE_NAME, github.sha) }}
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -264,16 +304,22 @@ jobs:
           fi
           docker buildx build --file - --platform linux/amd64 --push --sbom=true --provenance=mode=max \
             --tag "$IMAGE_NAME:$VERSION" --tag "$IMAGE_NAME:latest" \
-            --build-arg "STUDIO_CANDIDATE=$IMAGE_NAME:sha-$GITHUB_SHA" \
+            --build-arg "STUDIO_CANDIDATE=$CANDIDATE" \
+            --build-arg "STUDIO_COMMIT=$GITHUB_SHA" \
             --build-arg "STUDIO_RELEASE_VERSION=v$VERSION" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
             --label "org.opencontainers.image.version=$VERSION" . <<'DOCKERFILE'
           ARG STUDIO_CANDIDATE
           FROM ${STUDIO_CANDIDATE}
+          ARG STUDIO_COMMIT
           ARG STUDIO_RELEASE_VERSION
+          ENV STUDIO_COMMIT=${STUDIO_COMMIT}
           ENV STUDIO_RELEASE_VERSION=${STUDIO_RELEASE_VERSION}
           DOCKERFILE
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if [ -n "$worker" ]; then
             docker buildx imagetools create --tag "$IMAGE_NAME-worker:$VERSION" --tag "$IMAGE_NAME-worker:latest" "$worker"
+            echo "worker=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Publish Release
         if: steps.version.outputs.version && !steps.tag.outputs.superseded
@@ -289,3 +335,64 @@ jobs:
             exit 0
           fi
           gh release create "v$VERSION" --generate-notes --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Studio v$VERSION"
+
+  # Deploys each release through a kubelab pull request that merges once its Check passes; without
+  # KUBELAB_TOKEN, Renovate deploys it instead.
+  deploy:
+    name: Deploy
+    needs: release
+    if: needs.release.outputs.version
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # A newer release replaces the pending deployment.
+    concurrency:
+      cancel-in-progress: true
+      group: studio-deploy
+    steps:
+      - name: Update Kubelab
+        env:
+          GH_TOKEN: ${{ secrets.KUBELAB_TOKEN }}
+          VERSION: ${{ needs.release.outputs.version }}
+          WORKER: ${{ needs.release.outputs.worker }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::KUBELAB_TOKEN isn't set, so Renovate deploys $VERSION."
+            exit 0
+          fi
+          gh repo clone maxexcloo/kubelab kubelab -- --depth 1 --quiet
+          cd kubelab
+          gh auth setup-git
+          images=("$IMAGE_NAME")
+          [ -z "$WORKER" ] || images+=("$IMAGE_NAME-worker")
+          for image in "${images[@]}"; do
+            # Chart values give the tag on the line after the repository. LibreChat's sidecar names
+            # the image in one string, so Renovate updates it on its own overnight schedule.
+            git grep -lz -e "repository: $image\$" | xargs -0 -r sed -i "\#repository: $image\$#{n;s/tag: .*/tag: $VERSION/;}"
+          done
+          if git diff --quiet; then
+            echo "::notice::kubelab already deploys $VERSION."
+            exit 0
+          fi
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git switch --create studio-release --quiet
+          git commit --all --message "Deploy Studio $VERSION" --quiet
+          git push --force --quiet origin studio-release
+          pr="$(gh pr list --head studio-release --json url --jq '.[0].url')"
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --title "Deploy Studio $VERSION"
+          else
+            pr="$(gh pr create --body "Studio's Release workflow verified and published $VERSION." --head studio-release --title "Deploy Studio $VERSION")"
+          fi
+          gh pr merge "$pr" --auto --squash
+          # kubelab requires an up-to-date branch, so keep this one current until it merges.
+          for _ in $(seq 1 60); do
+            case "$(gh pr view "$pr" --json mergeStateStatus,state --jq '.state + " " + .mergeStateStatus')" in
+              MERGED*) exit 0 ;;
+              CLOSED*) echo "::error::$pr was closed."; exit 1 ;;
+              *BEHIND) gh pr update-branch "$pr" ;;
+            esac
+            sleep 15
+          done
+          echo "::error::$pr hasn't merged; check its Check run."
+          exit 1
