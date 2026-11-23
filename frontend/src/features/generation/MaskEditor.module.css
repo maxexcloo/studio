@@ -57,3 +57,9 @@
   height: auto;
   min-height: 0;
 }
+/* The zoom level keeps one width as it changes. */
+.percentage {
+  display: inline-block;
+  min-width: 4ch;
+  font-variant-numeric: tabular-nums;
+}

@@ -403,3 +403,13 @@
   inset-inline-end: calc(env(safe-area-inset-right) + var(--mantine-spacing-sm));
   z-index: 1;
 }
+/* A media count keeps its width as it changes or loads, so the segments stay put. */
+.count {
+  display: inline-block;
+  min-width: 4ch;
+  font-variant-numeric: tabular-nums;
+  text-align: start;
+}
+.count[data-hidden] {
+  visibility: hidden;
+}

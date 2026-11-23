@@ -393,7 +393,9 @@ export default function MaskEditor({
                   void transform.current?.zoomToElement(canvas.current, undefined, duration);
               }}
             >
-              <span ref={percentage}>100%</span>
+              <span ref={percentage} className={classes.percentage}>
+                100%
+              </span>
             </Button>
             <ActionIcon
               variant="subtle"

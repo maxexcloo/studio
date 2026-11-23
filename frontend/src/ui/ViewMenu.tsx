@@ -6,6 +6,8 @@ import { menuWidth } from "../theme";
 import { PopupTooltip } from "./PopupTooltip";
 import { usePhone } from "./usePhone";
 
+import classes from "./ViewMenu.module.css";
+
 export function ViewMenu<T extends string>({
   label,
   value,
@@ -36,7 +38,12 @@ export function ViewMenu<T extends string>({
             aria-describedby={describedBy}
             rightSection={<ChevronDown size={14} />}
           >
-            {current?.label}
+            <span className={classes.labels}>
+              <span>{current?.label}</span>
+              {groups.flat().map((choice) => (
+                <span key={choice.value} data-label={choice.label} />
+              ))}
+            </span>
           </Button>
         </Menu.Target>
       </PopupTooltip>

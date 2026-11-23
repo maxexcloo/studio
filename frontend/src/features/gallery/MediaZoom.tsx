@@ -204,7 +204,9 @@ export function MediaZoomControls({ zoom }: { zoom: ReturnType<typeof useMediaZo
             disabled={zoom.disabled}
             onClick={zoom.cycle}
           >
-            <span ref={zoom.percentage}>100%</span>
+            <span ref={zoom.percentage} className={classes.percentage}>
+              100%
+            </span>
           </Button>
           <ActionIcon
             variant="subtle"

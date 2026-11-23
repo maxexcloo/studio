@@ -200,10 +200,14 @@ export function DreamPage() {
       onChange={(value) => setMedia(value as DreamMedia)}
       data={(["image", "video"] as const).map((kind) => ({
         value: kind,
-        label:
-          pending[kind] === undefined
-            ? mediaLabels[kind]
-            : `${mediaLabels[kind]} (${pending[kind]})`,
+        label: (
+          <>
+            {mediaLabels[kind]}{" "}
+            <span className={classes.count} data-hidden={pending[kind] === undefined || undefined}>
+              ({pending[kind] ?? 0})
+            </span>
+          </>
+        ),
       }))}
     />
   );

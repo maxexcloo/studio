@@ -9,3 +9,9 @@
   background: var(--studio-glass-raised);
   backdrop-filter: var(--studio-glass-filter);
 }
+/* The zoom level keeps one width as it changes. */
+.percentage {
+  display: inline-block;
+  min-width: 4ch;
+  font-variant-numeric: tabular-nums;
+}
