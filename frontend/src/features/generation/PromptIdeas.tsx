@@ -68,18 +68,16 @@ export function usePromptIdeas({
             id: "suggestions",
             label: "Suggestions",
             icon: icons.assistant,
-            disabled: ideas.isFetching,
-            loading: ideas.isFetching,
             menu: [
               ideas.isPending && !ideas.isFetching
                 ? [{ id: "loading-suggestions", label: "Loading…", disabled: true }]
                 : options,
             ],
+            onOpen: () => load(),
           } satisfies Action,
           refresh: again,
         }
       : undefined,
-    load,
     label: current?.label,
     undo: current && (
       <UndoButton

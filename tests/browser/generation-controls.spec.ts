@@ -867,7 +867,7 @@ test("Clicking out of the open composer closes it without opening what lies unde
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
 });
 
-test("Phone prompt boxes copy and undoably clear in place; desktop leaves both to the browser", async ({
+test("Phone prompt tools copy and clear in place. Desktop offers Copy in the AI menu", async ({
   page,
 }, testInfo) => {
   await fixtures(page);
@@ -902,7 +902,7 @@ test("Phone prompt boxes copy and undoably clear in place; desktop leaves both t
       : page.getByRole("button", { name, exact: true });
   if (!phone) {
     const menu = await promptMenu(page, "Prompt");
-    await expect(menu.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
+    await expect(menu.getByRole("menuitem", { name: "Copy", exact: true })).toBeEnabled();
     await expect(menu.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
     await expect(button("Copy")).toHaveCount(0);
     return;

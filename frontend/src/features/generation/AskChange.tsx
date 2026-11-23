@@ -207,12 +207,13 @@ export function useChangeSuggestions<K extends QueryKey>({
     { disabled, onClick: () => refresh.mutate() },
     steps.error?.message || steps.data?.reason,
   );
+  const preparing = loading && (enabled || refresh.isPending);
   const action = {
     id: "suggestions",
     label: "Suggestions",
     icon: icons.assistant,
-    disabled: disabled || loading,
-    loading,
+    disabled: disabled || preparing,
+    loading: preparing,
     menu: [options],
   } satisfies Action;
   return { action, refresh: again };
