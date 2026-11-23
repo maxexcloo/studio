@@ -236,7 +236,11 @@ export function DreamPreview({
   const item = (
     card.kind === "pair" || card.kind === "set" ? card.items[side] : card.item
   ) as DreamItem;
-  const { play, sound } = useDreamPlayback(stage, !!playbackRoot && item.type === "video", item.id);
+  const { play, cornerSound } = useDreamPlayback(
+    stage,
+    !!playbackRoot && item.type === "video",
+    item.id,
+  );
   const previous = items?.[side - 1];
   const next = items?.[side + 1];
   function swipe(direction: SwipeDirection) {
@@ -320,10 +324,10 @@ export function DreamPreview({
               </div>
             </SwipeCard>
             {play && <VideoPlayButton play={play} />}
+            {cornerSound}
           </div>
           <ViewerChrome
             item={item}
-            actions={sound}
             details={{ phone, opened: details, toggle: () => setDetails((open) => !open) }}
             close={close}
             closeLabel="Close Preview"

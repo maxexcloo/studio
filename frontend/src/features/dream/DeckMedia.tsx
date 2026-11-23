@@ -8,6 +8,7 @@ import { useVideoSound } from "../gallery/useVideoSound";
 import { videoLifecycle } from "../gallery/videoPlayback";
 import { covers, useBoxShape } from "./mediaFit";
 
+import zoomClasses from "../gallery/MediaZoom.module.css";
 import classes from "./DreamPage.module.css";
 
 const attachVideo = (media: HTMLVideoElement | null) => {
@@ -202,24 +203,29 @@ export function useDreamPlayback(
   }, [root, playing, itemId]);
   const silent = muted || autoplayMuted;
   const label = silent ? "Unmute" : "Mute";
+  const toggle = (corner: boolean) => (
+    <Tooltip label={label}>
+      <ActionIcon
+        variant={corner ? "subtle" : "default"}
+        color={corner ? "gray" : undefined}
+        size={corner ? "sm" : undefined}
+        aria-label={label}
+        onClick={() => {
+          if (autoplayMuted) {
+            if (audibleVideo.current) audibleVideo.current.muted = false;
+            setAutoplayMuted(false);
+          }
+          setMuted(!silent);
+        }}
+      >
+        {silent ? <icons.mute size={corner ? 14 : 16} /> : <icons.sound size={corner ? 14 : 16} />}
+      </ActionIcon>
+    </Tooltip>
+  );
   return {
     play: playing && retry?.itemId === itemId ? retry?.play : undefined,
-    sound: playing && (
-      <Tooltip label={label}>
-        <ActionIcon
-          variant="default"
-          aria-label={label}
-          onClick={() => {
-            if (autoplayMuted) {
-              if (audibleVideo.current) audibleVideo.current.muted = false;
-              setAutoplayMuted(false);
-            }
-            setMuted(!silent);
-          }}
-        >
-          {silent ? <icons.mute size={16} /> : <icons.sound size={16} />}
-        </ActionIcon>
-      </Tooltip>
-    ),
+    sound: playing && toggle(false),
+    /** The toggle at the media's bottom-right corner, where images keep their zoom. */
+    cornerSound: playing && <div className={zoomClasses.controls}>{toggle(true)}</div>,
   };
 }

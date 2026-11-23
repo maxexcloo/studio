@@ -1725,10 +1725,12 @@ test("Dream autoplays silently when sound is blocked and lets the viewer choose 
   const player = viewer.locator("video");
   await expect(player).toHaveAttribute("aria-label", "Dream prompt video-b");
   await expect(player).toHaveJSProperty("muted", true);
-  await viewer
-    .getByRole("group", { name: "Viewer Header", exact: true })
-    .getByRole("button", { name: "Unmute", exact: true })
-    .click();
+  const unmute = viewer.getByRole("button", { name: "Unmute", exact: true });
+  const stage = (await player.boundingBox())!;
+  const corner = (await unmute.boundingBox())!;
+  expect(corner.x + corner.width).toBeGreaterThan(stage.x + stage.width * 0.75);
+  expect(corner.y + corner.height).toBeGreaterThan(stage.y + stage.height * 0.75);
+  await unmute.click();
   await expect(player).toHaveJSProperty("muted", false);
 });
 
