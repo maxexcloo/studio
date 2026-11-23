@@ -436,7 +436,7 @@ Reply with JSON only: {"issues": [{"issue": "...", "entries": [1, 4], "rule": ".
     label: "Image Change Directions",
     area: "Gallery",
     suggestions: true,
-    text: `Suggest {{maxSuggestions}} useful, distinct changes, each in a distinct area ({{areas}}). Keep the subject's identity. Include an everyday action or setting and a specific photographic or visual treatment when they fit. Name the actual visible change, including when it concerns framing or style.`,
+    text: `Suggest {{maxSuggestions}} useful, distinct changes from areas such as {{areas}}. Keep the subject's identity. {{specifics}} Name the actual visible change, including when it concerns framing or style.`,
   },
   "inspect-image": {
     label: "Inspect Reported Image",
@@ -677,7 +677,8 @@ Reply with JSON only: {"ideas": [{"label": "<title>", "prompt": "<prompt text>"}
     area: "Compose",
     suggestions: true,
     text: `You suggest changes to the draft prompt of {{media}} a person is about to make in a media studio, drawn from the prompt and their taste profile.
-Suggest {{maxSuggestions}} useful, distinct changes, each from a different angle ({{angles}}).
+Suggest {{maxSuggestions}} useful, distinct changes, some from these angles: {{angles}}.
+{{specifics}}
 {{guide}}
 {{referenceContext}}
 {{fidelity}}
@@ -750,7 +751,7 @@ Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>"}
     label: "Appearance Suggestion Scope",
     area: "Writing Standard",
     suggestions: true,
-    text: `For a clearly adult human subject, include a non-graphic body-shape, proportion or build alternative where it would be useful and visible, alongside distinct pose, framing, outfit, setting or other relevant choices. Infer a specific alternative from this subject's existing description, not a stock ideal: vary in different directions over refreshes, without treating slimmer, curvier, larger or more muscular as inherently better. A proposed body change replaces only the relevant trait; every unchosen trait stays as written.`,
+    text: `For a clearly adult human subject, include one or two non-graphic body alternatives (build, proportions or a specific body detail) where they would be visible, alongside outfit, pose, setting and other choices. Infer each from this subject's existing description, not a stock ideal: vary in different directions over refreshes, without treating slimmer, curvier, larger or more muscular as inherently better. Where a trait is already extreme, offer at most one body change and never push it further; spend the rest on outfit pieces, pose, setting or props. A proposed body change replaces only the relevant trait; every unchosen trait stays as written.`,
   },
   "suggestion-card": {
     label: "Card Suggestion Scope",
@@ -775,6 +776,12 @@ Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>"}
     area: "Writing Standard",
     suggestions: true,
     text: `When the source clearly depicts adults and a sensual direction fits the scene or request, make roughly a third to half of the choices sensual, spread from lightly suggestive to bold, and the rest non-sexual. Make the sensual ones differ in what changes as well as intensity, using specific expression, movement or interaction (and, for stills, wardrobe) that fits the scene. Otherwise keep every choice non-sexual.`,
+  },
+  "suggestion-specifics": {
+    label: "Specific Change Suggestions",
+    area: "Writing Standard",
+    suggestions: true,
+    text: `First pick out what is particular to this subject and scene: their pose and expression, each piece of their outfit and accessories, the props, the setting's details, the light and the style. Most changes swap one of those named parts for a specific alternative (the denim jacket for a cropped leather one, standing for sitting on the steps, the cafe for a night market), weighted toward the outfit and pose; at most two are purely photographic (framing, lens or light). Add a material or finish word (shiny, glossy, latex) only when the fabric itself is the change.`,
   },
   "suggestion-variety": {
     label: "Taste & Suggestion Variety",
@@ -879,6 +886,7 @@ Reply with JSON only: {"title": "{{titleRule}}", "prompt": "the finished prompt"
 {{standalonePrompt}}
 {{fidelity}}
 {{contentRule}}
+Carry out every part of the request (a narrower waist and a bigger bust both land), and keep everything it doesn't name exactly as the source has it.
 Preserve the source subject's identity and species. Never invent an adult age or change the age to justify a sexualised change; ambiguous ages and nonhuman subjects must not be sexualised.
 {{americanEnglish}}
 {{avoidFiller}}
