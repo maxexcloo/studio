@@ -1087,6 +1087,11 @@ test("Discarded Dream results can be viewed and accepted after all, or deleted a
     .getByRole("button", { name: "Accept", exact: true })
     .click();
   await expect(viewer.getByRole("img", { name: "Dream prompt last" })).toBeVisible();
+  if (!test.info().project.use.isMobile) {
+    // The first Escape closes the docked Details, the next the viewer.
+    await page.keyboard.press("Escape");
+    await expect(viewer).toBeVisible();
+  }
   await page.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   await page.getByRole("button", { name: "Delete All", exact: true }).click();

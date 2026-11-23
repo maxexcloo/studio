@@ -436,6 +436,12 @@ export function MediaViewer({
       close={() => setSheet(false)}
     />
   );
+  // Escape closes the docked Details first, as the layer over the media, then the viewer.
+  function dismiss() {
+    if (phone || !details) return close();
+    setDetails(false);
+    stage.current?.focus({ preventScroll: true });
+  }
   const toggleDetails = () => {
     if (phone) setSheet(true);
     else setDetails((open) => !open);
@@ -501,7 +507,7 @@ export function MediaViewer({
             !target.closest(`${textField},select,[aria-haspopup][aria-expanded="true"]`)
           ) {
             event.preventDefault();
-            close();
+            dismiss();
           }
         }}
         onKeyDown={(event) => {
@@ -515,10 +521,10 @@ export function MediaViewer({
             return;
           if (event.key === "Escape" && !event.nativeEvent.isComposing) {
             event.preventDefault();
-            // The first Escape leaves a text box, keeping its edit; the next one closes the viewer.
+            // The first Escape leaves a text box, keeping its edit; the next one dismisses.
             if ((event.target as Element).closest(textField))
               stage.current?.focus({ preventScroll: true });
-            else close();
+            else dismiss();
             return;
           }
           if (
