@@ -691,7 +691,7 @@ export function SavedName<T extends SavedItem>({
           </Combobox.Target>
           <Combobox.Dropdown>
             <Combobox.Options aria-label={`Saved ${noun}s`}>
-              <ScrollArea.Autosize mah={240} type="scroll">
+              <ScrollArea.Autosize mah={240}>
                 {matches.map((record) => (
                   <Combobox.Option
                     key={record.id}
