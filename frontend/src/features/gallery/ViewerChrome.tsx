@@ -27,7 +27,8 @@ export function ViewerMetadata({
   const timestamp = compact && !title ? undefined : mediaTimestamp(item);
   const settings = item.settings || {};
   const steps = Number(settings.steps);
-  const stepLabel = steps > 0 && !/\b\d+\s+steps?\b/i.test(title ?? model) ? `${steps} Steps` : "";
+  const stepLabel =
+    steps > 0 && !/\b\d+\s+steps?\b/i.test(`${title ?? ""} ${named}`) ? `${steps} Steps` : "";
   const seconds = Number(settings.duration) || Number(settings.frames) / Number(settings.fps);
   const sizeAndDuration = [
     width && height ? `${width} × ${height}` : "",
