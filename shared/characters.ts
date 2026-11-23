@@ -43,6 +43,11 @@ export interface Card {
   createdAt: string;
   updatedAt: string;
   rating?: CardRating | null;
+  /**
+   * The comparison Generate References queued (backend/card-references.js): its pick joins the
+   * card's images, and a character may wait on it without any.
+   */
+  candidates?: string;
 }
 
 export const compareCardLikes = (a: Pick<Card, "rating">, b: Pick<Card, "rating">) =>
@@ -50,6 +55,23 @@ export const compareCardLikes = (a: Pick<Card, "rating">, b: Pick<Card, "rating"
 
 export const suggestedCards = <T extends Pick<Card, "rating">>(cards: readonly T[]) =>
   cards.filter((card) => card.rating !== "disliked").sort(compareCardLikes);
+/** How many candidates Generate References draws, each with its own seed. */
+export const referenceCandidates = 4;
+
+/**
+ * The prompt Generate References draws a card's candidates from, its description verbatim: a
+ * character standing plainly against a plain background, so its face, hair and build read clearly;
+ * an outfit on a mannequin, so no face comes with it; a scene empty of people.
+ */
+export function referencePrompt(kind: CardKind, description: string) {
+  const text = description.trim().replace(/[\s.,;:]+$/, "");
+  if (kind === "characters")
+    return `Full-body reference photo of ${text}, in simple fitted plain clothes, standing upright facing the camera with arms relaxed at the sides and a neutral expression, plain light gray studio background, soft even lighting, sharp focus.`;
+  if (kind === "outfits")
+    return `Full-length product photo of an outfit on a mannequin: ${text}. The whole outfit in view, footwear included, plain light gray studio background, soft even lighting, sharp focus.`;
+  return `Wide establishing shot of ${text}, empty of people, natural light, sharp focus.`;
+}
+
 /**
  * A character's own story beside its looks: shown on its card and never sent to a model, which
  * draws only the description. Ages start at 18.

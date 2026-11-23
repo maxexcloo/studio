@@ -99,6 +99,10 @@ export function registerCompareRoutes(
     numbered(items: GalleryItem[]): GalleryItem[];
     /** Hears the winning image and other finished variants, for the taste profile; must not throw. */
     voted?(ownerId: string, winner: GalleryItem, others: GalleryItem[]): void;
+    /** The card waiting on a comparison's pick (Generate References), which a vote adds it to. */
+    card?(ownerId: string, comparisonId: string): { kind: string; id: string; name: string } | null;
+    /** Adds a card's comparison's pick to its images; must not throw. */
+    pickedReference?(ownerId: string, comparisonId: string, itemId: string): void;
     /**
      * Proposes an axis comparison's pick for its project's brief in Dream's Inbox, answering the
      * project, or null where nothing would change.
@@ -160,8 +164,10 @@ export function registerCompareRoutes(
         : {};
     const sets = new Set(variants.map((variant) => variant.item?.resultSet?.id));
     const [set] = sets;
+    const card = options.card?.(record.ownerId, record.id);
     return {
       id: record.id,
+      ...(card ? { card } : {}),
       createdAt: record.createdAt,
       seed: record.seed,
       // The result set every variant belongs to, which the gallery shows together.
@@ -456,14 +462,16 @@ export function registerCompareRoutes(
     save(record);
     return { status: 201, payload: { ...show(record, items), sessionId: session } };
   }
-  directRoute(app, "POST", "/api/comparisons/run", async (account, { body }) => {
+  /** Queues a comparison as `/api/comparisons/run` does, for other routes such as Generate References. */
+  async function queue(account: RouteAccount, body: Record<string, any>) {
     const source = body?.parentItemId;
     const items = galleryFor(
       account,
       typeof source === "string" ? { itemIds: [source], unseenSourceId: source } : {},
     );
     return items ? run(account, items, body || {}) : galleryOff;
-  });
+  }
+  directRoute(app, "POST", "/api/comparisons/run", (account, { body }) => queue(account, body));
   // Variants of one result: its recorded run and seed, each variant with its own prompt, lettered
   // A, B, C… in the run's session as versions of it.
   directRoute(app, "POST", "/api/comparisons/variants", async (account, { body }) => {
@@ -537,6 +545,7 @@ export function registerCompareRoutes(
         Boolean(item && item.id !== winner.id && item.status === "done"),
       );
       options.voted?.(record.ownerId, winner, others);
+      options.pickedReference?.(record.ownerId, record.id, String(winner.id));
       // The letter variants of a result lead with stays out of the brief.
       const label = record.labels?.[variants.indexOf(winner)]?.replace(/^[A-J] · /, "");
       if (record.axis && record.projectId && label)
@@ -544,4 +553,5 @@ export function registerCompareRoutes(
     }
     return { status: 200, payload: { ...show(record, items), ...(proposal ? { proposal } : {}) } };
   });
+  return { queue };
 }

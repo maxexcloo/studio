@@ -140,6 +140,7 @@ export async function fixtures(page: Page) {
       ? { prompt: comparison.requests[0].input.prompt }
       : {}),
     ...(comparison.itemIds ? {} : { set: comparison.id }),
+    ...(comparison.card ? { card: comparison.card } : {}),
     variants: comparison.jobIds.map((jobId: string, index: number) => ({
       jobId,
       label: comparison.labels[index],
@@ -617,6 +618,21 @@ export async function fixtures(page: Page) {
       const winner = gallery.find((item) => item.id === body.itemId);
       comparison.vote = winner?.jobId || null;
       comparison.winnerItemId = winner?.id || null;
+      // Generate References: the winner joins the card's images.
+      const waiting =
+        comparison.card &&
+        cards[comparison.card.kind as "characters"].find(
+          (card: any) => card.id === comparison.card.id,
+        );
+      if (waiting && winner && !waiting.referenceIds.includes(winner.id)) {
+        waiting.referenceIds.push(winner.id);
+        waiting.references.push({
+          id: winner.id,
+          name: "Reference",
+          thumbnailUrl: image,
+          url: image,
+        });
+      }
       return respond(showComparison(comparison));
     }
     if (comparison && method === "GET") return respond(showComparison(comparison));
@@ -742,6 +758,51 @@ export async function fixtures(page: Page) {
       if (path.endsWith("/sheet")) {
         characters[index].sheet = { jobId: "sheet-job", at: stamp, status: "making", panels: [] };
         return respond({ ok: true, jobId: "sheet-job", profile: "Qwen-Image 2.1" });
+      }
+      // Generate References: the card saved waiting on a comparison of its candidates.
+      if (path.endsWith("/references")) {
+        const comparisonId = `compare-${comparisons.length + 1}`;
+        const saved = {
+          ...card(body, body.id || `${noun}-${list.length + 1}`),
+          candidates: comparisonId,
+        };
+        if (body.id) list[list.findIndex((item) => item.id === body.id)] = saved;
+        else list.push(saved);
+        const labels = ["Seed 1", "Seed 2", "Seed 3", "Seed 4"];
+        const requests = labels.map(() => ({
+          input: {
+            kind: "image",
+            profileId: body.profileId,
+            prompt: `A reference of ${body.description}`,
+          },
+        }));
+        const comparison = {
+          id: comparisonId,
+          seed: "",
+          requests,
+          labels,
+          card: { kind: cardKind, id: saved.id, name: saved.name },
+          jobIds: requests.map(
+            ({ input }, index) =>
+              recordGeneration(
+                {
+                  ...input,
+                  resultSet: {
+                    id: comparisonId,
+                    title: "Comparison",
+                    index,
+                    variation: labels[index],
+                  },
+                  seed: String(index + 1),
+                  operation: "image",
+                },
+                "session-references",
+              ).id,
+          ),
+          vote: null,
+        };
+        comparisons.push(comparison);
+        return respond({ ok: true, [noun]: saved, comparison: showComparison(comparison) }, 201);
       }
       if (method === "POST") {
         list.push(card(body, `${noun}-${list.length + 1}`));

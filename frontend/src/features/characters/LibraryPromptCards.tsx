@@ -77,6 +77,7 @@ export function LibraryPromptCards({
               key={card.id}
               name={card.name}
               images={card.references}
+              candidates={card.candidates}
               onUse={selection.active ? undefined : () => use.promptCard(kind, card)}
               selection={selection.control(card)}
               menu={
