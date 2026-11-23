@@ -980,7 +980,7 @@ test("Administration Dream saves shared queue delays and hands an override back 
   await idle.fill("12");
   await idle.press("Enter");
   const images = page.getByRole("radiogroup", { name: "Dream Images", exact: true });
-  const spicy = page.getByRole("radiogroup", { name: "Dream Extended Themes" });
+  const spicy = page.getByRole("radiogroup", { name: "Dream Uncensored" });
   const choice = (group: typeof images, name: string) =>
     group.getByRole("radio", { name, exact: true });
   await expect(choice(images, "Per Account")).toBeChecked();

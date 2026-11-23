@@ -82,7 +82,7 @@ export function DreamPreferences() {
           </Text>
         )}
         {toggle("enabled", "Dream", "Make new media from your taste while Studio is idle.")}
-        {dream.data.spicyAvailable && toggle("spicy", "Extended Themes", "Allow explicit themes.")}
+        {dream.data.spicyAvailable && toggle("spicy", "Uncensored", "Allow explicit themes.")}
         {toggle("images", "Images", "Make new images.")}
         {number(
           "dailyImages",

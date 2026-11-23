@@ -50,7 +50,7 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
         <ConfirmDialog
           opened={deleting !== null}
           title="Delete Character"
-          action="Delete Character"
+          action="Delete"
           pending={deletion.isPending}
           error={deletion.error?.message}
           zIndex={getDefaultZIndex("overlay")}
@@ -91,7 +91,7 @@ export function CharacterMenu({
         <ActionMenuItems
           groups={[
             [
-              { id: "edit", label: "Edit Character", icon: icons.edit, onClick: onEdit },
+              { id: "edit", label: "Edit", icon: icons.edit, onClick: onEdit },
               {
                 id: "sheet",
                 label: "Make Sheet",
@@ -102,7 +102,7 @@ export function CharacterMenu({
             ],
             ...itemActionGroups([
               ...ratings,
-              itemAction("delete", { label: "Delete Character", onClick: onDelete }),
+              itemAction("delete", { label: "Delete", onClick: onDelete }),
             ]),
           ]}
         />

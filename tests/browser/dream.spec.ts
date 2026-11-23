@@ -521,9 +521,7 @@ test("Dream explains itself while off and saves its settings in Settings", async
   await images.fill("200");
   await images.press("Enter");
   await expect.poll(() => dream.settings.dailyImages).toBe(200);
-  await expect(
-    settings.getByRole("switch", { name: "Extended Themes", exact: true }),
-  ).toBeVisible();
+  await expect(settings.getByRole("switch", { name: "Uncensored", exact: true })).toBeVisible();
   await expect
     .poll(() => dream.requests.map((request) => request.body))
     .toEqual([{ enabled: true }, { paused: true }, { videos: true }, { dailyImages: 200 }]);
@@ -573,9 +571,7 @@ test("Dream settings an administrator forces stay locked for the account", async
   await page.goto("/settings#dream");
   const settings = page.getByRole("region", { name: "Settings: Dream", exact: true });
   await expect(settings.getByRole("switch", { name: "Dream", exact: true })).toBeDisabled();
-  await expect(
-    settings.getByRole("switch", { name: "Extended Themes", exact: true }),
-  ).toBeEnabled();
+  await expect(settings.getByRole("switch", { name: "Uncensored", exact: true })).toBeEnabled();
   await section(page, "Settings", "Where Work Runs");
   await expect(
     page
@@ -739,8 +735,9 @@ test("Taste displays readable preferences and saves explicit edits separately", 
   await expect(
     profile.getByText("Quiet coastal scenes in soft, misty light.", { exact: true }),
   ).toBeVisible();
-  await profile.getByRole("button", { name: "Clear", exact: true }).scrollIntoViewIfNeeded();
-  await profile.getByRole("button", { name: "Clear", exact: true }).click();
+  const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
+  await danger.getByRole("button", { name: "Clear", exact: true }).scrollIntoViewIfNeeded();
+  await danger.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(
     page.getByRole("dialog", { name: "Clear Taste Profile", exact: true }),
   ).toBeVisible();

@@ -52,7 +52,7 @@ const featureLabels: Record<string, { label: string; description: string }> = {
   },
   uncensoredModels: {
     label: "Uncensored Models",
-    description: "Profiles marked uncensored and the Extended Themes preset",
+    description: "Profiles marked uncensored and uncensored prompt styles and Dream themes",
   },
 };
 const features = Object.entries(featureLabels);
@@ -788,15 +788,6 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
               {!own && (
                 <>
                   <Menu.Divider />
-                  {!account.disabled && (
-                    <Menu.Item
-                      color="red"
-                      leftSection={<icons.disable size={16} />}
-                      onClick={act("disable")}
-                    >
-                      Disable
-                    </Menu.Item>
-                  )}
                   {galleryOf(account) > 0 && (
                     <Menu.Item
                       color="red"
@@ -809,6 +800,15 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                       onClick={act("gallery")}
                     >
                       Delete Gallery
+                    </Menu.Item>
+                  )}
+                  {!account.disabled && (
+                    <Menu.Item
+                      color="red"
+                      leftSection={<icons.disable size={16} />}
+                      onClick={act("disable")}
+                    >
+                      Disable
                     </Menu.Item>
                   )}
                   <Menu.Item
