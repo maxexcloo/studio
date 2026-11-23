@@ -2,11 +2,11 @@ import { ActionIcon, Group, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { StudioSession } from "../../../../shared/queue";
 import { post } from "../../api";
-import type { MediaKind, QueueJob, ReferenceAsset } from "../../types";
+import type { MediaKind, Profile, QueueJob, ReferenceAsset } from "../../types";
 import { CompareMenu } from "../compare/ComposerCompare";
 import { useCompareRun, useDraftComparison } from "../compare/variants";
 import { GenerationEditor, blockedProps, submitShortcut, useSubmitState } from "./GenerationEditor";
@@ -16,6 +16,7 @@ import {
   draftForProfile,
   initialInput,
   inputForProfile,
+  useDraft,
   useGeneration,
 } from "./GenerationProvider";
 import { generationInput, isProfile, referencePatch } from "./payload";
@@ -36,7 +37,9 @@ function useDraftSubmit({
   onSubmitted?: (jobId: string) => void;
   inlineError?: boolean;
 }) {
-  const { draft, setDraft, input, profile, models } = useGeneration();
+  const { setDraft, profile, models } = useGeneration();
+  const draft = useDraft(true);
+  const { input } = draft;
   const client = useQueryClient();
   return useMutation({
     meta: { inlineError },
@@ -101,7 +104,10 @@ export function GenerationForm({
   fill?: boolean;
   onNegativeWritten?: () => void;
 }) {
-  const { draft, setDraft, input, update, profile, selectProfile, models } = useGeneration();
+  const { setDraft, update, profile, selectProfile, models } = useGeneration();
+  const draft = useDraft(true);
+  const settled = useDraft();
+  const { input } = draft;
   // A draft without a picked profile runs on the account's default, following it as it changes.
   const preferred = defaultProfile(models.data, input.kind);
   const defaulted = !input.profileId || draft.defaultedProfileId === input.profileId;
@@ -151,6 +157,41 @@ export function GenerationForm({
     if (clearing.current) clearing.current = false;
     else setCleared(null);
   }, [draft]);
+  // The chips keep still while the prompt is typed.
+  const setReferences = useCallback(
+    (references: ReferenceAsset[]) =>
+      setDraft((value) => ({
+        ...value,
+        references,
+        input: {
+          ...value.input,
+          ...referencePatch(value.input, value.references, references, profile),
+        },
+      })),
+    [setDraft, profile],
+  );
+  const characterProfile = useCallback(
+    (editor: Profile, next: Parameters<typeof draftForProfile>[2]) =>
+      setDraft((previous) => draftForProfile(previous, editor, next)),
+    [setDraft],
+  );
+  const presets = useMemo(
+    () => (
+      <PresetPicker
+        input={settled.input}
+        references={settled.references}
+        profile={profile}
+        selection={settled}
+        onSelectionChange={(selection) => setDraft((value) => ({ ...value, ...selection }))}
+        onLoad={(loaded, selection) => {
+          setDraft(draftForInput(loaded, selection));
+        }}
+      />
+    ),
+    [settled, profile, setDraft],
+  );
+  const compareLabels = JSON.stringify(comparison.labels);
+  const compare = useMemo(() => <CompareMenu labels={comparison.labels} />, [compareLabels]);
   if (compact)
     return (
       <form
@@ -192,15 +233,6 @@ export function GenerationForm({
         )}
       </form>
     );
-  const setReferences = (references: ReferenceAsset[]) =>
-    setDraft((value) => ({
-      ...value,
-      references,
-      input: {
-        ...value.input,
-        ...referencePatch(value.input, value.references, references, profile),
-      },
-    }));
   return (
     <GenerationEditor
       input={input}
@@ -208,9 +240,7 @@ export function GenerationForm({
       profile={profile}
       onChange={update}
       onReferencesChange={setReferences}
-      onCharacterProfile={(editor, next) =>
-        setDraft((previous) => draftForProfile(previous, editor, next))
-      }
+      onCharacterProfile={characterProfile}
       onKindChange={onKindChange}
       onUndoClear={cleared ? () => setDraft(cleared) : undefined}
       onClear={() => {
@@ -240,19 +270,8 @@ export function GenerationForm({
       blockedReason={draft.compare ? comparison.blockedReason : undefined}
       submitLabel={submitLabel}
       assistantScope={assistantScope}
-      presets={
-        <PresetPicker
-          input={input}
-          references={draft.references}
-          profile={profile}
-          selection={draft}
-          onSelectionChange={(selection) => setDraft((value) => ({ ...value, ...selection }))}
-          onLoad={(loaded, selection) => {
-            setDraft(draftForInput(loaded, selection));
-          }}
-        />
-      }
-      compare={<CompareMenu labels={comparison.labels} />}
+      presets={presets}
+      compare={compare}
       autoFocusPrompt={autoFocusPrompt}
       focusPrompt={focusPrompt}
       fill={fill}

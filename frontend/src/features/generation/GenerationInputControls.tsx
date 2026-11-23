@@ -1,6 +1,6 @@
 import { Button, ComboboxPopover, SegmentedControl, Tooltip } from "@mantine/core";
 import { Brush, ChevronDown } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, memo } from "react";
 
 import { isCloudVideoProfile } from "../../../../shared/profiles";
 import type { GenerationInput, Profile } from "../../types";
@@ -116,7 +116,7 @@ function ChipRail({ label, children }: { label: string; children: ReactNode }) {
  * (References, then their role and mask as one group), what shapes it (LoRAs), what comes out
  * (Aspect, Count, a video's Length, a set Seed), then Settings, Compare and Presets.
  */
-export function GenerationInputControls({
+export const GenerationInputControls = memo(function GenerationInputControls({
   input,
   profile,
   onChange,
@@ -211,4 +211,4 @@ export function GenerationInputControls({
       {presets}
     </ChipRail>
   );
-}
+});

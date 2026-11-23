@@ -24,7 +24,7 @@ import { ProfilePicker } from "../generation/ProfilePicker";
 
 export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
   const openComposer = useOpenComposer();
-  const { draft, draftForKind, models, profiles, setDraft } = useGeneration();
+  const { draftForKind, models, profiles, setDraft } = useGeneration();
   const presets = useQuery(presetsQuery).data?.presets;
   const [selection, setSelection] = useState<GenerationInput | null>(null);
   const [replacement, setReplacement] = useState<{ draft: Draft; promptOnly: boolean } | null>(
@@ -54,8 +54,8 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
     const next: Draft = promptOnly
       ? { ...previous, input: { ...previous.input, prompt: preset.prompt } }
       : {
-          ...draft,
-          input: inspirationInput(preset, draft.input, profile),
+          ...previous,
+          input: inspirationInput(preset, previous.input, profile),
           references: [],
           operation: kind === "video" ? "animate" : "image",
           parentJobId: undefined,
