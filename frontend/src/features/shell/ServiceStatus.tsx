@@ -128,6 +128,7 @@ export function StatusAction() {
   const trigger = (
     <ActionIcon
       ref={target}
+      data-touch-target
       aria-label="Open Status"
       aria-description={tooltip}
       aria-haspopup="dialog"

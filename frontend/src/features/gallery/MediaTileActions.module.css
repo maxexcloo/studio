@@ -34,6 +34,17 @@
   }
 }
 
+/* Like and Dislike sit 4 px apart, so their touch areas meet between them. */
+@media (pointer: coarse) {
+  .ratings > :first-child::after {
+    inset-inline-end: -2px;
+  }
+
+  .ratings > :last-child::after {
+    inset-inline-start: -2px;
+  }
+}
+
 :where(:root[data-phone]) .ratings .control {
   opacity: 1;
   box-shadow: none;

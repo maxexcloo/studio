@@ -33,6 +33,18 @@ select {
     font-size: max(16px, 1em);
   }
 }
+/* A small control that keeps its look on touch screens spreads its hit area to a 44 px touch
+   target around it (`data-touch-target`), as linked badges do. */
+@media (pointer: coarse) {
+  [data-touch-target] {
+    overflow: visible;
+  }
+  [data-touch-target]::after {
+    content: "";
+    position: absolute;
+    inset: min(0px, calc((100% - 44px) / 2));
+  }
+}
 .studio-page {
   margin-inline: auto;
 }

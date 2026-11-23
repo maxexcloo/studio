@@ -61,6 +61,7 @@ export function MediaTileActions({
                     aria-pressed={pressed}
                     variant="default"
                     size={28}
+                    data-touch-target
                     onClick={rating[id]}
                   >
                     <Icon size={16} fill={pressed ? "currentColor" : "none"} />
