@@ -505,34 +505,35 @@ function Gallery() {
     retained: Map<string, MediaItem>;
     total?: number;
   } | null>(null);
-  const viewerScope = JSON.stringify(listingKey);
-  if (!itemId) viewerOrder.current = null;
-  else {
+  const listingScope = useMemo(() => JSON.stringify(listingKey), [listingKey]);
+  const total = gallery.data?.pages.at(-1)?.totalApprox;
+  // Reconciled only when the listing or the shown item changes, not on every gallery render.
+  const order = useMemo(() => {
+    if (!itemId) return (viewerOrder.current = null);
     const previous = viewerOrder.current;
-    const retained = new Map(previous?.scope === viewerScope ? previous.retained : []);
+    const retained = new Map(previous?.scope === listingScope ? previous.retained : []);
     // Dislike hides the current tile, but it remains a neighbour until this viewer closes.
     if (shown) retained.set(mediaIdentity(shown), shown);
     for (const candidate of loaded) retained.delete(mediaIdentity(candidate));
     const next =
-      previous?.scope === viewerScope
+      previous?.scope === listingScope
         ? reconcileViewerItems(previous.items, loaded, [...retained.values()])
         : loaded;
     const reset =
-      previous?.scope !== viewerScope ||
+      previous?.scope !== listingScope ||
       !previous.items.length ||
       (shown && !next.some((item) => mediaIdentity(item) === mediaIdentity(shown)));
-    viewerOrder.current = {
-      scope: viewerScope,
+    return (viewerOrder.current = {
+      scope: listingScope,
       items: reset ? loaded : next,
       retained,
-      total: gallery.data?.pages.at(-1)?.totalApprox ?? (reset ? undefined : previous.total),
-    };
-  }
-  const viewerItems = viewerOrder.current?.items || loaded;
+      total: total ?? (reset ? undefined : previous.total),
+    });
+  }, [itemId, listingScope, loaded, shown, total]);
+  const viewerItems = order?.items || loaded;
   // The query the shown results answer: placeholder results still answer the previous one.
-  const [resultsKey, setResultsKey] = useState(() => JSON.stringify(listingKey));
-  if (!gallery.isPlaceholderData && resultsKey !== JSON.stringify(listingKey))
-    setResultsKey(JSON.stringify(listingKey));
+  const [resultsKey, setResultsKey] = useState(listingScope);
+  if (!gallery.isPlaceholderData && resultsKey !== listingScope) setResultsKey(listingScope);
   const selection = useGallerySelection(loaded, scope, {
     complete: !gallery.hasNextPage && !gallery.hasPreviousPage,
     ready: Boolean(gallery.data) && !gallery.isPlaceholderData && query === search,
@@ -1001,11 +1002,7 @@ function Gallery() {
           </Stack>
         </Alert>
       )}
-      <MorePages
-        listing={gallery}
-        results={JSON.stringify(listingKey)}
-        paused={!!itemId || !!review}
-      />
+      <MorePages listing={gallery} results={listingScope} paused={!!itemId || !!review} />
       {!selection.selecting && (
         <ComposerDock
           compose={!!state?.compose}
@@ -1022,7 +1019,7 @@ function Gallery() {
           item={shown || selected}
           items={viewerItems}
           related={loaded}
-          total={viewerOrder.current?.total}
+          total={order?.total}
           navigate={showItem}
           follow={openItem}
           onReturnFocus={(item) => {
