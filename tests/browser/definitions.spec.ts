@@ -196,11 +196,11 @@ test("Guide editing and restoring an earlier version create distinct saved revis
     await editor.getByRole("button", { name: "Actions for Version 1", exact: true }).click();
     await page.getByRole("menuitem", { name: action, exact: true }).click();
   };
-  await versionActions("View Version");
-  await expect(editor.getByRole("textbox", { name: "Saved Definition", exact: true })).toHaveValue(
-    /Original guidance\./,
+  await versionActions("View");
+  await expect(editor.getByRole("region", { name: "Saved Definition", exact: true })).toContainText(
+    "Original guidance.",
   );
-  await versionActions("Restore Version");
+  await versionActions("Restore");
   await expect(editor).toBeHidden();
   expect(saved).toEqual([original, { ...original, summary: "Updated guidance." }, original]);
   await editDefinition(page, "Guide");

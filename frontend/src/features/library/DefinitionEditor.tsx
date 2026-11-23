@@ -2,11 +2,13 @@ import {
   Alert,
   Badge,
   Button,
+  Code,
   FocusTrap,
   Group,
   Menu,
   Modal,
   NumberInput,
+  ScrollArea,
   Select,
   SimpleGrid,
   Stack,
@@ -14,7 +16,6 @@ import {
   Tabs,
   Text,
   TextInput,
-  Textarea,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -454,7 +455,7 @@ function DefinitionForm({
                       sortValue: (entry) => entry.version,
                       cell: (entry) => (
                         <Group gap="xs" wrap="nowrap">
-                          <Text size="sm">{entry.version}</Text>
+                          <Text size="sm">v{entry.version}</Text>
                           {entry.aiDrafted && <Badge color="orange">AI</Badge>}
                         </Group>
                       ),
@@ -474,16 +475,18 @@ function DefinitionForm({
                   rowActions={(entry) => (
                     <>
                       <Menu.Item
+                        leftSection={<icons.show size={16} />}
                         disabled={version.isPending}
                         onClick={() => version.mutate(entry.version)}
                       >
-                        View Version
+                        View
                       </Menu.Item>
                       <Menu.Item
+                        leftSection={<icons.reset size={16} />}
                         disabled={busy || form.isDirty()}
                         onClick={() => action.mutate({ action: "revert", version: entry.version })}
                       >
-                        Restore Version
+                        Restore
                       </Menu.Item>
                     </>
                   )}
@@ -491,14 +494,9 @@ function DefinitionForm({
               )}
               {version.error && <Alert color="red">{version.error.message}</Alert>}
               {versionText && (
-                <Textarea
-                  label="Saved Definition"
-                  readOnly
-                  value={versionText}
-                  autosize
-                  minRows={8}
-                  maxRows={20}
-                />
+                <ScrollArea.Autosize mah={480} aria-label="Saved Definition">
+                  <Code block>{versionText}</Code>
+                </ScrollArea.Autosize>
               )}
               <Text size="xs" c="dimmed">
                 Restoring saves it as a new version. Save or discard your edits first.
@@ -529,7 +527,6 @@ function DefinitionForm({
                 size="compact-sm"
                 color="red"
                 variant="light"
-                leftSection={<icons.delete size={16} />}
                 disabled={busy}
                 onClick={() => setRemoving(true)}
               >

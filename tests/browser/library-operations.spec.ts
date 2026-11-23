@@ -20,16 +20,15 @@ async function updates(page: Page, action: "Check" | "Update All") {
   await page.getByRole("menuitem", { name: action, exact: true }).click();
 }
 
-test("The Library opens on Presets, groups Cards and Generation, and sets Files and Imports apart", async ({
-  page,
-}) => {
+test("The Library opens on Presets and groups Personal, Models and Prompting", async ({ page }) => {
   await fixtures(page);
   await page.goto("/library");
   const groups = {
-    Cards: ["Characters", "Outfits", "Scenes"],
-    Generation: ["Guides", "LoRAs", "Profiles", "Prompt Instructions", "Prompt Styles"],
+    Personal: ["Presets", "Characters", "Outfits", "Scenes"],
+    Models: ["Files", "Imports", "LoRAs", "Profiles"],
+    Prompting: ["Guides", "Prompt Instructions", "Prompt Styles"],
   };
-  const order = ["Presets", ...Object.values(groups).flat(), "Files", "Imports"];
+  const order = Object.values(groups).flat();
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
     await expect(select).toHaveText("Presets");

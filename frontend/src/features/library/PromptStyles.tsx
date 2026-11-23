@@ -16,7 +16,7 @@ import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
-import { DataTable, TableRecord, compareNames } from "../../ui/DataTable";
+import { DataTable, TableRecord } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import {
   FilterChoices,
@@ -183,9 +183,7 @@ function StyleEditor({
   );
 }
 
-/**
- * Library › Prompt Styles: the assistant's fixed options, grouped by type and name.
- */
+/** Library › Prompt Styles: the assistant's fixed options, by name, with a Type filter. */
 export function PromptStyles({ heading }: { heading: ReactNode }) {
   const client = useQueryClient();
   const list = useQuery(promptStylesQuery);
@@ -256,16 +254,14 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
       ) : (
         <DataTable
           label="Prompt Styles"
-          rows={styles
-            .filter((style) => !kind || style.kind === kind)
-            .sort((a, b) => compareNames(a.label, b.label))}
+          rows={styles.filter((style) => !kind || style.kind === kind)}
           rowKey={(style) => `${style.kind}:${style.id}`}
           rowName={(style) => style.label}
           loading={list.isPending && "Loading Prompt Styles"}
           query={query}
           searchText={(style) => [style.label, style.description, style.instruction]}
           empty="No Prompt Styles"
-          initialSort={{ key: "kind", descending: false }}
+          initialSort={{ key: "name", descending: false }}
           columns={[
             {
               key: "name",
@@ -285,6 +281,8 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
                     </>
                   }
                   detail={style.description}
+                  openLabel={`Edit ${style.label}`}
+                  onOpen={() => setEditing({ style, kind: style.kind })}
                 />
               ),
             },

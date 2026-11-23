@@ -3,23 +3,20 @@ import {
   Badge,
   Button,
   FileButton,
-  Group,
   Menu,
+  Modal,
   Stack,
   Text,
   TextInput,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { api, post } from "../../api";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable, TableRecord, filterTableRows } from "../../ui/DataTable";
-import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
-import { LoadingState } from "../../ui/LoadingState";
 import { plural } from "../../ui/plural";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
@@ -113,6 +110,7 @@ export function LibraryImports({
 }) {
   const client = useQueryClient();
   const [url, setUrl] = useState("");
+  const [adding, setAdding] = useState(false);
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -135,16 +133,15 @@ export function LibraryImports({
       void client.invalidateQueries({ queryKey });
   };
   const opened = (result: { import: ImportRecord }) => {
+    setAdding(false);
+    setUrl("");
     setReviewId(result.import.id);
     refresh();
   };
   const importing = useMutation({
     meta: { inlineError: true },
     mutationFn: () => post<{ import: ImportRecord }>("/api/library/imports", { url }),
-    onSuccess: (result) => {
-      setUrl("");
-      opened(result);
-    },
+    onSuccess: opened,
   });
   const uploading = useMutation({
     meta: { inlineError: true },
@@ -172,11 +169,7 @@ export function LibraryImports({
     onSuccess: (result) => {
       refresh();
       if (result.failures?.length)
-        notifications.show({
-          color: "yellow",
-          title: "Download Needs Attention",
-          message: result.failures.join(" "),
-        });
+        notifications.show({ color: "yellow", message: result.failures.join(" ") });
     },
   });
   const substitute = useMutation({
@@ -206,8 +199,7 @@ export function LibraryImports({
       if (failed.size)
         notifications.show({
           color: "red",
-          title: "Couldn't Accept Substitutes",
-          message: [...new Set(failed.values())].join(" "),
+          message: `Couldn't accept substitutes: ${[...new Set(failed.values())].join(" ")}`,
         });
     },
   });
@@ -254,9 +246,10 @@ export function LibraryImports({
   const substitutes = [...new Map(offered.map((row) => [substituteKey(row), row])).values()];
   const visibleSubstitutes = filterTableRows(substitutes, query, substituteSearch);
   const selectedSubstitutes = visibleSubstitutes.filter((row) => selected.has(substituteKey(row)));
+  const review = (record: ImportRecord) => setReviewId(record.id);
   const importActions = (record: ImportRecord) => (
     <>
-      <Menu.Item leftSection={<icons.details size={16} />} onClick={() => setReviewId(record.id)}>
+      <Menu.Item leftSection={<icons.details size={16} />} onClick={() => review(record)}>
         Review
       </Menu.Item>
       {downloadable(record) && (
@@ -291,17 +284,22 @@ export function LibraryImports({
         ...(record.grade?.reasons || []),
         ...lacking(record),
       ]}
+      initialSort={{ key: "name", descending: false }}
       empty="No Matches"
       compact
       columns={[
         {
-          key: "import",
-          header: "Import",
+          key: "name",
+          header: "Name",
           main: true,
           sortValue: nameOf,
           cell: (record) => (
             <>
-              <TableRecord name={nameOf(record)} />
+              <TableRecord
+                name={nameOf(record)}
+                openLabel={`Review ${nameOf(record)}`}
+                onOpen={() => review(record)}
+              />
               {(record.audit === "failed" && record.error
                 ? [record.error]
                 : record.audit === "needs-files"
@@ -348,48 +346,69 @@ export function LibraryImports({
                   onClick={() => setConfirming(true)}
                 />
               )}
-              <FileButton
-                onChange={(file) => file && uploading.mutate(file)}
-                accept="image/png,image/jpeg,image/webp"
-              >
-                {(props) => (
-                  <ToolbarAction
-                    {...props}
-                    label="Import Recipe Image"
-                    icon={icons.upload}
-                    variant="subtle"
-                    color="gray"
-                    loading={uploading.isPending}
-                  />
-                )}
-              </FileButton>
+              <ToolbarAction
+                label="Import"
+                icon={icons.import}
+                onClick={() => {
+                  importing.reset();
+                  uploading.reset();
+                  setAdding(true);
+                }}
+              />
             </>
           }
         />
       </SectionHeader>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          importing.mutate();
-        }}
-      >
-        <Group gap="xs" wrap="nowrap" align="start">
-          <TextInput
-            aria-label="Civitai or Hugging Face Link"
-            placeholder="Civitai or Hugging Face link"
-            value={url}
-            onChange={(event) => setUrl(event.currentTarget.value)}
-            required
-            type="url"
-            flex={1}
-            miw={0}
-          />
-          <Button type="submit" loading={importing.isPending}>
-            Import
-          </Button>
-        </Group>
-      </form>
-      {failed && <Alert color="red">{failed.message}</Alert>}
+      <Modal opened={adding} onClose={() => setAdding(false)} title="Import">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            importing.mutate();
+          }}
+        >
+          <Stack>
+            <TextInput
+              label="Link"
+              description="A Civitai or Hugging Face model or file, or upload a recipe image instead."
+              placeholder="https://civitai.com/models/…"
+              data-autofocus
+              value={url}
+              onChange={(event) => setUrl(event.currentTarget.value)}
+              type="url"
+            />
+            {failed && <Alert color="red">{failed.message}</Alert>}
+            <DialogFooter
+              pending={importing.isPending || uploading.isPending}
+              onCancel={() => setAdding(false)}
+              leading={
+                <FileButton
+                  onChange={(file) => file && uploading.mutate(file)}
+                  accept="image/png,image/jpeg,image/webp"
+                >
+                  {(props) => (
+                    <Button
+                      {...props}
+                      variant="default"
+                      loading={uploading.isPending}
+                      disabled={importing.isPending}
+                    >
+                      Upload Image
+                    </Button>
+                  )}
+                </FileButton>
+              }
+            >
+              <Button
+                type="submit"
+                loading={importing.isPending}
+                disabled={!url.trim() || uploading.isPending}
+              >
+                Import
+              </Button>
+            </DialogFooter>
+          </Stack>
+        </form>
+      </Modal>
       {cleared !== undefined && (
         <Text c="dimmed" size="xs">
           {cleared} cleared
@@ -397,10 +416,16 @@ export function LibraryImports({
       )}
       {imports.error ? (
         <Alert color="red">{imports.error.message}</Alert>
-      ) : imports.isPending ? (
-        <LoadingState label="Loading Imports" />
       ) : !records.length ? (
-        <EmptyState fill>No Imports</EmptyState>
+        <DataTable
+          label="Imports"
+          rows={records}
+          rowKey={(record) => record.id}
+          rowName={nameOf}
+          loading={imports.isPending && "Loading Imports"}
+          empty="No Imports"
+          columns={[]}
+        />
       ) : (
         groups.map(({ audit, title }) => {
           const rows = records.filter((record) => record.audit === audit);
@@ -414,7 +439,6 @@ export function LibraryImports({
                   <Button
                     size="compact-sm"
                     variant="default"
-                    leftSection={<Check size={16} />}
                     loading={accept.isPending}
                     disabled={deciding || !selectedSubstitutes.length}
                     onClick={() => accept.mutate(selectedSubstitutes)}
@@ -458,14 +482,14 @@ export function LibraryImports({
                   rowActions={(row) => (
                     <>
                       <Menu.Item
-                        leftSection={<Check size={16} />}
+                        leftSection={<icons.keep size={16} />}
                         disabled={deciding}
                         onClick={() => substitute.mutate({ row, accept: true })}
                       >
                         Accept
                       </Menu.Item>
                       <Menu.Item
-                        leftSection={<X size={16} />}
+                        leftSection={<icons.clear size={16} />}
                         disabled={deciding}
                         onClick={() => substitute.mutate({ row, accept: false })}
                       >
@@ -494,7 +518,6 @@ export function LibraryImports({
                   <Button
                     size="compact-sm"
                     variant="default"
-                    leftSection={<icons.download size={16} />}
                     loading={download.isPending && !download.variables}
                     disabled={download.isPending}
                     onClick={() => download.mutate(undefined)}

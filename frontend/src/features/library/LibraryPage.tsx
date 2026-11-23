@@ -63,12 +63,7 @@ export function LibraryPage() {
       for (const query of [catalogueQuery, loraInfoQuery, loraLibraryQuery, modelsQuery])
         void client.invalidateQueries({ queryKey: query.queryKey });
       setDeleting(null);
-      if (note)
-        notifications.show({
-          color: "yellow",
-          title: "LoRA Deletion Needs Attention",
-          message: note,
-        });
+      if (note) notifications.show({ color: "yellow", message: note });
     },
   });
   const install = useMutation({

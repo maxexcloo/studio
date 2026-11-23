@@ -1,4 +1,4 @@
-import { Alert, Checkbox, Group, Text, getDefaultZIndex } from "@mantine/core";
+import { Alert, Checkbox, getDefaultZIndex } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -11,6 +11,7 @@ import {
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { ToolbarAction } from "../../ui/SectionToolbar";
+import { SelectionBar } from "../../ui/SelectionBar";
 import { showDisliked } from "../gallery/useMediaRating";
 import { charactersQuery, deleteCard, promptCardsQuery, saveCardRating } from "./queries";
 
@@ -136,55 +137,44 @@ export function useCardSelection(
     bar: (
       <>
         {selection && (
-          <Group
-            gap="xs"
-            justify="space-between"
-            aria-label="Card Selection"
-            role="group"
-            aria-busy={batch.isPending}
+          <SelectionBar
+            label="Card Selection"
+            count={selected.length}
+            busy={batch.isPending}
+            all={{
+              checked: all,
+              indeterminate: !all && matches.some(({ id }) => selection.has(id)),
+              disabled: !matches.length,
+              onChange: (checked) =>
+                changeSelection(
+                  matches.map(({ id }) => id),
+                  checked,
+                ),
+            }}
           >
-            <Group gap="xs">
-              <Checkbox
-                label="Select All"
-                checked={all}
-                indeterminate={!all && matches.some(({ id }) => selection.has(id))}
-                disabled={!matches.length || batch.isPending}
-                onChange={(event) =>
-                  changeSelection(
-                    matches.map(({ id }) => id),
-                    event.currentTarget.checked,
-                  )
-                }
-              />
-              <Text size="sm" c="dimmed" aria-live="polite">
-                {selected.length} selected
-              </Text>
-            </Group>
-            <Group gap="xs">
-              <ToolbarAction
-                label="Like"
-                icon={icons.like}
-                variant="default"
-                disabled={actionDisabled}
-                onClick={() => apply("liked")}
-              />
-              <ToolbarAction
-                label="Dislike"
-                icon={icons.dislike}
-                variant="default"
-                disabled={actionDisabled}
-                onClick={() => apply("disliked")}
-              />
-              <ToolbarAction
-                label="Delete"
-                icon={icons.delete}
-                color="red"
-                variant="subtle"
-                disabled={actionDisabled}
-                onClick={() => setConfirm(true)}
-              />
-            </Group>
-          </Group>
+            <ToolbarAction
+              label="Like"
+              icon={icons.like}
+              variant="default"
+              disabled={actionDisabled}
+              onClick={() => apply("liked")}
+            />
+            <ToolbarAction
+              label="Dislike"
+              icon={icons.dislike}
+              variant="default"
+              disabled={actionDisabled}
+              onClick={() => apply("disliked")}
+            />
+            <ToolbarAction
+              label="Delete"
+              icon={icons.delete}
+              color="red"
+              variant="subtle"
+              disabled={actionDisabled}
+              onClick={() => setConfirm(true)}
+            />
+          </SelectionBar>
         )}
         {failure && (
           <Alert color="red" role="alert">
