@@ -43,7 +43,7 @@ export function writingIssue(writing, { engine, account }) {
     return { status: 403, error: promptAssistantOff };
   if (!engine) return { status: 503, error: "The prompt assistant is not configured." };
   if (writing.kind === "dream" && writing.spicy && !allowed("uncensoredModels"))
-    return { status: 403, error: "Spicy needs Uncensored Models for this account." };
+    return { status: 403, error: "Extended Themes needs Uncensored Models for this account." };
   return writing.kind === "animate" ? animateIssue(writing, { engine, allowed }) : null;
 }
 

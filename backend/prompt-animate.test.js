@@ -156,7 +156,7 @@ const issue = (features, writing) =>
   writingIssue(writingRequest({ kind: "animate", ...writing }), { engine, account: user(features) })
     ?.status;
 
-test("Animate is admitted only for known themes, with Spicy behind Uncensored Models", () => {
+test("Animate is admitted only for known themes, with Extended Themes behind Uncensored Models", () => {
   assert.equal(issue({}, { theme: "cinematic" }), undefined);
   assert.equal(issue({}, { theme: "dialogue" }), undefined);
   assert.equal(issue({}, { theme: "dance" }), 400);
@@ -164,7 +164,7 @@ test("Animate is admitted only for known themes, with Spicy behind Uncensored Mo
   assert.equal(issue({}, { theme: "spicy" }), 403);
   assert.equal(issue({ uncensoredModels: true }, { theme: "spicy" }), undefined);
   assert.equal(issue({ promptAssistant: false }, { theme: "cinematic" }), 403);
-  // Dream's Spicy needs it too.
+  // Dream's Extended Themes needs it too.
   const dream = (features) =>
     writingIssue(writingRequest({ kind: "dream", spicy: true }), {
       engine,
