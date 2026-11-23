@@ -168,6 +168,12 @@ function StyleEditor({
             checked={draft.uncensored === true}
             onChange={(event) => change({ uncensored: event.currentTarget.checked || undefined })}
           />
+          <Checkbox
+            label="Hidden With Uncensored Models"
+            description="Left out for accounts with Uncensored Models, so an uncensored style can take its place."
+            checked={draft.censored === true}
+            onChange={(event) => change({ censored: event.currentTarget.checked || undefined })}
+          />
           <DialogFooter pending={mutation.isPending} onCancel={close}>
             <Button
               type="submit"
