@@ -13,6 +13,7 @@ import {
   getComfyVideoPlayback,
   getComfyVideoPoster,
   getComfyVideoPreview,
+  getInstantVideoPreview,
   sendVideoPoster,
   sendVideoPreview,
 } from "../video-previews.js";
@@ -195,13 +196,22 @@ export function registerComfyMediaRoutes(app) {
           await getComfyVideoPoster(filename, subfolder, type, worker),
           cacheControl,
         );
-      else
-        sendVideoPreview(
-          req,
-          res,
-          await getComfyVideoPreview(filename, subfolder, type, worker),
-          cacheControl,
-        );
+      else {
+        const instant = await getInstantVideoPreview(filename, subfolder, type);
+        // The original stands in only until the preview is ready, so it is never kept as one.
+        if (instant?.original)
+          res.sendFile(instant.file, {
+            dotfiles: "allow",
+            headers: { "Cache-Control": "private, no-cache" },
+          });
+        else
+          sendVideoPreview(
+            req,
+            res,
+            instant?.file ?? (await getComfyVideoPreview(filename, subfolder, type, worker)),
+            cacheControl,
+          );
+      }
     } catch {
       if (!res.headersSent) res.status(503).end();
     }

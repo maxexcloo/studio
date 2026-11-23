@@ -37,6 +37,18 @@ try {
     "yuv420p",
     path.join(media, "clip.mp4"),
   ]);
+  // With its index first, as Studio saves generated videos.
+  execFileSync(encoder, [
+    "-loglevel",
+    "error",
+    "-i",
+    path.join(media, "clip.mp4"),
+    "-c",
+    "copy",
+    "-movflags",
+    "+faststart",
+    path.join(media, "ready.mp4"),
+  ]);
   // VP9 in WebM: iOS Safari can't be relied on to play it.
   execFileSync(encoder, [
     "-loglevel",
@@ -186,6 +198,30 @@ test(
       preview.headers.get("cache-control"),
       "private, max-age=604800, stale-while-revalidate=2592000",
     );
+  },
+);
+
+test(
+  "a tile plays an original that plays everywhere until its preview is ready",
+  { skip: !canEncode },
+  async () => {
+    const first = await fetch(address("video-preview", "ready.mp4"));
+    assert.equal(first.status, 200);
+    assert.equal(first.headers.get("cache-control"), "private, no-cache");
+    const original = fs.readFileSync(path.join(media, "ready.mp4"));
+    assert.ok(Buffer.from(await first.arrayBuffer()).equals(original));
+    let preview;
+    for (let tries = 0; tries < 100; tries += 1) {
+      preview = await fetch(address("video-preview", "ready.mp4"));
+      if (preview.headers.get("cache-control") !== "private, no-cache") break;
+      await preview.arrayBuffer();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.equal(
+      preview.headers.get("cache-control"),
+      "private, max-age=604800, stale-while-revalidate=2592000",
+    );
+    assert.ok(!Buffer.from(await preview.arrayBuffer()).equals(original));
   },
 );
 
