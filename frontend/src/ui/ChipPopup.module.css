@@ -40,6 +40,11 @@
   flex-direction: column;
 }
 
+/* An empty list keeps some room, its line centred in it; otherwise a popup fits its content. */
+.popupBody [data-empty-state] {
+  min-height: calc(2 * var(--studio-panel-min-height));
+}
+
 /* A popup's aside: a column beside the rest, divided from it to the top, whose own content never
    sets the popup's height. */
 .columns {

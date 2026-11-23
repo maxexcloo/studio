@@ -222,8 +222,7 @@ export function usePromptHistory({
         <Stack
           flex={1}
           gap="sm"
-          // Room for a few prompts, so an empty or short history doesn't shrink the popup.
-          mih="calc(3 * var(--studio-panel-min-height))"
+          mih={0}
           onKeyDown={(event) => {
             if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
               event.preventDefault();
