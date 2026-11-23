@@ -231,7 +231,7 @@ export function useChangeSuggestions<K extends QueryKey>({
     disabled,
     onRefresh: () => refresh.mutate(),
   });
-  return { action, options, refresh: again };
+  return { action, refresh: again };
 }
 
 /**
