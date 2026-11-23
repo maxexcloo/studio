@@ -5753,7 +5753,8 @@ test("aspect picks the profile's own preset and resolution its long edge", async
   assert.deepEqual(await size({ aspect: "portrait" }), [768, 1360]);
   assert.deepEqual(await size({ aspect: "square" }), [1024, 1024]);
   assert.deepEqual(await size({ aspect: "4:3" }), [1184, 880]);
-  assert.deepEqual(await size({ aspect: "landscape", resolution: "1K" }), [1024, 576]);
+  // 1K is this profile's own tier, so it keeps the preset rather than shrinking to 1024.
+  assert.deepEqual(await size({ aspect: "landscape", resolution: "1K" }), [1360, 768]);
   assert.deepEqual(await size({ aspect: "landscape", resolution: "2K" }), [2048, 1152]);
   assert.equal(f.submitted.at(-1).tiledDecode, true);
   assert.equal(f.submitted.at(-1).autoUpscale, null);
