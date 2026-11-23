@@ -1,0 +1,54 @@
+name: Images
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  prune:
+    name: Prune Candidates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Log In to GHCR
+        uses: docker/login-action@v4
+        with:
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+      - name: Delete Old Candidates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+          REPOSITORY: ${{ github.event.repository.name }}
+        run: |
+          # A version two weeks old goes when every tag it has is a CI candidate's (sha-, tree-), or
+          # when it is untagged and no image that stays lists it (platform images, attestations).
+          # Deleting a version drops all its tags, so one a release also tagged always stays.
+          cutoff="$(date -u -d '14 days ago' +%FT%TZ)"
+          for package in "$REPOSITORY" "$REPOSITORY-worker"; do
+            api="users/$OWNER/packages/container/$package/versions"
+            gh api --paginate --slurp "$api?per_page=100" | jq 'add' > versions.json
+            jq -r --arg cutoff "$cutoff" '.[]
+              | .metadata.container.tags as $tags
+              | select($tags != [] and (.updated_at >= $cutoff or any($tags[]; test("^(sha|tree)-") | not)))
+              | .name' versions.json > kept
+            : > referenced
+            while read -r digest; do
+              docker buildx imagetools inspect --raw "ghcr.io/$OWNER/$package@$digest" | jq -r '.manifests[]?.digest' >> referenced
+            done < kept
+            jq -r --arg cutoff "$cutoff" --rawfile referenced referenced '($referenced | split("\n")) as $refs
+              | .[]
+              | select(.updated_at < $cutoff)
+              | .metadata.container.tags as $tags
+              | select(if $tags == [] then (.name | IN($refs[]) | not) else all($tags[]; test("^(sha|tree)-")) end)
+              | .id' versions.json > stale
+            while read -r id; do
+              gh api --method DELETE --silent "$api/$id"
+            done < stale
+            echo "::notice::Deleted $(wc -l < stale) of $(jq length versions.json) $package versions."
+          done
