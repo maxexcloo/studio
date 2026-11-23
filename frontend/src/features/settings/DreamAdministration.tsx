@@ -84,7 +84,7 @@ export function DreamAdministration() {
         )}
         {delay(
           "imageSwitchMinutes",
-          "Image Model & LoRA Switch Delay",
+          "Model & LoRA Switch Delay",
           "Minutes the shared queue must be idle before Dream loads a different local image model or LoRA set. Dream can reuse the loaded setup during this wait.",
         )}
       </SettingGroup>

@@ -965,7 +965,7 @@ test("Administration Dream saves shared queue delays and hands an override back 
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
   await page.goto("/settings#dream-policy");
-  const delay = page.getByRole("textbox", { name: "Image Model & LoRA Switch Delay", exact: true });
+  const delay = page.getByRole("textbox", { name: "Model & LoRA Switch Delay", exact: true });
   await delay.fill("8");
   await delay.press("Enter");
   const idle = page.getByRole("textbox", { name: "Video Idle Delay", exact: true });
